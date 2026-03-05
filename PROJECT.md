@@ -199,7 +199,7 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
 ### Fase 3 — Plugin System
 
 #### 3.1 — BasePlugin ABC + PluginManager
-- [ ] `BasePlugin` ABC con interfaccia completa:
+- [x] `BasePlugin` ABC con interfaccia completa:
   - `plugin_name: str` — nome univoco del plugin (match chiave `PLUGIN_REGISTRY`)
   - `plugin_version: str` — semver (es. `"1.0.0"`)
   - `PLUGIN_API_VERSION: str` — semver API contract (per compatibilità retroattiva)
@@ -219,7 +219,7 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
   - `@classmethod def get_db_models() -> list[type[SQLModel]]` — modelli DB plugin-specifici (tabelle create a startup)
   - `@classmethod async def migrate_config(from_version, old_config, to_version) -> dict` — migrazione config tra versioni
   - `@property def logger` — logger pre-configurato con `bind(plugin=self.plugin_name)`
-- [ ] `ToolDefinition` dataclass:
+- [x] `ToolDefinition` dataclass:
   - `name: str` — nome tool (`^[a-zA-Z0-9_-]{1,64}$`)
   - `description: str` — max 1024 caratteri
   - `parameters: dict` — JSON Schema per argomenti
@@ -228,20 +228,20 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
   - `timeout_ms: int = 30000` — timeout esecuzione
   - `requires_confirmation: bool = False` — richiede approvazione utente (Fase 5)
   - `risk_level: Literal["safe", "medium", "dangerous", "forbidden"] = "safe"`
-- [ ] `ToolResult` dataclass:
+- [x] `ToolResult` dataclass:
   - `success: bool`
   - `content: str | dict | None` — risultato principale (string per OpenAI compat)
   - `content_type: str` — `"text/plain"`, `"application/json"`, `"image/png"`, etc.
   - `execution_time_ms: float`
   - `truncated: bool = False` — True se risultato tagliato per dimensione
   - `error_message: str | None`
-- [ ] `ExecutionContext` dataclass:
+- [x] `ExecutionContext` dataclass:
   - `user_id: str | None = None` — forward-compat Fase 8 JWT
   - `session_id: str`
   - `conversation_id: str`
   - `execution_id: str` — UUID per tracciamento/audit
-- [ ] `ConnectionStatus` enum: `UNKNOWN`, `CONNECTED`, `DISCONNECTED`, `DEGRADED`, `ERROR`
-- [ ] `PluginManager` con:
+- [x] `ConnectionStatus` enum: `UNKNOWN`, `CONNECTED`, `DISCONNECTED`, `DEGRADED`, `ERROR`
+- [x] `PluginManager` con:
   - Registro **statico** (`PLUGIN_REGISTRY` dict) per compatibilità PyInstaller (Fase 8)
   - Flag env `OMNIA_PLUGIN_DISCOVERY=dynamic` per scan `importlib` in dev
   - **Risoluzione dipendenze**: topological sort (algoritmo di Kahn) con cycle detection
@@ -255,28 +255,28 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
   - Creazione tabelle DB plugin-specifiche a startup (`get_db_models()` → `SQLModel.metadata.create_all`)
   - Health aggregation: `get_all_status() -> dict[str, ConnectionStatus]`
   - Emissione eventi EventBus: `plugin.loaded`, `plugin.failed`, `plugin.status_changed`
-- [ ] `AppContext` esteso: `plugin_manager: PluginManager | None = None`, `tool_registry: ToolRegistry | None = None` (opzionali, backward-compat con test pre-Fase 3)
-- [ ] FastAPI lifespan: wrap PluginManager init con `try/except` + flag `app.state.healthy` se plugin critici falliscono
+- [x] `AppContext` esteso: `plugin_manager: PluginManager | None = None`, `tool_registry: ToolRegistry | None = None` (opzionali, backward-compat con test pre-Fase 3)
+- [x] FastAPI lifespan: wrap PluginManager init con `try/except` + flag `app.state.healthy` se plugin critici falliscono
 
 #### 3.2 — ToolRegistry
-- [ ] Aggregazione tool descriptions (OpenAI format) da tutti i plugin attivi
-- [ ] Validazione nome: regex `^[a-zA-Z0-9_-]{1,64}$` (compatibilità OpenAI/Ollama)
-- [ ] **Namespacing opzionale**: nomi tool salvati come `plugin_name + "_" + tool_name` per evitare collisioni (escape dot in underscore)
-- [ ] Validazione description: max 1024 caratteri (warning se > 512)
-- [ ] Validazione `parameters`: JSON Schema valido (fallback a schema vuoto `{"type": "object"}`, non crash)
-- [ ] Collision detection: tool con stesso nome da plugin diversi → errore esplicito al load
-- [ ] Lookup `O(1)` per tool_call dispatch (dict)
-- [ ] Thread-safe read (RW-compatible con `asyncio.Lock`)
-- [ ] **Tool availability dinamica**: `get_available_tools()` filtra per `plugin.get_connection_status() != ERROR`
-- [ ] **Tool timeout enforcement**: `asyncio.wait_for()` wrapper su ogni `execute_tool()` con `tool.timeout_ms`
-- [ ] **Tool result truncation**: se `content` > 4096 chars, troncare + `truncated=True` + log warning
-- [ ] **Tool result sanitization**: strip eccezioni Python, path interni, PII prima di inviare a LLM
-- [ ] **Errore strutturato** per tool non trovato: `ToolResult(success=False, error_message="Tool 'X' not available: plugin Y disabled")`
+- [x] Aggregazione tool descriptions (OpenAI format) da tutti i plugin attivi
+- [x] Validazione nome: regex `^[a-zA-Z0-9_-]{1,64}$` (compatibilità OpenAI/Ollama)
+- [x] **Namespacing opzionale**: nomi tool salvati come `plugin_name + "_" + tool_name` per evitare collisioni (escape dot in underscore)
+- [x] Validazione description: max 1024 caratteri (warning se > 512)
+- [x] Validazione `parameters`: JSON Schema valido (fallback a schema vuoto `{"type": "object"}`, non crash)
+- [x] Collision detection: tool con stesso nome da plugin diversi → errore esplicito al load
+- [x] Lookup `O(1)` per tool_call dispatch (dict)
+- [x] Thread-safe read (RW-compatible con `asyncio.Lock`)
+- [x] **Tool availability dinamica**: `get_available_tools()` filtra per `plugin.get_connection_status() != ERROR`
+- [x] **Tool timeout enforcement**: `asyncio.wait_for()` wrapper su ogni `execute_tool()` con `tool.timeout_ms`
+- [x] **Tool result truncation**: se `content` > 4096 chars, troncare + `truncated=True` + log warning
+- [x] **Tool result sanitization**: strip eccezioni Python, path interni, PII prima di inviare a LLM
+- [x] **Errore strutturato** per tool non trovato: `ToolResult(success=False, error_message="Tool 'X' not available: plugin Y disabled")"
 
 #### 3.3 — Tool Calling Loop + History Fix
-- [ ] **Refactor `build_messages()`**: normalizza `Message` DB → OpenAI-compatible includendo `tool_calls` (per `role:"assistant"`) e `tool_call_id` (per `role:"tool"`)
-- [ ] **Refactor history fetch** in `ws_chat`: usare normalizzatore invece di `{"role", "content"}` solo
-- [ ] Tool calling loop in `ws_chat`:
+- [x] **Refactor `build_messages()`**: normalizza `Message` DB → OpenAI-compatible includendo `tool_calls` (per `role:"assistant"`) e `tool_call_id` (per `role:"tool"`)
+- [x] **Refactor history fetch** in `ws_chat`: usare normalizzatore invece di `{"role", "content"}` solo
+- [x] Tool calling loop in `ws_chat`:
   - `MAX_TOOL_ITERATIONS = 10` (anti-loop-infinito, configurabile)
   - `asyncio.gather` per parallel tool_calls nella stessa risposta LLM
   - **Ogni tool_call**: `asyncio.wait_for(execute, timeout=tool.timeout_ms/1000)` con `TimeoutError` handling
@@ -285,12 +285,12 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
   - Sync file JSON dopo ogni round di tool execution
   - **Recovery**: se WS si chiude mid-loop, cleanup tool in-flight + salva stato parziale
   - **Dedup**: se LLM chiama stesso tool con stessi args nella stessa iterazione, skip e log warning
-- [ ] **Confirmation flow (async)**: se `tool.requires_confirmation`:
+- [x] **Confirmation flow (async)**: se `tool.requires_confirmation`:
   1. Invia `{"type": "tool_confirmation_required", "tool_name": ..., "args": ..., "execution_id": ...}` al client
   2. Attendi risposta `{"type": "tool_confirmation_response", "execution_id": ..., "approved": bool}` con timeout 60s
   3. Se approvato → esegui; se rifiutato o timeout → `ToolResult(success=False, error_message="User rejected")`
-- [ ] `ExecutionContext` dataclass: `user_id=None`, `session_id`, `conversation_id`, `execution_id` — forward-compat con Fase 8 JWT multi-user
-- [ ] **Audit trail**: emetti `EVENT_TOOL_EXECUTION_START`, `EVENT_TOOL_EXECUTION_SUCCEEDED`, `EVENT_TOOL_EXECUTION_FAILED` su EventBus
+- [x] `ExecutionContext` dataclass: `user_id=None`, `session_id`, `conversation_id`, `execution_id` — forward-compat con Fase 8 JWT multi-user
+- [x] **Audit trail**: emetti `EVENT_TOOL_EXECUTION_START`, `EVENT_TOOL_EXECUTION_SUCCEEDED`, `EVENT_TOOL_EXECUTION_FAILED` su EventBus
 
 #### 3.4 — Plugin system_info (esempio)
 - [ ] `psutil` con lazy import (`try/except ImportError` + `check_dependencies()`)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from backend.core.config import OmniaConfig
 from backend.core.event_bus import EventBus
@@ -18,6 +18,7 @@ from backend.core.protocols import (
     PluginManagerProtocol,
     STTServiceProtocol,
     TTSServiceProtocol,
+    ToolRegistryProtocol,
 )
 
 
@@ -32,8 +33,10 @@ class AppContext:
     config: OmniaConfig
     event_bus: EventBus
     db: async_sessionmaker | None = None
+    engine: AsyncEngine | None = None
 
     plugin_manager: PluginManagerProtocol | None = None
+    tool_registry: ToolRegistryProtocol | None = None
     llm_service: LLMServiceProtocol | None = None
     stt_service: STTServiceProtocol | None = None
     tts_service: TTSServiceProtocol | None = None

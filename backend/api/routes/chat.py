@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import uuid
@@ -30,6 +31,7 @@ from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
 from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.llm_service import LLMService
+from backend.api.routes._tool_loop import run_tool_loop
 
 router = APIRouter()
 
@@ -283,9 +285,27 @@ async def ws_chat(websocket: WebSocket) -> None:
                 )
                 results = await session.exec(stmt)
                 history: list[dict[str, Any]] = [
-                    {"role": m.role, "content": m.content}
+                    {
+                        "role": m.role,
+                        "content": m.content,
+                        "tool_calls": m.tool_calls,
+                        "tool_call_id": m.tool_call_id,
+                    }
                     for m in results.all()
                 ]
+
+                # --- fetch available tools for LLM ------------------------
+                tools: list[dict[str, Any]] | None = None
+                if ctx.tool_registry:
+                    tools = await ctx.tool_registry.get_available_tools()
+                    if not tools:
+                        tools = None  # empty list confuses some LLMs
+
+                # --- pre-read attachment bytes async (avoid blocking I/O) --
+                if attachment_info:
+                    for att in attachment_info:
+                        fp = Path(att["file_path"])
+                        att["_bytes"] = await asyncio.to_thread(fp.read_bytes)
 
                 # --- call LLM (streaming) ---------------------------------
                 messages = llm.build_messages(
@@ -296,8 +316,9 @@ async def ws_chat(websocket: WebSocket) -> None:
 
                 full_content = ""
                 thinking_content = ""
+                tool_calls_collected: list[dict[str, Any]] = []
                 try:
-                    async for event in llm.chat(messages):
+                    async for event in llm.chat(messages, tools=tools):
                         if event["type"] == "token":
                             full_content += event["content"]
                             await websocket.send_json(event)
@@ -305,6 +326,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                             thinking_content += event["content"]
                             await websocket.send_json(event)
                         elif event["type"] == "tool_call":
+                            tool_calls_collected.append(event)
                             await websocket.send_json(event)
                         elif event["type"] == "done":
                             pass  # handled below
@@ -315,6 +337,51 @@ async def ws_chat(websocket: WebSocket) -> None:
                     )
                     await session.rollback()
                     continue
+
+                # --- tool calling loop (if LLM requested tools) -----------
+                if tool_calls_collected:
+                    try:
+                        full_content, thinking_content = await run_tool_loop(
+                            websocket=websocket,
+                            ctx=ctx,
+                            session=session,
+                            conv_id=conv_id,
+                            conv=conv,
+                            llm=llm,
+                            tool_calls_from_llm=tool_calls_collected,
+                            full_content=full_content,
+                            thinking_content=thinking_content,
+                            max_iterations=ctx.config.llm.max_tool_iterations,
+                            confirmation_timeout_s=ctx.config.llm.confirmation_timeout_s,
+                            client_ip=client_ip,
+                            sync_fn=_sync_conversation_to_file,
+                        )
+                    except WebSocketDisconnect:
+                        # Save any pending assistant content before propagating.
+                        logger.debug("WS disconnected during tool loop")
+                        if full_content:
+                            recovery_msg = Message(
+                                conversation_id=conv_id,
+                                role="assistant",
+                                content=full_content,
+                                thinking_content=thinking_content or None,
+                            )
+                            session.add(recovery_msg)
+                            conv.updated_at = _utcnow()
+                            await session.commit()
+                            if ctx.conversation_file_manager:
+                                await _sync_conversation_to_file(
+                                    session, conv_id,
+                                    ctx.conversation_file_manager,
+                                )
+                        raise
+                    except Exception:
+                        logger.exception("Tool loop error")
+                        await websocket.send_json(
+                            {"type": "error", "content": "Tool execution error"}
+                        )
+                        await session.rollback()
+                        continue
 
                 # --- save assistant message --------------------------------
                 try:

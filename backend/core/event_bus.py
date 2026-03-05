@@ -21,7 +21,12 @@ class OmniaEvent(StrEnum):
     STT_RESULT = "stt.result"
     TTS_START = "tts.start"
     PLUGIN_LOADED = "plugin.loaded"
+    PLUGIN_FAILED = "plugin.failed"
+    PLUGIN_STATUS_CHANGED = "plugin.status_changed"
     TOOL_CALLED = "tool.called"
+    TOOL_EXECUTION_START = "tool.execution_start"
+    TOOL_EXECUTION_SUCCEEDED = "tool.execution_succeeded"
+    TOOL_EXECUTION_FAILED = "tool.execution_failed"
     ERROR = "error"
 
 
@@ -30,7 +35,12 @@ EVENT_LLM_RESPONSE: str = OmniaEvent.LLM_RESPONSE
 EVENT_STT_RESULT: str = OmniaEvent.STT_RESULT
 EVENT_TTS_START: str = OmniaEvent.TTS_START
 EVENT_PLUGIN_LOADED: str = OmniaEvent.PLUGIN_LOADED
+EVENT_PLUGIN_FAILED: str = OmniaEvent.PLUGIN_FAILED
+EVENT_PLUGIN_STATUS_CHANGED: str = OmniaEvent.PLUGIN_STATUS_CHANGED
 EVENT_TOOL_CALLED: str = OmniaEvent.TOOL_CALLED
+EVENT_TOOL_EXECUTION_START: str = OmniaEvent.TOOL_EXECUTION_START
+EVENT_TOOL_EXECUTION_SUCCEEDED: str = OmniaEvent.TOOL_EXECUTION_SUCCEEDED
+EVENT_TOOL_EXECUTION_FAILED: str = OmniaEvent.TOOL_EXECUTION_FAILED
 EVENT_ERROR: str = OmniaEvent.ERROR
 
 # Type alias for async handlers

@@ -16,6 +16,8 @@ from backend.core.context import AppContext, create_context
 from backend.db.database import create_engine_and_session, init_db
 from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.llm_service import LLMService
+from backend.core.plugin_manager import PluginManager
+from backend.core.tool_registry import ToolRegistry
 from backend.api.middleware.rate_limit import setup_rate_limiting
 
 __version__ = "0.1.0"
@@ -48,12 +50,33 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ctx: AppContext = create_context(config)
     ctx.db = session_factory  # type: ignore[assignment]
+    ctx.engine = engine
 
     llm_service = LLMService(config.llm)
     ctx.llm_service = llm_service
 
     conversations_dir = PROJECT_ROOT / "data" / "conversations"
     ctx.conversation_file_manager = ConversationFileManager(conversations_dir)
+
+    # -- Plugin system ------------------------------------------------------
+    plugin_manager = PluginManager(ctx)
+    ctx.plugin_manager = plugin_manager
+    app.state.healthy = True
+    try:
+        await plugin_manager.startup()
+    except Exception as exc:
+        logger.error("Plugin system startup failed: {}", exc)
+        app.state.healthy = False
+
+    # -- Tool registry ------------------------------------------------------
+    tool_registry = ToolRegistry(
+        plugin_manager=plugin_manager, event_bus=ctx.event_bus,
+    )
+    try:
+        await tool_registry.refresh()
+    except Exception as exc:
+        logger.error("Tool registry refresh failed: {}", exc)
+    ctx.tool_registry = tool_registry
 
     app.state.context = ctx
     app.state.engine = engine
@@ -63,6 +86,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # -- Shutdown -----------------------------------------------------------
+    try:
+        await plugin_manager.shutdown()
+    except Exception as exc:
+        logger.error("Plugin system shutdown error: {}", exc)
     await llm_service.close()
     await engine.dispose()
     logger.info("OMNIA backend stopped")

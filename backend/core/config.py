@@ -101,6 +101,10 @@ class LLMConfig(BaseSettings):
     """Enable for reasoning models (QwQ, DeepSeek-R1) that emit <think> tags."""
     supports_vision: bool = False
     """Enable for multimodal models (LLaVA, Qwen2-VL) that accept images."""
+    max_tool_iterations: int = 10
+    """Maximum number of tool calling rounds before forcing a final answer."""
+    confirmation_timeout_s: int = 60
+    """Seconds to wait for user confirmation on dangerous tools."""
 
     @model_validator(mode="before")
     @classmethod

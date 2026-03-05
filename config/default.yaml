@@ -20,6 +20,8 @@ llm:
   system_prompt_file: "config/system_prompt.md"
   supports_thinking: false    # Enable for reasoning models (QwQ, DeepSeek R1)
   supports_vision: true       # qwen3.5:9b supports vision natively
+  max_tool_iterations: 10
+  confirmation_timeout_s: 60
 
 stt:
   engine: "faster-whisper"

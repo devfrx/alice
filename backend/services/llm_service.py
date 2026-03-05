@@ -15,6 +15,52 @@ from backend.core.config import LLMConfig
 from backend.services.thinking_parser import ThinkTagParser
 
 
+def normalize_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert raw DB message dicts into OpenAI-compatible message format.
+
+    Handles assistant messages with ``tool_calls``, tool-role messages with
+    ``tool_call_id``, and plain user/system/assistant messages.  Items
+    without tool-specific keys pass through unchanged (backward compatible).
+
+    Args:
+        history: List of message dicts, typically from the DB with keys
+            ``role``, ``content``, and optionally ``tool_calls`` /
+            ``tool_call_id``.
+
+    Returns:
+        List of dicts ready for the OpenAI chat completions API.
+    """
+    normalized: list[dict[str, Any]] = []
+    if not history:
+        return normalized
+    for msg in history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+
+        if role in ("user", "system"):
+            normalized.append({"role": role, "content": content})
+        elif role == "assistant":
+            tc = msg.get("tool_calls")
+            if tc:
+                normalized.append({
+                    "role": "assistant",
+                    "content": content or "",
+                    "tool_calls": tc,
+                })
+            else:
+                normalized.append({"role": "assistant", "content": content})
+        elif role == "tool":
+            entry: dict[str, Any] = {"role": "tool", "content": content}
+            tool_call_id = msg.get("tool_call_id")
+            if tool_call_id:
+                entry["tool_call_id"] = tool_call_id
+            normalized.append(entry)
+        else:
+            normalized.append({"role": role, "content": content})
+
+    return normalized
+
+
 class LLMService:
     """Communicate with any OpenAI-compatible API (LM Studio, Ollama, etc.).
 
@@ -78,7 +124,7 @@ class LLMService:
             {"role": "system", "content": self._load_system_prompt()},
         ]
         if history:
-            messages.extend(history)
+            messages.extend(normalize_history(history))
 
         # Build the user message — multimodal when vision attachments exist.
         if attachments and self._config.supports_vision:
@@ -86,7 +132,11 @@ class LLMService:
                 {"type": "text", "text": user_content},
             ]
             for att in attachments:
-                image_bytes = Path(att["file_path"]).read_bytes()
+                image_bytes = (
+                    att["_bytes"]
+                    if "_bytes" in att
+                    else Path(att["file_path"]).read_bytes()
+                )
                 b64 = base64.b64encode(image_bytes).decode("ascii")
                 content_parts.append(
                     {
@@ -103,6 +153,29 @@ class LLMService:
         else:
             messages.append({"role": "user", "content": user_content})
 
+        return messages
+
+    def build_continuation_messages(
+        self,
+        history: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Build messages for tool-loop continuation (no new user message).
+
+        Used when the LLM needs to be re-queried after tool execution.
+        The history already contains the user message, assistant tool_calls,
+        and tool results, so no additional user message is appended.
+
+        Args:
+            history: Full conversation history including tool messages.
+
+        Returns:
+            A list of message dicts: system prompt + normalized history.
+        """
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": self._load_system_prompt()},
+        ]
+        if history:
+            messages.extend(normalize_history(history))
         return messages
 
     # ------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 from collections.abc import AsyncIterator
@@ -70,7 +71,15 @@ class LLMService:
 
     def __init__(self, config: LLMConfig) -> None:
         self._config = config
-        self._client = httpx.AsyncClient(timeout=config.timeout)
+        self._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                connect=config.connect_timeout,
+                read=config.timeout,
+                write=10.0,
+                pool=10.0,
+            ),
+        )
+        self._is_ollama = ":11434" in config.base_url
         self._system_prompt: str | None = None
 
     # ------------------------------------------------------------------
@@ -186,18 +195,27 @@ class LLMService:
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
+        cancel_event: asyncio.Event | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion via SSE.
 
         Sends a POST to ``{base_url}/v1/chat/completions`` with
         ``stream=True`` and yields parsed event dicts.
 
+        Args:
+            messages: The full list of messages for the API.
+            tools: Optional tool definitions for function calling.
+            cancel_event: Optional event that, when set, signals the
+                stream to stop early. The generator will flush any
+                pending state and yield a done event with
+                ``finish_reason="cancelled"``.
+
         Yields:
             Dicts with a ``type`` key:
             - ``{"type": "token", "content": "..."}``
             - ``{"type": "thinking", "content": "..."}``  (reasoning models)
             - ``{"type": "tool_call", "id": "...", "function": {...}}``
-            - ``{"type": "done"}``
+            - ``{"type": "done", "finish_reason": "stop" | "cancelled"}``
         """
         url = f"{self._config.base_url}/v1/chat/completions"
 
@@ -210,6 +228,12 @@ class LLMService:
         }
         if tools:
             payload["tools"] = tools
+        if self._is_ollama:
+            payload["options"] = {
+                "num_gpu": self._config.num_gpu,
+                "num_ctx": self._config.num_ctx,
+            }
+            payload["keep_alive"] = self._config.keep_alive
 
         # Accumulator for tool calls that arrive across multiple chunks.
         # Keyed by index (int) -> {"id": str, "name": str, "arguments": str}
@@ -224,6 +248,11 @@ class LLMService:
             resp.raise_for_status()
 
             async for raw_line in resp.aiter_lines():
+                # Check for cancellation before processing each SSE line.
+                if cancel_event and cancel_event.is_set():
+                    logger.debug("LLM stream cancelled by cancel_event")
+                    break
+
                 line = raw_line.strip()
                 if not line or not line.startswith("data: "):
                     continue
@@ -249,7 +278,7 @@ class LLMService:
                                 "arguments": tc["arguments"],
                             },
                         }
-                    yield {"type": "done"}
+                    yield {"type": "done", "finish_reason": "stop"}
                     return
 
                 try:
@@ -302,7 +331,10 @@ class LLMService:
                     if func.get("arguments"):
                         tool_calls_acc[idx]["arguments"] += func["arguments"]
 
-        # If stream ended without [DONE], flush anyway.
+        # Stream ended without [DONE] — either cancelled or connection closed.
+        cancelled = cancel_event is not None and cancel_event.is_set()
+        finish_reason = "cancelled" if cancelled else "stop"
+
         if think_parser:
             for kind, text in think_parser.flush():
                 yield {
@@ -319,7 +351,7 @@ class LLMService:
                     "arguments": tc["arguments"],
                 },
             }
-        yield {"type": "done"}
+        yield {"type": "done", "finish_reason": finish_reason}
 
     # ------------------------------------------------------------------
     # Non-streaming chat
@@ -350,6 +382,12 @@ class LLMService:
         }
         if tools:
             payload["tools"] = tools
+        if self._is_ollama:
+            payload["options"] = {
+                "num_gpu": self._config.num_gpu,
+                "num_ctx": self._config.num_ctx,
+            }
+            payload["keep_alive"] = self._config.keep_alive
 
         resp = await self._client.post(url, json=payload)
         resp.raise_for_status()

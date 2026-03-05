@@ -6,7 +6,7 @@
  * Auto-scrolls on new messages.  Creates a blank conversation on
  * mount when none is active.
  */
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import ChatInput from '../components/chat/ChatInput.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
@@ -15,23 +15,43 @@ import { useChat } from '../composables/useChat'
 import { useChatStore } from '../stores/chat'
 
 const chatStore = useChatStore()
-const { sendMessage: send, isConnected } = useChat()
+const { sendMessage: send, isConnected, stopGeneration } = useChat()
 
 /** Template ref for the scrollable message container. */
 const messagesContainer = ref<HTMLElement | null>(null)
 
-/** Scroll the message container to the bottom. */
-function scrollToBottom(): void {
+/** Whether the scroll-to-bottom button is visible. */
+const showScrollButton = ref(false)
+
+/**
+ * Scroll the message container to the bottom.
+ * Skips the scroll when the user has scrolled up to read history,
+ * unless `force` is true (e.g. after the user sends a message).
+ */
+function scrollToBottom(force = false): void {
+  const el = messagesContainer.value
+  if (!el) return
+  if (!force) {
+    const threshold = 100
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > threshold) return
+  }
   nextTick(() => {
-    const el = messagesContainer.value
     if (el) el.scrollTop = el.scrollHeight
   })
 }
 
+/** Track scroll position to show/hide the scroll-to-bottom button. */
+function handleScroll(): void {
+  const el = messagesContainer.value
+  if (!el) return
+  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  showScrollButton.value = distanceFromBottom > 200
+}
+
 /** Handle a send event from the ChatInput component. */
-function handleSend(content: string, attachments: File[]): void {
-  send(content, undefined, attachments)
-  scrollToBottom()
+async function handleSend(content: string, attachments: File[]): Promise<void> {
+  await send(content, undefined, attachments)
+  scrollToBottom(true)
 }
 
 // Auto-scroll whenever the message list or streaming content changes.
@@ -46,6 +66,11 @@ onMounted(() => {
     chatStore.createConversation()
   }
   scrollToBottom()
+  messagesContainer.value?.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  messagesContainer.value?.removeEventListener('scroll', handleScroll)
 })
 </script>
 
@@ -63,7 +88,7 @@ onMounted(() => {
           </svg>
         </div>
         <p class="chat-view__empty-title">O.M.N.I.A.</p>
-        <p class="chat-view__empty-sub">Scrivi qualcosa per iniziare a parlare con il tuo assistente.</p>
+        <p class="chat-view__empty-sub">Il tuo assistente è pronto. Scrivi un messaggio per iniziare.</p>
       </div>
 
       <!-- Message list -->
@@ -72,10 +97,22 @@ onMounted(() => {
       <!-- Streaming response -->
       <StreamingIndicator v-if="chatStore.isStreaming" :content="chatStore.currentStreamContent"
         :thinking-content="chatStore.currentThinkingContent" />
+
+      <!-- Scroll to bottom button -->
+      <Transition name="scroll-btn">
+        <button v-if="showScrollButton" class="chat-view__scroll-btn" aria-label="Scorri in fondo"
+          @click="scrollToBottom(true)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      </Transition>
     </div>
 
     <!-- Input -->
-    <ChatInput :disabled="chatStore.isStreaming" :is-connected="isConnected" @send="handleSend" />
+    <ChatInput :disabled="false" :is-connected="isConnected" :is-streaming="chatStore.isStreaming"
+      @send="handleSend" @stop="stopGeneration" />
   </div>
 </template>
 
@@ -127,6 +164,7 @@ onMounted(() => {
 .chat-view__empty-icon {
   color: var(--accent);
   opacity: 0.6;
+  animation: emptyBreathing 3s ease-in-out infinite;
 }
 
 .chat-view__empty-title {
@@ -140,5 +178,58 @@ onMounted(() => {
 .chat-view__empty-sub {
   font-size: 0.85rem;
   color: var(--text-secondary);
+  max-width: 320px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------ Scroll-to-bottom button */
+.chat-view__scroll-btn {
+  position: sticky;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-hover);
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  z-index: 10;
+}
+
+.chat-view__scroll-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-border);
+}
+
+/* Scroll button enter/leave transition */
+.scroll-btn-enter-active,
+.scroll-btn-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.scroll-btn-enter-from,
+.scroll-btn-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
+/* ------------------------------------------ Empty state animation */
+@keyframes emptyBreathing {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 0.9;
+  }
 }
 </style>

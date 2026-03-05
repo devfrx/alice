@@ -7,7 +7,7 @@
  * and a subtle glow border.  Markdown is rendered via `useMarkdown`.
  * Supports collapsible thinking content and image attachments.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
@@ -62,6 +62,21 @@ function closeOverlay(): void {
   overlayImageUrl.value = null
   overlayImageAlt.value = ''
 }
+
+/** Handle Escape key to close overlay. */
+function handleKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && overlayImageUrl.value) {
+    closeOverlay()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
@@ -105,7 +120,7 @@ function closeOverlay(): void {
 .bubble-row {
   display: flex;
   margin-bottom: 12px;
-  animation: slideIn 0.25s ease-out both;
+  animation: slideIn 0.3s ease-out both;
 }
 
 .row--user {
@@ -141,6 +156,12 @@ function closeOverlay(): void {
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
   box-shadow: var(--shadow-glow);
   color: var(--text-primary);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.bubble--assistant:hover {
+  border-color: var(--border-hover);
+  transform: scale(1.002);
 }
 
 .bubble--tool {
@@ -264,6 +285,7 @@ function closeOverlay(): void {
   max-height: 90vh;
   object-fit: contain;
   border-radius: var(--radius-md);
+  animation: overlayZoomIn 0.3s ease-out both;
 }
 
 /* --------------------------------------------------------- Animation */
@@ -286,6 +308,18 @@ function closeOverlay(): void {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes overlayZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 </style>

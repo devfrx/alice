@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,32 @@ from typing import Any
 from loguru import logger
 
 from backend.db.models import Attachment, Conversation, Message
+
+CURRENT_SCHEMA_VERSION: int = 2
+
+_SAFE_USER_ID: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+def _migrate_v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v1 (pre-Phase 3) JSON to v2 (with tool_calls fields).
+
+    Adds ``tool_calls`` and ``tool_call_id`` keys (defaulting to ``None``)
+    to every message that does not already have them, and stamps the
+    schema version as 2.
+
+    Args:
+        data: Parsed conversation dict (mutated in place and returned).
+
+    Returns:
+        The same dict with v2 fields guaranteed on every message.
+    """
+    for msg in data.get("messages", []):
+        if "tool_calls" not in msg:
+            msg["tool_calls"] = None
+        if "tool_call_id" not in msg:
+            msg["tool_call_id"] = None
+    data["schema_version"] = CURRENT_SCHEMA_VERSION
+    return data
 
 
 class ConversationFileManager:
@@ -34,6 +61,32 @@ class ConversationFileManager:
         self._base_dir = base_dir
         self._base_dir.mkdir(parents=True, exist_ok=True)
 
+    # -- internal helpers ---------------------------------------------------
+
+    def _resolve_dir(self, user_id: str | None = None) -> Path:
+        """Return the storage directory, optionally scoped to a user.
+
+        Args:
+            user_id: When provided the returned path is
+                ``base_dir / user_id``; the subdirectory is created
+                automatically.
+
+        Returns:
+            The resolved directory path.
+
+        Raises:
+            ValueError: If *user_id* contains invalid characters.
+        """
+        if user_id is None:
+            return self._base_dir
+        if not _SAFE_USER_ID.match(user_id):
+            raise ValueError(f"Invalid user_id: {user_id!r}")
+        user_dir = self._base_dir / user_id
+        if not user_dir.resolve().is_relative_to(self._base_dir.resolve()):
+            raise ValueError(f"user_id escapes base directory: {user_id!r}")
+        user_dir.mkdir(parents=True, exist_ok=True)
+        return user_dir
+
     @property
     def base_dir(self) -> Path:
         """The directory where conversation JSON files are stored."""
@@ -41,14 +94,21 @@ class ConversationFileManager:
 
     # -- public API ---------------------------------------------------------
 
-    async def save(self, conversation_data: dict[str, Any]) -> None:
+    async def save(
+        self,
+        conversation_data: dict[str, Any],
+        user_id: str | None = None,
+    ) -> None:
         """Persist a conversation dict to its JSON file atomically.
 
         Args:
             conversation_data: Full conversation dict including messages.
+            user_id: Optional user id for per-user subdirectory sharding.
         """
+        conversation_data["schema_version"] = CURRENT_SCHEMA_VERSION
         conv_id = conversation_data["id"]
-        target = self._base_dir / f"{conv_id}.json"
+        directory = self._resolve_dir(user_id)
+        target = directory / f"{conv_id}.json"
         tmp = target.with_suffix(".tmp")
 
         payload = json.dumps(conversation_data, ensure_ascii=False, indent=2)
@@ -60,13 +120,19 @@ class ConversationFileManager:
         await asyncio.to_thread(_write)
         logger.debug("Saved conversation file {}", target.name)
 
-    async def delete(self, conversation_id: str) -> None:
+    async def delete(
+        self,
+        conversation_id: str,
+        user_id: str | None = None,
+    ) -> None:
         """Remove the JSON file for a conversation.
 
         Args:
             conversation_id: UUID string of the conversation.
+            user_id: Optional user id for per-user subdirectory sharding.
         """
-        target = self._base_dir / f"{conversation_id}.json"
+        directory = self._resolve_dir(user_id)
+        target = directory / f"{conversation_id}.json"
 
         def _remove() -> None:
             if target.exists():
@@ -75,16 +141,25 @@ class ConversationFileManager:
         await asyncio.to_thread(_remove)
         logger.debug("Deleted conversation file {}.json", conversation_id)
 
-    async def load(self, conversation_id: str) -> dict[str, Any] | None:
+    async def load(
+        self,
+        conversation_id: str,
+        user_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """Read a single conversation from its JSON file.
+
+        If the file uses schema v1 (or has no version), it is migrated
+        to v2 in memory and re-saved to disk.
 
         Args:
             conversation_id: UUID string of the conversation.
+            user_id: Optional user id for per-user subdirectory sharding.
 
         Returns:
             Parsed conversation dict, or ``None`` if the file doesn't exist.
         """
-        target = self._base_dir / f"{conversation_id}.json"
+        directory = self._resolve_dir(user_id)
+        target = directory / f"{conversation_id}.json"
 
         def _read() -> str | None:
             if not target.exists():
@@ -94,18 +169,33 @@ class ConversationFileManager:
         raw = await asyncio.to_thread(_read)
         if raw is None:
             return None
-        return json.loads(raw)
 
-    async def load_all(self) -> list[dict[str, Any]]:
-        """Read all conversation JSON files in the base directory.
+        data: dict[str, Any] = json.loads(raw)
+        if data.get("schema_version", 1) < CURRENT_SCHEMA_VERSION:
+            data = _migrate_v1_to_v2(data)
+            await self.save(data, user_id=user_id)
+            logger.info("Migrated conversation {} to schema v2", conversation_id)
+        return data
+
+    async def load_all(
+        self,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Read all conversation JSON files in the target directory.
+
+        Files using schema v1 are migrated to v2 and re-saved.
+
+        Args:
+            user_id: Optional user id for per-user subdirectory sharding.
 
         Returns:
             List of parsed conversation dicts (order is arbitrary).
         """
+        directory = self._resolve_dir(user_id)
 
         def _read_all() -> list[str]:
             results: list[str] = []
-            for path in self._base_dir.glob("*.json"):
+            for path in directory.glob("*.json"):
                 try:
                     results.append(path.read_text(encoding="utf-8"))
                 except Exception:
@@ -116,9 +206,18 @@ class ConversationFileManager:
         conversations: list[dict[str, Any]] = []
         for raw in raw_list:
             try:
-                conversations.append(json.loads(raw))
+                data: dict[str, Any] = json.loads(raw)
             except json.JSONDecodeError:
                 logger.warning("Skipping malformed conversation JSON")
+                continue
+
+            if data.get("schema_version", 1) < CURRENT_SCHEMA_VERSION:
+                data = _migrate_v1_to_v2(data)
+                await self.save(data, user_id=user_id)
+                logger.info(
+                    "Migrated conversation {} to schema v2", data.get("id")
+                )
+            conversations.append(data)
         return conversations
 
     async def rebuild_from_files(self, session_factory: Any) -> int:

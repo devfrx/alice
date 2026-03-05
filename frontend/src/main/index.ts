@@ -3,9 +3,11 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
+let mainWindow: BrowserWindow | null = null
+
 function createWindow(): void {
   // Create the browser window (frameless for custom title bar).
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -21,18 +23,30 @@ function createWindow(): void {
     }
   })
 
-  // IPC handlers for custom window controls
-  ipcMain.on('window-minimize', () => mainWindow.minimize())
-  ipcMain.on('window-maximize', () => {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize()
-    } else {
-      mainWindow.maximize()
-    }
-  })
-  ipcMain.on('window-close', () => mainWindow.close())
-  ipcMain.on('show-in-folder', (_event, filePath: string) => {
-    shell.showItemInFolder(filePath)
+  // --- Content Security Policy (dev-aware) --------------------------------
+  const devCsp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: http://localhost:8000",
+    "connect-src 'self' ws://localhost:8000 http://localhost:8000 ws://localhost:5173"
+  ].join('; ')
+
+  const prodCsp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: http://localhost:8000",
+    "connect-src 'self' ws://localhost:8000 http://localhost:8000"
+  ].join('; ')
+
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [is.dev ? devCsp : prodCsp]
+      }
+    })
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -74,6 +88,21 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // IPC handlers (registered once to avoid duplicates on macOS window re-creation)
+  ipcMain.on('window-minimize', () => mainWindow?.minimize())
+  ipcMain.on('window-maximize', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize()
+    } else {
+      mainWindow.maximize()
+    }
+  })
+  ipcMain.on('window-close', () => mainWindow?.close())
+  ipcMain.on('show-in-folder', (_event, filePath: string) => {
+    shell.showItemInFolder(filePath)
+  })
 
   createWindow()
 

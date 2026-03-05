@@ -43,6 +43,15 @@ export const useChatStore = defineStore('chat', () => {
   /** Thinking tokens accumulated for the in-progress assistant response. */
   const currentThinkingContent = ref('')
 
+  /** Monotonically increasing counter to detect stale stream events. */
+  const streamGeneration = ref(0)
+
+  /** True between sending a user message and receiving the first token/thinking. */
+  const isWaitingForResponse = ref(false)
+
+  /** True while a cancel has been sent but the server hasn't confirmed yet. */
+  const isCancelling = ref(false)
+
   /** Files selected by the user but not yet uploaded. */
   const pendingAttachments = ref<File[]>([])
 
@@ -89,10 +98,9 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Load a full conversation (with messages) and set it as active. */
   async function loadConversation(id: string): Promise<void> {
-    // Cancel any in-progress stream for a DIFFERENT conversation.
-    if (isStreaming.value && streamingConversationId.value && streamingConversationId.value !== id) {
-      cancelStream()
-    }
+    // NOTE: Do NOT cancel any in-progress stream for a different conversation.
+    // The stream continues accumulating in the background; when it completes,
+    // finalizeStream() will handle cleanup without touching the UI.
 
     // If the conversation only exists locally (created but no message sent yet),
     // skip the API call — the backend doesn't know about it and would return 404.
@@ -271,32 +279,57 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     currentConversation.value.messages.push(msg)
+    streamGeneration.value++
     isStreaming.value = true
+    isWaitingForResponse.value = true
+    isCancelling.value = false
     streamingConversationId.value = currentConversation.value.id
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
+
+    // Bump the sidebar message count so it reflects the new user message.
+    const sidebar = conversations.value.find((c) => c.id === currentConversation.value!.id)
+    if (sidebar) sidebar.message_count += 1
   }
 
   /** Append a streamed token to the in-progress assistant response. */
   function appendToStream(token: string): void {
+    if (!isStreaming.value) return
+    isWaitingForResponse.value = false
     currentStreamContent.value += token
   }
 
   /** Append a thinking token to the in-progress thinking content. */
   function appendToThinking(token: string): void {
+    if (!isStreaming.value) return
+    isWaitingForResponse.value = false
     currentThinkingContent.value += token
   }
 
   /**
    * Finalise the streamed response: create the assistant message,
    * reset streaming state, and refresh the sidebar.
+   *
+   * If the user navigated away from the streaming conversation, the
+   * assistant message is already persisted server-side. We just reset
+   * streaming state and refresh the sidebar; `loadConversation()` will
+   * fetch the complete message list when the user navigates back.
    */
   function finalizeStream(conversationId: string, messageId: string): void {
-    if (!currentConversation.value) return
+    // Prevent double-finalization.
+    if (!isStreaming.value) return
 
-    // Ensure the active conversation id matches the one from the server
-    if (currentConversation.value.id !== conversationId) {
-      currentConversation.value.id = conversationId
+    // User navigated away — message is saved server-side.
+    // Reset streaming state and refresh sidebar only.
+    if (!currentConversation.value || currentConversation.value.id !== conversationId) {
+      currentStreamContent.value = ''
+      currentThinkingContent.value = ''
+      isStreaming.value = false
+      isWaitingForResponse.value = false
+      isCancelling.value = false
+      streamingConversationId.value = null
+      loadConversations().catch(console.error)
+      return
     }
 
     const assistantMsg: ChatMessage = {
@@ -313,6 +346,8 @@ export const useChatStore = defineStore('chat', () => {
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
     isStreaming.value = false
+    isWaitingForResponse.value = false
+    isCancelling.value = false
     streamingConversationId.value = null
 
     // Refresh sidebar list asynchronously (fire-and-forget)
@@ -330,11 +365,28 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value.unshift(summary)
   }
 
-  /** Clear streaming state (e.g. on error). */
+  /** Clear streaming state (e.g. on error or cancel). Preserves partial content as a message. */
   function cancelStream(): void {
+    // If there's accumulated content, save as partial assistant message
+    if (currentStreamContent.value && currentConversation.value) {
+      const partialMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: currentStreamContent.value,
+        tool_calls: null,
+        tool_call_id: null,
+        created_at: new Date().toISOString(),
+        thinking_content: currentThinkingContent.value || null,
+      }
+      currentConversation.value.messages.push(partialMsg)
+    }
+
+    streamGeneration.value++
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
     isStreaming.value = false
+    isWaitingForResponse.value = false
+    isCancelling.value = false
     streamingConversationId.value = null
   }
 
@@ -350,6 +402,9 @@ export const useChatStore = defineStore('chat', () => {
     streamingConversationId,
     currentStreamContent,
     currentThinkingContent,
+    streamGeneration,
+    isWaitingForResponse,
+    isCancelling,
     pendingAttachments,
 
     // computed

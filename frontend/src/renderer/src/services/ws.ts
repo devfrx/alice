@@ -114,8 +114,11 @@ export class WebSocketManager {
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[OMNIA WS] Max reconnect attempts reached')
+      console.error('[OMNIA WS] Max reconnect attempts reached, will retry after delay')
       this.emit('reconnect_failed', null)
+      // Reset and try again after a long delay (30s)
+      this.reconnectAttempts = 0
+      this.reconnectTimer = setTimeout(() => this.connect(), 30_000)
       return
     }
 

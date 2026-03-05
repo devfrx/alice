@@ -54,7 +54,7 @@ async function onSelect(id: string): Promise<void> {
 
 /** Create a new conversation and navigate to /chat. */
 async function onCreate(): Promise<void> {
-  chatStore.createConversation()
+  await chatStore.createConversation()
   if (router.currentRoute.value.name !== 'chat') {
     await router.push({ name: 'chat' })
   }

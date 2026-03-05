@@ -95,7 +95,9 @@ class LLMConfig(BaseSettings):
     temperature: float = 0.7
     max_tokens: int = 4096
     timeout: float = 120.0
-    """HTTP timeout in seconds for LLM API requests."""
+    """HTTP read timeout in seconds for streaming LLM responses."""
+    connect_timeout: float = 10.0
+    """HTTP connect timeout in seconds."""
     system_prompt_file: str = "config/system_prompt.md"
     supports_thinking: bool = False
     """Enable for reasoning models (QwQ, DeepSeek-R1) that emit <think> tags."""
@@ -105,6 +107,14 @@ class LLMConfig(BaseSettings):
     """Maximum number of tool calling rounds before forcing a final answer."""
     confirmation_timeout_s: int = 60
     """Seconds to wait for user confirmation on dangerous tools."""
+
+    # -- Ollama-specific options (ignored by other providers) --
+    num_ctx: int = 8192
+    """Context window size. Ollama defaults to 2048; 8192 is better for 9B+ models."""
+    num_gpu: int = -1
+    """-1 = offload all layers to GPU. Set to 0 to force CPU."""
+    keep_alive: str = "5m"
+    """How long Ollama keeps the model loaded in memory after a request."""
 
     @model_validator(mode="before")
     @classmethod

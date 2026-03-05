@@ -13,15 +13,19 @@ server:
 
 llm:
   provider: "openai-compatible"    # Works with LM Studio, Ollama, or any OpenAI-compatible API
-  base_url: "http://localhost:11434"  # Ollama default (:11434) — change to :1234 for LM Studio
-  model: "qwen3.5:9b"                 # Ollama model tag (use ollama list to verify)
+  base_url: "http://localhost:1234"  # Ollama default (:11434) — change to :1234 for LM Studio
+  model: "qwen/qwen3.5-9b"                 # Ollama model tag (use ollama list to verify)
   temperature: 0.7
-  max_tokens: 4096
+  max_tokens: 30311
   system_prompt_file: "config/system_prompt.md"
-  supports_thinking: false    # Enable for reasoning models (QwQ, DeepSeek R1)
+  supports_thinking: true    # Enable for reasoning models (QwQ, DeepSeek R1)
   supports_vision: true       # qwen3.5:9b supports vision natively
   max_tool_iterations: 10
   confirmation_timeout_s: 60
+  # Ollama-specific options (ignored by LM Studio / other providers)
+  num_ctx: 8192          # Context window — Ollama defaults to 2048, too small for tool calling
+  num_gpu: -1            # -1 = offload all layers to GPU (use full VRAM)
+  keep_alive: "5m"       # Keep model loaded in VRAM between requests
 
 stt:
   engine: "faster-whisper"

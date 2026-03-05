@@ -118,6 +118,12 @@ export interface WsDoneMessage {
   type: 'done'
   conversation_id: string
   message_id: string
+  finish_reason?: string
+}
+
+/** Payload the client sends to cancel an in-progress generation. */
+export interface WsCancelPayload {
+  type: 'cancel'
 }
 
 /** Server reports an error. */

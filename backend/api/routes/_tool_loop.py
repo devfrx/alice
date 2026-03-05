@@ -11,7 +11,7 @@ import json
 import uuid
 from typing import Any, Callable, Coroutine
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 from sqlmodel import select
 
@@ -39,6 +39,7 @@ async def run_tool_loop(
     confirmation_timeout_s: int,
     client_ip: str,
     sync_fn: SyncFn | None,
+    cancel_event: asyncio.Event | None = None,
 ) -> tuple[str, str]:
     """Execute the tool-calling loop until the LLM produces a final answer.
 
@@ -61,6 +62,8 @@ async def run_tool_loop(
         confirmation_timeout_s: Seconds to wait for user confirmation.
         client_ip: Client IP used as session_id in ExecutionContext.
         sync_fn: Async callback to sync conversation to JSON file.
+        cancel_event: Optional event that, when set, signals the loop
+            to stop early and return accumulated content.
 
     Returns:
         ``(full_content, thinking_content)`` of the final LLM response
@@ -68,6 +71,11 @@ async def run_tool_loop(
     """
     for iteration in range(max_iterations):
         if not tool_calls_from_llm:
+            break
+
+        # Check for cancellation at the start of each iteration.
+        if cancel_event and cancel_event.is_set():
+            logger.debug("Tool loop cancelled at iteration {}", iteration + 1)
             break
 
         logger.info(
@@ -166,6 +174,8 @@ async def run_tool_loop(
         )
 
         # 4. Process results — persist and notify WS.
+        # NOTE: Cancel check is AFTER persistence to avoid orphaned tool_calls
+        # in the DB (OpenAI API requires a tool response for every tool_call_id).
         for idx, res in enumerate(results):
             if isinstance(res, BaseException):
                 logger.error("Tool execution exception: {}", res)
@@ -209,6 +219,11 @@ async def run_tool_loop(
 
         await session.flush()
 
+        # Check for cancellation AFTER results are persisted (DB consistent).
+        if cancel_event and cancel_event.is_set():
+            logger.debug("Tool loop cancelled after tool execution")
+            break
+
         # 5. Sync conversation to JSON file.
         if ctx.conversation_file_manager and sync_fn:
             await sync_fn(session, conv_id, ctx.conversation_file_manager)
@@ -250,7 +265,9 @@ async def run_tool_loop(
             "iteration": iteration + 1,
         })
 
-        async for event in llm.chat(messages, tools=tools):
+        async for event in llm.chat(
+            messages, tools=tools, cancel_event=cancel_event,
+        ):
             if event["type"] == "token":
                 full_content += event["content"]
                 await websocket.send_json(event)
@@ -269,6 +286,10 @@ async def run_tool_loop(
                 "Tool loop hit max iterations ({}) — forcing final answer",
                 max_iterations,
             )
+            await websocket.send_json({
+                "type": "warning",
+                "content": f"Tool loop exceeded maximum iterations ({max_iterations}). Returning partial response.",
+            })
 
     return full_content, thinking_content
 
@@ -345,10 +366,14 @@ async def _request_confirmation(
         "execution_id": execution_id,
     })
 
+    deadline = asyncio.get_event_loop().time() + timeout_s
     try:
         while True:
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                raise asyncio.TimeoutError
             raw = await asyncio.wait_for(
-                websocket.receive_text(), timeout=timeout_s,
+                websocket.receive_text(), timeout=remaining,
             )
             msg = json.loads(raw)
             if (
@@ -356,13 +381,14 @@ async def _request_confirmation(
                 and msg.get("execution_id") == execution_id
             ):
                 return bool(msg.get("approved", False))
-            # Ignore unrelated messages while waiting for confirmation.
     except asyncio.TimeoutError:
         logger.warning(
             "Confirmation timed out for tool '{}' (exec_id={})",
             tool_name, execution_id,
         )
         return False
+    except WebSocketDisconnect:
+        raise
     except (json.JSONDecodeError, Exception):
         logger.warning(
             "Error receiving confirmation for tool '{}' (exec_id={})",

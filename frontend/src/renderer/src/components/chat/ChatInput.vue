@@ -11,17 +11,22 @@
  * - The send button is disabled when the input is empty (and no files) or streaming.
  */
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import ModelSelector from '../settings/ModelSelector.vue'
 
 const props = defineProps<{
   /** Disable the input (e.g. while streaming). */
   disabled: boolean
   /** WebSocket connection status. */
   isConnected: boolean
+  /** Whether the LLM is currently streaming a response. */
+  isStreaming: boolean
 }>()
 
 const emit = defineEmits<{
   /** Fired when the user submits a message (with any pending attachments). */
   send: [content: string, attachments: File[]]
+  /** Fired when the user clicks the stop button during streaming. */
+  stop: []
 }>()
 
 /** Two-way bound text value. */
@@ -237,15 +242,30 @@ function handlePaste(event: ClipboardEvent): void {
         rows="1" :disabled="disabled" aria-label="Scrivi un messaggio" @keydown="handleKeydown" @input="autoResize"
         @paste="handlePaste" />
 
-      <button class="chat-input__send" :disabled="(!text.trim() && pendingFiles.length === 0) || disabled"
-        aria-label="Invia messaggio" @click="submit">
-        <!-- Send arrow icon -->
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13" />
-          <polygon points="22 2 15 22 11 13 2 9 22 2" />
-        </svg>
-      </button>
+      <ModelSelector />
+
+      <!-- Stop / Send button with smooth transition -->
+      <Transition name="btn-swap" mode="out-in">
+        <button v-if="isStreaming" key="stop" class="chat-input__stop" aria-label="Interrompi generazione"
+          @click="emit('stop')">
+          <!-- Stop icon: square inside a circle -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+        <button v-else key="send" class="chat-input__send"
+          :disabled="(!text.trim() && pendingFiles.length === 0) || disabled" aria-label="Invia messaggio"
+          @click="submit">
+          <!-- Send arrow icon -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
+      </Transition>
     </div>
   </div>
 </template>
@@ -423,5 +443,41 @@ function handlePaste(event: ClipboardEvent): void {
 .chat-input__send:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* -------------------------------------------------- Stop button */
+.chat-input__stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--danger, #c45c5c);
+  border-radius: var(--radius-md);
+  background: rgba(196, 92, 92, 0.12);
+  color: var(--danger, #c45c5c);
+  cursor: pointer;
+  transition: background var(--transition-normal), opacity var(--transition-normal);
+}
+
+.chat-input__stop:hover {
+  background: rgba(196, 92, 92, 0.25);
+}
+
+/* ----------------------------------------------- Button swap transition */
+.btn-swap-enter-active,
+.btn-swap-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.btn-swap-enter-from {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.btn-swap-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
 }
 </style>

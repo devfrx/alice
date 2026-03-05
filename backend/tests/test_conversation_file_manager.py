@@ -12,7 +12,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.db.models import Attachment, Conversation, Message
-from backend.services.conversation_file_manager import ConversationFileManager
+from backend.services.conversation_file_manager import (
+    CURRENT_SCHEMA_VERSION,
+    ConversationFileManager,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -361,3 +364,196 @@ class TestRebuildFromFiles:
             assert await fm.rebuild_from_files(factory) == 0
         finally:
             await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Helpers — v1 legacy data
+# ---------------------------------------------------------------------------
+
+
+def _sample_v1_conversation(**overrides: Any) -> dict[str, Any]:
+    """Return a v1 conversation dict (no schema_version, no tool_calls)."""
+    now = datetime.now(timezone.utc).isoformat()
+    msg_id = str(uuid.uuid4())
+    defaults: dict[str, Any] = {
+        "id": str(uuid.uuid4()),
+        "title": "Legacy conversation",
+        "created_at": now,
+        "updated_at": now,
+        "messages": [
+            {
+                "id": msg_id,
+                "role": "user",
+                "content": "Hello from v1",
+                "thinking_content": None,
+                "created_at": now,
+                "attachments": None,
+            },
+        ],
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+# ---------------------------------------------------------------------------
+# Tests — schema versioning
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaVersioning:
+    """Schema version tagging and v1→v2 migration."""
+
+    async def test_save_adds_schema_version(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Saved files must contain ``schema_version: 2``."""
+        data = _sample_conversation()
+        await fm.save(data)
+        raw = json.loads(
+            (tmp_path / f"{data['id']}.json").read_text(encoding="utf-8")
+        )
+        assert raw["schema_version"] == CURRENT_SCHEMA_VERSION
+
+    async def test_load_migrates_v1_to_v2(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Loading a v1 file adds ``tool_calls`` and ``tool_call_id``."""
+        v1 = _sample_v1_conversation()
+        # Write v1 file directly (bypassing save to avoid auto-stamping).
+        (tmp_path / f"{v1['id']}.json").write_text(
+            json.dumps(v1), encoding="utf-8",
+        )
+        loaded = await fm.load(v1["id"])
+        assert loaded is not None
+        assert loaded["schema_version"] == CURRENT_SCHEMA_VERSION
+        for msg in loaded["messages"]:
+            assert "tool_calls" in msg
+            assert "tool_call_id" in msg
+
+    async def test_load_v2_no_migration(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """A v2 file is returned as-is without re-saving."""
+        data = _sample_conversation()
+        await fm.save(data)
+        # Record modification time.
+        path = tmp_path / f"{data['id']}.json"
+        mtime_before = path.stat().st_mtime_ns
+        loaded = await fm.load(data["id"])
+        mtime_after = path.stat().st_mtime_ns
+        assert loaded is not None
+        assert loaded["schema_version"] == CURRENT_SCHEMA_VERSION
+        assert mtime_before == mtime_after
+
+    async def test_load_all_migrates(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """``load_all`` migrates every v1 file it encounters."""
+        v1a = _sample_v1_conversation()
+        v1b = _sample_v1_conversation()
+        for v1 in (v1a, v1b):
+            (tmp_path / f"{v1['id']}.json").write_text(
+                json.dumps(v1), encoding="utf-8",
+            )
+        results = await fm.load_all()
+        assert len(results) == 2
+        for conv in results:
+            assert conv["schema_version"] == CURRENT_SCHEMA_VERSION
+            for msg in conv["messages"]:
+                assert "tool_calls" in msg
+                assert "tool_call_id" in msg
+
+    async def test_migration_preserves_existing_tool_calls(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Messages that already carry ``tool_calls`` keep their value."""
+        tc = [{"id": "call_1", "type": "function", "function": {"name": "f", "arguments": "{}"}}]
+        v1 = _sample_v1_conversation()
+        v1["messages"][0]["tool_calls"] = tc
+        (tmp_path / f"{v1['id']}.json").write_text(
+            json.dumps(v1), encoding="utf-8",
+        )
+        loaded = await fm.load(v1["id"])
+        assert loaded is not None
+        assert loaded["messages"][0]["tool_calls"] == tc
+
+    async def test_migration_handles_tool_role(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Messages with ``role: tool`` are properly migrated."""
+        now = datetime.now(timezone.utc).isoformat()
+        v1 = _sample_v1_conversation(
+            messages=[
+                {
+                    "id": str(uuid.uuid4()),
+                    "role": "tool",
+                    "content": '{"result": 42}',
+                    "thinking_content": None,
+                    "created_at": now,
+                    "attachments": None,
+                },
+            ],
+        )
+        (tmp_path / f"{v1['id']}.json").write_text(
+            json.dumps(v1), encoding="utf-8",
+        )
+        loaded = await fm.load(v1["id"])
+        assert loaded is not None
+        msg = loaded["messages"][0]
+        assert msg["role"] == "tool"
+        assert "tool_calls" in msg
+        assert "tool_call_id" in msg
+
+
+# ---------------------------------------------------------------------------
+# Tests — sharding (user_id subdirectories)
+# ---------------------------------------------------------------------------
+
+
+class TestSharding:
+    """Per-user subdirectory isolation."""
+
+    async def test_save_with_user_id(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Files are saved under ``base_dir/user_id/``."""
+        data = _sample_conversation()
+        await fm.save(data, user_id="alice")
+        assert (tmp_path / "alice" / f"{data['id']}.json").exists()
+        # Should NOT exist in the root dir.
+        assert not (tmp_path / f"{data['id']}.json").exists()
+
+    async def test_load_with_user_id(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Files are loaded from ``base_dir/user_id/``."""
+        data = _sample_conversation()
+        await fm.save(data, user_id="bob")
+        loaded = await fm.load(data["id"], user_id="bob")
+        assert loaded is not None
+        assert loaded["id"] == data["id"]
+        # Loading without user_id should not find it.
+        assert await fm.load(data["id"]) is None
+
+    async def test_delete_with_user_id(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """Files are deleted from ``base_dir/user_id/``."""
+        data = _sample_conversation()
+        await fm.save(data, user_id="carol")
+        assert (tmp_path / "carol" / f"{data['id']}.json").exists()
+        await fm.delete(data["id"], user_id="carol")
+        assert not (tmp_path / "carol" / f"{data['id']}.json").exists()
+
+    async def test_load_all_with_user_id(
+        self, fm: ConversationFileManager, tmp_path: Path,
+    ) -> None:
+        """``load_all`` scoped to a user dir only returns that user's files."""
+        c_alice = _sample_conversation()
+        c_bob = _sample_conversation()
+        await fm.save(c_alice, user_id="alice")
+        await fm.save(c_bob, user_id="bob")
+
+        alice_convs = await fm.load_all(user_id="alice")
+        assert len(alice_convs) == 1
+        assert alice_convs[0]["id"] == c_alice["id"]

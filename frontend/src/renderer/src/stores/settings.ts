@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { api } from '../services/api'
+import type { OllamaModel } from '../types/settings'
 
 export interface OmniaSettings {
   llm: {
@@ -42,5 +44,31 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   })
 
-  return { settings }
+  /** All models available on the backend. */
+  const models = ref<OllamaModel[]>([])
+
+  /** Whether models are currently being fetched. */
+  const isLoadingModels = ref(false)
+
+  /** The model that is currently active (has `is_active === true`). */
+  const activeModel = computed(() => models.value.find((m) => m.is_active) ?? null)
+
+  /** Fetch the list of available models from the backend. */
+  async function loadModels(): Promise<void> {
+    isLoadingModels.value = true
+    try {
+      models.value = await api.getModels()
+    } finally {
+      isLoadingModels.value = false
+    }
+  }
+
+  /** Switch the active LLM model and refresh the model list. */
+  async function switchModel(modelName: string): Promise<void> {
+    await api.updateConfig({ llm: { model: modelName } })
+    await loadModels()
+    settings.value.llm.model = modelName
+  }
+
+  return { settings, models, isLoadingModels, activeModel, loadModels, switchModel }
 })

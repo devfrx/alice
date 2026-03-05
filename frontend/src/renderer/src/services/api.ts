@@ -13,6 +13,7 @@ import type {
   FileAttachment,
   RenameConversationResponse
 } from '../types/chat'
+import type { OllamaModel } from '../types/settings'
 
 /** Base URL for all REST calls. */
 const BASE_URL = 'http://localhost:8000/api'
@@ -42,12 +43,13 @@ export function resolveBackendUrl(path: string): string {
  * @throws {Error} On non-2xx status codes.
  */
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const { headers: customHeaders, ...fetchOptions } = options ?? {}
   const response = await fetch(`${BASE_URL}${endpoint}`, {
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...options?.headers
-    },
-    ...options
+      ...(customHeaders as Record<string, string>)
+    }
   })
 
   if (!response.ok) {
@@ -107,6 +109,10 @@ export const api = {
     }),
 
   // -- Config ---------------------------------------------------------------
+
+  /** Retrieve the list of available LLM models. */
+  getModels: (): Promise<OllamaModel[]> =>
+    request<OllamaModel[]>('/config/models'),
 
   /** Retrieve the current server configuration. */
   getConfig: (): Promise<Record<string, unknown>> =>

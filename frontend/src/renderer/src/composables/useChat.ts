@@ -17,13 +17,14 @@
  *   message to the store then sends it over the socket.
  */
 
-import { onScopeDispose, ref, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, type Ref } from 'vue'
 
 import { api } from '../services/api'
 import { wsManager } from '../services/ws'
 import { useChatStore } from '../stores/chat'
 import type {
   FileAttachment,
+  WsCancelPayload,
   WsDoneMessage,
   WsErrorMessage,
   WsSendPayload,
@@ -38,10 +39,14 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 export interface UseChatReturn {
   /** Send a user message with optional attachments. */
   sendMessage: (content: string, conversationId?: string, attachments?: File[]) => Promise<void>
+  /** Stop the in-progress generation. */
+  stopGeneration: () => void
   /** Reactive flag — `true` while the socket is open. */
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
   connectionStatus: Ref<ConnectionStatus>
+  /** Reactive flag — `true` while a cancel request is pending. */
+  isCancelling: Ref<boolean>
 }
 
 /**
@@ -55,6 +60,9 @@ export function useChat(): UseChatReturn {
   const isConnected = ref(false)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
 
+  /** Tracks the generation counter at the time the last message was sent. */
+  let activeGeneration = 0
+
   // -----------------------------------------------------------------------
   // WS event handlers (named so they can be removed in cleanup)
   // -----------------------------------------------------------------------
@@ -62,6 +70,8 @@ export function useChat(): UseChatReturn {
   const onConnected = (): void => {
     isConnected.value = true
     connectionStatus.value = 'connected'
+    // Sync sidebar list (picks up local-only conversations persisted while offline).
+    store.loadConversations().catch(console.error)
     // Reload the active conversation to sync any messages missed during disconnect.
     if (store.currentConversation?.id) {
       store.loadConversation(store.currentConversation.id).catch(console.error)
@@ -90,25 +100,20 @@ export function useChat(): UseChatReturn {
   }
 
   const onToken = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return // stale event
     const msg = data as WsTokenMessage
-    // Ignore tokens for a conversation we've navigated away from
-    if (store.streamingConversationId && store.currentConversation?.id !== store.streamingConversationId) return
     store.appendToStream(msg.content)
   }
 
   const onThinking = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return // stale event
     const msg = data as WsThinkingMessage
-    if (store.streamingConversationId && store.currentConversation?.id !== store.streamingConversationId) return
     store.appendToThinking(msg.content)
   }
 
   const onDone = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return // stale event
     const msg = data as WsDoneMessage
-    // Ignore done events for a conversation we've navigated away from
-    if (store.currentConversation && store.currentConversation.id !== msg.conversation_id) {
-      store.cancelStream()
-      return
-    }
     store.finalizeStream(msg.conversation_id, msg.message_id)
   }
 
@@ -177,6 +182,8 @@ export function useChat(): UseChatReturn {
    *
    * Files are uploaded first via the REST API, then their IDs are
    * included in the WebSocket payload.
+   *
+   * If a stream is already in progress, it is cancelled first.
    */
   async function sendMessage(
     content: string,
@@ -185,6 +192,18 @@ export function useChat(): UseChatReturn {
   ): Promise<void> {
     const trimmed = content.trim()
     if (!trimmed && (!attachments || attachments.length === 0)) return
+
+    // Cancel any in-progress stream before sending a new message.
+    if (store.isStreaming) {
+      const cancel: WsCancelPayload = { type: 'cancel' }
+      wsManager.send(cancel)
+      store.cancelStream()
+    }
+
+    // Auto-create a conversation if none exists yet.
+    if (!conversationId && !store.currentConversation) {
+      await store.createConversation()
+    }
 
     const convId = conversationId ?? store.currentConversation?.id
 
@@ -203,6 +222,9 @@ export function useChat(): UseChatReturn {
     // Optimistic UI update
     store.addUserMessage(trimmed, uploaded)
 
+    // Capture the generation counter so stale events from previous streams are ignored.
+    activeGeneration = store.streamGeneration
+
     // Guard: if the WebSocket is not open, cancel immediately so the
     // streaming indicator does not stay stuck.
     if (!wsManager.isConnected) {
@@ -220,9 +242,31 @@ export function useChat(): UseChatReturn {
     wsManager.send(payload)
   }
 
+  /**
+   * Request the server to stop the current generation.
+   * Does not immediately clear streaming state — waits for the server
+   * to send a "done" event with `finish_reason: "cancelled"`.
+   */
+  function stopGeneration(): void {
+    if (!store.isStreaming || store.isCancelling) return
+    store.isCancelling = true
+    const cancel: WsCancelPayload = { type: 'cancel' }
+    wsManager.send(cancel)
+    // Safety timeout: if server doesn't confirm cancel within 5s, force it.
+    // Scoped to current generation to avoid cancelling a newer stream.
+    const gen = store.streamGeneration
+    setTimeout(() => {
+      if (store.isCancelling && store.streamGeneration === gen) {
+        store.cancelStream()
+      }
+    }, 5000)
+  }
+
   return {
     sendMessage,
+    stopGeneration,
     isConnected,
-    connectionStatus
+    connectionStatus,
+    isCancelling: computed(() => store.isCancelling)
   }
 }

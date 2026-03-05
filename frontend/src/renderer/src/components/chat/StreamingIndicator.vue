@@ -7,7 +7,7 @@
  * Includes a collapsible "Ragionamento" section for thinking tokens.
  * The parent controls visibility (`v-if="isStreaming"` outside).
  */
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
@@ -32,15 +32,28 @@ const { handleCodeBlockClick } = useCodeBlocks()
 <template>
   <div class="bubble-row row--assistant">
     <div class="streaming-bubble">
+      <!-- Thinking-only state indicator -->
+      <div v-if="thinkingContent && !content" class="streaming-bubble__thinking-state">
+        <svg class="streaming-bubble__brain-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
+          <line x1="9" y1="21" x2="15" y2="21" />
+          <line x1="10" y1="23" x2="14" y2="23" />
+        </svg>
+        <span class="streaming-bubble__thinking-label">Ragionamento in corso...</span>
+      </div>
+
       <!-- Thinking section -->
-      <ThinkingSection v-if="thinkingContent" :thinking-html="thinkingHtml" :initial-collapsed="false"
-        :auto-expand="true" :content-length="thinkingContent.length">
+      <ThinkingSection v-if="thinkingContent" :thinking-html="thinkingHtml" :initial-collapsed="true"
+        :content-length="thinkingContent.length">
         <span v-if="!content" class="streaming-bubble__cursor" />
       </ThinkingSection>
 
       <!-- Main content -->
-      <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-if="content" class="streaming-bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
+      <Transition name="content-fade">
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div v-if="content" class="streaming-bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
+      </Transition>
       <span v-if="content || !thinkingContent" class="streaming-bubble__cursor" />
     </div>
   </div>
@@ -86,36 +99,93 @@ const { handleCodeBlockClick } = useCodeBlocks()
 
 /* ----- Code block styles are in assets/styles/code-blocks.css */
 
+/* ------------------------------------------------------ Thinking state */
+.streaming-bubble__thinking-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.streaming-bubble__brain-icon {
+  color: var(--accent);
+  opacity: 0.8;
+  animation: brainPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+.streaming-bubble__thinking-label {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--accent);
+  opacity: 0.7;
+  animation: thinkingFade 2s ease-in-out infinite;
+}
+
 /* ------------------------------------------------------ Blinking cursor */
 .streaming-bubble__cursor {
   display: inline-block;
-  width: 2px;
+  width: 3px;
   height: 1em;
-  background: var(--accent);
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
   margin-left: 2px;
   vertical-align: text-bottom;
-  animation: blink 0.8s step-end infinite;
+  border-radius: 1px;
+  animation: blink 0.8s step-end infinite, cursorFadeIn 0.3s ease both;
+}
+
+/* ------------------------------------------------- Content transition */
+.content-fade-enter-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.content-fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
 }
 
 @keyframes blink {
-
-  0%,
-  100% {
+  0%, 100% {
     opacity: 1;
   }
-
   50% {
     opacity: 0;
   }
 }
 
-@keyframes pulseGlow {
+@keyframes cursorFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
-  0%,
-  100% {
+@keyframes thinkingFade {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes brainPulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
     box-shadow: 0 0 16px var(--accent-glow);
   }
-
   50% {
     box-shadow: 0 0 24px rgba(201, 168, 76, 0.14);
   }

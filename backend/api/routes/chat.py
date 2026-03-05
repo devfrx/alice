@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import shutil
 import uuid
@@ -23,6 +24,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from loguru import logger
+import sqlalchemy as sa
 from sqlalchemy import func as sa_func
 from sqlmodel import select
 
@@ -194,7 +196,7 @@ async def ws_chat(websocket: WebSocket) -> None:
     client_ip = (
         websocket.client.host if websocket.client else "unknown"
     )
-    if _ws_connections[client_ip] >= max_ws:
+    if _ws_connections.get(client_ip, 0) >= max_ws:
         await websocket.close(
             code=1008, reason="Too many connections",
         )
@@ -228,13 +230,26 @@ async def ws_chat(websocket: WebSocket) -> None:
                 )
                 continue
 
+            MAX_USER_MESSAGE_LENGTH = 50_000  # 50K characters
+            if len(user_content) > MAX_USER_MESSAGE_LENGTH:
+                await websocket.send_json(
+                    {"type": "error", "content": "Message too long"}
+                )
+                continue
+
             conv_id_raw: str | None = data.get("conversation_id")
             attachment_ids: list[str] = data.get("attachments", [])
 
             async with session_factory() as session:
                 # --- resolve or create conversation -----------------------
                 if conv_id_raw:
-                    conv_id = uuid.UUID(conv_id_raw)
+                    try:
+                        conv_id = uuid.UUID(conv_id_raw)
+                    except ValueError:
+                        await websocket.send_json(
+                            {"type": "error", "content": "Invalid conversation_id"}
+                        )
+                        continue
                     conv = await session.get(Conversation, conv_id)
                     if conv is None:
                         conv = Conversation(id=conv_id)
@@ -317,29 +332,112 @@ async def ws_chat(websocket: WebSocket) -> None:
                 full_content = ""
                 thinking_content = ""
                 tool_calls_collected: list[dict[str, Any]] = []
-                try:
-                    async for event in llm.chat(messages, tools=tools):
-                        if event["type"] == "token":
+                finish_reason = "stop"
+                cancel_event = asyncio.Event()
+
+                async def _stream_and_collect() -> None:
+                    """Consume LLM stream, accumulate content and relay to WS."""
+                    nonlocal full_content, thinking_content, finish_reason
+                    async for event in llm.chat(
+                        messages, tools=tools, cancel_event=cancel_event,
+                    ):
+                        etype = event["type"]
+                        if etype == "token":
                             full_content += event["content"]
                             await websocket.send_json(event)
-                        elif event["type"] == "thinking":
+                        elif etype == "thinking":
                             thinking_content += event["content"]
                             await websocket.send_json(event)
-                        elif event["type"] == "tool_call":
+                        elif etype == "tool_call":
                             tool_calls_collected.append(event)
                             await websocket.send_json(event)
-                        elif event["type"] == "done":
-                            pass  # handled below
+                        elif etype == "done":
+                            finish_reason = event.get(
+                                "finish_reason", "stop",
+                            )
+
+                async def _listen_for_cancel(
+                    stream_task: asyncio.Task[None],
+                ) -> None:
+                    """Read WS messages while streaming; set cancel on request."""
+                    while not stream_task.done():
+                        try:
+                            raw_cancel = await asyncio.wait_for(
+                                websocket.receive_text(), timeout=0.5,
+                            )
+                            cancel_data = json.loads(raw_cancel)
+                            if cancel_data.get("type") == "cancel":
+                                cancel_event.set()
+                                logger.debug("Client requested stream cancel")
+                                return
+                        except asyncio.TimeoutError:
+                            continue
+                        except WebSocketDisconnect:
+                            cancel_event.set()
+                            return
+                        except Exception:
+                            logger.warning(
+                                "Non-fatal error in cancel listener, ignoring"
+                            )
+                            continue
+
+                stream_task = asyncio.create_task(_stream_and_collect())
+                cancel_task = asyncio.create_task(
+                    _listen_for_cancel(stream_task),
+                )
+
+                try:
+                    await stream_task
                 except Exception:
                     logger.exception("LLM streaming error")
+                    finish_reason = "error"
                     await websocket.send_json(
-                        {"type": "error", "content": "LLM error"}
+                        {"type": "error", "content": "LLM error"},
                     )
+                    await websocket.send_json({
+                        "type": "done",
+                        "conversation_id": str(conv_id),
+                        "message_id": "",
+                        "finish_reason": "error",
+                    })
                     await session.rollback()
+                    continue
+                finally:
+                    cancel_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await cancel_task
+
+                # --- handle cancellation before tool loop -----------------
+                if cancel_event.is_set():
+                    asst_msg_id = ""
+                    if full_content or thinking_content:
+                        asst_msg = Message(
+                            conversation_id=conv_id,
+                            role="assistant",
+                            content=full_content,
+                            thinking_content=thinking_content or None,
+                        )
+                        session.add(asst_msg)
+                        conv.updated_at = _utcnow()
+                        if conv.title is None and user_content:
+                            conv.title = user_content[:100]
+                        await session.commit()
+                        asst_msg_id = str(asst_msg.id)
+                        if ctx.conversation_file_manager:
+                            await _sync_conversation_to_file(
+                                session, conv_id,
+                                ctx.conversation_file_manager,
+                            )
+                    await websocket.send_json({
+                        "type": "done",
+                        "conversation_id": str(conv_id),
+                        "message_id": asst_msg_id,
+                        "finish_reason": "cancelled",
+                    })
                     continue
 
                 # --- tool calling loop (if LLM requested tools) -----------
-                if tool_calls_collected:
+                if tool_calls_collected and finish_reason != "cancelled":
                     try:
                         full_content, thinking_content = await run_tool_loop(
                             websocket=websocket,
@@ -355,6 +453,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                             confirmation_timeout_s=ctx.config.llm.confirmation_timeout_s,
                             client_ip=client_ip,
                             sync_fn=_sync_conversation_to_file,
+                            cancel_event=cancel_event,
                         )
                     except WebSocketDisconnect:
                         # Save any pending assistant content before propagating.
@@ -380,8 +479,33 @@ async def ws_chat(websocket: WebSocket) -> None:
                         await websocket.send_json(
                             {"type": "error", "content": "Tool execution error"}
                         )
+                        await websocket.send_json({
+                            "type": "done",
+                            "conversation_id": str(conv_id),
+                            "message_id": "",
+                            "finish_reason": "error",
+                        })
                         await session.rollback()
                         continue
+
+                # --- handle cancellation during tool loop -----------------
+                if cancel_event.is_set():
+                    conv.updated_at = _utcnow()
+                    if conv.title is None and user_content:
+                        conv.title = user_content[:100]
+                    await session.commit()
+                    if ctx.conversation_file_manager:
+                        await _sync_conversation_to_file(
+                            session, conv_id,
+                            ctx.conversation_file_manager,
+                        )
+                    await websocket.send_json({
+                        "type": "done",
+                        "conversation_id": str(conv_id),
+                        "message_id": "",
+                        "finish_reason": "cancelled",
+                    })
+                    continue
 
                 # --- save assistant message --------------------------------
                 try:
@@ -409,11 +533,15 @@ async def ws_chat(websocket: WebSocket) -> None:
                 except Exception:
                     logger.exception("DB commit error after streaming")
                     await session.rollback()
-                    # Generate a fallback message id so the client can finalise.
-                    asst_msg_id = uuid.uuid4()
                     await websocket.send_json(
                         {"type": "error", "content": "Failed to save response"}
                     )
+                    await websocket.send_json({
+                        "type": "done",
+                        "conversation_id": str(conv_id),
+                        "message_id": "",
+                        "finish_reason": "error",
+                    })
                     continue
 
                 await websocket.send_json(
@@ -421,6 +549,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                         "type": "done",
                         "conversation_id": str(conv_id),
                         "message_id": str(asst_msg.id),
+                        "finish_reason": finish_reason,
                     }
                 )
 
@@ -432,6 +561,8 @@ async def ws_chat(websocket: WebSocket) -> None:
         _ws_connections[client_ip] = max(
             0, _ws_connections[client_ip] - 1,
         )
+        if _ws_connections[client_ip] <= 0:
+            _ws_connections.pop(client_ip, None)
 
 
 # ---------------------------------------------------------------------------
@@ -534,34 +665,46 @@ async def get_conversation(
 async def delete_conversation(
     conversation_id: uuid.UUID, request: Request
 ) -> dict[str, str]:
-    """Delete a conversation and all its messages."""
+    """Delete a conversation and all its messages.
+
+    Uses bulk SQL DELETE statements to avoid async lazy-loading issues
+    with SQLAlchemy ORM relationships.
+    """
     ctx = _ctx(request)
     async with ctx.db() as session:
         conv = await session.get(Conversation, conversation_id)
         if conv is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
-        # Delete messages first.
-        msg_stmt = select(Message).where(
+        # Collect message IDs for attachment cleanup.
+        msg_stmt = select(Message.id).where(
             Message.conversation_id == conversation_id
         )
         results = await session.exec(msg_stmt)
-        msg_list = results.all()
+        msg_ids: list[uuid.UUID] = list(results.all())
 
-        # Delete attachment DB records for those messages.
-        msg_ids = [m.id for m in msg_list]
+        # Bulk-delete attachments for those messages.
         if msg_ids:
-            att_stmt = select(Attachment).where(
-                Attachment.message_id.in_(msg_ids)  # type: ignore[union-attr]
+            await session.execute(
+                sa.delete(Attachment).where(
+                    Attachment.message_id.in_(msg_ids)  # type: ignore[union-attr]
+                )
             )
-            att_results = await session.exec(att_stmt)
-            for att in att_results.all():
-                await session.delete(att)
 
-        for msg in msg_list:
-            await session.delete(msg)
+        # Bulk-delete messages.
+        await session.execute(
+            sa.delete(Message).where(
+                Message.conversation_id == conversation_id
+            )
+        )
 
-        await session.delete(conv)
+        # Bulk-delete conversation (avoids ORM relationship lazy-load).
+        await session.execute(
+            sa.delete(Conversation).where(
+                Conversation.id == conversation_id
+            )
+        )
+
         await session.commit()
 
         # Remove JSON conversation file.
@@ -574,7 +717,7 @@ async def delete_conversation(
         # Clean up uploaded files for this conversation.
         upload_dir = PROJECT_ROOT / "data" / "uploads" / str(conversation_id)
         if upload_dir.exists():
-            shutil.rmtree(upload_dir, ignore_errors=True)
+            await asyncio.to_thread(shutil.rmtree, upload_dir, True)
             logger.debug("Removed upload dir {}", upload_dir)
 
         return {"status": "deleted"}
@@ -642,7 +785,13 @@ async def create_conversation(request: Request) -> dict[str, Any]:
     except Exception:
         pass  # empty body is fine
 
-    conv_id = uuid.UUID(body["id"]) if body.get("id") else uuid.uuid4()
+    if body.get("id"):
+        try:
+            conv_id = uuid.UUID(body["id"])
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid conversation id")
+    else:
+        conv_id = uuid.uuid4()
     title: str | None = body.get("title")
 
     async with ctx.db() as session:
@@ -952,7 +1101,7 @@ async def upload_image(
 
     # Ensure the upload directory exists.
     abs_path.parent.mkdir(parents=True, exist_ok=True)
-    abs_path.write_bytes(content)
+    await asyncio.to_thread(abs_path.write_bytes, content)
 
     # Persist an attachment record (message_id linked later via WS handler).
     try:

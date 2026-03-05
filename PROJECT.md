@@ -293,18 +293,18 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
 - [x] **Audit trail**: emetti `EVENT_TOOL_EXECUTION_START`, `EVENT_TOOL_EXECUTION_SUCCEEDED`, `EVENT_TOOL_EXECUTION_FAILED` su EventBus
 
 #### 3.4 — Plugin system_info (esempio)
-- [ ] `psutil` con lazy import (`try/except ImportError` + `check_dependencies()`)
-- [ ] Tool: `get_system_info()` → CPU%, RAM%, disco, OS — output whitelist (no path utente, no processi privati)
-- [ ] Tool: `get_process_list()` → lista processi (filtrata, no PID sensibili)
-- [ ] Schema JSON Schema per parametri e validazione argomenti prima dell'esecuzione
-- [ ] `risk_level: "safe"` per entrambi i tool (nessuna conferma richiesta)
-- [ ] Test unitari: mock psutil, verifica output schema, verifica whitelist campi
+- [x] `psutil` con lazy import (`try/except ImportError` + `check_dependencies()`)
+- [x] Tool: `get_system_info()` → CPU%, RAM%, disco, OS — output whitelist (no path utente, no processi privati)
+- [x] Tool: `get_process_list()` → lista processi (filtrata, no PID sensibili)
+- [x] Schema JSON Schema per parametri e validazione argomenti prima dell'esecuzione
+- [x] `risk_level: "safe"` per entrambi i tool (nessuna conferma richiesta)
+- [x] Test unitari: mock psutil, verifica output schema, verifica whitelist campi
 
 #### 3.5 — ConversationFileManager: schema versioning
-- [ ] `schema_version: int` nei file JSON (v1 = pre-Fase 3, v2 = con tool_calls)
-- [ ] Migration v1→v2 al caricamento (aggiunge `tool_calls: null`, `tool_call_id: null` ai messaggi legacy)
-- [ ] Serializzazione corretta di `role:"tool"` e `tool_calls` array nei nuovi file
-- [ ] **Sharding futuro**: preparare struttura `data/conversations/` per eventuale sotto-directory per user (`data/conversations/{user_id}/`)
+- [x] `schema_version: int` nei file JSON (v1 = pre-Fase 3, v2 = con tool_calls)
+- [x] Migration v1→v2 al caricamento (aggiunge `tool_calls: null`, `tool_call_id: null` ai messaggi legacy)
+- [x] Serializzazione corretta di `role:"tool"` e `tool_calls` array nei nuovi file
+- [x] **Sharding futuro**: preparare struttura `data/conversations/` per eventuale sotto-directory per user (`data/conversations/{user_id}/`)
 
 #### 3.6 — Frontend: tool call UI
 - [ ] Nuovi tipi WS protocol:

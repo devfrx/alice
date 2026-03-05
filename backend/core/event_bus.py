@@ -110,8 +110,13 @@ class EventBus:
             event_name: The event to listen for.
             handler: An async callable invoked a single time.
         """
+        fired = False
 
         async def _wrapper(**kwargs: Any) -> None:
+            nonlocal fired
+            if fired:
+                return
+            fired = True
             self.unsubscribe(event_name, _wrapper)
             await handler(**kwargs)
 

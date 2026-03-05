@@ -11,6 +11,9 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src')
       }
     },
-    plugins: [vue()]
+    plugins: [vue()],
+    optimizeDeps: {
+      include: ['markdown-it', 'highlight.js/lib/core']
+    }
   }
 })

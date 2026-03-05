@@ -6,8 +6,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -57,6 +58,17 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     conversations_dir = PROJECT_ROOT / "data" / "conversations"
     ctx.conversation_file_manager = ConversationFileManager(conversations_dir)
+
+    # Restore conversations from JSON files that are missing from the DB.
+    if not testing:
+        try:
+            restored = await ctx.conversation_file_manager.rebuild_from_files(
+                session_factory,
+            )
+            if restored:
+                logger.info("Restored {} conversations from JSON files", restored)
+        except Exception as exc:
+            logger.error("Failed to rebuild conversations from files: {}", exc)
 
     # -- Plugin system ------------------------------------------------------
     plugin_manager = PluginManager(ctx)
@@ -132,6 +144,21 @@ def create_app(testing: bool = False) -> FastAPI:
 
     # Rate limiting (slowapi).
     setup_rate_limiting(app, config.server.rate_limit)
+
+    # -- Global exception handler -------------------------------------------
+    # Catches unhandled exceptions so they return a JSON 500 response
+    # that goes through CORSMiddleware (instead of a bare uvicorn 500).
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(
+        request: Request, exc: Exception,
+    ) -> JSONResponse:
+        logger.opt(exception=exc).error(
+            "Unhandled exception on {} {}", request.method, request.url.path,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error"},
+        )
 
     # -- Routes -------------------------------------------------------------
     from backend.api.routes import router as api_router  # noqa: E402

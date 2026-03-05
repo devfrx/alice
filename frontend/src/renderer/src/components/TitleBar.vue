@@ -14,18 +14,18 @@ const windowControls = window.electron?.windowControls
 
 /** Minimize the application window */
 const handleMinimize = (): void => {
-  windowControls.minimize()
+  windowControls?.minimize()
 }
 
 /** Toggle maximize / restore */
 const handleMaximize = (): void => {
-  windowControls.maximize()
+  windowControls?.maximize()
   isMaximized.value = !isMaximized.value
 }
 
 /** Close the application window */
 const handleClose = (): void => {
-  windowControls.close()
+  windowControls?.close()
 }
 
 /**

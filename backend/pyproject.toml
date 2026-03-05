@@ -46,6 +46,9 @@ dependencies = [
     "duckduckgo-search>=6.0",
     "beautifulsoup4>=4.12",
 
+    # System Info
+    "psutil>=6.0",
+
     # Utils
     "loguru>=0.7",
     "watchfiles>=0.24",

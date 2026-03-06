@@ -323,10 +323,10 @@ function handlePaste(event: ClipboardEvent): void {
 .ci {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   border-top: 1px solid var(--border);
   background: var(--bg-primary);
-  padding: 10px 16px 12px;
+  padding: var(--space-2-5) var(--space-4) var(--space-3);
 }
 
 /* ============================================================
@@ -334,9 +334,9 @@ function handlePaste(event: ClipboardEvent): void {
    ============================================================ */
 .ci__thumbs {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: var(--space-0-5);
   scrollbar-width: none;
 }
 
@@ -367,7 +367,7 @@ function handlePaste(event: ClipboardEvent): void {
   right: 3px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: rgba(0, 0, 0, 0.72);
   border: none;
   color: #fff;
@@ -394,7 +394,7 @@ function handlePaste(event: ClipboardEvent): void {
 .ci__toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   height: 36px;
 }
 
@@ -402,7 +402,7 @@ function handlePaste(event: ClipboardEvent): void {
 .ci__dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
   transition: background var(--transition-normal);
 }
@@ -427,7 +427,7 @@ function handlePaste(event: ClipboardEvent): void {
 
 .dot--err {
   background: var(--danger);
-  box-shadow: 0 0 5px rgba(196, 92, 92, 0.5);
+  box-shadow: 0 0 5px var(--danger-glow);
   animation: dot-blink 2s ease-in-out infinite;
 }
 
@@ -447,7 +447,7 @@ function handlePaste(event: ClipboardEvent): void {
 .ci__badges {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .ci__badge {
@@ -488,11 +488,11 @@ function handlePaste(event: ClipboardEvent): void {
 .ci__body {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: var(--space-0-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-input);
-  padding: 3px 4px;
+  padding: 3px var(--space-1);
   transition:
     border-color var(--transition-normal),
     box-shadow var(--transition-normal);
@@ -531,12 +531,12 @@ function handlePaste(event: ClipboardEvent): void {
 }
 
 .ci__attach:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--white-light);
   color: var(--accent);
 }
 
 .ci__attach:disabled {
-  opacity: 0.3;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -551,8 +551,8 @@ function handlePaste(event: ClipboardEvent): void {
   border: none;
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 0.92rem;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
   resize: none;
   outline: none;
 }
@@ -562,7 +562,7 @@ function handlePaste(event: ClipboardEvent): void {
 }
 
 .ci__textarea:disabled {
-  opacity: 0.45;
+  opacity: var(--opacity-muted);
   cursor: not-allowed;
 }
 
@@ -586,12 +586,12 @@ function handlePaste(event: ClipboardEvent): void {
 }
 
 .ci__send:hover:not(:disabled) {
-  background: rgba(201, 168, 76, 0.2);
+  background: var(--accent-strong);
   color: var(--accent-hover);
 }
 
 .ci__send:disabled {
-  opacity: 0.3;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -604,8 +604,8 @@ function handlePaste(event: ClipboardEvent): void {
   width: 34px;
   height: 34px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(196, 92, 92, 0.4);
-  background: rgba(196, 92, 92, 0.1);
+  border: 1px solid var(--danger-strong);
+  background: var(--danger-light);
   color: var(--danger);
   cursor: pointer;
   animation: stop-ring 1.5s ease-out infinite;
@@ -613,7 +613,7 @@ function handlePaste(event: ClipboardEvent): void {
 }
 
 .ci__stop:hover {
-  background: rgba(196, 92, 92, 0.22);
+  background: var(--danger-medium);
 }
 
 @keyframes stop-ring {

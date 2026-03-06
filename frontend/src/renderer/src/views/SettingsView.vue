@@ -81,7 +81,7 @@ const settingsStore = useSettingsStore()
 
 <style scoped>
 .settings-view {
-  padding: 2rem;
+  padding: var(--space-8);
   color: var(--text-primary);
   max-width: 900px;
   margin: 0 auto;
@@ -90,7 +90,7 @@ const settingsStore = useSettingsStore()
 }
 
 .settings-view::-webkit-scrollbar {
-  width: 4px;
+  width: var(--space-1);
 }
 
 .settings-view::-webkit-scrollbar-track {
@@ -99,7 +99,7 @@ const settingsStore = useSettingsStore()
 
 .settings-view::-webkit-scrollbar-thumb {
   background: var(--border-hover);
-  border-radius: 2px;
+  border-radius: var(--space-0-5);
 }
 
 .settings-view::-webkit-scrollbar-thumb:hover {
@@ -107,54 +107,54 @@ const settingsStore = useSettingsStore()
 }
 
 .settings-view__title {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.3rem;
+  margin: 0 0 var(--space-6) 0;
+  font-size: var(--text-xl);
 }
 
 .settings-view__content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 .settings-section {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .settings-section__title {
-  margin: 0 0 12px 0;
-  font-size: 0.95rem;
+  margin: 0 0 var(--space-3) 0;
+  font-size: var(--text-md);
   color: var(--text-primary);
 }
 
 .settings-section__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .settings-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .settings-field__label {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
 .settings-field__input {
-  padding: 7px 12px;
+  padding: 7px var(--space-3);
   background: var(--bg-input, var(--bg-secondary));
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 0.8rem;
+  font-size: var(--text-base);
   outline: none;
   transition: border-color var(--transition-fast);
 }

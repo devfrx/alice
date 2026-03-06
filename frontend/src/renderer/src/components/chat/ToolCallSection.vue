@@ -82,7 +82,7 @@ function formatArgs(args: string): string {
 
 <style scoped>
 .tool-section {
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2-5);
 }
 
 /* --------------------------------------------------------- Header / toggle */
@@ -95,7 +95,7 @@ function formatArgs(args: string): string {
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-sm);
     cursor: pointer;
     text-align: left;
     border-radius: var(--radius-sm);
@@ -115,8 +115,8 @@ function formatArgs(args: string): string {
 
 .tool-section__label {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.06em;
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
     flex: 1;
     text-align: left;
@@ -124,19 +124,19 @@ function formatArgs(args: string): string {
 
 .tool-section__count {
     font-family: var(--font-mono);
-    font-size: 0.62rem;
+    font-size: var(--text-2xs);
     color: var(--accent);
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
-    padding: 1px 8px;
-    border-radius: 10px;
+    padding: var(--space-px) var(--space-2);
+    border-radius: var(--space-2-5);
     letter-spacing: 0;
-    line-height: 1.6;
+    line-height: var(--leading-loose);
 }
 
 .tool-section__chevron {
     flex-shrink: 0;
-    opacity: 0.5;
+    opacity: var(--opacity-dim);
     transition: transform var(--transition-fast);
 }
 
@@ -164,8 +164,8 @@ function formatArgs(args: string): string {
     overflow: hidden;
     min-height: 0;
     display: flex;
-    gap: 6px;
-    padding: 3px 0 8px;
+    gap: var(--space-1-5);
+    padding: 3px 0 var(--space-2);
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -179,20 +179,20 @@ function formatArgs(args: string): string {
     align-items: center;
     gap: 5px;
     padding: 3px 10px 3px 7px;
-    background: rgba(201, 168, 76, 0.05);
+    background: var(--accent-faint);
     border: 1px solid var(--accent-border);
     border-radius: 20px;
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     color: var(--text-secondary);
     white-space: nowrap;
     flex-shrink: 0;
-    line-height: 1.4;
+    line-height: var(--leading-snug);
 }
 
 .tool-section__chip svg {
     flex-shrink: 0;
-    opacity: 0.45;
+    opacity: var(--opacity-muted);
     color: var(--accent);
 }
 
@@ -217,14 +217,14 @@ function formatArgs(args: string): string {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 3px 0 8px;
+    gap: var(--space-1-5);
+    padding: 3px 0 var(--space-2);
 }
 
 /* --------------------------------------------------------- Tool call card */
 .tool-section__card {
     background: rgba(0, 0, 0, 0.22);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--white-subtle);
     border-left: 2px solid var(--accent-border);
     border-radius: var(--radius-sm);
     overflow: hidden;
@@ -234,22 +234,22 @@ function formatArgs(args: string): string {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 10px 5px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    background: rgba(201, 168, 76, 0.03);
+    padding: var(--space-1-5) var(--space-2-5) 5px;
+    border-bottom: 1px solid var(--white-subtle);
+    background: var(--accent-faint);
 }
 
 .tool-section__fn-name {
     font-family: var(--font-mono);
-    font-size: 0.74rem;
+    font-size: var(--text-sm);
     color: var(--accent);
-    font-weight: 500;
-    letter-spacing: 0.02em;
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-tight);
 }
 
 .tool-section__call-id {
     font-family: var(--font-mono);
-    font-size: 0.6rem;
+    font-size: var(--text-2xs);
     color: var(--text-muted);
     letter-spacing: 0.06em;
     opacity: 0.65;
@@ -257,7 +257,7 @@ function formatArgs(args: string): string {
 
 .tool-section__args {
     margin: 0;
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
     font-family: var(--font-mono);
     font-size: 0.7rem;
     line-height: 1.65;
@@ -279,9 +279,9 @@ function formatArgs(args: string): string {
 
 /* --------------------------------------------------------- Separator */
 .tool-section__separator {
-    height: 1px;
+    height: var(--space-px);
     background: var(--border);
-    margin: 2px 0 6px;
+    margin: var(--space-0-5) 0 var(--space-1-5);
 }
 
 /* ------------------------------------------------- Reduced motion */

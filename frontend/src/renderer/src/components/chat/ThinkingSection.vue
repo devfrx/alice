@@ -82,13 +82,13 @@ if (props.autoExpand) {
 
 <style scoped>
 .thinking-section {
-    margin-bottom: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: var(--space-2);
+    border: 1px solid var(--border);
     border-left: 3px solid var(--accent-border);
     border-radius: var(--radius-md);
-    background: linear-gradient(135deg, rgba(201, 168, 76, 0.03), transparent);
+    background: linear-gradient(135deg, var(--accent-faint), transparent);
     overflow: hidden;
-    transition: border-color 0.3s ease;
+    transition: border-color var(--transition-normal);
 }
 
 /* Pulsing left border glow while streaming */
@@ -99,30 +99,30 @@ if (props.autoExpand) {
 .thinking-section__toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
     background: none;
     border: none;
     color: var(--text-secondary);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     cursor: pointer;
     border-radius: var(--radius-md);
-    transition: color 0.2s ease, background 0.2s ease;
+    transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .thinking-section__toggle:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--white-subtle);
 }
 
 .thinking-section__toggle:active {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--white-light);
 }
 
 .thinking-section__icon {
     flex-shrink: 0;
-    opacity: 0.7;
+    opacity: var(--opacity-medium);
 }
 
 .thinking-section__label {
@@ -132,26 +132,26 @@ if (props.autoExpand) {
 }
 
 .thinking-section__badge {
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     color: var(--text-secondary);
-    opacity: 0.5;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 1px 6px;
-    border-radius: 8px;
+    opacity: var(--opacity-dim);
+    background: var(--white-subtle);
+    padding: var(--space-px) var(--space-1-5);
+    border-radius: var(--space-2);
     font-style: normal;
 }
 
 .thinking-section__streaming-text {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-style: italic;
     color: var(--accent);
-    opacity: 0.8;
+    opacity: var(--opacity-visible);
     animation: thinkingTextPulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 .thinking-section__chevron {
     flex-shrink: 0;
-    transition: transform 0.2s ease;
+    transition: transform var(--transition-fast);
 }
 
 .thinking-section__chevron--collapsed {
@@ -164,11 +164,11 @@ if (props.autoExpand) {
     transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1),
         padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
         opacity 0.3s ease;
-    padding: 6px 12px 10px;
+    padding: var(--space-1-5) var(--space-3) var(--space-2-5);
     font-style: italic;
     color: var(--text-secondary);
-    font-size: 0.82rem;
-    line-height: 1.55;
+    font-size: var(--text-base);
+    line-height: var(--leading-relaxed);
     opacity: 0.75;
 }
 
@@ -186,9 +186,9 @@ if (props.autoExpand) {
 }
 
 .thinking-section__separator {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(201, 168, 76, 0.15), transparent);
-    margin: 0 12px;
+    height: var(--space-px);
+    background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+    margin: 0 var(--space-3);
 }
 
 .thinking-section__content {

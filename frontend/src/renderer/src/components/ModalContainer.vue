@@ -113,12 +113,12 @@ onUnmounted(() => {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: var(--z-modal);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    background: var(--black-heavy);
+    backdrop-filter: blur(var(--blur-sm));
 }
 
 /* ── Card ────────────────────────────────────────────────── */
@@ -129,20 +129,20 @@ onUnmounted(() => {
     border: 1px solid var(--accent-border);
     border-radius: var(--radius-lg);
     padding: 22px 26px;
-    box-shadow: 0 0 40px rgba(201, 168, 76, 0.12);
+    box-shadow: var(--shadow-lg);
 }
 
 .modal-card__title {
-    margin: 0 0 10px;
-    font-size: 1rem;
-    font-weight: 600;
+    margin: 0 0 var(--space-2-5);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
     color: var(--text-primary);
 }
 
 .modal-card__message {
-    margin: 0 0 20px;
-    font-size: 0.88rem;
-    line-height: 1.5;
+    margin: 0 0 var(--space-5);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
     color: var(--text-secondary);
 }
 
@@ -150,13 +150,13 @@ onUnmounted(() => {
 .modal-card__actions {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: var(--space-2-5);
 }
 
 .modal__btn {
     padding: 7px 18px;
-    font-size: 0.82rem;
-    font-weight: 500;
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
     cursor: pointer;
@@ -175,7 +175,7 @@ onUnmounted(() => {
 .modal__btn--cancel:hover {
     color: var(--text-primary);
     border-color: var(--border-hover);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--white-subtle);
 }
 
 .modal__btn--confirm,
@@ -187,25 +187,25 @@ onUnmounted(() => {
 
 .modal__btn--confirm:hover,
 .modal__btn--ok:hover {
-    background: rgba(201, 168, 76, 0.22);
+    background: var(--accent-strong);
     color: var(--accent-hover);
 }
 
 .modal__btn--danger {
     background: var(--danger-hover);
     color: var(--danger);
-    border-color: rgba(196, 92, 92, 0.35);
+    border-color: var(--danger-border);
 }
 
 .modal__btn--danger:hover {
-    background: rgba(196, 92, 92, 0.3);
+    background: var(--danger-border);
 }
 
 /* ── Hint ────────────────────────────────────────────────── */
 .modal-card__hint {
     margin: 14px 0 0;
     text-align: center;
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     color: var(--text-muted);
 }
 

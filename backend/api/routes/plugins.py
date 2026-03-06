@@ -43,7 +43,7 @@ async def list_plugins(request: Request) -> list[dict[str, Any]]:
                 "name": name,
                 "version": plugin.plugin_version,
                 "description": plugin.plugin_description,
-                "author": "",
+                "author": getattr(plugin, "plugin_author", ""),
                 "enabled": name in enabled_list,
                 "tools": tools,
             }
@@ -103,7 +103,31 @@ async def toggle_plugin(
             current.remove(plugin_name)
         await pm.unload_plugin(plugin_name)
 
+    # Refresh tool registry so the LLM sees updated tool definitions.
+    if ctx.tool_registry:
+        await ctx.tool_registry.refresh()
+
+    # Build full plugin info for the response.
+    plugin = pm.get_plugin(plugin_name) if pm else None
+    if plugin is not None:
+        tools = [
+            {"name": t.name, "description": t.description}
+            for t in plugin.get_tools()
+        ]
+        return {
+            "name": plugin_name,
+            "version": plugin.plugin_version,
+            "description": plugin.plugin_description,
+            "author": getattr(plugin, "plugin_author", ""),
+            "enabled": plugin_name in current,
+            "tools": tools,
+        }
+
     return {
         "name": plugin_name,
+        "version": "unknown",
+        "description": f"Plugin '{plugin_name}' not loaded",
+        "author": "",
         "enabled": plugin_name in current,
+        "tools": [],
     }

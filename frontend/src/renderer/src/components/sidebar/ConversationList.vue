@@ -298,8 +298,8 @@ function timeAgo(iso: string): string {
 .conv-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 8px 8px;
+  gap: var(--space-0-5);
+  padding: var(--space-1) var(--space-2) var(--space-2);
   flex: 1;
   min-height: 0;
   position: relative;
@@ -312,18 +312,18 @@ function timeAgo(iso: string): string {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: var(--space-2-5);
   width: 100%;
-  padding: 10px 14px;
-  margin-bottom: 2px;
+  padding: var(--space-2-5) 14px;
+  margin-bottom: var(--space-0-5);
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-md);
   background: linear-gradient(135deg,
-      rgba(201, 168, 76, 0.07) 0%,
-      rgba(201, 168, 76, 0.02) 100%);
+      var(--accent-subtle) 0%,
+      var(--accent-faint) 100%);
   color: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.03em;
   cursor: pointer;
   flex-shrink: 0;
@@ -367,7 +367,7 @@ function timeAgo(iso: string): string {
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   border: 1.5px solid var(--accent-border);
   background: var(--accent-dim);
   flex-shrink: 0;
@@ -383,15 +383,15 @@ function timeAgo(iso: string): string {
 
 .conv-list__new:hover {
   background: linear-gradient(135deg,
-      rgba(201, 168, 76, 0.14) 0%,
-      rgba(201, 168, 76, 0.06) 100%);
+      var(--accent-dim) 0%,
+      var(--accent-subtle) 100%);
   border-color: var(--accent);
   box-shadow: var(--shadow-glow);
   color: var(--accent-hover);
 }
 
 .conv-list__new:hover .conv-list__new-icon {
-  background: rgba(201, 168, 76, 0.2);
+  background: var(--accent-strong);
   border-color: var(--accent);
   transform: rotate(90deg);
 }
@@ -410,17 +410,17 @@ function timeAgo(iso: string): string {
   align-self: flex-end;
   display: flex;
   align-items: center;
-  padding: 2px 2px;
-  margin-bottom: 4px;
+  padding: var(--space-0-5);
+  margin-bottom: var(--space-1);
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.67rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-tight);
   cursor: pointer;
   flex-shrink: 0;
-  opacity: 0.5;
+  opacity: var(--opacity-dim);
   transition:
     color var(--transition-fast),
     opacity var(--transition-fast),
@@ -441,7 +441,7 @@ function timeAgo(iso: string): string {
 .conv-list__delete-all:focus-visible {
   outline: 1px solid var(--danger);
   outline-offset: 3px;
-  border-radius: 2px;
+  border-radius: var(--space-0-5);
   opacity: 1;
 }
 
@@ -466,7 +466,7 @@ function timeAgo(iso: string): string {
 
 .conv-list__scroller::-webkit-scrollbar-thumb {
   background: var(--accent-dim);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .conv-list__scroller::-webkit-scrollbar-thumb:hover {
@@ -491,7 +491,7 @@ function timeAgo(iso: string): string {
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  padding: 8px 8px 8px 14px;
+  padding: var(--space-2) var(--space-2) var(--space-2) 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   position: absolute;
@@ -520,7 +520,7 @@ function timeAgo(iso: string): string {
 }
 
 .conv-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-input);
 }
 
 .conv-item:hover .conv-item__bar {
@@ -540,7 +540,7 @@ function timeAgo(iso: string): string {
 }
 
 .conv-item--active:hover {
-  background: rgba(201, 168, 76, 0.14);
+  background: var(--accent-dim);
 }
 
 /* Streaming state — pulsing bar + subtle text glow */
@@ -577,8 +577,8 @@ function timeAgo(iso: string): string {
 
 /* ------------------------------------------------- Title */
 .conv-item__title {
-  font-size: 0.82rem;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -597,11 +597,11 @@ function timeAgo(iso: string): string {
 .conv-item__meta {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.67rem;
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
   color: var(--text-muted);
   letter-spacing: 0.01em;
-  line-height: 1.2;
+  line-height: var(--leading-tight);
   padding-right: 52px;
 }
 
@@ -626,7 +626,7 @@ function timeAgo(iso: string): string {
   display: inline-block;
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--accent);
   margin-right: 5px;
   vertical-align: middle;
@@ -652,12 +652,12 @@ function timeAgo(iso: string): string {
 /* ================================================ Inline rename input */
 .conv-item__rename-input {
   width: 100%;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   background: var(--bg-primary);
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 0.82rem;
+  font-size: var(--text-base);
   font-family: var(--font-sans);
   outline: none;
   transition:
@@ -684,7 +684,7 @@ function timeAgo(iso: string): string {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 2px;
+  padding: var(--space-0-5);
   box-shadow: var(--shadow-md);
   pointer-events: none;
   transition:
@@ -713,7 +713,7 @@ function timeAgo(iso: string): string {
   width: 22px;
   height: 22px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--space-1);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -755,7 +755,7 @@ function timeAgo(iso: string): string {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 2.5rem 1rem;
   pointer-events: none;
 }
@@ -767,16 +767,16 @@ function timeAgo(iso: string): string {
 }
 
 .conv-list__empty-text {
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
   color: var(--text-secondary);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-tight);
   opacity: 0;
   animation: emptyFadeUp 0.5s ease-out 0.25s forwards;
 }
 
 .conv-list__empty-sub {
-  font-size: 0.69rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   letter-spacing: 0.01em;
   opacity: 0;

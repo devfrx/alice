@@ -395,8 +395,12 @@ class TestReasoningContentStreaming:
         assert token_events[0]["content"] == "visible part"
 
     @pytest.mark.asyncio
-    async def test_think_tags_not_parsed_when_thinking_disabled(self):
-        """Inline <think> tags in content pass through raw when supports_thinking=False."""
+    async def test_think_tags_always_parsed_regardless_of_config(self):
+        """Inline <think> tags are parsed even when supports_thinking=False.
+
+        The ``supports_thinking`` flag controls API-level reasoning
+        requests, not inline tag detection — tags are always stripped.
+        """
         llm = _make_llm(supports_thinking=False)
         lines = [
             _sse_line({"content": "<think>some reasoning</think>The answer"}),
@@ -408,10 +412,11 @@ class TestReasoningContentStreaming:
         token_events = [e for e in events if e["type"] == "token"]
         thinking_events = [e for e in events if e["type"] == "thinking"]
 
-        # No ThinkTagParser active → content emitted as-is
-        assert len(thinking_events) == 0
+        # ThinkTagParser is always active → tags extracted
+        assert len(thinking_events) == 1
+        assert thinking_events[0]["content"] == "some reasoning"
         assert len(token_events) == 1
-        assert "<think>" in token_events[0]["content"]
+        assert token_events[0]["content"] == "The answer"
 
     @pytest.mark.asyncio
     async def test_think_tags_parsed_when_thinking_enabled(self):

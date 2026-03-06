@@ -56,50 +56,50 @@ function retry(): void {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 24px;
+    gap: var(--space-2);
+    padding: var(--space-6);
     border: 1px dashed var(--border);
     border-radius: var(--radius-md);
-    background: rgba(196, 92, 92, 0.04);
+    background: var(--danger-faint);
     text-align: center;
 }
 
 .error-boundary__icon {
     color: var(--danger);
-    opacity: 0.7;
+    opacity: var(--opacity-medium);
 }
 
 .error-boundary__title {
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     color: var(--text-primary);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
 }
 
 .error-boundary__detail {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
     max-width: 300px;
     word-break: break-word;
 }
 
 .error-boundary__retry {
-    margin-top: 8px;
-    padding: 6px 16px;
+    margin-top: var(--space-2);
+    padding: var(--space-1-5) var(--space-4);
     border: 1px solid var(--accent-border);
     border-radius: var(--radius-md);
     background: var(--accent-dim);
     color: var(--accent);
-    font-size: 0.82rem;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: background var(--transition-normal);
 }
 
 .error-boundary__retry:hover {
-    background: rgba(201, 168, 76, 0.22);
+    background: var(--accent-strong);
 }
 
 .error-boundary__retry:focus-visible {
     outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline-offset: var(--space-0-5);
 }
 </style>

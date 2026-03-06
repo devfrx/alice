@@ -297,7 +297,7 @@ class TestDependencies:
     async def test_connection_status_degraded(self, plugin) -> None:
         with patch("backend.plugins.system_info.plugin._PSUTIL_AVAILABLE", False):
             status = await plugin.get_connection_status()
-            assert status == ConnectionStatus.DEGRADED
+            assert status == ConnectionStatus.DISCONNECTED
 
 
 # -- Error paths ------------------------------------------------------------

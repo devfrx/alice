@@ -51,6 +51,7 @@ class BasePlugin(ABC):
     plugin_name: str
     plugin_version: str
     plugin_description: str
+    plugin_author: str = ""
     plugin_dependencies: list[str] = []
     plugin_priority: int = 50
     requires_user_confirmation: bool = False

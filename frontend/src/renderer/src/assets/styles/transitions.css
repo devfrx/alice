@@ -54,10 +54,10 @@
 @keyframes pulseGlow {
   0%,
   100% {
-    box-shadow: 0 0 4px rgba(201, 168, 76, 0.1);
+    box-shadow: 0 0 4px var(--accent-light);
   }
   50% {
-    box-shadow: 0 0 14px rgba(201, 168, 76, 0.2);
+    box-shadow: 0 0 14px var(--accent-strong);
   }
 }
 
@@ -122,7 +122,7 @@ a,
 input,
 textarea,
 select {
-  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 /* Focus ring with accent glow for inputs */

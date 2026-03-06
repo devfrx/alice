@@ -40,20 +40,6 @@ class OmniaEvent(StrEnum):
     TOOL_EXECUTION_FAILED = "tool.execution_failed"
     ERROR = "error"
 
-
-# Backward-compatible aliases so existing imports keep working.
-EVENT_LLM_RESPONSE: str = OmniaEvent.LLM_RESPONSE
-EVENT_STT_RESULT: str = OmniaEvent.STT_RESULT
-EVENT_TTS_START: str = OmniaEvent.TTS_START
-EVENT_PLUGIN_LOADED: str = OmniaEvent.PLUGIN_LOADED
-EVENT_PLUGIN_FAILED: str = OmniaEvent.PLUGIN_FAILED
-EVENT_PLUGIN_STATUS_CHANGED: str = OmniaEvent.PLUGIN_STATUS_CHANGED
-EVENT_TOOL_CALLED: str = OmniaEvent.TOOL_CALLED
-EVENT_TOOL_EXECUTION_START: str = OmniaEvent.TOOL_EXECUTION_START
-EVENT_TOOL_EXECUTION_SUCCEEDED: str = OmniaEvent.TOOL_EXECUTION_SUCCEEDED
-EVENT_TOOL_EXECUTION_FAILED: str = OmniaEvent.TOOL_EXECUTION_FAILED
-EVENT_ERROR: str = OmniaEvent.ERROR
-
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]
 

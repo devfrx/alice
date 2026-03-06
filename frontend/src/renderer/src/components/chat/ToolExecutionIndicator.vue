@@ -51,29 +51,29 @@ function truncate(text: string, max = 100): string {
 .tool-exec {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 12px;
-    margin-top: 6px;
-    background: rgba(255, 255, 255, 0.02);
+    gap: var(--space-1-5);
+    padding: var(--space-2) var(--space-3);
+    margin-top: var(--space-1-5);
+    background: var(--white-faint);
     border-radius: var(--radius-md);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--white-subtle);
 }
 
 .tool-exec__item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.78rem;
-    line-height: 1.4;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
 }
 
 /* Animated spinner */
 .tool-exec__spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(201, 168, 76, 0.2);
+    border: 2px solid var(--accent-strong);
     border-top-color: var(--accent);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     animation: toolSpin 0.8s linear infinite;
     flex-shrink: 0;
 }
@@ -83,24 +83,24 @@ function truncate(text: string, max = 100): string {
 }
 
 .tool-exec__icon--ok {
-    color: #4ade80;
+    color: var(--approve);
 }
 
 .tool-exec__icon--err {
-    color: #f87171;
+    color: var(--error);
 }
 
 .tool-exec__name {
     font-family: var(--font-mono);
     color: var(--accent);
-    font-size: 0.76rem;
+    font-size: var(--text-sm);
     white-space: nowrap;
 }
 
 .tool-exec__result {
     color: var(--text-secondary);
-    font-size: 0.72rem;
-    opacity: 0.7;
+    font-size: var(--text-xs);
+    opacity: var(--opacity-medium);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

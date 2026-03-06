@@ -7,6 +7,7 @@ user confirmation for dangerous tools, and graceful error recovery.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import uuid
 from typing import Any, Callable, Coroutine
@@ -179,6 +180,7 @@ async def run_tool_loop(
                     confirmation_timeout_s,
                     risk_level=tool_def.risk_level,
                     description=tool_def.description,
+                    cancel_event=cancel_event,
                 )
                 if not approved:
                     _save_rejected_tool_msg(
@@ -310,19 +312,30 @@ async def run_tool_loop(
             "iteration": iteration + 1,
         })
 
-        async for event in llm.chat(
-            messages, tools=tools, cancel_event=cancel_event,
-        ):
-            if event["type"] == "token":
-                full_content += event["content"]
-                await websocket.send_json(event)
-            elif event["type"] == "thinking":
-                thinking_content += event["content"]
-                await websocket.send_json(event)
-            elif event["type"] == "tool_call":
-                tool_calls_from_llm.append(event)
-            elif event["type"] == "done":
-                pass
+        # Spawn a reader task so cancel messages are detected during streaming.
+        reader_task = asyncio.create_task(
+            _ws_cancel_reader(websocket, cancel_event),
+        ) if cancel_event else None
+
+        try:
+            async for event in llm.chat(
+                messages, tools=tools, cancel_event=cancel_event,
+            ):
+                if event["type"] == "token":
+                    full_content += event["content"]
+                    await websocket.send_json(event)
+                elif event["type"] == "thinking":
+                    thinking_content += event["content"]
+                    await websocket.send_json(event)
+                elif event["type"] == "tool_call":
+                    tool_calls_from_llm.append(event)
+                elif event["type"] == "done":
+                    pass
+        finally:
+            if reader_task and not reader_task.done():
+                reader_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await reader_task
 
     else:
         # Loop exhausted max_iterations without a clean break.
@@ -389,6 +402,7 @@ async def _request_confirmation(
     timeout_s: int,
     risk_level: str = "medium",
     description: str = "",
+    cancel_event: asyncio.Event | None = None,
 ) -> bool:
     """Send a confirmation request and wait for the user's response.
 
@@ -404,6 +418,7 @@ async def _request_confirmation(
         timeout_s: Maximum seconds to wait.
         risk_level: Risk level of the tool (e.g. ``"low"``, ``"medium"``, ``"high"``).
         description: Human-readable description of the tool action.
+        cancel_event: Optional event to set when a cancel message arrives.
 
     Returns:
         ``True`` if the user approved, ``False`` on rejection or timeout.
@@ -427,6 +442,11 @@ async def _request_confirmation(
                 websocket.receive_text(), timeout=remaining,
             )
             msg = json.loads(raw)
+            # Handle cancel messages during confirmation wait.
+            if msg.get("type") == "cancel":
+                if cancel_event:
+                    cancel_event.set()
+                return False
             if (
                 msg.get("type") == "tool_confirmation_response"
                 and msg.get("execution_id") == execution_id
@@ -446,3 +466,31 @@ async def _request_confirmation(
             tool_name, execution_id,
         )
         return False
+
+
+async def _ws_cancel_reader(
+    websocket: WebSocket,
+    cancel_event: asyncio.Event | None,
+) -> None:
+    """Read WebSocket messages in the background during LLM re-streaming.
+
+    Sets *cancel_event* when a ``{"type": "cancel"}`` message arrives.
+    Any non-cancel messages are silently discarded (the main loop handles
+    only LLM stream events during this phase).
+    """
+    if cancel_event is None:
+        return
+    try:
+        while not cancel_event.is_set():
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if msg.get("type") == "cancel":
+                cancel_event.set()
+                return
+    except (WebSocketDisconnect, asyncio.CancelledError):
+        return
+    except Exception:
+        logger.debug("WS cancel reader stopped unexpectedly")

@@ -7,7 +7,7 @@
  * and a subtle glow border.  Markdown is rendered via `useMarkdown`.
  * Supports collapsible thinking content and image attachments.
  */
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
@@ -71,8 +71,12 @@ function handleKeydown(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
+watch(overlayImageUrl, (url) => {
+  if (url) {
+    window.addEventListener('keydown', handleKeydown)
+  } else {
+    window.removeEventListener('keydown', handleKeydown)
+  }
 })
 
 onUnmounted(() => {
@@ -123,7 +127,7 @@ onUnmounted(() => {
 /* ------------------------------------------------------------------ Row */
 .bubble-row {
   display: flex;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .row--user {
@@ -137,9 +141,9 @@ onUnmounted(() => {
 
 /* ------------------------------------------------------------- Bubble base */
 .bubble {
-  padding: 10px 14px;
-  line-height: 1.6;
-  font-size: 0.9rem;
+  padding: var(--space-2-5) 14px;
+  line-height: var(--leading-loose);
+  font-size: var(--text-md);
   position: relative;
   word-break: break-word;
 }
@@ -147,8 +151,8 @@ onUnmounted(() => {
 /* ------------------------------------------------------------- User bubble */
 .bubble--user {
   max-width: 65%;
-  background: linear-gradient(135deg, rgba(201, 168, 76, 0.10), rgba(201, 168, 76, 0.05));
-  border: 1px solid rgba(201, 168, 76, 0.18);
+  background: linear-gradient(135deg, var(--accent-light), var(--accent-faint));
+  border: 1px solid var(--accent-medium);
   border-radius: 16px 16px var(--radius-sm) 16px;
   color: var(--text-primary);
   animation: slideInUser 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -159,9 +163,9 @@ onUnmounted(() => {
   max-width: 82%;
   background: transparent;
   border: none;
-  border-left: 3px solid rgba(201, 168, 76, 0.18);
+  border-left: 3px solid var(--accent-medium);
   border-radius: 0;
-  padding: 12px 14px 12px 16px;
+  padding: var(--space-3) 14px var(--space-3) var(--space-4);
   color: var(--text-primary);
   animation: slideInAssistant 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   transition: border-left-color var(--transition-fast);
@@ -174,11 +178,11 @@ onUnmounted(() => {
 /* ------------------------------------------------------------- Tool bubble */
 .bubble--tool {
   max-width: 78%;
-  background: rgba(30, 34, 42, 0.6);
+  background: var(--bg-tool);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   animation: slideInAssistant 0.35s ease-out both;
 }
@@ -187,8 +191,8 @@ onUnmounted(() => {
 .bubble__attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-2);
 }
 
 .bubble__attachment {
@@ -249,7 +253,7 @@ onUnmounted(() => {
 /* --------------------------------------------------------- Timestamp */
 .bubble__time {
   display: block;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   margin-top: 5px;
   opacity: 0;
@@ -273,13 +277,13 @@ onUnmounted(() => {
 .image-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--black-overlay);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
   animation: fadeIn 0.2s ease;
 }
 
@@ -287,9 +291,9 @@ onUnmounted(() => {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 50%;
+  background: var(--white-medium);
+  border: 1px solid var(--white-strong);
+  border-radius: var(--radius-full);
   width: 38px;
   height: 38px;
   display: flex;
@@ -301,8 +305,8 @@ onUnmounted(() => {
 }
 
 .image-overlay__close:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--white-heavy);
+  border-color: var(--white-dim);
 }
 
 .image-overlay__img {

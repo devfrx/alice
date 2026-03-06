@@ -36,7 +36,7 @@ def test_server_port(config: OmniaConfig) -> None:
 
 
 def test_server_host(config: OmniaConfig) -> None:
-    assert config.server.host == "0.0.0.0"
+    assert config.server.host == "127.0.0.1"
 
 
 def test_llm_provider(config: OmniaConfig) -> None:
@@ -112,10 +112,10 @@ def test_load_config_missing_file_uses_defaults() -> None:
 
 def test_known_model_auto_capabilities() -> None:
     """Capabilities are auto-detected from KNOWN_MODELS when not explicitly set."""
-    # qwen3.5:9b has vision=True, thinking=False
+    # qwen3.5:9b has vision=True, thinking=True
     llm = LLMConfig(model="qwen3.5:9b")
     assert llm.supports_vision is True
-    assert llm.supports_thinking is False
+    assert llm.supports_thinking is True
 
     # qwq has vision=False, thinking=True
     llm = LLMConfig(model="qwq")
@@ -152,7 +152,7 @@ def test_lmstudio_style_key_vision_capabilities() -> None:
     """LM Studio-style keys (e.g. 'qwen/qwen3.5-9b') auto-detect vision."""
     llm = LLMConfig(model="qwen/qwen3.5-9b")
     assert llm.supports_vision is True
-    assert llm.supports_thinking is False
+    assert llm.supports_thinking is True
 
 
 def test_lmstudio_style_key_deepseek_reasoning() -> None:

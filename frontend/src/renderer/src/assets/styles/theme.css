@@ -11,6 +11,7 @@
   --bg-secondary: #13161c;                     /* Panel / sidebar */
   --bg-tertiary: #1a1e26;                      /* Elevated surfaces (cards, tooltips) */
   --bg-input: rgba(255, 255, 255, 0.03);       /* Input fields */
+  --bg-tool: rgba(30, 34, 42, 0.6);           /* Tool/code bubble background */
 }
 
 /* ── Typography ────────────────────────────────────────────── */
@@ -27,14 +28,71 @@
   --accent-dim: rgba(201, 168, 76, 0.12);     /* Subtle gold fill */
   --accent-border: rgba(201, 168, 76, 0.25);  /* Gold border */
   --accent-glow: rgba(201, 168, 76, 0.08);    /* Subtle glow */
+  --accent-faint: rgba(201, 168, 76, 0.03);   /* Barely visible tint */
+  --accent-subtle: rgba(201, 168, 76, 0.06);  /* Subtle tint for banners */
+  --accent-light: rgba(201, 168, 76, 0.10);   /* Light fill */
+  --accent-medium: rgba(201, 168, 76, 0.18);  /* Medium fill / borders */
+  --accent-strong: rgba(201, 168, 76, 0.22);  /* Strong fill on hover */
+  --accent-vivid: rgba(201, 168, 76, 0.35);   /* Scrollbar hover / heavy fill */
+  --accent-text-glow: 0 0 30px rgba(201, 168, 76, 0.15); /* Text shadow glow */
 }
 
 /* ── Semantic Colors ───────────────────────────────────────── */
 :root {
   --danger: #c45c5c;                           /* Muted red — destructive actions */
   --danger-hover: rgba(196, 92, 92, 0.2);
+  --danger-faint: rgba(196, 92, 92, 0.04);    /* Error boundary bg */
+  --danger-light: rgba(196, 92, 92, 0.1);     /* Error state bg */
+  --danger-medium: rgba(196, 92, 92, 0.22);   /* Stop button hover */
+  --danger-border: rgba(196, 92, 92, 0.35);   /* Danger button border */
+  --danger-strong: rgba(196, 92, 92, 0.4);    /* Stop ring/border */
+  --danger-glow: rgba(196, 92, 92, 0.5);      /* Error dot glow */
+
   --success: #5c9a6e;                          /* Muted green — positive status */
   --success-glow: rgba(92, 154, 110, 0.5);
+  --success-faint: rgba(92, 154, 110, 0.03);  /* Loaded model row tint */
+  --success-light: rgba(92, 154, 110, 0.1);   /* Status badge bg */
+  --success-medium: rgba(92, 154, 110, 0.15); /* Loaded badge bg */
+  --success-border: rgba(92, 154, 110, 0.3);  /* Loaded badge border */
+
+  --warning: #fbbf24;                          /* Amber — medium risk */
+  --warning-bg: rgba(251, 191, 36, 0.1);
+  --warning-border: rgba(251, 191, 36, 0.3);
+
+  --error: #f87171;                            /* Red — dangerous state */
+  --error-bg: rgba(248, 113, 113, 0.1);
+  --error-border: rgba(248, 113, 113, 0.3);
+  --error-bg-hover: rgba(248, 113, 113, 0.2);
+  --error-border-hover: rgba(248, 113, 113, 0.5);
+
+  --error-severe: #ef4444;                     /* Red — forbidden state */
+  --error-severe-bg: rgba(239, 68, 68, 0.15);
+  --error-severe-border: rgba(239, 68, 68, 0.5);
+
+  --approve: #4ade80;                          /* Green — approve action */
+  --approve-bg: rgba(74, 222, 128, 0.15);
+  --approve-border: rgba(74, 222, 128, 0.4);
+  --approve-bg-hover: rgba(74, 222, 128, 0.25);
+  --approve-border-hover: rgba(74, 222, 128, 0.6);
+}
+
+/* ── White Overlays ────────────────────────────────────────── */
+:root {
+  --white-faint: rgba(255, 255, 255, 0.02);   /* Barely visible fill */
+  --white-subtle: rgba(255, 255, 255, 0.04);  /* Subtle hover/badge bg */
+  --white-light: rgba(255, 255, 255, 0.06);   /* Light hover / code bg */
+  --white-medium: rgba(255, 255, 255, 0.08);  /* Titlebar hover */
+  --white-strong: rgba(255, 255, 255, 0.12);  /* Strong border / hover */
+  --white-heavy: rgba(255, 255, 255, 0.16);   /* Active overlay close hover */
+  --white-dim: rgba(255, 255, 255, 0.22);     /* Border hover on overlay */
+}
+
+/* ── Black Overlays ────────────────────────────────────────── */
+:root {
+  --black-light: rgba(0, 0, 0, 0.3);          /* Pre block bg */
+  --black-medium: rgba(0, 0, 0, 0.4);         /* Shadow base */
+  --black-heavy: rgba(0, 0, 0, 0.6);          /* Modal/dialog backdrop */
+  --black-overlay: rgba(0, 0, 0, 0.8);        /* Image overlay backdrop */
 }
 
 /* ── Borders ───────────────────────────────────────────────── */
@@ -47,20 +105,112 @@
 :root {
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 0 40px rgba(201, 168, 76, 0.12);
   --shadow-glow: 0 0 20px rgba(201, 168, 76, 0.06);
+  --shadow-dropdown: 0 -4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-sidebar: 1px 0 16px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.02);
 }
 
 /* ── Radii ─────────────────────────────────────────────────── */
 :root {
+  --radius-xs: 3px;                            /* Scrollbar thumb, minimal */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --radius-pill: 9999px;                       /* Pill/tag shapes */
+  --radius-full: 50%;                          /* Perfect circles */
+}
+
+/* ── Spacing Scale ─────────────────────────────────────────── */
+:root {
+  --space-px: 1px;
+  --space-0: 0;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+/* ── Font Sizes ────────────────────────────────────────────── */
+:root {
+  --text-2xs: 0.6rem;                          /* 9.6px — micro labels */
+  --text-xs: 0.68rem;                          /* 10.9px — timestamps, badges */
+  --text-sm: 0.75rem;                          /* 12px — labels, small UI */
+  --text-base: 0.82rem;                        /* 13.1px — default UI text */
+  --text-md: 0.9rem;                           /* 14.4px — body text, bubbles */
+  --text-lg: 1rem;                             /* 16px — dialog titles */
+  --text-xl: 1.3rem;                           /* 20.8px — section headings */
+  --text-2xl: 1.6rem;                          /* 25.6px — large headings */
+  --text-3xl: 3rem;                            /* 48px — hero display */
+}
+
+/* ── Font Weights ──────────────────────────────────────────── */
+:root {
+  --weight-light: 200;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+}
+
+/* ── Line Heights ──────────────────────────────────────────── */
+:root {
+  --leading-tight: 1.2;                        /* Compact text, badges */
+  --leading-snug: 1.4;                         /* Description text */
+  --leading-normal: 1.5;                       /* Standard body text */
+  --leading-relaxed: 1.55;                     /* Chat/code content */
+  --leading-loose: 1.6;                        /* Message bubbles */
+}
+
+/* ── Letter Spacing ────────────────────────────────────────── */
+:root {
+  --tracking-tight: 0.02em;
+  --tracking-normal: 0.04em;
+  --tracking-wide: 0.06em;
+  --tracking-wider: 0.25em;                    /* Headings, empty states */
+  --tracking-widest: 0.35em;                   /* Hero text */
+}
+
+/* ── Z-Index Layers ────────────────────────────────────────── */
+:root {
+  --z-base: 0;
+  --z-raised: 2;                               /* Texture overlays */
+  --z-sticky: 10;                              /* Sidebar, titlebar, scroll btn */
+  --z-dropdown: 100;                           /* Dropdown menus */
+  --z-overlay: 1000;                           /* Dialog overlays */
+  --z-modal: 9999;                             /* Modal / confirm overlays */
+}
+
+/* ── Opacity Levels ────────────────────────────────────────── */
+:root {
+  --opacity-disabled: 0.3;                     /* Disabled buttons */
+  --opacity-muted: 0.45;                       /* Very muted content */
+  --opacity-dim: 0.5;                          /* Dimmed elements */
+  --opacity-soft: 0.6;                         /* Soft icons, subtitles */
+  --opacity-medium: 0.7;                       /* Medium visibility */
+  --opacity-visible: 0.8;                      /* Nearly full visibility */
+}
+
+/* ── Overlay / Backdrop ────────────────────────────────────── */
+:root {
+  --blur-sm: 4px;                              /* Modal backdrop blur */
+  --blur-md: 8px;                              /* Image overlay blur */
 }
 
 /* ── Motion ────────────────────────────────────────────────── */
 :root {
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
+  --transition-slow: 0.35s ease;
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-decel: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Font Stacks ───────────────────────────────────────────── */
@@ -138,12 +288,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(201, 168, 76, 0.18);
-  border-radius: 3px;
+  background: var(--accent-medium);
+  border-radius: var(--radius-xs);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(201, 168, 76, 0.35);
+  background: var(--accent-vivid);
 }
 
 /* Hide scrollbar corner */
@@ -158,7 +308,7 @@ body {
  */
 
 ::selection {
-  background: rgba(201, 168, 76, 0.3);
+  background: var(--accent-border);
   color: var(--text-primary);
 }
 

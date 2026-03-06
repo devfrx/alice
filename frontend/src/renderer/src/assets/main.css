@@ -16,10 +16,10 @@ body {
 }
 
 code {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   padding: 3px 5px;
   border-radius: var(--radius-sm);
-  background-color: var(--color-background-mute);
+  background-color: var(--bg-tertiary);
   font-family: var(--font-mono);
   font-size: 85%;
 }

@@ -202,6 +202,14 @@ export const api = {
     return data
   },
 
+  // -- Model sync -----------------------------------------------------------
+
+  /** Sync config with the model currently loaded in LM Studio. */
+  syncModel: (): Promise<{ synced: boolean; model?: string; reason?: string }> =>
+    request<{ synced: boolean; model?: string; reason?: string }>('/config/sync-model', {
+      method: 'POST'
+    }),
+
   // -- Plugins --------------------------------------------------------------
 
   /** List installed plugins. */

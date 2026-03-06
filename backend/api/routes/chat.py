@@ -50,7 +50,20 @@ _MAGIC_BYTES: dict[str, list[bytes]] = {
 
 # Active WebSocket connections per IP (for rate limiting).
 _ws_connections: dict[str, int] = defaultdict(int)
-_ws_lock = asyncio.Lock()
+# Per-loop WS locks: maps event-loop id → asyncio.Lock.  This allows tests
+# that run in multiple event loops (e.g. threads with TestClient) to each
+# get a lock bound to the correct loop.
+_ws_locks: dict[int, asyncio.Lock] = {}
+
+
+def _get_ws_lock() -> asyncio.Lock:
+    """Return an ``asyncio.Lock`` bound to the *current* event loop."""
+    loop = asyncio.get_running_loop()
+    lock = _ws_locks.get(id(loop))
+    if lock is None:
+        lock = asyncio.Lock()
+        _ws_locks[id(loop)] = lock
+    return lock
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +90,8 @@ def _attachment_url(file_path: str) -> str:
         relative = Path(file_path).resolve().relative_to(_UPLOADS_BASE)
         return f"/uploads/{quote(str(relative), safe='/')}"
     except ValueError:
-        return f"/uploads/{quote(file_path, safe='/')}"
+        logger.warning("Attachment path outside uploads base: {}", file_path)
+        return ""
 
 
 def _verify_magic_bytes(
@@ -197,7 +211,8 @@ async def ws_chat(websocket: WebSocket) -> None:
     client_ip = (
         websocket.client.host if websocket.client else "unknown"
     )
-    async with _ws_lock:
+    ws_lock = _get_ws_lock()
+    async with ws_lock:
         if _ws_connections.get(client_ip, 0) >= max_ws:
             await websocket.close(
                 code=1008, reason="Too many connections",
@@ -218,6 +233,10 @@ async def ws_chat(websocket: WebSocket) -> None:
             {"type": "error", "content": "Server not ready \u2014 services not initialized"}
         )
         await websocket.close(code=1011)
+        async with ws_lock:
+            _ws_connections[client_ip] = max(0, _ws_connections[client_ip] - 1)
+            if _ws_connections[client_ip] <= 0:
+                _ws_connections.pop(client_ip, None)
         return
 
     try:
@@ -589,7 +608,7 @@ async def ws_chat(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("WebSocket unexpected error")
     finally:
-        async with _ws_lock:
+        async with ws_lock:
             _ws_connections[client_ip] = max(
                 0, _ws_connections[client_ip] - 1,
             )
@@ -698,12 +717,11 @@ async def delete_all_conversations(request: Request) -> dict[str, Any]:
     """Delete ALL conversations, messages, attachments, and associated files."""
     ctx = _ctx(request)
     async with ctx.db() as session:
-        # Bulk-delete all attachments.
-        await session.execute(sa.delete(Attachment))
-        # Bulk-delete all messages.
-        await session.execute(sa.delete(Message))
-        # Bulk-delete all conversations.
-        await session.execute(sa.delete(Conversation))
+        # Use the underlying SA connection for DML (avoids SQLModel exec() warning).
+        conn = await session.connection()
+        await conn.execute(sa.delete(Attachment))
+        await conn.execute(sa.delete(Message))
+        await conn.execute(sa.delete(Conversation))
         await session.commit()
 
     # Remove all JSON conversation files.
@@ -748,23 +766,26 @@ async def delete_conversation(
         results = await session.exec(msg_stmt)
         msg_ids: list[uuid.UUID] = list(results.all())
 
+        # Use the underlying SA connection for DML (avoids SQLModel exec() warning).
+        conn = await session.connection()
+
         # Bulk-delete attachments for those messages.
         if msg_ids:
-            await session.execute(
+            await conn.execute(
                 sa.delete(Attachment).where(
                     Attachment.message_id.in_(msg_ids)  # type: ignore[union-attr]
                 )
             )
 
         # Bulk-delete messages.
-        await session.execute(
+        await conn.execute(
             sa.delete(Message).where(
                 Message.conversation_id == conversation_id
             )
         )
 
         # Bulk-delete conversation (avoids ORM relationship lazy-load).
-        await session.execute(
+        await conn.execute(
             sa.delete(Conversation).where(
                 Conversation.id == conversation_id
             )

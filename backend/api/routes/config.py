@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from backend.api.routes.models import serialise_model
-from backend.core.config import KNOWN_MODELS, DEFAULT_MODEL
+from backend.core.config import KNOWN_MODELS
 from backend.core.context import AppContext
 
 router = APIRouter()
@@ -56,7 +56,7 @@ async def _models_legacy(ctx: AppContext) -> list[dict[str, Any]]:
     """Fetch models via OpenAI-compatible or Ollama endpoint."""
     active_model = ctx.config.llm.model
     base_url = ctx.config.llm.base_url
-    is_ollama = ":11434" in base_url
+    is_ollama = ctx.config.llm.provider == "ollama"
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -238,9 +238,15 @@ async def update_config(request: Request) -> dict[str, Any]:
                 caps.get("thinking", False),
             )
         if "temperature" in llm_updates:
-            object.__setattr__(cfg.llm, "temperature", float(llm_updates["temperature"]))
+            temp = float(llm_updates["temperature"])
+            if not (0.0 <= temp <= 2.0):
+                raise HTTPException(400, "temperature must be between 0.0 and 2.0")
+            object.__setattr__(cfg.llm, "temperature", temp)
         if "max_tokens" in llm_updates:
-            object.__setattr__(cfg.llm, "max_tokens", int(llm_updates["max_tokens"]))
+            mt = int(llm_updates["max_tokens"])
+            if mt <= 0:
+                raise HTTPException(400, "max_tokens must be a positive integer")
+            object.__setattr__(cfg.llm, "max_tokens", mt)
 
     if "ui" in body:
         ui_updates = body["ui"]
@@ -251,3 +257,76 @@ async def update_config(request: Request) -> dict[str, Any]:
 
     # Return the full config after applying changes.
     return await get_config(request)
+
+
+@router.post("/config/sync-model")
+async def sync_model(request: Request) -> dict[str, Any]:
+    """Sync config with the model currently loaded in LM Studio.
+
+    Queries LM Studio for loaded models.  If exactly one model is loaded
+    and it differs from ``config.llm.model``, the config is updated
+    automatically (model name, supports_thinking, supports_vision).
+
+    Returns:
+        ``{"synced": true, "model": "..."}`` on success, or
+        ``{"synced": false, "reason": "..."}`` when no sync is needed.
+    """
+    ctx = _ctx(request)
+    mgr = ctx.lmstudio_manager
+    if mgr is None:
+        return {"synced": False, "reason": "LM Studio manager not available"}
+
+    try:
+        data = await mgr.list_models()
+    except Exception as exc:
+        logger.warning("sync-model: cannot reach LM Studio — {}", exc)
+        return {"synced": False, "reason": "LM Studio unreachable"}
+
+    loaded = [
+        m for m in data.get("models", [])
+        if m.get("loaded_instances")
+    ]
+
+    if not loaded:
+        return {"synced": False, "reason": "no model loaded"}
+
+    cfg = ctx.config
+
+    # When multiple models are loaded, check if the config model is among
+    # them — that means the user intentionally loaded extras.
+    if len(loaded) > 1:
+        if any(m.get("key") == cfg.llm.model for m in loaded):
+            return {"synced": False, "reason": "already in sync"}
+        return {
+            "synced": False,
+            "reason": f"{len(loaded)} models loaded — ambiguous",
+        }
+
+    loaded_model = loaded[0]
+    loaded_key = loaded_model.get("key", "")
+
+    if not loaded_key:
+        return {"synced": False, "reason": "loaded model has no key"}
+
+    if loaded_key == cfg.llm.model:
+        return {"synced": False, "reason": "already in sync"}
+
+    # Resolve capabilities from live data, fallback to KNOWN_MODELS.
+    live_caps = loaded_model.get("capabilities", {})
+    known = KNOWN_MODELS.get(loaded_key, {})
+    supports_thinking = live_caps.get(
+        "thinking", known.get("thinking", False),
+    )
+    supports_vision = live_caps.get(
+        "vision", known.get("vision", False),
+    )
+
+    object.__setattr__(cfg.llm, "model", loaded_key)
+    object.__setattr__(cfg.llm, "supports_thinking", supports_thinking)
+    object.__setattr__(cfg.llm, "supports_vision", supports_vision)
+
+    logger.info(
+        "sync-model: config updated to '{}' (thinking={}, vision={})",
+        loaded_key, supports_thinking, supports_vision,
+    )
+    return {"synced": True, "model": loaded_key}

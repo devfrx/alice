@@ -77,7 +77,7 @@ watch(
 // On mount: ensure a conversation exists so the user can start chatting.
 onMounted(() => {
   if (!chatStore.currentConversation) {
-    chatStore.createConversation()
+    chatStore.createConversation().catch(console.error)
   }
   scrollToBottom()
   messagesContainer.value?.addEventListener('scroll', handleScroll)
@@ -161,13 +161,13 @@ onUnmounted(() => {
 .chat-view__messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: var(--space-5) var(--space-6);
   scroll-behavior: smooth;
 }
 
 /* Custom dark scrollbar */
 .chat-view__messages::-webkit-scrollbar {
-  width: 6px;
+  width: var(--space-1-5);
 }
 
 .chat-view__messages::-webkit-scrollbar-track {
@@ -175,12 +175,12 @@ onUnmounted(() => {
 }
 
 .chat-view__messages::-webkit-scrollbar-thumb {
-  background: rgba(201, 168, 76, 0.1);
-  border-radius: 3px;
+  background: var(--accent-light);
+  border-radius: var(--radius-xs);
 }
 
 .chat-view__messages::-webkit-scrollbar-thumb:hover {
-  background: rgba(201, 168, 76, 0.2);
+  background: var(--accent-strong);
 }
 
 /* ----------------------------------------------- Empty state */
@@ -190,37 +190,37 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 12px;
-  opacity: 0.45;
+  gap: var(--space-3);
+  opacity: var(--opacity-muted);
   user-select: none;
 }
 
 .chat-view__empty-icon {
   color: var(--accent);
-  opacity: 0.6;
+  opacity: var(--opacity-soft);
   animation: emptyBreathing 3s ease-in-out infinite;
 }
 
 .chat-view__empty-title {
-  font-size: 1.6rem;
-  font-weight: 200;
-  letter-spacing: 0.25em;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-light);
+  letter-spacing: var(--tracking-wider);
   color: var(--text-primary);
-  text-shadow: 0 0 30px rgba(201, 168, 76, 0.15);
+  text-shadow: var(--accent-text-glow);
 }
 
 .chat-view__empty-sub {
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   color: var(--text-secondary);
   max-width: 320px;
   text-align: center;
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 /* ------------------------------------------ Scroll-to-bottom button */
 .chat-view__scroll-btn {
   position: sticky;
-  bottom: 12px;
+  bottom: var(--space-3);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -228,14 +228,14 @@ onUnmounted(() => {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border-hover);
   background: var(--bg-tertiary);
   color: var(--accent);
   cursor: pointer;
   box-shadow: var(--shadow-md);
-  transition: background 0.2s ease, border-color 0.2s ease;
-  z-index: 10;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  z-index: var(--z-sticky);
 }
 
 .chat-view__scroll-btn:hover {
@@ -246,7 +246,7 @@ onUnmounted(() => {
 /* Scroll button enter/leave transition */
 .scroll-btn-enter-active,
 .scroll-btn-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
 }
 
 .scroll-btn-enter-from,
@@ -259,20 +259,20 @@ onUnmounted(() => {
 .chat-view__streaming-elsewhere {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  margin: 8px 0;
-  background: rgba(201, 168, 76, 0.06);
-  border: 1px solid rgba(201, 168, 76, 0.15);
+  gap: var(--space-2-5);
+  padding: var(--space-2-5) var(--space-4);
+  margin: var(--space-2) 0;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-dim);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: 0.84rem;
+  font-size: var(--text-base);
   animation: bannerFadeIn 0.3s ease;
 }
 
 .chat-view__streaming-elsewhere-icon {
   color: var(--accent);
-  opacity: 0.7;
+  opacity: var(--opacity-medium);
   animation: bannerPulse 2s ease-in-out infinite;
   flex-shrink: 0;
   display: flex;
@@ -280,20 +280,20 @@ onUnmounted(() => {
 
 .chat-view__streaming-elsewhere-btn {
   margin-left: auto;
-  padding: 4px 12px;
-  background: rgba(201, 168, 76, 0.1);
-  border: 1px solid rgba(201, 168, 76, 0.25);
+  padding: var(--space-1) var(--space-3);
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
   border-radius: var(--radius-sm);
   color: var(--accent);
-  font-size: 0.8rem;
+  font-size: var(--text-base);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
   white-space: nowrap;
 }
 
 .chat-view__streaming-elsewhere-btn:hover {
-  background: rgba(201, 168, 76, 0.18);
-  border-color: rgba(201, 168, 76, 0.4);
+  background: var(--accent-medium);
+  border-color: var(--accent-vivid);
 }
 
 @keyframes bannerFadeIn {

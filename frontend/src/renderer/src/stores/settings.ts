@@ -128,6 +128,19 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /** Sync config model with the model currently loaded in LM Studio. */
+  async function syncModel(): Promise<void> {
+    try {
+      const result = await api.syncModel()
+      if (result.synced && result.model) {
+        settings.value.llm.model = result.model
+        await loadModels()
+      }
+    } catch {
+      // Backend unreachable — ignore silently
+    }
+  }
+
   /** Fetch the list of available models from the backend. */
   async function loadModels(): Promise<void> {
     if (models.value.length === 0) {
@@ -343,6 +356,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isModelLoading,
     isInstanceUnloading,
     checkConnection,
+    syncModel,
     loadModels,
     loadModel,
     unloadModel,

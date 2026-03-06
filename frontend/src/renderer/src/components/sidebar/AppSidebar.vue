@@ -176,15 +176,13 @@ async function onOpenFile(id: string): Promise<void> {
   flex-direction: column;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
-  box-shadow:
-    1px 0 16px rgba(0, 0, 0, 0.5),
-    inset -1px 0 0 rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow-sidebar);
   transition:
     width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
-  z-index: 10;
+  z-index: var(--z-sticky);
 }
 
 .sidebar--collapsed {
@@ -198,9 +196,9 @@ async function onOpenFile(id: string): Promise<void> {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--z-base);
   background-image: radial-gradient(circle,
-      rgba(255, 255, 255, 0.025) 1px,
+      var(--white-faint) 1px,
       transparent 1px);
   background-size: 18px 18px;
   -webkit-mask-image: linear-gradient(to bottom,
@@ -222,8 +220,8 @@ async function onOpenFile(id: string): Promise<void> {
   top: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  z-index: 2;
+  height: var(--space-px);
+  z-index: var(--z-raised);
   pointer-events: none;
   background: linear-gradient(90deg,
       transparent 0%,
@@ -233,7 +231,7 @@ async function onOpenFile(id: string): Promise<void> {
       transparent 100%);
   background-size: 300% 100%;
   background-position: -100% 0;
-  opacity: 0.6;
+  opacity: var(--opacity-soft);
   animation: topLineSweep 8s ease-in-out infinite;
 }
 
@@ -256,7 +254,7 @@ async function onOpenFile(id: string): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 12px 8px 8px;
+  padding: var(--space-3) var(--space-2) var(--space-2);
   position: relative;
   z-index: 1;
   flex-shrink: 0;
@@ -264,18 +262,18 @@ async function onOpenFile(id: string): Promise<void> {
 }
 
 .sidebar--collapsed .sidebar__nav {
-  padding: 4px 4px 8px;
+  padding: var(--space-1) var(--space-1) var(--space-2);
 }
 
 /* Pill-style nav link */
 .sidebar__link {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
   padding: 9px 10px;
   border-radius: var(--radius-md);
-  font-size: 0.82rem;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
   letter-spacing: 0.01em;
   color: var(--text-secondary);
   text-decoration: none;
@@ -289,7 +287,7 @@ async function onOpenFile(id: string): Promise<void> {
 /* Center icons when collapsed */
 .sidebar--collapsed .sidebar__link {
   justify-content: center;
-  padding: 10px 0;
+  padding: var(--space-2-5) 0;
 }
 
 /* Hide the gold left-bar indicator when collapsed — too narrow to look good */
@@ -317,7 +315,7 @@ async function onOpenFile(id: string): Promise<void> {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: var(--opacity-soft);
   transition: opacity var(--transition-fast), filter var(--transition-fast);
 }
 
@@ -339,7 +337,7 @@ async function onOpenFile(id: string): Promise<void> {
 }
 
 .sidebar__link:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-subtle);
   color: var(--text-primary);
 }
 
@@ -395,10 +393,10 @@ async function onOpenFile(id: string): Promise<void> {
 .sidebar__section-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px 4px;
-  font-size: 0.6rem;
-  font-weight: 700;
+  gap: var(--space-2);
+  padding: var(--space-2) 14px var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -408,7 +406,7 @@ async function onOpenFile(id: string): Promise<void> {
 .sidebar__section-label::after {
   content: '';
   flex: 1;
-  height: 1px;
+  height: var(--space-px);
   background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
 }
 
@@ -419,13 +417,13 @@ async function onOpenFile(id: string): Promise<void> {
   justify-content: center;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: var(--bg-tertiary);
   color: var(--text-muted);
   cursor: pointer;
   flex-shrink: 0;
-  margin: 8px auto 12px;
+  margin: var(--space-2) auto var(--space-3);
   position: relative;
   z-index: 1;
   transition:

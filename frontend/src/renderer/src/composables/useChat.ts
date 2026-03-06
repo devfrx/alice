@@ -23,6 +23,7 @@ import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import { api } from '../services/api'
 import { wsManager } from '../services/ws'
 import { useChatStore } from '../stores/chat'
+import { useSettingsStore } from '../stores/settings'
 import type {
   FileAttachment,
   WsCancelPayload,
@@ -67,6 +68,7 @@ export const ChatApiKey: InjectionKey<UseChatReturn> = Symbol('chatApi')
  */
 export function useChat(): UseChatReturn {
   const store = useChatStore()
+  const settingsStore = useSettingsStore()
 
   const isConnected = ref(false)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
@@ -81,6 +83,8 @@ export function useChat(): UseChatReturn {
   const onConnected = (): void => {
     isConnected.value = true
     connectionStatus.value = 'connected'
+    // Re-sync model config with LM Studio on (re)connect.
+    settingsStore.syncModel().catch(console.error)
     // Sync sidebar list (picks up local-only conversations persisted while offline).
     store.loadConversations().catch(console.error)
     // Reload the active conversation to sync any messages missed during disconnect.

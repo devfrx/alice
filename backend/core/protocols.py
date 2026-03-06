@@ -15,32 +15,6 @@ from typing import Any, Protocol, runtime_checkable
 
 
 # ---------------------------------------------------------------------------
-# Base lifecycle
-# ---------------------------------------------------------------------------
-
-
-@runtime_checkable
-class BaseService(Protocol):
-    """Minimal lifecycle interface for managed services.
-
-    All long-lived services should support async start/stop and a
-    health-check probe.
-    """
-
-    async def start(self) -> None:
-        """Perform any async initialisation (connections, warm-up, …)."""
-        ...
-
-    async def stop(self) -> None:
-        """Release resources gracefully."""
-        ...
-
-    async def health_check(self) -> bool:
-        """Return ``True`` when the service is operational."""
-        ...
-
-
-# ---------------------------------------------------------------------------
 # LLM
 # ---------------------------------------------------------------------------
 
@@ -76,14 +50,6 @@ class LLMServiceProtocol(Protocol):
         attachments: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion, yielding event dicts."""
-        ...
-
-    async def chat_sync(
-        self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        """Send a non-streaming chat completion request."""
         ...
 
     async def close(self) -> None:

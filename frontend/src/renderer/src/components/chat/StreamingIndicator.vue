@@ -71,19 +71,19 @@ const chatStore = useChatStore()
 .bubble-row {
   display: flex;
   justify-content: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .streaming-bubble {
   max-width: 82%;
-  padding: 12px 14px 12px 16px;
+  padding: var(--space-3) 14px var(--space-3) var(--space-4);
   background: transparent;
   border: none;
-  border-left: 3px solid rgba(201, 168, 76, 0.18);
+  border-left: 3px solid var(--accent-medium);
   border-radius: 0;
   color: var(--text-primary);
-  line-height: 1.55;
-  font-size: 0.9rem;
+  line-height: var(--leading-relaxed);
+  font-size: var(--text-md);
   word-break: break-word;
   position: relative;
   animation: borderPulse 2.5s ease-in-out infinite;
@@ -116,22 +116,22 @@ const chatStore = useChatStore()
 .streaming-bubble__thinking-state {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-1-5);
 }
 
 .streaming-bubble__brain-icon {
   color: var(--accent);
-  opacity: 0.8;
+  opacity: var(--opacity-visible);
   animation: brainPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   flex-shrink: 0;
 }
 
 .streaming-bubble__thinking-label {
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   font-style: italic;
   color: var(--accent);
-  opacity: 0.7;
+  opacity: var(--opacity-medium);
   animation: thinkingFade 2s ease-in-out infinite;
 }
 
@@ -141,7 +141,7 @@ const chatStore = useChatStore()
   width: 3px;
   height: 1em;
   background: linear-gradient(180deg, var(--accent), var(--accent-hover));
-  margin-left: 2px;
+  margin-left: var(--space-0-5);
   vertical-align: text-bottom;
   border-radius: 1px;
   animation: blink 0.8s step-end infinite, cursorFadeIn 0.3s ease both;
@@ -149,7 +149,7 @@ const chatStore = useChatStore()
 
 /* ------------------------------------------------- Content transition */
 .content-fade-enter-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
 }
 
 .content-fade-enter-from {
@@ -209,7 +209,7 @@ const chatStore = useChatStore()
 
   0%,
   100% {
-    border-left-color: rgba(201, 168, 76, 0.18);
+    border-left-color: var(--accent-medium);
   }
 
   50% {

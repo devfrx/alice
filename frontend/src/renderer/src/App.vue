@@ -65,7 +65,7 @@ onMounted(() => {
   align-items: center;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
-  padding: 0 0 4px;
+  padding: 0 0 var(--space-1);
   flex-shrink: 0;
 }
 
@@ -80,7 +80,7 @@ onMounted(() => {
   width: 40%;
   height: 100%;
   background: var(--accent);
-  border-radius: 2px;
+  border-radius: var(--space-0-5);
   animation: globalOpSlide 1.4s ease-in-out infinite;
 }
 
@@ -99,8 +99,8 @@ onMounted(() => {
 }
 
 .global-operation-bar__text {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
-  margin-top: 2px;
+  margin-top: var(--space-0-5);
 }
 </style>

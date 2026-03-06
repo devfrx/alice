@@ -87,7 +87,7 @@ class LLMService:
                 pool=10.0,
             ),
         )
-        self._is_ollama = ":11434" in config.base_url
+        self._is_ollama = config.provider == "ollama"
         self._system_prompt: str | None = None
         self._response_ids: OrderedDict[str, str] = OrderedDict()
         self._response_ids_max = 500
@@ -264,14 +264,6 @@ class LLMService:
         return messages
 
     # ------------------------------------------------------------------
-    # Response-ID tracking (LM Studio native API)
-    # ------------------------------------------------------------------
-
-    def get_response_id(self, conversation_id: str) -> str | None:
-        """Return the cached LM Studio response_id for a conversation."""
-        return self._response_ids.get(conversation_id)
-
-    # ------------------------------------------------------------------
     # Streaming chat — public dispatcher
     # ------------------------------------------------------------------
 
@@ -338,7 +330,9 @@ class LLMService:
 
         This endpoint natively separates reasoning from content via
         dedicated SSE event types (``reasoning.delta`` /
-        ``message.delta``), so no ``ThinkTagParser`` is needed.
+        ``message.delta``).  For models that embed ``<think>`` tags in
+        ``message.delta`` content instead, a ``ThinkTagParser`` extracts
+        them when ``supports_thinking`` is enabled.
 
         Args:
             user_content: The raw user message text.
@@ -461,6 +455,12 @@ class LLMService:
         Raises ``httpx.HTTPStatusError`` on HTTP errors so the caller
         can decide to retry.
         """
+        # Always parse inline think tags — transparent when absent.
+        think_parser = ThinkTagParser()
+        # When the model emits native reasoning.delta events, disable
+        # the tag parser to avoid duplicate extraction.
+        saw_reasoning_event = False
+
         async with self._client.stream(
             "POST", url, json=payload, timeout=timeout,
         ) as resp:
@@ -490,6 +490,7 @@ class LLMService:
                 if evt_type == "reasoning.delta":
                     chunk = data.get("content", "")
                     if chunk:
+                        saw_reasoning_event = True
                         yield {
                             "type": "thinking",
                             "content": chunk,
@@ -497,11 +498,24 @@ class LLMService:
                 elif evt_type == "message.delta":
                     chunk = data.get("content", "")
                     if chunk:
-                        yield {
-                            "type": "token",
-                            "content": chunk,
-                        }
+                        if not saw_reasoning_event:
+                            for kind, text in think_parser.feed(chunk):
+                                yield {
+                                    "type": "thinking" if kind == "thinking" else "token",
+                                    "content": text,
+                                }
+                        else:
+                            yield {
+                                "type": "token",
+                                "content": chunk,
+                            }
                 elif evt_type == "chat.end":
+                    if not saw_reasoning_event:
+                        for kind, text in think_parser.flush():
+                            yield {
+                                "type": "thinking" if kind == "thinking" else "token",
+                                "content": text,
+                            }
                     result = data.get("result", {})
                     resp_id = result.get("response_id")
                     if resp_id and conversation_id:
@@ -553,6 +567,14 @@ class LLMService:
                 # Ignore: chat.start, reasoning.start/end,
                 # message.start/end, prompt_processing.*, model_load.*
 
+            # Stream ended without chat.end — flush any buffered thinking.
+            if think_parser:
+                for kind, text in think_parser.flush():
+                    yield {
+                        "type": "thinking" if kind == "thinking" else "token",
+                        "content": text,
+                    }
+
     # ------------------------------------------------------------------
     # OpenAI-compatible streaming
     # ------------------------------------------------------------------
@@ -586,9 +608,13 @@ class LLMService:
         # LM Studio suppresses reasoning_content when a 'system' role
         # message is present in the messages array.  Work around this
         # by folding the system prompt into the first user message.
+        # Applied unconditionally for LM Studio: harmless for non-thinking
+        # models (just moves system text into the user message) but
+        # essential for thinking models even when supports_thinking is
+        # stale or False due to config/model mismatch.
         actual_messages = (
             self._fold_system_into_user(messages)
-            if self._config.supports_thinking and not self._is_ollama
+            if not self._is_ollama
             else messages
         )
 
@@ -614,10 +640,13 @@ class LLMService:
         tool_calls_acc: dict[int, dict[str, str]] = {}
         last_finish_reason: str | None = None
 
-        # Inline <think> tag parser for models that embed reasoning in content.
-        think_parser: ThinkTagParser | None = (
-            ThinkTagParser() if self._config.supports_thinking else None
-        )
+        # Always parse inline <think> tags — transparent when absent.
+        # Covers any model that embeds reasoning in content, regardless
+        # of the supports_thinking config flag.
+        think_parser: ThinkTagParser | None = ThinkTagParser()
+        # When the model emits native reasoning_content deltas, disable
+        # the tag parser to avoid duplicate / interfering extraction.
+        saw_reasoning_content = False
 
         # Use a generous read timeout for the streaming request.
         # Reasoning models may think for several minutes before
@@ -694,6 +723,9 @@ class LLMService:
                 # --- explicit reasoning_content (LM Studio / Ollama extension) ---
                 reasoning = delta.get("reasoning_content")
                 if reasoning:
+                    if not saw_reasoning_content:
+                        saw_reasoning_content = True
+                        think_parser = None
                     yield {"type": "thinking", "content": reasoning}
 
                 # --- content token (may contain inline <think> tags) ---
@@ -760,43 +792,6 @@ class LLMService:
     # ------------------------------------------------------------------
     # Non-streaming chat
     # ------------------------------------------------------------------
-
-    async def chat_sync(
-        self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        """Send a non-streaming chat completion request.
-
-        Args:
-            messages: The full list of messages.
-            tools: Optional tool definitions.
-
-        Returns:
-            The raw JSON response dict from the API.
-        """
-        url = f"{self._config.base_url}/v1/chat/completions"
-
-        payload: dict[str, Any] = {
-            "model": self._config.model,
-            "messages": messages,
-            "temperature": self._config.temperature,
-            "max_tokens": self._config.max_tokens,
-            "stream": False,
-        }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
-        if self._is_ollama:
-            payload["options"] = {
-                "num_gpu": self._config.num_gpu,
-                "num_ctx": self._config.num_ctx,
-            }
-            payload["keep_alive"] = self._config.keep_alive
-
-        resp = await self._client.post(url, json=payload)
-        resp.raise_for_status()
-        return resp.json()
 
     # ------------------------------------------------------------------
     # Lifecycle

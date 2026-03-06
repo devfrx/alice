@@ -7,7 +7,6 @@ Settings v2 for validation and env parsing.
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 from typing import Any
 
@@ -42,13 +41,13 @@ DEFAULT_MODEL: str = "qwen3.5:9b"
 
 KNOWN_MODELS: dict[str, dict[str, bool]] = {
     # Ollama-style keys
-    "qwen3.5:9b": {"vision": True, "thinking": False},
+    "qwen3.5:9b": {"vision": True, "thinking": True},
     "qwen2.5:14b": {"vision": False, "thinking": False},
     "qwq": {"vision": False, "thinking": True},
     "deepseek-r1:14b": {"vision": False, "thinking": True},
     "llava": {"vision": True, "thinking": False},
     # LM Studio-style keys
-    "qwen/qwen3.5-9b": {"vision": True, "thinking": False},
+    "qwen/qwen3.5-9b": {"vision": True, "thinking": True},
     "qwen/qwq-32b": {"vision": False, "thinking": True},
     "deepseek/deepseek-r1-0528-qwen3-8b": {
         "vision": False, "thinking": True,
@@ -70,7 +69,7 @@ class ServerConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="OMNIA_SERVER__")
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
     reload: bool = True
     environment: str = "development"
@@ -127,7 +126,11 @@ class LLMConfig(BaseSettings):
     """HTTP connect timeout in seconds."""
     system_prompt_file: str = "config/system_prompt.md"
     supports_thinking: bool = False
-    """Enable for reasoning models (QwQ, DeepSeek-R1) that emit <think> tags."""
+    """Request explicit reasoning from the API (QwQ, DeepSeek-R1).
+
+    Inline ``<think>`` tags are always detected and parsed regardless
+    of this flag — it only controls sending ``reasoning: "on"`` to
+    LM Studio and folding system prompts into user messages."""
     supports_vision: bool = False
     """Enable for multimodal models (LLaVA, Qwen2-VL) that accept images."""
     max_tool_iterations: int = 10
@@ -330,13 +333,3 @@ def load_config(path: Path | None = None) -> OmniaConfig:
         )
 
     return OmniaConfig(**raw)
-
-
-@functools.lru_cache(maxsize=1)
-def get_config() -> OmniaConfig:
-    """Return a cached singleton of the default configuration.
-
-    The config is loaded once (from the default YAML path) and then reused
-    for subsequent calls.
-    """
-    return load_config()

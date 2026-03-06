@@ -31,7 +31,12 @@ function reject(): void {
 function handleKeydown(e: KeyboardEvent): void {
     if (e.key === 'Enter') {
         e.preventDefault()
-        approve()
+        const focused = document.activeElement as HTMLElement | null
+        if (focused?.classList.contains('confirm-card__btn--reject')) {
+            reject()
+        } else {
+            approve()
+        }
     } else if (e.key === 'Escape') {
         e.preventDefault()
         reject()
@@ -96,12 +101,12 @@ onMounted(() => {
 .confirm-overlay {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: var(--z-modal);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    background: var(--black-heavy);
+    backdrop-filter: blur(var(--blur-sm));
     animation: overlayFadeIn 0.2s ease;
 }
 
@@ -113,91 +118,91 @@ onMounted(() => {
     background: var(--bg-secondary);
     border: 1px solid var(--accent-border);
     border-radius: var(--radius-lg);
-    padding: 20px 24px;
-    box-shadow: 0 0 40px rgba(201, 168, 76, 0.12);
+    padding: var(--space-5) var(--space-6);
+    box-shadow: var(--shadow-lg);
     animation: cardSlideIn 0.25s ease;
 }
 
 .confirm-card__title {
     margin: 0 0 14px;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
     color: var(--text-primary);
 }
 
 .confirm-card__tool {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
 }
 
 .confirm-card__badge {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.82rem;
+    font-size: var(--text-base);
     color: var(--accent);
-    background: rgba(201, 168, 76, 0.1);
-    padding: 3px 10px;
+    background: var(--accent-light);
+    padding: 3px var(--space-2-5);
     border-radius: var(--radius-sm);
     border: 1px solid var(--accent-border);
 }
 
 .confirm-card__risk {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
 }
 
 .confirm-card__risk-badge {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 2px 8px;
+    padding: var(--space-0-5) var(--space-2);
     border-radius: var(--radius-sm);
 }
 
 .confirm-card__risk-badge--medium {
-    color: #fbbf24;
-    background: rgba(251, 191, 36, 0.1);
-    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--warning);
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
 }
 
 .confirm-card__risk-badge--dangerous {
-    color: #f87171;
-    background: rgba(248, 113, 113, 0.1);
-    border: 1px solid rgba(248, 113, 113, 0.3);
+    color: var(--error);
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
 }
 
 .confirm-card__risk-badge--forbidden {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: var(--error-severe);
+    background: var(--error-severe-bg);
+    border: 1px solid var(--error-severe-border);
 }
 
 .confirm-card__desc {
-    margin: 0 0 12px;
-    font-size: 0.8rem;
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-base);
     color: var(--text-secondary);
-    line-height: 1.4;
+    line-height: var(--leading-snug);
 }
 
 .confirm-card__args-wrap {
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
 }
 
 .confirm-card__args-label {
     display: block;
-    font-size: 0.75rem;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
 }
 
 .confirm-card__args {
     margin: 0;
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
     font-family: var(--font-mono);
-    font-size: 0.74rem;
-    line-height: 1.5;
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
     color: var(--text-secondary);
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--black-light);
     border-radius: var(--radius-sm);
     overflow-x: auto;
     white-space: pre-wrap;
@@ -207,45 +212,45 @@ onMounted(() => {
 
 .confirm-card__actions {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2-5);
     justify-content: flex-end;
 }
 
 .confirm-card__btn {
     padding: 7px 18px;
-    font-size: 0.82rem;
-    font-weight: 500;
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .confirm-card__btn--approve {
-    background: rgba(74, 222, 128, 0.15);
-    border-color: rgba(74, 222, 128, 0.4);
-    color: #4ade80;
+    background: var(--approve-bg);
+    border-color: var(--approve-border);
+    color: var(--approve);
 }
 
 .confirm-card__btn--approve:hover {
-    background: rgba(74, 222, 128, 0.25);
-    border-color: rgba(74, 222, 128, 0.6);
+    background: var(--approve-bg-hover);
+    border-color: var(--approve-border-hover);
 }
 
 .confirm-card__btn--reject {
-    background: rgba(248, 113, 113, 0.1);
-    border-color: rgba(248, 113, 113, 0.3);
-    color: #f87171;
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error);
 }
 
 .confirm-card__btn--reject:hover {
-    background: rgba(248, 113, 113, 0.2);
-    border-color: rgba(248, 113, 113, 0.5);
+    background: var(--error-bg-hover);
+    border-color: var(--error-border-hover);
 }
 
 .confirm-card__hint {
-    margin: 12px 0 0;
-    font-size: 0.68rem;
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-xs);
     color: var(--text-secondary);
     opacity: 0.4;
     text-align: center;

@@ -21,22 +21,22 @@
 }
 
 h1 {
-  font-size: 3rem;
-  letter-spacing: 0.35em;
-  font-weight: 200;
-  text-shadow: 0 0 40px rgba(201, 168, 76, 0.15);
+  font-size: var(--text-3xl);
+  letter-spacing: var(--tracking-widest);
+  font-weight: var(--weight-light);
+  text-shadow: var(--accent-text-glow);
 }
 
 .subtitle {
-  font-size: 0.9rem;
+  font-size: var(--text-md);
   color: var(--text-secondary);
-  opacity: 0.6;
-  margin-top: 0.5rem;
+  opacity: var(--opacity-soft);
+  margin-top: var(--space-2);
 }
 
 .start-btn {
-  margin-top: 2rem;
-  padding: 0.8rem 2rem;
+  margin-top: var(--space-8);
+  padding: var(--space-3) var(--space-8);
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-md);
   color: var(--text-primary);

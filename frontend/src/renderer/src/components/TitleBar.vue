@@ -96,7 +96,7 @@ onUnmounted(() => {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
-  z-index: 10;
+  z-index: var(--z-sticky);
   user-select: none;
 }
 
@@ -106,13 +106,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   height: 100%;
-  padding-left: 12px;
+  padding-left: var(--space-3);
   -webkit-app-region: drag;
 }
 
 .titlebar__title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   letter-spacing: 2px;
   color: var(--text-muted);
 }
@@ -138,12 +138,12 @@ onUnmounted(() => {
 }
 
 .titlebar__btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--white-medium);
   color: var(--text-primary);
 }
 
 .titlebar__btn:active {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-subtle);
 }
 
 .titlebar__btn--close:hover {

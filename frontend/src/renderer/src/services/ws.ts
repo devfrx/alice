@@ -153,13 +153,6 @@ export class WebSocketManager {
     this.scheduleDrain()
   }
 
-  /** Send raw binary data (ArrayBuffer or Blob). */
-  sendBinary(data: ArrayBuffer | Blob): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(data)
-    }
-  }
-
   /** Schedule periodic queue draining until the buffer is clear. */
   private scheduleDrain(): void {
     if (this.drainTimer !== null) return

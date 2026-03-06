@@ -28,10 +28,15 @@ import type {
   WsCancelPayload,
   WsDoneMessage,
   WsErrorMessage,
+  WsLlmRequeryMessage,
   WsSendPayload,
   WsThinkingMessage,
   WsTokenMessage,
-  WsToolCallMessage
+  WsToolConfirmationRequiredMessage,
+  WsToolConfirmationResponsePayload,
+  WsToolExecutionDoneMessage,
+  WsToolExecutionStartMessage,
+  WsWarningMessage
 } from '../types/chat'
 
 /** Connection status reported by the composable. */
@@ -42,6 +47,8 @@ export interface UseChatReturn {
   sendMessage: (content: string, conversationId?: string, attachments?: File[]) => Promise<void>
   /** Stop the in-progress generation. */
   stopGeneration: () => void
+  /** Respond to a tool confirmation request. */
+  respondToConfirmation: (executionId: string, approved: boolean) => void
   /** Reactive flag — `true` while the socket is open. */
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
@@ -122,10 +129,45 @@ export function useChat(): UseChatReturn {
   }
 
   const onToolCall = (data: unknown): void => {
-    const msg = data as WsToolCallMessage
-    console.debug('[useChat] Tool call received:', msg)
-    // Tool execution is handled server-side in a future phase.
-    // For now, just log it so the event is not silently dropped.
+    // Legacy handler kept for backward compatibility with older backends.
+    console.debug('[useChat] Legacy tool_call event received:', data)
+  }
+
+  const onToolExecutionStart = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsToolExecutionStartMessage
+    store.addToolExecution(msg.execution_id, msg.tool_name)
+  }
+
+  const onToolExecutionDone = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsToolExecutionDoneMessage
+    store.completeToolExecution(msg.execution_id, msg.result, msg.success)
+  }
+
+  const onToolConfirmationRequired = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsToolConfirmationRequiredMessage
+    store.addPendingConfirmation({
+      executionId: msg.execution_id,
+      toolName: msg.tool_name,
+      args: msg.args
+    })
+  }
+
+  const onLlmRequery = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsLlmRequeryMessage
+    console.debug('[useChat] LLM re-query iteration:', msg.iteration)
+    // Reset streaming content for the new LLM iteration.
+    // The previous iteration's content is already persisted server-side.
+    store.currentStreamContent = ''
+    store.currentThinkingContent = ''
+  }
+
+  const onWarning = (data: unknown): void => {
+    const msg = data as WsWarningMessage
+    console.warn('[useChat] Server warning:', msg.content)
   }
 
   const onWsError = (data: unknown): void => {
@@ -149,6 +191,11 @@ export function useChat(): UseChatReturn {
   wsManager.on('thinking', onThinking)
   wsManager.on('done', onDone)
   wsManager.on('tool_call', onToolCall)
+  wsManager.on('tool_execution_start', onToolExecutionStart)
+  wsManager.on('tool_execution_done', onToolExecutionDone)
+  wsManager.on('tool_confirmation_required', onToolConfirmationRequired)
+  wsManager.on('llm_requery', onLlmRequery)
+  wsManager.on('warning', onWarning)
   wsManager.on('error', onWsError) // also catches server-side error frames
 
   connectionStatus.value = 'connecting'
@@ -173,6 +220,11 @@ export function useChat(): UseChatReturn {
     wsManager.off('thinking', onThinking)
     wsManager.off('done', onDone)
     wsManager.off('tool_call', onToolCall)
+    wsManager.off('tool_execution_start', onToolExecutionStart)
+    wsManager.off('tool_execution_done', onToolExecutionDone)
+    wsManager.off('tool_confirmation_required', onToolConfirmationRequired)
+    wsManager.off('llm_requery', onLlmRequery)
+    wsManager.off('warning', onWarning)
     wsManager.off('error', onWsError)
     wsManager.disconnect()
   })
@@ -266,9 +318,23 @@ export function useChat(): UseChatReturn {
     }, 5000)
   }
 
+  /**
+   * Respond to a tool confirmation request (approve or reject).
+   */
+  function respondToConfirmation(executionId: string, approved: boolean): void {
+    const payload: WsToolConfirmationResponsePayload = {
+      type: 'tool_confirmation_response',
+      execution_id: executionId,
+      approved
+    }
+    wsManager.send(payload)
+    store.removePendingConfirmation(executionId)
+  }
+
   return {
     sendMessage,
     stopGeneration,
+    respondToConfirmation,
     isConnected,
     connectionStatus,
     isCancelling: computed(() => store.isCancelling)

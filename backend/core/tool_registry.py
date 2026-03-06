@@ -242,10 +242,14 @@ class ToolRegistry:
         Returns:
             Filtered list of OpenAI-format tool dicts.
         """
+        async with self._lock:
+            cache_snapshot = list(self._openai_cache)
+            plugin_map_snapshot = dict(self._tool_to_plugin)
+
         available: list[dict[str, Any]] = []
-        for entry in self._openai_cache:
+        for entry in cache_snapshot:
             ns_name: str = entry["function"]["name"]
-            plugin_name = self._tool_to_plugin.get(ns_name)
+            plugin_name = plugin_map_snapshot.get(ns_name)
             if plugin_name is None:
                 continue
             plugin = self._plugin_manager.get_plugin(plugin_name)

@@ -132,10 +132,67 @@ export interface WsErrorMessage {
   content: string
 }
 
-/** Future: server reports a tool call during generation. */
-export interface WsToolCallMessage {
-  type: 'tool_call'
-  [key: string]: unknown
+/** Server signals a tool has started executing. */
+export interface WsToolExecutionStartMessage {
+  type: 'tool_execution_start'
+  tool_name: string
+  execution_id: string
+}
+
+/** Server signals a tool has finished executing. */
+export interface WsToolExecutionDoneMessage {
+  type: 'tool_execution_done'
+  tool_name: string
+  result: string
+  execution_id: string
+  success: boolean
+}
+
+/** Server requests user confirmation before running a tool. */
+export interface WsToolConfirmationRequiredMessage {
+  type: 'tool_confirmation_required'
+  tool_name: string
+  args: Record<string, unknown>
+  execution_id: string
+}
+
+/** Payload the client sends to approve/reject a tool confirmation. */
+export interface WsToolConfirmationResponsePayload {
+  type: 'tool_confirmation_response'
+  execution_id: string
+  approved: boolean
+}
+
+/** Server signals it is re-querying the LLM after tool execution. */
+export interface WsLlmRequeryMessage {
+  type: 'llm_requery'
+  iteration: number
+}
+
+/** Server sends a warning message. */
+export interface WsWarningMessage {
+  type: 'warning'
+  content: string
+}
+
+// ---------------------------------------------------------------------------
+// Tool execution tracking (client-side)
+// ---------------------------------------------------------------------------
+
+/** Tracks the lifecycle of a single tool execution during streaming. */
+export interface ToolExecution {
+  executionId: string
+  toolName: string
+  status: 'running' | 'done' | 'error'
+  result?: string
+  success?: boolean
+}
+
+/** A pending tool confirmation awaiting user approval. */
+export interface ConfirmationRequest {
+  executionId: string
+  toolName: string
+  args: Record<string, unknown>
 }
 
 /** Discriminated union of all server→client WebSocket frames. */
@@ -144,7 +201,11 @@ export type WsMessage =
   | WsThinkingMessage
   | WsDoneMessage
   | WsErrorMessage
-  | WsToolCallMessage
+  | WsToolExecutionStartMessage
+  | WsToolExecutionDoneMessage
+  | WsToolConfirmationRequiredMessage
+  | WsLlmRequeryMessage
+  | WsWarningMessage
 
 // ---------------------------------------------------------------------------
 // Export / Import

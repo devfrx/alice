@@ -7,6 +7,8 @@ injected where needed without relying on module-level globals.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
@@ -41,6 +43,41 @@ class AppContext:
     stt_service: STTServiceProtocol | None = None
     tts_service: TTSServiceProtocol | None = None
     conversation_file_manager: ConversationFileManagerProtocol | None = None
+
+    plugin_local_state: dict[str, dict] = field(default_factory=dict)
+    """Per-plugin local state, keyed by plugin name."""
+
+    # ------------------------------------------------------------------
+    # Plugin state helpers
+    # ------------------------------------------------------------------
+
+    def get_plugin_state(self, name: str) -> MappingProxyType:
+        """Return a read-only view of a plugin's local state.
+
+        Args:
+            name: The plugin name.
+
+        Returns:
+            A ``MappingProxyType`` wrapping the plugin's state dict.
+            Returns an empty read-only mapping if no state exists.
+        """
+        return MappingProxyType(self.plugin_local_state.get(name, {}))
+
+    async def set_plugin_state(
+        self, plugin_name: str, key: str, value: Any,
+    ) -> None:
+        """Update a single key in a plugin's local state.
+
+        Creates the plugin's state dict if it doesn't exist yet.
+
+        Args:
+            plugin_name: The plugin whose state to update.
+            key: The state key to set.
+            value: The new value.
+        """
+        if plugin_name not in self.plugin_local_state:
+            self.plugin_local_state[plugin_name] = {}
+        self.plugin_local_state[plugin_name][key] = value
 
 
 def create_context(config: OmniaConfig) -> AppContext:

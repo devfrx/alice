@@ -3,11 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import defaultdict
 from enum import StrEnum
 from typing import Any, Callable, Coroutine
 
 from loguru import logger
+
+# ---------------------------------------------------------------------------
+# Circuit breaker defaults
+# ---------------------------------------------------------------------------
+
+CIRCUIT_BREAKER_THRESHOLD: int = 5
+"""Consecutive failures before a handler is temporarily disabled."""
+
+CIRCUIT_BREAKER_COOLDOWN_S: float = 60.0
+"""Seconds a tripped handler stays disabled before retrying."""
 
 # ---------------------------------------------------------------------------
 # Well-known event names
@@ -53,14 +64,26 @@ AsyncHandler = Callable[..., Coroutine[Any, Any, None]]
 
 
 class EventBus:
-    """A lightweight async event bus.
+    """A lightweight async event bus with circuit-breaker protection.
 
     Handlers are async callables. When an event is emitted every registered
     handler for that event is called concurrently via ``asyncio.gather``.
+
+    If a handler fails *threshold* consecutive times it is disabled for
+    *cooldown* seconds to prevent log flooding.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        circuit_breaker_threshold: int = CIRCUIT_BREAKER_THRESHOLD,
+        circuit_breaker_cooldown: float = CIRCUIT_BREAKER_COOLDOWN_S,
+    ) -> None:
         self._handlers: dict[str, list[AsyncHandler]] = defaultdict(list)
+        self._cb_threshold = circuit_breaker_threshold
+        self._cb_cooldown = circuit_breaker_cooldown
+        # Circuit breaker state
+        self._handler_failures: dict[AsyncHandler, int] = {}
+        self._disabled_handlers: dict[AsyncHandler, float] = {}
 
     # -- public API ---------------------------------------------------------
 
@@ -129,6 +152,9 @@ class EventBus:
     ) -> None:
         """Fire *event_name*, calling all registered handlers concurrently.
 
+        Handlers disabled by the circuit breaker are skipped until their
+        cooldown expires.
+
         Args:
             event_name: The event to fire.
             **kwargs: Keyword arguments forwarded to every handler.
@@ -138,19 +164,56 @@ class EventBus:
             logger.debug("Event '{}' fired — no handlers", event_name)
             return
 
+        now = time.monotonic()
+        active: list[AsyncHandler] = []
+        for h in handlers:
+            disabled_until = self._disabled_handlers.get(h)
+            if disabled_until is not None:
+                if now >= disabled_until:
+                    # Cooldown expired — re-enable
+                    del self._disabled_handlers[h]
+                    self._handler_failures.pop(h, None)
+                    active.append(h)
+                else:
+                    continue  # still disabled
+            else:
+                active.append(h)
+
+        if not active:
+            return
+
         logger.debug(
             "Event '{}' fired — {} handler(s)",
             event_name,
-            len(handlers),
+            len(active),
         )
 
         results = await asyncio.gather(
-            *(h(**kwargs) for h in handlers),
+            *(h(**kwargs) for h in active),
             return_exceptions=True,
         )
 
-        for result in results:
+        for handler, result in zip(active, results):
             if isinstance(result, BaseException):
                 logger.error(
-                    "Handler error on '{}': {}", event_name, result
+                    "Handler error on '{}': {}",
+                    event_name,
+                    result,
                 )
+                count = self._handler_failures.get(handler, 0) + 1
+                self._handler_failures[handler] = count
+                if count >= self._cb_threshold:
+                    self._disabled_handlers[handler] = (
+                        now + self._cb_cooldown
+                    )
+                    logger.warning(
+                        "Circuit breaker tripped for {} on '{}': "
+                        "{} consecutive failures — disabled for {}s",
+                        handler.__qualname__,
+                        event_name,
+                        count,
+                        self._cb_cooldown,
+                    )
+            else:
+                # Success resets failure counter
+                self._handler_failures.pop(handler, None)

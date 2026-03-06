@@ -14,10 +14,12 @@ import { computed, ref } from 'vue'
 import { api, resolveBackendUrl } from '../services/api'
 import type {
   ChatMessage,
+  ConfirmationRequest,
   ConversationDetail,
   ConversationExport,
   ConversationSummary,
-  FileAttachment
+  FileAttachment,
+  ToolExecution
 } from '../types/chat'
 
 export const useChatStore = defineStore('chat', () => {
@@ -54,6 +56,12 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Files selected by the user but not yet uploaded. */
   const pendingAttachments = ref<File[]>([])
+
+  /** Tool executions running during the current stream. */
+  const activeToolExecutions = ref<ToolExecution[]>([])
+
+  /** Tool confirmations awaiting user approval. */
+  const pendingConfirmations = ref<Map<string, ConfirmationRequest>>(new Map())
 
   // -----------------------------------------------------------------------
   // Computed
@@ -335,6 +343,8 @@ export const useChatStore = defineStore('chat', () => {
       isWaitingForResponse.value = false
       isCancelling.value = false
       streamingConversationId.value = null
+      activeToolExecutions.value = []
+      pendingConfirmations.value = new Map()
       loadConversations().catch(console.error)
       return
     }
@@ -349,6 +359,10 @@ export const useChatStore = defineStore('chat', () => {
       thinking_content: currentThinkingContent.value || null
     }
 
+    // Check if tool executions occurred — if so, we need a full reload to get
+    // intermediate tool messages that were persisted server-side.
+    const hadToolExecutions = activeToolExecutions.value.length > 0
+
     currentConversation.value.messages.push(assistantMsg)
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
@@ -356,9 +370,17 @@ export const useChatStore = defineStore('chat', () => {
     isWaitingForResponse.value = false
     isCancelling.value = false
     streamingConversationId.value = null
+    activeToolExecutions.value = []
+    pendingConfirmations.value = new Map()
 
     // Refresh sidebar list asynchronously (fire-and-forget)
     loadConversations().catch(console.error)
+
+    // After a tool loop, reload the full conversation to pick up
+    // intermediate tool messages persisted server-side.
+    if (hadToolExecutions) {
+      loadConversation(conversationId).catch(console.error)
+    }
   }
 
   /** Export a conversation as JSON from the backend. */
@@ -370,6 +392,37 @@ export const useChatStore = defineStore('chat', () => {
   async function importConversation(data: ConversationExport): Promise<void> {
     const summary = await api.importConversation(data)
     conversations.value.unshift(summary)
+  }
+
+  // -----------------------------------------------------------------------
+  // Tool execution actions
+  // -----------------------------------------------------------------------
+
+  /** Register a new tool execution as running. */
+  function addToolExecution(executionId: string, toolName: string): void {
+    activeToolExecutions.value.push({ executionId, toolName, status: 'running' })
+  }
+
+  /** Mark a tool execution as completed. */
+  function completeToolExecution(executionId: string, result: string, success: boolean): void {
+    const exec = activeToolExecutions.value.find((e) => e.executionId === executionId)
+    if (exec) {
+      exec.status = success ? 'done' : 'error'
+      exec.result = result
+      exec.success = success
+    }
+    // Clean up any orphaned confirmation (e.g. backend timeout before user responded).
+    pendingConfirmations.value.delete(executionId)
+  }
+
+  /** Add a pending confirmation request. */
+  function addPendingConfirmation(req: ConfirmationRequest): void {
+    pendingConfirmations.value.set(req.executionId, req)
+  }
+
+  /** Remove a pending confirmation (after user responds). */
+  function removePendingConfirmation(executionId: string): void {
+    pendingConfirmations.value.delete(executionId)
   }
 
   /** Clear streaming state (e.g. on error or cancel). Preserves partial content as a message. */
@@ -395,6 +448,8 @@ export const useChatStore = defineStore('chat', () => {
     isWaitingForResponse.value = false
     isCancelling.value = false
     streamingConversationId.value = null
+    activeToolExecutions.value = []
+    pendingConfirmations.value = new Map()
   }
 
   // -----------------------------------------------------------------------
@@ -413,6 +468,8 @@ export const useChatStore = defineStore('chat', () => {
     isWaitingForResponse,
     isCancelling,
     pendingAttachments,
+    activeToolExecutions,
+    pendingConfirmations,
 
     // computed
     messages,
@@ -432,6 +489,12 @@ export const useChatStore = defineStore('chat', () => {
     appendToStream,
     appendToThinking,
     finalizeStream,
-    cancelStream
+    cancelStream,
+
+    // tool execution actions
+    addToolExecution,
+    completeToolExecution,
+    addPendingConfirmation,
+    removePendingConfirmation
   }
 })

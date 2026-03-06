@@ -307,30 +307,30 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
 - [x] **Sharding futuro**: preparare struttura `data/conversations/` per eventuale sotto-directory per user (`data/conversations/{user_id}/`)
 
 #### 3.6 — Frontend: tool call UI
-- [ ] Nuovi tipi WS protocol:
+- [x] Nuovi tipi WS protocol:
   - `{"type": "tool_execution_start", "tool_name": "...", "execution_id": "..."}`
   - `{"type": "tool_execution_done", "tool_name": "...", "result": "...", "execution_id": "..."}`
   - `{"type": "tool_confirmation_required", "tool_name": "...", "args": {...}, "execution_id": "..."}`
   - `{"type": "tool_confirmation_response", "execution_id": "...", "approved": bool}` (client → server)
-- [ ] Loading state intermedio visibile (spinner/badge tra token LLM e risposta finale)
-- [ ] `MessageBubble`: visualizzazione tool calls eseguiti (collapsible, come il thinking block)
-- [ ] **ToolConfirmationDialog**: modale per approvazione/rifiuto azioni con risk_level ≥ medium
-- [ ] **Chat store**: gestione stato `pendingConfirmations: Map<execution_id, ConfirmationRequest>`
+- [x] Loading state intermedio visibile (spinner/badge tra token LLM e risposta finale)
+- [x] `MessageBubble`: visualizzazione tool calls eseguiti (collapsible, come il thinking block)
+- [x] **ToolConfirmationDialog**: modale per approvazione/rifiuto azioni con risk_level ≥ medium
+- [x] **Chat store**: gestione stato `pendingConfirmations: Map<execution_id, ConfirmationRequest>`
 
 #### 3.7 — Inter-Plugin Communication + EventBus Extension
-- [ ] Nuovi eventi standard:
+- [x] Nuovi eventi standard:
   - `plugin.loaded`, `plugin.failed`, `plugin.status_changed`
   - `tool.execution_start`, `tool.execution_succeeded`, `tool.execution_failed`
-- [ ] **Plugin local state**: `AppContext.plugin_local_state: dict[str, dict]` — ogni plugin aggiorna il proprio stato, read-only per gli altri via `ctx.get_plugin_state(name)`
-- [ ] **Circuit breaker** su EventBus: se handler fallisce N volte consecutive, disabilitare temporaneamente (evita log flood)
+- [x] **Plugin local state**: `AppContext.plugin_local_state: dict[str, dict]` — ogni plugin aggiorna il proprio stato, read-only per gli altri via `ctx.get_plugin_state(name)`
+- [x] **Circuit breaker** su EventBus: se handler fallisce N volte consecutive, disabilitare temporaneamente (evita log flood)
 
 #### 3.8 — Test Suite Fase 3
-- [ ] Test BasePlugin: lifecycle (init → startup → tool_call → shutdown → cleanup)
-- [ ] Test PluginManager: load order, collision, crash isolation, reload
-- [ ] Test ToolRegistry: validazione nome, collision, lookup, thread-safety, timeout
-- [ ] Test tool calling loop: max iterations, parallel calls, error recovery, confirmation flow
-- [ ] Test system_info plugin: mock psutil, output schema
-- [ ] Test ConversationFileManager: migration v1→v2, serializzazione tool_calls
+- [x] Test BasePlugin: lifecycle (init → startup → tool_call → shutdown → cleanup)
+- [x] Test PluginManager: load order, collision, crash isolation, reload
+- [x] Test ToolRegistry: validazione nome, collision, lookup, thread-safety, timeout
+- [x] Test tool calling loop: max iterations, parallel calls, error recovery, confirmation flow
+- [x] Test system_info plugin: mock psutil, output schema
+- [x] Test ConversationFileManager: migration v1→v2, serializzazione tool_calls
 
 ---
 

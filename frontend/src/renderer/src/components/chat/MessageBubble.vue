@@ -12,6 +12,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import ThinkingSection from './ThinkingSection.vue'
+import ToolCallSection from './ToolCallSection.vue'
 import type { ChatMessage } from '../../types/chat'
 
 const props = defineProps<{
@@ -92,6 +93,9 @@ onUnmounted(() => {
 
       <!-- Thinking section (assistant only) -->
       <ThinkingSection v-if="message.thinking_content" :thinking-html="thinkingHtml" :initial-collapsed="true" />
+
+      <!-- Tool calls section (assistant only) -->
+      <ToolCallSection v-if="message.tool_calls?.length" :tool-calls="message.tool_calls" />
 
       <!-- Message content -->
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->

@@ -58,6 +58,7 @@ class PluginManager:
         self._plugins: dict[str, BasePlugin] = {}
         self._load_order: list[str] = []
         self._failed_plugins: set[str] = set()
+        self._last_status: dict[str, ConnectionStatus] = {}
         self._lock = asyncio.Lock()
         self._logger = logger.bind(component="PluginManager")
 
@@ -239,6 +240,10 @@ class PluginManager:
                 await new_plugin.initialize(self._ctx)
                 self._plugins[name] = new_plugin
                 self._logger.info("Plugin '{}' reloaded", name)
+
+                if self._ctx.tool_registry:
+                    await self._ctx.tool_registry.refresh()
+
                 return True
             except Exception as exc:
                 self._logger.error(
@@ -315,6 +320,53 @@ class PluginManager:
         return not any(
             s == ConnectionStatus.ERROR for s in statuses.values()
         )
+
+    async def check_health(self) -> dict[str, ConnectionStatus]:
+        """Query plugin statuses, detect changes, and emit events.
+
+        Compares each plugin's current ``ConnectionStatus`` against the
+        last known value.  For every change:
+
+        - Emits ``PLUGIN_STATUS_CHANGED`` on the event bus.
+        - Calls ``on_dependency_status_change()`` on plugins that
+          depend on the changed plugin.
+
+        Returns:
+            Dict mapping plugin name → current ``ConnectionStatus``.
+        """
+        current = await self.get_all_status()
+
+        for name, status in current.items():
+            prev = self._last_status.get(name)
+            if prev == status:
+                continue
+
+            self._logger.info(
+                "Plugin '{}' status changed: {} → {}",
+                name, prev, status,
+            )
+            await self._ctx.event_bus.emit(
+                OmniaEvent.PLUGIN_STATUS_CHANGED,
+                plugin_name=name,
+                new_status=status,
+            )
+
+            # Notify dependent plugins
+            for dep_name, dep_plugin in self._plugins.items():
+                if name in dep_plugin.plugin_dependencies:
+                    try:
+                        await dep_plugin.on_dependency_status_change(
+                            name, status,
+                        )
+                    except Exception as exc:
+                        self._logger.error(
+                            "Plugin '{}' on_dependency_status_change "
+                            "error: {}",
+                            dep_name, exc,
+                        )
+
+        self._last_status = current
+        return current
 
     # ---------------------------------------------------------------
     # Dependency resolution (Kahn's algorithm)

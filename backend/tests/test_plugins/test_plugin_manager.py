@@ -629,3 +629,79 @@ class TestReloadPlugin:
             result = await manager.reload_plugin("stub")
             assert result is True
             assert manager.get_plugin("stub") is not None
+
+
+# ===================================================================
+# check_health — status change detection and event emission
+# ===================================================================
+
+
+class TestCheckHealth:
+    """check_health() detects status changes and emits events."""
+
+    @pytest.mark.asyncio
+    async def test_check_health_detects_status_change(
+        self, ctx: AppContext, manager: PluginManager,
+    ) -> None:
+        """When a plugin's status changes, check_health returns the new value."""
+        PLUGIN_REGISTRY["status_reporter"] = StatusPlugin
+        ctx.config.plugins.enabled = ["status_reporter"]
+        await manager.startup()
+
+        statuses = await manager.check_health()
+        assert statuses["status_reporter"] == ConnectionStatus.CONNECTED
+
+    @pytest.mark.asyncio
+    async def test_check_health_emits_event_on_change(
+        self, ctx: AppContext, manager: PluginManager,
+    ) -> None:
+        """On status change, PLUGIN_STATUS_CHANGED is emitted."""
+        PLUGIN_REGISTRY["status_reporter"] = StatusPlugin
+        ctx.config.plugins.enabled = ["status_reporter"]
+        await manager.startup()
+
+        events: list[dict] = []
+
+        async def _on_status(**kw: object) -> None:
+            events.append(dict(kw))
+
+        ctx.event_bus.subscribe(OmniaEvent.PLUGIN_STATUS_CHANGED, _on_status)
+
+        # First check_health → status goes from None (unknown) to CONNECTED
+        await manager.check_health()
+        assert len(events) == 1
+        assert events[0]["plugin_name"] == "status_reporter"
+        assert events[0]["new_status"] == ConnectionStatus.CONNECTED
+
+        # Second check_health → no change → no new event
+        events.clear()
+        await manager.check_health()
+        assert len(events) == 0
+
+    @pytest.mark.asyncio
+    async def test_check_health_notifies_dependents(
+        self, ctx: AppContext, manager: PluginManager,
+    ) -> None:
+        """When a dependency plugin changes status, dependents are notified."""
+        notified: list[tuple[str, ConnectionStatus]] = []
+
+        class DepTrackingBeta(BetaPlugin):
+            async def on_dependency_status_change(
+                self, plugin_name: str, status: ConnectionStatus,
+            ) -> None:
+                notified.append((plugin_name, status))
+
+        PLUGIN_REGISTRY["alpha"] = StatusPlugin  # alpha → CONNECTED
+        # Override plugin_name for StatusPlugin to match alpha
+        StatusPlugin.plugin_name = "alpha"
+        PLUGIN_REGISTRY["beta"] = DepTrackingBeta
+        ctx.config.plugins.enabled = ["alpha", "beta"]
+        await manager.startup()
+
+        await manager.check_health()
+
+        # beta depends on alpha; alpha changed from None → CONNECTED
+        assert any(pn == "alpha" for pn, _ in notified)
+
+        # Restore original plugin_name
+        StatusPlugin.plugin_name = "status_reporter"

@@ -6,17 +6,23 @@
  * Auto-scrolls on new messages.  Creates a blank conversation on
  * mount when none is active.
  */
-import { inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import ChatInput from '../components/chat/ChatInput.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
 import StreamingIndicator from '../components/chat/StreamingIndicator.vue'
+import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useChatStore } from '../stores/chat'
 
 const chatStore = useChatStore()
 const chatApi = inject(ChatApiKey)!
 const { sendMessage: send, isConnected, stopGeneration } = chatApi
+
+/** Pending confirmations as an array for template iteration. */
+const pendingConfirmationsList = computed(() =>
+  Array.from(chatStore.pendingConfirmations.values())
+)
 
 /** Template ref for the scrollable message container. */
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -137,6 +143,10 @@ onUnmounted(() => {
     <!-- Input -->
     <ChatInput :disabled="false" :is-connected="isConnected" :is-streaming="chatStore.isStreamingCurrentConversation"
       @send="handleSend" @stop="stopGeneration" />
+
+    <!-- Tool confirmation dialog (one at a time; others queued) -->
+    <ToolConfirmationDialog v-if="pendingConfirmationsList.length > 0" :key="pendingConfirmationsList[0].executionId"
+      :confirmation="pendingConfirmationsList[0]" @respond="chatApi.respondToConfirmation" />
   </div>
 </template>
 

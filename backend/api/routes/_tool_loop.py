@@ -69,6 +69,10 @@ async def run_tool_loop(
         ``(full_content, thinking_content)`` of the final LLM response
         (the one with no further tool calls).
     """
+    if ctx.tool_registry is None:
+        logger.error("Tool registry not available, cannot execute tool loop")
+        return full_content, thinking_content
+
     for iteration in range(max_iterations):
         if not tool_calls_from_llm:
             break
@@ -178,20 +182,23 @@ async def run_tool_loop(
         # in the DB (OpenAI API requires a tool response for every tool_call_id).
         for idx, res in enumerate(results):
             if isinstance(res, BaseException):
-                logger.error("Tool execution exception: {}", res)
                 # Save an error tool message to satisfy the OpenAI contract.
                 failed_tc_id = tasks[idx][0]
                 failed_tool_name = tasks[idx][1]
+                logger.error(
+                    "Tool execution exception for '{}': {}",
+                    failed_tool_name, res,
+                )
                 session.add(Message(
                     conversation_id=conv_id,
                     role="tool",
-                    content=f"Tool execution failed: {res}",
+                    content=f"Tool '{failed_tool_name}' execution failed.",
                     tool_call_id=failed_tc_id,
                 ))
                 await websocket.send_json({
                     "type": "tool_execution_done",
                     "tool_name": failed_tool_name,
-                    "result": f"Tool execution failed: {res}",
+                    "result": f"Tool '{failed_tool_name}' execution failed.",
                     "execution_id": tasks[idx][3].execution_id,
                     "success": False,
                 })

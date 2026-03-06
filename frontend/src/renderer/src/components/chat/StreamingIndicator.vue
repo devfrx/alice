@@ -11,7 +11,9 @@ import { computed } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
+import { useChatStore } from '../../stores/chat'
 import ThinkingSection from './ThinkingSection.vue'
+import ToolExecutionIndicator from './ToolExecutionIndicator.vue'
 
 const props = defineProps<{
   /** Accumulated tokens so far (`currentStreamContent` from the store). */
@@ -27,6 +29,8 @@ const htmlContent = computed(() => renderMarkdown(props.content))
 const thinkingHtml = computed(() => renderMarkdown(props.thinkingContent))
 
 const { handleCodeBlockClick } = useCodeBlocks()
+
+const chatStore = useChatStore()
 </script>
 
 <template>
@@ -36,7 +40,8 @@ const { handleCodeBlockClick } = useCodeBlocks()
       <div v-if="thinkingContent && !content" class="streaming-bubble__thinking-state">
         <svg class="streaming-bubble__brain-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
+          <path
+            d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
           <line x1="9" y1="21" x2="15" y2="21" />
           <line x1="10" y1="23" x2="14" y2="23" />
         </svg>
@@ -48,6 +53,9 @@ const { handleCodeBlockClick } = useCodeBlocks()
         :content-length="thinkingContent.length">
         <span v-if="!content" class="streaming-bubble__cursor" />
       </ThinkingSection>
+
+      <!-- Tool execution indicator -->
+      <ToolExecutionIndicator :executions="chatStore.activeToolExecutions" />
 
       <!-- Main content -->
       <Transition name="content-fade">
@@ -145,9 +153,12 @@ const { handleCodeBlockClick } = useCodeBlocks()
 }
 
 @keyframes blink {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0;
   }
@@ -157,25 +168,32 @@ const { handleCodeBlockClick } = useCodeBlocks()
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
 
 @keyframes thinkingFade {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.7;
   }
+
   50% {
     opacity: 0.3;
   }
 }
 
 @keyframes brainPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.8;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.4;
     transform: scale(0.92);
@@ -183,9 +201,12 @@ const { handleCodeBlockClick } = useCodeBlocks()
 }
 
 @keyframes pulseGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 16px var(--accent-glow);
   }
+
   50% {
     box-shadow: 0 0 24px rgba(201, 168, 76, 0.14);
   }

@@ -54,7 +54,11 @@ class OmniaEvent(StrEnum):
     PC_APP_OPENED = "pc_automation.app_opened"
     PC_APP_CLOSED = "pc_automation.app_closed"
     TOOL_CONFIRMATION_LOGGED = "tool.confirmation_logged"
+    # -- Notifications (Phase 7.5) --
+    TIMER_FIRED = "timer.fired"
     ERROR = "error"
+    # -- Calendar --
+    CALENDAR_REMINDER = "calendar.reminder"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

@@ -36,6 +36,23 @@ dependencies = [
     "duckduckgo-search>=6.0",
     "beautifulsoup4>=4.12",
 
+    # Calendar
+    "python-dateutil>=2.9",
+    "tzdata>=2024.1",
+
+    # Notifications (Windows)
+    "winotify>=1.1",
+
+    # Media Control (Windows)
+    "pycaw>=20230407",
+    "comtypes>=1.4",
+
+    # Clipboard
+    "pyperclip>=1.9",
+
+    # News
+    "feedparser>=6.0",
+
     # System Info
     "psutil>=6.0",
 
@@ -89,6 +106,11 @@ voice-gpu = [
     "pynvml>=12.0,<13",
     "nvidia-cublas-cu12>=12.4,<13",
     "nvidia-cudnn-cu12>=9.0,<10",
+]
+# File reading (optional)
+file-reader = [
+    "pdfplumber>=0.11",
+    "python-docx>=1.1",
 ]
 
 [build-system]

@@ -79,12 +79,12 @@ def test_plugins_enabled_list(config: OmniaConfig) -> None:
     assert isinstance(enabled, list)
     assert "system_info" in enabled
     assert "pc_automation" in enabled
-    assert len(enabled) == 2
+    assert len(enabled) == 10
 
 
 def test_stt_defaults(config: OmniaConfig) -> None:
     assert config.stt.engine == "faster-whisper"
-    assert config.stt.model == "small"
+    assert config.stt.model == "large-v3"
     assert config.stt.language == "it"
 
 

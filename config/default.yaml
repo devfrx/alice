@@ -21,7 +21,7 @@ llm:
   system_prompt_file: "config/system_prompt.md"
   supports_thinking: true    # Enable for reasoning models (QwQ, DeepSeek R1)
   supports_vision: true       # Enable for multimodal models
-  max_tool_iterations: 10
+  max_tool_iterations: 25
   # Ollama-specific options (ignored by LM Studio)
   num_ctx: 8192
   num_gpu: -1
@@ -29,7 +29,7 @@ llm:
 
 stt:
   engine: "faster-whisper"
-  model: "small"
+  model: "large-v3"
   language: "it"
   device: "cuda"            # cuda | cpu
   compute_type: "float16"   # float16 | int8 | int8_float16
@@ -56,9 +56,15 @@ plugins:
   enabled:
     - system_info
     - pc_automation
-    # - web_search       # TODO: implement
-    # - calendar         # TODO: implement
-    # - home_automation  # TODO: implement (requires Home Assistant)
+    - web_search
+    - calendar
+    - weather
+    - clipboard
+    - notifications
+    - media_control
+    - file_search
+    - news
+    # - home_automation  # not implemented yet
 
 home_assistant:
   url: "http://homeassistant.local:8123"
@@ -96,3 +102,62 @@ ui:
   theme: "dark"
   global_hotkey: "Ctrl+Shift+O"
   language: "it"
+
+# ──────────────────────────────────────────────────
+# Phase 7 — Plugin Configurations
+# ──────────────────────────────────────────────────
+
+web_search:
+  max_results: 5
+  cache_ttl_s: 300
+  request_timeout_s: 10
+  rate_limit_s: 2.0
+  region: "it-it"
+  proxy_http: null
+  proxy_https: null
+
+calendar:
+  timezone: "Europe/Rome"
+  reminder_check_interval_s: 60
+
+weather:
+  default_city: "Rome"
+  units: "metric"
+  lang: "it"
+  cache_ttl_s: 600
+  request_timeout_s: 8
+
+clipboard:
+  max_content_chars: 4000
+
+notifications:
+  app_id: "OMNIA"
+  sound_enabled: true
+  default_timeout_s: 5
+  max_active_timers: 20
+
+media_control:
+  volume_step: 10
+  brightness_step: 10
+
+file_search:
+  allowed_paths: []
+  forbidden_paths:
+    - "C:\\Windows"
+    - "C:\\Program Files"
+    - "C:\\Program Files (x86)"
+    - "C:\\ProgramData"
+  max_results: 50
+  max_file_size_read_bytes: 1048576
+  max_content_chars: 8000
+  follow_symlinks: false
+
+news:
+  feeds:
+    - "https://feeds.bbci.co.uk/news/world/rss.xml"
+    - "https://www.ansa.it/sito/notizie/tecnologia/rss.xml"
+    - "https://www.repubblica.it/rss/homepage/rss2.0.xml"
+  max_articles: 10
+  cache_ttl_minutes: 15
+  request_timeout_s: 10
+  default_lang: "it"

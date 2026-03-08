@@ -23,6 +23,8 @@ async def safe_subprocess(
     args: list[str] | None = None,
     timeout: int | None = None,
     cwd: str | None = None,
+    *,
+    raw_cmdline: bool = False,
 ) -> str:
     """Execute a command safely via subprocess with strict security constraints.
 
@@ -31,9 +33,17 @@ async def safe_subprocess(
 
     Args:
         command: The executable name (e.g. "ipconfig", "systeminfo").
+            When *raw_cmdline* is ``True``, this is the full command-line
+            string passed directly to ``CreateProcessW`` (no re-quoting).
         args: Optional list of arguments (NOT a single string).
+            Ignored when *raw_cmdline* is ``True``.
         timeout: Timeout in seconds (defaults to COMMAND_TIMEOUT_S).
         cwd: Optional working directory.
+        raw_cmdline: If ``True``, *command* is passed as a single string
+            to ``subprocess.run`` so that Python does **not** apply
+            ``list2cmdline`` quoting.  Use this for ``cmd.exe /c …``
+            invocations where the command string already contains its
+            own quoting (e.g. ``cmd.exe /c mkdir "C:\\My Folder"``).
 
     Returns:
         Truncated stdout+stderr output as a string.
@@ -46,15 +56,19 @@ async def safe_subprocess(
     if timeout is None:
         timeout = COMMAND_TIMEOUT_S
 
-    cmd_list = [command]
-    if args:
-        cmd_list.extend(args)
-
-    logger.debug("safe_subprocess: {}", " ".join(cmd_list))
+    if raw_cmdline:
+        cmd_or_list: str | list[str] = command
+        logger.debug("safe_subprocess (raw): {}", command)
+    else:
+        cmd_list = [command]
+        if args:
+            cmd_list.extend(args)
+        cmd_or_list = cmd_list
+        logger.debug("safe_subprocess: {}", " ".join(cmd_list))
 
     def _run() -> str:
         result = subprocess.run(
-            cmd_list,
+            cmd_or_list,
             capture_output=True,
             text=True,
             timeout=timeout,

@@ -25,11 +25,14 @@ import type {
   ModelsStatusResponse
 } from '../types/settings'
 
+/** Backend host (without /api), configurable via VITE_API_BASE_URL env var. */
+const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
 /** Base URL for all REST calls. */
-const BASE_URL = 'http://localhost:8000/api'
+const BASE_URL = `${BACKEND_BASE}/api`
 
 /** Backend host root (without /api), used to resolve relative asset URLs. */
-export const BACKEND_HOST = 'http://localhost:8000'
+export const BACKEND_HOST = BACKEND_BASE
 
 /**
  * Resolve a backend-relative path (e.g. `/uploads/...`) to an absolute URL.
@@ -54,10 +57,11 @@ export function resolveBackendUrl(path: string): string {
  */
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const { headers: customHeaders, ...fetchOptions } = options ?? {}
+  const hasBody = !!fetchOptions.body
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...fetchOptions,
     headers: {
-      'Content-Type': 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       ...(customHeaders as Record<string, string>)
     }
   })
@@ -90,7 +94,7 @@ export const api = {
 
   /** Export a conversation as JSON. */
   exportConversation: (id: string): Promise<ConversationExport> =>
-    request<ConversationExport>(`/chat/conversations/${id}/export`),
+    request<ConversationExport>(`/chat/conversations/${encodeURIComponent(id)}/export`),
 
   /** Import a conversation from JSON. */
   importConversation: (data: ConversationExport): Promise<ConversationSummary> =>
@@ -101,15 +105,15 @@ export const api = {
 
   /** Get the absolute filesystem path of a conversation's JSON file. */
   getConversationFilePath: (id: string): Promise<{ path: string }> =>
-    request<{ path: string }>(`/chat/conversations/${id}/file-path`),
+    request<{ path: string }>(`/chat/conversations/${encodeURIComponent(id)}/file-path`),
 
   /** Fetch a single conversation with its full message list. */
   getConversation: (id: string): Promise<ConversationDetail> =>
-    request<ConversationDetail>(`/chat/conversations/${id}`),
+    request<ConversationDetail>(`/chat/conversations/${encodeURIComponent(id)}`),
 
   /** Delete a conversation and all its messages. */
   deleteConversation: (id: string): Promise<DeleteConversationResponse> =>
-    request<DeleteConversationResponse>(`/chat/conversations/${id}`, { method: 'DELETE' }),
+    request<DeleteConversationResponse>(`/chat/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   /** Delete ALL conversations, messages, and files. */
   deleteAllConversations: (): Promise<DeleteAllConversationsResponse> =>
@@ -117,7 +121,7 @@ export const api = {
 
   /** Rename a conversation. */
   renameConversation: (id: string, title: string): Promise<RenameConversationResponse> =>
-    request<RenameConversationResponse>(`/chat/conversations/${id}/title`, {
+    request<RenameConversationResponse>(`/chat/conversations/${encodeURIComponent(id)}/title`, {
       method: 'POST',
       body: JSON.stringify({ title })
     }),
@@ -217,7 +221,7 @@ export const api = {
 
   /** Enable or disable a plugin by name. */
   togglePlugin: (name: string, enabled: boolean): Promise<PluginInfo> =>
-    request<PluginInfo>(`/plugins/${name}`, {
+    request<PluginInfo>(`/plugins/${encodeURIComponent(name)}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled })
     }),
@@ -239,5 +243,21 @@ export const api = {
 
   /** Read current tool confirmations state from backend. */
   getToolConfirmations: (): Promise<{ confirmations_enabled: boolean }> =>
-    request<{ confirmations_enabled: boolean }>('/settings/tool-confirmations')
+    request<{ confirmations_enabled: boolean }>('/settings/tool-confirmations'),
+
+  // -- Plugin tool execution ------------------------------------------------
+
+  /** Execute a plugin tool directly via REST. */
+  executePluginTool: <T = unknown>(
+    plugin: string,
+    tool: string,
+    args: Record<string, unknown> = {}
+  ): Promise<{ success: boolean; content: T; error_message?: string }> =>
+    request<{ success: boolean; content: T; error_message?: string }>(
+      '/plugins/execute',
+      {
+        method: 'POST',
+        body: JSON.stringify({ plugin, tool, args })
+      }
+    )
 }

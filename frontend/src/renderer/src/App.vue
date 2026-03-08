@@ -6,12 +6,14 @@ import TitleBar from './components/TitleBar.vue'
 import AppSidebar from './components/sidebar/AppSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
 import { useChat, ChatApiKey } from './composables/useChat'
+import { usePluginComponents } from './composables/usePluginComponents'
 import { useSettingsStore } from './stores/settings'
 
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
 
 const settingsStore = useSettingsStore()
+const { toolbarComponents } = usePluginComponents()
 
 onMounted(() => {
   settingsStore.resumeOperationTracking()
@@ -21,6 +23,14 @@ onMounted(() => {
 <template>
   <div id="omnia-app">
     <TitleBar />
+    <!-- Plugin toolbar mount point -->
+    <div v-if="toolbarComponents.length" class="plugin-toolbar">
+      <component
+        v-for="entry in toolbarComponents"
+        :is="entry.component"
+        :key="entry.name"
+      />
+    </div>
     <div v-if="settingsStore.isAnyOperationInProgress" class="global-operation-bar">
       <div class="global-operation-bar__track" role="progressbar" aria-label="Operazione modello in corso">
         <div class="global-operation-bar__fill" />
@@ -102,5 +112,16 @@ onMounted(() => {
   font-size: var(--text-sm);
   color: var(--text-secondary);
   margin-top: var(--space-0-5);
+}
+
+/* ── Plugin toolbar mount point ─────────────────────────────────── */
+.plugin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 </style>

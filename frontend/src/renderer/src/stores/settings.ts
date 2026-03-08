@@ -8,6 +8,7 @@ export interface OmniaSettings {
     model: string
     temperature: number
     maxTokens: number
+    maxToolIterations: number
   }
   stt: {
     language: string
@@ -28,11 +29,12 @@ export const useSettingsStore = defineStore('settings', () => {
     llm: {
       model: 'mistralai/ministral-3-14b-reasoning',
       temperature: 0.7,
-      maxTokens: 30311
+      maxTokens: 30311,
+      maxToolIterations: 25
     },
     stt: {
       language: 'it',
-      model: 'small'
+      model: 'large-v3'
     },
     tts: {
       voice: 'models/tts/it_IT-paola-medium',
@@ -73,6 +75,7 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value.llm.model = (llm.model as string) ?? settings.value.llm.model
         settings.value.llm.temperature = (llm.temperature as number) ?? settings.value.llm.temperature
         settings.value.llm.maxTokens = (llm.max_tokens as number) ?? settings.value.llm.maxTokens
+        settings.value.llm.maxToolIterations = (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
       }
       if (config.stt) {
         const stt = config.stt as Record<string, unknown>
@@ -100,7 +103,8 @@ export const useSettingsStore = defineStore('settings', () => {
       await api.updateConfig({
         llm: {
           temperature: settings.value.llm.temperature,
-          max_tokens: settings.value.llm.maxTokens
+          max_tokens: settings.value.llm.maxTokens,
+          max_tool_iterations: settings.value.llm.maxToolIterations
         },
         stt: {
           language: settings.value.stt.language,

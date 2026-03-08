@@ -114,6 +114,7 @@ async def get_config(request: Request) -> dict[str, Any]:
             "max_tokens": cfg.llm.max_tokens,
             "supports_thinking": cfg.llm.supports_thinking,
             "supports_vision": cfg.llm.supports_vision,
+            "max_tool_iterations": cfg.llm.max_tool_iterations,
         },
         "stt": {
             "engine": cfg.stt.engine,
@@ -269,6 +270,14 @@ async def update_config(request: Request) -> dict[str, Any]:
             if mt <= 0:
                 raise HTTPException(400, "max_tokens must be a positive integer")
             object.__setattr__(cfg.llm, "max_tokens", mt)
+        if "max_tool_iterations" in llm_updates:
+            try:
+                mti = int(llm_updates["max_tool_iterations"])
+            except (TypeError, ValueError):
+                raise HTTPException(400, "max_tool_iterations must be a positive integer")
+            if not (1 <= mti <= 100):
+                raise HTTPException(400, "max_tool_iterations must be between 1 and 100")
+            object.__setattr__(cfg.llm, "max_tool_iterations", mti)
 
     if "ui" in body:
         ui_updates = body["ui"]

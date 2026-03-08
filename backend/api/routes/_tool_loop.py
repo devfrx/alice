@@ -7,23 +7,18 @@ user confirmation for dangerous tools, and graceful error recovery.
 from __future__ import annotations
 
 import asyncio
-import base64
 import contextlib
-import re
 import json
 import uuid
-from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 from sqlmodel import select
 
-from backend.core.config import PROJECT_ROOT
 from backend.core.context import AppContext
-from backend.core.event_bus import OmniaEvent
 from backend.core.plugin_models import ExecutionContext, ToolResult
-from backend.db.models import Attachment, Message, ToolConfirmationAudit
+from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
 
 # Type alias for the sync callback.
@@ -45,7 +40,6 @@ async def run_tool_loop(
     client_ip: str,
     sync_fn: SyncFn | None,
     cancel_event: asyncio.Event | None = None,
-    message_buffer: list[str] | None = None,
 ) -> tuple[str, str]:
     """Execute the tool-calling loop until the LLM produces a final answer.
 
@@ -69,8 +63,6 @@ async def run_tool_loop(
         sync_fn: Async callback to sync conversation to JSON file.
         cancel_event: Optional event that, when set, signals the loop
             to stop early and return accumulated content.
-        message_buffer: Optional list to buffer non-cancel WS messages
-            received during tool execution for later processing.
 
     Returns:
         ``(full_content, thinking_content)`` of the final LLM response
@@ -79,10 +71,6 @@ async def run_tool_loop(
     if ctx.tool_registry is None:
         logger.error("Tool registry not available, cannot execute tool loop")
         return full_content, thinking_content
-
-    # Track saved screenshot base64 data per tool_call_id across iterations,
-    # so the LLM re-query can include images for vision models.
-    screenshot_data: dict[str, tuple[str, str]] = {}
 
     for iteration in range(max_iterations):
         if not tool_calls_from_llm:
@@ -97,6 +85,12 @@ async def run_tool_loop(
             "Tool loop iteration {}/{} — {} tool call(s)",
             iteration + 1, max_iterations, len(tool_calls_from_llm),
         )
+
+        # Normalise tool-call IDs upfront so assistant msg and tool
+        # responses always use the same value.
+        for tc in tool_calls_from_llm:
+            if not tc.get("id"):
+                tc["id"] = f"call_{uuid.uuid4().hex[:24]}"
 
         # 1. Save assistant message with tool_calls to DB.
         asst_msg = Message(
@@ -121,13 +115,13 @@ async def run_tool_loop(
         tasks: list[tuple[str, str, dict[str, Any], ExecutionContext]] = []
 
         for tc in tool_calls_from_llm:
+            tc_id = tc["id"]
             fn = tc.get("function") or {}
             tool_name = fn.get("name", "")
             if not tool_name:
                 logger.warning(
                     "Skipping tool call with no function name: {}", tc,
                 )
-                tc_id = tc.get("id", "")
                 if tc_id:
                     session.add(Message(
                         conversation_id=conv_id,
@@ -150,7 +144,7 @@ async def run_tool_loop(
                     conversation_id=conv_id,
                     role="tool",
                     content=f"Error: could not parse arguments \u2014 {e}",
-                    tool_call_id=tc["id"],
+                    tool_call_id=tc_id,
                 ))
                 await session.flush()
                 await websocket.send_json({
@@ -172,7 +166,7 @@ async def run_tool_loop(
                     conversation_id=conv_id,
                     role="tool",
                     content="Duplicate call — see prior result.",
-                    tool_call_id=tc["id"],
+                    tool_call_id=tc_id,
                 ))
                 await session.flush()  # Ensure dedup response persisted immediately
                 continue
@@ -193,7 +187,7 @@ async def run_tool_loop(
                     "Blocked FORBIDDEN tool '{}' (exec_id={})",
                     tool_name, exec_id,
                 )
-                _save_rejected_tool_msg(session, conv_id, tc["id"])
+                _save_rejected_tool_msg(session, conv_id, tc_id)
                 await session.flush()
                 await websocket.send_json({
                     "type": "tool_execution_done",
@@ -215,12 +209,6 @@ async def run_tool_loop(
                 )
                 session.add(audit_entry)
                 await session.flush()
-                await ctx.event_bus.emit(
-                    OmniaEvent.TOOL_CONFIRMATION_LOGGED,
-                    execution_id=exec_id,
-                    tool_name=tool_name,
-                    approved=False,
-                )
                 continue
 
             if tool_def and tool_def.requires_confirmation:
@@ -258,16 +246,10 @@ async def run_tool_loop(
                 )
                 session.add(audit_entry)
                 await session.flush()
-                await ctx.event_bus.emit(
-                    OmniaEvent.TOOL_CONFIRMATION_LOGGED,
-                    execution_id=exec_id,
-                    tool_name=tool_name,
-                    approved=approved,
-                )
 
                 if not approved:
                     _save_rejected_tool_msg(
-                        session, conv_id, tc["id"],
+                        session, conv_id, tc_id,
                     )
                     await session.flush()  # Persist rejection immediately
                     await websocket.send_json({
@@ -290,10 +272,7 @@ async def run_tool_loop(
                 conversation_id=str(conv_id),
                 execution_id=exec_id,
             )
-            tasks.append((tc["id"], tool_name, args, context))
-
-        # Track screenshots before execution to detect new ones.
-        prev_screenshot_ids = set(screenshot_data.keys())
+            tasks.append((tc_id, tool_name, args, context))
 
         # 3. Execute all tools in parallel.
         results = await asyncio.gather(
@@ -350,16 +329,6 @@ async def run_tool_loop(
                 tool_call_id=tc_id,
             )
             session.add(tool_msg)
-            await session.flush()
-
-            # Persist screenshot to disk and create an Attachment record.
-            if is_image and tool_result.content:
-                await _save_screenshot_attachment(
-                    session, conv_id, tool_msg.id, tc_id,
-                    tool_result.content,
-                    tool_result.content_type or "image/png",
-                    screenshot_data,
-                )
 
             ws_payload: dict[str, Any] = {
                 "type": "tool_execution_done",
@@ -384,9 +353,6 @@ async def run_tool_loop(
         if ctx.conversation_file_manager and sync_fn:
             await sync_fn(session, conv_id, ctx.conversation_file_manager)
 
-        # Commit all changes from this iteration to prevent data loss.
-        await session.commit()
-
         # 6. Rebuild messages from full DB history and re-query LLM.
         stmt = (
             select(Message)
@@ -394,15 +360,14 @@ async def run_tool_loop(
             .order_by(Message.created_at)
         )
         results_db = await session.exec(stmt)
-
         updated_history: list[dict[str, Any]] = []
         for m in results_db.all():
-            updated_history.append({
-                "role": m.role,
-                "content": m.content,
-                "tool_calls": m.tool_calls,
-                "tool_call_id": m.tool_call_id,
-            })
+            entry: dict[str, Any] = {"role": m.role, "content": m.content or ""}
+            if m.role == "assistant" and m.tool_calls:
+                entry["tool_calls"] = m.tool_calls
+            if m.role == "tool" and m.tool_call_id:
+                entry["tool_call_id"] = m.tool_call_id
+            updated_history.append(entry)
 
         tools = (
             await ctx.tool_registry.get_available_tools()
@@ -413,38 +378,6 @@ async def run_tool_loop(
             tools = None  # empty list confuses some LLMs
 
         messages = llm.build_continuation_messages(history=updated_history)
-
-        # Inject new screenshot images so vision-capable models can
-        # actually "see" what was captured.  Gated behind the
-        # supports_vision config flag to avoid breaking text-only models.
-        new_screenshot_ids = set(screenshot_data.keys()) - prev_screenshot_ids
-        if new_screenshot_ids and llm.supports_vision:
-            image_parts: list[dict[str, Any]] = []
-            for tc_id in new_screenshot_ids:
-                b64, ct = screenshot_data[tc_id]
-                image_parts.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{ct};base64,{b64}",
-                    },
-                })
-            messages.append({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "[Attached: screenshot(s) captured by the tool. "
-                            "Analyze the image(s) to complete the task.]"
-                        ),
-                    },
-                    *image_parts,
-                ],
-            })
-            logger.debug(
-                "Injected {} screenshot(s) into LLM re-query",
-                len(image_parts),
-            )
 
         # 7. Re-stream LLM.
         full_content = ""
@@ -458,10 +391,9 @@ async def run_tool_loop(
 
         # Spawn a reader task so cancel messages are detected during streaming.
         reader_task = asyncio.create_task(
-            _ws_cancel_reader(websocket, cancel_event, message_buffer),
+            _ws_cancel_reader(websocket, cancel_event),
         ) if cancel_event else None
 
-        requery_error = False
         try:
             async for event in llm.chat(
                 messages, tools=tools, cancel_event=cancel_event,
@@ -474,13 +406,6 @@ async def run_tool_loop(
                     await websocket.send_json(event)
                 elif event["type"] == "tool_call":
                     tool_calls_from_llm.append(event)
-                elif event["type"] == "error":
-                    logger.error(
-                        "LLM error during tool loop re-query: {}",
-                        event.get("content", "unknown"),
-                    )
-                    await websocket.send_json(event)
-                    requery_error = True
                 elif event["type"] == "done":
                     pass
         finally:
@@ -488,11 +413,6 @@ async def run_tool_loop(
                 reader_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await reader_task
-
-        # If the LLM returned an error, stop the tool loop.
-        if requery_error:
-            logger.warning("Stopping tool loop due to LLM re-query error")
-            break
 
     else:
         # Loop exhausted max_iterations without a clean break.
@@ -512,62 +432,6 @@ async def run_tool_loop(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-# Base directory for uploaded / generated files.
-_UPLOADS_BASE: Path = (PROJECT_ROOT / "data" / "uploads").resolve()
-
-
-async def _save_screenshot_attachment(
-    session: Any,
-    conv_id: uuid.UUID,
-    message_id: uuid.UUID,
-    tool_call_id: str,
-    b64_content: str,
-    content_type: str,
-    screenshot_data: dict[str, tuple[str, str]],
-) -> None:
-    """Save a screenshot image to disk and create a DB ``Attachment``.
-
-    Also registers the base64 data in *screenshot_data* so the LLM
-    re-query can include the image for vision models.
-
-    Args:
-        session: Active async DB session.
-        conv_id: Conversation UUID (used for the directory structure).
-        message_id: The tool message UUID to link the attachment to.
-        tool_call_id: Tool call ID (key for screenshot_data map).
-        b64_content: Raw base64-encoded image data.
-        content_type: MIME type (e.g. ``"image/png"``).
-        screenshot_data: Mutable dict collecting screenshots for the LLM.
-    """
-    screenshots_dir = _UPLOADS_BASE / str(conv_id)
-    screenshots_dir.mkdir(parents=True, exist_ok=True)
-
-    file_id = uuid.uuid4()
-    raw_ext = content_type.split("/")[-1] if "/" in content_type else "png"
-    file_ext = raw_ext if re.fullmatch(r"[a-zA-Z0-9]+", raw_ext) else "png"
-    file_name = f"{file_id}.{file_ext}"
-    file_path = screenshots_dir / file_name
-
-    image_bytes = base64.b64decode(b64_content)
-    await asyncio.to_thread(file_path.write_bytes, image_bytes)
-
-    rel_path = f"data/uploads/{conv_id}/{file_name}"
-    att = Attachment(
-        id=file_id,
-        message_id=message_id,
-        filename=f"screenshot_{file_name}",
-        content_type=content_type,
-        file_path=rel_path,
-    )
-    session.add(att)
-
-    # Keep in memory so the LLM re-query in the same loop can use it.
-    screenshot_data[tool_call_id] = (b64_content, content_type)
-
-    logger.debug(
-        "Saved screenshot attachment {} for tool_call_id={}", rel_path, tool_call_id,
-    )
 
 
 async def _exec_one(
@@ -674,7 +538,11 @@ async def _request_confirmation(
         )
         return False
     except WebSocketDisconnect:
-        raise
+        logger.warning(
+            "WebSocket disconnected during confirmation for tool '{}' (exec_id={})",
+            tool_name, execution_id,
+        )
+        return False
     except (json.JSONDecodeError, Exception):
         logger.warning(
             "Error receiving confirmation for tool '{}' (exec_id={})",
@@ -686,13 +554,12 @@ async def _request_confirmation(
 async def _ws_cancel_reader(
     websocket: WebSocket,
     cancel_event: asyncio.Event | None,
-    message_buffer: list[str] | None = None,
 ) -> None:
     """Read WebSocket messages in the background during LLM re-streaming.
 
     Sets *cancel_event* when a ``{"type": "cancel"}`` message arrives.
-    Non-cancel messages are buffered in *message_buffer* for later
-    processing by the main loop.
+    Any non-cancel messages are silently discarded (the main loop handles
+    only LLM stream events during this phase).
     """
     if cancel_event is None:
         return
@@ -706,9 +573,6 @@ async def _ws_cancel_reader(
             if msg.get("type") == "cancel":
                 cancel_event.set()
                 return
-            elif message_buffer is not None:
-                message_buffer.append(raw)
-                logger.debug("Buffered non-cancel message during tool loop re-query")
     except (WebSocketDisconnect, asyncio.CancelledError):
         return
     except Exception:

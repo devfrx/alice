@@ -61,7 +61,7 @@ def normalize_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif role == "tool":
             entry: dict[str, Any] = {"role": "tool", "content": content}
             tool_call_id = msg.get("tool_call_id")
-            if tool_call_id:
+            if tool_call_id is not None:
                 entry["tool_call_id"] = tool_call_id
             normalized.append(entry)
         else:
@@ -798,7 +798,7 @@ class LLMService:
                     func = tc_delta.get("function", {})
                     if func.get("name"):
                         tool_calls_acc[idx]["name"] = func["name"]
-                    if func.get("arguments"):
+                    if func.get("arguments") is not None:
                         tool_calls_acc[idx]["arguments"] += func["arguments"]
 
         # Stream ended without [DONE] — either cancelled or connection closed.

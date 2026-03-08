@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from backend.core.context import AppContext
+from backend.core.plugin_models import ExecutionContext
 
 router = APIRouter()
 
@@ -20,45 +23,50 @@ def _ctx(request: Request) -> AppContext:
 async def list_plugins(request: Request) -> list[dict[str, Any]]:
     """Return all available plugins and their status.
 
-    Builds the list from loaded plugins (real metadata) plus any
-    entries in ``plugins.enabled`` that failed to load.
+    Discovers every plugin under ``backend/plugins/`` (even those
+    not currently enabled) so the frontend can display toggles for
+    all of them.
     """
     ctx = _ctx(request)
     enabled_list = ctx.config.plugins.enabled
     pm = ctx.plugin_manager
 
     loaded = pm.get_all_plugins() if pm else {}
-    seen: set[str] = set()
+
+    # Discover ALL plugin classes (imports modules that aren't loaded yet).
+    all_available = pm.discover_available_plugins() if pm else {}
+
     results: list[dict[str, Any]] = []
 
-    # Loaded plugins — real metadata
-    for name, plugin in loaded.items():
-        seen.add(name)
-        tools = [
-            {"name": t.name, "description": t.description}
-            for t in plugin.get_tools()
-        ]
-        results.append(
-            {
-                "name": name,
-                "version": plugin.plugin_version,
-                "description": plugin.plugin_description,
-                "author": getattr(plugin, "plugin_author", ""),
-                "enabled": name in enabled_list,
-                "tools": tools,
-            }
-        )
-
-    # Expected but not loaded — show as disabled/unavailable
-    for name in enabled_list:
-        if name not in seen:
+    for name, plugin_cls in sorted(all_available.items()):
+        plugin = loaded.get(name)
+        if plugin is not None:
+            # Loaded — real metadata
+            tools = [
+                {"name": t.name, "description": t.description}
+                for t in plugin.get_tools()
+            ]
             results.append(
                 {
                     "name": name,
-                    "version": "unknown",
-                    "description": f"Plugin '{name}' not loaded",
-                    "author": "",
-                    "enabled": True,
+                    "version": plugin.plugin_version,
+                    "description": plugin.plugin_description,
+                    "author": getattr(plugin, "plugin_author", ""),
+                    "enabled": name in enabled_list,
+                    "tools": tools,
+                }
+            )
+        else:
+            # Not loaded — extract class-level metadata
+            results.append(
+                {
+                    "name": name,
+                    "version": getattr(plugin_cls, "plugin_version", "unknown"),
+                    "description": getattr(
+                        plugin_cls, "plugin_description", ""
+                    ),
+                    "author": getattr(plugin_cls, "plugin_author", ""),
+                    "enabled": False,
                     "tools": [],
                 }
             )
@@ -130,4 +138,83 @@ async def toggle_plugin(
         "author": "",
         "enabled": plugin_name in current,
         "tools": [],
+    }
+
+
+# -------------------------------------------------------------------
+# Direct plugin tool execution
+# -------------------------------------------------------------------
+
+
+class _ExecuteRequest(BaseModel):
+    """Body schema for ``POST /plugins/execute``."""
+
+    plugin: str = Field(..., min_length=1, max_length=64)
+    tool: str = Field(..., min_length=1, max_length=64)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/plugins/execute")
+async def execute_plugin_tool(request: Request) -> dict[str, Any]:
+    """Execute a plugin tool directly via REST.
+
+    Body: ``{"plugin": str, "tool": str, "args": dict}``
+
+    Returns ``{"success": bool, "content": ..., "error_message": ...}``.
+    """
+    ctx = _ctx(request)
+    pm = ctx.plugin_manager
+
+    if pm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Plugin manager not available",
+        )
+
+    body = _ExecuteRequest(**(await request.json()))
+
+    plugin = pm.get_plugin(body.plugin)
+    if plugin is None:
+        return {
+            "success": False,
+            "content": None,
+            "error_message": f"Plugin '{body.plugin}' is not loaded or enabled",
+        }
+
+    # Verify the tool exists on the plugin
+    known_tools = {t.name for t in plugin.get_tools()}
+    if body.tool not in known_tools:
+        return {
+            "success": False,
+            "content": None,
+            "error_message": (
+                f"Tool '{body.tool}' not found on plugin '{body.plugin}'"
+            ),
+        }
+
+    exec_ctx = ExecutionContext(
+        session_id="rest",
+        conversation_id="rest",
+        execution_id=str(uuid.uuid4()),
+    )
+
+    try:
+        result = await plugin.execute_tool(body.tool, body.args, exec_ctx)
+    except Exception as exc:
+        logger.error(
+            "Plugin '{}' tool '{}' raised: {}",
+            body.plugin,
+            body.tool,
+            exc,
+        )
+        return {
+            "success": False,
+            "content": None,
+            "error_message": f"Tool execution failed: {exc}",
+        }
+
+    return {
+        "success": result.success,
+        "content": result.content,
+        "error_message": result.error_message,
     }

@@ -491,41 +491,369 @@ Ogni conversazione è salvata come file JSON atomico, sincronizzato automaticame
 
 --- -->
 
-### Fase 7 — Plugin: Ricerca Web + Calendario
+### Fase 7 — Plugin: Ricerca Web + Calendario + Meteo
 
-#### 7.1 — Web Search Plugin
-- [ ] DuckDuckGo search primario (`duckduckgo-search` library)
-- [ ] Opzionale: SearXNG self-hosted come alternativa
-- [ ] **SSRF prevention**: validare URL risultati — bloccare `localhost`, `127.0.0.1`, `10.*`, `192.168.*`, `169.254.*`, indirizzi IPv6 locali
-- [ ] **Rate limiting**: max 1 req/10s verso DDG (evitare ban)
-- [ ] **Proxy support** in config: `web.proxy.http`, `web.proxy.https`, `web.proxy.no_proxy`
-- [ ] **Result caching**: cache resultati per 5 minuti (evitare ricerche duplicate); LRU con max 100 entries
-- [ ] Tool: `web_search(query: str, max_results: int = 5) -> list[SearchResult]`
-- [ ] Tool: `web_scrape(url: str) -> str` — estrai testo con `httpx` + `beautifulsoup4`; max 50KB output; timeout 10s
+> **Struttura file per ogni plugin** (pattern consolidato dal codebase):
+> `backend/plugins/{name}/__init__.py` — import + `PLUGIN_REGISTRY["{name}"] = XxxPlugin`
+> `backend/plugins/{name}/plugin.py` — `BasePlugin` subclass con `get_tools()` e `execute_tool()`
+> File aggiuntivi (client.py, executor.py, etc.) se il plugin ha >150 righe di logica
 
-#### 7.2 — Calendario Plugin
-- [ ] DB models plugin-specifici: `CalendarEvent(id, title, description, start_time, end_time, recurrence_rule, reminder_minutes, created_by)`
-- [ ] Tool: `create_event(title, start, end, description?, recurrence?)` — risk: `SAFE`
-- [ ] Tool: `list_events(from_date, to_date)` — risk: `SAFE`
-- [ ] Tool: `delete_event(event_id)` — risk: `MEDIUM` (confirmation)
-- [ ] **Recurring events**: RRULE format (RFC 5545) con parsing via `python-dateutil`
-- [ ] **Reminder system**: background task che controlla reminder ogni minuto; emette `calendar.reminder` event
-- [ ] **Timezone handling**: tutti i tempi in UTC nel DB; conversione a timezone utente (config `calendar.timezone: str`)
-- [ ] **Futura integrazione esterna**: forward-compat con CalDAV/Google Calendar (non implementare ora, ma struttura DB pronta)
+#### 7.1 — Web Search Plugin (`backend/plugins/web_search/`)
+- [x] `WebSearchPlugin(BasePlugin)` — `plugin_name = "web_search"`, `plugin_version = "1.0.0"`, `plugin_priority = 40`
+- [x] `plugin_dependencies: list[str] = []` — standalone, nessun altro plugin richiesto
+- [x] `WebSearchConfig(BaseSettings)` in `backend/core/config.py`:
+  - `enabled: bool = False`
+  - `max_results: int = 5`
+  - `cache_ttl_s: int = 300` (5 min)
+  - `request_timeout_s: int = 10`
+  - `rate_limit_s: float = 10.0` (min secondi fra richieste DDG)
+  - `proxy_http: str | None = None`, `proxy_https: str | None = None`
+- [x] Entry in `config/default.yaml`: `web_search:` section + `web_search` nella lista `plugins.enabled` (disabled by default)
+- [x] `backend/plugins/web_search/client.py`:
+  - `WebSearchClient` — singleton su `httpx.AsyncClient` persistente (connection pool, non ricreare per ogni call, stesso pattern di HA client pianificato in Fase 6)
+  - Lazy DDG import: `try: from duckduckgo_search import DDGS` con `check_dependencies()` se mancante
+  - Rate limiting: `asyncio.Lock` + timestamp ultima richiesta (evita ban DDG)
+  - Result caching: `functools.lru_cache` con TTL manuale (dict `{query_hash: (timestamp, results)}`)
+  - `async def search(query, max_results) -> list[dict]` — `asyncio.to_thread(ddg.text, ...)` (DDG sync)
+  - `async def scrape(url) -> str` — `await client.get(url, timeout=10)` → `BeautifulSoup(html, "html.parser").get_text()` → tronca a 50KB
+- [x] **SSRF prevention** in `client.py` (`_validate_url(url: str) -> None`):
+  - Bloccare schemi non-HTTPS/HTTP: `file://`, `ftp://`, `ssh://`, etc.
+  - Risolvere hostname via `socket.getaddrinfo()` in thread (async-safe) — bloccare IP privati: `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1`, `fc00::/7`
+  - Bloccare `localhost` e varianti (case-insensitive)
+  - Stessa funzione riusata da `weather` client (7.3) e `news` reader (7.6)
+- [x] Tool `web_search`: `risk_level="safe"`, `timeout_ms=15000`, `result_type="json"` — `max_results` validato: 1–20
+- [x] Tool `web_scrape`: `risk_level="medium"`, `requires_confirmation=True`, `timeout_ms=15000` — URL validata con `_validate_url()` prima dell'esecuzione
+- [x] Sanitizzazione output: strip tag HTML residui + normalizzazione whitespace + tronca a 4096 chars (già gestito da `ToolRegistry`)
+- [x] `get_config_schema()` per auto-generazione form Settings (Fase 8)
 
-#### 7.3 — Plugin UI (Vue components)
-- [ ] **Strategia**: plugin components bundled nel frontend (Option A — semplice per Electron; Option B con fetch remoto in Fase 8)
-- [ ] `defineAsyncComponent()` per lazy loading componenti plugin
-- [ ] **Plugin component registry**: `PluginManager.get_frontend_components()` → REST endpoint `GET /api/plugins/components` → frontend carica async
-- [ ] **Mount points** per plugin UI: `sidebar`, `modal`, `toolbar`, `settings-panel`
-- [ ] Componente `CalendarView.vue`: vista settimanale/mensile base, CRUD eventi
-- [ ] Componente `SearchResultsPanel.vue`: risultati ricerca in sidebar collassabile
+#### 7.2 — Calendario Plugin (`backend/plugins/calendar/`)
+- [x] `CalendarPlugin(BasePlugin)` — `plugin_name = "calendar"`, `plugin_priority = 30`
+- [x] `plugin_dependencies: list[str] = []` — standalone
+- [x] DB models via `get_db_models()` — tabella creata da `PluginManager` a startup (già supportato):
+  - `CalendarEvent(SQLModel, table=True)`: `id: uuid`, `title: str`, `description: str | None`, `start_time: datetime` (UTC), `end_time: datetime` (UTC), `recurrence_rule: str | None` (RRULE RFC 5545), `reminder_minutes: int | None`, `created_by: str = "llm"`, `created_at: datetime`
+- [x] `CalendarConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `timezone: str = "Europe/Rome"` (IANA timezone)
+  - `reminder_check_interval_s: int = 60`
+- [x] `on_app_startup()`: avvia `asyncio.create_task(_reminder_loop())` — background task con `asyncio.sleep(reminder_check_interval_s)`, cerca eventi con `reminder_minutes` entro la finestra, emette `calendar.reminder` su EventBus
+- [x] `on_app_shutdown()`: cancella il task del reminder loop
+- [x] Dipendenza: `python-dateutil ≥ 2.9` in `pyproject.toml` per RRULE parsing + `pytz` per timezone
+- [x] Tool `create_event`: `risk_level="safe"`, validazione start < end, parse `start`/`end` come ISO 8601 con `dateutil.parser.parse()`, converti a UTC prima di salvare
+- [x] Tool `list_events`: `risk_level="safe"`, filtra per range UTC, converti risultati a timezone utente prima di restituire
+- [x] Tool `update_event`: `risk_level="safe"`, stesso processo di validazione di `create_event`
+- [x] Tool `delete_event`: `risk_level="medium"`, `requires_confirmation=True`
+- [x] Tool `get_today_summary`: `risk_level="safe"`, restituisce eventi di oggi (da mezzanotte a mezzanotte utente timezone)
+- [x] **Edge case**: se `start_time` e `end_time` sono nello stesso fuso orario passato come stringa ISO 8601 con offset (es. `2026-03-08T15:00:00+01:00`), preservare intent senza convertire a UTC e riconvertire (usare `dateutil.parser.parse()` che mantiene tzinfo)
+- [x] **Futura integrazione esterna**: colonna `external_id: str | None` + `external_source: str | None` per CalDAV/Google Calendar
 
-#### 7.4 — Test Suite Fase 7
-- [ ] Test web search: mock DDG, rate limiting, SSRF blocking, caching
-- [ ] Test web scrape: mock httpx, max size, timeout, URL validation
-- [ ] Test calendar: CRUD, recurring events, reminder trigger, timezone
-- [ ] Test plugin UI loading: async component, mount points
+#### 7.3 — Weather Plugin (`backend/plugins/weather/`)
+> **Dipendenza Fase 7.1**: riusa `_validate_url()` da `web_search/client.py` — importare come utility condivisa. Alternativa (più pulita): copiare la logica in un modulo `backend/core/http_security.py` condiviso tra i plugin che fanno fetch HTTP (web_search, weather, news). **Scelta consigliata**: creare `backend/core/http_security.py` con `validate_url_ssrf(url: str) -> None` usato da tutti e tre.
+
+- [x] **Prerequisito**: creare `backend/core/http_security.py` (SSRF check centralizzato) — rimuovere logica duplicata da web_search/client.py e usare solo questo modulo
+- [x] `WeatherPlugin(BasePlugin)` — `plugin_name = "weather"`, `plugin_priority = 35`, `plugin_dependencies: list[str] = []`
+- [x] Backend dati: **open-meteo.com** (free, no API key, HTTPS only) — URL: `https://api.open-meteo.com/v1/forecast`
+  - Zero dipendenze cloud a pagamento, conforme al vincolo di progetto
+  - Geocoding: `https://geocoding-api.open-meteo.com/v1/search` per nome città → lat/lon
+- [x] `WeatherConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `default_city: str = "Rome"` (usata se tool chiamato senza `city`)
+  - `units: Literal["metric", "imperial"] = "metric"`
+  - `lang: str = "it"`
+  - `cache_ttl_s: int = 600` (10 min — meteo non cambia al secondo)
+  - `request_timeout_s: int = 8`
+- [x] `backend/plugins/weather/client.py`:
+  - `WeatherClient` — `httpx.AsyncClient` persistente (non ricreare per ogni call)
+  - `async def get_coordinates(city: str) -> tuple[float, float]` — geocoding con caching in `plugin_local_state`
+  - `async def get_current(lat, lon, units, lang) -> dict`
+  - `async def get_forecast(lat, lon, days, units, lang) -> list[dict]`
+  - Caching: `{(city, units, lang): (timestamp, data)}` dict in memory — invalidato dopo `cache_ttl_s`
+  - `validate_url_ssrf()` da `backend/core/http_security.py` prima di ogni fetch
+- [x] Tool `get_weather(city?: str)` → `risk_level="safe"`, `timeout_ms=10000`, `result_type="json"`:
+  - Output: `{city, temperature, feels_like, humidity, wind_speed, condition, uv_index, timestamp}`
+  - Se `city` omesso → usa `config.weather.default_city`
+- [x] Tool `get_weather_forecast(city?: str, days: int = 3)` → `risk_level="safe"`, `timeout_ms=10000`:
+  - `days` validato: 1–7 (limite open-meteo free tier)
+  - Output: lista di `{date, temp_max, temp_min, condition, precipitation_prob}`
+- [x] `initialize()`: crea `WeatherClient`, registra in `plugin_local_state["weather"]["client"]`
+- [x] `cleanup()`: chiude `httpx.AsyncClient` (`await client.aclose()`)
+- [x] **Edge case**: città non trovata → `ToolResult.error("City not found: ...")` (non eccezione Python raw)
+- [x] **Edge case**: open-meteo offline → `ToolResult.error("Weather service unavailable")` + emit `ConnectionStatus.DISCONNECTED` via `get_connection_status()`
+
+#### 7.4 — Plugin UI (Vue components)
+- [x] **Strategia**: plugin components bundled nel frontend (Option A — semplice per Electron; Option B con fetch remoto in Fase 8)
+- [x] `defineAsyncComponent()` per lazy loading componenti plugin
+- [x] **Plugin component registry**: `PluginManager.get_frontend_components()` → REST endpoint `GET /api/plugins/components` → frontend carica async
+- [x] **Mount points** per plugin UI: `sidebar`, `modal`, `toolbar`, `settings-panel`
+- [x] Componente `CalendarView.vue`: vista settimanale/mensile base, CRUD eventi
+- [x] Componente `SearchResultsPanel.vue`: risultati ricerca in sidebar collassabile
+- [x] Componente `WeatherWidget.vue`: widget compatto per toolbar (temperatura + icona condizione)
+
+#### 7.5 — Dipendenze e Config Changes per Fase 7
+- [x] `pyproject.toml` — nuove dipendenze:
+  - `duckduckgo-search >= 6.0` (web_search)
+  - `beautifulsoup4 >= 4.12` (web_search scrape)
+  - `python-dateutil >= 2.9` (calendar RRULE)
+  - `pytz >= 2024.1` (calendar timezone — alternativa: `zoneinfo` stdlib Python 3.9+, preferibile)
+  - Nessuna nuova dep per weather (httpx già in core)
+- [x] `backend/core/config.py`:
+  - Aggiungere `WebConfig`, `CalendarConfig`, `WeatherConfig` come `BaseSettings` subclass
+  - Aggiungere a `OmniaConfig` come campi: `web: WebConfig`, `calendar: CalendarConfig`, `weather: WeatherConfig`
+- [x] `config/default.yaml`:
+  - Sezioni `web_search:`, `calendar:`, `weather:` con tutti i defaults
+  - `plugins.enabled` rimane `[system_info, pc_automation]` — gli altri `enabled: false` individualmente per safety
+
+#### 7.6 — Test Suite Fase 7
+- [x] Test web_search: mock `DDGS.text()` via `asyncio.to_thread`, rate limiting (token bucket), SSRF blocking su 127.0.0.1/10.x/192.168.x, caching LRU hit/miss
+- [x] Test web_scrape: mock `httpx.AsyncClient.get()`, max size truncation (>50KB), timeout, URL SSRF validation
+- [x] Test calendar: CRUD eventi, RRULE parsing, reminder trigger (mock `asyncio.sleep`), conversione UTC↔timezone, edge: start > end, event non trovato
+- [x] Test weather: mock httpx responses open-meteo, geocoding caching, città non trovata, servizio offline → ConnectionStatus.DISCONNECTED
+- [x] Test `http_security.py`: ogni categoria IP privato bloccata, schema non-HTTP bloccato, URL pubblica valida passa
+- [x] Test plugin UI loading: `defineAsyncComponent()`, mount points
+
+---
+
+### Fase 7.5 — Plugin: Media Control + Notifiche + Clipboard
+
+> **Ordine di implementazione consigliato**: clipboard (più semplice, zero nuove dep) → notifications (timer stateful) → media_control (COM/Windows = più complesso). Tutti e tre sono standalone senza dipendenze da altri plugin.
+
+#### 7.5.1 — Clipboard Plugin (`backend/plugins/clipboard/`)
+- [x] `ClipboardPlugin(BasePlugin)` — `plugin_name = "clipboard"`, `plugin_priority = 20`, `plugin_dependencies: list[str] = []`
+- [x] Dipendenza: **`pyperclip >= 1.9`** in `pyproject.toml` (cross-platform; su Windows usa `win32clipboard` da pywin32 già presente come dep di pc_automation — ma `pyperclip` è più semplice come api)
+- [x] Lazy import: `try: import pyperclip` con `check_dependencies()` se mancante
+- [x] `ClipboardConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `max_content_chars: int = 4000` (tronca prima di inviare a LLM — evita context flooding)
+- [x] Tool `get_clipboard()` → `risk_level="safe"`, `timeout_ms=3000`:
+  - `asyncio.to_thread(pyperclip.paste)` — API sync, sempre thread
+  - Output: `{content: str, truncated: bool, length: int}`
+  - **Edge case**: clipboard contiene binario (immagine/file) → `pyperclip.PyperclipException` → `ToolResult.error("Clipboard contains non-text content")`
+  - **Edge case**: clipboard vuota → `{content: "", truncated: false, length: 0}`
+- [x] Tool `set_clipboard(text: str)` → `risk_level="medium"`, `requires_confirmation=True`, `timeout_ms=3000`:
+  - `asyncio.to_thread(pyperclip.copy, text)`
+  - Validazione: `len(text) <= 1_000_000` (anti–memory bomb se LLM genera testo enorme)
+  - **Edge case**: `pyperclip` non disponibile (headless server senza display) → `ToolResult.error("Clipboard not available in headless environment")`
+- [x] File structure: solo `__init__.py` + `plugin.py` (plugin < 80 righe, nessun executor separato)
+- [x] Test: mock pyperclip.paste/copy, testo binario → errore, testo lungo > max → truncated flag, pyperclip non disponibile
+
+#### 7.5.2 — Notifications Plugin (`backend/plugins/notifications/`)
+- [x] `NotificationsPlugin(BasePlugin)` — `plugin_name = "notifications"`, `plugin_priority = 25`, `plugin_dependencies: list[str] = []`
+- [x] Dipendenza Windows: **`winotify >= 1.1`** in `pyproject.toml` per Windows 10/11 toast native
+  - Fallback headless (no display): log warning + `ToolResult.ok("Notification queued (no display)")` — non crashare
+  - Lazy import: `try: from winotify import Notification, audio as WinAudio`
+- [x] `NotificationsConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `app_id: str = "OMNIA"` (nome app nelle notifiche Windows)
+  - `sound_enabled: bool = True`
+  - `default_timeout_s: int = 5`
+  - `max_active_timers: int = 20` (anti DoS per richieste timer dal LLM)
+- [x] `backend/plugins/notifications/timer_manager.py`:
+  - `TimerManager` (non singleton — istanziato in `NotificationsPlugin.initialize()`)
+  - `_timers: dict[str, asyncio.Task]` — mapping `timer_id → Task`
+  - `async def create_timer(timer_id: str, label: str, duration_s: int, callback: Callable) -> None`
+  - `def cancel_timer(timer_id: str) -> bool` — `task.cancel()` + rimozione dal dict
+  - `async def shutdown()` — cancella tutti i task attivi (chiamato da `cleanup()`)
+  - **Persistenza timers**: DB model `ActiveTimer(SQLModel, table=True)`: `id: str (uuid)`, `label: str`, `fires_at: datetime`, `created_at: datetime`, `status: Literal["pending", "fired", "cancelled"]`
+  - `on_app_startup()`: carica timers `status="pending"` con `fires_at > now()` dal DB, ri-crea i task `asyncio` corrispondenti (sopravvivono a restart del backend)
+  - **Edge case**: se `fires_at` è nel passato al reload → inviare notifica immediately + aggiornare status a "fired"
+- [x] Tool `send_notification(title: str, message: str, timeout_s?: int)` → `risk_level="safe"`, `timeout_ms=5000`:
+  - `asyncio.to_thread(_send_win_notification, title, message, timeout_s)`
+  - Fallback: se winotify non disponibile → solo log (non errore)
+- [x] Tool `set_timer(label: str, duration_seconds: int)` → `risk_level="safe"`, `timeout_ms=3000`:
+  - Valida `1 <= duration_seconds <= 86400` (max 24h)
+  - Valida `len(active_timers) < max_active_timers`
+  - Genera `timer_id = uuid4()`, crea task + salva in DB
+  - Return: `{timer_id, label, fires_at_iso}`
+- [x] Tool `cancel_timer(timer_id: str)` → `risk_level="safe"`, `timeout_ms=3000`
+- [x] Tool `list_active_timers()` → `risk_level="safe"`, `timeout_ms=3000`:
+  - Legge dal DB (source of truth), non da dict in-memory
+- [x] EventBus: `timer.fired` event con `{timer_id, label}` quando scatta
+- [x] **Integrazione calendar**: se `calendar` plugin è attivo e `calendar.reminder` EventBus event arriva, `notifications` può iscriversi a quell'evento per inviare toast — ma NON dichiara `plugin_dependencies=["calendar"]` (soft coupling via EventBus, non hard dep)
+- [x] Test: mock winotify, timer create/fire/cancel, persistence/reload su restart, max_active_timers limit, duration fuori range, winotify non disponibile
+
+#### 7.5.3 — Media Control Plugin (`backend/plugins/media_control/`)
+- [x] `MediaControlPlugin(BasePlugin)` — `plugin_name = "media_control"`, `plugin_priority = 30`, `plugin_dependencies: list[str] = []`
+- [x] **Windows-only** — `check_dependencies()` verifica OS + disponibilità COM:
+  - `import sys; sys.platform == "win32"` — se non Windows → tutti i tool restituiscono `ToolResult.error("Media control is Windows-only")`
+  - Lazy import: `try: from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume` (COM interface)
+- [x] Dipendenze in `pyproject.toml`:
+  - **`pycaw >= 20230407`** (Windows Core Audio API wrapper via `comtypes`)
+  - `comtypes >= 1.4` (già installato come dep di pycaw, COM interop)
+  - `pywin32 >= 306` — già presente come dep di pc_automation (Windows media key simulation)
+  - Nessuna collisione: pywin32 è già in pyproject.toml
+- [x] `MediaControlConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `volume_step: int = 10` (% per increment/decrement)
+  - `brightness_step: int = 10`
+- [x] `backend/plugins/media_control/executor.py`:
+  - Tutte le funzioni **DEVONO** usare `asyncio.to_thread()` — le API COM sono blocking e non thread-safe sull'event loop
+  - `_get_volume_interface()` — inizializza `IAudioEndpointVolume` via `pycaw.pycaw.AudioUtilities.GetSpeakers()`; cache in modulo (reinizializzare se COM disconnessa)
+  - `async def exec_get_volume() -> int` — range 0–100 (normalizza da 0.0–1.0 della COM API)
+  - `async def exec_set_volume(level: int) -> str` — valida `0 <= level <= 100`, `SetMasterVolumeLevelScalar(level/100)`
+  - `async def exec_media_play_pause()` — `win32api.keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 0, 0)` via pywin32
+  - `async def exec_media_next() / exec_media_prev()` — idem con `VK_MEDIA_NEXT_TRACK / VK_MEDIA_PREV_TRACK`
+  - `async def exec_get_current_media() -> dict` — legge Windows SMTC via `winrt` (opzionale, fallback: `GetForegroundWindow()` + titolo finestra come approssimazione)
+  - `async def exec_set_brightness(level: int) -> str` — WMI query `SELECT * FROM WmiMonitorBrightnessMethods`; `asyncio.to_thread` obbligatorio
+- [x] Tool `get_volume()` → `risk_level="safe"`, `timeout_ms=3000`
+- [x] Tool `set_volume(level: int)` → `risk_level="medium"`, `requires_confirmation=False` (non distruttivo, invertibile), `timeout_ms=3000`
+  - **Nota design**: volume NON richiede confirmation per esperienza Jarvis fluida (come abbassare volume fisicamente)
+- [x] Tool `volume_up() / volume_down()` → `risk_level="safe"`, usa `volume_step` da config
+- [x] Tool `mute() / unmute()` → `risk_level="safe"`
+- [x] Tool `media_play_pause() / media_next() / media_previous()` → `risk_level="safe"` (controllo media non distruttivo)
+- [x] Tool `get_current_media()` → `risk_level="safe"`, `timeout_ms=3000` — output: `{title?, artist?, album?, app?}`
+- [x] Tool `set_brightness(level: int)` → `risk_level="medium"`, `requires_confirmation=False`, `timeout_ms=5000`
+  - WMI blocking → sempre `asyncio.to_thread`
+  - **Edge case**: monitor non supporta WMI brightness (monitor esterno) → `ToolResult.error("Brightness control not supported for this display")`
+- [x] `get_connection_status()`: verifica se COM disponibile → `CONNECTED` / `ERROR`
+- [x] **Edge case**: COM interface invalida (es. device audio rimosso) → reinizializza `_get_volume_interface()` al prossimo call invece di crashare
+- [x] Test: mock pycaw COM via `unittest.mock`, mock win32api keybd_event, non-Windows → error graceful, COM device rimosso → reinit
+
+#### 7.5.4 — Config e Dipendenze Fase 7.5
+- [x] `pyproject.toml` nuove dipendenze:
+  - `pyperclip >= 1.9` (clipboard)
+  - `winotify >= 1.1` (notifications, Windows only)
+  - `pycaw >= 20230407` (media_control, Windows only)
+  - `comtypes >= 1.4` (media_control, transitiva di pycaw)
+- [x] `config/default.yaml`: sezioni `clipboard:`, `notifications:`, `media_control:` con tutti i defaults
+- [x] `backend/core/config.py`: `ClipboardConfig`, `NotificationsConfig`, `MediaControlConfig` + aggiunta a `OmniaConfig`
+
+#### 7.5.5 — Test Suite Fase 7.5
+- [x] Test clipboard: get/set successo, clipboard binaria → errore, testo > max → truncated, pyperclip assente → errore graceful
+- [x] Test notifications (winotify): mock `Notification.show()`, timer create→fire→callback, timer cancel, list_active, max_active_timers exceeded, persistence al restart, `fires_at` nel passato al reload
+- [x] Test media_control: mock pycaw `IAudioEndpointVolume`, mock win32api `keybd_event`, non-Windows → errori graceful, volume bounds (0–100), COM device rimosso → reinit
+- [x] Test config: env var override (`OMNIA_MEDIA_CONTROL__ENABLED=true`), defaults
+
+---
+
+### Fase 7.6 — Plugin: Ricerca File + Notizie/Briefing
+
+> **Ordine di implementazione consigliato**: file_search (zero nuove dep obbligatorie) → news (richiede feedparser + soft dep su weather/calendar). `file_search` non dipende da nessun altro plugin. `news.get_daily_briefing()` ha soft dependency su weather e calendar (via `ctx.plugin_manager`, non hard dep).
+
+#### 7.6.1 — File Search Plugin (`backend/plugins/file_search/`)
+- [x] `FileSearchPlugin(BasePlugin)` — `plugin_name = "file_search"`, `plugin_priority = 25`, `plugin_dependencies: list[str] = []`
+- [x] **Zero nuove dipendenze obbligatorie** — usa stdlib: `os`, `pathlib`, `mimetypes`, `stat`
+  - Dipendenze opzionali per lettura file avanzata (lazy import con `check_dependencies()`):
+    - `pdfplumber >= 0.11` per lettura PDF
+    - `python-docx >= 1.1` per lettura DOCX
+    - Se mancanti: `read_text_file` restituisce errore specifico (`"PDF reading requires: pip install pdfplumber"`)
+- [x] `FileSearchConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `allowed_paths: list[str] = []` — default calcolato dinamicamente in `initialize()`: `[Path.home(), Path.home()/"Desktop", Path.home()/"Documents", Path.home()/"Downloads"]`
+  - `forbidden_paths: list[str]` — PATH di sistema bloccati: `["C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)", "C:\\ProgramData"]` (Windows); `/etc`, `/sys`, `/proc`, `/dev` (Linux/macOS)
+  - `max_results: int = 50`
+  - `max_file_size_read_bytes: int = 1_048_576` (1 MB — limite lettura file)
+  - `max_content_chars: int = 8000` (tronca testo prima di inviare a LLM)
+  - `follow_symlinks: bool = False` (anti path-traversal via symlink)
+- [x] `backend/plugins/file_search/searcher.py`:
+  - `async def search_files(query, roots, extensions, max_results, forbidden) -> list[dict]`:
+    - `asyncio.to_thread(_sync_walk, ...)` — `os.walk()` è blocking
+    - `_sync_walk`: case-insensitive `query in filename.lower()`, filtra per estensione se specificato
+    - Ogni risultato: `{path, name, size_bytes, modified_iso, extension}`
+    - `_validate_path(path, allowed, forbidden)`: controlla che il path reale (risolto, no symlink if `follow_symlinks=False`) stia dentro un allowed root e non in un forbidden path
+    - Timeout di sicurezza: max 5 secondi per walk (anti-freeze su directory enormi) via `asyncio.wait_for`
+    - **Edge case**: `PermissionError` su singola directory → log warning + continua (non interrompe l'intera ricerca)
+- [x] `backend/plugins/file_search/readers.py`:
+  - `async def read_text_file(path: str, max_bytes: int) -> str`
+  - Dispatcher per estensione: `.txt/.md/.py/.js/.ts/.json/.yaml/.csv` → `open(encoding="utf-8", errors="replace")`
+  - `.pdf` → `pdfplumber.open(path)` + `asyncio.to_thread`
+  - `.docx` → `python-docx` + `asyncio.to_thread`
+  - Resto → `ToolResult.error("Unsupported file type for reading: .{ext}")`
+  - Rispetta `max_bytes` — legge solo i primi N bytes
+- [x] Tool `search_files(query: str, path?: str, extensions?: list[str], max_results?: int = 20)` → `risk_level="safe"`, `timeout_ms=10000`:
+  - `path` opzionale: se fornito, validato contro `allowed_paths`; se omesso → cerca in tutti gli `allowed_paths`
+  - `extensions` opzionale: `[".pdf", ".docx"]` — normalizzate a lowercase con punto
+- [x] Tool `get_file_info(path: str)` → `risk_level="safe"`, `timeout_ms=3000`:
+  - Solo metadata: `{name, size_bytes, modified_iso, created_iso, extension, mime_type}`
+  - **NO** contenuto file — metadata è sempre safe
+  - Valida path contro `allowed_paths`
+- [x] Tool `read_text_file(path: str, max_chars?: int)` → `risk_level="medium"`, `requires_confirmation=True`, `timeout_ms=15000`:
+  - Il contenuto di file personali è sensibile → confirmation obbligatoria
+  - Valida path + legge tramite `readers.py`
+  - Output include `{content, truncated, chars_read, path}`
+- [x] Tool `open_file(path: str)` → `risk_level="medium"`, `requires_confirmation=True`, `timeout_ms=5000`:
+  - `asyncio.to_thread(os.startfile, path)` — apre con app associata di Windows
+  - Valida path contro `allowed_paths` + forbidden antes
+  - **Edge case**: file non esiste → `ToolResult.error("File not found: ...")`
+  - **Edge case**: `os.startfile` non disponibile (non-Windows) → fallback a `subprocess.Popen(["xdg-open", path])` (Linux) o `subprocess.Popen(["open", path])` (macOS)
+- [x] **Edge case generale**: UNC paths (`\\server\share`) → bloccare (potenziale SSRF-equivalente su reti condivise)
+- [x] Test: mock os.walk, file trovato/non trovato, PermissionError continua, UNC path bloccato, symlink con follow=False, timeout 5s walk, read PDF senza pdfplumber → errore, path fuori allowed_paths, forbidden path bloccato
+
+#### 7.6.2 — News / Briefing Plugin (`backend/plugins/news/`)
+- [x] `NewsPlugin(BasePlugin)` — `plugin_name = "news"`, `plugin_priority = 15`, `plugin_dependencies: list[str] = []`
+  - **Soft dependency** (non hard) su `weather` e `calendar`: in `get_daily_briefing()`, controllare `ctx.plugin_manager.get_plugin("weather")` — se disponibile e connected → aggiungere dati meteo al briefing; se no → procedere senza
+- [x] Dipendenza: **`feedparser >= 6.0`** in `pyproject.toml` (RSS/Atom parsing — puro Python, zero dep native)
+- [x] `NewsConfig(BaseSettings)` in `config.py`:
+  - `enabled: bool = False`
+  - `feeds: list[str]` — default: feed RSS pubblici selezionati (BBC World, ANSA, Repubblica):
+    ```
+    - "https://feeds.bbci.co.uk/news/world/rss.xml"
+    - "https://www.ansa.it/sito/notizie/tecnologia/rss.xml"
+    - "https://www.repubblica.it/rss/homepage/rss2.0.xml"
+    ```
+  - `max_articles: int = 10` (per feed)
+  - `cache_ttl_minutes: int = 15`
+  - `request_timeout_s: int = 10`
+  - `default_lang: str = "it"`
+- [x] `backend/plugins/news/feed_reader.py`:
+  - `FeedReader` — `httpx.AsyncClient` persistente (pattern shared con weather/web_search)
+  - `async def fetch_feed(url: str) -> list[dict]`:
+    - `validate_url_ssrf(url)` da `backend/core/http_security.py` — **stessa utility di weather e web_search**
+    - `response = await client.get(url, timeout=config.request_timeout_s)`
+    - `asyncio.to_thread(feedparser.parse, response.text)` (feedparser è CPU-bound, non async)
+    - Ogni articolo normalizzato: `{title, summary, link, published_iso, source}`
+  - Cache: `{url: (timestamp, articles)}` in memory — TTL `cache_ttl_minutes`
+  - `async def fetch_all_feeds(urls, max_per_feed) -> list[dict]`: `asyncio.gather(*[fetch_feed(u) for u in urls])` — fetch paralleli
+- [x] Tool `get_news(topic?: str, lang?: str, max_results?: int = 10)` → `risk_level="safe"`, `timeout_ms=20000`:
+  - Fetch tutti i feed configurati in parallelo
+  - Se `topic`: filtra titoli/sommari contenenenti il termine (case-insensitive)
+  - Output: `{articles: [{title, summary, link, published_iso, source}], total, cached: bool}`
+- [x] Tool `get_daily_briefing()` → `risk_level="safe"`, `timeout_ms=30000`:
+  - Aggrega sincronicamente:
+    1. **Data e ora corrente** (sempre disponibile)
+    2. **Top news** (da `fetch_all_feeds`) — prime 5 notizie
+    3. **Meteo** (soft dep): se `weather` plugin disponibile e `ConnectionStatus.CONNECTED` → chiama `ctx.tool_registry.execute_tool("weather_get_weather", {}, context)` — non import diretto (evita accoppiamento)
+    4. **Agenda del giorno** (soft dep): se `calendar` plugin disponibile → chiama `ctx.tool_registry.execute_tool("calendar_get_today_summary", {}, context)`
+  - Output strutturato: `{date_iso, weather?: {...}, today_events?: [...], top_news: [...]}`
+  - **Edge case**: se uno dei servizi soft-dep fallisce → includi solo i dati disponibili, non fail tutto il briefing
+- [x] `initialize()`: crea `FeedReader`, registra in `plugin_local_state["news"]["reader"]`
+- [x] `cleanup()`: chiude `httpx.AsyncClient`
+- [x] Test: mock httpx.AsyncClient + feedparser, parallel fetch, caching hit/miss, SSRF blocking su feed URL custom, topic filter, daily briefing con weather/calendar assenti (graceful), weather online → incluso nel briefing
+
+#### 7.6.3 — Config e Dipendenze Fase 7.6
+- [x] `pyproject.toml` nuove dipendenze:
+  - `feedparser >= 6.0` (news)
+  - `pdfplumber >= 0.11` (file_search, optional — lazy import)
+  - `python-docx >= 1.1` (file_search, optional — lazy import)
+  - Nessuna nuova dep per file_search base (stdlib)
+- [x] `backend/core/config.py`: `FileSearchConfig`, `NewsConfig` + aggiunta a `OmniaConfig`
+- [x] `config/default.yaml`: sezioni `file_search:`, `news:` con defaults
+
+#### 7.6.4 — Test Suite Fase 7.6
+- [x] Test file_search: mock os.walk, path validation (allowed/forbidden/UNC/symlink), PermissionError continuazione, timeout walk, read_text_file con mock pdfplumber/docx, open_file cross-platform (Windows startfile, Linux xdg-open)
+- [x] Test news: mock httpx + feedparser, parallel fetch, cache TTL, SSRF su URL feed custom, filtro topic, daily briefing con/senza weather/calendar, soft dep non disponibile → partial result
+- [x] Test `backend/core/http_security.py` (riusato da weather + web_search + news): copertura completa IP privati RFC 1918 + loopback + link-local + IPv6 private
+
+---
+
+### Riepilogo Dipendenze tra Fasi 7, 7.5, 7.6
+
+```
+backend/core/http_security.py   ← creato in Fase 7.3 (weather)
+     ↑ usato da: web_search (7.1), weather (7.3), news (7.6.2)
+
+calendar (7.2) ── soft dep ──→ notifications (7.5.2) [EventBus: calendar.reminder]
+weather  (7.3) ── soft dep ──→ news briefing (7.6.2) [ctx.tool_registry call]
+calendar (7.2) ── soft dep ──→ news briefing (7.6.2) [ctx.tool_registry call]
+
+Ordine implementazione consigliato:
+  1. http_security.py (utility condivisa, richiesta da weather + news)
+  2. web_search (7.1) + calendar (7.2) [parallelo, no inter-dep]
+  3. weather (7.3) [dopo http_security.py]
+  4. clipboard (7.5.1) [standalone, più semplice]
+  5. notifications (7.5.2) [standalone + EventBus subscription opzionale]
+  6. media_control (7.5.3) [standalone, più complesso per COM Windows]
+  7. file_search (7.6.1) [standalone]
+  8. news (7.6.2) [dopo weather + calendar per briefing completo]
+```
 
 ---
 
@@ -628,6 +956,8 @@ ToolError → { tool_name, error_type (timeout|permission|network|logic|internal
 | `transcript` | 4 | S→C | `{text}` |
 | `audio` | 4 | bidirezionale | binary frames |
 | `iot_state_update` | 6 | S→C | `{device_id, new_state, changed_by}` |
+| `calendar_reminder` | 7.2 | S→C | `{event_id, title, minutes_until}` |
+| `timer_fired` | 7.5 | S→C | `{timer_id, label}` |
 | `auth` | 8 | C→S | `{token}` |
 
 ---
@@ -649,7 +979,11 @@ ToolError → { tool_name, error_type (timeout|permission|network|logic|internal
 | 5 (edge) | Prompt injection "cancella tutto" → tool FORBIDDEN bloccato; shell injection → bloccato |
 | 6 | "Accendi la luce" → HA API call → luce si accende; MQTT disconnect → plugin status degraded |
 | 6 (edge) | Dispositivo protetto → rifiuto; command injection → bloccato; HA offline → errore user-friendly |
-| 7 | "Che tempo fa a Roma?" → DDG search → risposta con fonti; "Ricordami riunione domani" → evento creato |
-| 7 (edge) | SSRF `http://localhost` → bloccato; DDG rate limit → caching; timezone UTC↔local corretta |
+| 7 | "Cerca notizie su AI" → DDG search → risposta con fonti; "Ricordami riunione domani" → evento creato; "Che tempo fa a Roma?" → open-meteo → temperatura + condizioni |
+| 7 (edge) | SSRF `http://localhost` → bloccato (web_search + weather + news); DDG rate limit → caching; timezone UTC↔local corretta; città meteo non trovata → errore user-friendly |
+| 7.5 | "Abbassa il volume al 30%" → set_volume(30) → volume cambia; "Ricordami tra 10 minuti" → timer creato → toast Windows dopo 10 min; "Cosa c'è negli appunti?" → get_clipboard() → contenuto |
+| 7.5 (edge) | Clipboard binaria → errore graceful; >20 timer attivi → rifiuto; COM pycaw device rimosso → reinit invece di crash; timer sopravvive a restart backend (DB persistence) |
+| 7.6 | "Trova il PDF del contratto" → search_files → lista risultati; "Leggi quel file" → confirmation → contenuto; "Briefing mattutino" → data+meteo+calendario+notizie in un'unica risposta |
+| 7.6 (edge) | Path fuori allowed_paths → bloccato; UNC path `\\server\share` → bloccato; pdfplumber non installato → errore con hint installazione; news offline → briefing parziale senza crash |
 | 8 | JWT login → token → WS auth → chat; PyInstaller build → app funzionante; Ctrl+Shift+O → attivazione |
 | 8 (edge) | Multi-user: utente A non vede conversazioni utente B; migration DB → zero data loss |

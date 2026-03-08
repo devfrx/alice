@@ -440,6 +440,36 @@ class PluginManager:
         """
         return list(self._plugins.keys())
 
+    def discover_available_plugins(self) -> dict[str, type[BasePlugin]]:
+        """Import all plugin modules to populate ``PLUGIN_REGISTRY``.
+
+        Scans ``backend/plugins/`` for subdirectories with an
+        ``__init__.py`` and imports each one.  Modules that fail
+        to import are silently skipped.
+
+        Returns:
+            Dict mapping plugin name to plugin class for every
+            discoverable plugin (loaded or not).
+        """
+        plugins_dir = Path(__file__).resolve().parent.parent / "plugins"
+        for child in sorted(plugins_dir.iterdir()):
+            if not child.is_dir() or child.name.startswith("_"):
+                continue
+            if not (child / "__init__.py").exists():
+                continue
+            name = child.name
+            if name in PLUGIN_REGISTRY:
+                continue
+            for suffix in ("", ".plugin"):
+                mod = f"backend.plugins.{name}{suffix}"
+                try:
+                    importlib.import_module(mod)
+                except Exception:
+                    continue
+                if name in PLUGIN_REGISTRY:
+                    break
+        return dict(PLUGIN_REGISTRY)
+
     async def get_all_status(
         self,
     ) -> dict[str, ConnectionStatus]:

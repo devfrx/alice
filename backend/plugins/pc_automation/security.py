@@ -74,10 +74,6 @@ class ScreenshotLockout:
 def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
     """Validate an application name against the whitelist.
 
-    Supports friendly names (e.g. "task_manager"), executable names
-    (e.g. "taskmgr", "taskmgr.exe"), and process names returned by
-    ``get_running_apps`` (e.g. "Taskmgr").
-
     Args:
         app_name: User-provided application name (case-insensitive).
 
@@ -86,32 +82,18 @@ def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
     """
     normalized = app_name.strip().lower().replace(" ", "_")
 
-    # Direct lookup by friendly name
-    if normalized in ALLOWED_APPS:
-        executable = ALLOWED_APPS[normalized]
-        if isinstance(executable, list):
-            resolved = executable[0]
-        else:
-            resolved = executable
-        return True, f"Application '{normalized}' resolved to '{resolved}'", resolved
+    if normalized not in ALLOWED_APPS:
+        allowed = ", ".join(sorted(ALLOWED_APPS.keys()))
+        return False, f"Application '{app_name}' is not in the whitelist. Allowed: {allowed}", None
 
-    # Reverse lookup: match against executable names (with/without .exe)
-    candidate = normalized if not normalized.endswith(".exe") else normalized[:-4]
-    for friendly_name, exe_val in ALLOWED_APPS.items():
-        exe_list = exe_val if isinstance(exe_val, list) else [exe_val]
-        for exe in exe_list:
-            exe_lower = exe.lower()
-            exe_bare = exe_lower[:-4] if exe_lower.endswith(".exe") else exe_lower
-            if candidate == exe_bare or candidate == exe_lower:
-                resolved = exe_list[0] if isinstance(exe_val, list) else exe_val
-                return (
-                    True,
-                    f"Application '{app_name}' matched '{friendly_name}' → '{resolved}'",
-                    resolved,
-                )
+    executable = ALLOWED_APPS[normalized]
+    # If it's a list, return the first one
+    if isinstance(executable, list):
+        resolved = executable[0]
+    else:
+        resolved = executable
 
-    allowed = ", ".join(sorted(ALLOWED_APPS.keys()))
-    return False, f"Application '{app_name}' is not in the whitelist. Allowed: {allowed}", None
+    return True, f"Application '{normalized}' resolved to '{resolved}'", resolved
 
 
 def validate_command(command: str) -> tuple[bool, str]:
@@ -158,16 +140,10 @@ def validate_command(command: str) -> tuple[bool, str]:
             if flag in args_lower:
                 return False, f"Flag '{flag}' is forbidden for command '{base_cmd}'"
 
-    # Block UNC/extended-length paths in arguments
-    args_str = command.strip()[len(parts[0]):].strip()
-    if "\\\\" in args_str and not args_str.startswith("/"):
-        for token in _extract_path_tokens(args_str):
-            if token.startswith("\\\\") or token.startswith("//"):
-                return False, "UNC and network paths are not allowed in commands"
-
     # Path validation for file management commands —
     # resolve paths and check against protected directories.
     if base_cmd in FILE_MANAGEMENT_CMDS:
+        args_str = command.strip()[len(parts[0]):].strip()
         # Extract path-like tokens and validate each
         for token in _extract_path_tokens(args_str):
             valid, msg = validate_path(token)
@@ -262,20 +238,6 @@ def validate_path(path: str) -> tuple[bool, str]:
     """
     if not path or not path.strip():
         return False, "Empty path"
-
-    stripped = path.strip()
-
-    # Block UNC paths (\\server\share) — cannot be validated against local dirs
-    if stripped.startswith("\\\\") or stripped.startswith("//"):
-        return False, "UNC paths are not allowed"
-
-    # Block Windows extended-length paths (\\?\...)
-    if stripped.startswith("\\\\?\\" ) or stripped.startswith("//?/"):
-        return False, "Extended-length paths are not allowed"
-
-    # Block device paths (\\.\...)
-    if stripped.startswith("\\\\.\\" ) or stripped.startswith("//./"):
-        return False, "Device paths are not allowed"
 
     try:
         resolved = Path(path).resolve()

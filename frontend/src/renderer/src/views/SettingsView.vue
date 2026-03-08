@@ -18,6 +18,11 @@
             <input v-model.number="settingsStore.settings.llm.maxTokens" type="number" class="settings-field__input"
               min="256" max="131072" step="256" />
           </label>
+          <label class="settings-field">
+            <span class="settings-field__label">Max iterazioni strumenti</span>
+            <input v-model.number="settingsStore.settings.llm.maxToolIterations" type="number"
+              class="settings-field__input" min="1" max="100" step="1" />
+          </label>
         </div>
       </section>
 

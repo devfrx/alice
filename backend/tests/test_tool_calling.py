@@ -177,7 +177,7 @@ class TestToolCallingConfig:
         from backend.core.config import LLMConfig
 
         config = LLMConfig()
-        assert config.max_tool_iterations == 10
+        assert config.max_tool_iterations == 25
 
     def test_default_confirmation_timeout(self):
         from backend.core.config import PcAutomationConfig

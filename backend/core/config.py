@@ -133,7 +133,7 @@ class LLMConfig(BaseSettings):
     LM Studio and folding system prompts into user messages."""
     supports_vision: bool = False
     """Enable for multimodal models (LLaVA, Qwen2-VL) that accept images."""
-    max_tool_iterations: int = 10
+    max_tool_iterations: int = 25
     """Maximum number of tool calling rounds before forcing a final answer."""
     # -- Ollama-specific options (ignored by other providers) --
     num_ctx: int = 8192
@@ -165,7 +165,7 @@ class STTConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="OMNIA_STT__")
 
     engine: Literal["faster-whisper"] = "faster-whisper"
-    model: str = "small"
+    model: str = "large-v3"
     language: str = "it"
     device: str = "cuda"
     compute_type: str = "float16"
@@ -290,6 +290,27 @@ class VRAMConfig(BaseSettings):
     """Total GPU VRAM budget in MB."""
 
 
+class WebSearchConfig(BaseSettings):
+    """Web search plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_WEB_SEARCH__")
+
+    max_results: int = 5
+    """Default number of search results."""
+    cache_ttl_s: int = 300
+    """Seconds before cached search results expire."""
+    request_timeout_s: int = 10
+    """HTTP timeout for scrape requests in seconds."""
+    rate_limit_s: float = 2.0
+    """Minimum seconds between DuckDuckGo search calls."""
+    region: str = "it-it"
+    """DuckDuckGo region code (e.g. 'it-it', 'us-en', 'wt-wt' for none)."""
+    proxy_http: str | None = None
+    """Optional HTTP proxy URL."""
+    proxy_https: str | None = None
+    """Optional HTTPS proxy URL."""
+
+
 class UIConfig(BaseSettings):
     """UI configuration."""
 
@@ -298,6 +319,87 @@ class UIConfig(BaseSettings):
     theme: str = "dark"
     global_hotkey: str = "Ctrl+Shift+O"
     language: str = "it"
+
+
+class CalendarConfig(BaseSettings):
+    """Calendar plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_CALENDAR__")
+
+    timezone: str = "Europe/Rome"
+    reminder_check_interval_s: int = 60
+
+
+class WeatherConfig(BaseSettings):
+    """Weather plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_WEATHER__")
+
+    default_city: str = "Rome"
+    units: Literal["metric", "imperial"] = "metric"
+    lang: str = "it"
+    cache_ttl_s: int = 600
+    request_timeout_s: int = 8
+
+
+class ClipboardConfig(BaseSettings):
+    """Clipboard plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_CLIPBOARD__")
+
+    max_content_chars: int = 4000
+
+
+class NotificationsConfig(BaseSettings):
+    """Notifications plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_NOTIFICATIONS__")
+
+    app_id: str = "OMNIA"
+    sound_enabled: bool = True
+    default_timeout_s: int = 5
+    max_active_timers: int = 20
+
+
+class MediaControlConfig(BaseSettings):
+    """Media control plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_MEDIA_CONTROL__")
+
+    volume_step: int = 10
+    brightness_step: int = 10
+
+
+class FileSearchConfig(BaseSettings):
+    """File search plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_FILE_SEARCH__")
+
+    allowed_paths: list[str] = Field(default_factory=list)
+    forbidden_paths: list[str] = Field(default_factory=lambda: [
+        "C:\\Windows", "C:\\Program Files",
+        "C:\\Program Files (x86)", "C:\\ProgramData",
+    ])
+    max_results: int = 50
+    max_file_size_read_bytes: int = 1_048_576
+    max_content_chars: int = 8000
+    follow_symlinks: bool = False
+
+
+class NewsConfig(BaseSettings):
+    """News/briefing plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_NEWS__")
+
+    feeds: list[str] = Field(default_factory=lambda: [
+        "https://feeds.bbci.co.uk/news/world/rss.xml",
+        "https://www.ansa.it/sito/notizie/tecnologia/rss.xml",
+        "https://www.repubblica.it/rss/homepage/rss2.0.xml",
+    ])
+    max_articles: int = 10
+    cache_ttl_minutes: int = 15
+    request_timeout_s: int = 10
+    default_lang: str = "it"
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +431,18 @@ class OmniaConfig(BaseSettings):
     )
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
+    web_search: WebSearchConfig = Field(default_factory=WebSearchConfig)
+    calendar: CalendarConfig = Field(default_factory=CalendarConfig)
+    weather: WeatherConfig = Field(default_factory=WeatherConfig)
+    clipboard: ClipboardConfig = Field(default_factory=ClipboardConfig)
+    notifications: NotificationsConfig = Field(
+        default_factory=NotificationsConfig
+    )
+    media_control: MediaControlConfig = Field(
+        default_factory=MediaControlConfig
+    )
+    file_search: FileSearchConfig = Field(default_factory=FileSearchConfig)
+    news: NewsConfig = Field(default_factory=NewsConfig)
 
     @model_validator(mode="before")
     @classmethod

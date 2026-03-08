@@ -221,13 +221,12 @@ class ToolRegistry:
                     # --- collision detection ---
                     if ns_name in new_tools:
                         existing_plugin = new_map[ns_name]
-                        self._logger.error(
-                            "Tool name collision: '{}' registered by "
-                            "both '{}' and '{}' — keeping first, "
-                            "skipping duplicate",
-                            ns_name, existing_plugin, plugin_name,
+                        raise ValueError(
+                            f"Tool name collision: '{ns_name}' "
+                            f"registered by both "
+                            f"'{existing_plugin}' and "
+                            f"'{plugin_name}'"
                         )
-                        continue
 
                     new_tools[ns_name] = tool_def
                     new_map[ns_name] = plugin_name
@@ -259,6 +258,8 @@ class ToolRegistry:
         Returns:
             List of tool dicts (shallow copy).
         """
+        # _openai_cache is replaced atomically in refresh(); a snapshot
+        # via list() is safe without the async lock in sync context.
         return list(self._openai_cache)
 
     async def get_available_tools(self) -> list[dict[str, Any]]:
@@ -340,15 +341,17 @@ class ToolRegistry:
         """
         execution_id = context.execution_id
 
-        # --- lookup ---
-        tool_def = self._tools.get(tool_name)
+        # --- snapshot under lock to avoid TOCTOU with refresh() ---
+        async with self._lock:
+            tool_def = self._tools.get(tool_name)
+            plugin_name = self._tool_to_plugin.get(tool_name)
+
         if tool_def is None:
             return ToolResult.error(
                 f"Tool '{tool_name}' not available: "
                 "not found in registry"
             )
 
-        plugin_name = self._tool_to_plugin.get(tool_name)
         if plugin_name is None:
             return ToolResult.error(
                 f"Tool '{tool_name}' not available: "
@@ -394,26 +397,6 @@ class ToolRegistry:
                     tool_name,
                 )
 
-        # --- pre-execution hook ---
-        try:
-            should_proceed = await plugin.pre_execution_hook(
-                tool_def.name, args,
-            )
-            if not should_proceed:
-                self._logger.info(
-                    "Tool '{}' blocked by pre_execution_hook of '{}'",
-                    tool_name, plugin_name,
-                )
-                return ToolResult.error(
-                    f"Tool '{tool_name}' blocked by plugin pre-execution hook"
-                )
-        except Exception as hook_exc:
-            self._logger.warning(
-                "pre_execution_hook error for '{}': {}",
-                tool_name, hook_exc,
-            )
-            # Don't block execution if the hook itself fails
-
         start = time.perf_counter()
         timeout_s = tool_def.timeout_ms / 1000.0
 
@@ -426,22 +409,6 @@ class ToolRegistry:
             )
         except asyncio.TimeoutError:
             elapsed_ms = (time.perf_counter() - start) * 1000
-            # Attempt cleanup via cancel_tool if the plugin supports it
-            if tool_def.supports_cancellation:
-                try:
-                    await asyncio.wait_for(
-                        plugin.cancel_tool(tool_def.name, context),
-                        timeout=5.0,
-                    )
-                    self._logger.info(
-                        "Tool '{}' cancelled successfully after timeout",
-                        tool_name,
-                    )
-                except Exception as cancel_exc:
-                    self._logger.warning(
-                        "cancel_tool failed for '{}': {}",
-                        tool_name, cancel_exc,
-                    )
             result = ToolResult.error(
                 f"Tool '{tool_name}' timed out after "
                 f"{tool_def.timeout_ms}ms",

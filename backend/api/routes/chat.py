@@ -515,7 +515,6 @@ async def ws_chat(websocket: WebSocket) -> None:
                             client_ip=client_ip,
                             sync_fn=_sync_conversation_to_file,
                             cancel_event=cancel_event,
-                            message_buffer=message_buffer,
                         )
                     except WebSocketDisconnect:
                         # Save any pending assistant content before propagating.

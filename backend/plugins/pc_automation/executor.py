@@ -8,7 +8,10 @@ performed before execution via the security module.
 from __future__ import annotations
 
 import asyncio
+import csv
 import io
+import json
+import re
 from typing import Any
 
 from loguru import logger
@@ -72,6 +75,23 @@ def check_dependencies() -> list[str]:
     return missing
 
 
+# ---------------------------------------------------------------------------
+# Command normalisation helpers
+# ---------------------------------------------------------------------------
+
+_RE_MULTI_BACKSLASH = re.compile(r"\\{2,}")
+
+
+def _normalize_backslashes(command: str) -> str:
+    """Collapse doubled backslashes produced by LLM JSON encoding.
+
+    ``"C:\\\\Users\\\\Jays"`` → ``"C:\\Users\\Jays"``.
+    UNC paths (``\\\\server\\share``) are preserved as ``\\server\\share``
+    because the regex collapses *any* run of 2+ backslashes into one.
+    """
+    return _RE_MULTI_BACKSLASH.sub("\\\\", command)
+
+
 async def exec_open_app(app_name: str) -> str:
     """Open an application by name (must be in whitelist).
 
@@ -80,13 +100,6 @@ async def exec_open_app(app_name: str) -> str:
     valid, msg, executable = validate_app_name(app_name)
     if not valid:
         raise ValueError(msg)
-
-    if _lockout.is_locked("open_application"):
-        remaining = _lockout.get_remaining_s()
-        raise RuntimeError(
-            f"open_application is locked for {remaining:.0f}s "
-            "due to recent screenshot (anti-exfiltration protection)"
-        )
 
     def _open() -> str:
         import subprocess
@@ -131,15 +144,10 @@ async def exec_type_text(text: str) -> str:
     """
     sanitized = sanitize_text_input(text)
 
-    if _lockout.is_locked("type_text"):
-        remaining = _lockout.get_remaining_s()
-        raise RuntimeError(
-            f"type_text is locked for {remaining:.0f}s "
-            "due to recent screenshot (anti-exfiltration protection)"
-        )
-
     if not _PYAUTOGUI_AVAILABLE:
         raise RuntimeError("pyautogui is not installed")
+    if not _PYPERCLIP_AVAILABLE:
+        raise RuntimeError("pyperclip is not installed")
 
     def _type() -> str:
         import time as _time
@@ -170,16 +178,11 @@ async def exec_type_text(text: str) -> str:
 
 async def exec_press_keys(keys: list[str]) -> str:
     """Press a key combination using pyautogui."""
+    if not keys:
+        raise ValueError("keys list must not be empty")
     valid, msg = validate_keys(keys)
     if not valid:
         raise ValueError(msg)
-
-    if _lockout.is_locked("press_keys"):
-        remaining = _lockout.get_remaining_s()
-        raise RuntimeError(
-            f"press_keys is locked for {remaining:.0f}s "
-            "due to recent screenshot (anti-exfiltration protection)"
-        )
 
     if not _PYAUTOGUI_AVAILABLE:
         raise RuntimeError("pyautogui is not installed")
@@ -230,15 +233,17 @@ async def exec_take_screenshot() -> bytes:
 
 
 async def exec_get_active_window() -> str:
-    """Get the title of the currently active window."""
-    if not _PYAUTOGUI_AVAILABLE:
-        raise RuntimeError("pyautogui is not installed")
-
+    """Get the title of the currently active window (Win32 API)."""
     def _get_window() -> str:
         try:
-            win = pyautogui.getActiveWindow()
-            if win:
-                return win.title or "(no title)"
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = user32.GetForegroundWindow()
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                buf = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, buf, length + 1)
+                return buf.value or "(no title)"
             return "(no active window)"
         except Exception:
             return "(could not detect active window)"
@@ -246,44 +251,42 @@ async def exec_get_active_window() -> str:
     return await asyncio.to_thread(_get_window)
 
 
-async def exec_get_running_apps() -> list[dict[str, str]]:
+async def exec_get_running_apps() -> str:
     """Get list of running applications with visible windows.
 
-    Uses PowerShell ``Get-Process`` which is significantly faster than
-    ``tasklist /V`` because it reads window titles from the process handle
-    directly rather than querying WMI for every process.
+    Uses ``tasklist /FO CSV /NH /V`` whose columns are:
+    Image Name, PID, Session Name, Session#, Mem Usage,
+    Status, User Name, CPU Time, Window Title.
 
-    Returns only processes whose window title is non-empty,
+    Returns only processes whose window title is non-empty/non-"N/A",
     deduplicated by name, limited to 50 entries.
+
+    Returns:
+        JSON string of the application list.
     """
-    ps_cmd = (
-        "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} "
-        "| Select-Object -First 50 Name,Id,MainWindowTitle "
-        "| ForEach-Object { $_.Name + '|' + $_.Id + '|' + $_.MainWindowTitle }"
-    )
-    output = await safe_subprocess(
-        "powershell",
-        ["-NoProfile", "-NoLogo", "-Command", ps_cmd],
-        timeout=10,
-    )
+    output = await safe_subprocess("tasklist", ["/FO", "CSV", "/NH", "/V"], timeout=15)
 
     apps: list[dict[str, str]] = []
     seen_names: set[str] = set()
-    for line in output.strip().splitlines():
-        parts = line.split("|", 2)
-        if len(parts) < 3:
+    reader = csv.reader(io.StringIO(output))
+    for row in reader:
+        if len(row) < 9:
             continue
-        name = parts[0].strip()
-        pid = parts[1].strip()
-        window_title = parts[2].strip()
-        if not name or not window_title:
+        name = row[0].strip()
+        pid = row[1].strip()
+        window_title = row[8].strip()
+        if not name or name.startswith("System"):
+            continue
+        if not window_title or window_title == "N/A":
             continue
         if name in seen_names:
             continue
         seen_names.add(name)
         apps.append({"name": name, "pid": pid, "window_title": window_title})
+        if len(apps) >= 50:
+            break
 
-    return apps
+    return json.dumps(apps)
 
 
 async def exec_command(command: str) -> str:
@@ -298,6 +301,11 @@ async def exec_command(command: str) -> str:
             "due to recent screenshot (anti-exfiltration protection)"
         )
 
+    # LLMs often JSON-encode backslashes in Windows paths, producing
+    # doubled backslashes (e.g. "C:\\\\Users\\\\..." → "C:\\Users\\...").
+    # Collapse them so cmd.exe receives valid paths.
+    command = _normalize_backslashes(command)
+
     valid, msg = validate_command(command)
     if not valid:
         raise ValueError(msg)
@@ -308,10 +316,12 @@ async def exec_command(command: str) -> str:
 
     if base_cmd in CMD_BUILTINS:
         # CMD built-in commands must run through cmd.exe /c.
-        # Split into individual tokens so cmd.exe cannot re-interpret
-        # shell operators embedded in a single string argument.
-        parts = command.strip().split()
-        return await safe_subprocess("cmd.exe", ["/c"] + parts)
+        # Use raw_cmdline=True so Python does NOT re-quote the
+        # command string — cmd.exe receives it exactly as-is,
+        # preserving the embedded quotes the LLM placed around paths.
+        return await safe_subprocess(
+            f"cmd.exe /c {command}", raw_cmdline=True,
+        )
 
     # External executables: split into command + args
     parts = command.strip().split()
@@ -322,13 +332,6 @@ async def exec_command(command: str) -> str:
 
 async def exec_move_mouse(x: int, y: int) -> str:
     """Move mouse cursor to absolute position."""
-    if _lockout.is_locked("move_mouse"):
-        remaining = _lockout.get_remaining_s()
-        raise RuntimeError(
-            f"move_mouse is locked for {remaining:.0f}s "
-            "due to recent screenshot (anti-exfiltration protection)"
-        )
-
     if not _PYAUTOGUI_AVAILABLE:
         raise RuntimeError("pyautogui is not installed")
 
@@ -349,13 +352,6 @@ async def exec_click(x: int, y: int, button: str = "left") -> str:
     """Click at absolute screen position."""
     if button not in ("left", "right", "middle"):
         raise ValueError(f"Invalid button '{button}', must be left/right/middle")
-
-    if _lockout.is_locked("click"):
-        remaining = _lockout.get_remaining_s()
-        raise RuntimeError(
-            f"click is locked for {remaining:.0f}s "
-            "due to recent screenshot (anti-exfiltration protection)"
-        )
 
     if not _PYAUTOGUI_AVAILABLE:
         raise RuntimeError("pyautogui is not installed")

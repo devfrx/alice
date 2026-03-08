@@ -36,11 +36,13 @@ def create_engine_and_session(
 
     is_sqlite = db_url.startswith("sqlite")
 
-    # In-memory SQLite requires StaticPool so all sessions share the same DB.
-    if db_url in ("sqlite+aiosqlite://", "sqlite+aiosqlite:///:memory:"):
+    # SQLite (both in-memory and file-based) uses StaticPool so all async
+    # sessions share a single underlying connection.  This prevents
+    # "database is locked" errors because SQLite only allows one writer.
+    if is_sqlite:
         engine_kwargs["poolclass"] = StaticPool
         engine_kwargs["connect_args"] = {"check_same_thread": False}
-    elif not is_sqlite:
+    else:
         # Connection pool tuning for non-SQLite databases (e.g. PostgreSQL).
         engine_kwargs["pool_size"] = 5
         engine_kwargs["max_overflow"] = 10

@@ -14,6 +14,9 @@ ALLOWED_APPS: dict[str, str | list[str]] = {
     "paint": "mspaint.exe",
     "wordpad": "wordpad.exe",
     "task_manager": "taskmgr.exe",
+    "terminal": "wt.exe",
+    "powershell": "powershell.exe",
+    "cmd": "cmd.exe",
     "snipping_tool": "SnippingTool.exe",
     "notepad_plus": ["notepad++.exe", "notepad++"],
     "vscode": ["code.exe", "Code.exe"],
@@ -149,14 +152,11 @@ MAX_SCREENSHOT_PIXELS: int = 2_000_000
 SCREENSHOT_LOCKOUT_S: int = 60
 """Seconds to lock dangerous tools after a screenshot is taken."""
 
-# Tools that are blocked after a screenshot (anti-exfiltration).
-# Only execute_command is a real exfiltration vector (can run network
-# commands to send data).  Other tools (open_application, type_text,
-# press_keys, click, move_mouse) operate on whitelisted inputs and
-# cannot exfiltrate screenshot data.  Blocking them breaks legitimate
-# workflows like "screenshot → open notepad → type description".
+# Tools that are blocked after a screenshot (anti-exfiltration)
 LOCKOUT_TOOLS: set[str] = {
     "execute_command",
+    "type_text",
+    "open_application",
 }
 
 # Per-command forbidden flags (prevent destructive operations)

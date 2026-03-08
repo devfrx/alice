@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from backend.core.plugin_base import BasePlugin
-from backend.core.plugin_manager import PLUGIN_REGISTRY
 from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
@@ -286,8 +285,3 @@ class SystemInfoPlugin(BasePlugin):
             reverse=True,
         )
         return {"processes": processes[:max_results]}
-
-
-# -- Register in static registry ------------------------------------------
-
-PLUGIN_REGISTRY["system_info"] = SystemInfoPlugin

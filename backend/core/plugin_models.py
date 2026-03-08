@@ -57,7 +57,7 @@ class ToolDefinition:
 
     name: str
     description: str
-    parameters: dict[str, Any] = None  # type: ignore[assignment]
+    parameters: dict[str, Any] | None = None
     result_type: Literal["string", "json", "binary_base64"] = "string"
     supports_cancellation: bool = False
     timeout_ms: int = 30_000
@@ -126,7 +126,7 @@ class ToolResult:
     """
 
     success: bool
-    content: str | dict | None = None
+    content: str | dict | list | None = None
     content_type: str = "text/plain"
     execution_time_ms: float = 0.0
     truncated: bool = False
@@ -137,7 +137,7 @@ class ToolResult:
     @classmethod
     def ok(
         cls,
-        content: str | dict | None,
+        content: str | dict | list | None,
         content_type: str = "text/plain",
         execution_time_ms: float = 0.0,
     ) -> ToolResult:

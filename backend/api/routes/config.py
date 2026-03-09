@@ -166,6 +166,23 @@ async def update_config(request: Request) -> dict[str, Any]:
 
     cfg = ctx.config
 
+    # Snapshot old STT/TTS values for change detection
+    old_stt = {
+        "enabled": cfg.stt.enabled,
+        "model": cfg.stt.model,
+        "device": cfg.stt.device,
+    } if "stt" in body else None
+    old_tts = {
+        "enabled": cfg.tts.enabled,
+        "engine": cfg.tts.engine,
+        "voice": cfg.tts.voice,
+        "speed": cfg.tts.speed,
+        "kokoro_model": cfg.tts.kokoro_model,
+        "kokoro_voices": cfg.tts.kokoro_voices,
+        "kokoro_voice": cfg.tts.kokoro_voice,
+        "kokoro_language": cfg.tts.kokoro_language,
+    } if "tts" in body else None
+
     # Apply supported runtime overrides.
     if "llm" in body:
         llm_updates = body["llm"]
@@ -443,11 +460,30 @@ async def update_config(request: Request) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("Failed to persist preferences: {}", exc)
 
-    # -- Restart STT/TTS services if their config changed ------------------
-    if "stt" in body:
-        await _apply_stt_changes(ctx, body["stt"])
-    if "tts" in body:
-        await _apply_tts_changes(ctx, body["tts"])
+    # -- Restart STT/TTS services if their config ACTUALLY changed ---------
+    if old_stt is not None:
+        stt_changed = (
+            cfg.stt.enabled != old_stt["enabled"]
+            or cfg.stt.model != old_stt["model"]
+            or cfg.stt.device != old_stt["device"]
+        )
+        if stt_changed:
+            await _apply_stt_changes(ctx, body["stt"])
+
+    if old_tts is not None:
+        tts_changed = (
+            cfg.tts.enabled != old_tts["enabled"]
+            or cfg.tts.engine != old_tts["engine"]
+            or cfg.tts.voice != old_tts["voice"]
+            or cfg.tts.speed != old_tts["speed"]
+            or cfg.tts.kokoro_model != old_tts["kokoro_model"]
+            or cfg.tts.kokoro_voices != old_tts["kokoro_voices"]
+            or cfg.tts.kokoro_voice != old_tts["kokoro_voice"]
+            or cfg.tts.kokoro_language
+            != old_tts["kokoro_language"]
+        )
+        if tts_changed:
+            await _apply_tts_changes(ctx, body["tts"])
 
     # Return the full config after applying changes.
     return await get_config(request)

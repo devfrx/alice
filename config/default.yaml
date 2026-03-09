@@ -30,7 +30,7 @@ llm:
 stt:
   engine: "faster-whisper"
   model: "large-v3"
-  language: "it"
+  language: null  # auto-detect (null = Whisper rileva la lingua)
   device: "cuda"            # cuda | cpu
   compute_type: "float16"   # float16 | int8 | int8_float16
   vad_filter: true

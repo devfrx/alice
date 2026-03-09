@@ -50,6 +50,7 @@ const isDragOver = ref(false)
 const dragCounter = ref(0)
 const thumbnailUrls = ref<Map<File, string>>(new Map())
 const isExpanded = ref(false)
+const rootRef = ref<HTMLElement | null>(null)
 
 /** Whether we are in an "active" (non-idle) state that hides the full input. */
 const isActive = computed(() => props.orbState !== 'idle')
@@ -93,7 +94,9 @@ function handleFocus(): void {
     if (!isActive.value) isExpanded.value = true
 }
 
-function handleBlur(): void {
+function handleBlur(event: FocusEvent): void {
+    const related = event.relatedTarget as Node | null
+    if (related && rootRef.value?.contains(related)) return
     if (!text.value.trim() && pendingFiles.value.length === 0) {
         isExpanded.value = false
     }
@@ -232,7 +235,7 @@ defineExpose({
 </script>
 
 <template>
-    <div class="fib" :class="barClasses" @dragenter="handleDragEnter" @dragover="handleDragOver"
+    <div ref="rootRef" class="fib" :class="barClasses" @dragenter="handleDragEnter" @dragover="handleDragOver"
         @dragleave="handleDragLeave" @drop="handleDrop">
         <!-- Active state overlay (recording, processing, thinking, speaking) -->
         <Transition name="fib-state">

@@ -18,6 +18,7 @@ import { useUIStore } from '../../stores/ui'
 import { useModal } from '../../composables/useModal'
 import { api } from '../../services/api'
 import ConversationList from './ConversationList.vue'
+import CalendarWidget from '../calendar/CalendarWidget.vue'
 
 const chatStore = useChatStore()
 const uiStore = useUIStore()
@@ -151,6 +152,9 @@ async function onOpenFile(id: string): Promise<void> {
       </router-link>
     </nav>
 
+    <!-- Calendar widget — shows today's events and next upcoming -->
+    <CalendarWidget :collapsed="!isOpen" />
+
     <!-- Conversations section — only shown when expanded -->
     <div v-show="isOpen" class="sidebar__conversations">
       <!-- Section divider with micro uppercase label -->
@@ -279,7 +283,8 @@ async function onOpenFile(id: string): Promise<void> {
 }
 
 .sidebar--collapsed .sidebar__nav {
-  padding: var(--space-1) var(--space-1) var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
+  align-items: center;
 }
 
 /* Pill-style nav link */
@@ -304,6 +309,7 @@ async function onOpenFile(id: string): Promise<void> {
 /* Center icons when collapsed */
 .sidebar--collapsed .sidebar__link {
   justify-content: center;
+  gap: 0;
   padding: var(--space-2) 0;
   border-radius: var(--radius-full);
   width: 34px;

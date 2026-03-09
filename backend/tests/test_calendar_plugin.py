@@ -767,7 +767,9 @@ class TestCleanup:
     async def test_cleanup_clears_fired_reminders(
         self, plugin: CalendarPlugin,
     ) -> None:
-        plugin._fired_reminders.add(uuid.uuid4())
+        plugin._fired_reminders.add(
+            (uuid.uuid4(), "2026-01-01T00:00:00+00:00"),
+        )
         await plugin.cleanup()
         assert len(plugin._fired_reminders) == 0
 

@@ -328,8 +328,8 @@ class TTSService:
                         logger.info("TTS fallback to Piper successful")
                     except Exception:
                         logger.exception("Piper fallback also failed")
-                except Exception:
-                    logger.warning("Kokoro failed to load, falling back to Piper")
+                except Exception as _kokoro_exc:
+                    logger.warning("Kokoro failed to load ({}), falling back to Piper", _kokoro_exc)
                     try:
                         self._engine = await asyncio.to_thread(
                             _PiperEngine,

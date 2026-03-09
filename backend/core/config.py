@@ -170,7 +170,7 @@ class STTConfig(BaseSettings):
 
     engine: Literal["faster-whisper"] = "faster-whisper"
     model: str = "large-v3"
-    language: str = "it"
+    language: str | None = None
     device: str = "cuda"
     compute_type: str = "float16"
     vad_filter: bool = True

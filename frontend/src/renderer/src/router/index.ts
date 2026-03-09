@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('../views/HybridView.vue')
     },
     {
+      path: '/calendar',
+      name: 'calendar',
+      component: () => import('../views/CalendarPageView.vue')
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue')

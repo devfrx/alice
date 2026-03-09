@@ -10,19 +10,22 @@ import { useChat, ChatApiKey } from './composables/useChat'
 import { usePluginComponents } from './composables/usePluginComponents'
 import { useSettingsStore } from './stores/settings'
 import { useUIStore } from './stores/ui'
+import { usePluginsStore } from './stores/plugins'
 
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
 
 const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
+const pluginsStore = usePluginsStore()
 const { toolbarComponents } = usePluginComponents()
 
-/** Show sidebar in hybrid mode, hide in assistant mode. */
-const showSidebar = computed(() => uiStore.mode !== 'assistant')
+/** Always show sidebar (collapsed in assistant mode). */
+const showSidebar = computed(() => true)
 
 onMounted(() => {
   settingsStore.resumeOperationTracking()
+  pluginsStore.loadPlugins()
 })
 </script>
 

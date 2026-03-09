@@ -348,10 +348,23 @@ class NotificationsPlugin(BasePlugin):
 
     async def _on_calendar_reminder(self, **kwargs: Any) -> None:
         """Handle calendar reminder events with a toast notification."""
-        title = kwargs.get("title", "Calendar Reminder")
-        message = kwargs.get("message", "")
+        title = kwargs.get("title", "Promemoria")
+        start_time = kwargs.get("start_time", "")
+        reminder_minutes = kwargs.get("reminder_minutes", 0)
+        if start_time:
+            message = (
+                f"Tra {reminder_minutes} minuti — alle {start_time}"
+                if reminder_minutes
+                else f"Inizia alle {start_time}"
+            )
+        else:
+            message = (
+                f"Tra {reminder_minutes} minuti"
+                if reminder_minutes
+                else "Evento imminente"
+            )
         await self._tool_send_notification({
-            "title": title,
+            "title": f"\U0001f4c5 {title}",
             "message": message,
         })
 

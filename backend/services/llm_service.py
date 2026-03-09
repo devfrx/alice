@@ -7,6 +7,7 @@ import base64
 import json
 import uuid
 from collections.abc import AsyncIterator
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -143,6 +144,45 @@ class LLMService:
         logger.debug("Loaded system prompt from {}", path)
         return self._system_prompt
 
+    def _get_dynamic_system_prompt(self) -> str:
+        """Return system prompt with current date/time appended.
+
+        The base prompt is cached; only the temporal context is
+        regenerated on each call so the LLM always knows "today's" date.
+        """
+        base = self._load_system_prompt()
+        if not base:
+            return ""
+
+        now = datetime.now()
+        # Italian locale-aware day/month names
+        days_it = [
+            "lunedì", "martedì", "mercoledì", "giovedì",
+            "venerdì", "sabato", "domenica",
+        ]
+        months_it = [
+            "", "gennaio", "febbraio", "marzo", "aprile", "maggio",
+            "giugno", "luglio", "agosto", "settembre", "ottobre",
+            "novembre", "dicembre",
+        ]
+        day_name = days_it[now.weekday()]
+        month_name = months_it[now.month]
+        date_str = f"{day_name} {now.day} {month_name} {now.year}"
+
+        time_block = (
+            f"\n\n## Data e ora corrente\n\n"
+            f"- **Data odierna**: {date_str}\n"
+            f"- **Data ISO**: {now.strftime('%Y-%m-%d')}\n"
+            f"- **Ora**: {now.strftime('%H:%M')}\n"
+            f"\n\n## LANGUAGE RULE (mandatory)\n\n"
+            f"Detect the language of the user's message and reply in that SAME language.\n"
+            f"Examples: user writes in English → reply in English. "
+            f"User writes in Italian → reply in Italian. "
+            f"User writes in French → reply in French.\n"
+            f"NEVER default to Italian just because the system prompt is written in Italian.\n"
+        )
+        return base + time_block
+
     # ------------------------------------------------------------------
     # Message building
     # ------------------------------------------------------------------
@@ -231,7 +271,7 @@ class LLMService:
             A list of message dicts ready for the chat completions API.
         """
         messages: list[dict[str, Any]] = []
-        sys_prompt = self._load_system_prompt()
+        sys_prompt = self._get_dynamic_system_prompt()
         if sys_prompt:
             messages.append({"role": "system", "content": sys_prompt})
         if history:
@@ -283,7 +323,7 @@ class LLMService:
             A list of message dicts: system prompt + normalized history.
         """
         messages: list[dict[str, Any]] = []
-        sys_prompt = self._load_system_prompt()
+        sys_prompt = self._get_dynamic_system_prompt()
         if sys_prompt:
             messages.append({"role": "system", "content": sys_prompt})
         if history:
@@ -396,7 +436,7 @@ class LLMService:
         else:
             input_field = user_content
 
-        sys_prompt = self._load_system_prompt()
+        sys_prompt = self._get_dynamic_system_prompt()
         payload: dict[str, Any] = {
             "model": self._config.model,
             "input": input_field,

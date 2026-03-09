@@ -56,6 +56,92 @@ const ttsEngines = [
   { value: 'xtts', label: 'XTTS v2 (GPU, clonazione voce)' },
 ]
 
+/** Kokoro voices grouped by language, with auto-language mapping. */
+const kokoroVoices: { group: string; lang: string; voices: { value: string; label: string }[] }[] = [
+  {
+    group: '🇮🇹 Italiano', lang: 'it',
+    voices: [
+      { value: 'if_sara', label: 'Sara (femminile)' },
+      { value: 'im_nicola', label: 'Nicola (maschile)' },
+    ],
+  },
+  {
+    group: '🇺🇸 English (US)', lang: 'en-us',
+    voices: [
+      { value: 'am_michael', label: 'Michael (maschile)' },
+      { value: 'am_fenrir', label: 'Fenrir (maschile)' },
+      { value: 'am_onyx', label: 'Onyx (maschile)' },
+      { value: 'am_echo', label: 'Echo (maschile)' },
+      { value: 'am_eric', label: 'Eric (maschile)' },
+      { value: 'am_liam', label: 'Liam (maschile)' },
+      { value: 'am_adam', label: 'Adam (maschile)' },
+      { value: 'am_puck', label: 'Puck (maschile)' },
+      { value: 'af_heart', label: 'Heart (femminile)' },
+      { value: 'af_sarah', label: 'Sarah (femminile)' },
+      { value: 'af_nova', label: 'Nova (femminile)' },
+      { value: 'af_sky', label: 'Sky (femminile)' },
+      { value: 'af_bella', label: 'Bella (femminile)' },
+      { value: 'af_jessica', label: 'Jessica (femminile)' },
+      { value: 'af_nicole', label: 'Nicole (femminile)' },
+      { value: 'af_river', label: 'River (femminile)' },
+    ],
+  },
+  {
+    group: '🇬🇧 English (UK)', lang: 'en-gb',
+    voices: [
+      { value: 'bm_daniel', label: 'Daniel (maschile)' },
+      { value: 'bm_george', label: 'George (maschile)' },
+      { value: 'bm_lewis', label: 'Lewis (maschile)' },
+      { value: 'bm_fable', label: 'Fable (maschile)' },
+      { value: 'bf_emma', label: 'Emma (femminile)' },
+      { value: 'bf_alice', label: 'Alice (femminile)' },
+      { value: 'bf_isabella', label: 'Isabella (femminile)' },
+      { value: 'bf_lily', label: 'Lily (femminile)' },
+    ],
+  },
+  {
+    group: '🇫🇷 Français', lang: 'fr-fr',
+    voices: [
+      { value: 'ff_siwis', label: 'Siwis (femminile)' },
+    ],
+  },
+  {
+    group: '🇪🇸 Español', lang: 'es',
+    voices: [
+      { value: 'ef_dora', label: 'Dora (femminile)' },
+      { value: 'em_alex', label: 'Alex (maschile)' },
+    ],
+  },
+  {
+    group: '🇯🇵 日本語', lang: 'ja',
+    voices: [
+      { value: 'jf_alpha', label: 'Alpha (femminile)' },
+      { value: 'jf_nezumi', label: 'Nezumi (femminile)' },
+      { value: 'jm_kumo', label: 'Kumo (maschile)' },
+    ],
+  },
+  {
+    group: '🇨🇳 中文', lang: 'zh',
+    voices: [
+      { value: 'zf_xiaoxiao', label: 'Xiaoxiao (femminile)' },
+      { value: 'zf_xiaoyi', label: 'Xiaoyi (femminile)' },
+      { value: 'zm_yunxi', label: 'Yunxi (maschile)' },
+      { value: 'zm_yunyang', label: 'Yunyang (maschile)' },
+    ],
+  },
+]
+
+/** Map voice → its canonical language code. */
+const voiceLangMap = Object.fromEntries(
+  kokoroVoices.flatMap(g => g.voices.map(v => [v.value, g.lang]))
+)
+
+function onKokoroVoiceChange(): void {
+  const lang = voiceLangMap[kokoroVoice.value]
+  if (lang) kokoroLanguage.value = lang
+  save()
+}
+
 onMounted(async () => {
   try {
     const cfg = await api.getConfig()
@@ -186,9 +272,11 @@ async function save(): Promise<void> {
             <template v-if="ttsEngine === 'kokoro'">
               <label class="settings-field">
                 <span class="settings-field__label">Voce Kokoro</span>
-                <select v-model="kokoroVoice" class="settings-field__input" aria-label="Voce Kokoro" @change="save">
-                  <option value="if_sara">Sara (italiana, femminile)</option>
-                  <option value="im_nicola">Nicola (italiano, maschile)</option>
+                <select v-model="kokoroVoice" class="settings-field__input" aria-label="Voce Kokoro"
+                  @change="onKokoroVoiceChange">
+                  <optgroup v-for="group in kokoroVoices" :key="group.group" :label="group.group">
+                    <option v-for="v in group.voices" :key="v.value" :value="v.value">{{ v.label }}</option>
+                  </optgroup>
                 </select>
               </label>
               <label class="settings-field">
@@ -198,7 +286,7 @@ async function save(): Promise<void> {
                   <option value="it">Italiano</option>
                   <option value="en-us">English (US)</option>
                   <option value="en-gb">English (UK)</option>
-                  <option value="fr">Français</option>
+                  <option value="fr-fr">Français</option>
                   <option value="es">Español</option>
                   <option value="de">Deutsch</option>
                   <option value="ja">日本語</option>

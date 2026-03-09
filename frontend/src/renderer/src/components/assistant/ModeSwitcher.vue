@@ -19,7 +19,6 @@ interface ModeEntry {
 
 const modes: ModeEntry[] = [
     { id: 'assistant', label: 'Assistente' },
-    { id: 'chat', label: 'Chat' },
     { id: 'hybrid', label: 'Ibrido' },
 ]
 
@@ -49,12 +48,6 @@ function switchMode(mode: UIMode): void {
                 <circle cx="12" cy="12" r="10" />
                 <circle cx="12" cy="12" r="6" />
                 <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
-            </svg>
-
-            <!-- Chat: speech bubble icon -->
-            <svg v-else-if="m.id === 'chat'" class="mode-switcher__icon" width="18" height="18" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
 
             <!-- Hybrid: overlapping circle + bubble -->
@@ -87,20 +80,50 @@ function switchMode(mode: UIMode): void {
     border-radius: 22px;
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
-    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+        width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        background 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease,
+        transform 0.2s ease;
     overflow: hidden;
 }
 
-/* Collapsed state: show only active mode as a tiny dot */
+/* Collapsed state: compact gold dot with subtle pulse */
 .mode-switcher--collapsed {
-    padding: 3px;
-    width: 14px;
-    height: 14px;
+    padding: 4px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background: var(--accent-dim);
     border-color: var(--accent-border);
     gap: 0;
-    opacity: 0.6;
+    opacity: 0.7;
+    box-shadow: 0 0 8px rgba(201, 168, 76, 0.15);
+    animation: collapsed-pulse 3s ease-in-out infinite;
+}
+
+.mode-switcher--collapsed:hover {
+    opacity: 1;
+    transform: scale(1.15);
+    box-shadow: 0 0 16px rgba(201, 168, 76, 0.35);
+    border-color: var(--accent);
+}
+
+@keyframes collapsed-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 8px rgba(201, 168, 76, 0.15);
+    }
+
+    50% {
+        box-shadow: 0 0 14px rgba(201, 168, 76, 0.28);
+    }
 }
 
 .mode-switcher--collapsed .mode-switcher__btn,
@@ -120,7 +143,7 @@ function switchMode(mode: UIMode): void {
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
     box-shadow: 0 0 12px rgba(201, 168, 76, 0.1);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     pointer-events: none;
     z-index: 0;
 }
@@ -171,13 +194,13 @@ function switchMode(mode: UIMode): void {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* ── Label slide transition ──────────────────────────── */
+/* ── Label slide transition (150ms enter delay to prevent flash) ── */
 .label-slide-enter-active {
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity 0.2s ease 0.15s, transform 0.2s ease 0.15s;
 }
 
 .label-slide-leave-active {
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity 0.12s ease, transform 0.12s ease;
 }
 
 .label-slide-enter-from {

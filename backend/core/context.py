@@ -48,6 +48,9 @@ class AppContext:
     lmstudio_manager: LMStudioManagerProtocol | None = None
     vram_monitor: VRAMMonitorProtocol | None = None
 
+    preferences_service: Any | None = None
+    """User preferences persistence service."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

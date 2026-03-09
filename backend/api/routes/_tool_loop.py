@@ -371,7 +371,7 @@ async def run_tool_loop(
 
         tools = (
             await ctx.tool_registry.get_available_tools()
-            if ctx.tool_registry
+            if ctx.tool_registry and ctx.config.llm.tools_enabled
             else None
         )
         if tools is not None and len(tools) == 0:

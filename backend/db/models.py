@@ -188,3 +188,22 @@ class ToolConfirmationAudit(SQLModel, table=True):
         description="LLM reasoning/thinking content at time of tool invocation.",
     )
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ---------------------------------------------------------------------------
+# User Preferences
+# ---------------------------------------------------------------------------
+
+
+class UserPreference(SQLModel, table=True):
+    """Persisted user preference (survives across restarts).
+
+    Stores independent settings as key-value pairs, where the key
+    uses dot notation (e.g. 'tts.engine', 'ui.theme').
+    """
+
+    __tablename__ = "user_preferences"
+
+    key: str = Field(primary_key=True, max_length=128)
+    value: str = Field(default="")  # JSON-encoded value
+    updated_at: datetime = Field(default_factory=_utcnow)

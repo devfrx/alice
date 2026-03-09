@@ -3,7 +3,7 @@
  * AppSidebar.vue — Collapsible sidebar wrapping navigation and conversations.
  *
  * Layout:
- * - Top: navigation links (Chat, Settings)
+ * - Top: navigation links (Settings)
  * - Middle: {@link ConversationList} (scrollable)
  * - Toggle button to collapse/expand (0 ↔ 260 px)
  *
@@ -41,7 +41,7 @@ onMounted(() => {
 // Conversation actions (delegated to store)
 // -----------------------------------------------------------------------
 
-/** Select an existing conversation and navigate to /chat. */
+/** Select an existing conversation and navigate to hybrid mode. */
 async function onSelect(id: string): Promise<void> {
   try {
     await chatStore.loadConversation(id)
@@ -51,16 +51,16 @@ async function onSelect(id: string): Promise<void> {
     console.error(`[AppSidebar] Failed to load conversation ${id}:`, err)
     return
   }
-  if (router.currentRoute.value.name !== 'chat') {
-    await router.push({ name: 'chat' })
+  if (router.currentRoute.value.name !== 'hybrid') {
+    await router.push({ name: 'hybrid' })
   }
 }
 
-/** Create a new conversation and navigate to /chat. */
+/** Create a new conversation and navigate to hybrid mode. */
 async function onCreate(): Promise<void> {
   await chatStore.createConversation()
-  if (router.currentRoute.value.name !== 'chat') {
-    await router.push({ name: 'chat' })
+  if (router.currentRoute.value.name !== 'hybrid') {
+    await router.push({ name: 'hybrid' })
   }
 }
 
@@ -116,16 +116,6 @@ async function onOpenFile(id: string): Promise<void> {
 
     <!-- Primary navigation — icons always visible, labels hidden when collapsed -->
     <nav class="sidebar__nav" aria-label="Navigazione principale">
-      <router-link to="/chat" class="sidebar__link" active-class="sidebar__link--active" title="Chat">
-        <span class="sidebar__link-bar" aria-hidden="true" />
-        <span class="sidebar__link-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </span>
-        <span class="sidebar__link-label">Chat</span>
-      </router-link>
-
       <router-link to="/settings" class="sidebar__link" active-class="sidebar__link--active" title="Impostazioni">
         <span class="sidebar__link-bar" aria-hidden="true" />
         <span class="sidebar__link-icon" aria-hidden="true">
@@ -314,12 +304,23 @@ async function onOpenFile(id: string): Promise<void> {
 /* Center icons when collapsed */
 .sidebar--collapsed .sidebar__link {
   justify-content: center;
-  padding: var(--space-2-5) 0;
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-full);
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
 }
 
 /* Hide the gold left-bar indicator when collapsed — too narrow to look good */
 .sidebar--collapsed .sidebar__link-bar {
   opacity: 0;
+}
+
+/* Compact circular highlight for active link when collapsed */
+.sidebar--collapsed .sidebar__link--active {
+  background: var(--accent-dim);
+  box-shadow: 0 0 12px rgba(201, 168, 76, 0.1);
+  border-radius: var(--radius-full);
 }
 
 /* Gold left-bar indicator — transparent by default */

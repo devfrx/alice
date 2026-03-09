@@ -245,6 +245,36 @@ export const api = {
   getToolConfirmations: (): Promise<{ confirmations_enabled: boolean }> =>
     request<{ confirmations_enabled: boolean }>('/settings/tool-confirmations'),
 
+  /** Toggle system prompt on/off. */
+  setSystemPrompt: (enabled: boolean): Promise<{ system_prompt_enabled: boolean }> =>
+    request<{ system_prompt_enabled: boolean }>('/settings/system-prompt', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled })
+    }),
+
+  /** Read current system prompt enabled state from backend. */
+  getSystemPrompt: (): Promise<{ system_prompt_enabled: boolean }> =>
+    request<{ system_prompt_enabled: boolean }>('/settings/system-prompt'),
+
+  /** Toggle tools on/off. */
+  setTools: (enabled: boolean): Promise<{ tools_enabled: boolean }> =>
+    request<{ tools_enabled: boolean }>('/settings/tools', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled })
+    }),
+
+  /** Read current tools enabled state from backend. */
+  getTools: (): Promise<{ tools_enabled: boolean }> =>
+    request<{ tools_enabled: boolean }>('/settings/tools'),
+
+  /** Get all persisted user preferences. */
+  getPreferences: (): Promise<Record<string, unknown>> =>
+    request<Record<string, unknown>>('/settings/preferences'),
+
+  /** Reset all persisted preferences to defaults. */
+  resetPreferences: (): Promise<{ deleted: number; message: string }> =>
+    request<{ deleted: number; message: string }>('/settings/preferences', { method: 'DELETE' }),
+
   // -- Plugin tool execution ------------------------------------------------
 
   /** Execute a plugin tool directly via REST. */

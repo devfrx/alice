@@ -2,7 +2,7 @@
 /**
  * ModelSelector.vue — Compact dropdown for switching the active LLM model.
  *
- * Displays the current model name as a small button in the ChatInput area.
+ * Displays the current model name as a small button in the input bar area.
  * On click, opens a dropdown listing all available models with size,
  * capability badges, load status, and model metadata.
  */

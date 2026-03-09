@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * OmniaOrb.vue — Fluid Neural Nexus
+ * OmniaOrb.vue — Expressive Neural Nexus
  *
- * A living, morphing AI consciousness visualization.
- * Organic blob that breathes, stretches, and pulses with neural tendrils.
- * Each state has a dramatically different visual personality.
+ * A living, morphing AI consciousness visualization with emotional expression.
+ * Features: organic blob morphing, neural tendrils, aurora bands, pupil-like
+ * focus point, breathing rhythm, and state-driven emotional personality.
  */
 import { computed } from 'vue'
 
@@ -23,14 +23,17 @@ const emit = defineEmits<{
 /** Base size for the nexus container. */
 const size = computed(() => props.compact ? 80 : 180)
 
-/** Audio-reactive scale factor. */
-const audioScale = computed(() => 1 + props.audioLevel * (props.compact ? 0.06 : 0.14))
+/** Audio-reactive scale factor — more dramatic response. */
+const audioScale = computed(() => 1 + props.audioLevel * (props.compact ? 0.08 : 0.22))
 
-/** Tendril reach increases with audio. */
-const tendrilReach = computed(() => 1 + props.audioLevel * 0.6)
+/** Tendril reach increases with audio — up to 50% longer. */
+const tendrilReach = computed(() => 1 + props.audioLevel * 0.9)
 
-/** Core brightness pulses with audio. */
-const coreBrightness = computed(() => 0.6 + props.audioLevel * 0.4)
+/** Core brightness pulses with audio — up to 3x brighter. */
+const coreBrightness = computed(() => 0.4 + props.audioLevel * 0.6)
+
+/** Fog expansion with audio. */
+const fogExpand = computed(() => 1 + props.audioLevel * 0.25)
 
 /** Particle swarm speed multiplier (for thinking state). */
 const particleSpeed = computed(() => {
@@ -39,12 +42,16 @@ const particleSpeed = computed(() => {
     return 1
 })
 
+/** Whether audio is spiking (for shockwave trigger). */
+const audioSpiking = computed(() => props.audioLevel > 0.7)
+
 const containerStyle = computed(() => ({
     width: `${size.value}px`,
     height: `${size.value}px`,
     '--audio-scale': audioScale.value,
     '--tendril-reach': tendrilReach.value,
     '--core-bright': coreBrightness.value,
+    '--fog-expand': fogExpand.value,
     '--particle-speed': `${3 / particleSpeed.value}s`,
 }))
 
@@ -54,48 +61,71 @@ function handleClick(): void {
 </script>
 
 <template>
-    <div class="nexus" :class="[`nexus--${state}`, { 'nexus--compact': compact }]" :style="containerStyle" role="button"
-        tabindex="0" :aria-label="state === 'idle' ? 'Clicca per parlare' : `Stato: ${state}`" @click="handleClick"
+    <div class="nexus" :class="[`nexus--${state}`, { 'nexus--compact': compact, 'nexus--spike': audioSpiking }]"
+        :style="containerStyle" role="button" tabindex="0"
+        :aria-label="state === 'idle' ? 'Clicca per parlare' : `Stato: ${state}`" @click="handleClick"
         @keydown.enter="handleClick" @keydown.space.prevent="handleClick">
-        <!-- Ambient fog — outermost atmospheric glow -->
-        <div class="nexus__fog" />
 
-        <!-- Neural tendrils — synaptic connections radiating outward -->
-        <div v-if="!compact" class="nexus__tendrils">
-            <span v-for="i in 8" :key="i" class="nexus__tendril" />
-        </div>
+        <!-- Breathing wrapper — whole orb breathes organically -->
+        <div class="nexus__breath">
+            <!-- Ambient fog — outermost atmospheric glow -->
+            <div class="nexus__fog" />
 
-        <!-- Pulse ripples — expanding wave rings -->
-        <div class="nexus__ripple nexus__ripple--1" />
-        <div class="nexus__ripple nexus__ripple--2" />
-        <div class="nexus__ripple nexus__ripple--3" />
+            <!-- Audio shockwave ring — appears on audio spikes -->
+            <div v-if="!compact" class="nexus__shockwave" />
 
-        <!-- Outer membrane — iridescent morphing surface -->
-        <div class="nexus__membrane">
-            <div class="nexus__iridescence" />
-        </div>
+            <!-- Neural tendrils — synaptic connections radiating outward -->
+            <div v-if="!compact" class="nexus__tendrils">
+                <span v-for="i in 8" :key="i" class="nexus__tendril" />
+            </div>
 
-        <!-- Inner plasma — mid layer with depth parallax -->
-        <div class="nexus__plasma" />
+            <!-- Pulse ripples — expanding wave rings -->
+            <div class="nexus__ripple nexus__ripple--1" />
+            <div class="nexus__ripple nexus__ripple--2" />
+            <div class="nexus__ripple nexus__ripple--3" />
 
-        <!-- Hex grid overlay — processing state crystalline geometry -->
-        <div v-if="state === 'processing'" class="nexus__hexgrid" />
+            <!-- Aurora bands — rotating luminous bands around the orb -->
+            <div v-if="!compact" class="nexus__aurora">
+                <div class="nexus__aurora-band nexus__aurora-band--1" />
+                <div class="nexus__aurora-band nexus__aurora-band--2" />
+                <div class="nexus__aurora-band nexus__aurora-band--3" />
+            </div>
 
-        <!-- Particle field — internal constellation swarm -->
-        <div v-if="!compact" class="nexus__particles">
-            <span v-for="i in 12" :key="i" class="nexus__particle" />
-        </div>
+            <!-- Outer membrane — iridescent morphing surface -->
+            <div class="nexus__membrane">
+                <div class="nexus__iridescence" />
+            </div>
 
-        <!-- Core singularity — the star at the center -->
-        <div class="nexus__core">
-            <div class="nexus__core-flare" />
+            <!-- Inner plasma — mid layer with depth parallax -->
+            <div class="nexus__plasma" />
+
+            <!-- Hex grid overlay — processing state crystalline geometry -->
+            <div v-if="state === 'processing'" class="nexus__hexgrid" />
+
+            <!-- Particle field — internal constellation swarm -->
+            <div class="nexus__particles">
+                <span v-for="i in (compact ? 6 : 16)" :key="i" class="nexus__particle" />
+            </div>
+
+            <!-- State transition flash -->
+            <div class="nexus__flash" />
+
+            <!-- Core singularity — the star at the center -->
+            <div class="nexus__core">
+                <div class="nexus__core-flare" />
+            </div>
+
+            <!-- Eye / Focus point — pupil-like element expressing attention -->
+            <div class="nexus__eye">
+                <div class="nexus__pupil" />
+            </div>
         </div>
     </div>
 </template>
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════
-   Fluid Neural Nexus — Living AI Consciousness
+   Expressive Neural Nexus — Living AI Consciousness
    ═══════════════════════════════════════════════════════════ */
 
 .nexus {
@@ -126,6 +156,36 @@ function handleClick(): void {
     outline: 2px solid rgba(var(--c-gold), 0.6);
     outline-offset: 12px;
     border-radius: 50%;
+}
+
+/* ── Breathing Wrapper — whole orb breathes ────────────── */
+.nexus__breath {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nexus--idle .nexus__breath {
+    animation: breathIdle 5s ease-in-out infinite;
+}
+
+.nexus--listening .nexus__breath {
+    animation: breathListen 1.8s ease-in-out infinite;
+}
+
+.nexus--thinking .nexus__breath {
+    animation: breathThink 3s ease-in-out infinite;
+}
+
+.nexus--speaking .nexus__breath {
+    animation: breathSpeak 2.5s ease-in-out infinite;
+}
+
+.nexus--processing .nexus__breath {
+    animation: breathProcess 1s linear infinite;
 }
 
 /* ── State Color Overrides ─────────────────────────────── */
@@ -165,7 +225,7 @@ function handleClick(): void {
     --nx-morph-fn: linear;
 }
 
-/* ── Ambient Fog ───────────────────────────────────────── */
+/* ── Ambient Fog — audio-reactive expansion ────────────── */
 .nexus__fog {
     position: absolute;
     inset: -60%;
@@ -178,16 +238,139 @@ function handleClick(): void {
     opacity: 0.8;
     pointer-events: none;
     animation: fogPulse 6s ease-in-out infinite;
-    will-change: opacity;
+    transform: scale(var(--fog-expand, 1));
+    transition: transform 0.15s ease-out, inset 0.5s ease;
+    will-change: opacity, transform;
 }
 
 .nexus--listening .nexus__fog {
     animation: fogPulse 2s ease-in-out infinite;
-    inset: -70%;
+    inset: -75%;
 }
 
 .nexus--speaking .nexus__fog {
     animation: fogBreath 3s ease-in-out infinite;
+}
+
+.nexus--thinking .nexus__fog {
+    inset: -50%;
+    animation: fogPulse 3s ease-in-out infinite;
+}
+
+/* ── Audio Shockwave — appears on loud audio spikes ───── */
+.nexus__shockwave {
+    position: absolute;
+    inset: 5%;
+    border-radius: 50%;
+    border: 2px solid rgba(var(--nx-hue1), 0);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+.nexus--spike .nexus__shockwave {
+    animation: shockwaveBurst 0.6s ease-out;
+}
+
+/* ── Aurora Bands — luminous rotating energy rings ─────── */
+.nexus__aurora {
+    position: absolute;
+    inset: 5%;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.nexus__aurora-band {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    mix-blend-mode: screen;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+.nexus__aurora-band--1 {
+    background: conic-gradient(from 0deg,
+            rgba(var(--nx-hue1), 0.12) 0deg,
+            transparent 60deg,
+            rgba(var(--nx-hue2), 0.08) 120deg,
+            transparent 180deg,
+            rgba(var(--nx-hue1), 0.1) 240deg,
+            transparent 300deg,
+            rgba(var(--nx-hue1), 0.12) 360deg);
+    animation: auroraRotate1 16s linear infinite;
+}
+
+.nexus__aurora-band--2 {
+    background: conic-gradient(from 120deg,
+            transparent 0deg,
+            rgba(var(--nx-hue2), 0.1) 40deg,
+            transparent 100deg,
+            rgba(var(--nx-hue1), 0.06) 200deg,
+            transparent 280deg,
+            rgba(var(--nx-hue2), 0.08) 340deg,
+            transparent 360deg);
+    animation: auroraRotate2 22s linear infinite reverse;
+}
+
+.nexus__aurora-band--3 {
+    background: conic-gradient(from 240deg,
+            rgba(var(--nx-hue1), 0.06) 0deg,
+            transparent 80deg,
+            rgba(var(--c-sapphire), 0.05) 160deg,
+            transparent 220deg,
+            rgba(var(--nx-hue2), 0.07) 300deg,
+            transparent 360deg);
+    animation: auroraRotate1 28s linear infinite;
+}
+
+/* Aurora visible in all states except compact */
+.nexus--idle .nexus__aurora-band {
+    opacity: 0.5;
+}
+
+.nexus--listening .nexus__aurora-band {
+    opacity: 0.9;
+}
+
+.nexus--thinking .nexus__aurora-band {
+    opacity: 0.8;
+}
+
+.nexus--speaking .nexus__aurora-band {
+    opacity: 0.7;
+}
+
+.nexus--processing .nexus__aurora-band {
+    opacity: 1;
+}
+
+.nexus--listening .nexus__aurora-band--1 {
+    animation-duration: 6s;
+}
+
+.nexus--listening .nexus__aurora-band--2 {
+    animation-duration: 8s;
+}
+
+.nexus--thinking .nexus__aurora-band--1 {
+    animation-duration: 8s;
+}
+
+.nexus--thinking .nexus__aurora-band--2 {
+    animation-duration: 5s;
+}
+
+.nexus--processing .nexus__aurora-band--1 {
+    animation-duration: 3s;
+}
+
+.nexus--processing .nexus__aurora-band--2 {
+    animation-duration: 2s;
+}
+
+.nexus--processing .nexus__aurora-band--3 {
+    animation-duration: 4s;
 }
 
 /* ── Neural Tendrils ───────────────────────────────────── */
@@ -541,21 +724,28 @@ function handleClick(): void {
     animation: orbitC calc(var(--particle-speed) * 0.7) linear infinite;
 }
 
-/* Particles visible in thinking + processing states */
-.nexus--thinking .nexus__particle,
-.nexus--processing .nexus__particle {
-    opacity: 0.8;
+.nexus__particle:nth-child(13) {
+    top: 35%;
+    left: 65%;
+    animation: orbitA calc(var(--particle-speed) * 1.3) linear infinite;
 }
 
-.nexus--idle .nexus__particle {
-    opacity: 0.15;
+.nexus__particle:nth-child(14) {
+    top: 70%;
+    left: 35%;
+    animation: orbitB calc(var(--particle-speed) * 0.85) linear infinite reverse;
 }
 
-.nexus--processing .nexus__particle {
-    width: 2px;
-    height: 2px;
-    background: rgba(var(--c-sapphire), 0.8);
-    box-shadow: 0 0 6px rgba(var(--c-sapphire), 0.5);
+.nexus__particle:nth-child(15) {
+    top: 20%;
+    left: 50%;
+    animation: orbitC calc(var(--particle-speed) * 1.15) linear infinite;
+}
+
+.nexus__particle:nth-child(16) {
+    top: 50%;
+    left: 20%;
+    animation: orbitA calc(var(--particle-speed) * 0.95) linear infinite reverse;
 }
 
 /* ── Core Singularity ──────────────────────────────────── */
@@ -629,6 +819,158 @@ function handleClick(): void {
     animation-duration: 2s;
 }
 
+/* ── State transition flash ─────────────────────────────── */
+.nexus__flash {
+    position: absolute;
+    inset: 10%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+}
+
+/* Trigger flash on any state class change via animation */
+.nexus--idle .nexus__flash {
+    animation: stateFlashA 0.4s ease-out;
+}
+
+.nexus--listening .nexus__flash {
+    animation: stateFlashB 0.4s ease-out;
+}
+
+.nexus--thinking .nexus__flash {
+    animation: stateFlashC 0.4s ease-out;
+}
+
+.nexus--speaking .nexus__flash {
+    animation: stateFlashD 0.4s ease-out;
+}
+
+.nexus--processing .nexus__flash {
+    animation: stateFlashE 0.4s ease-out;
+}
+
+/* ── Eye / Focus Point — pupil expressing attention ───── */
+.nexus__eye {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20%;
+    height: 20%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.nexus__pupil {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40%;
+    height: 40%;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+            rgba(255, 255, 255, 0.9) 0%,
+            rgba(var(--nx-hue1), 0.7) 50%,
+            rgba(var(--nx-hue1), 0.2) 100%);
+    box-shadow:
+        0 0 6px rgba(255, 255, 255, 0.5),
+        0 0 12px rgba(var(--nx-hue1), 0.4);
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Idle: pupil wanders in figure-8 (curious) */
+.nexus--idle .nexus__pupil {
+    width: 35%;
+    height: 35%;
+    animation: pupilWander 8s ease-in-out infinite;
+}
+
+/* Listening: pupil focuses upward, grows (attentive) */
+.nexus--listening .nexus__pupil {
+    width: 50%;
+    height: 50%;
+    animation: pupilFocus 2s ease-in-out infinite;
+    box-shadow:
+        0 0 8px rgba(255, 255, 255, 0.6),
+        0 0 16px rgba(var(--c-crimson), 0.5);
+}
+
+/* Thinking: pupil contracts tight and vibrates (concentrating) */
+.nexus--thinking .nexus__pupil {
+    width: 20%;
+    height: 20%;
+    animation: pupilVibrate 0.3s ease-in-out infinite;
+    box-shadow:
+        0 0 4px rgba(255, 255, 255, 0.4),
+        0 0 8px rgba(var(--c-gold), 0.6);
+}
+
+/* Speaking: pupil expands and pulses (projecting) */
+.nexus--speaking .nexus__pupil {
+    width: 55%;
+    height: 55%;
+    animation: pupilProject 2.5s ease-in-out infinite;
+    box-shadow:
+        0 0 10px rgba(255, 255, 255, 0.5),
+        0 0 20px rgba(var(--c-emerald), 0.4);
+}
+
+/* Processing: pupil splits into orbital motion */
+.nexus--processing .nexus__pupil {
+    width: 25%;
+    height: 25%;
+    animation: pupilOrbit 1.2s linear infinite;
+    box-shadow:
+        0 0 6px rgba(var(--c-sapphire), 0.6),
+        8px 0 6px rgba(var(--c-gold), 0.4);
+}
+
+/* ── Enhanced Particles — state-driven behavior ────────── */
+.nexus--idle .nexus__particle {
+    opacity: 0.2;
+}
+
+/* Listening: particles cluster toward top (drawn to voice) */
+.nexus--listening .nexus__particle {
+    opacity: 0.6;
+    animation-direction: normal;
+}
+
+.nexus--listening .nexus__particle:nth-child(odd) {
+    animation-name: particleClusterTop;
+}
+
+/* Thinking: particles spiral inward (concentration) */
+.nexus--thinking .nexus__particle {
+    opacity: 0.8;
+}
+
+.nexus--thinking .nexus__particle:nth-child(odd) {
+    animation-name: particleSpiralIn;
+}
+
+/* Speaking: particles radiate outward (projection) */
+.nexus--speaking .nexus__particle {
+    opacity: 0.5;
+}
+
+.nexus--speaking .nexus__particle:nth-child(even) {
+    animation-name: particleRadiate;
+}
+
+/* Processing: structured grid pattern */
+.nexus--processing .nexus__particle {
+    opacity: 0.7;
+    width: 2px;
+    height: 2px;
+    background: rgba(var(--c-sapphire), 0.8);
+    box-shadow: 0 0 6px rgba(var(--c-sapphire), 0.5), 0 0 2px rgba(var(--c-sapphire), 0.8);
+}
+
 /* ── Hover ─────────────────────────────────────────────── */
 .nexus:hover .nexus__membrane {
     box-shadow:
@@ -671,6 +1013,16 @@ function handleClick(): void {
 
 .nexus--compact .nexus__ripple {
     display: none;
+}
+
+.nexus--compact .nexus__eye {
+    width: 16%;
+    height: 16%;
+}
+
+.nexus--compact .nexus__particle {
+    width: 2px;
+    height: 2px;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1153,6 +1505,374 @@ function handleClick(): void {
 
     to {
         transform: translateY(-50%) rotate(360deg);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyframes — Breathing Rhythms
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes breathIdle {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.03);
+    }
+}
+
+@keyframes breathListen {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    35% {
+        transform: scale(1.04);
+    }
+
+    65% {
+        transform: scale(0.98);
+    }
+}
+
+@keyframes breathThink {
+    0% {
+        transform: scale(1);
+    }
+
+    40% {
+        transform: scale(1.05);
+    }
+
+    60% {
+        transform: scale(1.04);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes breathSpeak {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    15% {
+        transform: scale(1.05);
+    }
+
+    30% {
+        transform: scale(0.98);
+    }
+
+    50% {
+        transform: scale(1.04);
+    }
+
+    70% {
+        transform: scale(0.99);
+    }
+
+    85% {
+        transform: scale(1.03);
+    }
+}
+
+@keyframes breathProcess {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyframes — Aurora Bands
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes auroraRotate1 {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes auroraRotate2 {
+    from {
+        transform: rotate(0deg) scale(0.95);
+    }
+
+    to {
+        transform: rotate(360deg) scale(0.95);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyframes — Audio Shockwave
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes shockwaveBurst {
+    0% {
+        transform: scale(1);
+        border-color: rgba(var(--nx-hue1), 0.5);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(2.2);
+        border-color: rgba(var(--nx-hue1), 0);
+        opacity: 0;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyframes — State Transition Flash
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes stateFlashA {
+    0% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes stateFlashB {
+    0% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes stateFlashC {
+    0% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes stateFlashD {
+    0% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes stateFlashE {
+    0% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyframes — Eye / Pupil Expression
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes pupilWander {
+
+    0%,
+    100% {
+        transform: translate(-50%, -50%);
+    }
+
+    12% {
+        transform: translate(-40%, -60%);
+    }
+
+    25% {
+        transform: translate(-35%, -50%);
+    }
+
+    37% {
+        transform: translate(-45%, -40%);
+    }
+
+    50% {
+        transform: translate(-55%, -45%);
+    }
+
+    62% {
+        transform: translate(-60%, -55%);
+    }
+
+    75% {
+        transform: translate(-50%, -60%);
+    }
+
+    87% {
+        transform: translate(-45%, -48%);
+    }
+}
+
+@keyframes pupilFocus {
+
+    0%,
+    100% {
+        transform: translate(-50%, -60%);
+    }
+
+    50% {
+        transform: translate(-50%, -55%);
+    }
+}
+
+@keyframes pupilVibrate {
+    0% {
+        transform: translate(-50%, -50%);
+    }
+
+    25% {
+        transform: translate(-48%, -51%);
+    }
+
+    50% {
+        transform: translate(-52%, -49%);
+    }
+
+    75% {
+        transform: translate(-49%, -52%);
+    }
+
+    100% {
+        transform: translate(-50%, -50%);
+    }
+}
+
+@keyframes pupilProject {
+
+    0%,
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    25% {
+        transform: translate(-50%, -50%) scale(1.15);
+    }
+
+    50% {
+        transform: translate(-50%, -50%) scale(0.95);
+    }
+
+    75% {
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+}
+
+@keyframes pupilOrbit {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg) translateX(4px);
+    }
+
+    to {
+        transform: translate(-50%, -50%) rotate(360deg) translateX(4px);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyframes — Emotion Particles
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes particleClusterTop {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: translate(0, -15px);
+        opacity: 0.9;
+    }
+}
+
+@keyframes particleSpiralIn {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: translate(-5px, -5px) scale(0.6);
+        opacity: 0.9;
+    }
+
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.6;
+    }
+}
+
+@keyframes particleRadiate {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.4;
+    }
+
+    50% {
+        transform: translate(8px, 8px) scale(1.3);
+        opacity: 0.7;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .nexus__shockwave,
+    .nexus__flash,
+    .nexus__hexgrid {
+        display: none;
+    }
+
+    .nexus__breath {
+        animation: none;
+    }
+
+    .nexus__tendril {
+        animation-duration: 20s !important;
+    }
+
+    .nexus__ripple {
+        animation-duration: 12s !important;
+    }
+
+    .nexus__particle {
+        animation-duration: 10s !important;
+    }
+
+    .nexus__aurora-band {
+        animation-duration: 40s !important;
     }
 }
 </style>

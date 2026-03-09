@@ -2,7 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { useUIStore, type UIMode } from '../stores/ui'
 
 /** Route names that correspond to a UI mode. */
-const MODE_ROUTES = new Set<string>(['chat', 'assistant', 'hybrid'])
+const MODE_ROUTES = new Set<string>(['assistant', 'hybrid'])
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -11,11 +11,6 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: () => import('../views/HomeView.vue')
-    },
-    {
-      path: '/chat',
-      name: 'chat',
-      component: () => import('../views/ChatView.vue')
     },
     {
       path: '/assistant',
@@ -34,7 +29,7 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/'
+      redirect: '/assistant'
     }
   ]
 })

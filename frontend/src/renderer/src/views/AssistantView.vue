@@ -6,13 +6,14 @@
  * Voice-first: the user speaks, the orb reacts, and responds.
  * Shows floating status bubbles for current activity.
  */
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import OmniaOrb from '../components/assistant/OmniaOrb.vue'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
 import StatusBubbles from '../components/assistant/StatusBubbles.vue'
 import QuickActions from '../components/assistant/QuickActions.vue'
 import AssistantResponse from '../components/assistant/AssistantResponse.vue'
 import AssistantTranscript from '../components/assistant/AssistantTranscript.vue'
+import FloatingInputBar from '../components/input/FloatingInputBar.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
@@ -27,7 +28,11 @@ const { sendMessage: send, stopGeneration } = chatApi
 const {
     startListening, stopListening, cancelProcessing, connect: connectVoice,
     transcript, speak, cancelSpeak,
+    audioDevices, selectedDeviceId, refreshDevices,
 } = useVoice()
+
+/** Template ref for the floating input bar. */
+const floatingBarRef = ref<InstanceType<typeof FloatingInputBar> | null>(null)
 
 /** Pending tool confirmations for ToolConfirmationDialog. */
 const pendingConfirmationsList = computed(() =>
@@ -71,6 +76,11 @@ const showLastResponse = computed(() =>
 const isInterruptible = computed(() =>
     orbState.value === 'thinking' || orbState.value === 'speaking'
 )
+
+/** Send a text message with optional file attachments. */
+async function handleSend(content: string, attachments: File[]): Promise<void> {
+    await send(content, undefined, attachments)
+}
 
 function handleOrbClick(): void {
     if (voiceStore.isSpeaking) {
@@ -179,6 +189,14 @@ onMounted(() => {
         <QuickActions />
 
         <!-- Tool confirmation dialog -->
+        <!-- Floating input bar -->
+        <FloatingInputBar ref="floatingBarRef" :disabled="chatStore.isStreamingCurrentConversation"
+            :is-connected="chatApi.isConnected.value" :is-streaming="chatStore.isStreamingCurrentConversation"
+            :audio-devices="audioDevices" :selected-device-id="selectedDeviceId" :orb-state="orbState"
+            @send="handleSend" @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"
+            @voice-stop="stopListening" @voice-cancel-processing="cancelProcessing" @refresh-devices="refreshDevices"
+            @select-device="(id) => { selectedDeviceId = id }" />
+
         <ToolConfirmationDialog v-if="pendingConfirmationsList.length > 0"
             :key="pendingConfirmationsList[0].executionId" :confirmation="pendingConfirmationsList[0]"
             @respond="chatApi.respondToConfirmation" />

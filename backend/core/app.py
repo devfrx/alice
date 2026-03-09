@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -60,6 +61,19 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     ctx.db = session_factory  # type: ignore[assignment]
     ctx.engine = engine
 
+    # -- Load persisted user preferences ------------------------------------
+    from backend.services.preferences_service import PreferencesService
+
+    preferences_service = PreferencesService(session_factory)
+    ctx.preferences_service = preferences_service
+
+    if not testing:
+        try:
+            prefs = await preferences_service.load_all()
+            preferences_service.apply_to_config(config, prefs)
+        except Exception as exc:
+            logger.warning("Failed to load persisted preferences: {}", exc)
+
     llm_service = LLMService(config.llm)
     ctx.llm_service = llm_service
 
@@ -95,7 +109,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     if config.stt.enabled:
         try:
             stt_service = STTService(config.stt)
-            await stt_service.start()
+            try:
+                await asyncio.wait_for(stt_service.start(), timeout=120)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "STT model pre-load timed out — will lazy-load on first use",
+                )
             ctx.stt_service = stt_service
             logger.info("STT service started (engine={})", config.stt.engine)
         except Exception as exc:

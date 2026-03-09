@@ -1,15 +1,14 @@
 /**
  * Pinia store managing UI mode state for OMNIA.
  *
- * Supports three modes:
- * - 'chat'      — Traditional text chat interface
+ * Supports two modes:
  * - 'assistant' — Living AI orb, voice-first interaction
  * - 'hybrid'    — Chat with ambient orb overlay
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export type UIMode = 'chat' | 'assistant' | 'hybrid'
+export type UIMode = 'assistant' | 'hybrid'
 
 export const useUIStore = defineStore('ui', () => {
   const mode = ref<UIMode>(loadMode())
@@ -21,7 +20,7 @@ export const useUIStore = defineStore('ui', () => {
   const ambientEnabled = computed(() => mode.value === 'assistant' || mode.value === 'hybrid')
 
   /** Whether chat panel is visible. */
-  const chatVisible = computed(() => mode.value === 'chat' || mode.value === 'hybrid')
+  const chatVisible = computed(() => mode.value === 'hybrid')
 
   /** Whether the orb/living visualization is visible. */
   const orbVisible = computed(() => mode.value === 'assistant' || mode.value === 'hybrid')
@@ -38,7 +37,7 @@ export const useUIStore = defineStore('ui', () => {
   function loadMode(): UIMode {
     try {
       const stored = localStorage.getItem('omnia_ui_mode')
-      if (stored === 'chat' || stored === 'assistant' || stored === 'hybrid') return stored
+      if (stored === 'assistant' || stored === 'hybrid') return stored
     } catch {
       /* localStorage may be unavailable */
     }

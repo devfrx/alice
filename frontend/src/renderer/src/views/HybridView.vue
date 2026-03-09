@@ -24,7 +24,7 @@ const voiceStore = useVoiceStore()
 const { sendMessage: send, isConnected, stopGeneration } = chatApi
 const {
     startListening, stopListening, cancelProcessing, connect: connectVoice,
-    transcript, audioDevices, selectedDeviceId, refreshDevices, speak,
+    transcript, audioDevices, selectedDeviceId, refreshDevices, speak, cancelSpeak,
 } = useVoice()
 
 /** Template ref to access ChatInput's pending files for voice sends. */
@@ -188,9 +188,9 @@ onUnmounted(() => {
                 <ChatInput ref="chatInputRef" :disabled="chatStore.isStreamingCurrentConversation"
                     :is-connected="isConnected" :is-streaming="chatStore.isStreamingCurrentConversation"
                     :audio-devices="audioDevices" :selected-device-id="selectedDeviceId" @send="handleSend"
-                    @stop="stopGeneration" @voice-start="startListening" @voice-stop="stopListening"
-                    @voice-cancel-processing="cancelProcessing" @refresh-devices="refreshDevices"
-                    @select-device="(id) => { selectedDeviceId = id }" />
+                    @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"
+                    @voice-stop="stopListening" @voice-cancel-processing="cancelProcessing"
+                    @refresh-devices="refreshDevices" @select-device="(id) => { selectedDeviceId = id }" />
             </div>
         </div>
 

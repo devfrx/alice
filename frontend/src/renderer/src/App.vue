@@ -18,7 +18,7 @@ const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
 const { toolbarComponents } = usePluginComponents()
 
-/** Show sidebar in chat + hybrid modes, hide in pure assistant mode. */
+/** Show sidebar in hybrid mode, hide in assistant mode. */
 const showSidebar = computed(() => uiStore.mode !== 'assistant')
 
 onMounted(() => {

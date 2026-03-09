@@ -170,4 +170,40 @@ onMounted(() => {
     color: var(--text-secondary);
     cursor: default;
 }
+
+/* Toggle switch — mirrors SettingsView toggle styles */
+.settings-toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.settings-toggle--on {
+    background: rgba(201, 168, 76, 0.2);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(201, 168, 76, 0.1);
+}
+
+.settings-toggle__thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.settings-toggle--on .settings-toggle__thumb {
+    transform: translateX(18px);
+    background: var(--accent);
+}
 </style>

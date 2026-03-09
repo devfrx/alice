@@ -113,6 +113,9 @@ class LLMService:
         Raises:
             FileNotFoundError: If the configured system prompt file is missing.
         """
+        if not self._config.system_prompt_enabled:
+            return ""
+
         if self._system_prompt is not None:
             return self._system_prompt
 
@@ -227,9 +230,10 @@ class LLMService:
         Returns:
             A list of message dicts ready for the chat completions API.
         """
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self._load_system_prompt()},
-        ]
+        messages: list[dict[str, Any]] = []
+        sys_prompt = self._load_system_prompt()
+        if sys_prompt:
+            messages.append({"role": "system", "content": sys_prompt})
         if history:
             messages.extend(normalize_history(history))
 
@@ -278,9 +282,10 @@ class LLMService:
         Returns:
             A list of message dicts: system prompt + normalized history.
         """
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self._load_system_prompt()},
-        ]
+        messages: list[dict[str, Any]] = []
+        sys_prompt = self._load_system_prompt()
+        if sys_prompt:
+            messages.append({"role": "system", "content": sys_prompt})
         if history:
             messages.extend(normalize_history(history))
         return messages
@@ -391,15 +396,17 @@ class LLMService:
         else:
             input_field = user_content
 
+        sys_prompt = self._load_system_prompt()
         payload: dict[str, Any] = {
             "model": self._config.model,
             "input": input_field,
-            "system_prompt": self._load_system_prompt(),
             "stream": True,
             "temperature": self._config.temperature,
             "max_output_tokens": self._config.max_tokens,
             "store": True,
         }
+        if sys_prompt:
+            payload["system_prompt"] = sys_prompt
 
         # Multi-turn: include previous response_id if available.
         if conversation_id:

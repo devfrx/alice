@@ -348,7 +348,7 @@ async def ws_chat(websocket: WebSocket) -> None:
 
                 # --- fetch available tools for LLM ------------------------
                 tools: list[dict[str, Any]] | None = None
-                if ctx.tool_registry:
+                if ctx.tool_registry and ctx.config.llm.tools_enabled:
                     tools = await ctx.tool_registry.get_available_tools()
                     if not tools:
                         tools = None  # empty list confuses some LLMs

@@ -22,16 +22,6 @@
           <p class="mode-card__desc">Interazione vocale con visualizzazione IA</p>
         </button>
 
-        <button class="mode-card" :class="{ 'mode-card--active': uiStore.mode === 'chat' }" @click="selectMode('chat')">
-          <div class="mode-card__icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </div>
-          <h3 class="mode-card__title">Chat</h3>
-          <p class="mode-card__desc">Conversazione testuale classica</p>
-        </button>
-
         <button class="mode-card" :class="{ 'mode-card--active': uiStore.mode === 'hybrid' }"
           @click="selectMode('hybrid')">
           <div class="mode-card__icon">
@@ -127,7 +117,7 @@ function start(): void {
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.3s ease;
-  min-width: 160px;
+  min-width: 200px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }

@@ -125,6 +125,10 @@ class LLMConfig(BaseSettings):
     connect_timeout: float = 10.0
     """HTTP connect timeout in seconds."""
     system_prompt_file: str = "config/system_prompt.md"
+    system_prompt_enabled: bool = True
+    """Whether to include the system prompt in LLM requests."""
+    tools_enabled: bool = True
+    """Whether to send tool definitions to the LLM for function calling."""
     supports_thinking: bool = False
     """Request explicit reasoning from the API (QwQ, DeepSeek-R1).
 

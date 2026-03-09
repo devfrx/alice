@@ -47,24 +47,44 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   /** Whether tool executions require user confirmation before running. */
-  const toolConfirmations = ref<boolean>(loadToolConfirmations())
+  const toolConfirmations = ref<boolean>(true)
 
-  function loadToolConfirmations(): boolean {
-    try {
-      const stored = localStorage.getItem('omnia_tool_confirmations')
-      return stored === null ? true : stored === 'true'
-    } catch {
-      return true
-    }
-  }
+  /** Whether the system prompt is sent to the LLM. */
+  const systemPromptEnabled = ref<boolean>(true)
+
+  /** Whether tool definitions are sent to the LLM. */
+  const toolsEnabled = ref<boolean>(true)
 
   watch(toolConfirmations, (val) => {
-    localStorage.setItem('omnia_tool_confirmations', String(val))
     api.setToolConfirmations(val).catch(console.error)
   })
 
-  // Sync backend state on startup — push local preference to backend
-  api.setToolConfirmations(toolConfirmations.value).catch(console.error)
+  watch(systemPromptEnabled, (val) => {
+    api.setSystemPrompt(val).catch(console.error)
+  })
+
+  watch(toolsEnabled, (val) => {
+    api.setTools(val).catch(console.error)
+  })
+
+  /** Load toggle states from the backend (persisted preferences). */
+  async function loadToggles(): Promise<void> {
+    try {
+      const [tc, sp, t] = await Promise.all([
+        api.getToolConfirmations(),
+        api.getSystemPrompt(),
+        api.getTools(),
+      ])
+      toolConfirmations.value = tc.confirmations_enabled
+      systemPromptEnabled.value = sp.system_prompt_enabled
+      toolsEnabled.value = t.tools_enabled
+    } catch (err) {
+      console.warn('[settings store] loadToggles failed:', err)
+    }
+  }
+
+  // Load persisted toggle states from backend on startup
+  loadToggles()
 
   /** Load settings from the backend. */
   async function loadSettings(): Promise<void> {
@@ -431,6 +451,8 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     settings,
     toolConfirmations,
+    systemPromptEnabled,
+    toolsEnabled,
     models,
     isLoadingModels,
     isLoadingModel,
@@ -460,6 +482,7 @@ export const useSettingsStore = defineStore('settings', () => {
     stopOperationPolling,
     resumeOperationTracking,
     loadSettings,
-    saveSettings
+    saveSettings,
+    loadToggles
   }
 })

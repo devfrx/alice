@@ -158,8 +158,8 @@ async def update_config(request: Request) -> dict[str, Any]:
 
     Body: a partial config dict with only the keys to change.
 
-    Note: Currently a stub — changes are accepted but NOT persisted to
-    disk.  Full persistence is planned for a future phase.
+    Independent preferences (TTS, STT, voice, UI, etc.) are automatically
+    persisted to the database so they survive restarts.
     """
     ctx = _ctx(request)
     body = await request.json()
@@ -435,6 +435,13 @@ async def update_config(request: Request) -> dict[str, Any]:
                 cfg.pc_automation, "confirmations_enabled",
                 pc_updates["confirmations_enabled"],
             )
+
+    # -- Persist independent preferences to database -------------------------
+    if ctx.preferences_service is not None:
+        try:
+            await ctx.preferences_service.persist_from_update(body)
+        except Exception as exc:
+            logger.warning("Failed to persist preferences: {}", exc)
 
     # -- Restart STT/TTS services if their config changed ------------------
     if "stt" in body:

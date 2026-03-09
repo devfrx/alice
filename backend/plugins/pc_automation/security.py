@@ -87,13 +87,13 @@ def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
         return False, f"Application '{app_name}' is not in the whitelist. Allowed: {allowed}", None
 
     executable = ALLOWED_APPS[normalized]
-    # If it's a list, return the first one
+    # Return all candidates so the executor can try each one
     if isinstance(executable, list):
-        resolved = executable[0]
+        candidates = executable
     else:
-        resolved = executable
+        candidates = [executable]
 
-    return True, f"Application '{normalized}' resolved to '{resolved}'", resolved
+    return True, f"Application '{normalized}' is whitelisted", candidates
 
 
 def validate_command(command: str) -> tuple[bool, str]:

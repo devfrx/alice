@@ -13,7 +13,6 @@ import type { LMStudioModel } from '../../types/settings'
 const settingsStore = useSettingsStore()
 
 const isOpen = ref(false)
-const switchingModel = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -64,19 +63,6 @@ function toggle(): void {
   }
   isOpen.value = !isOpen.value
   errorMessage.value = null
-}
-
-async function selectModel(name: string): Promise<void> {
-  switchingModel.value = name
-  errorMessage.value = null
-  try {
-    await settingsStore.switchModel(name)
-    isOpen.value = false
-  } catch (e) {
-    errorMessage.value = e instanceof Error ? e.message : 'Errore nel cambio modello'
-  } finally {
-    switchingModel.value = null
-  }
 }
 
 async function toggleModelLoad(model: LMStudioModel, event: MouseEvent): Promise<void> {
@@ -141,8 +127,8 @@ onBeforeUnmount(() => {
       </svg>
       <span class="model-selector__label">
         {{
-          settingsStore.activeModel
-            ? truncateName(settingsStore.activeModel.display_name || settingsStore.activeModel.name)
+          loadedModels[0]
+            ? truncateName(loadedModels[0].display_name || loadedModels[0].name)
             : settingsStore.settings.llm.model
         }}
       </span>
@@ -195,12 +181,9 @@ onBeforeUnmount(() => {
               Caricati ({{ loadedModels.length }})
             </div>
             <button v-for="model in loadedModels" :key="'loaded-' + model.name" class="model-selector__item" :class="{
-              'model-selector__item--active': model.is_active,
               'model-selector__item--loaded': true,
-              'model-selector__item--switching': switchingModel === model.name,
               'model-selector__item--busy': isModelBusy(model)
-            }" :disabled="switchingModel !== null || settingsStore.isAnyOperationInProgress"
-              @click="selectModel(model.name)">
+            }" :disabled="settingsStore.isAnyOperationInProgress">
               <!-- Left accent bar for loaded models -->
               <span v-if="model.loaded" class="model-selector__accent-bar" />
 
@@ -276,13 +259,8 @@ onBeforeUnmount(() => {
                 </button>
               </span>
 
-              <!-- Switching spinner overlay -->
-              <span v-if="switchingModel === model.name" class="model-selector__item-loading">
-                <span class="model-selector__spinner model-selector__spinner--small" />
-              </span>
-
               <!-- Loading progress bar -->
-              <div v-if="settingsStore.isModelLoading(model.name) && !switchingModel"
+              <div v-if="settingsStore.isModelLoading(model.name)"
                 class="model-selector__load-progress">
                 <div class="model-selector__load-progress-bar" />
                 <span class="model-selector__load-progress-text">Caricamento in corso...</span>
@@ -300,11 +278,8 @@ onBeforeUnmount(() => {
               Disponibili ({{ availableModels.length }})
             </div>
             <button v-for="model in availableModels" :key="'avail-' + model.name" class="model-selector__item" :class="{
-              'model-selector__item--active': model.is_active,
-              'model-selector__item--switching': switchingModel === model.name,
               'model-selector__item--busy': isModelBusy(model)
-            }" :disabled="switchingModel !== null || settingsStore.isAnyOperationInProgress"
-              @click="selectModel(model.name)">
+            }" :disabled="settingsStore.isAnyOperationInProgress">
               <span class="model-selector__item-left">
                 <span class="model-selector__load-dot model-selector__load-dot--unloaded" title="Non caricato" />
                 <span class="model-selector__item-name">
@@ -354,10 +329,7 @@ onBeforeUnmount(() => {
                   </svg>
                 </button>
               </span>
-              <span v-if="switchingModel === model.name" class="model-selector__item-loading">
-                <span class="model-selector__spinner model-selector__spinner--small" />
-              </span>
-              <div v-if="settingsStore.isModelLoading(model.name) && !switchingModel"
+              <div v-if="settingsStore.isModelLoading(model.name)"
                 class="model-selector__load-progress">
                 <div class="model-selector__load-progress-bar" />
                 <span class="model-selector__load-progress-text">Caricamento in corso...</span>

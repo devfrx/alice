@@ -142,33 +142,33 @@ class TestWebSearchPluginLifecycle:
             )
 
     @pytest.mark.asyncio
-    async def test_check_dependencies_ddg_available(self):
-        """When DDG is importable, check_dependencies returns []."""
+    async def test_check_dependencies_ddgs_available(self):
+        """When DDGS is importable, check_dependencies returns []."""
         plugin = _get_plugin()
-        with patch("backend.plugins.web_search.plugin._DDG_AVAILABLE", True):
+        with patch("backend.plugins.web_search.plugin._DDGS_AVAILABLE", True):
             assert plugin.check_dependencies() == []
 
     @pytest.mark.asyncio
-    async def test_check_dependencies_ddg_missing(self):
-        """When DDG is missing, check_dependencies flags it."""
+    async def test_check_dependencies_ddgs_missing(self):
+        """When DDGS is missing, check_dependencies flags it."""
         plugin = _get_plugin()
-        with patch("backend.plugins.web_search.plugin._DDG_AVAILABLE", False):
+        with patch("backend.plugins.web_search.plugin._DDGS_AVAILABLE", False):
             deps = plugin.check_dependencies()
-            assert "duckduckgo-search" in deps
+            assert "ddgs" in deps
 
     @pytest.mark.asyncio
     async def test_connection_status_connected(self):
-        """Status is CONNECTED when DDG library is available."""
+        """Status is CONNECTED when DDGS library is available."""
         plugin = _get_plugin()
-        with patch("backend.plugins.web_search.plugin._DDG_AVAILABLE", True):
+        with patch("backend.plugins.web_search.plugin._DDGS_AVAILABLE", True):
             status = await plugin.get_connection_status()
             assert status == ConnectionStatus.CONNECTED
 
     @pytest.mark.asyncio
     async def test_connection_status_error(self):
-        """Status is ERROR when DDG library is missing."""
+        """Status is ERROR when DDGS library is missing."""
         plugin = _get_plugin()
-        with patch("backend.plugins.web_search.plugin._DDG_AVAILABLE", False):
+        with patch("backend.plugins.web_search.plugin._DDGS_AVAILABLE", False):
             status = await plugin.get_connection_status()
             assert status == ConnectionStatus.ERROR
 
@@ -198,7 +198,7 @@ class TestWebSearchPluginLifecycle:
 
 
 class TestWebSearchTool:
-    """web_search tool execution with mocked DDG."""
+    """web_search tool execution with mocked DDGS."""
 
     @pytest.mark.asyncio
     async def test_search_returns_results(self, ctx: AppContext, exec_context: ExecutionContext):
@@ -298,7 +298,7 @@ class TestWebSearchTool:
         with patch.object(
             plugin._client, "search",
             new_callable=AsyncMock,
-            side_effect=RuntimeError("duckduckgo-search is not installed"),
+            side_effect=RuntimeError("ddgs is not installed"),
         ):
             result = await plugin.execute_tool(
                 "web_search", {"query": "test"}, exec_context,
@@ -459,8 +459,8 @@ class TestWebSearchClient:
         client._http.aclose.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_search_calls_ddg_via_to_thread(self):
-        """search() runs _ddg_search_sync in a thread and returns results."""
+    async def test_search_calls_metasearch_via_to_thread(self):
+        """search() runs _metasearch_sync in a thread and returns results."""
         client = self._make_client()
         fake = _fake_ddg_results(3)
 
@@ -471,13 +471,13 @@ class TestWebSearchClient:
         ) as mock_thread:
             results = await client.search("python asyncio", max_results=3)
 
-        mock_thread.assert_awaited_once_with(client._ddg_search_sync, "python asyncio", 3, client._region, client._proxy_url)
+        mock_thread.assert_awaited_once_with(client._metasearch_sync, "python asyncio", 3, client._region, client._proxy_url)
         assert results == fake
         await client.close()
 
     @pytest.mark.asyncio
     async def test_search_cache_hit(self):
-        """Second identical search returns cached results without DDG call."""
+        """Second identical search returns cached results without DDGS call."""
         client = self._make_client()
         fake = _fake_ddg_results(3)
 
@@ -489,14 +489,14 @@ class TestWebSearchClient:
             first = await client.search("cached query", max_results=3)
             second = await client.search("cached query", max_results=3)
 
-        # DDG should be called only once → cache hit on second call
+        # DDGS should be called only once → cache hit on second call
         mock_thread.assert_awaited_once()
         assert first == second == fake
         await client.close()
 
     @pytest.mark.asyncio
     async def test_search_cache_ttl_expiry(self):
-        """Expired cache entry triggers a fresh DDG search."""
+        """Expired cache entry triggers a fresh DDGS search."""
         client = self._make_client(cache_ttl_s=60)
         fake = _fake_ddg_results(2)
 
@@ -520,7 +520,7 @@ class TestWebSearchClient:
             mock_mono.return_value = monotonic_base + 100
             await client.search("expire test")
 
-        # DDG called twice: first miss + second miss (cache expired)
+        # DDGS called twice: first miss + second miss (cache expired)
         assert mock_thread.await_count == 2
         await client.close()
 
@@ -553,11 +553,11 @@ class TestWebSearchClient:
         await client.close()
 
     @pytest.mark.asyncio
-    async def test_search_ddg_not_available(self):
-        """search() raises RuntimeError when DDG is not installed."""
+    async def test_search_ddgs_not_available(self):
+        """search() raises RuntimeError when DDGS is not installed."""
         client = self._make_client()
 
-        with patch("backend.plugins.web_search.client._DDG_AVAILABLE", False):
+        with patch("backend.plugins.web_search.client._DDGS_AVAILABLE", False):
             with pytest.raises(RuntimeError, match="not installed"):
                 await client.search("test")
 
@@ -704,8 +704,8 @@ class TestWebSearchClient:
         assert key1 != key2
 
     @pytest.mark.asyncio
-    async def test_ddg_search_sync_static(self):
-        """_ddg_search_sync extracts title/href/body from DDG results."""
+    async def test_metasearch_sync_static(self):
+        """_metasearch_sync extracts title/href/body from DDGS results."""
         from backend.plugins.web_search.client import WebSearchClient
 
         raw_results = [
@@ -716,9 +716,9 @@ class TestWebSearchClient:
         mock_ddgs_instance.text.return_value = raw_results
 
         with patch("backend.plugins.web_search.client.DDGS", return_value=mock_ddgs_instance):
-            results = WebSearchClient._ddg_search_sync("test query", 2, "it-it")
+            results = WebSearchClient._metasearch_sync("test query", 2, "it-it")
 
         assert len(results) == 2
         assert results[0] == {"title": "T1", "href": "https://a.com", "body": "B1"}
         assert results[1] == {"title": "T2", "href": "https://b.com", "body": "B2"}
-        mock_ddgs_instance.text.assert_called_once_with("test query", region="it-it", max_results=2)
+        mock_ddgs_instance.text.assert_called_once_with("test query", region="it-it", max_results=2, backend="auto")

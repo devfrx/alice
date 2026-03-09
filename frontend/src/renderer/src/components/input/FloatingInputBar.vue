@@ -385,7 +385,7 @@ defineExpose({
 .fib {
     position: fixed;
     bottom: 24px;
-    left: 50%;
+    left: calc(50% + var(--sidebar-offset, 0px) / 2);
     transform: translateX(-50%);
     z-index: 100;
     min-width: 360px;
@@ -408,7 +408,8 @@ defineExpose({
         box-shadow 0.3s ease,
         border-radius 0.3s ease,
         padding 0.3s ease,
-        min-width 0.3s ease;
+        min-width 0.3s ease,
+        left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     /* Prevent layout jump during state/input crossfade */
     display: grid;

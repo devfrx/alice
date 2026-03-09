@@ -34,7 +34,7 @@ dependencies = [
     "paho-mqtt>=2.1",
 
     # Web Search
-    "duckduckgo-search>=6.0",
+    "ddgs>=9.0",
     "beautifulsoup4>=4.12",
 
     # Calendar

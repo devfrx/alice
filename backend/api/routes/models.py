@@ -96,9 +96,8 @@ async def list_models(request: Request) -> list[dict[str, Any]]:
     except httpx.HTTPError:
         raise HTTPException(503, "LM Studio is unreachable")
 
-    active_model = _ctx(request).config.llm.model
     models = data.get("models", [])
-    return [serialise_model(m, active_model) for m in models]
+    return [serialise_model(m) for m in models]
 
 
 @router.post("/models/load")
@@ -198,7 +197,7 @@ async def models_status(request: Request) -> ModelStatusResponse:
 # ---------------------------------------------------------------------------
 
 
-def serialise_model(m: dict, active_model: str) -> dict[str, Any]:
+def serialise_model(m: dict) -> dict[str, Any]:
     """Transform a v1 API model object into the OMNIA response shape.
 
     Shared by both ``/api/models`` and ``/api/config/models`` to ensure
@@ -215,7 +214,7 @@ def serialise_model(m: dict, active_model: str) -> dict[str, Any]:
         "type": m.get("type", "llm"),
         "size": m.get("size_bytes", 0),
         "modified_at": "",
-        "is_active": key == active_model,
+        "is_active": bool(m.get("loaded_instances")),
         "loaded": bool(m.get("loaded_instances")),
         "loaded_instances": m.get("loaded_instances", []),
         "architecture": m.get("architecture"),

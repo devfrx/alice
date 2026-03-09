@@ -30,7 +30,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="omnia-app" :class="`omnia-app--${uiStore.mode}`">
+  <div id="omnia-app" :class="`omnia-app--${uiStore.mode}`"
+    :style="{ '--sidebar-offset': uiStore.sidebarOpen ? 'var(--sidebar-width)' : 'var(--sidebar-collapsed)' }">
     <TitleBar />
     <!-- Plugin toolbar mount point -->
     <div v-if="toolbarComponents.length" class="plugin-toolbar">

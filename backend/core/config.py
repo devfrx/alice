@@ -315,9 +315,9 @@ class WebSearchConfig(BaseSettings):
     request_timeout_s: int = 10
     """HTTP timeout for scrape requests in seconds."""
     rate_limit_s: float = 2.0
-    """Minimum seconds between DuckDuckGo search calls."""
+    """Minimum seconds between search calls."""
     region: str = "it-it"
-    """DuckDuckGo region code (e.g. 'it-it', 'us-en', 'wt-wt' for none)."""
+    """Search region code (e.g. 'it-it', 'us-en', 'wt-wt' for none)."""
     proxy_http: str | None = None
     """Optional HTTP proxy URL."""
     proxy_https: str | None = None

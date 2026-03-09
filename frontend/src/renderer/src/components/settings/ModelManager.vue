@@ -121,16 +121,6 @@ async function handleDownload(): Promise<void> {
     }
 }
 
-/** Set a model as active. */
-async function setActive(modelName: string): Promise<void> {
-    errorMessage.value = null
-    try {
-        await settingsStore.switchModel(modelName)
-    } catch (e) {
-        errorMessage.value = e instanceof Error ? e.message : 'Errore nel cambio modello'
-    }
-}
-
 onMounted(() => {
     settingsStore.loadModels()
 })
@@ -192,7 +182,6 @@ onMounted(() => {
             </div>
 
             <div v-for="model in settingsStore.models" :key="model.name" class="mm-model" :class="{
-                'mm-model--active': model.is_active,
                 'mm-model--loaded': model.loaded,
                 'mm-model--loading': settingsStore.isModelLoading(model.name),
                 'mm-model--unloading': model.loaded_instances.some(i => settingsStore.isInstanceUnloading(i.id))
@@ -203,13 +192,8 @@ onMounted(() => {
                         <span class="mm-model__load-dot"
                             :class="model.loaded ? 'mm-model__load-dot--on' : 'mm-model__load-dot--off'" />
                         <span class="mm-model__name">{{ model.display_name || model.name }}</span>
-                        <span v-if="model.is_active" class="mm-model__active-badge">Attivo</span>
                     </div>
                     <div class="mm-model__actions">
-                        <button v-if="!model.is_active" class="mm-btn mm-btn--ghost mm-btn--sm"
-                            :disabled="settingsStore.isAnyOperationInProgress" @click="setActive(model.name)">
-                            Imposta attivo
-                        </button>
                         <button v-if="!model.loaded" class="mm-btn mm-btn--primary mm-btn--sm"
                             :disabled="settingsStore.isModelLoading(model.name) || settingsStore.isAnyOperationInProgress"
                             @click="openLoadDialog(model)">

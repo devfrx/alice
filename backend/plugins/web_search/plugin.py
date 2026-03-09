@@ -1,8 +1,8 @@
 """O.M.N.I.A. — Web Search plugin.
 
-Exposes ``web_search`` and ``web_scrape`` tools powered by DuckDuckGo
+Exposes ``web_search`` and ``web_scrape`` tools powered by DDGS metasearch
 and httpx-based page scraping.  All external requests go through SSRF
-validation; DDG calls are rate-limited and cached.
+validation; search calls are rate-limited and cached.
 """
 
 from __future__ import annotations
@@ -19,18 +19,18 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
-from backend.plugins.web_search.client import WebSearchClient, _DDG_AVAILABLE
+from backend.plugins.web_search.client import WebSearchClient, _DDGS_AVAILABLE
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
 
 
 class WebSearchPlugin(BasePlugin):
-    """Web search and page scraping via DuckDuckGo."""
+    """Web search and page scraping via DDGS metasearch."""
 
     plugin_name: str = "web_search"
     plugin_version: str = "1.0.0"
-    plugin_description: str = "Web search and page scraping via DuckDuckGo."
+    plugin_description: str = "Web search and page scraping via DDGS metasearch."
     plugin_dependencies: list[str] = []
     plugin_priority: int = 40
 
@@ -57,9 +57,9 @@ class WebSearchPlugin(BasePlugin):
             proxy_https=cfg.proxy_https,
         )
 
-        if not _DDG_AVAILABLE:
+        if not _DDGS_AVAILABLE:
             logger.warning(
-                "web_search plugin: duckduckgo-search is not installed"
+                "web_search plugin: ddgs is not installed"
                 " — search tool will be unavailable"
             )
 
@@ -83,8 +83,8 @@ class WebSearchPlugin(BasePlugin):
             ToolDefinition(
                 name="web_search",
                 description=(
-                    "Search the web using DuckDuckGo. Returns a list of "
-                    "results with title, URL and snippet."
+                    "Search the web using multiple engines (Google, Bing, DuckDuckGo, "
+                    "Brave, Yahoo, etc.). Returns a list of results with title, URL and snippet."
                 ),
                 parameters={
                     "type": "object",
@@ -166,19 +166,19 @@ class WebSearchPlugin(BasePlugin):
         """Report missing optional dependencies.
 
         Returns:
-            A list with ``"duckduckgo-search"`` if missing, else empty.
+            A list with ``"ddgs"`` if missing, else empty.
         """
-        if not _DDG_AVAILABLE:
-            return ["duckduckgo-search"]
+        if not _DDGS_AVAILABLE:
+            return ["ddgs"]
         return []
 
     async def get_connection_status(self) -> ConnectionStatus:
-        """Return CONNECTED if DDG library is available, ERROR otherwise.
+        """Return CONNECTED if DDGS library is available, ERROR otherwise.
 
         Returns:
             Current connection status.
         """
-        if _DDG_AVAILABLE:
+        if _DDGS_AVAILABLE:
             return ConnectionStatus.CONNECTED
         return ConnectionStatus.ERROR
 

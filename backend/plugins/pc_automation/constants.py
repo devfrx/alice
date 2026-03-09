@@ -25,6 +25,13 @@ ALLOWED_APPS: dict[str, str | list[str]] = {
     "edge": ["msedge.exe", "MsEdge.exe"],
     "spotify": "Spotify.exe",
     "vlc": "vlc.exe",
+    "vivaldi": ["vivaldi.exe", "Vivaldi.exe"],
+    "discord": ["Discord.exe", "discord.exe"],
+    "lmstudio": ["LM Studio.exe", "lmstudio.exe"],
+    "notion": ["Notion.exe", "notion.exe"],
+    "hwinfo": ["HWiNFO64.exe"],
+    "steam": ["steam.exe", "Steam.exe"],
+    "impostazioni": "ms-settings:",
 }
 
 # -- Key Whitelist --------------------------------------------------------

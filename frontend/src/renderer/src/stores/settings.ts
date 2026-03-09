@@ -186,8 +186,8 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Synchronous guard to prevent concurrent resumeOperationTracking calls. */
   let _isResumingOperation = false
 
-  /** The model that is currently active (has `is_active === true`). */
-  const activeModel = computed(() => models.value.find((m) => m.is_active) ?? null)
+  /** The model currently loaded in LM Studio (first loaded instance). */
+  const activeModel = computed(() => models.value.find((m) => m.loaded) ?? null)
 
   /** Models that are currently loaded in LM Studio. */
   const loadedModels = computed(() => models.value.filter((m) => m.loaded))
@@ -336,16 +336,6 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       await api.loadModel(modelKey, config)
       await loadModels()
-      // If the loaded model is not active, switch to it so selectors stay in sync
-      const justLoaded = models.value.find((m) => m.name === modelKey)
-      if (justLoaded && !justLoaded.is_active) {
-        try {
-          await api.updateConfig({ llm: { model: modelKey } })
-          settings.value.llm.model = modelKey
-        } catch {
-          // 409 is expected if backend is still busy — model is loaded regardless
-        }
-      }
     } catch (err) {
       currentOperation.value = null
       stopOperationPolling()
@@ -427,27 +417,6 @@ export const useSettingsStore = defineStore('settings', () => {
     stopOperationPolling()
   }
 
-  /** Switch the active LLM model. The backend loads it automatically. */
-  async function switchModel(modelName: string): Promise<void> {
-    if (isAnyOperationInProgress.value) throw new Error('Un\'altra operazione è in corso')
-    loadingModelKeys.value = new Set([...loadingModelKeys.value, modelName])
-    currentOperation.value = { status: 'in_progress', type: 'switch', model: modelName }
-    startOperationPolling()
-    try {
-      await api.updateConfig({ llm: { model: modelName } })
-      await loadModels()
-      settings.value.llm.model = modelName
-    } catch (err) {
-      currentOperation.value = null
-      stopOperationPolling()
-      throw err
-    } finally {
-      const next = new Set(loadingModelKeys.value)
-      next.delete(modelName)
-      loadingModelKeys.value = next
-    }
-  }
-
   return {
     settings,
     toolConfirmations,
@@ -473,7 +442,6 @@ export const useSettingsStore = defineStore('settings', () => {
     loadModel,
     unloadModel,
     downloadModel,
-    switchModel,
     stopAllPolling,
     currentOperation,
     isAnyOperationInProgress,

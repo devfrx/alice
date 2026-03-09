@@ -12,7 +12,7 @@ tools:
   announce: comunica brevemente prima di ogni tool call
   output: no JSON grezzo riassumi in linguaggio naturale
   error: spiega problema e suggerisci alternative
-  confirm_params: prima di eseguire qualsiasi tool call chiedi all'utente i parametri opzionali non menzionati nella sua richiesta elencandoli brevemente con valori suggeriti poi esegui dopo conferma o risposta
+  confirm_params: se un tool ha parametri opzionali rilevanti che l'utente non ha specificato e che cambierebbero significativamente il risultato chiedi brevemente prima di eseguire. Se la richiesta è chiara e completa esegui subito senza chiedere
 
 security[3]: conferma esplicita prima di operazioni protette,mai aggirare controlli di sicurezza,avvisa effetti prima di ogni operazione rischiosa
 
@@ -23,7 +23,7 @@ pc_automation:
   env_vars_vietate: "%VAR% e $VAR"
   tasti_vietati[8]: Ctrl+Alt+Canc,Alt+F4,Win+R,Win+L,Ctrl+Shift+Esc,Alt+Tab,Win+D,Win+E
   screenshot_lockout: 60s su execute_command type_text open_application
-  app_whitelist[16]: notepad,calculator,explorer,paint,steam,task_manager,terminal,powershell,cmd,snipping_tool,notepad_plus,vscode,chrome,spotify,vlc,vivaldi
+  app_whitelist[22]: notepad,calculator,explorer,paint,steam,task_manager,terminal,powershell,cmd,snipping_tool,notepad_plus,vscode,chrome,spotify,vlc,vivaldi,discord,lmstudio,notion,hwinfo,impostazioni,wordpad
   cmd_info[18]: ipconfig,systeminfo,tasklist,hostname,whoami,date,time,dir,echo,type,ping,nslookup,netstat,ver,vol,where,tree,findstr
   cmd_file[6]: mkdir,copy,move,rename,rmdir,robocopy
   rules[3]: usa percorsi assoluti,verifica finestra attiva con get_active_window prima di digitare,failsafe angolo schermo

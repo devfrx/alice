@@ -51,8 +51,8 @@ def exec_context() -> ExecutionContext:
 EXPECTED_TOOLS: dict[str, dict] = {
     "get_active_window":  {"risk": "safe",      "confirm": False},
     "get_running_apps":   {"risk": "safe",      "confirm": False},
-    "open_application":   {"risk": "medium",    "confirm": True},
-    "close_application":  {"risk": "medium",    "confirm": True},
+    "open_application":   {"risk": "low",       "confirm": False},
+    "close_application":  {"risk": "low",       "confirm": False},
     "type_text":          {"risk": "medium",    "confirm": True},
     "press_keys":         {"risk": "medium",    "confirm": True},
     "take_screenshot":    {"risk": "medium",    "confirm": True},
@@ -134,12 +134,22 @@ class TestPcAutomationToolRiskLevels:
         for name in ("get_active_window", "get_running_apps"):
             assert tm[name].risk_level == "safe", f"{name} should be safe"
 
+    def test_low_tools(self):
+        """open_application and close_application are risk 'low'
+        (whitelisted, no confirmation needed)."""
+        tm = self._tool_map()
+        for name in ("open_application", "close_application"):
+            assert tm[name].risk_level == "low", f"{name} should be low"
+            assert not tm[name].requires_confirmation, (
+                f"{name} (low/whitelisted) should NOT require confirmation"
+            )
+
     def test_medium_tools(self):
-        """open/close_application, type_text, press_keys, take_screenshot,
+        """type_text, press_keys, take_screenshot,
         move_mouse, click are risk 'medium'."""
         tm = self._tool_map()
         medium_names = [
-            "open_application", "close_application", "type_text",
+            "type_text",
             "press_keys", "take_screenshot", "move_mouse", "click",
         ]
         for name in medium_names:
@@ -160,12 +170,12 @@ class TestPcAutomationToolRiskLevels:
                 )
 
     def test_safe_no_confirmation(self):
-        """Safe tools have requires_confirmation=False."""
+        """Safe and low-risk tools have requires_confirmation=False."""
         tm = self._tool_map()
         for name, td in tm.items():
-            if td.risk_level == "safe":
+            if td.risk_level in ("safe", "low"):
                 assert not td.requires_confirmation, (
-                    f"{name} (safe) should NOT require confirmation"
+                    f"{name} ({td.risk_level}) should NOT require confirmation"
                 )
 
 
@@ -186,7 +196,7 @@ class TestPcAutomationExecuteTool:
         self, mock_to_thread, mock_validate, ctx, exec_context,
     ):
         """Opening a whitelisted app succeeds."""
-        mock_validate.return_value = (True, "ok", "notepad.exe")
+        mock_validate.return_value = (True, "ok", ["notepad.exe"])
         mock_to_thread.return_value = "Application 'notepad' opened (notepad.exe)"
 
         plugin = _get_plugin()

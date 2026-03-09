@@ -81,7 +81,8 @@ class PcAutomationPlugin(BasePlugin):
                 description=(
                     "Open a whitelisted application by name. Allowed: "
                     "notepad, calculator, explorer, paint, chrome, firefox, "
-                    "edge, vscode, terminal, etc."
+                    "edge, vscode, vivaldi, discord, lmstudio, notion, "
+                    "hwinfo, steam, impostazioni, terminal, etc."
                 ),
                 parameters={
                     "type": "object",
@@ -97,8 +98,8 @@ class PcAutomationPlugin(BasePlugin):
                     "required": ["app_name"],
                 },
                 result_type="string",
-                risk_level="medium",
-                requires_confirmation=True,
+                risk_level="low",
+                requires_confirmation=False,
                 timeout_ms=15000,
             ),
             ToolDefinition(
@@ -118,8 +119,8 @@ class PcAutomationPlugin(BasePlugin):
                     "required": ["app_name"],
                 },
                 result_type="string",
-                risk_level="medium",
-                requires_confirmation=True,
+                risk_level="low",
+                requires_confirmation=False,
                 timeout_ms=15000,
             ),
             ToolDefinition(

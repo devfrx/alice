@@ -92,24 +92,125 @@ def _normalize_backslashes(command: str) -> str:
     return _RE_MULTI_BACKSLASH.sub("\\\\", command)
 
 
+def _find_executable(candidates: list[str]) -> str | None:
+    """Resolve an executable from a list of candidate names.
+
+    Search order:
+    1. URI protocols (e.g. ``ms-settings:``) — returned as-is.
+    2. ``shutil.which`` (system PATH).
+    3. Windows App Paths registry.
+    4. Common install directories (Program Files, LocalAppData\\Programs) up to
+       2 directory levels deep.
+
+    Args:
+        candidates: Ordered list of executable names to try.
+
+    Returns:
+        Resolved path/URI string, or ``None`` if nothing was found.
+    """
+    import os
+    import shutil
+
+    for name in candidates:
+        # URI protocols are handled by os.startfile — no path resolution needed
+        if ":" in name and not name.endswith(".exe"):
+            return name
+
+        # 1. PATH lookup
+        found = shutil.which(name)
+        if found:
+            return found
+
+        # 2. Windows App Paths registry
+        try:
+            import winreg
+            for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                try:
+                    key_path = rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{name}"
+                    with winreg.OpenKey(hive, key_path) as key:
+                        val, _ = winreg.QueryValueEx(key, "")
+                        if val and os.path.isfile(val):
+                            return val
+                except OSError:
+                    continue
+        except ImportError:
+            pass
+
+        # 3. Shallow scan of common install directories (2 levels deep)
+        bases = [
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+        ]
+        name_lower = name.lower()
+        for base in bases:
+            if not base or not os.path.isdir(base):
+                continue
+            try:
+                for entry in os.scandir(base):
+                    if not entry.is_dir():
+                        continue
+                    candidate = os.path.join(entry.path, name)
+                    if os.path.isfile(candidate):
+                        return candidate
+                    # One sub-level deeper
+                    try:
+                        for sub in os.scandir(entry.path):
+                            if sub.is_dir():
+                                candidate = os.path.join(sub.path, name)
+                                if os.path.isfile(candidate):
+                                    return candidate
+                    except (OSError, PermissionError):
+                        pass
+            except (OSError, PermissionError):
+                pass
+
+    return None
+
+
 async def exec_open_app(app_name: str) -> str:
     """Open an application by name (must be in whitelist).
 
-    Validates against ALLOWED_APPS whitelist, then uses subprocess to start.
+    Validates against ALLOWED_APPS whitelist, resolves the executable via
+    PATH / registry / common install directories, then launches it.
+    URI-style entries (e.g. ``ms-settings:``) are opened via ``os.startfile``.
     """
-    valid, msg, executable = validate_app_name(app_name)
+    valid, msg, candidates = validate_app_name(app_name)
     if not valid:
         raise ValueError(msg)
 
     def _open() -> str:
+        import os
         import subprocess
 
-        subprocess.Popen(
-            [executable],
-            shell=False,
-            close_fds=True,
-        )
-        return f"Application '{app_name}' opened ({executable})"
+        resolved = _find_executable(candidates)
+        if resolved is None:
+            tried = ", ".join(candidates)
+            raise FileNotFoundError(
+                f"Could not find '{app_name}' on this system. Tried: {tried}"
+            )
+
+        # URI protocols (e.g. ms-settings:) must be launched via ShellExecute
+        if ":" in resolved and not resolved.endswith(".exe"):
+            os.startfile(resolved)
+        else:
+            try:
+                subprocess.Popen(
+                    [resolved],
+                    shell=False,
+                    close_fds=True,
+                )
+            except OSError as exc:
+                # WinError 740: app requires elevation — re-launch via ShellExecuteEx
+                # which triggers UAC prompt and runs the process as administrator.
+                if getattr(exc, "winerror", None) == 740:
+                    import ctypes
+                    ctypes.windll.shell32.ShellExecuteW(
+                        None, "runas", resolved, None, None, 1,
+                    )
+                else:
+                    raise
+        return f"Application '{app_name}' opened ({resolved})"
 
     return await asyncio.to_thread(_open)
 
@@ -119,9 +220,12 @@ async def exec_close_app(app_name: str) -> str:
 
     Uses taskkill to terminate the process gracefully.
     """
-    valid, msg, executable = validate_app_name(app_name)
+    valid, msg, candidates = validate_app_name(app_name)
     if not valid:
         raise ValueError(msg)
+
+    # taskkill needs just the base exe name, use the first candidate
+    executable = candidates[0]
 
     try:
         output = await safe_subprocess("taskkill", ["/IM", executable, "/F"], timeout=10)

@@ -1,6 +1,6 @@
 """O.M.N.I.A. — Web search client.
 
-Wraps DuckDuckGo search (sync, run via ``asyncio.to_thread``) and
+Wraps DDGS metasearch (sync, run via ``asyncio.to_thread``) and
 ``httpx``-based page scraping with SSRF protection, rate limiting,
 and in-memory result caching.
 """
@@ -21,15 +21,15 @@ from backend.core.http_security import (
     create_ssrf_safe_event_hooks,
 )
 
-# -- Lazy DDG import -------------------------------------------------------
+# -- Lazy DDGS import ------------------------------------------------------
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 
-    _DDG_AVAILABLE = True
+    _DDGS_AVAILABLE = True
 except ImportError:
     DDGS = None  # type: ignore[assignment,misc]
-    _DDG_AVAILABLE = False
+    _DDGS_AVAILABLE = False
 
 
 # -- Constants --------------------------------------------------------------
@@ -53,8 +53,8 @@ class WebSearchClient:
         max_results: Default number of search results.
         cache_ttl_s: Seconds before cached results expire.
         request_timeout_s: HTTP request timeout in seconds.
-        rate_limit_s: Minimum seconds between DDG search calls.
-        region: DuckDuckGo region code (e.g. 'it-it').
+        rate_limit_s: Minimum seconds between search calls.
+        region: Search region code (e.g. 'it-it').
         proxy_http: Optional HTTP proxy URL.
         proxy_https: Optional HTTPS proxy URL.
     """
@@ -107,7 +107,7 @@ class WebSearchClient:
         query: str,
         max_results: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Run a DuckDuckGo text search.
+        """Run a metasearch query.
 
         Args:
             query: Search query string.
@@ -117,12 +117,12 @@ class WebSearchClient:
             A list of result dicts with keys ``title``, ``href``, ``body``.
 
         Raises:
-            RuntimeError: If the ``duckduckgo-search`` package is missing.
+            RuntimeError: If the ``ddgs`` package is missing.
         """
-        if not _DDG_AVAILABLE:
+        if not _DDGS_AVAILABLE:
             raise RuntimeError(
-                "duckduckgo-search is not installed — "
-                "run: uv add duckduckgo-search"
+                "ddgs is not installed — "
+                "run: uv add ddgs"
             )
 
         effective_max = max_results or self._max_results
@@ -137,9 +137,9 @@ class WebSearchClient:
         # Rate limiting
         await self._enforce_rate_limit()
 
-        # DDG is synchronous — run in a thread
+        # DDGS is synchronous — run in a thread
         results = await asyncio.to_thread(
-            self._ddg_search_sync,
+            self._metasearch_sync,
             query,
             effective_max,
             self._region,
@@ -201,21 +201,21 @@ class WebSearchClient:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _ddg_search_sync(
+    def _metasearch_sync(
         query: str,
         max_results: int,
         region: str,
         proxy: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Synchronous DDG search (called via ``to_thread``)."""
-        ddg = DDGS(proxy=proxy) if proxy else DDGS()
-        raw = ddg.text(query, region=region, max_results=max_results)
+        """Synchronous DDGS metasearch (called via ``to_thread``)."""
+        ddgs = DDGS(proxy=proxy) if proxy else DDGS()
+        raw = ddgs.text(query, region=region, max_results=max_results, backend="auto")
         results = [
             {"title": r.get("title", ""), "href": r.get("href", ""), "body": r.get("body", "")}
             for r in raw
         ]
         if not results:
-            logger.warning("DDG returned no results for query={!r}", query)
+            logger.warning("DDGS returned no results for query={!r}", query)
         return results
 
     async def _enforce_rate_limit(self) -> None:

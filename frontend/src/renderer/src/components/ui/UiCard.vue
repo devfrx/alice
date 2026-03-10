@@ -7,85 +7,82 @@
  */
 
 export interface UiCardProps {
-  variant?: 'default' | 'subtle' | 'elevated' | 'glass'
-  interactive?: boolean
-  noPadding?: boolean
+    variant?: 'default' | 'subtle' | 'elevated' | 'glass'
+    interactive?: boolean
+    noPadding?: boolean
 }
 
 withDefaults(defineProps<UiCardProps>(), {
-  variant: 'default',
-  interactive: false,
-  noPadding: false,
+    variant: 'default',
+    interactive: false,
+    noPadding: false,
 })
 </script>
 
 <template>
-  <div
-    class="ui-card"
-    :class="[
-      `ui-card--${variant}`,
-      { 'ui-card--interactive': interactive, 'ui-card--no-padding': noPadding },
-    ]"
-  >
-    <slot />
-  </div>
+    <div class="ui-card" :class="[
+        `ui-card--${variant}`,
+        { 'ui-card--interactive': interactive, 'ui-card--no-padding': noPadding },
+    ]">
+        <slot />
+    </div>
 </template>
 
 <style scoped>
 .ui-card {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  padding: var(--space-4);
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    box-shadow 200ms ease,
-    transform 200ms ease;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    padding: var(--space-4);
+    transition:
+        background-color 150ms ease,
+        border-color 150ms ease,
+        box-shadow 200ms ease,
+        transform 200ms ease;
 }
 
 /* ── Variants ──── */
 .ui-card--default {
-  background: var(--surface-2);
+    background: var(--surface-2);
 }
 
 .ui-card--subtle {
-  background: var(--surface-1);
-  border-color: transparent;
+    background: var(--surface-1);
+    border-color: transparent;
 }
 
 .ui-card--elevated {
-  background: var(--surface-3);
-  box-shadow: var(--shadow-elevated);
+    background: var(--surface-3);
+    box-shadow: var(--shadow-elevated);
 }
 
 .ui-card--glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-color: var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-color: var(--glass-border);
 }
 
 /* ── Interactive ── */
 .ui-card--interactive {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 .ui-card--interactive:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .ui-card--interactive:active {
-  transform: translateY(0);
+    transform: translateY(0);
 }
 
 .ui-card--interactive:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
+    box-shadow: var(--focus-ring-shadow);
 }
 
 /* ── No padding ── */
 .ui-card--no-padding {
-  padding: 0;
+    padding: 0;
 }
 </style>

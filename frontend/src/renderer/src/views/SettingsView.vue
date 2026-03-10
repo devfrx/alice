@@ -7,14 +7,10 @@
       </div>
       <ul class="sv__nav-list">
         <li v-for="item in navItems" :key="item.id">
-          <button
-            class="sv__nav-item"
-            :class="{ 'sv__nav-item--active': activeSection === item.id }"
-            @click="scrollTo(item.id)"
-          >
-            <svg class="sv__nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-              v-html="item.icon" />
+          <button class="sv__nav-item" :class="{ 'sv__nav-item--active': activeSection === item.id }"
+            @click="scrollTo(item.id)">
+            <svg class="sv__nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" v-html="item.icon" />
             <span>{{ item.label }}</span>
           </button>
         </li>
@@ -41,8 +37,8 @@
               <span class="sv__row-label">System Prompt</span>
               <span class="sv__row-hint">Invia il system prompt al modello LLM</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.systemPromptEnabled }"
-              role="switch" :aria-checked="settingsStore.systemPromptEnabled"
+            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.systemPromptEnabled }" role="switch"
+              :aria-checked="settingsStore.systemPromptEnabled"
               @click="settingsStore.systemPromptEnabled = !settingsStore.systemPromptEnabled">
               <span class="sv__toggle-thumb" />
             </button>
@@ -52,7 +48,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               <span>Senza system prompt il modello non avrà istruzioni su personalità, limiti e strumenti.</span>
             </div>
@@ -65,8 +62,8 @@
               <span class="sv__row-label">Strumenti (Tool Calling)</span>
               <span class="sv__row-hint">Invia le definizioni degli strumenti al modello LLM</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.toolsEnabled }"
-              role="switch" :aria-checked="settingsStore.toolsEnabled"
+            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.toolsEnabled }" role="switch"
+              :aria-checked="settingsStore.toolsEnabled"
               @click="settingsStore.toolsEnabled = !settingsStore.toolsEnabled">
               <span class="sv__toggle-thumb" />
             </button>
@@ -76,7 +73,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               <span>Senza tool calling il modello non potrà eseguire azioni (meteo, calendario, automazione).</span>
             </div>
@@ -87,22 +85,22 @@
           <label class="sv__field">
             <span class="sv__field-label">Temperatura</span>
             <div class="sv__input-wrap">
-              <input v-model.number="settingsStore.settings.llm.temperature" type="number"
-                class="sv__input" min="0" max="2" step="0.1" />
+              <input v-model.number="settingsStore.settings.llm.temperature" type="number" class="sv__input" min="0"
+                max="2" step="0.1" />
             </div>
           </label>
           <label class="sv__field">
             <span class="sv__field-label">Max Tokens</span>
             <div class="sv__input-wrap">
-              <input v-model.number="settingsStore.settings.llm.maxTokens" type="number"
-                class="sv__input" min="256" max="131072" step="256" />
+              <input v-model.number="settingsStore.settings.llm.maxTokens" type="number" class="sv__input" min="256"
+                max="131072" step="256" />
             </div>
           </label>
           <label class="sv__field">
             <span class="sv__field-label">Max iterazioni strumenti</span>
             <div class="sv__input-wrap">
-              <input v-model.number="settingsStore.settings.llm.maxToolIterations" type="number"
-                class="sv__input" min="1" max="100" step="1" />
+              <input v-model.number="settingsStore.settings.llm.maxToolIterations" type="number" class="sv__input"
+                min="1" max="100" step="1" />
             </div>
           </label>
         </div>
@@ -135,8 +133,8 @@
               <span class="sv__row-label">Conferme strumenti</span>
               <span class="sv__row-hint">Richiedi conferma prima di eseguire strumenti</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.toolConfirmations }"
-              role="switch" :aria-checked="settingsStore.toolConfirmations"
+            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.toolConfirmations }" role="switch"
+              :aria-checked="settingsStore.toolConfirmations"
               @click="settingsStore.toolConfirmations = !settingsStore.toolConfirmations">
               <span class="sv__toggle-thumb" />
             </button>
@@ -146,9 +144,11 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <span>Disabilitare le conferme riduce la sicurezza. Gli strumenti pericolosi verranno eseguiti senza approvazione.</span>
+              <span>Disabilitare le conferme riduce la sicurezza. Gli strumenti pericolosi verranno eseguiti senza
+                approvazione.</span>
             </div>
           </Transition>
         </div>
@@ -291,7 +291,9 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
-.sv__nav::-webkit-scrollbar { width: 0; }
+.sv__nav::-webkit-scrollbar {
+  width: 0;
+}
 
 .sv__nav-header {
   padding: 0 var(--space-2) var(--space-4);
@@ -503,6 +505,7 @@ onUnmounted(() => {
   transition: all 200ms ease;
   overflow: hidden;
 }
+
 .sv-warn-enter-from,
 .sv-warn-leave-to {
   opacity: 0;
@@ -511,6 +514,7 @@ onUnmounted(() => {
   padding-bottom: 0;
   margin-bottom: 0;
 }
+
 .sv-warn-enter-to,
 .sv-warn-leave-from {
   opacity: 1;

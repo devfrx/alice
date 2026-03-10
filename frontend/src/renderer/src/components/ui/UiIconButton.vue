@@ -6,111 +6,122 @@
  */
 
 export interface UiIconButtonProps {
-  variant?: 'ghost' | 'subtle' | 'outlined'
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  active?: boolean
-  disabled?: boolean
-  label: string
+    variant?: 'ghost' | 'subtle' | 'outlined'
+    size?: 'xs' | 'sm' | 'md' | 'lg'
+    active?: boolean
+    disabled?: boolean
+    label: string
 }
 
 withDefaults(defineProps<UiIconButtonProps>(), {
-  variant: 'ghost',
-  size: 'md',
-  active: false,
-  disabled: false,
+    variant: 'ghost',
+    size: 'md',
+    active: false,
+    disabled: false,
 })
 
 defineEmits<{
-  click: [event: MouseEvent]
+    click: [event: MouseEvent]
 }>()
 </script>
 
 <template>
-  <button
-    class="ui-icon-btn"
-    :class="[
-      `ui-icon-btn--${variant}`,
-      `ui-icon-btn--${size}`,
-      { 'ui-icon-btn--active': active },
-    ]"
-    :disabled="disabled"
-    :aria-label="label"
-    :title="label"
-    @click="$emit('click', $event)"
-  >
-    <slot />
-  </button>
+    <button class="ui-icon-btn" :class="[
+        `ui-icon-btn--${variant}`,
+        `ui-icon-btn--${size}`,
+        { 'ui-icon-btn--active': active },
+    ]" :disabled="disabled" :aria-label="label" :title="label" @click="$emit('click', $event)">
+        <slot />
+    </button>
 </template>
 
 <style scoped>
 .ui-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--interactive-normal);
-  cursor: pointer;
-  outline: none;
-  flex-shrink: 0;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease,
-    transform 80ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--interactive-normal);
+    cursor: pointer;
+    outline: none;
+    flex-shrink: 0;
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease,
+        box-shadow 120ms ease,
+        transform 80ms ease;
 }
 
 .ui-icon-btn:hover:not(:disabled) {
-  color: var(--interactive-hover);
+    color: var(--interactive-hover);
 }
 
 .ui-icon-btn:active:not(:disabled) {
-  transform: scale(0.92);
+    transform: scale(0.92);
 }
 
 .ui-icon-btn:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
 }
 
 .ui-icon-btn:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
+    box-shadow: var(--focus-ring-shadow);
 }
 
 /* ── Sizes ─────────── */
-.ui-icon-btn--xs { width: 24px; height: 24px; }
-.ui-icon-btn--sm { width: 28px; height: 28px; }
-.ui-icon-btn--md { width: 32px; height: 32px; }
-.ui-icon-btn--lg { width: 40px; height: 40px; }
+.ui-icon-btn--xs {
+    width: 24px;
+    height: 24px;
+}
+
+.ui-icon-btn--sm {
+    width: 28px;
+    height: 28px;
+}
+
+.ui-icon-btn--md {
+    width: 32px;
+    height: 32px;
+}
+
+.ui-icon-btn--lg {
+    width: 40px;
+    height: 40px;
+}
 
 /* ── Variants ──────── */
 .ui-icon-btn--ghost:hover:not(:disabled) {
-  background: var(--surface-hover);
+    background: var(--surface-hover);
 }
 
 .ui-icon-btn--subtle {
-  background: var(--white-faint);
+    background: var(--white-faint);
 }
+
 .ui-icon-btn--subtle:hover:not(:disabled) {
-  background: var(--white-subtle);
+    background: var(--white-subtle);
 }
 
 .ui-icon-btn--outlined {
-  border-color: var(--border);
+    border-color: var(--border);
 }
+
 .ui-icon-btn--outlined:hover:not(:disabled) {
-  border-color: var(--border-hover);
-  background: var(--surface-hover);
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
 }
 
 /* ── Active ────────── */
 .ui-icon-btn--active {
-  color: var(--accent);
-  background: var(--accent-dim);
+    color: var(--accent);
+    background: var(--accent-dim);
 }
+
 .ui-icon-btn--active:hover:not(:disabled) {
-  background: var(--accent-light);
+    background: var(--accent-light);
 }
 </style>

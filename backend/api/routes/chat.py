@@ -186,6 +186,26 @@ async def _sync_conversation_to_file(
         await file_manager.save(data)
 
 
+def _format_memory_context(
+    memories: list[dict[str, Any]], max_chars: int,
+) -> str:
+    """Serialize relevant memories into a text block for the system prompt."""
+    lines = ["[RELEVANT MEMORIES]"]
+    total = 0
+    for m in memories:
+        entry = m.get("entry")
+        if entry is None:
+            continue
+        cat = getattr(entry, "category", None) or "general"
+        content = getattr(entry, "content", "")
+        line = f"- [{cat}] {content}"
+        if total + len(line) > max_chars:
+            break
+        lines.append(line)
+        total += len(line)
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # WebSocket — streaming chat
 # ---------------------------------------------------------------------------
@@ -350,6 +370,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                 tools: list[dict[str, Any]] | None = None
                 if ctx.tool_registry and ctx.config.llm.tools_enabled:
                     tools = await ctx.tool_registry.get_available_tools()
+                    if tools and ctx.config.llm.max_tools > 0:
+                        tools = ctx.tool_registry.limit_tools(
+                            tools,
+                            max_tools=ctx.config.llm.max_tools,
+                            priority_plugins=ctx.config.llm.priority_plugins,
+                        )
                     if not tools:
                         tools = None  # empty list confuses some LLMs
 
@@ -359,11 +385,34 @@ async def ws_chat(websocket: WebSocket) -> None:
                         fp = Path(att["file_path"])
                         att["_bytes"] = await asyncio.to_thread(fp.read_bytes)
 
+                # --- retrieve relevant memories (Phase 9) -----------------
+                memory_context: str | None = None
+                if (
+                    ctx.memory_service
+                    and ctx.config.memory.inject_in_context
+                ):
+                    try:
+                        relevant = await ctx.memory_service.search(
+                            query=user_content,
+                            k=ctx.config.memory.top_k,
+                            filter={"scope": "long_term"},
+                        )
+                        if relevant:
+                            memory_context = _format_memory_context(
+                                relevant,
+                                ctx.config.memory.context_max_chars,
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "Memory retrieval failed: {}", exc,
+                        )
+
                 # --- call LLM (streaming) ---------------------------------
                 messages = llm.build_messages(
                     user_content,
                     history=history[:-1],  # history already has user msg
                     attachments=attachment_info or None,
+                    memory_context=memory_context,
                 )
 
                 full_content = ""
@@ -382,6 +431,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                         user_content=user_content,
                         conversation_id=str(conv_id),
                         attachments=attachment_info or None,
+                        memory_context=memory_context,
                     ):
                         etype = event["type"]
                         if etype == "token":
@@ -515,6 +565,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                             client_ip=client_ip,
                             sync_fn=_sync_conversation_to_file,
                             cancel_event=cancel_event,
+                            memory_context=memory_context,
                         )
                     except WebSocketDisconnect:
                         # Save any pending assistant content before propagating.

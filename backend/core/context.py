@@ -18,6 +18,7 @@ from backend.core.protocols import (
     ConversationFileManagerProtocol,
     LLMServiceProtocol,
     LMStudioManagerProtocol,
+    MemoryServiceProtocol,
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     STTServiceProtocol,
@@ -51,6 +52,9 @@ class AppContext:
 
     preferences_service: PreferencesServiceProtocol | None = None
     """User preferences persistence service."""
+
+    memory_service: MemoryServiceProtocol | None = None
+    """Persistent semantic memory service."""
 
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""

@@ -965,6 +965,21 @@ ToolError → { tool_name, error_type (timeout|permission|network|logic|internal
 
 ### Fase 9 — Memory Service (Agente con Memoria Persistente)
 
+- [x] EmbeddingClient (OpenAI + fastembed fallback) — §9.2
+- [x] MemoryConfig in config.py + default.yaml — §9.3
+- [x] MemoryServiceProtocol in protocols.py — §9.1
+- [x] AppContext.memory_service field — §9.1
+- [x] MemoryService (sqlite-vec CRUD + vector search) — §9.1
+- [x] App lifespan (startup init + shutdown close) — §9.1
+- [x] MemoryPlugin (5 tools: remember/recall/forget/list/clear) — §9.4
+- [x] LLM context injection (build_messages + chat.py) — §9.5
+- [x] Tool loop memory_context passthrough — §9.5
+- [x] REST API /api/memory (5 endpoints) — §9.7
+- [x] System prompt memory guidelines — §9.9
+- [x] Frontend types + Pinia store + MemoryManager.vue — §9.8
+- [x] Test suite (4 files, 46+ test cases) — §9.11
+- [x] Dependencies (sqlite-vec, fastembed optional) — §9.10
+
 > **Obiettivo**: trasformare OMNIA da assistente reattivo a agente con memoria semantica persistente.
 > Ogni informazione rilevante può essere salvata esplicitamente (tool call) o recuperata
 > automaticamente al momento opportuno, senza che l'utente debba ripetersi tra sessioni.

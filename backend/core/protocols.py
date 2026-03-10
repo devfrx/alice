@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -31,6 +32,7 @@ class LLMServiceProtocol(Protocol):
         user_content: str,
         history: list[dict[str, Any]] | None = None,
         attachments: list[dict[str, str]] | None = None,
+        memory_context: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build the full message list for a chat completion request."""
         ...
@@ -38,6 +40,7 @@ class LLMServiceProtocol(Protocol):
     def build_continuation_messages(
         self,
         history: list[dict[str, Any]],
+        memory_context: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build messages for tool-loop continuation (no new user message)."""
         ...
@@ -51,6 +54,7 @@ class LLMServiceProtocol(Protocol):
         user_content: str | None = None,
         conversation_id: str | None = None,
         attachments: list[dict[str, str]] | None = None,
+        memory_context: str | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion, yielding event dicts."""
         ...
@@ -313,4 +317,63 @@ class PreferencesServiceProtocol(Protocol):
 
     async def delete_all(self) -> int:
         """Delete all persisted preferences."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# Memory service
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class MemoryServiceProtocol(Protocol):
+    """Protocol for the persistent semantic memory service."""
+
+    async def add(
+        self,
+        content: str,
+        *,
+        scope: str = "long_term",
+        category: str | None = None,
+        source: str = "llm",
+        conversation_id: str | None = None,
+        expires_at: datetime | None = None,
+    ) -> Any:
+        """Store a new memory entry with its embedding."""
+        ...
+
+    async def search(
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search memories by semantic similarity."""
+        ...
+
+    async def delete(self, memory_id: str) -> bool:
+        """Delete a memory by ID."""
+        ...
+
+    async def list(
+        self,
+        *,
+        filter: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[Any], int]:
+        """List memories with optional filters. Returns (entries, total)."""
+        ...
+
+    async def stats(self) -> dict[str, Any]:
+        """Return memory statistics."""
+        ...
+
+    async def delete_by_scope(self, scope: str) -> int:
+        """Delete all memories of a given scope. Returns count deleted."""
+        ...
+
+    async def close(self) -> None:
+        """Shut down the memory service."""
         ...

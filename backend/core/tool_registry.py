@@ -294,6 +294,54 @@ class ToolRegistry:
                 available.append(entry)
         return available
 
+    def limit_tools(
+        self,
+        tools: list[dict[str, Any]],
+        max_tools: int,
+        priority_plugins: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Cap *tools* to *max_tools*, prioritising certain plugins.
+
+        Tools from *priority_plugins* are always included first.
+        Remaining slots are filled in the order the other tools appear.
+
+        Args:
+            tools: Full list of available tools (OpenAI format).
+            max_tools: Maximum number to return.  ``0`` disables limiting.
+            priority_plugins: Plugin names whose tools have priority.
+
+        Returns:
+            A (possibly shorter) list of tool dicts.
+        """
+        if max_tools <= 0 or len(tools) <= max_tools:
+            return tools
+
+        prio = set(priority_plugins or [])
+        priority: list[dict[str, Any]] = []
+        rest: list[dict[str, Any]] = []
+
+        for entry in tools:
+            ns_name: str = entry["function"]["name"]
+            plugin_name = self._tool_to_plugin.get(ns_name)
+            if plugin_name in prio:
+                priority.append(entry)
+            else:
+                rest.append(entry)
+
+        # Priority tools always included; fill remainder from rest.
+        remaining_slots = max(0, max_tools - len(priority))
+        limited = priority + rest[:remaining_slots]
+
+        if len(limited) < len(tools):
+            self._logger.info(
+                "Tool limit applied: {} → {} tools (priority plugins: {})",
+                len(tools),
+                len(limited),
+                ", ".join(sorted(prio)) if prio else "none",
+            )
+
+        return limited
+
     def get_tool_plugin(self, tool_name: str) -> str | None:
         """Return the plugin name that owns *tool_name*.
 

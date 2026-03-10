@@ -105,6 +105,19 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception as exc:
             logger.error("Failed to rebuild conversations from files: {}", exc)
 
+    # -- Memory service (Phase 9) ------------------------------------------
+    if config.memory.enabled:
+        from backend.services.memory_service import MemoryService
+
+        memory_service = MemoryService(config.memory, config.llm.base_url)
+        try:
+            await memory_service.initialize()
+            ctx.memory_service = memory_service
+            logger.info("Memory service started")
+        except Exception as exc:
+            logger.warning("Memory service failed to start: {}", exc)
+            await memory_service.close()
+
     # -- Voice services (Phase 4) ------------------------------------------
     if config.stt.enabled:
         try:
@@ -238,6 +251,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await ctx.vram_monitor.stop()
         except Exception as exc:
             logger.error("VRAM monitor shutdown error: {}", exc)
+    if ctx.memory_service:
+        try:
+            await ctx.memory_service.close()
+        except Exception as exc:
+            logger.error("Memory service shutdown error: {}", exc)
     await engine.dispose()
     logger.info("OMNIA backend stopped")
 

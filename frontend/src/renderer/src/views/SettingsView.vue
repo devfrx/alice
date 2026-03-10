@@ -19,20 +19,22 @@
           </label>
           <div v-if="!settingsStore.systemPromptEnabled" class="settings-warning">
             <span class="settings-warning__icon">⚠️</span>
-            <span class="settings-warning__text">Senza system prompt il modello non avrà istruzioni su personalità, limiti e strumenti. Utile per modelli con context ridotto.</span>
+            <span class="settings-warning__text">Senza system prompt il modello non avrà istruzioni su personalità,
+              limiti e strumenti. Utile per modelli con context ridotto.</span>
           </div>
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Strumenti (Tool Calling)</span>
             <span class="settings-field__hint">Invia le definizioni degli strumenti al modello LLM</span>
-            <button class="settings-toggle" :class="{ 'settings-toggle--on': settingsStore.toolsEnabled }"
-              role="switch" :aria-checked="settingsStore.toolsEnabled"
+            <button class="settings-toggle" :class="{ 'settings-toggle--on': settingsStore.toolsEnabled }" role="switch"
+              :aria-checked="settingsStore.toolsEnabled"
               @click="settingsStore.toolsEnabled = !settingsStore.toolsEnabled">
               <span class="settings-toggle__thumb" />
             </button>
           </label>
           <div v-if="!settingsStore.toolsEnabled" class="settings-warning">
             <span class="settings-warning__icon">⚠️</span>
-            <span class="settings-warning__text">Senza tool calling il modello non potrà eseguire azioni (meteo, calendario, automazione, ecc.). Utile per modelli con context ridotto.</span>
+            <span class="settings-warning__text">Senza tool calling il modello non potrà eseguire azioni (meteo,
+              calendario, automazione, ecc.). Utile per modelli con context ridotto.</span>
           </div>
           <label class="settings-field">
             <span class="settings-field__label">Temperatura</span>
@@ -57,6 +59,9 @@
 
       <!-- Plugin Management -->
       <PluginManagement />
+
+      <!-- Memory Management -->
+      <MemoryManager />
 
       <!-- Security Settings -->
       <section class="settings-section">
@@ -104,6 +109,7 @@
 import ModelManager from '../components/settings/ModelManager.vue'
 import VoiceSettings from '../components/voice/VoiceSettings.vue'
 import PluginManagement from '../components/settings/PluginManagement.vue'
+import MemoryManager from '../components/settings/MemoryManager.vue'
 import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()

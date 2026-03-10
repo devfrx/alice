@@ -26,6 +26,7 @@ async def _mock_chat_generator(
     user_content: str | None = None,
     conversation_id: str | None = None,
     attachments: list[dict[str, str]] | None = None,
+    memory_context: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Yield a few tokens then done — stands in for ``LLMService.chat``."""
     yield {"type": "token", "content": "Hello"}
@@ -37,6 +38,7 @@ def _mock_build_messages(
     user_content: str,
     history: list[dict[str, Any]] | None = None,
     attachments: list[dict[str, str]] | None = None,
+    memory_context: str | None = None,
 ) -> list[dict[str, Any]]:
     return [
         {"role": "system", "content": "system"},

@@ -79,7 +79,8 @@ def test_plugins_enabled_list(config: OmniaConfig) -> None:
     assert isinstance(enabled, list)
     assert "system_info" in enabled
     assert "pc_automation" in enabled
-    assert len(enabled) == 10
+    assert "memory" in enabled
+    assert len(enabled) == 11
 
 
 def test_stt_defaults(config: OmniaConfig) -> None:

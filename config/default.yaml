@@ -22,6 +22,7 @@ llm:
   supports_thinking: true    # Enable for reasoning models (QwQ, DeepSeek R1)
   supports_vision: true       # Enable for multimodal models
   max_tool_iterations: 25
+  max_tools: 0               # 0 = unlimited. Qwen3.5-9B handles 49 tools correctly.
   # Ollama-specific options (ignored by LM Studio)
   num_ctx: 8192
   num_gpu: -1
@@ -68,6 +69,7 @@ plugins:
     - media_control
     - file_search
     - news
+    - memory
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -165,3 +167,20 @@ news:
   cache_ttl_minutes: 15
   request_timeout_s: 10
   default_lang: "it"
+
+# ──────────────────────────────────────────────────
+# Phase 9 — Memory Service
+# ──────────────────────────────────────────────────
+
+memory:
+  enabled: false
+  # db_path: "data/memory.db"  # default, relative to project root
+  embedding_model: "text-embedding-mxbai-embed-large-v1"
+  embedding_dim: 1024
+  embedding_fallback: true
+  top_k: 5
+  similarity_threshold: 0.4
+  inject_in_context: true
+  context_max_chars: 2000
+  session_ttl_hours: 24
+  auto_cleanup_days: 90

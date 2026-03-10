@@ -207,3 +207,4 @@ class UserPreference(SQLModel, table=True):
     key: str = Field(primary_key=True, max_length=128)
     value: str = Field(default="")  # JSON-encoded value
     updated_at: datetime = Field(default_factory=_utcnow)
+

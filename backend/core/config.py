@@ -139,6 +139,16 @@ class LLMConfig(BaseSettings):
     """Enable for multimodal models (LLaVA, Qwen2-VL) that accept images."""
     max_tool_iterations: int = 25
     """Maximum number of tool calling rounds before forcing a final answer."""
+    max_tools: int = 0
+    """Maximum number of tool definitions sent to the LLM per request.
+
+    Smaller models (<13B) struggle with more than ~20-30 tools.
+    Priority plugins (memory, system_info) are always included first.
+    Set to 0 to disable the limit."""
+    priority_plugins: list[str] = Field(
+        default_factory=lambda: ["memory", "system_info"],
+    )
+    """Plugins whose tools are always included when limiting by max_tools."""
     # -- Ollama-specific options (ignored by other providers) --
     num_ctx: int = 8192
     """Context window size. Ollama defaults to 2048; 8192 is better for 9B+ models."""
@@ -415,6 +425,45 @@ class NewsConfig(BaseSettings):
     default_lang: str = "it"
 
 
+class MemoryConfig(BaseSettings):
+    """Persistent semantic memory configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_MEMORY__")
+
+    enabled: bool = False
+    """Enable the Memory Service. False by default (opt-in)."""
+
+    db_path: str = "data/memory.db"
+    """Path to the dedicated memory SQLite file (separate from omnia.db)."""
+
+    embedding_model: str = "text-embedding-mxbai-embed-large-v1"
+    """Embedding model name for LM Studio/Ollama /v1/embeddings."""
+
+    embedding_dim: int = 1024
+    """Vector dimensions of the chosen embedding model."""
+
+    embedding_fallback: bool = True
+    """If True, fall back to fastembed (CPU) when LLM embedding API is unavailable."""
+
+    top_k: int = 5
+    """Max memories retrieved for context injection."""
+
+    similarity_threshold: float = 0.4
+    """Minimum cosine similarity score to include a memory (0.0\u20131.0)."""
+
+    inject_in_context: bool = True
+    """If True, relevant memories are injected into the system prompt."""
+
+    context_max_chars: int = 2000
+    """Max characters injected from memory context into prompt."""
+
+    session_ttl_hours: int = 24
+    """TTL for session-scoped memories. Expired entries are ignored."""
+
+    auto_cleanup_days: int = 90
+    """Remove memories not accessed for N days (0 = disabled)."""
+
+
 # ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
@@ -456,6 +505,7 @@ class OmniaConfig(BaseSettings):
     )
     file_search: FileSearchConfig = Field(default_factory=FileSearchConfig)
     news: NewsConfig = Field(default_factory=NewsConfig)
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
 
     @model_validator(mode="before")
     @classmethod

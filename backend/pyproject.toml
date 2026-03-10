@@ -54,6 +54,9 @@ dependencies = [
     # News
     "feedparser>=6.0",
 
+    # Memory (Phase 9)
+    "sqlite-vec>=0.1.6",
+
     # System Info
     "psutil>=6.0",
 
@@ -120,6 +123,10 @@ voice-gpu = [
 file-reader = [
     "pdfplumber>=0.11",
     "python-docx>=1.1",
+]
+# Memory embedding fallback (CPU)
+memory = [
+    "fastembed>=0.3",
 ]
 
 [build-system]

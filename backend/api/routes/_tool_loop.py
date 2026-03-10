@@ -40,6 +40,7 @@ async def run_tool_loop(
     client_ip: str,
     sync_fn: SyncFn | None,
     cancel_event: asyncio.Event | None = None,
+    memory_context: str | None = None,
 ) -> tuple[str, str]:
     """Execute the tool-calling loop until the LLM produces a final answer.
 
@@ -63,6 +64,8 @@ async def run_tool_loop(
         sync_fn: Async callback to sync conversation to JSON file.
         cancel_event: Optional event that, when set, signals the loop
             to stop early and return accumulated content.
+        memory_context: Optional pre-formatted memory block to inject
+            into the system prompt on each LLM re-query.
 
     Returns:
         ``(full_content, thinking_content)`` of the final LLM response
@@ -380,7 +383,10 @@ async def run_tool_loop(
         if tools is not None and len(tools) == 0:
             tools = None  # empty list confuses some LLMs
 
-        messages = llm.build_continuation_messages(history=updated_history)
+        messages = llm.build_continuation_messages(
+            history=updated_history,
+            memory_context=memory_context,
+        )
 
         # 7. Re-stream LLM.
         full_content = ""

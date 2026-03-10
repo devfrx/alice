@@ -26,6 +26,11 @@ import type {
 } from '../types/settings'
 import type { CalendarEvent, TodaySummary } from '../types/calendar'
 import type { AuditConfirmationsResponse } from '../types/audit'
+import type {
+  MemoryListResponse,
+  MemorySearchResponse,
+  MemoryStats
+} from '../types/memory'
 
 /** Backend host (without /api), configurable via VITE_API_BASE_URL env var. */
 const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -362,5 +367,42 @@ export const api = {
     if (params?.offset !== undefined) qs.set('offset', String(params.offset))
     const q = qs.toString()
     return request<AuditConfirmationsResponse>(`/audit/confirmations${q ? `?${q}` : ''}`)
-  }
+  },
+
+  // -- Memory ---------------------------------------------------------------
+
+  /** Fetch memory entries with optional filters. */
+  getMemories: (params?: {
+    scope?: string
+    category?: string
+    limit?: number
+    offset?: number
+  }): Promise<MemoryListResponse> => {
+    const qs = new URLSearchParams()
+    if (params?.scope) qs.set('scope', params.scope)
+    if (params?.category) qs.set('category', params.category)
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    if (params?.offset !== undefined) qs.set('offset', String(params.offset))
+    const q = qs.toString()
+    return request<MemoryListResponse>(`/memory${q ? `?${q}` : ''}`)
+  },
+
+  /** Semantic search over memories. */
+  searchMemories: (query: string, limit = 10, category?: string): Promise<MemorySearchResponse> =>
+    request<MemorySearchResponse>('/memory/search', {
+      method: 'POST',
+      body: JSON.stringify({ query, limit, ...(category ? { category } : {}) })
+    }),
+
+  /** Delete a single memory entry by ID. */
+  deleteMemory: (id: string): Promise<{ deleted: true }> =>
+    request<{ deleted: true }>(`/memory/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  /** Clear all session-scoped memories. */
+  clearSessionMemory: (): Promise<{ deleted_count: number }> =>
+    request<{ deleted_count: number }>('/memory/session', { method: 'DELETE' }),
+
+  /** Load memory statistics. */
+  getMemoryStats: (): Promise<MemoryStats> =>
+    request<MemoryStats>('/memory/stats')
 }

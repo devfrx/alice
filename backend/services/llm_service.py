@@ -143,14 +143,25 @@ class LLMService:
             data = resp.json()
             items = data.get("models") or data.get("data") or []
             if items:
-                # Prefer a model that is loaded (LM Studio v1 has state field).
+                # Prefer a loaded LLM (skip embedding models — LM Studio v1 API
+                # returns "type": "llm" | "embedding" for each entry, and
+                # sending chat/completions to an embedding model will fail).
                 for item in items:
+                    if item.get("type") == "embedding":
+                        continue
                     state = item.get("state", "")
                     if state in ("loaded", "loading", ""):
                         resolved = item.get("path") or item.get("id") or item.get("name")
                         if resolved:
                             break
                 if not resolved:
+                    # Fall back to first non-embedding model regardless of state
+                    for item in items:
+                        if item.get("type") != "embedding":
+                            resolved = item.get("path") or item.get("id") or item.get("name")
+                            break
+                if not resolved:
+                    # Last resort: take whatever is there
                     first = items[0]
                     resolved = first.get("path") or first.get("id") or first.get("name")
         except Exception as exc:
@@ -338,6 +349,7 @@ class LLMService:
         user_content: str,
         history: list[dict[str, Any]] | None = None,
         attachments: list[dict[str, str]] | None = None,
+        memory_context: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build a full message list with system prompt, history, and user msg.
 
@@ -346,12 +358,18 @@ class LLMService:
             history: Optional prior messages to include.
             attachments: Optional list of dicts with ``file_path`` (absolute)
                 and ``content_type`` keys for vision-model image inputs.
+            memory_context: Optional block of relevant memories to append
+                to the system prompt.
 
         Returns:
             A list of message dicts ready for the chat completions API.
         """
         messages: list[dict[str, Any]] = []
         sys_prompt = self._get_dynamic_system_prompt()
+        if memory_context and sys_prompt:
+            sys_prompt = f"{sys_prompt}\n\n{memory_context}"
+        elif memory_context:
+            sys_prompt = memory_context
         if sys_prompt:
             messages.append({"role": "system", "content": sys_prompt})
         if history:
@@ -389,6 +407,7 @@ class LLMService:
     def build_continuation_messages(
         self,
         history: list[dict[str, Any]],
+        memory_context: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build messages for tool-loop continuation (no new user message).
 
@@ -398,12 +417,18 @@ class LLMService:
 
         Args:
             history: Full conversation history including tool messages.
+            memory_context: Optional block of relevant memories to append
+                to the system prompt.
 
         Returns:
             A list of message dicts: system prompt + normalized history.
         """
         messages: list[dict[str, Any]] = []
         sys_prompt = self._get_dynamic_system_prompt()
+        if memory_context and sys_prompt:
+            sys_prompt = f"{sys_prompt}\n\n{memory_context}"
+        elif memory_context:
+            sys_prompt = memory_context
         if sys_prompt:
             messages.append({"role": "system", "content": sys_prompt})
         if history:
@@ -423,6 +448,7 @@ class LLMService:
         user_content: str | None = None,
         conversation_id: str | None = None,
         attachments: list[dict[str, str]] | None = None,
+        memory_context: str | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion, choosing the best backend.
 
@@ -439,6 +465,9 @@ class LLMService:
                 tracking.
             attachments: Optional image attachment dicts with
                 ``file_path`` / ``content_type`` / ``_bytes`` keys.
+            memory_context: Optional pre-formatted memory block to
+                inject into the system prompt (native path only;
+                OAI-compat path already has it baked into *messages*).
 
         Yields:
             Dicts with a ``type`` key — same contract for both paths.
@@ -454,6 +483,7 @@ class LLMService:
                 cancel_event=cancel_event,
                 conversation_id=conversation_id,
                 attachments=attachments,
+                memory_context=memory_context,
             ):
                 yield event
         else:
@@ -472,6 +502,7 @@ class LLMService:
         cancel_event: asyncio.Event | None = None,
         conversation_id: str | None = None,
         attachments: list[dict[str, str]] | None = None,
+        memory_context: str | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream via LM Studio native REST API ``/api/v1/chat``.
 
@@ -487,6 +518,8 @@ class LLMService:
             conversation_id: Conversation UUID string for multi-turn
                 response_id tracking.
             attachments: Optional image attachment dicts.
+            memory_context: Optional pre-formatted memory block to
+                append to the system prompt.
 
         Yields:
             ``{"type": "thinking"|"token"|"done", ...}``
@@ -517,6 +550,10 @@ class LLMService:
             input_field = user_content
 
         sys_prompt = self._get_dynamic_system_prompt()
+        if memory_context and sys_prompt:
+            sys_prompt = f"{sys_prompt}\n\n{memory_context}"
+        elif memory_context:
+            sys_prompt = memory_context
         active_model = await self._resolve_model()
         payload: dict[str, Any] = {
             "model": active_model,
@@ -758,13 +795,17 @@ class LLMService:
         # LM Studio suppresses reasoning_content when a 'system' role
         # message is present in the messages array.  Work around this
         # by folding the system prompt into the first user message.
-        # Applied unconditionally for LM Studio: harmless for non-thinking
-        # models (just moves system text into the user message) but
-        # essential for thinking models even when supports_thinking is
-        # stale or False due to config/model mismatch.
+        #
+        # However, when tools are provided, the system role must stay
+        # intact: LM Studio appends tool definitions to the system
+        # message in the model's chat template.  Folding the system
+        # prompt into user content breaks this — the model sees the
+        # tools but cannot emit structured tool_calls.  Thinking is
+        # still captured via inline <think> tags (ThinkTagParser).
+        should_fold = not self._is_ollama and not tools
         actual_messages = (
             self._fold_system_into_user(messages)
-            if not self._is_ollama
+            if should_fold
             else messages
         )
 

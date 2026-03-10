@@ -43,3 +43,9 @@ limits:
   web: rate_limit 10s JS dinamico non garantito — per prezzi usa web_scrape su siti comparatori (trovaprezzi.it, idealo.it) non su articoli di news che possono essere datati
   weather: Open-Meteo cache 10min forecast_max 16giorni
   news: RSS cache 15min max 50
+
+memory:
+  remember: quando l'utente esprime preferenze, fornisce fatti su sé stesso, o chiede esplicitamente di ricordare qualcosa, chiama SUBITO memory_remember — non rispondere solo verbalmente, la tool call è obbligatoria. NON salvare dati transitori (comandi singoli, risultati di ricerca).
+  recall: usa SOLO se il contesto iniettato automaticamente non è sufficiente e hai bisogno di cercare qualcosa di specifico. Non chiamare recall per ogni messaggio.
+  forget: usa SOLO su richiesta esplicita dell'utente.
+  scope: usa 'session' per informazioni valide solo nella conversazione corrente; 'long_term' per tutto il resto.

@@ -112,8 +112,11 @@ def _get_volume_interface() -> Any:
         if devices is None:
             raise RuntimeError("No audio output device found")
 
-        # GetSpeakers() may return an AudioDevice wrapper — get the raw IMMDevice
-        raw_device = getattr(devices, "_dev", devices)
+        # GetSpeakers() may return a pycaw AudioDevice wrapper whose raw
+        # IMMDevice is stored in ._dev (set in __init__, so in __dict__).
+        # Use vars() to avoid triggering MagicMock's lazy attribute creation.
+        _raw = vars(devices).get("_dev") if hasattr(devices, "__dict__") else None
+        raw_device = _raw if _raw is not None else devices
         interface = raw_device.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
         _volume_interface = interface.QueryInterface(IAudioEndpointVolume)
         return _volume_interface

@@ -53,6 +53,9 @@ class ToolDefinition:
         timeout_ms: Execution timeout in milliseconds.
         requires_confirmation: Whether user approval is needed (Phase 5).
         risk_level: Safety classification for the tool.
+        max_result_chars: Maximum characters in the tool result before truncation.
+            Defaults to ``MAX_TOOL_RESULT_LENGTH``. Override for tools that
+            return large payloads (e.g. web scraping).
     """
 
     name: str
@@ -64,6 +67,7 @@ class ToolDefinition:
     requires_confirmation: bool = False
     risk_level: Literal["safe", "medium", "dangerous", "forbidden"] = "safe"
     sanitise_output: bool = True
+    max_result_chars: int = MAX_TOOL_RESULT_LENGTH
 
     def __post_init__(self) -> None:
         if self.parameters is None:

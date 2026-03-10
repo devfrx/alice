@@ -21,10 +21,10 @@ export const usePluginsStore = defineStore('plugins', () => {
 
   async function togglePlugin(name: string, enabled: boolean): Promise<void> {
     try {
-      await api.togglePlugin(name, enabled)
-      const target = plugins.value.find((p) => p.name === name)
-      if (target) {
-        target.enabled = enabled
+      const updated = await api.togglePlugin(name, enabled)
+      const idx = plugins.value.findIndex((p) => p.name === name)
+      if (idx >= 0) {
+        plugins.value[idx] = updated
       }
     } catch (err) {
       console.error('[plugins store] togglePlugin failed:', err)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import base64
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from loguru import logger
 
@@ -98,7 +98,7 @@ class PcAutomationPlugin(BasePlugin):
                     "required": ["app_name"],
                 },
                 result_type="string",
-                risk_level="low",
+                risk_level="safe",
                 requires_confirmation=False,
                 timeout_ms=15000,
             ),
@@ -119,7 +119,7 @@ class PcAutomationPlugin(BasePlugin):
                     "required": ["app_name"],
                 },
                 result_type="string",
-                risk_level="low",
+                risk_level="safe",
                 requires_confirmation=False,
                 timeout_ms=15000,
             ),
@@ -298,7 +298,7 @@ class PcAutomationPlugin(BasePlugin):
     async def execute_tool(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
         context: ExecutionContext,
     ) -> ToolResult:
         """Dispatch to the matching executor function.

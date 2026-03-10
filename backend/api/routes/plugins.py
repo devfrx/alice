@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext
 
-router = APIRouter()
+router = APIRouter(tags=["plugins"])
 
 
 def _ctx(request: Request) -> AppContext:

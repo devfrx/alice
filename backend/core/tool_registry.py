@@ -213,6 +213,7 @@ class ToolRegistry:
                             ),
                             risk_level=tool_def.risk_level,
                             sanitise_output=tool_def.sanitise_output,
+                            max_result_chars=tool_def.max_result_chars,
                         )
 
                     # --- namespacing ---
@@ -221,12 +222,12 @@ class ToolRegistry:
                     # --- collision detection ---
                     if ns_name in new_tools:
                         existing_plugin = new_map[ns_name]
-                        raise ValueError(
-                            f"Tool name collision: '{ns_name}' "
-                            f"registered by both "
-                            f"'{existing_plugin}' and "
-                            f"'{plugin_name}'"
+                        self._logger.warning(
+                            "Tool name collision: '{}' registered by both "
+                            "'{}' and '{}' — skipping duplicate",
+                            ns_name, existing_plugin, plugin_name,
                         )
+                        continue
 
                     new_tools[ns_name] = tool_def
                     new_map[ns_name] = plugin_name
@@ -453,10 +454,11 @@ class ToolRegistry:
             result.content_type is not None
             and result.content_type.startswith("image/")
         )
+        limit = tool_def.max_result_chars
         if isinstance(result.content, str) and not is_binary:
-            if len(result.content) > MAX_TOOL_RESULT_LENGTH:
+            if len(result.content) > limit:
                 result.content = (
-                    result.content[:MAX_TOOL_RESULT_LENGTH - 30]
+                    result.content[:limit - 30]
                     + "\n...[output truncated]"
                 )
                 result.truncated = True

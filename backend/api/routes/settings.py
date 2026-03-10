@@ -39,7 +39,11 @@ async def set_tool_confirmations(
     the frontend can sync its toggle with the backend state.
     """
     ctx = _ctx(request)
-    ctx.config.pc_automation.confirmations_enabled = body.enabled
+    object.__setattr__(
+        ctx.config.pc_automation,
+        "confirmations_enabled",
+        body.enabled,
+    )
     if ctx.preferences_service is not None:
         try:
             await ctx.preferences_service.save_preference(
@@ -85,10 +89,13 @@ async def set_system_prompt(
 ) -> SystemPromptResponse:
     """Toggle system prompt on/off at runtime."""
     ctx = _ctx(request)
-    ctx.config.llm.system_prompt_enabled = body.enabled
+    object.__setattr__(
+        ctx.config.llm, "system_prompt_enabled", body.enabled,
+    )
     # Invalidate cached system prompt so change takes effect immediately
-    if hasattr(ctx, "llm_service") and ctx.llm_service:
-        ctx.llm_service._system_prompt = None
+    if ctx.llm_service is not None:
+        if hasattr(ctx.llm_service, "_system_prompt"):
+            ctx.llm_service._system_prompt = None
     if ctx.preferences_service is not None:
         try:
             await ctx.preferences_service.save_preference(
@@ -134,7 +141,9 @@ async def set_tools(
 ) -> ToolsResponse:
     """Toggle tool definitions on/off at runtime."""
     ctx = _ctx(request)
-    ctx.config.llm.tools_enabled = body.enabled
+    object.__setattr__(
+        ctx.config.llm, "tools_enabled", body.enabled,
+    )
     if ctx.preferences_service is not None:
         try:
             await ctx.preferences_service.save_preference(

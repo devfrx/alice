@@ -35,6 +35,7 @@ export interface ModelCapabilities {
 export interface LMStudioModel {
   name: string
   display_name: string
+  type: string
   size: number
   modified_at: string
   is_active: boolean

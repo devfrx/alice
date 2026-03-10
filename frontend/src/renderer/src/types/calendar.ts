@@ -11,6 +11,7 @@ export interface CalendarEvent {
   end_time: string     // ISO 8601 in local timezone
   recurrence_rule: string | null
   reminder_minutes: number | null
+  created_by: string | null
   occurrence_date: string | null  // ISO date for recurring occurrence dedup
 }
 

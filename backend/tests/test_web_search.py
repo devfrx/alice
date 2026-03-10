@@ -90,7 +90,7 @@ def _fake_ddg_results(n: int = 3) -> list[dict[str, str]]:
 
 EXPECTED_TOOLS: dict[str, dict] = {
     "web_search": {"risk": "safe", "confirm": False},
-    "web_scrape": {"risk": "medium", "confirm": True},
+    "web_scrape": {"risk": "medium", "confirm": False},
 }
 
 
@@ -603,10 +603,14 @@ class TestWebSearchClient:
         )
         mock_response = MagicMock()
         mock_response.text = html
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
 
+        async def fake_to_thread(fn, *args, **kwargs):
+            return mock_response
+
         with (
-            patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_response),
+            patch("backend.plugins.web_search.client.asyncio.to_thread", side_effect=fake_to_thread),
             patch("backend.plugins.web_search.client.async_validate_url_ssrf", new_callable=AsyncMock),
         ):
             text = await client.scrape("https://example.com/page")
@@ -633,10 +637,14 @@ class TestWebSearchClient:
         html = f"<html><body><p>{long_text}</p></body></html>"
         mock_response = MagicMock()
         mock_response.text = html
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
 
+        async def fake_to_thread(fn, *args, **kwargs):
+            return mock_response
+
         with (
-            patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_response),
+            patch("backend.plugins.web_search.client.asyncio.to_thread", side_effect=fake_to_thread),
             patch("backend.plugins.web_search.client.async_validate_url_ssrf", new_callable=AsyncMock),
         ):
             text = await client.scrape("https://example.com/big")
@@ -667,14 +675,18 @@ class TestWebSearchClient:
         client = self._make_client()
 
         mock_response = MagicMock()
+        mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Not Found",
             request=MagicMock(),
             response=MagicMock(status_code=404),
         )
 
+        async def fake_to_thread(fn, *args, **kwargs):
+            return mock_response
+
         with (
-            patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_response),
+            patch("backend.plugins.web_search.client.asyncio.to_thread", side_effect=fake_to_thread),
             patch("backend.plugins.web_search.client.async_validate_url_ssrf", new_callable=AsyncMock),
         ):
             with pytest.raises(httpx.HTTPStatusError):

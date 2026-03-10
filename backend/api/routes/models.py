@@ -13,7 +13,7 @@ from backend.core.config import KNOWN_MODELS
 from backend.core.context import AppContext
 from backend.core.protocols import LMStudioManagerProtocol
 
-router = APIRouter()
+router = APIRouter(tags=["models"])
 
 
 # ---------------------------------------------------------------------------

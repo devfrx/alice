@@ -35,7 +35,7 @@ from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.llm_service import LLMService
 from backend.api.routes._tool_loop import run_tool_loop
 
-router = APIRouter()
+router = APIRouter(tags=["chat"])
 
 # Base path for uploaded files.
 _UPLOADS_BASE: Path = (PROJECT_ROOT / "data" / "uploads").resolve()

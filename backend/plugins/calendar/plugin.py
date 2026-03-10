@@ -447,7 +447,7 @@ class CalendarPlugin(BasePlugin):
     async def execute_tool(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
         context: ExecutionContext,
     ) -> ToolResult:
         """Dispatch a tool call to the appropriate handler.
@@ -487,7 +487,7 @@ class CalendarPlugin(BasePlugin):
     # Tool implementations
     # ------------------------------------------------------------------
 
-    async def _create_event(self, args: dict) -> str:
+    async def _create_event(self, args: dict[str, Any]) -> str:
         """Create a new calendar event.
 
         Args:
@@ -539,7 +539,7 @@ class CalendarPlugin(BasePlugin):
             f"(id={event.id}, start={local_start.isoformat()})."
         )
 
-    async def _list_events(self, args: dict) -> str:
+    async def _list_events(self, args: dict[str, Any]) -> str:
         """List calendar events in a date range.
 
         Args:
@@ -611,7 +611,7 @@ class CalendarPlugin(BasePlugin):
 
         return f"Found {len(expanded)} event(s):\n" + "\n".join(lines)
 
-    async def _update_event(self, args: dict) -> str:
+    async def _update_event(self, args: dict[str, Any]) -> str:
         """Update an existing calendar event.
 
         Args:
@@ -666,7 +666,7 @@ class CalendarPlugin(BasePlugin):
         self.logger.info("Updated event '{}'", event.title)
         return f"Event '{event.title}' (id={event_id}) updated."
 
-    async def _delete_event(self, args: dict) -> str:
+    async def _delete_event(self, args: dict[str, Any]) -> str:
         """Delete a calendar event by ID.
 
         Args:
@@ -695,7 +695,7 @@ class CalendarPlugin(BasePlugin):
         self.logger.info("Deleted event '{}' ({})", title, event_id)
         return f"Event '{title}' (id={event_id}) deleted."
 
-    async def _get_today_summary(self, _args: dict) -> str:
+    async def _get_today_summary(self, _args: dict[str, Any]) -> str:
         """Get a summary of today's events.
 
         Args:

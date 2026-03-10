@@ -84,7 +84,11 @@ class WebSearchPlugin(BasePlugin):
                 name="web_search",
                 description=(
                     "Search the web using multiple engines (Google, Bing, DuckDuckGo, "
-                    "Brave, Yahoo, etc.). Returns a list of results with title, URL and snippet."
+                    "Brave, Yahoo, etc.). Returns a list of results with title, URL and snippet. "
+                    "IMPORTANT: snippets may contain outdated prices from old news articles — "
+                    "always check the article date before citing a price. "
+                    "For real-time prices use web_scrape on a price-comparison page "
+                    "(e.g. trovaprezzi.it, kelkoo.it, idealo.it) found in the results."
                 ),
                 parameters={
                     "type": "object",
@@ -114,7 +118,10 @@ class WebSearchPlugin(BasePlugin):
                 name="web_scrape",
                 description=(
                     "Fetch a web page and return its text content. "
-                    "Useful for reading articles or documentation."
+                    "Use this to get real-time prices and direct product links from "
+                    "e-commerce or price-comparison sites (trovaprezzi.it, idealo.it, "
+                    "amazon.it, etc.) after a web_search identifies candidate URLs. "
+                    "Also useful for reading articles or documentation."
                 ),
                 parameters={
                     "type": "object",
@@ -128,8 +135,8 @@ class WebSearchPlugin(BasePlugin):
                 },
                 result_type="string",
                 risk_level="medium",
-                requires_confirmation=True,
                 timeout_ms=15_000,
+                max_result_chars=20_000,
             ),
         ]
 
@@ -246,9 +253,18 @@ class WebSearchPlugin(BasePlugin):
         except ValueError as exc:
             # SSRF validation failure
             return ToolResult.error(f"URL blocked: {exc}")
+        except RuntimeError as exc:
+            # Domain blocked / anti-bot — give LLM actionable advice
+            logger.warning("web_scrape blocked for {}: {}", url, exc)
+            return ToolResult.error(
+                f"{exc} — Do NOT retry this domain. "
+                f"Use web_search results directly or try a different URL."
+            )
         except Exception as exc:
             logger.error("web_scrape failed for {}: {}", url, exc)
-            return ToolResult.error(f"Scrape failed: {exc}")
+            return ToolResult.error(
+                f"Scrape failed: {exc} — Try a different URL."
+            )
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         return ToolResult.ok(

@@ -27,13 +27,13 @@ export interface OmniaSettings {
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<OmniaSettings>({
     llm: {
-      model: 'mistralai/ministral-3-14b-reasoning',
+      model: 'auto',
       temperature: 0.7,
       maxTokens: 30311,
       maxToolIterations: 25
     },
     stt: {
-      language: 'it',
+      language: '',
       model: 'large-v3'
     },
     tts: {
@@ -99,7 +99,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       if (config.stt) {
         const stt = config.stt as Record<string, unknown>
-        settings.value.stt.language = (stt.language as string) ?? settings.value.stt.language
+        settings.value.stt.language = stt.language != null ? (stt.language as string) : ''
         settings.value.stt.model = (stt.model as string) ?? settings.value.stt.model
       }
       if (config.tts) {
@@ -127,7 +127,7 @@ export const useSettingsStore = defineStore('settings', () => {
           max_tool_iterations: settings.value.llm.maxToolIterations
         },
         stt: {
-          language: settings.value.stt.language,
+          language: settings.value.stt.language || null,
           model: settings.value.stt.model
         },
         tts: {

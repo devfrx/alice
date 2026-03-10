@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import os
+import time
 import uuid
+from collections import OrderedDict
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-from collections import OrderedDict
 
 import httpx
 from loguru import logger
@@ -92,6 +93,9 @@ class LLMService:
         self._system_prompt: str | None = None
         self._response_ids: OrderedDict[str, str] = OrderedDict()
         self._response_ids_max = 500
+        # Cache for "auto" model resolution: (resolved_id, resolved_at_monotonic)
+        self._auto_model_cache: tuple[str, float] | None = None
+        self._auto_model_ttl: float = 5.0  # seconds
 
     # ------------------------------------------------------------------
     # System prompt
@@ -101,6 +105,83 @@ class LLMService:
     def supports_vision(self) -> bool:
         """Whether the active model supports multimodal (vision) input."""
         return self._config.supports_vision
+
+    async def _resolve_model(self) -> str:
+        """Return the effective model ID to use in API requests.
+
+        When ``config.model`` is ``"auto"``, queries LM Studio (via the
+        OAI-compatible ``/v1/models`` endpoint) for the first loaded model
+        and caches the result for ``_auto_model_ttl`` seconds.  Falls back to
+        ``"auto"`` itself if the query fails so LM Studio chooses for us.
+
+        Returns:
+            The resolved model ID string.
+        """
+        if self._config.model != "auto":
+            return self._config.model
+
+        now = time.monotonic()
+        if (
+            self._auto_model_cache is not None
+            and now - self._auto_model_cache[1] < self._auto_model_ttl
+        ):
+            return self._auto_model_cache[0]
+
+        # Try LM Studio v1 API first, then OAI-compat fallback.
+        resolved: str | None = None
+        endpoints = (
+            [f"{self._config.base_url}/api/v1/models", "models"]
+            if not self._is_ollama
+            else [f"{self._config.base_url}/api/tags", "models"]
+        )
+        try:
+            resp = await self._client.get(
+                endpoints[0],
+                timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            items = data.get("models") or data.get("data") or []
+            if items:
+                # Prefer a model that is loaded (LM Studio v1 has state field).
+                for item in items:
+                    state = item.get("state", "")
+                    if state in ("loaded", "loading", ""):
+                        resolved = item.get("path") or item.get("id") or item.get("name")
+                        if resolved:
+                            break
+                if not resolved:
+                    first = items[0]
+                    resolved = first.get("path") or first.get("id") or first.get("name")
+        except Exception as exc:
+            logger.warning("Auto model resolution failed: {}", exc)
+
+        if not resolved:
+            # Final fallback: OAI-compat /v1/models
+            try:
+                resp = await self._client.get(
+                    f"{self._config.base_url}/v1/models",
+                    timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
+                )
+                resp.raise_for_status()
+                items = resp.json().get("data", [])
+                if items:
+                    resolved = items[0].get("id")
+            except Exception as exc2:
+                logger.warning("OAI-compat auto model resolution failed: {}", exc2)
+
+        if resolved:
+            self._auto_model_cache = (resolved, now)
+            logger.info("Auto-resolved LLM model: {}", resolved)
+            return resolved
+
+        # Could not resolve — let the server decide.
+        logger.warning("Could not auto-resolve model; sending 'auto'")
+        return "auto"
+
+    def _invalidate_model_cache(self) -> None:
+        """Invalidate the cached auto-resolved model ID."""
+        self._auto_model_cache = None
 
     def _load_system_prompt(self) -> str:
         """Read the system prompt from the configured file path.
@@ -129,10 +210,9 @@ class LLMService:
         base = path.read_text(encoding="utf-8").strip()
 
         # Append dynamic environment context
-        import os
         username = os.getlogin()
-        home = os.path.expanduser("~")
-        desktop = os.path.join(home, "Desktop")
+        home = str(Path.home())
+        desktop = str(Path.home() / "Desktop")
         env_block = (
             f"\n\n## Ambiente utente\n\n"
             f"- **Username**: {username}\n"
@@ -437,8 +517,9 @@ class LLMService:
             input_field = user_content
 
         sys_prompt = self._get_dynamic_system_prompt()
+        active_model = await self._resolve_model()
         payload: dict[str, Any] = {
-            "model": self._config.model,
+            "model": active_model,
             "input": input_field,
             "stream": True,
             "temperature": self._config.temperature,
@@ -468,7 +549,7 @@ class LLMService:
 
         logger.debug(
             "LM Studio native chat — model={}, reasoning={}",
-            self._config.model,
+            active_model,
             payload.get("reasoning", "off"),
         )
 
@@ -687,8 +768,9 @@ class LLMService:
             else messages
         )
 
+        active_model = await self._resolve_model()
         payload: dict[str, Any] = {
-            "model": self._config.model,
+            "model": active_model,
             "messages": actual_messages,
             "temperature": self._config.temperature,
             "max_tokens": self._config.max_tokens,

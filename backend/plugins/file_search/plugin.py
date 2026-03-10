@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from loguru import logger
 
@@ -270,7 +270,7 @@ class FileSearchPlugin(BasePlugin):
     async def execute_tool(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
         context: ExecutionContext,
     ) -> ToolResult:
         """Dispatch to the requested tool.
@@ -342,7 +342,7 @@ class FileSearchPlugin(BasePlugin):
 
     # -- Private tool handlers ---------------------------------------------
 
-    async def _exec_search_files(self, args: dict) -> list[dict]:
+    async def _exec_search_files(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         """Execute the search_files tool.
 
         Args:
@@ -385,7 +385,7 @@ class FileSearchPlugin(BasePlugin):
             follow_symlinks=cfg.follow_symlinks,
         )
 
-    async def _exec_get_file_info(self, args: dict) -> dict:
+    async def _exec_get_file_info(self, args: dict[str, Any]) -> dict[str, Any]:
         """Execute the get_file_info tool.
 
         Args:
@@ -433,7 +433,7 @@ class FileSearchPlugin(BasePlugin):
 
         return await asyncio.to_thread(_gather_metadata)
 
-    async def _exec_read_text_file(self, args: dict) -> dict | ToolResult:
+    async def _exec_read_text_file(self, args: dict[str, Any]) -> dict[str, Any] | ToolResult:
         """Execute the read_text_file tool.
 
         Args:
@@ -477,7 +477,7 @@ class FileSearchPlugin(BasePlugin):
             max_chars=max_chars,
         )
 
-    async def _exec_open_file(self, args: dict) -> str:
+    async def _exec_open_file(self, args: dict[str, Any]) -> str:
         """Execute the open_file tool.
 
         Args:
@@ -512,7 +512,7 @@ class FileSearchPlugin(BasePlugin):
         await asyncio.to_thread(_open_with_system)
         return f"Opened file: {resolved.name}"
 
-    async def _exec_write_text_file(self, args: dict) -> str:
+    async def _exec_write_text_file(self, args: dict[str, Any]) -> str:
         """Execute the write_text_file tool.
 
         Creates or overwrites a text file at the given path with the

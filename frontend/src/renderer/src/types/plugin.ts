@@ -12,5 +12,4 @@ export interface PluginInfo {
 export interface PluginTool {
   name: string
   description: string
-  parameters: Record<string, unknown>
 }

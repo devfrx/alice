@@ -19,6 +19,7 @@ from backend.core.protocols import (
     LLMServiceProtocol,
     LMStudioManagerProtocol,
     PluginManagerProtocol,
+    PreferencesServiceProtocol,
     STTServiceProtocol,
     TTSServiceProtocol,
     ToolRegistryProtocol,
@@ -48,7 +49,7 @@ class AppContext:
     lmstudio_manager: LMStudioManagerProtocol | None = None
     vram_monitor: VRAMMonitorProtocol | None = None
 
-    preferences_service: Any | None = None
+    preferences_service: PreferencesServiceProtocol | None = None
     """User preferences persistence service."""
 
     plugin_local_state: dict[str, dict] = field(default_factory=dict)

@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import struct
 import tempfile
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal

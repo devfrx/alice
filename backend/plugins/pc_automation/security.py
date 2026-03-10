@@ -78,7 +78,9 @@ def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
         app_name: User-provided application name (case-insensitive).
 
     Returns:
-        Tuple of (is_valid, message, resolved_executable_or_None).
+        Tuple of ``(is_valid, message, primary_executable_or_None)``.
+        The third element is the primary (first) executable name when the
+        app is whitelisted, or ``None`` when rejected.
     """
     normalized = app_name.strip().lower().replace(" ", "_")
 
@@ -87,13 +89,13 @@ def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
         return False, f"Application '{app_name}' is not in the whitelist. Allowed: {allowed}", None
 
     executable = ALLOWED_APPS[normalized]
-    # Return all candidates so the executor can try each one
+    # Resolve to the primary (first) candidate
     if isinstance(executable, list):
-        candidates = executable
+        primary = executable[0]
     else:
-        candidates = [executable]
+        primary = executable
 
-    return True, f"Application '{normalized}' is whitelisted", candidates
+    return True, f"Application '{normalized}' is whitelisted", primary
 
 
 def validate_command(command: str) -> tuple[bool, str]:
@@ -230,6 +232,8 @@ def validate_keys(keys: list[str]) -> tuple[bool, str]:
 def validate_path(path: str) -> tuple[bool, str]:
     """Validate a file path is not in a protected system directory.
 
+    Blocks UNC paths (network shares) and Win32 device paths.
+
     Args:
         path: File path to validate.
 
@@ -238,6 +242,10 @@ def validate_path(path: str) -> tuple[bool, str]:
     """
     if not path or not path.strip():
         return False, "Empty path"
+
+    # Block UNC paths (\\server\share) and Win32 device paths (\\.\device)
+    if path.startswith("\\\\"):
+        return False, f"UNC and device paths are not allowed: {path}"
 
     try:
         resolved = Path(path).resolve()

@@ -9,7 +9,7 @@ caching.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import httpx
 from loguru import logger
@@ -166,7 +166,7 @@ class WeatherPlugin(BasePlugin):
     async def execute_tool(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
         context: ExecutionContext,
     ) -> ToolResult:
         """Dispatch to the requested weather tool.

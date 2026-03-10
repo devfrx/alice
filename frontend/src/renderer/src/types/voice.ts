@@ -44,14 +44,13 @@ export interface AudioChunk {
 // STT
 // ---------------------------------------------------------------------------
 
-/** Configuration for speech-to-text. */
+/** Configuration for speech-to-text (matches GET /api/config → stt). */
 export interface STTConfig {
   enabled: boolean
   engine: string
   model: string
-  language: string
+  language: string | null
   device: string
-  vad_filter: boolean
 }
 
 /** Result from STT transcription. */
@@ -72,13 +71,17 @@ export interface STTResult {
 // TTS
 // ---------------------------------------------------------------------------
 
-/** Configuration for text-to-speech. */
+/** Configuration for text-to-speech (matches GET /api/config → tts). */
 export interface TTSConfig {
   enabled: boolean
   engine: 'piper' | 'xtts' | 'kokoro'
   voice: string
   speed: number
   sample_rate: number
+  kokoro_model: string
+  kokoro_voices: string
+  kokoro_voice: string
+  kokoro_language: string
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +119,9 @@ export interface VoiceReadyMessage {
   stt_engine?: string | null
   tts_engine?: string | null
   sample_rate?: number | null
+  activation_mode?: string
+  wake_word?: string
+  auto_tts_response?: boolean
 }
 
 /** Server → Client: recording started acknowledgment. */
@@ -164,6 +170,11 @@ export interface VoiceErrorMessage {
   message: string
 }
 
+/** Server → Client: pong response to a ping. */
+export interface VoicePongMessage {
+  type: 'pong'
+}
+
 /** Union of all voice WS messages from server. */
 export type VoiceServerMessage =
   | VoiceReadyMessage
@@ -175,6 +186,7 @@ export type VoiceServerMessage =
   | TTSDoneMessage
   | TTSCancelledMessage
   | VoiceErrorMessage
+  | VoicePongMessage
 
 /** Union of all voice WS messages from client. */
 export type VoiceClientMessage =

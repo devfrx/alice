@@ -25,6 +25,7 @@ import type {
   ModelsStatusResponse
 } from '../types/settings'
 import type { CalendarEvent, TodaySummary } from '../types/calendar'
+import type { AuditConfirmationsResponse } from '../types/audit'
 
 /** Backend host (without /api), configurable via VITE_API_BASE_URL env var. */
 const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -129,9 +130,13 @@ export const api = {
 
   // -- Config ---------------------------------------------------------------
 
-  /** Retrieve the list of available LLM models. */
+  /** Retrieve the list of available LLM models (via /config/models). */
   getModels: (): Promise<LMStudioModel[]> =>
     request<LMStudioModel[]>('/config/models'),
+
+  /** Retrieve the list of available LLM models (via /models). */
+  listModels: (): Promise<LMStudioModel[]> =>
+    request<LMStudioModel[]>('/models'),
 
   /** Load a model into LM Studio. */
   loadModel: (
@@ -337,5 +342,25 @@ export const api = {
   deleteCalendarEvent: (id: string): Promise<{ deleted: boolean; id: string }> =>
     request<{ deleted: boolean; id: string }>(`/calendar/events/${encodeURIComponent(id)}`, {
       method: 'DELETE'
-    })
+    }),
+
+  // -- Audit ----------------------------------------------------------------
+
+  /** List tool confirmation audit entries with optional filters. */
+  getAuditConfirmations: (params?: {
+    conversationId?: string
+    toolName?: string
+    approved?: boolean
+    limit?: number
+    offset?: number
+  }): Promise<AuditConfirmationsResponse> => {
+    const qs = new URLSearchParams()
+    if (params?.conversationId) qs.set('conversation_id', params.conversationId)
+    if (params?.toolName) qs.set('tool_name', params.toolName)
+    if (params?.approved !== undefined) qs.set('approved', String(params.approved))
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    if (params?.offset !== undefined) qs.set('offset', String(params.offset))
+    const q = qs.toString()
+    return request<AuditConfirmationsResponse>(`/audit/confirmations${q ? `?${q}` : ''}`)
+  }
 }

@@ -14,6 +14,7 @@ import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, typ
 import { WebSocketManager } from '../services/ws'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
+import type { VoiceReadyMessage } from '../types/voice'
 
 // ---------------------------------------------------------------------------
 // AudioWorklet processor source (inlined as JS to avoid TS loading issues).
@@ -165,11 +166,7 @@ export function useVoice(): UseVoiceReturn {
   let sttRetryTimer: ReturnType<typeof setTimeout> | null = null
 
   const onVoiceReady = (data: unknown): void => {
-    const d = data as {
-      stt_available: boolean; tts_available: boolean; sample_rate?: number;
-      stt_model?: string; stt_engine?: string; tts_engine?: string;
-      activation_mode?: string; wake_word?: string; auto_tts_response?: boolean;
-    }
+    const d = data as VoiceReadyMessage
     console.log('[OMNIA Voice] voice_ready:', d)
     voiceAvailable.value = d.stt_available || d.tts_available
     store.sttAvailable = d.stt_available

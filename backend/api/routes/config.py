@@ -14,7 +14,7 @@ from backend.core.context import AppContext
 from backend.services.stt_service import STTService
 from backend.services.tts_service import TTSService
 
-router = APIRouter()
+router = APIRouter(tags=["config"])
 
 
 def _ctx(request: Request) -> AppContext:
@@ -182,6 +182,14 @@ async def update_config(request: Request) -> dict[str, Any]:
     # Apply supported runtime overrides.
     if "llm" in body:
         llm_updates = body["llm"]
+        if "model" in llm_updates:
+            model_val = str(llm_updates["model"]).strip()
+            if not model_val or len(model_val) > 256:
+                raise HTTPException(400, "model must be a non-empty string (max 256 chars)")
+            object.__setattr__(cfg.llm, "model", model_val)
+            # Invalidate auto-resolved model cache when model changes.
+            if ctx.llm_service is not None and hasattr(ctx.llm_service, "_invalidate_model_cache"):
+                ctx.llm_service._invalidate_model_cache()
         if "temperature" in llm_updates:
             try:
                 temp = float(llm_updates["temperature"])

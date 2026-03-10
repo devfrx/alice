@@ -46,9 +46,16 @@ def _validate_path(
     p = Path(raw)
     resolved = p.resolve()
 
-    # When symlinks should not be followed, reject symlinks
-    if not follow_symlinks and p.is_symlink():
-        raise ValueError(f"Symlinks not allowed: {raw}")
+    # When symlinks should not be followed, reject symlinks.
+    # Wrap is_symlink() to handle TypeError from Python 3.13 pathlib when
+    # lstat().st_mode is unavailable (mocked path or non-existent file).
+    if not follow_symlinks:
+        try:
+            is_symlink = p.is_symlink()
+        except (OSError, TypeError):
+            is_symlink = False
+        if is_symlink:
+            raise ValueError(f"Symlinks not allowed: {raw}")
 
     # Block forbidden directories
     for fb in forbidden:

@@ -10,7 +10,7 @@ the plugin manager calls at well-defined moments.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from loguru import logger as _loguru_logger
 
@@ -156,7 +156,7 @@ class BasePlugin(ABC):
     async def execute_tool(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
         context: ExecutionContext,
     ) -> ToolResult:
         """Execute *tool_name* with the supplied arguments.
@@ -191,7 +191,7 @@ class BasePlugin(ABC):
     async def pre_execution_hook(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
     ) -> bool:
         """Gate that runs before every tool execution.
 

@@ -8,7 +8,7 @@ use pywin32 virtual key events, and brightness uses WMI via PowerShell.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from loguru import logger
 
@@ -201,7 +201,7 @@ class MediaControlPlugin(BasePlugin):
     async def execute_tool(
         self,
         tool_name: str,
-        args: dict,
+        args: dict[str, Any],
         context: ExecutionContext,
     ) -> ToolResult:
         """Dispatch to the matching executor function.

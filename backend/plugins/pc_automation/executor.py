@@ -17,6 +17,7 @@ from typing import Any
 from loguru import logger
 
 from backend.plugins.pc_automation.constants import (
+    ALLOWED_APPS,
     CMD_BUILTINS,
     MAX_SCREENSHOT_PIXELS,
 )
@@ -90,6 +91,50 @@ def _normalize_backslashes(command: str) -> str:
     because the regex collapses *any* run of 2+ backslashes into one.
     """
     return _RE_MULTI_BACKSLASH.sub("\\\\", command)
+
+
+def _tokenize_command(command: str) -> list[str]:
+    """Tokenise a Windows command string respecting double-quoted paths.
+
+    Backslash is NOT treated as an escape character (Windows semantics).
+    Surrounding double quotes are stripped from each token.  Trailing
+    backslashes are stripped from tokens longer than one character to
+    work around the cmd.exe ``\\"`` trailing-backslash bug where a
+    quoted destination path ends with a backslash, e.g.::
+
+        move "C:\\src\\a.jpg" "C:\\dest\\"
+
+    Args:
+        command: The raw command string (e.g. from the LLM).
+
+    Returns:
+        List of string tokens with quotes removed and trailing backslashes
+        stripped from multi-character tokens.
+    """
+    tokens: list[str] = []
+    current: list[str] = []
+    in_quotes = False
+
+    for ch in command:
+        if ch == '"':
+            in_quotes = not in_quotes
+        elif ch == ' ' and not in_quotes:
+            if current:
+                token = "".join(current)
+                if len(token) > 1:
+                    token = token.rstrip("\\")
+                tokens.append(token)
+                current = []
+        else:
+            current.append(ch)
+
+    if current:
+        token = "".join(current)
+        if len(token) > 1:
+            token = token.rstrip("\\")
+        tokens.append(token)
+
+    return tokens
 
 
 def _find_executable(candidates: list[str]) -> str | None:
@@ -175,9 +220,14 @@ async def exec_open_app(app_name: str) -> str:
     PATH / registry / common install directories, then launches it.
     URI-style entries (e.g. ``ms-settings:``) are opened via ``os.startfile``.
     """
-    valid, msg, candidates = validate_app_name(app_name)
+    valid, msg, primary_exe = validate_app_name(app_name)
     if not valid:
         raise ValueError(msg)
+
+    # Build the full candidate list for _find_executable so all alternates
+    # (e.g. chrome.exe / Chrome.exe) are tried.
+    _raw = ALLOWED_APPS.get(app_name.strip().lower().replace(" ", "_"))
+    candidates: list[str] = _raw if isinstance(_raw, list) else ([primary_exe] if primary_exe else [])
 
     def _open() -> str:
         import os
@@ -220,12 +270,12 @@ async def exec_close_app(app_name: str) -> str:
 
     Uses taskkill to terminate the process gracefully.
     """
-    valid, msg, candidates = validate_app_name(app_name)
+    valid, msg, primary_exe = validate_app_name(app_name)
     if not valid:
         raise ValueError(msg)
 
-    # taskkill needs just the base exe name, use the first candidate
-    executable = candidates[0]
+    # taskkill needs just the base exe name
+    executable = primary_exe or app_name
 
     try:
         output = await safe_subprocess("taskkill", ["/IM", executable, "/F"], timeout=10)
@@ -337,8 +387,18 @@ async def exec_take_screenshot() -> bytes:
 
 
 async def exec_get_active_window() -> str:
-    """Get the title of the currently active window (Win32 API)."""
+    """Get the title of the currently active window.
+
+    Uses ``pyautogui.getActiveWindow()`` when available, falling back
+    to the Win32 API via ``ctypes``.
+    """
     def _get_window() -> str:
+        if _PYAUTOGUI_AVAILABLE:
+            window = pyautogui.getActiveWindow()
+            if window is None:
+                return "(no active window)"
+            return window.title or "(no title)"
+
         try:
             import ctypes
             user32 = ctypes.windll.user32
@@ -414,24 +474,19 @@ async def exec_command(command: str) -> str:
     if not valid:
         raise ValueError(msg)
 
-    base_cmd = command.strip().split()[0].lower()
+    tokens = _tokenize_command(command)
+    base_cmd = tokens[0].lower()
     if base_cmd.endswith(".exe"):
         base_cmd = base_cmd[:-4]
 
     if base_cmd in CMD_BUILTINS:
         # CMD built-in commands must run through cmd.exe /c.
-        # Use raw_cmdline=True so Python does NOT re-quote the
-        # command string — cmd.exe receives it exactly as-is,
-        # preserving the embedded quotes the LLM placed around paths.
-        return await safe_subprocess(
-            f"cmd.exe /c {command}", raw_cmdline=True,
-        )
+        # Pass tokens as a proper argument list so subprocess does not
+        # re-quote already-stripped paths.
+        return await safe_subprocess("cmd.exe", ["/c"] + tokens)
 
     # External executables: split into command + args
-    parts = command.strip().split()
-    cmd = parts[0]
-    args = parts[1:] if len(parts) > 1 else []
-    return await safe_subprocess(cmd, args)
+    return await safe_subprocess(tokens[0], tokens[1:])
 
 
 async def exec_move_mouse(x: int, y: int) -> str:

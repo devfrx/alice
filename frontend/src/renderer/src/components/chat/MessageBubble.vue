@@ -99,7 +99,7 @@ onUnmounted(() => {
       <ThinkingSection v-if="message.thinking_content" :thinking-html="thinkingHtml" :initial-collapsed="true" />
 
       <!-- Tool calls section (assistant only) -->
-      <ToolCallSection v-if="message.tool_calls?.length" :tool-calls="message.tool_calls" />
+      <ToolCallSection v-if="message.tool_calls?.length" :tool-calls="message.tool_calls ?? []" />
 
       <!-- Message content -->
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->

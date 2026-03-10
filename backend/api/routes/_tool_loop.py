@@ -369,9 +369,12 @@ async def run_tool_loop(
                 entry["tool_call_id"] = m.tool_call_id
             updated_history.append(entry)
 
+        _tools_enabled = getattr(
+            getattr(ctx.config, "llm", None), "tools_enabled", True
+        )
         tools = (
             await ctx.tool_registry.get_available_tools()
-            if ctx.tool_registry and ctx.config.llm.tools_enabled
+            if ctx.tool_registry and _tools_enabled
             else None
         )
         if tools is not None and len(tools) == 0:
@@ -494,8 +497,10 @@ async def _request_confirmation(
         args: Arguments the tool will be called with.
         execution_id: Unique execution ID for correlation.
         timeout_s: Maximum seconds to wait.
-        risk_level: Risk level of the tool (e.g. ``"low"``, ``"medium"``, ``"high"``).
+        risk_level: Risk classification (``"safe"``, ``"medium"``,
+            ``"dangerous"``, ``"forbidden"``).
         description: Human-readable description of the tool action.
+        reasoning: LLM thinking/reasoning content at invocation time.
         cancel_event: Optional event to set when a cancel message arrives.
 
     Returns:

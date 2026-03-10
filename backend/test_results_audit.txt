@@ -1,0 +1,11 @@
+﻿python : ERROR: file or directory not found: tests/
+In riga:1 car:1
++ python -m pytest tests/ --tb=line --override-ini="addopts=" -q 2>&1 | ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: file or ...t found: tests/ 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+no tests ran in 0.01s

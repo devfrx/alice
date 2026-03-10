@@ -282,7 +282,10 @@ def create_app(testing: bool = False) -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.add_middleware(OriginGuardMiddleware)
+    app.add_middleware(
+        OriginGuardMiddleware,
+        trusted_origins=config.server.cors_origins,
+    )
 
     # Rate limiting (slowapi).
     setup_rate_limiting(app, config.server.rate_limit)

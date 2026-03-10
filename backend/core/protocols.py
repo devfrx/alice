@@ -11,7 +11,10 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from backend.core.config import OmniaConfig
 
 
 # ---------------------------------------------------------------------------
@@ -258,20 +261,56 @@ class ConversationFileManagerProtocol(Protocol):
         """Read a single conversation from its JSON file."""
         ...
 
-    async def load_all(self, user_id: str | None = None) -> list[dict[str, Any]]:
+    async def load_all(
+        self, user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Read all conversation JSON files."""
+        ...
+
+    async def rebuild_from_files(
+        self, session_factory: Any,
+    ) -> int:
+        """Rebuild DB from saved JSON files."""
         ...
 
 
 # ---------------------------------------------------------------------------
-# Conversation DB sync
+# Preferences service
 # ---------------------------------------------------------------------------
 
 
 @runtime_checkable
-class ConversationDBSyncProtocol(Protocol):
-    """Protocol for rebuilding database from conversation files."""
+class PreferencesServiceProtocol(Protocol):
+    """Protocol for user preferences persistence."""
 
-    async def rebuild_from_files(self, session_factory: Any) -> int:
-        """Rebuild the database from saved JSON files."""
+    async def load_all(self) -> dict[str, Any]:
+        """Load all stored preferences."""
+        ...
+
+    def apply_to_config(
+        self, config: OmniaConfig, prefs: dict[str, Any],
+    ) -> None:
+        """Overlay persisted preferences onto config."""
+        ...
+
+    async def save_preference(
+        self, key: str, value: Any,
+    ) -> None:
+        """Save a single preference."""
+        ...
+
+    async def save_section(
+        self, section: str, data: dict[str, Any],
+    ) -> None:
+        """Persist all keys in a section."""
+        ...
+
+    async def persist_from_update(
+        self, body: dict[str, Any],
+    ) -> None:
+        """Extract and persist preferences from update."""
+        ...
+
+    async def delete_all(self) -> int:
+        """Delete all persisted preferences."""
         ...

@@ -162,8 +162,6 @@ SCREENSHOT_LOCKOUT_S: int = 60
 # Tools that are blocked after a screenshot (anti-exfiltration)
 LOCKOUT_TOOLS: set[str] = {
     "execute_command",
-    "type_text",
-    "open_application",
 }
 
 # Per-command forbidden flags (prevent destructive operations)

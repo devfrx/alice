@@ -1,8 +1,12 @@
 """O.M.N.I.A. — Web search client.
 
 Wraps DDGS metasearch (sync, run via ``asyncio.to_thread``) and
-``httpx``-based page scraping with SSRF protection, rate limiting,
+``primp``-based page scraping with SSRF protection, rate limiting,
 and in-memory result caching.
+
+Uses ``primp.Client`` for scraping because it impersonates real browser
+TLS fingerprints, which avoids the 403 / empty-response blocks that
+plain ``httpx`` triggers on sites like trovaprezzi.it and idealo.it.
 """
 
 from __future__ import annotations
@@ -11,10 +15,12 @@ import asyncio
 import hashlib
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
+from primp import Client as PrimpClient
 
 from backend.core.http_security import (
     async_validate_url_ssrf,
@@ -91,12 +97,24 @@ class WebSearchClient:
             event_hooks=create_ssrf_safe_event_hooks(),
         )
 
+        # primp client for scraping — impersonates a real browser TLS
+        # fingerprint, which bypasses 403s on anti-bot sites.
+        self._primp = PrimpClient(
+            impersonate="firefox",
+            follow_redirects=True,
+            timeout=request_timeout_s,
+        )
+
         # Rate limiting state
         self._rate_lock = asyncio.Lock()
         self._last_search_ts: float = 0.0
 
         # In-memory cache: {query_hash: (timestamp, results)}
         self._cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+        # Track failed scrape URLs to avoid retrying the same domain
+        self._scrape_failures: dict[str, float] = {}
+        self._failure_cooldown_s: float = 300.0  # 5 minutes
 
     # ------------------------------------------------------------------
     # Search
@@ -163,6 +181,7 @@ class WebSearchClient:
         """Fetch a web page and return its text content.
 
         SSRF validation is performed before making the request.
+        Uses ``primp`` for browser-like TLS impersonation to avoid 403s.
 
         Args:
             url: The URL to scrape.
@@ -172,11 +191,28 @@ class WebSearchClient:
 
         Raises:
             ValueError: If the URL fails SSRF validation.
+            RuntimeError: If the domain was recently blocked (403/timeout).
             httpx.HTTPStatusError: On non-2xx HTTP responses.
         """
         await async_validate_url_ssrf(url)
 
-        response = await self._http.get(url)
+        # Check if this domain recently failed — avoid retry spirals
+        domain = urlparse(url).netloc
+        fail_ts = self._scrape_failures.get(domain)
+        if fail_ts and (time.monotonic() - fail_ts) < self._failure_cooldown_s:
+            raise RuntimeError(
+                f"Domain '{domain}' is temporarily blocked "
+                f"(failed recently). Try a different site."
+            )
+
+        # Use primp (browser TLS fingerprint) in a thread
+        response = await asyncio.to_thread(self._primp.get, url)
+        if response.status_code in (403, 429, 503):
+            self._scrape_failures[domain] = time.monotonic()
+            raise RuntimeError(
+                f"HTTP {response.status_code} from '{domain}' — "
+                f"site blocks automated access. Try a different site."
+            )
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")

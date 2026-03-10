@@ -85,7 +85,7 @@ def test_plugins_enabled_list(config: OmniaConfig) -> None:
 def test_stt_defaults(config: OmniaConfig) -> None:
     assert config.stt.engine == "faster-whisper"
     assert config.stt.model == "large-v3"
-    assert config.stt.language == "it"
+    assert config.stt.language is None  # auto-detect by default
 
 
 def test_tts_defaults(config: OmniaConfig) -> None:

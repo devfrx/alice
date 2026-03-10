@@ -50,12 +50,7 @@ function reject(): void {
 function handleKeydown(e: KeyboardEvent): void {
     if (e.key === 'Enter') {
         e.preventDefault()
-        const focused = document.activeElement as HTMLElement | null
-        if (focused?.classList.contains('confirm-card__btn--reject')) {
-            reject()
-        } else {
-            approve()
-        }
+        approve()
     } else if (e.key === 'Escape') {
         e.preventDefault()
         reject()
@@ -69,8 +64,8 @@ function formatArgs(args: Record<string, unknown>): string {
 
 onMounted(() => {
     nextTick(() => {
-        const firstBtn = dialogRoot.value?.querySelector('.confirm-card__btn--reject') as HTMLElement | null
-        firstBtn?.focus()
+        const approveBtn = dialogRoot.value?.querySelector('.confirm-card__btn--approve') as HTMLElement | null
+        approveBtn?.focus()
     })
     timerInterval = setInterval(() => {
         if (remainingSeconds.value > 0) {

@@ -18,7 +18,7 @@
  */
 
 import type { InjectionKey } from 'vue'
-import { computed, onScopeDispose, ref, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
 
 import { api } from '../services/api'
 import { wsManager } from '../services/ws'
@@ -54,8 +54,8 @@ export interface UseChatReturn {
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
   connectionStatus: Ref<ConnectionStatus>
-  /** Reactive flag — `true` while a cancel request is pending. */
-  isCancelling: Ref<boolean>
+  /** Reactive flag — `true` while a cancel request is pending (read-only). */
+  isCancelling: ComputedRef<boolean>
 }
 
 /** Injection key for the global chat API provided by App.vue. */

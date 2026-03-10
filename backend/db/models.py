@@ -148,7 +148,7 @@ class ToolConfirmationAudit(SQLModel, table=True):
         sa.Index("ix_audit_tool_name", "tool_name"),
         sa.Index("ix_audit_created_at", "created_at"),
         sa.CheckConstraint(
-            "risk_level IN ('safe', 'low', 'medium', 'dangerous', 'forbidden')",
+            "risk_level IN ('safe', 'medium', 'dangerous', 'forbidden')",
             name="ck_audit_risk_level",
         ),
     )

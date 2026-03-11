@@ -7,6 +7,7 @@ Settings v2 for validation and env parsing.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -595,7 +596,17 @@ class OmniaConfig(BaseSettings):
                 if db_path and not Path(db_path).is_absolute():
                     abs_path = PROJECT_ROOT / db_path
                     db_data["url"] = f"{prefix}:///{abs_path}"
-
+        # -- MCP server commands: expand ~ and env vars in args --
+        mcp_data = data.get("mcp", {})
+        if isinstance(mcp_data, dict):
+            for server in mcp_data.get("servers", []):
+                if isinstance(server, dict) and server.get("command"):
+                    server["command"] = [
+                        str(Path(os.path.expandvars(arg)).expanduser())
+                        if ("~" in arg or "$" in arg or "%" in arg)
+                        else arg
+                        for arg in server["command"]
+                    ]
         return data
 
 

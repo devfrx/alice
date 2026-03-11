@@ -74,6 +74,30 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception as exc:
             logger.warning("Failed to load persisted preferences: {}", exc)
 
+    # -- Restore persisted plugin toggle states -----------------------------
+    from backend.db.plugin_state import PluginStateRepository
+
+    plugin_state_repo = PluginStateRepository(session_factory)
+    ctx.plugin_state_repo = plugin_state_repo  # type: ignore[attr-defined]
+
+    if not testing:
+        try:
+            # On first run: seed DB from default.yaml list.
+            await plugin_state_repo.initialize_defaults(
+                config.plugins.enabled
+            )
+            # Replace in-memory list with the persisted user choices.
+            persisted = await plugin_state_repo.get_all()
+            config.plugins.enabled = [
+                name for name, enabled in persisted.items() if enabled
+            ]
+            logger.debug(
+                "Plugin states restored from DB: enabled={}",
+                config.plugins.enabled,
+            )
+        except Exception as exc:
+            logger.warning("Failed to restore plugin states: {}", exc)
+
     llm_service = LLMService(config.llm)
     ctx.llm_service = llm_service
 

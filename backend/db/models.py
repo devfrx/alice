@@ -209,3 +209,27 @@ class UserPreference(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_utcnow)
 
 
+# ---------------------------------------------------------------------------
+# Plugin State
+# ---------------------------------------------------------------------------
+
+
+class PluginState(SQLModel, table=True):
+    """Persists the enabled/disabled toggle for each plugin across restarts.
+
+    At startup the plugin manager reads this table and overrides the default
+    list from ``config/default.yaml``.  On every toggle via the REST API the
+    new state is written here so it survives the next restart.
+    """
+
+    __tablename__ = "plugin_states"
+
+    plugin_name: str = Field(primary_key=True, max_length=64)
+    """Unique plugin identifier (e.g. 'web_search', 'calendar')."""
+
+    enabled: bool = Field(default=True)
+    """Whether this plugin should be loaded at startup."""
+
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+

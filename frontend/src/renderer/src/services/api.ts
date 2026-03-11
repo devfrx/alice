@@ -291,6 +291,15 @@ export const api = {
   resetPreferences: (): Promise<{ deleted: number; message: string }> =>
     request<{ deleted: number; message: string }>('/settings/preferences', { method: 'DELETE' }),
 
+  /** Probe which TTS/STT engine libraries are installed on the backend. */
+  getAvailableVoiceEngines: (): Promise<{
+    tts: Record<string, boolean>
+    stt: Record<string, boolean>
+  }> =>
+    request<{ tts: Record<string, boolean>; stt: Record<string, boolean> }>(
+      '/settings/voice/available-engines'
+    ),
+
   // -- Plugin tool execution ------------------------------------------------
 
   /** Execute a plugin tool directly via REST. */

@@ -132,6 +132,25 @@ memory = [
     "fastembed>=0.3",
 ]
 
+# tts-xtts (Coqui TTS) requires numpy<2.0 while kokoro-onnx/voice/voice-gpu
+# require numpy>=2.0.2 — declare them as mutually exclusive so uv resolves
+# each independently rather than failing on a combined resolution.
+[tool.uv]
+conflicts = [
+    [
+        { extra = "tts-xtts" },
+        { extra = "tts-kokoro" },
+    ],
+    [
+        { extra = "tts-xtts" },
+        { extra = "voice" },
+    ],
+    [
+        { extra = "tts-xtts" },
+        { extra = "voice-gpu" },
+    ],
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

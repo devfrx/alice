@@ -256,7 +256,12 @@ class TTSService:
     # -- lifecycle ----------------------------------------------------------
 
     async def start(self) -> None:
-        """Initialise the selected TTS engine in a background thread."""
+        """Initialise the selected TTS engine in a background thread.
+
+        All ``ImportError`` cases (missing optional library) are handled
+        gracefully: a WARNING is logged and TTS stays disabled.  Only true
+        unexpected errors produce an ERROR-level log with traceback.
+        """
         if self._started:
             return
         engine = self._config.engine
@@ -274,33 +279,15 @@ class TTSService:
                     self._started = True
                 except ImportError as exc:
                     logger.warning(
-                        "XTTS not available ({}): falling back to Piper engine",
-                        exc,
+                        "XTTS not available ({}): falling back to Piper", exc,
                     )
-                    try:
-                        self._engine = await asyncio.to_thread(
-                            _PiperEngine,
-                            self._config.voice,
-                            self._config.sample_rate,
-                            self._config.speed,
-                        )
-                        self._started = True
-                        logger.info("TTS fallback to Piper successful")
-                    except Exception:
-                        logger.exception("Piper fallback also failed")
-                except Exception:
-                    logger.warning("XTTS failed to load, falling back to Piper")
-                    try:
-                        self._engine = await asyncio.to_thread(
-                            _PiperEngine,
-                            self._config.voice,
-                            self._config.sample_rate,
-                            self._config.speed,
-                        )
-                        self._started = True
-                        logger.info("TTS fallback to Piper successful")
-                    except Exception:
-                        logger.exception("Piper fallback also failed")
+                    self._started = await self._try_start_piper()
+                except Exception as exc:
+                    logger.warning(
+                        "XTTS failed to load ({}): falling back to Piper", exc,
+                    )
+                    self._started = await self._try_start_piper()
+
             elif engine == "kokoro":
                 try:
                     self._engine = await asyncio.to_thread(
@@ -314,49 +301,56 @@ class TTSService:
                     self._started = True
                 except ImportError as exc:
                     logger.warning(
-                        "Kokoro not available ({}): falling back to Piper engine",
-                        exc,
+                        "Kokoro not available ({}): falling back to Piper", exc,
                     )
-                    try:
-                        self._engine = await asyncio.to_thread(
-                            _PiperEngine,
-                            self._config.voice,
-                            self._config.sample_rate,
-                            self._config.speed,
-                        )
-                        self._started = True
-                        logger.info("TTS fallback to Piper successful")
-                    except Exception:
-                        logger.exception("Piper fallback also failed")
-                except Exception as _kokoro_exc:
-                    logger.warning("Kokoro failed to load ({}), falling back to Piper", _kokoro_exc)
-                    try:
-                        self._engine = await asyncio.to_thread(
-                            _PiperEngine,
-                            self._config.voice,
-                            self._config.sample_rate,
-                            self._config.speed,
-                        )
-                        self._started = True
-                        logger.info("TTS fallback to Piper successful")
-                    except Exception:
-                        logger.exception("Piper fallback also failed")
-            else:
-                self._engine = await asyncio.to_thread(
-                    _PiperEngine,
-                    self._config.voice,
-                    self._config.sample_rate,
-                    self._config.speed,
-                )
-                self._started = True
+                    self._started = await self._try_start_piper()
+                except Exception as exc:
+                    logger.warning(
+                        "Kokoro failed to load ({}): falling back to Piper", exc,
+                    )
+                    self._started = await self._try_start_piper()
+
+            else:  # piper (primary)
+                self._started = await self._try_start_piper()
+
             if self._started:
                 logger.info("TTS service ready (engine={})", engine)
-        except ImportError:
-            logger.warning(
-                "TTS engine '{}' not available — library not installed", engine,
-            )
+            else:
+                logger.warning(
+                    "TTS service unavailable — engine '{}' and all fallbacks "
+                    "could not be loaded (install the matching extras: "
+                    "tts-piper / tts-kokoro / voice)",
+                    engine,
+                )
         except Exception:
-            logger.exception("Failed to start TTS engine '{}'", engine)
+            logger.exception("Unexpected error starting TTS engine '{}'", engine)
+
+    async def _try_start_piper(self) -> bool:
+        """Attempt to load the Piper engine using the configured voice.
+
+        Returns:
+            ``True`` on success, ``False`` if the library is missing or the
+            model file cannot be loaded (logged at WARNING, not ERROR).
+        """
+        try:
+            self._engine = await asyncio.to_thread(
+                _PiperEngine,
+                self._config.voice,
+                self._config.sample_rate,
+                self._config.speed,
+            )
+            logger.info("Piper TTS engine loaded")
+            return True
+        except ImportError as exc:
+            logger.warning(
+                "Piper not available ({}): TTS disabled. "
+                "Install with: uv sync --extra tts-piper",
+                exc,
+            )
+            return False
+        except Exception as exc:
+            logger.warning("Piper failed to load ({}): TTS disabled", exc)
+            return False
 
     async def stop(self) -> None:
         """Shut down the engine and free resources."""

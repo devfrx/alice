@@ -50,11 +50,16 @@ const activationModes = [
   { value: 'always_on', label: 'Sempre attivo' },
 ]
 
-const ttsEngines = [
+const ttsEnginesAll = [
   { value: 'piper', label: 'Piper (CPU, veloce)' },
   { value: 'kokoro', label: 'Kokoro (CPU/GPU, alta qualità)' },
   { value: 'xtts', label: 'XTTS v2 (GPU, clonazione voce)' },
 ]
+
+/** Filtered to only the engines whose Python library is installed. */
+const ttsEngines = ref(ttsEnginesAll)
+/** False when faster-whisper is not installed. */
+const sttLibAvailable = ref(true)
 
 /** Kokoro voices grouped by language, with auto-language mapping. */
 const kokoroVoices: { group: string; lang: string; voices: { value: string; label: string }[] }[] = [
@@ -144,7 +149,17 @@ function onKokoroVoiceChange(): void {
 
 onMounted(async () => {
   try {
-    const cfg = await api.getConfig()
+    const [cfg, engines] = await Promise.all([
+      api.getConfig(),
+      api.getAvailableVoiceEngines().catch(() => null),
+    ])
+
+    // Filter TTS engine list to only installed libraries.
+    if (engines) {
+      ttsEngines.value = ttsEnginesAll.filter((e) => engines.tts[e.value] === true)
+      sttLibAvailable.value = engines.stt['faster_whisper'] === true
+    }
+
     const stt = cfg.stt as Record<string, unknown> | undefined
     const tts = cfg.tts as Record<string, unknown> | undefined
     const voice = cfg.voice as Record<string, unknown> | undefined
@@ -221,15 +236,20 @@ async function save(): Promise<void> {
       <section class="settings-section" aria-labelledby="stt-heading">
         <h3 id="stt-heading" class="settings-section__title">Riconoscimento Vocale (STT)</h3>
         <div class="settings-section__grid">
+          <p v-if="!sttLibAvailable" class="settings-unavailable-hint">
+            ⚠ faster-whisper non installato — STT non disponibile.
+            Installa con: <code>uv sync --extra voice --extra voice-gpu</code>
+
+          </p>
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Abilita STT</span>
             <span class="settings-field__hint">Riconoscimento vocale tramite Whisper</span>
             <button class="settings-toggle" :class="{ 'settings-toggle--on': sttEnabled }" role="switch"
-              :aria-checked="sttEnabled" @click="sttEnabled = !sttEnabled; save()">
+              :aria-checked="sttEnabled" :disabled="!sttLibAvailable" @click="sttEnabled = !sttEnabled; save()">
               <span class="settings-toggle__thumb" />
             </button>
           </label>
-          <template v-if="sttEnabled">
+          <template v-if="sttEnabled && sttLibAvailable">
             <label class="settings-field">
               <span class="settings-field__label">Modello</span>
               <select v-model="sttModel" class="settings-field__input" aria-label="Modello STT" @change="save">
@@ -249,15 +269,19 @@ async function save(): Promise<void> {
       <section class="settings-section" aria-labelledby="tts-heading">
         <h3 id="tts-heading" class="settings-section__title">Sintesi Vocale (TTS)</h3>
         <div class="settings-section__grid">
+          <p v-if="ttsEngines.length === 0" class="settings-unavailable-hint">
+            ⚠ Nessun motore TTS installato. Installa con:
+            <code>uv sync --extra tts-piper</code>
+          </p>
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Abilita TTS</span>
             <span class="settings-field__hint">Sintesi vocale delle risposte</span>
             <button class="settings-toggle" :class="{ 'settings-toggle--on': ttsEnabled }" role="switch"
-              :aria-checked="ttsEnabled" @click="ttsEnabled = !ttsEnabled; save()">
+              :aria-checked="ttsEnabled" :disabled="ttsEngines.length === 0" @click="ttsEnabled = !ttsEnabled; save()">
               <span class="settings-toggle__thumb" />
             </button>
           </label>
-          <template v-if="ttsEnabled">
+          <template v-if="ttsEnabled && ttsEngines.length > 0">
             <label class="settings-field">
               <span class="settings-field__label">Motore</span>
               <select v-model="ttsEngine" class="settings-field__input" aria-label="Motore TTS" @change="save">
@@ -457,6 +481,23 @@ async function save(): Promise<void> {
   margin: 0 0 var(--space-3) 0;
   font-size: var(--text-md);
   color: var(--text-primary);
+}
+
+.settings-unavailable-hint {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.settings-unavailable-hint code {
+  font-family: monospace;
+  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  padding: 0 var(--space-1);
+  border-radius: 2px;
 }
 
 .settings-section__grid {

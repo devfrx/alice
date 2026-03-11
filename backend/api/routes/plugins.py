@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext
+from backend.db.plugin_state import PluginStateRepository
 
 router = APIRouter(tags=["plugins"])
 
@@ -110,6 +111,10 @@ async def toggle_plugin(
         if plugin_name in current:
             current.remove(plugin_name)
         await pm.unload_plugin(plugin_name)
+
+    # Persist the new state so it survives restarts.
+    repo = PluginStateRepository(ctx.db)
+    await repo.set(plugin_name, enabled)
 
     # Refresh tool registry so the LLM sees updated tool definitions.
     if ctx.tool_registry:

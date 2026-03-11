@@ -5,7 +5,7 @@
  * confirm / alert / custom modals without native browser dialogs.
  * Safe for Electron — never steals renderer focus.
  */
-import { type Component, reactive } from 'vue'
+import { type Component, markRaw, reactive } from 'vue'
 
 /** Visual type that controls button styling. */
 export type ModalType = 'confirm' | 'alert' | 'danger'
@@ -162,7 +162,7 @@ function openCustom(opts: CustomModalOptions): Promise<boolean> {
     state.type = 'confirm'
     state.confirmText = 'OK'
     state.cancelText = 'Annulla'
-    state.customComponent = opts.component
+    state.customComponent = markRaw(opts.component)
     state.customProps = opts.props ?? {}
     state.width = opts.width ?? null
     state.closeOnOverlay = opts.closeOnOverlay ?? true

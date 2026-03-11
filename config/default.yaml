@@ -195,7 +195,7 @@ mcp:
   servers:
     - name: filesystem
       transport: stdio
-      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "C:/Users/zagor/Desktop"]
+      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "~"]
       enabled: true
   # ── Plug & Play (zero config, solo Node.js/Python richiesto) ─────────────────
   #

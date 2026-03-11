@@ -184,8 +184,16 @@ class STTService:
                 self._config.device,
                 self._config.compute_type,
             )
-            self._model = await asyncio.to_thread(self._create_model)
-            logger.info("STT model loaded")
+            try:
+                self._model = await asyncio.to_thread(self._create_model)
+                logger.info("STT model loaded")
+            except ImportError as exc:
+                logger.warning(
+                    "STT engine unavailable — faster-whisper not installed ({})."
+                    " Install with: uv sync --extra voice",
+                    exc,
+                )
+                # Leave self._model = None; health_check() will return False.
 
     def _create_model(self) -> WhisperModel:
         """Instantiate the WhisperModel (runs in a worker thread)."""

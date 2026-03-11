@@ -994,10 +994,21 @@ async def create_conversation(request: Request) -> dict[str, Any]:
     async with ctx.db() as session:
         existing = await session.get(Conversation, conv_id)
         if existing is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="Conversation already exists",
-            )
+            # Idempotent: return the existing conversation instead of erroring.
+            # This prevents spurious 409 errors when the frontend retries creation
+            # on reconnect or when two concurrent calls race.
+            message_count: int = await session.scalar(
+                sa.select(sa.func.count(Message.id)).where(
+                    Message.conversation_id == existing.id
+                )
+            ) or 0
+            return {
+                "id": str(existing.id),
+                "title": existing.title,
+                "created_at": existing.created_at.isoformat(),
+                "updated_at": existing.updated_at.isoformat(),
+                "message_count": message_count,
+            }
 
         conv = Conversation(id=conv_id, title=title)
         session.add(conv)

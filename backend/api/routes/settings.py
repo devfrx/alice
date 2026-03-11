@@ -179,6 +179,40 @@ async def get_preferences(request: Request) -> dict[str, Any]:
     return await ctx.preferences_service.load_all()
 
 
+# -- Voice engine availability check ---------------------------------------
+
+
+@router.get("/voice/available-engines")
+async def get_available_voice_engines() -> dict[str, Any]:
+    """Probe which TTS and STT engine libraries are actually installed.
+
+    Uses ``importlib.util.find_spec`` — no import side-effects.  The
+    frontend uses this to hide engine options that cannot be used.
+
+    Returns::
+
+        {
+            "tts": {"piper": true, "kokoro": false, "xtts": false},
+            "stt": {"faster_whisper": true}
+        }
+    """
+    import importlib.util
+
+    def installed(module: str) -> bool:
+        return importlib.util.find_spec(module) is not None
+
+    return {
+        "tts": {
+            "piper": installed("piper"),
+            "kokoro": installed("kokoro_onnx"),
+            "xtts": installed("TTS"),
+        },
+        "stt": {
+            "faster_whisper": installed("faster_whisper"),
+        },
+    }
+
+
 @router.delete("/preferences")
 async def reset_preferences(request: Request) -> dict[str, Any]:
     """Reset all persisted user preferences to defaults.

@@ -186,6 +186,39 @@ async def _sync_conversation_to_file(
         await file_manager.save(data)
 
 
+def _build_mcp_context(ctx: AppContext) -> str | None:
+    """Build a brief context block listing active MCP servers and their roots.
+
+    Injected into the system prompt so the LLM knows which MCP servers are
+    available and what directories (for filesystem) are accessible.
+
+    Args:
+        ctx: Application context with config.
+
+    Returns:
+        A markdown context block, or None if no MCP servers are configured.
+    """
+    enabled = [s for s in ctx.config.mcp.servers if s.enabled]
+    if not enabled:
+        return None
+
+    lines = ["[MCP SERVERS ATTIVI]"]
+    for srv in enabled:
+        if srv.transport == "stdio" and srv.command:
+            # Extract path args (anything starting with a drive letter or /)
+            roots = [
+                arg for arg in srv.command[1:]
+                if arg and (arg[0].isalpha() and len(arg) > 1 and arg[1] == ":" or arg.startswith("/"))
+            ]
+            root_info = f"  root permessa: {', '.join(roots)}" if roots else ""
+            lines.append(f"- {srv.name} (stdio){root_info}")
+        else:
+            url_info = f"  url: {srv.url}" if srv.url else ""
+            lines.append(f"- {srv.name} (sse){url_info}")
+    lines.append("[/MCP SERVERS ATTIVI]")
+    return "\n".join(lines)
+
+
 def _format_memory_context(
     memories: list[dict[str, Any]], max_chars: int,
 ) -> str:
@@ -406,6 +439,15 @@ async def ws_chat(websocket: WebSocket) -> None:
                         logger.warning(
                             "Memory retrieval failed: {}", exc,
                         )
+
+                # --- inject active MCP server list (Phase 11) -------------
+                mcp_ctx = _build_mcp_context(ctx)
+                if mcp_ctx:
+                    memory_context = (
+                        f"{memory_context}\n\n{mcp_ctx}"
+                        if memory_context
+                        else mcp_ctx
+                    )
 
                 # --- call LLM (streaming) ---------------------------------
                 messages = llm.build_messages(

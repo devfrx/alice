@@ -57,6 +57,9 @@ dependencies = [
     # Memory (Phase 9)
     "sqlite-vec>=0.1.6",
 
+    # MCP Client (Phase 11)
+    "mcp>=1.0",
+
     # System Info
     "psutil>=6.0",
 

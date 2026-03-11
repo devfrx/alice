@@ -10,9 +10,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
+import re
+
 import yaml
 from loguru import logger
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ---------------------------------------------------------------------------
@@ -464,6 +466,62 @@ class MemoryConfig(BaseSettings):
     """Remove memories not accessed for N days (0 = disabled)."""
 
 
+_MCP_SERVER_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,29}$")
+
+
+class McpServerConfig(BaseModel):
+    """Configuration for a single MCP server connection."""
+
+    name: str
+    """Unique identifier (lowercase_snake_case). Used in tool prefix: mcp_{name}_*."""
+
+    transport: Literal["stdio", "sse"] = "stdio"
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: str) -> str:
+        if not _MCP_SERVER_NAME_RE.match(v):
+            raise ValueError(
+                f"MCP server name '{v}' must be lowercase "
+                "alphanumeric + underscores, 1-30 chars, start with letter"
+            )
+        return v
+    """Connection transport: 'stdio' for subprocess, 'sse' for HTTP/SSE."""
+
+    command: list[str] | None = None
+    """[stdio only] Command + args to launch the MCP server subprocess."""
+
+    url: str | None = None
+    """[sse only] Full URL of the SSE endpoint."""
+
+    env: dict[str, str] = Field(default_factory=dict)
+    """Extra environment variables injected into the subprocess (stdio only)."""
+
+    enabled: bool = True
+    """Set to false to skip this server without removing it from config."""
+
+    @model_validator(mode="after")
+    def _validate_transport_fields(self) -> McpServerConfig:
+        if self.transport == "stdio" and not self.command:
+            raise ValueError(
+                f"MCP server '{self.name}': stdio transport requires 'command'"
+            )
+        if self.transport == "sse" and not self.url:
+            raise ValueError(
+                f"MCP server '{self.name}': sse transport requires 'url'"
+            )
+        return self
+
+
+class McpConfig(BaseSettings):
+    """MCP client configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_MCP__")
+
+    servers: list[McpServerConfig] = Field(default_factory=list)
+    """List of MCP servers to connect at startup. Empty by default (opt-in)."""
+
+
 # ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
@@ -506,6 +564,7 @@ class OmniaConfig(BaseSettings):
     file_search: FileSearchConfig = Field(default_factory=FileSearchConfig)
     news: NewsConfig = Field(default_factory=NewsConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    mcp: McpConfig = Field(default_factory=McpConfig)
 
     @model_validator(mode="before")
     @classmethod

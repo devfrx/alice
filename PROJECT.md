@@ -2519,14 +2519,14 @@ frontend/src/renderer/src/
 > nel `ToolRegistry` esistente e diventano disponibili all'LLM — senza modifiche
 > al flusso chat, al tool loop o a qualsiasi layer esistente.
 
-- [ ] `McpServerConfig` + `McpConfig` in `config.py` + `default.yaml` — §11.1
-- [ ] `McpSession` service (stdio + SSE transport) — §11.2
-- [ ] `McpClientPlugin` (aggregazione + dispatch) — §11.3
-- [ ] Tool namespacing `mcp_{server}_{tool}` — §11.4
-- [ ] `OmniaEvent.MCP_SERVER_CONNECTED` + `MCP_SERVER_DISCONNECTED` — §11.5
-- [ ] Dipendenza `mcp` in `pyproject.toml` — §11.6
-- [ ] File structure — §11.7
-- [ ] Test suite (2 file, 14+ test case) — §11.8
+- [x] `McpServerConfig` + `McpConfig` in `config.py` + `default.yaml` — §11.1
+- [x] `McpSession` service (stdio + SSE transport) — §11.2
+- [x] `McpClientPlugin` (aggregazione + dispatch) — §11.3
+- [x] Tool namespacing `mcp_{server}_{tool}` — §11.4
+- [x] `OmniaEvent.MCP_SERVER_CONNECTED` + `MCP_SERVER_DISCONNECTED` — §11.5
+- [x] Dipendenza `mcp` in `pyproject.toml` — §11.6
+- [x] File structure — §11.7
+- [x] Test suite (2 file, 14+ test case) — §11.8
 
 ---
 

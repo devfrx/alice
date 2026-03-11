@@ -59,6 +59,9 @@ class OmniaEvent(StrEnum):
     ERROR = "error"
     # -- Calendar --
     CALENDAR_REMINDER = "calendar.reminder"
+    # -- MCP Client (Phase 11) --
+    MCP_SERVER_CONNECTED = "mcp.server.connected"
+    MCP_SERVER_DISCONNECTED = "mcp.server.disconnected"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

@@ -8,12 +8,14 @@
 
 import { onScopeDispose, ref } from 'vue'
 import { useCalendarStore } from '../stores/calendar'
+import { useMcpStore } from '../stores/mcp'
 import { BACKEND_HOST } from '../services/api'
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
 
 export function useEventsWebSocket() {
   const isConnected = ref(false)
   const calendarStore = useCalendarStore()
+  const mcpStore = useMcpStore()
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -52,6 +54,14 @@ export function useEventsWebSocket() {
         // Forward calendar change events to the store
         if (data.type === 'calendar_changed') {
           void calendarStore.refresh()
+        }
+
+        // Refresh MCP state on server connect/disconnect
+        if (
+          data.type === 'mcp.server.connected' ||
+          data.type === 'mcp.server.disconnected'
+        ) {
+          void mcpStore.loadServers()
         }
       } catch {
         console.warn('[OMNIA Events WS] Failed to parse message')

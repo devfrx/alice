@@ -70,6 +70,7 @@ plugins:
     - file_search
     - news
     - memory
+    - mcp_client
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -184,5 +185,72 @@ memory:
   context_max_chars: 2000
   session_ttl_hours: 24
   auto_cleanup_days: 90
+
+
+# ──────────────────────────────────────────────────
+# Phase 11 — MCP Client
+# ──────────────────────────────────────────────────
+
+mcp:
+  servers:
+    - name: filesystem
+      transport: stdio
+      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "C:/Users/zagor/Desktop"]
+      enabled: true
+  # ── Plug & Play (zero config, solo Node.js/Python richiesto) ─────────────────
+  #
+  # FETCH — recupera il contenuto completo di qualsiasi URL (HTML, JSON, testo)
+  # Usa quando vuoi leggere una pagina intera, non solo cercarla.
+  # Package Python (NON npm) — richiede uvx (incluso con uv)
+    - name: fetch
+      transport: stdio
+      command: ["uvx", "mcp-server-fetch"]
+      enabled: true
+  #
+  # SEQUENTIAL THINKING — meta-tool: scompone problemi complessi in step numerati
+  # Migliora ragionamento su task multi-fase; nessun accesso esterno.
+  # - name: think
+  #   transport: stdio
+  #   command: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+  #   enabled: true
+  #
+  # SQLITE — esegui query SQL su qualsiasi file .db locale (read + write)
+  # Utile per analizzare DB personali, log strutturati, ecc.
+  # - name: sqlite
+  #   transport: stdio
+  #   command: ["npx", "-y", "@modelcontextprotocol/server-sqlite", "--db-path", "C:/Users/zagor/Desktop/dati.db"]
+  #   enabled: true
+  #
+  # PLAYWRIGHT — browser automation reale (naviga, clicca, screenshot, scraping JS)
+  # Richiede: npm install -g @playwright/mcp && npx playwright install chromium
+  # - name: browser
+  #   transport: stdio
+  #   command: ["npx", "@playwright/mcp"]
+  #   enabled: true
+  #
+  # ── Richiedono account / installazione extra ──────────────────────────────
+  #
+  # GIT — operazioni git su un repo locale (log, diff, commit, branch, ecc.)
+  # Richiede: pip install uvx  oppure  uv tool install mcp-server-git
+  # - name: git
+  #   transport: stdio
+  #   command: ["uvx", "mcp-server-git", "--repository", "C:/progetti/mio-repo"]
+  #   enabled: true
+  #
+  # GITHUB — API GitHub (issues, PR, commenti, repo search)
+  # Richiede: GITHUB_PERSONAL_ACCESS_TOKEN come env var
+  # - name: github
+  #   transport: stdio
+  #   command: ["npx", "-y", "@modelcontextprotocol/server-github"]
+  #   env:
+  #     GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_..."
+  #   enabled: true
+  #
+  # n8n MCP Server (self-hosted workflow automation)
+  # Requires: n8n running on localhost:5678 with MCP node enabled
+  # - name: n8n
+  #   transport: sse
+  #   url: "http://localhost:5678/mcp/sse"
+  #   enabled: true
 
 

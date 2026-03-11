@@ -31,6 +31,7 @@ import type {
   MemorySearchResponse,
   MemoryStats
 } from '../types/memory'
+import type { McpReconnectResponse, McpServersResponse } from '../types/mcp'
 
 /** Backend host (without /api), configurable via VITE_API_BASE_URL env var. */
 const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -409,5 +410,17 @@ export const api = {
   /** Load memory statistics. */
   getMemoryStats: (): Promise<MemoryStats> =>
     request<MemoryStats>('/memory/stats'),
+
+  // -- MCP Servers ----------------------------------------------------------
+
+  /** List all configured MCP servers with status and tools. */
+  getMcpServers: (): Promise<McpServersResponse> =>
+    request<McpServersResponse>('/mcp/servers'),
+
+  /** Reconnect a specific MCP server. */
+  reconnectMcpServer: (name: string): Promise<McpReconnectResponse> =>
+    request<McpReconnectResponse>(`/mcp/servers/${encodeURIComponent(name)}/reconnect`, {
+      method: 'POST',
+    }),
 
 }

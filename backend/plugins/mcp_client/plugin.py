@@ -100,12 +100,11 @@ class McpClientPlugin(BasePlugin):
             if session.status != ConnectionStatus.CONNECTED:
                 continue
             for tool in session.get_tools():
+                full_desc = f"[{server_name}] {tool.description}"
                 tools.append(
                     ToolDefinition(
                         name=f"mcp_{server_name}_{tool.name}",
-                        description=(
-                            f"[{server_name}] {tool.description}"
-                        ),
+                        description=full_desc[:512],
                         parameters=tool.parameters,
                     )
                 )

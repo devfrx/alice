@@ -209,20 +209,36 @@ mcp:
   #
   # SEQUENTIAL THINKING — meta-tool: scompone problemi complessi in step numerati
   # Migliora ragionamento su task multi-fase; nessun accesso esterno.
-  # - name: think
-  #   transport: stdio
-  #   command: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
-  #   enabled: true
+  #  - name: think
+  #    transport: stdio
+  #    command: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+  #    enabled: true
   #
-  # SQLITE — esegui query SQL su qualsiasi file .db locale (read + write)
-  # Utile per analizzare DB personali, log strutturati, ecc.
+  # SQLITE — query SQL sul DB di OMNIA (lettura + scrittura)
+  # Utile per analisi conversazioni, debug, query custom sull'agente.
   # - name: sqlite
   #   transport: stdio
-  #   command: ["npx", "-y", "@modelcontextprotocol/server-sqlite", "--db-path", "C:/Users/zagor/Desktop/dati.db"]
+  #   command: ["uvx", "mcp-server-sqlite", "--db-path", "C:/Users/Jays/Desktop/omnia/omnia/data/omnia.db"]
   #   enabled: true
   #
+  # MEMORY — knowledge graph persistente locale (entities + relations)
+  # Permette all'LLM di ricordare fatti, persone, preferenze tra sessioni.
+  #  - name: memory
+  #   transport: stdio
+  #   command: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+  #   env:
+  #   MEMORY_FILE_PATH: "C:/Users/Jays/Desktop/omnia/omnia/data/mcp_memory.jsonl"
+  #   enabled: true
+  #
+  # TIME — ora corrente + conversione timezone (IANA)
+  # Zero dipendenze esterne, risposta istantanea.
+    - name: time
+      transport: stdio
+      command: ["uvx", "mcp-server-time"]
+      enabled: true
+  #
   # PLAYWRIGHT — browser automation reale (naviga, clicca, screenshot, scraping JS)
-  # Richiede: npm install -g @playwright/mcp && npx playwright install chromium
+  # Prima di abilitare: npx playwright install chromium
   # - name: browser
   #   transport: stdio
   #   command: ["npx", "@playwright/mcp"]
@@ -231,10 +247,10 @@ mcp:
   # ── Richiedono account / installazione extra ──────────────────────────────
   #
   # GIT — operazioni git su un repo locale (log, diff, commit, branch, ecc.)
-  # Richiede: pip install uvx  oppure  uv tool install mcp-server-git
+  # Richiede: uv tool install mcp-server-git
   # - name: git
   #   transport: stdio
-  #   command: ["uvx", "mcp-server-git", "--repository", "C:/progetti/mio-repo"]
+  #   command: ["uvx", "mcp-server-git", "--repository", "C:/Users/Jays/Desktop/omnia"]
   #   enabled: true
   #
   # GITHUB — API GitHub (issues, PR, commenti, repo search)

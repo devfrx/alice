@@ -121,6 +121,11 @@
         <McpManager />
       </section>
 
+      <!-- Knowledge Graph -->
+      <section :ref="(el) => setSectionRef('knowledge', el)" id="section-knowledge" class="sv__section">
+        <KnowledgeGraphManager />
+      </section>
+
       <!-- Memory -->
       <section :ref="(el) => setSectionRef('memory', el)" id="section-memory" class="sv__section">
         <MemoryManager />
@@ -197,13 +202,14 @@ import ModelManager from '../components/settings/ModelManager.vue'
 import VoiceSettings from '../components/voice/VoiceSettings.vue'
 import PluginManagement from '../components/settings/PluginManagement.vue'
 import McpManager from '../components/settings/McpManager.vue'
+import KnowledgeGraphManager from '../components/settings/KnowledgeGraphManager.vue'
 import MemoryManager from '../components/settings/MemoryManager.vue'
 import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
 
 /* ── Navigation ─────────────────────────────────────────────── */
-type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'mcp' | 'memory' | 'security' | 'ui'
+type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'mcp' | 'knowledge' | 'memory' | 'security' | 'ui'
 
 const navItems: { id: SectionId; label: string; icon: string }[] = [
   { id: 'model', label: 'Modello', icon: '<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>' },
@@ -211,6 +217,7 @@ const navItems: { id: SectionId; label: string; icon: string }[] = [
   { id: 'voice', label: 'Voce', icon: '<path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>' },
   { id: 'plugins', label: 'Plugin', icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>' },
   { id: 'mcp', label: 'Server MCP', icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>' },
+  { id: 'knowledge', label: 'Knowledge Graph', icon: '<circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="5" y1="19" x2="19" y2="19"/>' },
   { id: 'memory', label: 'Memoria', icon: '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>' },
   { id: 'security', label: 'Sicurezza', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
   { id: 'ui', label: 'Interfaccia', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' },
@@ -219,7 +226,7 @@ const navItems: { id: SectionId; label: string; icon: string }[] = [
 const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
-  model: null, llm: null, voice: null, plugins: null, mcp: null, memory: null, security: null, ui: null,
+  model: null, llm: null, voice: null, plugins: null, mcp: null, knowledge: null, memory: null, security: null, ui: null,
 })
 
 function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null) {

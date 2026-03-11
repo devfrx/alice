@@ -32,6 +32,15 @@ import type {
   MemoryStats
 } from '../types/memory'
 import type { McpReconnectResponse, McpServersResponse } from '../types/mcp'
+import type {
+  AddObservationsPayload,
+  CreateEntitiesPayload,
+  CreateRelationsPayload,
+  DeleteEntitiesPayload,
+  DeleteObservationsPayload,
+  DeleteRelationsPayload,
+  KGGraph
+} from '../types/mcpMemory'
 
 /** Backend host (without /api), configurable via VITE_API_BASE_URL env var. */
 const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -430,6 +439,68 @@ export const api = {
   reconnectMcpServer: (name: string): Promise<McpReconnectResponse> =>
     request<McpReconnectResponse>(`/mcp/servers/${encodeURIComponent(name)}/reconnect`, {
       method: 'POST',
+    }),
+
+  // -- MCP Memory (Knowledge Graph) ----------------------------------------
+
+  /** Read the entire knowledge graph. */
+  getKnowledgeGraph: (): Promise<KGGraph> =>
+    request<KGGraph>('/mcp/memory/graph'),
+
+  /** Search the knowledge graph by query. */
+  searchKnowledgeGraph: (query: string): Promise<KGGraph> =>
+    request<KGGraph>('/mcp/memory/search', {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    }),
+
+  /** Retrieve specific entities by name. */
+  openKnowledgeNodes: (names: string[]): Promise<KGGraph> =>
+    request<KGGraph>('/mcp/memory/nodes', {
+      method: 'POST',
+      body: JSON.stringify({ names }),
+    }),
+
+  /** Create new entities. */
+  createKGEntities: (payload: CreateEntitiesPayload): Promise<KGGraph> =>
+    request<KGGraph>('/mcp/memory/entities', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  /** Delete entities and their relations. */
+  deleteKGEntities: (payload: DeleteEntitiesPayload): Promise<unknown> =>
+    request<unknown>('/mcp/memory/entities', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    }),
+
+  /** Create relations between entities. */
+  createKGRelations: (payload: CreateRelationsPayload): Promise<KGGraph> =>
+    request<KGGraph>('/mcp/memory/relations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  /** Delete specific relations. */
+  deleteKGRelations: (payload: DeleteRelationsPayload): Promise<unknown> =>
+    request<unknown>('/mcp/memory/relations', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    }),
+
+  /** Add observations to existing entities. */
+  addKGObservations: (payload: AddObservationsPayload): Promise<unknown> =>
+    request<unknown>('/mcp/memory/observations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  /** Remove specific observations from entities. */
+  deleteKGObservations: (payload: DeleteObservationsPayload): Promise<unknown> =>
+    request<unknown>('/mcp/memory/observations', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
     }),
 
 }

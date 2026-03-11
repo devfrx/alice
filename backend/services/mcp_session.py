@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import traceback
 from typing import Any
 
 from loguru import logger
@@ -69,8 +70,13 @@ class McpSession:
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        # Clean up the waiter future if the background task finished first.
+        # If wait_ready finished first (normal case), self._task is in pending.
+        # We must NOT cancel it — it is the live session task that must keep running.
+        # Only cancel wait_ready if the background task crashed first.
         for fut in pending:
+            if fut is self._task:
+                # Keep the session task alive.
+                continue
             fut.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await fut
@@ -153,6 +159,39 @@ class McpSession:
         return self._config.name
 
     # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _log_exception(self, exc: BaseException, depth: int = 0) -> None:
+        """Recursively log all leaf exceptions inside an ExceptionGroup.
+
+        Anyio's TaskGroup wraps task errors in ``ExceptionGroup``; this
+        unwraps every level and logs each leaf error with its full
+        traceback so the root cause is always visible in the logs.
+        """
+        indent = "  " * depth
+        if hasattr(exc, "exceptions") and exc.exceptions:  # ExceptionGroup
+            logger.warning(
+                "{}MCP '{}' TaskGroup error ({}): {}",
+                indent,
+                self._config.name,
+                type(exc).__name__,
+                exc,
+            )
+            for sub in exc.exceptions:
+                self._log_exception(sub, depth + 1)
+        else:
+            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            logger.warning(
+                "{}MCP '{}' exception — {}: {}\n{}",
+                indent,
+                self._config.name,
+                type(exc).__name__,
+                exc,
+                tb,
+            )
+
+    # ------------------------------------------------------------------
     # Background task
     # ------------------------------------------------------------------
 
@@ -216,7 +255,9 @@ class McpSession:
                 self._cached_tools = [
                     ToolDefinition(
                         name=tool.name,
-                        description=tool.description or "",
+                        # MCP servers can have very long descriptions; truncate to
+                        # the 1024-char limit enforced by ToolDefinition.validate().
+                        description=(tool.description or "")[:1024],
                         parameters=(
                             tool.inputSchema
                             if tool.inputSchema
@@ -239,13 +280,18 @@ class McpSession:
                 # All context managers above are exited inside this task.
                 await self._stop_event.wait()
 
+        except asyncio.CancelledError:
+            # Normal shutdown: the task was cancelled cleanly (stop() or
+            # server/app shutdown).  Do not treat this as a connection error.
+            self._status = ConnectionStatus.DISCONNECTED
+            raise  # re-raise so asyncio marks the task as cancelled
+
         except Exception as exc:
             self._init_error = exc
             self._status = ConnectionStatus.ERROR
             # Unblock start() so it can raise the error.
-            self._ready_event.set()
-            logger.warning(
-                "MCP session '{}' task failed: {}",
-                self._config.name,
-                exc,
-            )
+            if self._ready_event is not None:
+                self._ready_event.set()
+            # Recursively unwrap ExceptionGroup (anyio TaskGroup errors) and
+            # log every leaf exception with its full traceback.
+            self._log_exception(exc)

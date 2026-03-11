@@ -165,16 +165,20 @@ class SystemInfoPlugin(BasePlugin):
 
         start = time.perf_counter()
 
-        if tool_name == "get_system_info":
-            data = await asyncio.to_thread(self._collect_system_info)
-        elif tool_name == "get_process_list":
-            filter_name: str | None = args.get("filter_name")
-            max_results: int = args.get("max_results", 50)
-            data = await asyncio.to_thread(
-                self._collect_process_list, filter_name, max_results,
-            )
-        else:
-            return ToolResult.error(f"Unknown tool: {tool_name}")
+        try:
+            if tool_name == "get_system_info":
+                data = await asyncio.to_thread(self._collect_system_info)
+            elif tool_name == "get_process_list":
+                filter_name: str | None = args.get("filter_name")
+                max_results: int = args.get("max_results", 50)
+                data = await asyncio.to_thread(
+                    self._collect_process_list, filter_name, max_results,
+                )
+            else:
+                return ToolResult.error(f"Unknown tool: {tool_name}")
+        except Exception as exc:
+            self.logger.error("Tool {} failed: {}", tool_name, exc)
+            return ToolResult.error(str(exc))
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         return ToolResult.ok(

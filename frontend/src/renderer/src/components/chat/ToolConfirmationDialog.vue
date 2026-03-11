@@ -71,6 +71,10 @@ onMounted(() => {
         if (remainingSeconds.value > 0) {
             remainingSeconds.value--
         } else {
+            if (timerInterval) {
+                clearInterval(timerInterval)
+                timerInterval = null
+            }
             emit('respond', props.confirmation.executionId, false)
         }
     }, 1000)

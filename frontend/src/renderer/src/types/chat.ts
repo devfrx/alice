@@ -43,7 +43,7 @@ export interface ChatMessage {
   tool_call_id: string | null
   created_at: string
   thinking_content?: string | null
-  attachments?: FileAttachment[]
+  attachments?: FileAttachment[] | null
 }
 
 // ---------------------------------------------------------------------------

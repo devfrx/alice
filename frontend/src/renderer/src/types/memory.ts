@@ -16,7 +16,7 @@ export interface MemoryEntry {
   content: string
   scope: 'long_term' | 'session' | 'user_fact'
   category: string | null
-  source: 'llm' | 'user' | 'plugin'
+  source: 'llm' | 'user' | 'plugin' | null
   created_at: string
   expires_at: string | null
   conversation_id: string | null

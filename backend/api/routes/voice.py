@@ -229,10 +229,12 @@ async def ws_voice(websocket: WebSocket) -> None:
                 wav_bytes = wav_buf.getvalue()
 
                 # Offload STT to a task so the WS loop stays responsive
-                async def _run_stt(wav_data: bytes, sid: str) -> None:
+                async def _run_stt(
+                    wav_data: bytes, sid: str, stt_svc: object,
+                ) -> None:
                     try:
                         await ctx.event_bus.emit(OmniaEvent.STT_STARTED, session_id=sid)
-                        result = await stt.transcribe(wav_data)
+                        result = await stt_svc.transcribe(wav_data)
                         logger.debug(
                             "STT result: text={!r} lang={} conf={:.3f} dur={:.1f}s",
                             result.text, result.language,
@@ -268,7 +270,7 @@ async def ws_voice(websocket: WebSocket) -> None:
                             "message": f"Transcription failed: {type(exc).__name__}",
                         })
 
-                asyncio.create_task(_run_stt(wav_bytes, session_id))
+                asyncio.create_task(_run_stt(wav_bytes, session_id, stt))
 
             elif msg_type == "tts_speak":
                 text = data.get("text", "").strip()

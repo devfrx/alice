@@ -55,20 +55,27 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Whether tool definitions are sent to the LLM. */
   const toolsEnabled = ref<boolean>(true)
 
+  /** Guard flag: skip watchers while loading from backend. */
+  let _loadingToggles = false
+
   watch(toolConfirmations, (val) => {
+    if (_loadingToggles) return
     api.setToolConfirmations(val).catch(console.error)
   })
 
   watch(systemPromptEnabled, (val) => {
+    if (_loadingToggles) return
     api.setSystemPrompt(val).catch(console.error)
   })
 
   watch(toolsEnabled, (val) => {
+    if (_loadingToggles) return
     api.setTools(val).catch(console.error)
   })
 
   /** Load toggle states from the backend (persisted preferences). */
   async function loadToggles(): Promise<void> {
+    _loadingToggles = true
     try {
       const [tc, sp, t] = await Promise.all([
         api.getToolConfirmations(),
@@ -80,6 +87,8 @@ export const useSettingsStore = defineStore('settings', () => {
       toolsEnabled.value = t.tools_enabled
     } catch (err) {
       console.warn('[settings store] loadToggles failed:', err)
+    } finally {
+      _loadingToggles = false
     }
   }
 
@@ -88,6 +97,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Load settings from the backend. */
   async function loadSettings(): Promise<void> {
+    _loadingSettings = true
     try {
       const config = await api.getConfig()
       if (config.llm) {
@@ -114,6 +124,8 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     } catch (err) {
       console.warn('[settings store] loadSettings failed:', err)
+    } finally {
+      _loadingSettings = false
     }
   }
 
@@ -127,7 +139,7 @@ export const useSettingsStore = defineStore('settings', () => {
           max_tool_iterations: settings.value.llm.maxToolIterations
         },
         stt: {
-          language: settings.value.stt.language || null,
+          ...(settings.value.stt.language ? { language: settings.value.stt.language } : {}),
           model: settings.value.stt.model
         },
         tts: {
@@ -145,7 +157,10 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  /** Guard flag: skip deep watcher while loading from backend. */
+  let _loadingSettings = false
   watch(settings, () => {
+    if (_loadingSettings) return
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => saveSettings(), 1000)
   }, { deep: true })

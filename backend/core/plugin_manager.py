@@ -263,6 +263,26 @@ class PluginManager:
                 else:
                     importlib.import_module(module_path)
 
+                # Also reload __init__.py so PLUGIN_REGISTRY is updated
+                init_path = f"backend.plugins.{name}"
+                init_module = sys.modules.get(init_path)
+                if init_module is not None:
+                    importlib.reload(init_module)
+
+                # Fallback: scan reloaded module for BasePlugin subclass
+                if name not in PLUGIN_REGISTRY:
+                    reloaded = sys.modules.get(module_path)
+                    if reloaded is not None:
+                        for attr_name in dir(reloaded):
+                            attr = getattr(reloaded, attr_name)
+                            if (
+                                inspect.isclass(attr)
+                                and issubclass(attr, BasePlugin)
+                                and attr is not BasePlugin
+                            ):
+                                PLUGIN_REGISTRY[name] = attr
+                                break
+
                 # Re-read the class from the registry
                 plugin_cls = PLUGIN_REGISTRY.get(name)
                 if plugin_cls is None:

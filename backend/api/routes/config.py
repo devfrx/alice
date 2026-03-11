@@ -214,6 +214,14 @@ async def update_config(request: Request) -> dict[str, Any]:
             if not (1 <= mti <= 100):
                 raise HTTPException(400, "max_tool_iterations must be between 1 and 100")
             object.__setattr__(cfg.llm, "max_tool_iterations", mti)
+        if "supports_thinking" in llm_updates:
+            if not isinstance(llm_updates["supports_thinking"], bool):
+                raise HTTPException(400, "supports_thinking must be a boolean")
+            object.__setattr__(cfg.llm, "supports_thinking", llm_updates["supports_thinking"])
+        if "supports_vision" in llm_updates:
+            if not isinstance(llm_updates["supports_vision"], bool):
+                raise HTTPException(400, "supports_vision must be a boolean")
+            object.__setattr__(cfg.llm, "supports_vision", llm_updates["supports_vision"])
 
     if "ui" in body:
         ui_updates = body["ui"]
@@ -237,12 +245,19 @@ async def update_config(request: Request) -> dict[str, Any]:
                 raise HTTPException(400, "stt.enabled must be a boolean")
             object.__setattr__(cfg.stt, "enabled", stt_updates["enabled"])
         if "language" in stt_updates:
-            lang = str(stt_updates["language"]).strip()
-            if not lang or len(lang) > 10:
-                raise HTTPException(
-                    400, "language must be a non-empty string (max 10 chars)",
-                )
-            object.__setattr__(cfg.stt, "language", lang)
+            raw_lang = stt_updates["language"]
+            if raw_lang is None or (
+                isinstance(raw_lang, str) and not raw_lang.strip()
+            ):
+                object.__setattr__(cfg.stt, "language", None)
+            else:
+                lang = str(raw_lang).strip()
+                if not lang or len(lang) > 10:
+                    raise HTTPException(
+                        400,
+                        "language must be a non-empty string (max 10 chars)",
+                    )
+                object.__setattr__(cfg.stt, "language", lang)
         if "model" in stt_updates:
             model = str(stt_updates["model"]).strip()
             if not model or len(model) > 64:

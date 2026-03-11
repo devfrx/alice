@@ -171,6 +171,8 @@ class MemoryService:
             logger.debug("MemoryService already initialised, skipping")
             return
 
+        self._closed = False
+
         db_path = Path(self._config.db_path)
         if not db_path.is_absolute():
             db_path = PROJECT_ROOT / db_path

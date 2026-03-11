@@ -5,6 +5,11 @@
  * exponential back-off, and clean teardown via {@link disconnect}.
  */
 
+import { BACKEND_HOST } from './api'
+
+/** Default chat WebSocket URL derived from the backend host. */
+const DEFAULT_CHAT_WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/ws/chat`
+
 /** Callback signature for all WebSocket events. */
 type MessageHandler = (data: unknown) => void
 
@@ -33,7 +38,7 @@ export class WebSocketManager {
   /** Timer for draining the send queue. */
   private drainTimer: ReturnType<typeof setTimeout> | null = null
 
-  constructor(url: string = 'ws://localhost:8000/api/ws/chat') {
+  constructor(url: string = DEFAULT_CHAT_WS_URL) {
     this.url = url
   }
 

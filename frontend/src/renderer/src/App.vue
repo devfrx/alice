@@ -17,7 +17,7 @@ import { usePluginsStore } from './stores/plugins'
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
 
-// Persistent WebSocket for real-time task events from backend.
+// Persistent WebSocket for real-time calendar and backend events.
 useEventsWebSocket()
 
 const settingsStore = useSettingsStore()

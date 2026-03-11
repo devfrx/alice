@@ -115,7 +115,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="rootRef" class="model-selector">
     <!-- Trigger button -->
-    <button class="model-selector__trigger" aria-haspopup="listbox" :aria-expanded="isOpen" @click="toggle"
+    <button class="model-selector__trigger" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle"
       @keydown="handleKeydown">
       <!-- Warning icon only when LM Studio is disconnected -->
       <svg v-if="!settingsStore.lmStudioConnected" class="model-selector__warn-icon" title="LM Studio disconnesso"
@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
 
     <!-- Dropdown -->
     <Transition name="dropdown">
-      <div v-if="isOpen" ref="dropdownRef" class="model-selector__dropdown" role="listbox">
+      <div v-if="isOpen" ref="dropdownRef" class="model-selector__dropdown" role="group">
         <!-- Error -->
         <div v-if="errorMessage" class="model-selector__error">
           {{ errorMessage }}
@@ -180,10 +180,10 @@ onBeforeUnmount(() => {
               <span class="model-selector__section-dot model-selector__section-dot--loaded" />
               Caricati ({{ loadedModels.length }})
             </div>
-            <button v-for="model in loadedModels" :key="'loaded-' + model.name" class="model-selector__item" :class="{
+            <div v-for="model in loadedModels" :key="'loaded-' + model.name" class="model-selector__item" :class="{
               'model-selector__item--loaded': true,
               'model-selector__item--busy': isModelBusy(model)
-            }" :disabled="settingsStore.isAnyOperationInProgress">
+            }" :aria-disabled="settingsStore.isAnyOperationInProgress || undefined">
               <!-- Left accent bar for loaded models -->
               <span v-if="model.loaded" class="model-selector__accent-bar" />
 
@@ -265,7 +265,7 @@ onBeforeUnmount(() => {
                 <div class="model-selector__load-progress-bar" />
                 <span class="model-selector__load-progress-text">Caricamento in corso...</span>
               </div>
-            </button>
+            </div>
           </template>
 
           <!-- Divider between sections -->
@@ -277,9 +277,9 @@ onBeforeUnmount(() => {
               <span class="model-selector__section-dot model-selector__section-dot--available" />
               Disponibili ({{ availableModels.length }})
             </div>
-            <button v-for="model in availableModels" :key="'avail-' + model.name" class="model-selector__item" :class="{
+            <div v-for="model in availableModels" :key="'avail-' + model.name" class="model-selector__item" :class="{
               'model-selector__item--busy': isModelBusy(model)
-            }" :disabled="settingsStore.isAnyOperationInProgress">
+            }" :aria-disabled="settingsStore.isAnyOperationInProgress || undefined">
               <span class="model-selector__item-left">
                 <span class="model-selector__load-dot model-selector__load-dot--unloaded" title="Non caricato" />
                 <span class="model-selector__item-name">
@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
                 <div class="model-selector__load-progress-bar" />
                 <span class="model-selector__load-progress-text">Caricamento in corso...</span>
               </div>
-            </button>
+            </div>
           </template>
         </template>
       </div>

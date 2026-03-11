@@ -14,6 +14,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+from backend.core.plugin_models import (
+    ConnectionStatus,
+    ExecutionContext,
+    ToolDefinition,
+    ToolResult,
+)
+
 if TYPE_CHECKING:
     from backend.core.config import OmniaConfig
 
@@ -69,7 +76,7 @@ class LLMServiceProtocol(Protocol):
 # ---------------------------------------------------------------------------
 
 
-class TranscriptionResult(Protocol):
+class TranscriptResult(Protocol):
     """Result returned by STT transcription."""
 
     text: str
@@ -94,8 +101,8 @@ class STTServiceProtocol(Protocol):
 
     async def transcribe(
         self, audio_data: bytes, sample_rate: int = 16000,
-    ) -> TranscriptionResult:
-        """Transcribe audio bytes, returning a TranscriptionResult."""
+    ) -> TranscriptResult:
+        """Transcribe audio bytes, returning a TranscriptResult."""
         ...
 
 
@@ -158,7 +165,7 @@ class PluginManagerProtocol(Protocol):
     async def startup(self) -> None: ...
     async def shutdown(self) -> None: ...
     async def health_check(self) -> bool: ...
-    async def check_health(self) -> dict[str, Any]: ...
+    async def check_health(self) -> dict[str, ConnectionStatus]: ...
     async def load_plugin(self, name: str) -> bool: ...
     async def unload_plugin(self, name: str) -> bool: ...
     async def reload_plugin(self, name: str) -> bool: ...
@@ -166,7 +173,7 @@ class PluginManagerProtocol(Protocol):
     def get_all_plugins(self) -> dict[str, Any]: ...
     def get_loaded_plugin_names(self) -> list[str]: ...
     def discover_available_plugins(self) -> dict[str, Any]: ...
-    async def get_all_status(self) -> dict[str, Any]: ...
+    async def get_all_status(self) -> dict[str, ConnectionStatus]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -181,11 +188,17 @@ class ToolRegistryProtocol(Protocol):
     def get_all_tools(self) -> list[dict[str, Any]]: ...
     async def get_available_tools(self) -> list[dict[str, Any]]: ...
     async def execute_tool(
-        self, tool_name: str, args: dict, context: Any,
-    ) -> Any: ...
+        self, tool_name: str, args: dict[str, Any], context: ExecutionContext,
+    ) -> ToolResult: ...
     async def refresh(self) -> None: ...
     def get_tool_plugin(self, tool_name: str) -> str | None: ...
-    def get_tool_definition(self, tool_name: str) -> Any: ...
+    def get_tool_definition(self, tool_name: str) -> ToolDefinition | None: ...
+    def limit_tools(
+        self,
+        tools: list[dict[str, Any]],
+        max_tools: int,
+        priority_plugins: list[str] | None = None,
+    ) -> list[dict[str, Any]]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +341,10 @@ class PreferencesServiceProtocol(Protocol):
 @runtime_checkable
 class MemoryServiceProtocol(Protocol):
     """Protocol for the persistent semantic memory service."""
+
+    async def initialize(self) -> None:
+        """Open DB, load extensions, create tables, start cleanup."""
+        ...
 
     async def add(
         self,

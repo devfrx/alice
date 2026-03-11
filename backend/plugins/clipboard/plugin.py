@@ -126,11 +126,15 @@ class ClipboardPlugin(BasePlugin):
         if not _PYPERCLIP_AVAILABLE:
             return ToolResult.error("pyperclip not installed")
 
-        if tool_name == "get_clipboard":
-            return await self._get_clipboard()
-        if tool_name == "set_clipboard":
-            return await self._set_clipboard(args)
-        return ToolResult.error(f"Unknown tool: {tool_name}")
+        try:
+            if tool_name == "get_clipboard":
+                return await self._get_clipboard()
+            if tool_name == "set_clipboard":
+                return await self._set_clipboard(args)
+            return ToolResult.error(f"Unknown tool: {tool_name}")
+        except Exception as exc:
+            self.logger.error("Tool {} failed: {}", tool_name, exc)
+            return ToolResult.error(str(exc))
 
     # -- Dependency / health -----------------------------------------------
 

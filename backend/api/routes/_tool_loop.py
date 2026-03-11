@@ -384,6 +384,12 @@ async def run_tool_loop(
             if ctx.tool_registry and _tools_enabled
             else None
         )
+        if tools and ctx.config.llm.max_tools > 0 and ctx.tool_registry:
+            tools = ctx.tool_registry.limit_tools(
+                tools,
+                max_tools=ctx.config.llm.max_tools,
+                priority_plugins=ctx.config.llm.priority_plugins,
+            )
         if tools is not None and len(tools) == 0:
             tools = None  # empty list confuses some LLMs
 
@@ -526,10 +532,10 @@ async def _request_confirmation(
         "reasoning": reasoning,
     })
 
-    deadline = asyncio.get_event_loop().time() + timeout_s
+    deadline = asyncio.get_running_loop().time() + timeout_s
     try:
         while True:
-            remaining = deadline - asyncio.get_event_loop().time()
+            remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
                 raise asyncio.TimeoutError
             raw = await asyncio.wait_for(

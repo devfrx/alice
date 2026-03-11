@@ -11,6 +11,7 @@
 
 import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref, type ShallowRef } from 'vue'
 
+import { BACKEND_HOST } from '../services/api'
 import { WebSocketManager } from '../services/ws'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
@@ -48,10 +49,7 @@ function createWorkletUrl(): string {
 // ---------------------------------------------------------------------------
 
 function getVoiceWsUrl(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = window.location.hostname || 'localhost'
-  const port = '8000'
-  return `${protocol}//${host}:${port}/api/voice/ws/voice`
+  return `${BACKEND_HOST.replace(/^http/, 'ws')}/api/voice/ws/voice`
 }
 
 const voiceWs = new WebSocketManager(getVoiceWsUrl())

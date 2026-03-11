@@ -216,16 +216,21 @@ class NotificationsPlugin(BasePlugin):
         """
         start = time.perf_counter()
 
-        if tool_name == "send_notification":
-            result = await self._tool_send_notification(args)
-        elif tool_name == "set_timer":
-            result = await self._tool_set_timer(args)
-        elif tool_name == "cancel_timer":
-            result = await self._tool_cancel_timer(args)
-        elif tool_name == "list_active_timers":
-            result = await self._tool_list_active_timers()
-        else:
-            return ToolResult.error(f"Unknown tool: {tool_name}")
+        try:
+            if tool_name == "send_notification":
+                result = await self._tool_send_notification(args)
+            elif tool_name == "set_timer":
+                result = await self._tool_set_timer(args)
+            elif tool_name == "cancel_timer":
+                result = await self._tool_cancel_timer(args)
+            elif tool_name == "list_active_timers":
+                result = await self._tool_list_active_timers()
+            else:
+                return ToolResult.error(f"Unknown tool: {tool_name}")
+        except Exception as exc:
+            elapsed = (time.perf_counter() - start) * 1000
+            self.logger.error("Tool '{}' failed: {}", tool_name, exc)
+            return ToolResult.error(str(exc), execution_time_ms=elapsed)
 
         result.execution_time_ms = (time.perf_counter() - start) * 1000
         return result
@@ -317,7 +322,9 @@ class NotificationsPlugin(BasePlugin):
         if self._timer_manager is None:
             return ToolResult.error("Timer manager not initialised")
 
-        timer_id: str = args["timer_id"]
+        timer_id: str = args.get("timer_id", "")
+        if not timer_id:
+            return ToolResult.error("Missing required parameter: timer_id")
         cancelled = await self._timer_manager.cancel_timer(timer_id)
         if cancelled:
             return ToolResult.ok(f"Timer '{timer_id}' cancelled")

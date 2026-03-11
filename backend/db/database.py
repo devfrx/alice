@@ -105,8 +105,6 @@ async def init_db(engine: AsyncEngine) -> None:
         ("messages", "thinking_content", "TEXT"),
         ("messages", "tool_calls", "TEXT"),
         ("messages", "tool_call_id", "VARCHAR(64)"),
-        ("agent_tasks", "time_utc", "VARCHAR(5)"),
-        ("agent_tasks", "time_local", "VARCHAR(5)"),
     ]
 
     async with engine.begin() as conn:
@@ -126,69 +124,4 @@ async def init_db(engine: AsyncEngine) -> None:
                 )
                 logger.info("Added missing column {}.{}", table, column)
 
-    # -- SQLite CHECK constraint migration for agent_tasks ------------------
-    # SQLite doesn't support ALTER TABLE DROP/ADD CONSTRAINT, so we must
-    # recreate the table to update ck_task_trigger_type to include 'daily_at'.
-    await _migrate_agent_tasks_trigger_constraint(engine)
 
-
-async def _migrate_agent_tasks_trigger_constraint(
-    engine: AsyncEngine,
-) -> None:
-    """Recreate agent_tasks table if CHECK constraint is outdated.
-
-    SQLite CHECK constraints are embedded in the CREATE TABLE DDL and
-    cannot be altered.  This migration detects the old constraint
-    (missing 'daily_at') by inspecting the table's SQL definition,
-    then rebuilds the table using SQLite's recommended 12-step process.
-    """
-    async with engine.begin() as conn:
-        # Check if the table exists and has the old constraint
-        result = await conn.execute(
-            sa.text(
-                "SELECT sql FROM sqlite_master "
-                "WHERE type='table' AND name='agent_tasks'"
-            )
-        )
-        row = result.first()
-        if row is None:
-            return  # Table doesn't exist yet; create_all will handle it
-
-        table_sql: str = row[0]
-        if "daily_at" in table_sql:
-            return  # Already has the new constraint
-
-        logger.info(
-            "Migrating agent_tasks table to add 'daily_at' trigger type..."
-        )
-
-        # SQLite table rebuild: rename → create new → copy → drop old
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_tasks RENAME TO _agent_tasks_old"
-        ))
-
-        # Let SQLModel create the new table with updated constraints
-        await conn.run_sync(
-            lambda sync_conn: SQLModel.metadata.tables["agent_tasks"].create(
-                sync_conn,
-            )
-        )
-
-        # Copy all existing data (time_utc will be NULL for old rows)
-        await conn.execute(sa.text("""
-            INSERT INTO agent_tasks (
-                id, prompt, trigger_type, run_at, interval_seconds, time_utc,
-                next_run_at, max_runs, status, run_count, last_run_at,
-                result_summary, error_message, conversation_id,
-                created_at, updated_at
-            )
-            SELECT
-                id, prompt, trigger_type, run_at, interval_seconds, time_utc,
-                next_run_at, max_runs, status, run_count, last_run_at,
-                result_summary, error_message, conversation_id,
-                created_at, updated_at
-            FROM _agent_tasks_old
-        """))
-
-        await conn.execute(sa.text("DROP TABLE _agent_tasks_old"))
-        logger.info("agent_tasks table migrated successfully")

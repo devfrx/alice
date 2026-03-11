@@ -93,7 +93,12 @@ export function useEventsWebSocket() {
   }
 
   function scheduleReconnect(): void {
-    if (reconnectAttempts >= 10) return
+    if (reconnectAttempts >= 10) {
+      // Reset and retry after a long delay (30s) to recover from extended outages.
+      reconnectAttempts = 0
+      reconnectTimer = setTimeout(() => connect(), 30_000)
+      return
+    }
     const delay = Math.min(1000 * 2 ** reconnectAttempts, 30_000)
     reconnectAttempts += 1
     reconnectTimer = setTimeout(() => {

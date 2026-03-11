@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
-import json
 import re
 from typing import Any
 
@@ -415,7 +414,7 @@ async def exec_get_active_window() -> str:
     return await asyncio.to_thread(_get_window)
 
 
-async def exec_get_running_apps() -> str:
+async def exec_get_running_apps() -> list[dict[str, str]]:
     """Get list of running applications with visible windows.
 
     Uses ``tasklist /FO CSV /NH /V`` whose columns are:
@@ -426,7 +425,7 @@ async def exec_get_running_apps() -> str:
     deduplicated by name, limited to 50 entries.
 
     Returns:
-        JSON string of the application list.
+        List of application dicts with name, pid and window_title.
     """
     output = await safe_subprocess("tasklist", ["/FO", "CSV", "/NH", "/V"], timeout=15)
 
@@ -450,7 +449,7 @@ async def exec_get_running_apps() -> str:
         if len(apps) >= 50:
             break
 
-    return json.dumps(apps)
+    return apps
 
 
 async def exec_command(command: str) -> str:

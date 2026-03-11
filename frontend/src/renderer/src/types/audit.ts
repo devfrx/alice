@@ -7,7 +7,7 @@ export interface AuditConfirmationEntry {
   execution_id: string
   tool_name: string
   args_json: string
-  risk_level: 'safe' | 'low' | 'medium' | 'dangerous' | 'forbidden'
+  risk_level: 'safe' | 'medium' | 'dangerous' | 'forbidden'
   user_approved: boolean
   rejection_reason: string | null
   thinking_content: string | null

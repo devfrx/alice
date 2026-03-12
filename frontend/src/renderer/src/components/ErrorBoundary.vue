@@ -58,9 +58,9 @@ function retry(): void {
     justify-content: center;
     gap: var(--space-2);
     padding: var(--space-6);
-    border: 1px dashed var(--border);
+    border: 1px solid var(--danger-border);
     border-radius: var(--radius-md);
-    background: var(--danger-faint);
+    background: var(--surface-1);
     text-align: center;
 }
 
@@ -85,17 +85,19 @@ function retry(): void {
 .error-boundary__retry {
     margin-top: var(--space-2);
     padding: var(--space-1-5) var(--space-4);
-    border: 1px solid var(--accent-border);
-    border-radius: var(--radius-md);
-    background: var(--accent-dim);
-    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
     font-size: var(--text-base);
     cursor: pointer;
-    transition: background var(--transition-normal);
+    transition: all var(--transition-fast);
 }
 
 .error-boundary__retry:hover {
-    background: var(--accent-strong);
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
 }
 
 .error-boundary__retry:focus-visible {

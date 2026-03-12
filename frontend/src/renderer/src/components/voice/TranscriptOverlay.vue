@@ -103,15 +103,12 @@ function handleDismiss(): void {
   right: 0;
   margin-bottom: 10px;
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: rgba(19, 22, 28, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.03),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
   z-index: 10;
 }
 
@@ -119,13 +116,13 @@ function handleDismiss(): void {
 .to__processing {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
   font-size: var(--text-base);
   color: var(--text-secondary);
 }
 
 .to__recording {
-  color: #e74c3c;
+  color: var(--listening);
 }
 
 .to__bars {
@@ -141,7 +138,6 @@ function handleDismiss(): void {
   border-radius: 1.5px;
   background: currentColor;
   transition: height 0.08s ease;
-  box-shadow: 0 0 4px rgba(231, 76, 60, 0.3);
 }
 
 .to__label {
@@ -152,32 +148,31 @@ function handleDismiss(): void {
 .to__duration {
   font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
-  opacity: 0.6;
+  opacity: var(--opacity-soft);
   font-weight: var(--weight-medium);
 }
 
 .to__dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: #e74c3c;
-  box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+  border-radius: var(--radius-full);
+  background: var(--listening);
   animation: dotPulse 1.2s ease-in-out infinite;
 }
 
 .to__spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(201, 168, 76, 0.2);
+  border: 2px solid var(--thinking-dim);
   border-top-color: var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 0.8s linear infinite;
 }
 
 .to__result {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .to__text {
@@ -185,56 +180,52 @@ function handleDismiss(): void {
   font-size: var(--text-md);
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
-  letter-spacing: 0.01em;
-  animation: textReveal 0.3s ease both;
+  animation: textReveal var(--duration-moderate) ease both;
 }
 
 .to__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   justify-content: flex-end;
 }
 
 .to__btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 14px;
+  gap: var(--space-1);
+  padding: var(--space-1-5) var(--space-3);
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  transition: background var(--transition-fast);
   letter-spacing: 0.02em;
 }
 
 .to__btn--send {
-  background: linear-gradient(135deg, var(--accent), rgba(212, 182, 94, 0.9));
-  color: #0c0e12;
-  box-shadow: 0 2px 8px rgba(201, 168, 76, 0.25);
+  background: var(--accent);
+  color: var(--surface-0);
 }
 
 .to__btn--send:hover {
-  background: linear-gradient(135deg, #d4b65e, var(--accent));
-  box-shadow: 0 4px 16px rgba(201, 168, 76, 0.35);
-  transform: translateY(-1px);
+  background: var(--accent-hover);
 }
 
 .to__btn--dismiss {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
   color: var(--text-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
 }
 
 .to__btn--dismiss:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-active);
+  border-color: var(--border-hover);
 }
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all var(--duration-normal) var(--ease-smooth);
 }
 
 .slide-up-enter-from {
@@ -252,12 +243,10 @@ function handleDismiss(): void {
   0%,
   100% {
     opacity: 1;
-    box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
   }
 
   50% {
     opacity: 0.3;
-    box-shadow: 0 0 16px rgba(231, 76, 60, 0.7);
   }
 }
 
@@ -276,6 +265,18 @@ function handleDismiss(): void {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .to__dot,
+  .to__spinner {
+    animation: none;
+  }
+
+  .to__text {
+    animation: none;
   }
 }
 </style>

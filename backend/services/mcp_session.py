@@ -223,7 +223,16 @@ class McpSession:
                         )
                     import shutil
                     exe = self._config.command[0]
-                    if not shutil.which(exe):
+                    # Accept both PATH-resolvable commands (e.g. "uvx", "npx")
+                    # and direct file paths (absolute or relative with a separator).
+                    has_separator = (os.sep in exe) or ("/" in exe)
+                    if has_separator:
+                        if not os.path.isfile(exe):
+                            raise RuntimeError(
+                                f"MCP server '{self._config.name}': "
+                                f"executable path '{exe}' does not exist"
+                            )
+                    elif not shutil.which(exe):
                         raise RuntimeError(
                             f"MCP server '{self._config.name}': "
                             f"executable '{exe}' not found in PATH"

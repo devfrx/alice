@@ -395,83 +395,83 @@ async function save(): Promise<void> {
 .vs {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6, 24px);
+  gap: var(--space-6);
 }
 
 .vs__range-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
   flex: 1;
 }
 
 .vs__range {
   flex: 1;
-  accent-color: var(--accent, #c8a23c);
+  accent-color: var(--accent);
 }
 
 .vs__range-value {
   min-width: 36px;
   text-align: right;
-  font-size: var(--text-sm, 0.8rem);
-  color: var(--text-secondary, #a0a0a0);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
 }
 
 .vs__loading {
-  font-size: var(--text-sm, 0.82rem);
-  color: var(--text-muted, #808080);
-  padding: var(--space-2, 8px) 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: var(--space-2) 0;
 }
 
 .vs__activation-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }
 
 .vs__activation-card {
   display: flex;
   align-items: center;
-  gap: var(--space-2, 8px);
-  padding: var(--space-2, 8px) var(--space-3, 12px);
-  border-radius: var(--radius-sm, 6px);
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.2));
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   cursor: pointer;
-  transition: border-color var(--transition-fast, 0.15s), background var(--transition-fast, 0.15s);
-  font-size: var(--text-sm, 0.82rem);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  font-size: var(--text-sm);
 }
 
 .vs__activation-card:hover {
-  border-color: var(--border-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-hover);
 }
 
 .vs__activation-card--active {
-  border-color: var(--accent-border, #c8a23c);
-  background: var(--accent-dim, rgba(200, 162, 60, 0.1));
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
 }
 
 .vs__activation-radio {
-  accent-color: var(--accent, #c8a23c);
+  accent-color: var(--accent);
 }
 
 .vs__activation-label {
-  color: var(--text-primary, #e0e0e0);
+  color: var(--text-primary);
 }
 
 .vs__wake-word-row {
-  margin-top: var(--space-2, 8px);
+  margin-top: var(--space-2);
 }
 
 .vs__error {
-  font-size: var(--text-sm, 0.8rem);
-  color: #e74c3c;
-  padding: var(--space-1, 4px) var(--space-2, 8px);
+  font-size: var(--text-sm);
+  color: var(--danger);
+  padding: var(--space-1) var(--space-2);
 }
 
-/* ── Shared settings field styles (scoped, duplicated from SettingsView) ── */
+/* ── Settings sections ── */
 .settings-section {
-  background: var(--bg-tertiary);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
@@ -488,16 +488,16 @@ async function save(): Promise<void> {
   margin: 0 0 var(--space-2) 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
+  background: var(--warning-bg);
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }
 
 .settings-unavailable-hint code {
-  font-family: monospace;
-  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  font-family: var(--font-mono);
+  background: var(--surface-2);
   padding: 0 var(--space-1);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .settings-section__grid {
@@ -519,7 +519,7 @@ async function save(): Promise<void> {
 
 .settings-field__input {
   padding: 7px var(--space-3);
-  background: var(--bg-input, var(--bg-secondary));
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
@@ -546,7 +546,7 @@ async function save(): Promise<void> {
 }
 
 .settings-field__hint {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   flex: 1;
 }
@@ -557,9 +557,9 @@ async function save(): Promise<void> {
   height: 22px;
   border-radius: 11px;
   border: 1px solid var(--border);
-  background: var(--bg-tertiary);
+  background: var(--surface-2);
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
   flex-shrink: 0;
   padding: 0;
 }
@@ -575,9 +575,9 @@ async function save(): Promise<void> {
   left: 2px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--text-muted);
-  transition: transform 0.2s, background 0.2s;
+  transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .settings-toggle--on .settings-toggle__thumb {

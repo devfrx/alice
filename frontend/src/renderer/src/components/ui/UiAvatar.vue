@@ -33,7 +33,7 @@ withDefaults(defineProps<UiAvatarProps>(), {
     justify-content: center;
     border-radius: var(--radius-full);
     flex-shrink: 0;
-    font-weight: var(--weight-semibold);
+    font-weight: var(--weight-medium);
 }
 
 /* ── Sizes ─── */
@@ -59,13 +59,11 @@ withDefaults(defineProps<UiAvatarProps>(), {
 .ui-avatar--agent {
     background: var(--accent-dim);
     color: var(--accent);
-    border: 1px solid var(--accent-border);
 }
 
 .ui-avatar--user {
     background: var(--surface-3);
     color: var(--text-secondary);
-    border: 1px solid var(--border);
 }
 
 .ui-avatar__letter {
@@ -80,7 +78,7 @@ withDefaults(defineProps<UiAvatarProps>(), {
     right: -1px;
     width: 8px;
     height: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     border: 2px solid var(--surface-0);
 }
 

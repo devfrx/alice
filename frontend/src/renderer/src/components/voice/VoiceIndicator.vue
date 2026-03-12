@@ -42,12 +42,7 @@ const stateClass = computed(() => `vi--${props.state}`)
 <template>
   <div v-if="state !== 'idle'" class="vi" :class="stateClass" role="status" :aria-label="stateLabel">
     <div class="vi__bars">
-      <span
-        v-for="(bar, index) in bars"
-        :key="index"
-        class="vi__bar"
-        :style="{ height: bar.height }"
-      />
+      <span v-for="(bar, index) in bars" :key="index" class="vi__bar" :style="{ height: bar.height }" />
     </div>
     <span class="vi__label">{{ stateLabel }}</span>
   </div>
@@ -57,28 +52,28 @@ const stateClass = computed(() => `vi--${props.state}`)
 .vi {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  color: var(--text-secondary, #a0a0a0);
-  background: rgba(255, 255, 255, 0.04);
-  transition: background 0.2s;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2-5);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  background: var(--surface-hover);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .vi--recording {
-  background: rgba(231, 76, 60, 0.08);
-  color: #e74c3c;
+  background: var(--listening-dim);
+  color: var(--listening);
 }
 
 .vi--processing {
-  background: rgba(200, 162, 60, 0.08);
-  color: var(--accent, #c8a23c);
+  background: var(--thinking-dim);
+  color: var(--thinking);
 }
 
 .vi--speaking {
-  background: rgba(46, 204, 113, 0.08);
-  color: #2ecc71;
+  background: var(--speaking-dim);
+  color: var(--speaking);
 }
 
 .vi__bars {
@@ -100,19 +95,35 @@ const stateClass = computed(() => `vi--${props.state}`)
   animation: speak-pulse 0.6s ease-in-out infinite alternate;
 }
 
-.vi--speaking .vi__bar:nth-child(2) { animation-delay: 0.1s; }
-.vi--speaking .vi__bar:nth-child(3) { animation-delay: 0.2s; }
-.vi--speaking .vi__bar:nth-child(4) { animation-delay: 0.3s; }
-.vi--speaking .vi__bar:nth-child(5) { animation-delay: 0.4s; }
+.vi--speaking .vi__bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.vi--speaking .vi__bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.vi--speaking .vi__bar:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.vi--speaking .vi__bar:nth-child(5) {
+  animation-delay: 0.4s;
+}
 
 @keyframes speak-pulse {
-  from { height: 30%; }
-  to { height: 70%; }
+  from {
+    height: 30%;
+  }
+
+  to {
+    height: 70%;
+  }
 }
 
 .vi__label {
   white-space: nowrap;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   letter-spacing: 0.02em;
 }
 </style>

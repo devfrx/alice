@@ -291,61 +291,48 @@ function timeAgo(iso: string): string {
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════
-   ConversationList — Redesigned conversation browser
+   ConversationList — Supabase-style ultra-flat design
    ═══════════════════════════════════════════════════════════ */
 
 /* ------------------------------------------------- Root */
 .conv-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-0-5);
   padding: var(--space-1) var(--space-2) var(--space-2);
   flex: 1;
   min-height: 0;
   position: relative;
 }
 
-/* ================================================ New chat button
-   Wider, prominent, gold text, circle-plus badge, animated border */
+/* ------------------------------------------------- New chat button */
 .conv-list__new {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2-5);
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2-5) 14px;
-  margin-bottom: var(--space-0-5);
+  padding: var(--space-2) var(--space-2-5);
+  margin-bottom: var(--space-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-secondary);
   font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.03em;
+  font-weight: var(--weight-medium);
   cursor: pointer;
   flex-shrink: 0;
-  overflow: hidden;
   transition:
-    background var(--duration-fast) ease,
-    border-color var(--duration-fast) ease,
-    color var(--duration-fast) ease;
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
-/* Circle container for the plus icon */
 .conv-list__new-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-full);
-  border: 1.5px solid var(--border);
-  background: var(--surface-3);
   flex-shrink: 0;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
 }
 
 .conv-list__new-label {
@@ -353,63 +340,47 @@ function timeAgo(iso: string): string {
 }
 
 .conv-list__new:hover {
-  background: var(--surface-3);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
 .conv-list__new:hover .conv-list__new-icon {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-}
-
-.conv-list__new:active {
-  transform: scale(0.97);
+  color: var(--text-primary);
 }
 
 .conv-list__new:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  box-shadow: var(--focus-ring-shadow);
+  outline: none;
 }
 
-/* ================================================ Delete all — minimal text-link style */
+/* ------------------------------------------------- Delete all */
 .conv-list__delete-all {
   align-self: flex-end;
   display: flex;
   align-items: center;
-  padding: var(--space-0-5);
+  padding: var(--space-0-5) var(--space-1);
   margin-bottom: var(--space-1);
   border: none;
   background: transparent;
   color: var(--text-muted);
   font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-regular);
   cursor: pointer;
   flex-shrink: 0;
-  opacity: var(--opacity-dim);
   transition:
     color var(--transition-fast),
-    opacity var(--transition-fast),
-    text-decoration var(--transition-fast);
+    opacity var(--transition-fast);
 }
 
 .conv-list__delete-all:hover {
   color: var(--danger);
-  opacity: 1;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.conv-list__delete-all:active {
-  opacity: 0.75;
 }
 
 .conv-list__delete-all:focus-visible {
-  outline: 1px solid var(--danger);
-  outline-offset: 3px;
-  border-radius: var(--space-0-5);
-  opacity: 1;
+  box-shadow: var(--focus-ring-shadow);
+  outline: none;
+  border-radius: var(--radius-xs);
 }
 
 /* ------------------------------------------------- Scroller */
@@ -418,13 +389,12 @@ function timeAgo(iso: string): string {
   overflow-y: auto;
   position: relative;
   outline: none;
-  /* Slim gold-tinted scrollbar */
   scrollbar-width: thin;
-  scrollbar-color: var(--accent-dim) transparent;
+  scrollbar-color: var(--surface-3) transparent;
 }
 
 .conv-list__scroller::-webkit-scrollbar {
-  width: 3px;
+  width: 4px;
 }
 
 .conv-list__scroller::-webkit-scrollbar-track {
@@ -432,17 +402,16 @@ function timeAgo(iso: string): string {
 }
 
 .conv-list__scroller::-webkit-scrollbar-thumb {
-  background: var(--accent-dim);
+  background: var(--surface-3);
   border-radius: var(--radius-xs);
 }
 
 .conv-list__scroller::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-border);
+  background: var(--surface-4);
 }
 
 .conv-list__scroller:focus-visible {
-  outline: 1px solid var(--accent-border);
-  outline-offset: -1px;
+  box-shadow: var(--focus-ring-shadow);
   border-radius: var(--radius-sm);
 }
 
@@ -451,95 +420,48 @@ function timeAgo(iso: string): string {
   width: 100%;
 }
 
-/* ================================================ Conversation item
-   No hard borders — left bar accent for active/hover state */
+/* ------------------------------------------------- Conversation item */
 .conv-item {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
-  padding: var(--space-2) var(--space-2) var(--space-2) 14px;
+  gap: 2px;
+  padding: var(--space-2) var(--space-2-5);
   border-radius: var(--radius-sm);
   cursor: pointer;
   position: absolute;
   left: 0;
   right: 0;
   height: 52px;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
+  transition: background var(--transition-fast);
 }
 
-/* ------------------------------------------------- Left accent bar */
+/* Accent bar — hidden in Supabase style */
 .conv-item__bar {
-  position: absolute;
-  left: 0;
-  top: 20%;
-  bottom: 20%;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: transparent;
-  transition:
-    background var(--transition-fast),
-    box-shadow var(--transition-fast),
-    top var(--transition-fast),
-    bottom var(--transition-fast);
+  display: none;
 }
 
 .conv-item:hover {
   background: var(--surface-hover);
 }
 
-.conv-item:hover .conv-item__bar {
-  background: var(--accent-border);
-}
-
-/* Active state — accent tint background + solid bar */
+/* Active state — stronger bg fill, no bar */
 .conv-item--active {
-  background: var(--surface-selected);
-}
-
-.conv-item--active .conv-item__bar {
-  top: 8%;
-  bottom: 8%;
-  background: var(--accent);
-  box-shadow: 0 0 8px rgba(201, 168, 76, 0.25);
+  background: var(--surface-active);
 }
 
 .conv-item--active:hover {
-  background: var(--surface-selected);
+  background: var(--surface-active);
 }
 
-/* Streaming state — pulsing bar + subtle text glow */
-.conv-item--streaming .conv-item__bar {
-  top: 8%;
-  bottom: 8%;
-  background: var(--accent);
-  animation: streamingBarPulse 1.8s ease-in-out infinite;
-}
-
-.conv-item--streaming .conv-item__title {
-  text-shadow: 0 0 12px rgba(201, 168, 76, 0.28);
-}
-
-@keyframes streamingBarPulse {
-
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 8px rgba(201, 168, 76, 0.4);
-  }
-
-  50% {
-    opacity: 0.35;
-    box-shadow: 0 0 4px rgba(201, 168, 76, 0.1);
-  }
+/* Streaming — same as active */
+.conv-item--streaming {
+  background: var(--surface-active);
 }
 
 /* Keyboard-focused item */
 .conv-item--focused {
-  outline: 1px solid var(--accent-border);
-  outline-offset: -1px;
+  box-shadow: var(--focus-ring-shadow);
 }
 
 /* ------------------------------------------------- Title */
@@ -551,8 +473,7 @@ function timeAgo(iso: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   padding-right: 52px;
-  line-height: 1.3;
-  transition: color 120ms ease;
+  line-height: 1.35;
 }
 
 .conv-item--active .conv-item__title {
@@ -564,9 +485,8 @@ function timeAgo(iso: string): string {
   display: flex;
   align-items: center;
   gap: var(--space-1-5);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--text-muted);
-  letter-spacing: 0.01em;
   line-height: var(--leading-tight);
   padding-right: 52px;
 }
@@ -575,100 +495,67 @@ function timeAgo(iso: string): string {
   color: var(--text-secondary);
 }
 
-/* Small icon+count badge for message count */
 .conv-item__meta-badge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  opacity: 0.75;
+  opacity: 0.7;
 }
 
 .conv-item__time {
   margin-left: auto;
 }
 
-/* ------------------------------------------------- Inline streaming dot */
+/* ------------------------------------------------- Streaming dot */
 .conv-item__streaming-dot {
   display: inline-block;
   width: 5px;
   height: 5px;
   border-radius: var(--radius-full);
   background: var(--accent);
-  margin-right: 5px;
+  margin-right: var(--space-1);
   vertical-align: middle;
   flex-shrink: 0;
-  animation: dotPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  box-shadow: 0 0 6px rgba(201, 168, 76, 0.5);
+  opacity: 1;
 }
 
-@keyframes dotPulse {
-
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.3;
-    transform: scale(0.7);
-  }
-}
-
-/* ================================================ Inline rename input */
+/* ------------------------------------------------- Rename input */
 .conv-item__rename-input {
   width: 100%;
-  padding: var(--space-1) var(--space-2);
-  background: var(--bg-primary);
-  border: 1px solid var(--accent-border);
+  padding: var(--space-1) var(--space-1-5);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-family: var(--font-sans);
   outline: none;
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast);
 }
 
 .conv-item__rename-input:focus {
   border-color: var(--accent);
-  /* Use token: --accent-dim = rgba(201,168,76,0.12) */
-  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
-/* ================================================ Action buttons
-   Hidden by default, slide in from the right on item hover */
+/* ------------------------------------------------- Action buttons */
 .conv-item__actions {
   position: absolute;
   top: 50%;
-  right: 4px;
-  transform: translateY(-50%) translateX(8px);
+  right: var(--space-1);
+  transform: translateY(-50%);
   display: flex;
-  gap: 1px;
+  gap: 2px;
   opacity: 0;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-0-5);
-  box-shadow: var(--shadow-md);
   pointer-events: none;
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease;
+  background: var(--surface-1);
+  padding: var(--space-0-5);
+  border-radius: var(--radius-sm);
+  transition: opacity var(--transition-fast);
 }
 
-/* Reveal on hover (slide-in effect) */
-.conv-item:hover .conv-item__actions {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-  pointer-events: auto;
-}
-
-/* Reveal on keyboard focus */
+.conv-item:hover .conv-item__actions,
 .conv-item--focused .conv-item__actions {
   opacity: 1;
-  transform: translateY(-50%) translateX(0);
   pointer-events: auto;
 }
 
@@ -676,31 +563,26 @@ function timeAgo(iso: string): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
-  border-radius: var(--space-1);
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition:
     background var(--transition-fast),
-    color var(--transition-fast),
-    transform var(--transition-fast);
+    color var(--transition-fast);
 }
 
 .conv-item__action:hover {
-  background: var(--border-hover);
+  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
-.conv-item__action:active {
-  transform: scale(0.85);
-}
-
 .conv-item__action:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 0;
+  box-shadow: var(--focus-ring-shadow);
+  outline: none;
 }
 
 .conv-item__action--confirm:hover {
@@ -709,11 +591,9 @@ function timeAgo(iso: string): string {
 
 .conv-item__action--danger:hover {
   color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
-/* ================================================ Empty state
-   Staggered fade-in for icon → title → subtitle */
+/* ------------------------------------------------- Empty state */
 .conv-list__empty {
   position: absolute;
   inset: 0;
@@ -722,75 +602,36 @@ function timeAgo(iso: string): string {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: 2.5rem 1rem;
+  padding: var(--space-6) var(--space-4);
   pointer-events: none;
 }
 
 .conv-list__empty-icon {
   color: var(--text-muted);
-  opacity: 0;
-  animation: emptyFadeUp 0.5s ease-out 0.1s forwards;
+  opacity: 0.5;
 }
 
 .conv-list__empty-text {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--text-secondary);
-  letter-spacing: var(--tracking-tight);
-  opacity: 0;
-  animation: emptyFadeUp 0.5s ease-out 0.25s forwards;
 }
 
 .conv-list__empty-sub {
   font-size: var(--text-xs);
   color: var(--text-muted);
-  letter-spacing: 0.01em;
-  opacity: 0;
-  animation: emptyFadeUp 0.5s ease-out 0.4s forwards;
 }
 
-@keyframes emptyFadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ================================================ Reduced motion */
+/* ------------------------------------------------- Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 
-  /* Disable all decorative animations */
-  .conv-list__new::before,
-  .conv-item__streaming-dot,
-  .conv-item--streaming .conv-item__bar {
-    animation: none;
-  }
-
-  .conv-item__streaming-dot {
-    opacity: 1;
-  }
-
-  /* Make empty state items immediately visible */
-  .conv-list__empty-icon,
-  .conv-list__empty-text,
-  .conv-list__empty-sub {
-    animation: none;
-    opacity: 1;
-  }
-
-  /* Disable transitions */
   .conv-item,
-  .conv-item__bar,
-  .conv-item__title,
   .conv-item__actions,
+  .conv-item__rename-input,
   .conv-list__new,
   .conv-list__new-icon,
-  .conv-list__delete-all {
+  .conv-list__delete-all,
+  .conv-item__action {
     transition: none;
   }
 }

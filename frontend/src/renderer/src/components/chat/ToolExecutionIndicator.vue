@@ -50,34 +50,41 @@ function truncate(text: string, max = 100): string {
 </template>
 
 <style scoped>
+/* ToolExecutionIndicator — Supabase-clean status log */
+
 .tool-exec {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1-5);
-    padding: var(--space-2) var(--space-3);
-    margin-top: var(--space-1-5);
-    background: var(--white-faint);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--white-subtle);
+    gap: 0;
+    padding: var(--space-1) var(--space-3);
+    margin-top: var(--space-2);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
 }
 
 .tool-exec__item {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-sm);
-    line-height: var(--leading-snug);
+    font-size: var(--text-xs);
+    line-height: var(--leading-tight);
+    padding: var(--space-1-5) 0;
 }
 
-/* Animated spinner */
+.tool-exec__item:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+}
+
 .tool-exec__spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid var(--accent-strong);
-    border-top-color: var(--accent);
     border-radius: var(--radius-full);
-    animation: toolSpin 0.8s linear infinite;
     flex-shrink: 0;
+    border: 1.5px solid transparent;
+    border-top-color: var(--accent);
+    animation: toolSpin 0.7s linear infinite;
 }
 
 .tool-exec__icon {
@@ -85,35 +92,34 @@ function truncate(text: string, max = 100): string {
 }
 
 .tool-exec__icon--ok {
-    color: var(--approve);
+    color: var(--success);
 }
 
 .tool-exec__icon--err {
-    color: var(--error);
+    color: var(--danger);
 }
 
 .tool-exec__name {
     font-family: var(--font-mono);
-    color: var(--accent);
+    color: var(--text-primary);
     font-size: var(--text-sm);
     white-space: nowrap;
 }
 
 .tool-exec__result {
     color: var(--text-secondary);
-    font-size: var(--text-xs);
-    opacity: var(--opacity-medium);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 280px;
+    max-width: 300px;
 }
 
 .tool-exec__image {
-    max-width: 240px;
-    max-height: 140px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--white-subtle);
+    max-width: 200px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border);
     object-fit: contain;
     margin-top: var(--space-1);
 }
@@ -121,6 +127,12 @@ function truncate(text: string, max = 100): string {
 @keyframes toolSpin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tool-exec__spinner {
+        animation: none;
     }
 }
 </style>

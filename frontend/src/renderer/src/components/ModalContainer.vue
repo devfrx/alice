@@ -93,8 +93,7 @@ onUnmounted(() => {
 <template>
     <Teleport to="body">
         <Transition name="modal">
-            <div v-if="state.visible" class="modal-overlay" @click.self="handleOverlayClick"
-                @keydown="handleKeydown">
+            <div v-if="state.visible" class="modal-overlay" @click.self="handleOverlayClick" @keydown="handleKeydown">
                 <div ref="cardRef" class="modal-card" role="dialog" aria-modal="true"
                     :aria-label="state.title || 'Dialogo'" aria-describedby="modal-desc"
                     :style="state.width ? { width: state.width } : {}" tabindex="-1">
@@ -102,8 +101,7 @@ onUnmounted(() => {
 
                     <!-- Custom component mode -->
                     <template v-if="isCustom">
-                        <component :is="state.customComponent" v-bind="state.customProps"
-                            @close="close" />
+                        <component :is="state.customComponent" v-bind="state.customProps" @close="close" />
                     </template>
 
                     <!-- Standard message+buttons mode -->
@@ -154,8 +152,8 @@ onUnmounted(() => {
     max-width: 90vw;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 22px 26px;
+    border-radius: var(--radius-md);
+    padding: var(--space-5) var(--space-6);
     box-shadow: var(--shadow-floating);
 }
 
@@ -187,10 +185,7 @@ onUnmounted(() => {
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
     cursor: pointer;
-    transition:
-        background var(--transition-fast),
-        color var(--transition-fast),
-        border-color var(--transition-fast);
+    transition: all var(--transition-fast);
 }
 
 .modal__btn--cancel {
@@ -201,7 +196,7 @@ onUnmounted(() => {
 
 .modal__btn--cancel:hover {
     color: var(--text-primary);
-    border-color: var(--interactive-hover);
+    border-color: var(--border-hover);
     background: var(--surface-hover);
 }
 
@@ -266,7 +261,7 @@ onUnmounted(() => {
 @keyframes cardIn {
     from {
         opacity: 0;
-        transform: scale(0.95) translateY(-8px);
+        transform: scale(0.96) translateY(-6px);
     }
 
     to {

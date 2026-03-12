@@ -5,6 +5,7 @@
  *  Styles for code blocks rendered by `useMarkdown` inside v-html.
  *  Imported globally so both MessageBubble and StreamingIndicator
  *  (and any future markdown-rendering component) share one source.
+ *  Clean Supabase-dashboard inspired code display.
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -13,18 +14,21 @@
 .streaming-bubble__content code {
   font-family: var(--font-mono);
   font-size: 0.85em;
-  background: var(--white-light);
-  padding: var(--space-px) 5px;
+  background: var(--surface-3);
+  color: var(--text-primary);
+  padding: 2px 6px;
   border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
 }
 
 /* ----- Code block wrapper */
 .bubble__content .code-block-wrapper,
 .streaming-bubble__content .code-block-wrapper {
   margin: var(--space-2) 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   border: 1px solid var(--border);
+  background: var(--surface-2);
 }
 
 /* ----- Code block header (language label + copy button) */
@@ -34,8 +38,8 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-1) var(--space-3);
-  background: rgba(0, 0, 0, 0.45);
-  border-bottom: 1px solid var(--white-subtle);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
   min-height: 32px;
 }
 
@@ -43,9 +47,9 @@
 .streaming-bubble__content .code-block-lang {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   user-select: none;
 }
 
@@ -57,20 +61,20 @@
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   padding: var(--space-0-5) var(--space-2);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
   user-select: none;
 }
 
 .bubble__content .code-block-copy:hover,
 .streaming-bubble__content .code-block-copy:hover {
-  color: var(--text-primary);
-  background: var(--white-light);
-  border-color: var(--white-strong);
+  color: var(--text-secondary);
+  background: var(--surface-3);
+  border-color: var(--border);
 }
 
 .bubble__content .code-block-copy--copied,
@@ -93,7 +97,7 @@
 /* ----- Code block body */
 .bubble__content .code-block,
 .streaming-bubble__content .code-block {
-  background: var(--black-light);
+  background: var(--surface-0);
   padding: var(--space-3) 14px;
   overflow-x: auto;
   margin: 0;
@@ -109,14 +113,16 @@
   padding: 0;
   font-size: inherit;
   border-radius: 0;
+  border: none;
 }
 
-/* ----- highlight.js token colors (warm dark theme matching OMNIA gold aesthetic) */
+/* ----- highlight.js token colors (warm neutral palette) ─── */
 .bubble__content .hljs,
 .streaming-bubble__content .hljs {
-  color: #e0dcd4;
+  color: #d4d0c8;
 }
 
+/* Keywords, built-ins, tag names */
 .bubble__content .hljs-keyword,
 .bubble__content .hljs-selector-tag,
 .bubble__content .hljs-built_in,
@@ -128,6 +134,7 @@
   color: var(--accent);
 }
 
+/* Strings, additions */
 .bubble__content .hljs-string,
 .bubble__content .hljs-addition,
 .streaming-bubble__content .hljs-string,
@@ -135,66 +142,76 @@
   color: #8fbc6a;
 }
 
+/* Comments, quotes */
 .bubble__content .hljs-comment,
 .bubble__content .hljs-quote,
 .streaming-bubble__content .hljs-comment,
 .streaming-bubble__content .hljs-quote {
-  color: #6a6458;
+  color: var(--text-muted);
   font-style: italic;
 }
 
+/* Numbers, literals */
 .bubble__content .hljs-number,
 .bubble__content .hljs-literal,
 .streaming-bubble__content .hljs-number,
 .streaming-bubble__content .hljs-literal {
-  color: #d4956a;
+  color: #CC9B6D;
 }
 
+/* Types, class titles */
 .bubble__content .hljs-type,
 .bubble__content .hljs-class .hljs-title,
 .bubble__content .hljs-title,
 .streaming-bubble__content .hljs-type,
 .streaming-bubble__content .hljs-class .hljs-title,
 .streaming-bubble__content .hljs-title {
-  color: #e0c080;
+  color: #D4C8B0;
 }
 
+/* Attributes, variables */
 .bubble__content .hljs-attr,
 .bubble__content .hljs-variable,
 .bubble__content .hljs-template-variable,
 .streaming-bubble__content .hljs-attr,
 .streaming-bubble__content .hljs-variable,
 .streaming-bubble__content .hljs-template-variable {
-  color: #d4b896;
+  color: #BDB3A0;
 }
 
+/* Functions */
 .bubble__content .hljs-function,
 .streaming-bubble__content .hljs-function {
-  color: #d4c49c;
+  color: #C8BCA8;
 }
 
+/* Params */
 .bubble__content .hljs-params,
 .streaming-bubble__content .hljs-params {
-  color: #c0b89c;
+  color: #B5AE9C;
 }
 
+/* Regexp, links */
 .bubble__content .hljs-regexp,
 .bubble__content .hljs-link,
 .streaming-bubble__content .hljs-regexp,
 .streaming-bubble__content .hljs-link {
-  color: #c49060;
+  color: #B89878;
 }
 
+/* Meta */
 .bubble__content .hljs-meta,
 .streaming-bubble__content .hljs-meta {
   color: var(--text-secondary);
 }
 
+/* Deletion */
 .bubble__content .hljs-deletion,
 .streaming-bubble__content .hljs-deletion {
   color: var(--danger);
 }
 
+/* Symbols, bullets */
 .bubble__content .hljs-symbol,
 .bubble__content .hljs-bullet,
 .streaming-bubble__content .hljs-symbol,
@@ -202,17 +219,20 @@
   color: var(--accent);
 }
 
+/* Substitution */
 .bubble__content .hljs-subst,
 .streaming-bubble__content .hljs-subst {
-  color: #e0dcd4;
+  color: #d4d0c8;
 }
 
+/* Sections */
 .bubble__content .hljs-section,
 .streaming-bubble__content .hljs-section {
   color: var(--accent);
-  font-weight: bold;
+  font-weight: 600;
 }
 
+/* Emphasis / strong */
 .bubble__content .hljs-emphasis,
 .streaming-bubble__content .hljs-emphasis {
   font-style: italic;

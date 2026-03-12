@@ -198,14 +198,24 @@ mcp:
       command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "~"]
       enabled: true
   # ── Plug & Play (zero config, solo Node.js/Python richiesto) ─────────────────
+  #about:blank#blocked
+  # PRIMP FETCH — fetch con TLS fingerprint Chrome reale (primp). Bypassa Cloudflare,
+  # Radware, anti-bot. Usa per e-commerce, comparatori, qualsiasi sito che ritorna 403.
+  # Richiede: backend/.venv (primp + mcp già installati)
+    - name: primp
+      transport: stdio
+      command: ["backend/.venv/Scripts/python.exe", "backend/tools/mcp_fetch_primp.py"]
+      enabled: true
   #
-  # FETCH — recupera il contenuto completo di qualsiasi URL (HTML, JSON, testo)
-  # Usa quando vuoi leggere una pagina intera, non solo cercarla.
+  # FETCH — fallback leggero per API REST, siti statici senza anti-bot.
+  # Usa primp (sopra) per siti e-commerce o con Cloudflare.
   # Package Python (NON npm) — richiede uvx (incluso con uv)
     - name: fetch
       transport: stdio
-      command: ["uvx", "mcp-server-fetch"]
-      enabled: true
+      command: ["uvx", "mcp-server-fetch", "--ignore-robots-txt", "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"]
+      env:
+        PYTHONIOENCODING: "utf-8"
+      enabled: false
   #
   # SEQUENTIAL THINKING — meta-tool: scompone problemi complessi in step numerati
   # Migliora ragionamento su task multi-fase; nessun accesso esterno.

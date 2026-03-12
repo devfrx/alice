@@ -60,15 +60,15 @@ defineEmits<{
 
 <style scoped>
 .ec {
-    padding: var(--space-3, 12px);
-    background: var(--bg-secondary, #13161c);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    transition: border-color 0.2s;
+    padding: var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast);
 }
 
 .ec:hover {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
+    border-color: var(--border-hover);
 }
 
 /* ── Header ────────────────────────────────────────── */
@@ -76,35 +76,35 @@ defineEmits<{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-2, 8px);
+    margin-bottom: var(--space-2);
 }
 
 .ec__identity {
     display: flex;
     align-items: center;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 
 .ec__name {
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 600;
-    color: var(--text-primary, #e8e4de);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
 }
 
 .ec__type {
-    font-size: 0.65rem;
+    font-size: var(--text-2xs);
     padding: 1px 6px;
-    border-radius: 9999px;
-    font-weight: 500;
+    border-radius: var(--radius-pill);
+    font-weight: var(--weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    background: rgba(100, 160, 220, 0.12);
-    color: rgba(100, 160, 220, 0.9);
+    letter-spacing: var(--tracking-normal);
+    background: var(--accent-dim);
+    color: var(--accent);
 }
 
 .ec__actions {
     display: flex;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1);
 }
 
 .ec__action-btn {
@@ -113,31 +113,31 @@ defineEmits<{
     justify-content: center;
     width: 22px;
     height: 22px;
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     border: none;
     background: transparent;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition: all var(--transition-fast);
 }
 
 .ec__action-btn--add {
-    color: var(--accent, #c9a84c);
-    font-size: 0.9rem;
-    font-weight: 700;
+    color: var(--accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
 }
 
 .ec__action-btn--add:hover {
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
+    background: var(--accent-dim);
 }
 
 .ec__action-btn--delete {
-    color: var(--text-muted, #5c584f);
+    color: var(--text-muted);
 }
 
 .ec__action-btn--delete:hover {
-    background: rgba(220, 80, 80, 0.12);
-    color: rgba(220, 80, 80, 0.9);
+    background: var(--danger-light);
+    color: var(--danger);
 }
 
 /* ── Observations ──────────────────────────────────── */
@@ -145,27 +145,27 @@ defineEmits<{
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin-bottom: var(--space-2, 8px);
+    margin-bottom: var(--space-2);
 }
 
 .ec__obs {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1);
     padding: 2px 0;
 }
 
 .ec__obs-text {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #8a8578);
-    line-height: 1.4;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    line-height: var(--leading-snug);
     flex: 1;
     word-break: break-word;
 }
 
 .ec__obs-text::before {
     content: "• ";
-    color: var(--accent-dim, rgba(201, 168, 76, 0.3));
+    color: var(--text-muted);
 }
 
 .ec__obs-delete {
@@ -177,11 +177,11 @@ defineEmits<{
     border-radius: 2px;
     border: none;
     background: transparent;
-    color: var(--text-muted, #5c584f);
-    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.15s, background 0.2s, color 0.2s;
+    transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
     flex-shrink: 0;
     margin-top: 1px;
 }
@@ -191,24 +191,24 @@ defineEmits<{
 }
 
 .ec__obs-delete:hover {
-    background: rgba(220, 80, 80, 0.12);
-    color: rgba(220, 80, 80, 0.9);
+    background: var(--danger-light);
+    color: var(--danger);
 }
 
 .ec__no-obs {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-muted, #5c584f);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
     font-style: italic;
-    margin-bottom: var(--space-2, 8px);
+    margin-bottom: var(--space-2);
 }
 
 /* ── Relations ─────────────────────────────────────── */
 .ec__relations {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1, 4px);
-    padding-top: var(--space-1, 4px);
-    border-top: 1px solid var(--border, rgba(255, 255, 255, 0.04));
+    gap: var(--space-1);
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--border);
 }
 
 .ec__rel {
@@ -216,17 +216,17 @@ defineEmits<{
     align-items: center;
     gap: 2px;
     padding: 1px 8px;
-    border-radius: 9999px;
-    background: rgba(201, 168, 76, 0.06);
-    border: 1px solid rgba(201, 168, 76, 0.12);
-    font-size: 0.65rem;
-    color: var(--text-secondary, #8a8578);
+    border-radius: var(--radius-pill);
+    background: var(--accent-faint);
+    border: 1px solid var(--accent-subtle);
+    font-size: var(--text-2xs);
+    color: var(--text-secondary);
 }
 
 .ec__rel em {
-    color: var(--accent, #c9a84c);
+    color: var(--accent);
     font-style: normal;
-    font-weight: 500;
+    font-weight: var(--weight-medium);
 }
 
 .ec__rel-label {
@@ -240,13 +240,13 @@ defineEmits<{
     width: 14px;
     height: 14px;
     border: none;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: transparent;
-    color: var(--text-muted, #5c584f);
+    color: var(--text-muted);
     font-size: 0.55rem;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.15s, background 0.2s, color 0.2s;
+    transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 }
 
 .ec__rel:hover .ec__rel-delete {
@@ -254,7 +254,7 @@ defineEmits<{
 }
 
 .ec__rel-delete:hover {
-    background: rgba(220, 80, 80, 0.15);
-    color: rgba(220, 80, 80, 0.9);
+    background: var(--danger-light);
+    color: var(--danger);
 }
 </style>

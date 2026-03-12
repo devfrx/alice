@@ -66,23 +66,22 @@ function handleClick(): void {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    /* Allow glow to extend beyond bounds */
+    transition: transform var(--transition-normal);
     overflow: visible;
 }
 
 .neural-orb:hover {
-    transform: scale(1.03);
+    transform: scale(1.02);
 }
 
 .neural-orb:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
 }
 
 .neural-orb:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
 }
 
 .neural-orb__canvas {
@@ -93,80 +92,28 @@ function handleClick(): void {
     pointer-events: none;
 }
 
-/* State-specific breathing animations on the container */
+/* State-driven subtle breathing */
 .neural-orb--idle {
-    animation: nn-breathe-idle 5s ease-in-out infinite;
+    animation: orb-breathe 5s ease-in-out infinite;
 }
 
 .neural-orb--listening {
-    animation: nn-breathe-listen 2s ease-in-out infinite;
+    animation: orb-breathe 2s ease-in-out infinite;
 }
 
 .neural-orb--thinking {
-    animation: nn-breathe-think 3s ease-in-out infinite;
+    animation: orb-breathe 3s ease-in-out infinite;
 }
 
 .neural-orb--speaking {
-    animation: nn-breathe-speak 2.5s ease-in-out infinite;
+    animation: orb-breathe 2.5s ease-in-out infinite;
 }
 
 .neural-orb--processing {
-    animation: nn-breathe-process 1.5s ease-in-out infinite;
+    animation: orb-breathe 1.5s ease-in-out infinite;
 }
 
-@keyframes nn-breathe-idle {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.012);
-    }
-}
-
-@keyframes nn-breathe-listen {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.025);
-    }
-}
-
-@keyframes nn-breathe-think {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.018);
-    }
-}
-
-@keyframes nn-breathe-speak {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    30% {
-        transform: scale(1.022);
-    }
-
-    70% {
-        transform: scale(0.99);
-    }
-}
-
-@keyframes nn-breathe-process {
+@keyframes orb-breathe {
 
     0%,
     100% {
@@ -175,6 +122,20 @@ function handleClick(): void {
 
     50% {
         transform: scale(1.015);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .neural-orb {
+        transition: none;
+    }
+
+    .neural-orb--idle,
+    .neural-orb--listening,
+    .neural-orb--thinking,
+    .neural-orb--speaking,
+    .neural-orb--processing {
+        animation: none;
     }
 }
 </style>

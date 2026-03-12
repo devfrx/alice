@@ -41,22 +41,20 @@ defineEmits<{
     align-items: center;
     justify-content: center;
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--interactive-normal);
+    color: var(--text-secondary);
     cursor: pointer;
     outline: none;
     flex-shrink: 0;
     transition:
-        background-color 120ms ease,
-        border-color 120ms ease,
-        color 120ms ease,
-        box-shadow 120ms ease,
-        transform 80ms ease;
+        background-color var(--transition-fast),
+        border-color var(--transition-fast),
+        color var(--transition-fast);
 }
 
 .ui-icon-btn:hover:not(:disabled) {
-    color: var(--interactive-hover);
+    color: var(--text-primary);
 }
 
 .ui-icon-btn:active:not(:disabled) {
@@ -69,7 +67,7 @@ defineEmits<{
 }
 
 .ui-icon-btn:focus-visible {
-    box-shadow: var(--focus-ring-shadow);
+    box-shadow: var(--shadow-focus);
 }
 
 /* ── Sizes ─────────── */
@@ -84,8 +82,8 @@ defineEmits<{
 }
 
 .ui-icon-btn--md {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
 }
 
 .ui-icon-btn--lg {
@@ -99,11 +97,11 @@ defineEmits<{
 }
 
 .ui-icon-btn--subtle {
-    background: var(--white-faint);
+    background: var(--surface-hover);
 }
 
 .ui-icon-btn--subtle:hover:not(:disabled) {
-    background: var(--white-subtle);
+    background: var(--surface-active);
 }
 
 .ui-icon-btn--outlined {

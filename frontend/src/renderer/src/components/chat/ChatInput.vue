@@ -296,8 +296,11 @@ defineExpose({
 
       <div class="ci__gap" />
 
-      <!-- Model selector pushed to the right -->
-      <ModelSelector />
+      <!-- Model selectors pushed to the right -->
+      <div class="ci__selectors">
+        <ModelSelector model-type="embedding" />
+        <ModelSelector model-type="llm" />
+      </div>
     </div>
 
     <!-- Layer 2: Input row (grows with textarea, border lights up on focus) -->
@@ -364,7 +367,7 @@ defineExpose({
   gap: var(--space-2);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: var(--space-3) var(--space-4) var(--space-3);
   box-shadow: var(--shadow-elevated);
   transition: box-shadow var(--duration-normal) var(--ease-out-expo),
@@ -538,6 +541,13 @@ defineExpose({
   flex: 1;
 }
 
+/* Selectors wrapper */
+.ci__selectors {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
 /* ============================================================
    Input body (Layer 2 — border container, grows with textarea)
    ============================================================ */
@@ -556,14 +566,14 @@ defineExpose({
 }
 
 .ci__body:focus-within {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--border);
   background: var(--surface-0);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 /* Drag-over: subtle glow on the input border */
 .ci--drag .ci__body {
-  border-color: rgba(140, 180, 255, 0.3);
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(140, 180, 255, 0.12);
 }
 
@@ -642,9 +652,9 @@ defineExpose({
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: var(--text-muted);
   cursor: pointer;
   transition:
     background 120ms ease,
@@ -654,9 +664,9 @@ defineExpose({
 }
 
 .ci__send:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface-2);
   color: var(--text-primary);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.06);
+  ;
 }
 
 .ci__send:not(:disabled) {
@@ -691,7 +701,7 @@ defineExpose({
   height: 36px;
   border-radius: var(--radius-md);
   border: 1px solid var(--danger-strong);
-  background: var(--danger-light);
+  background: var(--accent);
   color: var(--danger);
   cursor: pointer;
   animation: stop-ring 1.5s ease-out infinite;
@@ -699,7 +709,7 @@ defineExpose({
 }
 
 .ci__stop:hover {
-  background: var(--danger-medium);
+  background: var(--surface-2);
 }
 
 @keyframes stop-ring {

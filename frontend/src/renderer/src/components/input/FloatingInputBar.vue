@@ -318,7 +318,10 @@ defineExpose({
                 <div v-if="isExpanded" class="fib__toolbar">
                     <div class="fib__dot" :class="isConnected ? 'dot--ok' : 'dot--err'" />
                     <div class="fib__gap" />
-                    <ModelSelector />
+                    <div class="fib__selectors">
+                        <ModelSelector model-type="embedding" />
+                        <ModelSelector model-type="llm" />
+                    </div>
                 </div>
 
                 <!-- Main row -->
@@ -379,9 +382,7 @@ defineExpose({
 </template>
 
 <style scoped>
-/* ============================================================
-   Root — Floating glass pill
-   ============================================================ */
+/* ── Root — Floating input pill ── */
 .fib {
     position: fixed;
     bottom: 24px;
@@ -399,25 +400,23 @@ defineExpose({
 
     box-shadow: var(--shadow-floating);
     transition:
-        border-color 0.25s var(--ease-out-expo),
-        box-shadow 0.25s var(--ease-out-expo),
-        border-radius 0.25s var(--ease-out-expo),
-        padding 0.25s var(--ease-out-expo),
-        min-width 0.25s var(--ease-out-expo),
-        left 0.25s var(--ease-out-expo);
+        border-color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth),
+        border-radius var(--duration-normal) var(--ease-smooth),
+        padding var(--duration-normal) var(--ease-smooth),
+        min-width var(--duration-normal) var(--ease-smooth),
+        left var(--duration-normal) var(--ease-smooth);
 
-    /* Prevent layout jump during state/input crossfade */
     display: grid;
 }
 
 .fib:focus-within {
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: var(--shadow-floating), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    border-color: var(--border-hover);
 }
 
 /* Collapsed pill shape */
 .fib:not(.fib--expanded):not(.fib--active) {
-    border-radius: 9999px;
+    border-radius: var(--radius-pill);
     min-width: 320px;
 }
 
@@ -429,67 +428,33 @@ defineExpose({
 
 /* Active states pill */
 .fib--active {
-    border-radius: 9999px;
+    border-radius: var(--radius-pill);
     min-width: 280px;
     max-width: 400px;
     padding: var(--space-2) var(--space-4);
 }
 
-/* Listening: pulsing red border */
+/* Listening */
 .fib--listening {
-    border-color: rgba(220, 80, 80, 0.4);
-    box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.4),
-        0 0 20px rgba(220, 80, 80, 0.1);
-    animation: fib-pulse-rec 1.5s ease-in-out infinite;
+    border-color: var(--listening-border);
 }
 
-@keyframes fib-pulse-rec {
-
-    0%,
-    100% {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 12px rgba(220, 80, 80, 0.08);
-    }
-
-    50% {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 24px rgba(220, 80, 80, 0.18);
-    }
-}
-
-/* Thinking: subtle white pulse */
+/* Thinking */
 .fib--thinking {
-    border-color: rgba(255, 255, 255, 0.15);
-    animation: fib-pulse-think 2s ease-in-out infinite;
+    border-color: var(--thinking-border);
 }
 
-@keyframes fib-pulse-think {
-
-    0%,
-    100% {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 8px rgba(255, 255, 255, 0.03);
-    }
-
-    50% {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.08);
-    }
-}
-
-/* Speaking: subtle blue glow */
+/* Speaking */
 .fib--speaking {
-    border-color: rgba(100, 160, 220, 0.3);
+    border-color: var(--speaking-border);
 }
 
-/* Drag over: subtle glow */
+/* Drag over */
 .fib--drag {
-    border-color: rgba(140, 180, 255, 0.3);
-    box-shadow:
-        0 0 0 2px rgba(140, 180, 255, 0.12),
-        0 0 32px rgba(140, 180, 255, 0.06);
+    border-color: var(--accent-border);
 }
 
-/* ============================================================
-   Active state overlay
-   ============================================================ */
+/* ── Active state overlay ── */
 .fib__state {
     grid-area: 1 / 1;
     display: flex;
@@ -503,7 +468,7 @@ defineExpose({
 .fib__state-label {
     color: var(--text-secondary);
     font-size: var(--text-sm);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
     letter-spacing: 0.02em;
     white-space: nowrap;
     flex: 1;
@@ -548,7 +513,7 @@ defineExpose({
 .fib__wave-bar {
     width: 3px;
     border-radius: 2px;
-    background: rgba(220, 80, 80, 0.8);
+    background: var(--listening);
     animation: wave-bounce 0.6s ease-in-out infinite alternate;
 }
 
@@ -568,7 +533,7 @@ defineExpose({
     height: 18px;
     border: 2px solid var(--accent-dim);
     border-top-color: var(--accent);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     animation: spin 0.8s linear infinite;
     flex-shrink: 0;
 }
@@ -589,7 +554,7 @@ defineExpose({
 .fib__dots span {
     width: 6px;
     height: 6px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--accent);
     animation: dot-bounce 1.2s ease-in-out infinite;
 }
@@ -628,7 +593,7 @@ defineExpose({
 .fib__sound-wave span {
     width: 3px;
     border-radius: 2px;
-    background: rgba(100, 160, 220, 0.7);
+    background: var(--speaking);
     animation: sound-bar 0.8s ease-in-out infinite alternate;
 }
 
@@ -655,29 +620,29 @@ defineExpose({
     color: var(--text-secondary);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    transition: background var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast);
 }
 
 .fib__stop-btn:hover {
     background: var(--surface-3);
     color: var(--text-primary);
-    border-color: var(--interactive-hover);
+    border-color: var(--border-hover);
 }
 
 .fib__stop-btn--rec {
-    border-color: rgba(220, 80, 80, 0.3);
-    color: rgba(220, 80, 80, 0.9);
+    border-color: var(--listening-border);
+    color: var(--listening);
 }
 
 .fib__stop-btn--rec:hover {
-    background: rgba(220, 80, 80, 0.15);
-    border-color: rgba(220, 80, 80, 0.5);
-    color: rgb(220, 80, 80);
+    background: var(--listening-dim);
+    border-color: var(--listening-border);
+    color: var(--listening);
 }
 
-/* ============================================================
-   Input area (idle)
-   ============================================================ */
+/* ── Input area (idle) ── */
 .fib__input-area {
     grid-area: 1 / 1;
     display: flex;
@@ -702,16 +667,20 @@ defineExpose({
 
 .dot--ok {
     background: var(--success);
-    box-shadow: 0 0 6px var(--success-glow);
 }
 
 .dot--err {
     background: var(--danger);
-    box-shadow: 0 0 6px var(--danger-glow);
 }
 
 .fib__gap {
     flex: 1;
+}
+
+.fib__selectors {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
 }
 
 /* Body row */
@@ -734,7 +703,7 @@ defineExpose({
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: color 120ms ease, background 120ms ease;
+    transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .fib__attach:hover:not(:disabled) {
@@ -771,7 +740,6 @@ defineExpose({
 
 .fib__textarea::placeholder {
     color: var(--text-muted);
-    opacity: 0.7;
     letter-spacing: 0.02em;
 }
 
@@ -795,17 +763,19 @@ defineExpose({
     width: 34px;
     height: 34px;
     border-radius: var(--radius-md);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    background: var(--surface-hover);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+    transition: background var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast);
 }
 
 .fib__send:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--surface-active);
     color: var(--text-primary);
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.06);
+    border-color: var(--border-hover);
 }
 
 .fib__send:disabled {
@@ -821,35 +791,18 @@ defineExpose({
     width: 34px;
     height: 34px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--danger-strong);
-    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    background: var(--surface-1);
     color: var(--danger);
     cursor: pointer;
-    animation: stop-ring 1.5s ease-out infinite;
-    transition: background 0.2s;
+    transition: background var(--transition-fast);
 }
 
 .fib__stop:hover {
-    background: var(--danger-medium);
+    background: var(--surface-hover);
 }
 
-@keyframes stop-ring {
-    0% {
-        box-shadow: 0 0 0 0 rgba(196, 92, 92, 0.5);
-    }
-
-    70% {
-        box-shadow: 0 0 0 6px rgba(196, 92, 92, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(196, 92, 92, 0);
-    }
-}
-
-/* ============================================================
-   Thumbnails
-   ============================================================ */
+/* ── Thumbnails ── */
 .fib__thumbs {
     display: flex;
     gap: var(--space-2);
@@ -869,7 +822,7 @@ defineExpose({
     height: 48px;
     border-radius: var(--radius-md);
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
 }
 
 .fib__thumb img {
@@ -886,16 +839,16 @@ defineExpose({
     width: 16px;
     height: 16px;
     border-radius: var(--radius-full);
-    background: rgba(0, 0, 0, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--surface-0);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity var(--transition-fast);
 }
 
 .fib__thumb:hover .fib__thumb-rm {
@@ -903,15 +856,14 @@ defineExpose({
 }
 
 .fib__thumb-rm:hover {
-    background: rgba(196, 92, 92, 0.85);
+    background: var(--surface-hover);
+    color: var(--danger);
 }
 
-/* ============================================================
-   Transitions
-   ============================================================ */
+/* ── Transitions ── */
 .fib-state-enter-active,
 .fib-state-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity var(--duration-normal) ease, transform var(--duration-normal) ease;
 }
 
 .fib-state-enter-from {
@@ -926,7 +878,7 @@ defineExpose({
 
 .fib-input-enter-active,
 .fib-input-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity var(--duration-normal) ease, transform var(--duration-normal) ease;
 }
 
 .fib-input-enter-from {
@@ -941,7 +893,7 @@ defineExpose({
 
 .btn-swap-enter-active,
 .btn-swap-leave-active {
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .btn-swap-enter-from {
@@ -954,9 +906,7 @@ defineExpose({
     transform: scale(0.8);
 }
 
-/* ============================================================
-   Reduced motion
-   ============================================================ */
+/* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
 
     .fib,

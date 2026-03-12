@@ -103,6 +103,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   align-items: center;
   justify-content: center;
   height: 100%;
+  background: var(--surface-0);
   color: var(--text-primary);
   overflow: hidden;
 }
@@ -114,7 +115,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   flex-direction: column;
   align-items: center;
   gap: var(--space-8);
-  animation: scaleIn 600ms var(--ease-out-expo, cubic-bezier(0.19, 1, 0.22, 1)) both;
 }
 
 /* ── Hero ──────────────────── */
@@ -126,8 +126,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .home-view__logo {
-  opacity: 0.8;
-  animation: gentleFloat 4s ease-in-out infinite;
+  opacity: 0.7;
 }
 
 .home-view__title {
@@ -157,24 +156,22 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-2);
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
   position: relative;
   transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    box-shadow 200ms ease,
-    transform 150ms ease;
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .mode-card:hover {
-  background: var(--surface-3);
+  background: var(--surface-hover);
   border-color: var(--border-hover);
-  transform: translateY(-1px);
 }
 
 .mode-card--active {
@@ -200,9 +197,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   height: 40px;
   flex-shrink: 0;
   border-radius: var(--radius-md);
-  background: var(--white-faint);
+  background: var(--surface-2);
   color: var(--text-muted);
-  transition: color 150ms ease, background 150ms ease;
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .mode-card--active .mode-card__icon {
@@ -236,7 +233,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   flex-shrink: 0;
   opacity: 0;
   transform: scale(0);
-  transition: opacity 150ms ease, transform 200ms var(--ease-spring, ease);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 /* ── Start Button ─────────── */
@@ -254,17 +251,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   cursor: pointer;
   letter-spacing: var(--tracking-wide);
   transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    box-shadow 200ms ease,
-    transform 100ms ease;
+    background var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .home-view__start:hover {
   background: var(--accent-light);
   border-color: var(--accent);
-  box-shadow: 0 4px 20px rgba(201, 168, 76, 0.12);
-  transform: translateY(-1px);
 }
 
 .home-view__start:active {

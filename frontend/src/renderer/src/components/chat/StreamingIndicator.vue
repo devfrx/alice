@@ -68,6 +68,8 @@ const chatStore = useChatStore()
 </template>
 
 <style scoped>
+/* StreamingIndicator — Supabase-clean */
+
 .bubble-row {
   display: flex;
   justify-content: flex-start;
@@ -76,20 +78,17 @@ const chatStore = useChatStore()
 
 .streaming-bubble {
   max-width: 82%;
-  padding: var(--space-2-5) var(--space-4) var(--space-2-5) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   background: transparent;
   border: none;
-  border-left: 2px solid var(--accent-border);
-  border-radius: 0;
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
   font-size: var(--text-sm);
+  font-family: var(--font-sans);
   word-break: break-word;
   position: relative;
-  animation: borderGradientPulse 3s ease-in-out infinite;
 }
 
-/* ----- markdown content */
 .streaming-bubble__content {
   user-select: text;
   cursor: text;
@@ -106,147 +105,67 @@ const chatStore = useChatStore()
 .streaming-bubble__content :deep(a) {
   color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: rgba(201, 168, 76, 0.3);
+  text-decoration-color: var(--accent-border);
   text-underline-offset: 2px;
+  transition: text-decoration-color var(--transition-fast);
 }
 
-/* ----- Code block styles are in assets/styles/code-blocks.css */
+.streaming-bubble__content :deep(a:hover) {
+  text-decoration-color: var(--accent);
+}
 
-/* ------------------------------------------------------ Thinking state */
 .streaming-bubble__thinking-state {
   display: flex;
   align-items: center;
-  gap: var(--space-1-5);
+  gap: var(--space-2);
   margin-bottom: var(--space-2);
-  padding: var(--space-1-5) var(--space-2-5);
-  background: var(--surface-1);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
 }
 
 .streaming-bubble__brain-icon {
   color: var(--accent);
-  opacity: var(--opacity-visible);
-  animation: brainPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 4px rgba(201, 168, 76, 0.3));
+  width: 14px;
+  height: 14px;
 }
 
 .streaming-bubble__thinking-label {
-  font-size: var(--text-sm);
-  font-style: italic;
-  color: var(--accent);
-  opacity: var(--opacity-medium);
-  animation: thinkingShimmer 2.5s ease-in-out infinite;
-  background: linear-gradient(90deg, var(--accent), rgba(212, 182, 94, 0.8), var(--accent));
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
 }
 
-/* ------------------------------------------------------ Blinking cursor — Elegant line */
 .streaming-bubble__cursor {
   display: inline-block;
   width: 2px;
-  height: 1.1em;
-  background: linear-gradient(180deg, var(--accent), rgba(201, 168, 76, 0.5));
-  margin-left: var(--space-0-5);
+  height: 1em;
+  margin-left: 2px;
   vertical-align: text-bottom;
-  border-radius: 1px;
-  box-shadow: 0 0 6px rgba(201, 168, 76, 0.3);
-  animation: cursorBlink 1s ease-in-out infinite, cursorFadeIn 0.3s ease both;
+  background: var(--accent);
+  animation: cursorBlink 1s steps(2) infinite;
 }
 
-/* ------------------------------------------------- Content transition */
 .content-fade-enter-active {
-  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  transition: opacity 120ms ease;
 }
 
 .content-fade-enter-from {
   opacity: 0;
-  transform: translateY(4px);
 }
 
 @keyframes cursorBlink {
 
   0%,
-  100% {
+  49.9% {
     opacity: 1;
   }
 
-  50% {
-    opacity: 0.15;
-  }
-}
-
-@keyframes cursorFadeIn {
-  from {
+  50%,
+  100% {
     opacity: 0;
   }
-
-  to {
-    opacity: 1;
-  }
 }
 
-@keyframes thinkingShimmer {
-
-  0%,
-  100% {
-    background-position: 0% 50%;
-    opacity: 0.7;
-  }
-
-  50% {
-    background-position: 100% 50%;
-    opacity: 0.5;
-  }
-}
-
-@keyframes brainPulse {
-
-  0%,
-  100% {
-    opacity: 0.85;
-    transform: scale(1);
-    filter: drop-shadow(0 0 4px rgba(201, 168, 76, 0.3));
-  }
-
-  50% {
-    opacity: 0.5;
-    transform: scale(0.93);
-    filter: drop-shadow(0 0 8px rgba(201, 168, 76, 0.5));
-  }
-}
-
-@keyframes borderGradientPulse {
-
-  0%,
-  100% {
-    border-left-color: var(--accent-medium);
-  }
-
-  33% {
-    border-left-color: rgba(201, 168, 76, 0.35);
-  }
-
-  66% {
-    border-left-color: rgba(212, 182, 94, 0.25);
-  }
-}
-
-/* ------------------------------------------------- Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .streaming-bubble {
-    animation: none;
-  }
-
-  .streaming-bubble__brain-icon,
-  .streaming-bubble__thinking-label {
-    animation: none;
-  }
-
   .streaming-bubble__cursor {
     animation: none;
     opacity: 1;

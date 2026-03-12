@@ -167,18 +167,14 @@ const ringOuterStyle = computed(() => ({
 </template>
 
 <style scoped>
-/* ============================================================
-   Mic wrapper — positions pills relative to the button
-   ============================================================ */
+/* ── Mic wrapper ── */
 .mic-wrapper {
   position: relative;
   display: inline-flex;
   overflow: visible;
 }
 
-/* ============================================================
-   Base button — Premium glass effect
-   ============================================================ */
+/* ── Base button ── */
 .mic-btn {
   position: relative;
   display: flex;
@@ -186,67 +182,51 @@ const ringOuterStyle = computed(() => ({
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: var(--surface-hover);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color 0.2s, background 0.25s, transform 0.15s ease, border-color 0.2s, box-shadow 0.2s;
+  transition: color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast);
   outline: none;
   -webkit-app-region: no-drag;
 }
 
 .mic-btn:hover:not(:disabled) {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-active);
+  border-color: var(--border-hover);
 }
 
 .mic-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent), 0 0 12px rgba(201, 168, 76, 0.2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-/* ---- Recording state — Dramatic crimson glow ---- */
+/* Recording state */
 .mic-btn--active {
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.12);
-  border-color: rgba(231, 76, 60, 0.25);
-  box-shadow: 0 0 20px rgba(231, 76, 60, 0.15);
-  animation: rec-bg-pulse 2s ease-in-out infinite;
+  color: var(--listening);
+  background: var(--listening-dim);
+  border-color: var(--listening-border);
 }
 
-@keyframes rec-bg-pulse {
-
-  0%,
-  100% {
-    background: rgba(231, 76, 60, 0.1);
-    box-shadow: 0 0 16px rgba(231, 76, 60, 0.12);
-  }
-
-  50% {
-    background: rgba(231, 76, 60, 0.2);
-    box-shadow: 0 0 28px rgba(231, 76, 60, 0.22);
-  }
-}
-
-/* ---- Processing state — Visually distinct ---- */
+/* Processing state */
 .mic-btn--processing {
   color: var(--accent);
-  background: rgba(201, 168, 76, 0.1);
-  border-color: rgba(201, 168, 76, 0.18);
-  box-shadow: 0 0 12px rgba(201, 168, 76, 0.1);
+  background: var(--thinking-dim);
+  border-color: var(--thinking-border);
   cursor: pointer;
 }
 
-/* ---- Disabled ---- */
+/* Disabled */
 .mic-btn--disabled {
-  opacity: 0.3;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
-/* ---- Click ripple ---- */
+/* Click ripple */
 .mic-btn--click {
   animation: mic-click 0.2s ease;
 }
@@ -257,7 +237,7 @@ const ringOuterStyle = computed(() => ({
   }
 
   50% {
-    transform: scale(0.88);
+    transform: scale(0.9);
   }
 
   100% {
@@ -265,9 +245,7 @@ const ringOuterStyle = computed(() => ({
   }
 }
 
-/* ============================================================
-   Multi-ring audio visualization — Smoother, layered
-   ============================================================ */
+/* ── Audio visualization rings ── */
 .mic-ring {
   position: absolute;
   border-radius: var(--radius-md);
@@ -277,35 +255,30 @@ const ringOuterStyle = computed(() => ({
 
 .mic-ring--inner {
   inset: -4px;
-  border: 2px solid rgba(231, 76, 60, 0.35);
-  box-shadow: 0 0 8px rgba(231, 76, 60, 0.15);
+  border: 2px solid var(--listening-border);
 }
 
 .mic-ring--mid {
   inset: -10px;
-  border: 1.5px solid rgba(231, 76, 60, 0.25);
-  box-shadow: 0 0 12px rgba(231, 76, 60, 0.1);
+  border: 1.5px solid var(--listening-dim);
 }
 
 .mic-ring--outer {
   inset: -16px;
-  border: 1px solid rgba(231, 76, 60, 0.15);
-  box-shadow: 0 0 16px rgba(231, 76, 60, 0.08);
+  border: 1px solid var(--listening-dim);
 }
 
-/* ============================================================
-   Processing — conic gradient spinner border
-   ============================================================ */
+/* ── Processing conic spinner ── */
 .mic-btn__conic {
   position: absolute;
   inset: -3px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: conic-gradient(from 0deg, transparent 50%, var(--accent) 80%, transparent 100%);
   mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px));
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px));
   animation: conic-spin 1s linear infinite;
   pointer-events: none;
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 @keyframes conic-spin {
@@ -314,22 +287,18 @@ const ringOuterStyle = computed(() => ({
   }
 }
 
-/* ============================================================
-   Mic icon
-   ============================================================ */
+/* ── Mic icon ── */
 .mic-btn__icon {
   position: relative;
   z-index: 1;
-  transition: filter 0.2s ease, transform 0.15s ease, opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
 }
 
 .mic-btn__icon--rec {
-  filter: drop-shadow(0 0 6px rgba(231, 76, 60, 0.6));
+  opacity: 1;
 }
 
-/* ============================================================
-   Processing dots (thinking animation)
-   ============================================================ */
+/* ── Processing dots ── */
 .mic-btn__dots {
   display: flex;
   gap: 3px;
@@ -342,9 +311,8 @@ const ringOuterStyle = computed(() => ({
 .mic-btn__dots span {
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--accent);
-  box-shadow: 0 0 4px rgba(201, 168, 76, 0.3);
   animation: dot-bounce 1.2s ease-in-out infinite;
 }
 
@@ -371,12 +339,10 @@ const ringOuterStyle = computed(() => ({
   }
 }
 
-/* ============================================================
-   Icon morph transition
-   ============================================================ */
+/* ── Icon morph transition ── */
 .icon-morph-enter-active,
 .icon-morph-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .icon-morph-enter-from {
@@ -389,30 +355,25 @@ const ringOuterStyle = computed(() => ({
   transform: scale(0.7);
 }
 
-/* ============================================================
-   Device selection dropdown — Glass-morphism
-   ============================================================ */
+/* ── Device selection dropdown ── */
 .mic-menu {
   position: absolute;
   bottom: calc(100% + 10px);
   right: 0;
   min-width: 240px;
   max-width: 340px;
-  background: rgba(19, 22, 28, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-1) 0;
-  box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.03),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-md);
   z-index: 100;
 }
 
 .mic-menu__title {
-  padding: 8px 14px 6px;
+  padding: var(--space-2) var(--space-3) var(--space-1-5);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
@@ -421,7 +382,7 @@ const ringOuterStyle = computed(() => ({
 }
 
 .mic-menu__empty {
-  padding: 10px 14px;
+  padding: var(--space-2-5) var(--space-3);
   font-size: var(--text-sm);
   color: var(--text-muted);
   font-style: italic;
@@ -430,9 +391,9 @@ const ringOuterStyle = computed(() => ({
 .mic-menu__item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 8px 14px;
+  padding: var(--space-2) var(--space-3);
   border: none;
   background: transparent;
   color: var(--text-primary);
@@ -442,11 +403,11 @@ const ringOuterStyle = computed(() => ({
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 
 .mic-menu__item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
 }
 
 .mic-menu__item--active {
@@ -454,9 +415,9 @@ const ringOuterStyle = computed(() => ({
 }
 
 .mic-menu__item--default {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
   margin-top: 2px;
-  padding-top: 10px;
+  padding-top: var(--space-2-5);
 }
 
 .mic-menu__check {
@@ -468,12 +429,23 @@ const ringOuterStyle = computed(() => ({
 
 .menu-fade-enter-active,
 .menu-fade-leave-active {
-  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-normal) var(--ease-smooth);
 }
 
 .menu-fade-enter-from,
 .menu-fade-leave-to {
   opacity: 0;
   transform: translateY(6px) scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .mic-btn--active,
+  .mic-btn__conic,
+  .mic-btn__dots span,
+  .mic-btn--click {
+    animation: none;
+  }
 }
 </style>

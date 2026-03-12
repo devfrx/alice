@@ -81,76 +81,70 @@ if (props.autoExpand) {
 </template>
 
 <style scoped>
-.thinking-section {
-    margin-bottom: var(--space-2);
-    border: 1px solid var(--border);
-    border-left: 2px solid var(--accent-border);
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
-    overflow: hidden;
-    transition: border-color var(--duration-normal) var(--ease-out-expo);
-}
+/* ThinkingSection — Supabase-clean collapsible */
 
-/* Pulsing left border glow while streaming */
-.thinking-section--streaming {
-    animation: thinkingBorderPulse 2s ease-in-out infinite;
+.thinking-section {
+    position: relative;
+    margin-bottom: var(--space-2);
+    background: transparent;
+    overflow: hidden;
 }
 
 .thinking-section__toggle {
     display: flex;
     align-items: center;
-    gap: var(--space-1-5);
+    gap: var(--space-2);
     width: 100%;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-1-5) var(--space-2);
     background: none;
     border: none;
     color: var(--text-secondary);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
     cursor: pointer;
-    border-radius: var(--radius-md);
-    transition: color 120ms ease, background 120ms ease;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
 }
 
 .thinking-section__toggle:hover {
     color: var(--text-primary);
-    background: var(--surface-hover);
-}
-
-.thinking-section__toggle:active {
-    background: var(--surface-active);
 }
 
 .thinking-section__icon {
     flex-shrink: 0;
-    opacity: var(--opacity-medium);
+    width: 12px;
+    height: 12px;
+    color: var(--accent);
 }
 
 .thinking-section__label {
-    font-style: italic;
     flex: 1;
     text-align: left;
+    font-size: var(--text-xs);
+    color: inherit;
 }
 
 .thinking-section__badge {
     font-size: var(--text-2xs);
-    color: var(--text-secondary);
-    opacity: var(--opacity-dim);
-    background: var(--surface-2);
-    padding: var(--space-px) var(--space-1-5);
-    border-radius: var(--space-2);
-    font-style: normal;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    padding: var(--space-0-5) var(--space-2);
+    border-radius: var(--radius-pill);
+    line-height: var(--leading-snug);
+    white-space: nowrap;
 }
 
 .thinking-section__streaming-text {
-    font-size: var(--text-xs);
-    font-style: italic;
-    color: var(--accent);
-    opacity: var(--opacity-visible);
-    animation: thinkingTextPulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    font-size: var(--text-2xs);
+    color: var(--text-muted);
+    animation: thinkingPulse 2s ease-in-out infinite;
 }
 
 .thinking-section__chevron {
     flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    color: var(--text-muted);
     transition: transform var(--transition-fast);
 }
 
@@ -161,15 +155,16 @@ if (props.autoExpand) {
 .thinking-section__body {
     display: grid;
     grid-template-rows: 1fr;
-    transition: grid-template-rows 0.3s var(--ease-out-expo),
-        padding 0.3s var(--ease-out-expo),
-        opacity 0.25s ease;
-    padding: var(--space-1-5) var(--space-3) var(--space-2-5);
-    font-style: italic;
+    transition:
+        grid-template-rows var(--duration-moderate) ease,
+        opacity var(--duration-normal) ease;
+    padding: 0 var(--space-2) var(--space-2) var(--space-3);
+    border-left: 2px solid var(--border);
+    margin-left: var(--space-2);
     color: var(--text-secondary);
-    font-size: var(--text-sm);
-    line-height: var(--leading-relaxed);
-    opacity: 0.75;
+    font-size: var(--text-xs);
+    line-height: var(--leading-snug);
+    opacity: 1;
 }
 
 .thinking-section__body--collapsed {
@@ -182,13 +177,12 @@ if (props.autoExpand) {
 .thinking-section__body>.thinking-section__inner {
     overflow: hidden;
     min-height: 0;
-    position: relative;
 }
 
 .thinking-section__separator {
-    height: var(--space-px);
-    background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
-    margin: 0 var(--space-3);
+    height: 1px;
+    background: var(--border);
+    margin: var(--space-2) 0;
 }
 
 .thinking-section__content {
@@ -204,31 +198,25 @@ if (props.autoExpand) {
     margin-bottom: 0;
 }
 
-@keyframes thinkingBorderPulse {
+@keyframes thinkingPulse {
 
     0%,
     100% {
-        border-left-color: var(--accent-border);
+        opacity: 0.4;
     }
 
     50% {
-        border-left-color: var(--accent);
+        opacity: 1;
     }
 }
 
-@keyframes thinkingTextPulse {
+@media (prefers-reduced-motion: reduce) {
 
-    0%,
-    100% {
-        opacity: 0.8;
-    }
-
-    40% {
-        opacity: 0.35;
-    }
-
-    60% {
-        opacity: 0.35;
+    .thinking-section__chevron,
+    .thinking-section__body,
+    .thinking-section__streaming-text {
+        animation: none;
+        transition: none;
     }
 }
 </style>

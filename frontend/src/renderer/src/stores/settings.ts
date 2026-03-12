@@ -201,8 +201,21 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Synchronous guard to prevent concurrent resumeOperationTracking calls. */
   let _isResumingOperation = false
 
-  /** The model currently loaded in LM Studio (first loaded instance). */
-  const activeModel = computed(() => models.value.find((m) => m.loaded) ?? null)
+  /** The active LLM model (ignores embedding models). */
+  const activeModel = computed(() =>
+    models.value.find((m) => m.loaded && m.type !== 'embedding') ?? null
+  )
+
+  /** The active embedding model (if any). */
+  const activeEmbeddingModel = computed(() =>
+    models.value.find((m) => m.loaded && m.type === 'embedding') ?? null
+  )
+
+  /** All LLM models (excludes embedding). */
+  const llmModels = computed(() => models.value.filter((m) => m.type !== 'embedding'))
+
+  /** All embedding models. */
+  const embeddingModels = computed(() => models.value.filter((m) => m.type === 'embedding'))
 
   /** Models that are currently loaded in LM Studio. */
   const loadedModels = computed(() => models.value.filter((m) => m.loaded))
@@ -447,6 +460,9 @@ export const useSettingsStore = defineStore('settings', () => {
     loadedModelCount,
     activeDownloads,
     activeModel,
+    activeEmbeddingModel,
+    llmModels,
+    embeddingModels,
     loadedModels,
     unloadedModels,
     isModelLoading,

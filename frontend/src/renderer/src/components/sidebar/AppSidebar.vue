@@ -109,16 +109,10 @@ async function onOpenFile(id: string): Promise<void> {
 
 <template>
   <aside class="sidebar" :class="{ 'sidebar--collapsed': !isOpen }">
-    <!-- Dot-grid texture overlay (CSS-only depth layer) -->
-    <div class="sidebar__texture" aria-hidden="true" />
-
-    <!-- Animated sweep line along the top edge -->
-    <span class="sidebar__top-line" aria-hidden="true" />
 
     <!-- Primary navigation — icons always visible, labels hidden when collapsed -->
     <nav class="sidebar__nav" aria-label="Navigazione principale">
       <router-link to="/settings" class="sidebar__link" active-class="sidebar__link--active" title="Impostazioni">
-        <span class="sidebar__link-bar" aria-hidden="true" />
         <span class="sidebar__link-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
@@ -130,7 +124,6 @@ async function onOpenFile(id: string): Promise<void> {
       </router-link>
 
       <router-link to="/assistant" class="sidebar__link" active-class="sidebar__link--active" title="Assistente">
-        <span class="sidebar__link-bar" aria-hidden="true" />
         <span class="sidebar__link-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10" />
@@ -141,7 +134,6 @@ async function onOpenFile(id: string): Promise<void> {
       </router-link>
 
       <router-link to="/hybrid" class="sidebar__link" active-class="sidebar__link--active" title="Ibrido">
-        <span class="sidebar__link-bar" aria-hidden="true" />
         <span class="sidebar__link-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="8" r="6" />
@@ -181,11 +173,9 @@ async function onOpenFile(id: string): Promise<void> {
 </template>
 
 <style scoped>
-/* ═══════════════════════════════════════════════════════════
-   AppSidebar — Collapsible navigation sidebar
-   ═══════════════════════════════════════════════════════════ */
+/* ─── AppSidebar — Supabase-style flat sidebar ─── */
 
-/* ------------------------------------------------- Root */
+/* Root */
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
@@ -194,13 +184,12 @@ async function onOpenFile(id: string): Promise<void> {
   flex-direction: column;
   background: var(--surface-1);
   border-right: 1px solid var(--border);
-  box-shadow: 1px 0 12px rgba(0, 0, 0, 0.25);
-  transition:
-    width var(--duration-moderate) var(--ease-out-expo),
-    min-width var(--duration-moderate) var(--ease-out-expo);
   overflow: hidden;
   position: relative;
   z-index: var(--z-sticky);
+  transition:
+    width var(--transition-normal) ease,
+    min-width var(--transition-normal) ease;
 }
 
 .sidebar--collapsed {
@@ -208,163 +197,35 @@ async function onOpenFile(id: string): Promise<void> {
   min-width: var(--sidebar-collapsed);
 }
 
-/* ------------------------------------------------- Subtle texture overlay */
-.sidebar__texture {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: var(--z-base);
-  background-image: radial-gradient(circle,
-      rgba(255, 255, 255, 0.015) 1px,
-      transparent 1px);
-  background-size: 20px 20px;
-  opacity: 0.25;
-  -webkit-mask-image: linear-gradient(to bottom,
-      transparent 0%,
-      rgba(0, 0, 0, 0.3) 15%,
-      rgba(0, 0, 0, 0.3) 85%,
-      transparent 100%);
-  mask-image: linear-gradient(to bottom,
-      transparent 0%,
-      rgba(0, 0, 0, 0.3) 15%,
-      rgba(0, 0, 0, 0.3) 85%,
-      transparent 100%);
-}
-
-/* ------------------------------------------------- Animated top border sweep
-   A soft gold highlight that scans left → right → left slowly */
-.sidebar__top-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--space-px);
-  z-index: var(--z-raised);
-  pointer-events: none;
-  background: linear-gradient(90deg,
-      transparent 0%,
-      transparent 10%,
-      var(--accent) 50%,
-      transparent 90%,
-      transparent 100%);
-  background-size: 300% 100%;
-  background-position: -100% 0;
-  opacity: var(--opacity-soft);
-  animation: topLineSweep 8s ease-in-out infinite;
-}
-
-@keyframes topLineSweep {
-  0% {
-    background-position: -100% 0;
-  }
-
-  50% {
-    background-position: 100% 0;
-  }
-
-  100% {
-    background-position: -100% 0;
-  }
-}
-
-/* ------------------------------------------------- Navigation */
+/* Navigation */
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3) var(--space-2) var(--space-2);
-  position: relative;
-  z-index: 1;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-3) var(--space-3);
   flex-shrink: 0;
-  transition: padding var(--duration-normal) ease;
+  transition: padding var(--transition-normal) ease;
 }
 
 .sidebar--collapsed .sidebar__nav {
-  padding: var(--space-1) 0 var(--space-2);
+  padding: var(--space-4) var(--space-1) var(--space-3);
   align-items: center;
 }
 
-/* Pill-style nav link */
+/* Nav link */
 .sidebar__link {
   display: flex;
   align-items: center;
-  gap: var(--space-2-5);
-  padding: 8px 10px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.01em;
+  font-weight: var(--weight-regular);
   color: var(--text-secondary);
   text-decoration: none;
-  position: relative;
-  overflow: hidden;
   transition:
-    background 120ms ease,
-    color 120ms ease;
-}
-
-/* Center icons when collapsed */
-.sidebar--collapsed .sidebar__link {
-  justify-content: center;
-  gap: 0;
-  padding: var(--space-2) 0;
-  border-radius: var(--radius-full);
-  width: 34px;
-  height: 34px;
-  margin: 0 auto;
-}
-
-/* Hide the gold left-bar indicator when collapsed — too narrow to look good */
-.sidebar--collapsed .sidebar__link-bar {
-  opacity: 0;
-}
-
-/* Compact circular highlight for active link when collapsed */
-.sidebar--collapsed .sidebar__link--active {
-  background: var(--accent-dim);
-  box-shadow: 0 0 12px rgba(201, 168, 76, 0.1);
-  border-radius: var(--radius-full);
-}
-
-/* Gold left-bar indicator — transparent by default */
-.sidebar__link-bar {
-  position: absolute;
-  left: 0;
-  top: 22%;
-  bottom: 22%;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: transparent;
-  transition:
-    background var(--transition-fast),
-    box-shadow var(--transition-fast),
-    opacity var(--transition-fast);
-}
-
-.sidebar__link-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  opacity: var(--opacity-soft);
-  transition: opacity var(--transition-fast), filter var(--transition-fast);
-}
-
-/* Text label — collapses out with width + opacity */
-.sidebar__link-label {
-  white-space: nowrap;
-  overflow: hidden;
-  max-width: 160px;
-  opacity: 1;
-  transition:
-    opacity var(--transition-normal),
-    max-width var(--transition-normal);
-}
-
-.sidebar--collapsed .sidebar__link-label {
-  opacity: 0;
-  max-width: 0;
-  pointer-events: none;
+    background var(--transition-fast) ease,
+    color var(--transition-fast) ease;
 }
 
 .sidebar__link:hover {
@@ -373,129 +234,144 @@ async function onOpenFile(id: string): Promise<void> {
 }
 
 .sidebar__link:hover .sidebar__link-icon {
-  opacity: 1;
-}
-
-.sidebar__link:active {
-  transform: scale(0.97);
-}
-
-/* Active state — gold left bar + subtle highlight */
-.sidebar__link--active {
   color: var(--text-primary);
-  background: var(--surface-selected);
 }
 
-.sidebar__link--active .sidebar__link-bar {
-  background: var(--accent);
-  box-shadow: 0 0 8px rgba(201, 168, 76, 0.3);
-  width: 3px;
+/* Active state — subtle bg fill only, no accent bar */
+.sidebar__link--active {
+  background: var(--surface-selected);
+  color: var(--text-primary);
 }
 
 .sidebar__link--active .sidebar__link-icon {
-  opacity: 1;
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
-/* ------------------------------------------------- Conversations section */
+.sidebar__link:focus-visible {
+  box-shadow: var(--focus-ring-shadow);
+}
+
+/* Collapsed link — centered icon circle */
+.sidebar--collapsed .sidebar__link {
+  justify-content: center;
+  gap: 0;
+  padding: var(--space-2);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  margin: 0 auto;
+}
+
+.sidebar--collapsed .sidebar__link--active {
+  background: var(--surface-active);
+}
+
+/* Icon */
+.sidebar__link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color var(--transition-fast) ease;
+}
+
+/* Label — collapses with width + opacity */
+.sidebar__link-label {
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 160px;
+  opacity: 1;
+  transition:
+    opacity var(--transition-normal) ease,
+    max-width var(--transition-normal) ease;
+}
+
+.sidebar--collapsed .sidebar__link-label {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+}
+
+/* Conversations section */
 .sidebar__conversations {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  position: relative;
-  z-index: 1;
-  animation: contentReveal 0.22s ease-out;
 }
 
-@keyframes contentReveal {
-  from {
-    opacity: 0;
-    transform: translateX(-5px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* ------------------------------------------------- Section label
-   Micro uppercase text + trailing fade line */
+/* Section label — simple uppercase micro text with border line */
 .sidebar__section-label {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 14px var(--space-1);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-2);
   font-size: var(--text-2xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.14em;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
   flex-shrink: 0;
+  border-top: 1px solid var(--border);
 }
 
 .sidebar__section-label::after {
-  content: '';
-  flex: 1;
-  height: var(--space-px);
-  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+  content: none;
 }
 
-/* ------------------------------------------------- Toggle button (bottom-center, circular) */
+/* Toggle button — minimal */
 .sidebar__toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: none;
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   flex-shrink: 0;
   margin: var(--space-2) auto var(--space-3);
-  position: relative;
-  z-index: 1;
   transition:
-    color 120ms ease,
-    border-color 120ms ease,
-    background 120ms ease,
-    transform 80ms ease;
+    color var(--transition-fast) ease,
+    background var(--transition-fast) ease;
 }
 
 .sidebar__toggle:hover {
   color: var(--text-primary);
-  border-color: var(--border-hover);
-  background: var(--surface-3);
-}
-
-.sidebar__toggle:active {
-  transform: scale(0.9);
+  background: var(--surface-hover);
 }
 
 .sidebar__toggle:focus-visible {
   box-shadow: var(--focus-ring-shadow);
 }
 
-/* ------------------------------------------------- Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .sidebar__top-line {
-    animation: none;
-    background: var(--accent-border);
-    background-size: 100% 100%;
-    opacity: 0.35;
-  }
+/* Scrollbar — thin, subtle */
+.sidebar :deep(::-webkit-scrollbar) {
+  width: 4px;
+}
 
-  .sidebar__conversations {
-    animation: none;
-  }
+.sidebar :deep(::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.sidebar :deep(::-webkit-scrollbar-thumb) {
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+}
+
+.sidebar :deep(::-webkit-scrollbar-thumb:hover) {
+  background: var(--surface-4);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
 
   .sidebar,
   .sidebar__nav,
   .sidebar__link,
-  .sidebar__link-bar,
   .sidebar__link-icon,
   .sidebar__link-label,
   .sidebar__toggle {

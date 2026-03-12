@@ -1,14 +1,20 @@
 <script setup lang="ts">
 /**
- * ModelSelector.vue — Compact dropdown for switching the active LLM model.
+ * ModelSelector.vue — Compact dropdown for switching models.
  *
- * Displays the current model name as a small button in the input bar area.
- * On click, opens a dropdown listing all available models with size,
- * capability badges, load status, and model metadata.
+ * Accepts a `modelType` prop ('llm' | 'embedding') to filter which models
+ * are shown. Displays the current model name as a small button in the input
+ * bar area. On click, opens a dropdown listing models with size, capability
+ * badges, load status, and metadata.
  */
 import { computed, onBeforeUnmount, onMounted, ref, nextTick, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
+
+const props = withDefaults(defineProps<{
+  /** Which model type to show: 'llm' (default) or 'embedding'. */
+  modelType?: 'llm' | 'embedding'
+}>(), { modelType: 'llm' })
 
 const settingsStore = useSettingsStore()
 
@@ -17,8 +23,29 @@ const errorMessage = ref<string | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 
-const loadedModels = computed(() => settingsStore.models.filter((m) => m.loaded))
-const availableModels = computed(() => settingsStore.models.filter((m) => !m.loaded))
+/** All models for this selector's type. */
+const typeModels = computed(() =>
+  props.modelType === 'embedding'
+    ? settingsStore.embeddingModels
+    : settingsStore.llmModels
+)
+
+const loadedModels = computed(() => typeModels.value.filter((m) => m.loaded))
+const availableModels = computed(() => typeModels.value.filter((m) => !m.loaded))
+
+/** The active model for the current type. */
+const active = computed(() =>
+  props.modelType === 'embedding'
+    ? settingsStore.activeEmbeddingModel
+    : settingsStore.activeModel
+)
+
+/** Label shown on the trigger button. */
+const triggerLabel = computed(() => {
+  if (active.value) return truncateName(active.value.display_name || active.value.name)
+  if (props.modelType === 'embedding') return 'Nessun embedding'
+  return settingsStore.settings.llm.model
+})
 
 function adjustDropdownPosition(): void {
   nextTick(() => {
@@ -58,7 +85,7 @@ function truncateName(name: string, maxLen = 24): string {
 }
 
 function toggle(): void {
-  if (!isOpen.value && settingsStore.models.length === 0) {
+  if (!isOpen.value && typeModels.value.length === 0) {
     settingsStore.loadModels()
   }
   isOpen.value = !isOpen.value
@@ -115,23 +142,26 @@ onBeforeUnmount(() => {
 <template>
   <div ref="rootRef" class="model-selector">
     <!-- Trigger button -->
-    <button class="model-selector__trigger" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle"
-      @keydown="handleKeydown">
+    <button class="model-selector__trigger"
+      :class="{ 'model-selector__trigger--embedding': props.modelType === 'embedding' }" aria-haspopup="true"
+      :aria-expanded="isOpen" @click="toggle" @keydown="handleKeydown">
+      <!-- Type icon -->
+      <svg v-if="props.modelType === 'embedding'" class="model-selector__type-icon" width="12" height="12"
+        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round" title="Embedding model">
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="12" cy="12" r="10" />
+      </svg>
       <!-- Warning icon only when LM Studio is disconnected -->
-      <svg v-if="!settingsStore.lmStudioConnected" class="model-selector__warn-icon" title="LM Studio disconnesso"
+      <svg v-else-if="!settingsStore.lmStudioConnected" class="model-selector__warn-icon" title="LM Studio disconnesso"
         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
         <line x1="12" y1="9" x2="12" y2="13" />
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
-      <span class="model-selector__label">
-        {{
-          loadedModels[0]
-            ? truncateName(loadedModels[0].display_name || loadedModels[0].name)
-            : settingsStore.settings.llm.model
-        }}
-      </span>
+      <span class="model-selector__label">{{ triggerLabel }}</span>
       <span v-if="loadedModels.length > 1" class="model-selector__loaded-badge">
         {{ loadedModels.length }} caricati
       </span>
@@ -168,8 +198,8 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Empty state -->
-        <div v-else-if="settingsStore.models.length === 0" class="model-selector__empty">
-          Nessun modello disponibile
+        <div v-else-if="typeModels.length === 0" class="model-selector__empty">
+          {{ props.modelType === 'embedding' ? 'Nessun modello embedding disponibile' : 'Nessun modello disponibile' }}
         </div>
 
         <!-- Model list -->
@@ -260,8 +290,7 @@ onBeforeUnmount(() => {
               </span>
 
               <!-- Loading progress bar -->
-              <div v-if="settingsStore.isModelLoading(model.name)"
-                class="model-selector__load-progress">
+              <div v-if="settingsStore.isModelLoading(model.name)" class="model-selector__load-progress">
                 <div class="model-selector__load-progress-bar" />
                 <span class="model-selector__load-progress-text">Caricamento in corso...</span>
               </div>
@@ -329,8 +358,7 @@ onBeforeUnmount(() => {
                   </svg>
                 </button>
               </span>
-              <div v-if="settingsStore.isModelLoading(model.name)"
-                class="model-selector__load-progress">
+              <div v-if="settingsStore.isModelLoading(model.name)" class="model-selector__load-progress">
                 <div class="model-selector__load-progress-bar" />
                 <span class="model-selector__load-progress-text">Caricamento in corso...</span>
               </div>
@@ -885,5 +913,22 @@ onBeforeUnmount(() => {
   font-size: var(--text-xs);
   color: var(--accent);
   text-align: center;
+}
+
+/* ── Embedding variant ────────────────────────────────────────────── */
+.model-selector__trigger--embedding {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.model-selector__trigger--embedding:hover {
+  background: var(--surface-3);
+  border-color: var(--border-hover);
+}
+
+.model-selector__type-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 </style>

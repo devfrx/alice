@@ -51,20 +51,17 @@ defineEmits<{
     justify-content: center;
     gap: var(--space-2);
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     font-family: var(--font-sans);
     font-weight: var(--weight-medium);
-    letter-spacing: var(--tracking-tight);
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
     outline: none;
     transition:
-        background-color 150ms ease,
-        border-color 150ms ease,
-        box-shadow 150ms ease,
-        color 150ms ease,
-        transform 80ms ease;
+        background-color var(--transition-fast),
+        border-color var(--transition-fast),
+        color var(--transition-fast);
 }
 
 .ui-btn:active:not(:disabled) {
@@ -77,7 +74,7 @@ defineEmits<{
 }
 
 .ui-btn:focus-visible {
-    box-shadow: var(--focus-ring-shadow);
+    box-shadow: var(--shadow-focus);
 }
 
 /* ── Sizes ─────────────────────────── */
@@ -102,24 +99,21 @@ defineEmits<{
 /* ── Variants ──────────────────────── */
 .ui-btn--primary {
     background: var(--accent);
-    color: var(--bg-primary);
-    border-color: var(--accent);
+    color: var(--surface-0);
 }
 
 .ui-btn--primary:hover:not(:disabled) {
     background: var(--accent-hover);
-    border-color: var(--accent-hover);
-    box-shadow: 0 2px 12px rgba(201, 168, 76, 0.2);
 }
 
 .ui-btn--secondary {
-    background: var(--surface-2);
+    background: transparent;
     color: var(--text-primary);
     border-color: var(--border);
 }
 
 .ui-btn--secondary:hover:not(:disabled) {
-    background: var(--surface-3);
+    background: var(--surface-hover);
     border-color: var(--border-hover);
 }
 
@@ -134,14 +128,13 @@ defineEmits<{
 }
 
 .ui-btn--danger {
-    background: var(--danger-light);
+    background: transparent;
     border-color: var(--danger-border);
     color: var(--danger);
 }
 
 .ui-btn--danger:hover:not(:disabled) {
-    background: var(--danger-hover);
-    border-color: rgba(196, 92, 92, 0.5);
+    background: var(--danger-faint);
 }
 
 /* ── Icon-only ─────────────────────── */
@@ -173,7 +166,7 @@ defineEmits<{
     height: 16px;
     border: 2px solid transparent;
     border-top-color: currentColor;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     animation: spin 0.6s linear infinite;
 }
 

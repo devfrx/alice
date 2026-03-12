@@ -90,14 +90,14 @@ function toggleExpand(): void {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 6px;
+    gap: var(--space-1-5);
 }
 
-/* ── Trigger button ──────────────────────────────────── */
+/* ── Trigger button ── */
 .quick-actions__trigger {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     border: 1px solid var(--border);
     background: var(--surface-2);
     color: var(--text-secondary);
@@ -105,11 +105,13 @@ function toggleExpand(): void {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s var(--ease-out-expo);
+    transition: border-color var(--transition-fast),
+        color var(--transition-fast),
+        background var(--transition-fast);
 }
 
 .quick-actions__trigger:hover {
-    border-color: var(--accent-border);
+    border-color: var(--border-hover);
     color: var(--accent);
     background: var(--surface-3);
 }
@@ -120,43 +122,43 @@ function toggleExpand(): void {
     color: var(--accent);
 }
 
-/* ── Menu ────────────────────────────────────────────── */
+/* ── Menu ── */
 .quick-actions__menu {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 5px;
+    gap: var(--space-0-5);
+    padding: var(--space-1);
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-floating);
+    box-shadow: var(--shadow-md);
     min-width: 180px;
 }
 
-/* ── Menu item ───────────────────────────────────────── */
+/* ── Menu item ── */
 .quick-actions__item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 120ms ease;
+    transition: background var(--transition-fast), color var(--transition-fast);
     text-align: left;
     width: 100%;
 }
 
 .quick-actions__item:hover {
     background: var(--surface-hover);
-    color: var(--accent);
+    color: var(--text-primary);
 }
 
 .quick-actions__item-icon {
     flex-shrink: 0;
-    opacity: 0.8;
+    opacity: var(--opacity-visible);
 }
 
 .quick-actions__item:hover .quick-actions__item-icon {
@@ -164,17 +166,19 @@ function toggleExpand(): void {
 }
 
 .quick-actions__item-label {
-    font-size: 13px;
+    font-size: var(--text-sm);
     white-space: nowrap;
 }
 
-/* ── Menu slide transition ───────────────────────────── */
+/* ── Menu slide transition ── */
 .menu-slide-enter-active {
-    transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity var(--duration-fast) ease,
+        transform var(--duration-fast) var(--ease-bounce);
 }
 
 .menu-slide-leave-active {
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity var(--duration-fast) ease,
+        transform var(--duration-fast) ease;
 }
 
 .menu-slide-enter-from {

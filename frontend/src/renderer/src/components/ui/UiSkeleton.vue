@@ -31,26 +31,24 @@ withDefaults(defineProps<UiSkeletonProps>(), {
 
 <style scoped>
 .ui-skeleton {
-    background: linear-gradient(90deg,
-            var(--surface-2) 0%,
-            var(--surface-3) 40%,
-            var(--surface-2) 80%);
-    background-size: 200% 100%;
-    animation: shimmer 1.8s ease-in-out infinite;
+    background: var(--surface-2);
     border-radius: var(--radius-sm);
+    animation: skeleton-pulse 1.5s ease infinite;
 }
 
 .ui-skeleton--circle {
-    border-radius: 50%;
+    border-radius: var(--radius-full);
 }
 
-@keyframes shimmer {
-    0% {
-        background-position: 200% 0;
+@keyframes skeleton-pulse {
+
+    0%,
+    100% {
+        opacity: 0.4;
     }
 
-    100% {
-        background-position: -200% 0;
+    50% {
+        opacity: 0.8;
     }
 }
 </style>

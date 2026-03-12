@@ -147,6 +147,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ToolConfirmationDialog — Supabase dialog */
+
 .confirm-overlay {
     position: fixed;
     inset: 0;
@@ -155,9 +157,7 @@ onUnmounted(() => {
     align-items: center;
     justify-content: center;
     background: var(--black-heavy);
-    backdrop-filter: blur(var(--blur-sm));
-    -webkit-backdrop-filter: blur(var(--blur-sm));
-    animation: overlayFadeIn 0.2s ease;
+    animation: overlayFadeIn 200ms ease;
 }
 
 .confirm-card {
@@ -167,17 +167,17 @@ onUnmounted(() => {
     overflow-y: auto;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5) var(--space-6);
-    box-shadow: var(--shadow-floating);
-    animation: cardSlideIn 0.2s var(--ease-out-expo);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-md);
+    animation: cardSlideIn 200ms ease;
 }
 
 .confirm-card__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: var(--space-4);
 }
 
 .confirm-card__title {
@@ -190,13 +190,13 @@ onUnmounted(() => {
 .confirm-card__timer {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
 }
 
 .timer-icon {
-    font-size: 1rem;
+    font-size: var(--text-base);
 }
 
 .timer-value {
@@ -212,10 +212,10 @@ onUnmounted(() => {
     font-family: var(--font-mono);
     font-size: var(--text-base);
     color: var(--accent);
-    background: var(--accent-light);
-    padding: 3px var(--space-2-5);
+    background: var(--surface-3);
+    padding: var(--space-0-5) var(--space-2-5);
     border-radius: var(--radius-sm);
-    border: 1px solid var(--accent-border);
+    border: 1px solid var(--border);
 }
 
 .confirm-card__risk {
@@ -257,10 +257,9 @@ onUnmounted(() => {
     line-height: var(--leading-snug);
 }
 
-/* ── Reasoning section ── */
 .confirm-card__reasoning {
     margin-bottom: var(--space-3);
-    border: 1px solid var(--accent-border);
+    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     overflow: hidden;
 }
@@ -268,16 +267,16 @@ onUnmounted(() => {
 .reasoning-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    padding: 8px 12px;
-    background: var(--surface-2);
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
     font-size: var(--text-xs);
     text-align: left;
-    transition: background 120ms ease;
+    transition: background var(--transition-fast);
 }
 
 .reasoning-toggle:hover {
@@ -285,11 +284,11 @@ onUnmounted(() => {
 }
 
 .toggle-icon {
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
 }
 
 .reasoning-content {
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
     font-size: var(--text-xs);
     color: var(--text-secondary);
     max-height: 150px;
@@ -317,10 +316,10 @@ onUnmounted(() => {
     margin: 0;
     padding: var(--space-2) var(--space-3);
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     line-height: var(--leading-normal);
     color: var(--text-secondary);
-    background: var(--surface-inset);
+    background: var(--surface-1);
     border-radius: var(--radius-sm);
     overflow-x: auto;
     white-space: pre-wrap;
@@ -335,8 +334,8 @@ onUnmounted(() => {
 }
 
 .confirm-card__btn {
-    padding: 7px 18px;
-    font-size: var(--text-base);
+    padding: var(--space-2) var(--space-5);
+    font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
@@ -345,32 +344,31 @@ onUnmounted(() => {
 }
 
 .confirm-card__btn--approve {
-    background: var(--approve-bg);
-    border-color: var(--approve-border);
-    color: var(--approve);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface-0);
 }
 
 .confirm-card__btn--approve:hover {
-    background: var(--approve-bg-hover);
-    border-color: var(--approve-border-hover);
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
 }
 
 .confirm-card__btn--reject {
-    background: var(--error-bg);
-    border-color: var(--error-border);
-    color: var(--error);
+    background: transparent;
+    border-color: var(--border);
+    color: var(--danger);
 }
 
 .confirm-card__btn--reject:hover {
-    background: var(--error-bg-hover);
-    border-color: var(--error-border-hover);
+    background: var(--danger-light);
+    border-color: var(--danger-border);
 }
 
 .confirm-card__hint {
     margin: var(--space-3) 0 0;
     font-size: var(--text-xs);
-    color: var(--text-secondary);
-    opacity: 0.4;
+    color: var(--text-muted);
     text-align: center;
 }
 
@@ -387,7 +385,7 @@ onUnmounted(() => {
 @keyframes cardSlideIn {
     from {
         opacity: 0;
-        transform: translateY(-12px) scale(0.97);
+        transform: translateY(-8px) scale(0.98);
     }
 
     to {

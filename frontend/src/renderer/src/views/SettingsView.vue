@@ -284,8 +284,10 @@ onUnmounted(() => {
 
 <style scoped>
 /* ============================================================
-   Layout — Split panel (sidebar + scrollable content)
+   SettingsView — Supabase-inspired flat dashboard design
    ============================================================ */
+
+/* ── Layout ───────────────────────────────────────────────── */
 .sv {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -294,15 +296,17 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* ── Sidebar ──────────────────────────────────────────────── */
+/* ── Sidebar navigation ──────────────────────────────────── */
 .sv__nav {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-6) var(--space-3);
   border-right: 1px solid var(--border);
-  background: var(--surface-0);
+  background: var(--bg-primary);
   overflow-y: auto;
+  position: sticky;
+  top: 0;
 }
 
 .sv__nav::-webkit-scrollbar {
@@ -310,14 +314,15 @@ onUnmounted(() => {
 }
 
 .sv__nav-header {
-  padding: 0 var(--space-2) var(--space-4);
+  padding: 0 var(--space-2) var(--space-5);
 }
 
 .sv__title {
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: var(--weight-semibold, 600);
   letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .sv__nav-list {
@@ -326,19 +331,19 @@ onUnmounted(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .sv__nav-item {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 8px;
   width: 100%;
   padding: 8px var(--space-2);
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -348,18 +353,23 @@ onUnmounted(() => {
 }
 
 .sv__nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-primary);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
 }
 
 .sv__nav-item--active {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-selected);
   color: var(--text-primary);
 }
 
 .sv__nav-icon {
   flex-shrink: 0;
-  opacity: 0.65;
+  opacity: 0.5;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.sv__nav-item:hover .sv__nav-icon {
+  opacity: 0.7;
 }
 
 .sv__nav-item--active .sv__nav-icon {
@@ -371,10 +381,12 @@ onUnmounted(() => {
   overflow-y: auto;
   padding: var(--space-6) var(--space-8);
   scroll-behavior: smooth;
+  background: var(--bg-primary);
 }
 
+/* Ultra-thin scrollbar */
 .sv__content::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .sv__content::-webkit-scrollbar-track {
@@ -382,12 +394,12 @@ onUnmounted(() => {
 }
 
 .sv__content::-webkit-scrollbar-thumb {
-  background: var(--border-hover);
-  border-radius: 3px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
 }
 
 .sv__content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--surface-4);
 }
 
 /* ── Section ──────────────────────────────────────────────── */
@@ -397,14 +409,15 @@ onUnmounted(() => {
 }
 
 .sv__section-head {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .sv__section-title {
   margin: 0 0 var(--space-1) 0;
   font-size: var(--text-md);
-  font-weight: 600;
+  font-weight: var(--weight-semibold, 600);
   letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .sv__section-desc {
@@ -414,12 +427,12 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-/* ── Toggle row (label + switch) ─────────────────────────── */
+/* ── Group card (toggle rows) ────────────────────────────── */
 .sv__group {
-  background: var(--surface-1);
+  background: var(--surface-0);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-1) var(--space-4);
+  padding: 0 var(--space-4);
   margin-bottom: var(--space-4);
 }
 
@@ -440,12 +453,12 @@ onUnmounted(() => {
 
 .sv__row-label {
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: var(--weight-medium, 500);
   color: var(--text-primary);
 }
 
 .sv__row-hint {
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -458,38 +471,36 @@ onUnmounted(() => {
 /* ── Toggle switch ────────────────────────────────────────── */
 .sv__toggle {
   position: relative;
-  width: 40px;
-  height: 22px;
-  border-radius: 11px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--surface-3);
   cursor: pointer;
-  transition:
-    background 200ms ease,
-    border-color 200ms ease;
+  transition: background var(--duration-fast) ease;
   flex-shrink: 0;
   padding: 0;
 }
 
 .sv__toggle--on {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--accent);
 }
 
 .sv__toggle-thumb {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1), background 200ms ease;
+  background: var(--text-primary);
+  transition:
+    transform var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 
 .sv__toggle--on .sv__toggle-thumb {
-  transform: translateX(18px);
-  background: var(--text-primary);
+  transform: translateX(16px);
 }
 
 /* ── Warning banner ───────────────────────────────────────── */
@@ -499,10 +510,10 @@ onUnmounted(() => {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   margin: 0 0 var(--space-1) 0;
-  background: rgba(255, 170, 0, 0.06);
-  border: 1px solid rgba(255, 170, 0, 0.15);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   line-height: 1.45;
 }
@@ -510,13 +521,15 @@ onUnmounted(() => {
 .sv__warn svg {
   flex-shrink: 0;
   margin-top: 1px;
-  color: rgba(255, 170, 0, 0.7);
+  color: var(--warning);
 }
 
 /* Warning transition */
 .sv-warn-enter-active,
 .sv-warn-leave-active {
-  transition: all 200ms ease;
+  transition:
+    opacity var(--duration-fast) ease,
+    max-height var(--duration-fast) ease;
   overflow: hidden;
 }
 
@@ -551,7 +564,7 @@ onUnmounted(() => {
 .sv__field-label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: var(--weight-medium, 500);
 }
 
 .sv__input-wrap {
@@ -568,20 +581,19 @@ onUnmounted(() => {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: border-color var(--duration-fast) ease;
   box-sizing: border-box;
 }
 
 .sv__input:focus {
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  border-color: var(--border-hover);
 }
 
 .sv__input::placeholder {
   color: var(--text-muted);
 }
 
-/* select arrow fix */
+/* Select dropdown */
 select.sv__input {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -590,8 +602,26 @@ select.sv__input {
   padding-right: 32px;
 }
 
-/* ── Bottom spacer (so last section can scroll to top) ────── */
+/* ── Bottom spacer ────────────────────────────────────────── */
 .sv__spacer {
   height: 40vh;
+}
+
+/* ── Reduced motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+
+  .sv__nav-item,
+  .sv__nav-icon,
+  .sv__toggle,
+  .sv__toggle-thumb,
+  .sv__input,
+  .sv-warn-enter-active,
+  .sv-warn-leave-active {
+    transition: none;
+  }
+
+  .sv__content {
+    scroll-behavior: auto;
+  }
 }
 </style>

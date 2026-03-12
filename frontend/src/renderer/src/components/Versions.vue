@@ -11,3 +11,19 @@ const versions = reactive({ ...window.electron.process.versions })
     <li class="node-version">Node v{{ versions.node }}</li>
   </ul>
 </template>
+
+<style scoped>
+.versions {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.versions li {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  letter-spacing: var(--tracking-normal);
+}
+</style>

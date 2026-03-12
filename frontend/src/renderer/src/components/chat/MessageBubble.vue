@@ -124,10 +124,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ------------------------------------------------------------------ Row */
+/* MessageBubble — Supabase-clean */
+
+/* Row layout */
 .bubble-row {
   display: flex;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  position: relative;
 }
 
 .row--user {
@@ -139,89 +142,82 @@ onUnmounted(() => {
   justify-content: flex-start;
 }
 
-/* ------------------------------------------------------------- Bubble base */
+/* Bubble base */
 .bubble {
-  padding: var(--space-3) var(--space-4);
-  line-height: var(--leading-relaxed);
-  font-size: var(--text-sm);
   position: relative;
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
   word-break: break-word;
 }
 
-/* ------------------------------------------------------------- User bubble */
+/* User bubble */
 .bubble--user {
   max-width: 65%;
-  background: var(--surface-3);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  animation: slideInUser 250ms var(--ease-out-expo, cubic-bezier(0.19, 1, 0.22, 1)) both;
+  padding: var(--space-3) var(--space-4);
+  line-height: var(--leading-relaxed);
+  animation: bubbleFadeIn 150ms ease both;
 }
 
-.bubble--user:hover {
-  border-color: var(--border-hover);
-}
-
-/* --------------------------------------------------------- Assistant bubble */
+/* Assistant bubble */
 .bubble--assistant {
   max-width: 82%;
   background: transparent;
   border: none;
-  border-left: 2px solid var(--accent-medium);
   border-radius: 0;
-  padding: var(--space-2-5) var(--space-4) var(--space-2-5) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   color: var(--text-primary);
-  animation: slideInAssistant 250ms var(--ease-out-expo, cubic-bezier(0.19, 1, 0.22, 1)) both;
+  line-height: var(--leading-relaxed);
+  animation: bubbleFadeIn 150ms ease both;
 }
 
-.bubble--assistant:hover {
-  border-left-color: var(--accent-border);
-}
-
-/* ------------------------------------------------------------- Tool bubble */
+/* Tool result bubble */
 .bubble--tool {
   max-width: 78%;
-  background: var(--surface-2);
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--text-muted);
-  animation: slideInAssistant 250ms ease-out both;
+  color: var(--text-secondary);
+  padding: var(--space-3) var(--space-4);
+  line-height: var(--leading-relaxed);
+  animation: bubbleFadeIn 150ms ease both;
 }
 
-/* -------------------------------------------------------- Attachments */
+/* Attachments */
 .bubble__attachments {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-bottom: var(--space-2-5);
+  margin-bottom: var(--space-3);
 }
 
 .bubble__attachment {
-  width: 140px;
-  height: 100px;
-  border-radius: var(--radius-md);
+  width: 144px;
+  height: 104px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  border: 1px solid var(--border);
+  transition: border-color var(--transition-fast);
 }
 
 .bubble__attachment:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 12px rgba(201, 168, 76, 0.1);
+  border-color: var(--accent-border);
 }
 
 .bubble__attachment img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
-/* --------------------------------------------------------- Content */
+/* Content typography */
 .bubble__content {
   overflow-wrap: break-word;
   user-select: text;
@@ -229,7 +225,7 @@ onUnmounted(() => {
 }
 
 .bubble__content :deep(p) {
-  margin: 0 0 0.45em;
+  margin: 0 0 0.5em;
 }
 
 .bubble__content :deep(p:last-child) {
@@ -239,7 +235,7 @@ onUnmounted(() => {
 .bubble__content :deep(a) {
   color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: rgba(201, 168, 76, 0.3);
+  text-decoration-color: var(--accent-border);
   text-underline-offset: 2px;
   transition: text-decoration-color var(--transition-fast);
 }
@@ -248,46 +244,48 @@ onUnmounted(() => {
   text-decoration-color: var(--accent);
 }
 
-/* ----- Code block styles are in assets/styles/code-blocks.css */
-
 .bubble__content :deep(ul),
 .bubble__content :deep(ol) {
   padding-left: 1.4em;
-  margin: 0.3em 0;
+  margin: 0.4em 0;
 }
 
 .bubble__content :deep(blockquote) {
-  border-left: 3px solid var(--accent);
+  border-left: 2px solid var(--border);
   margin: 0.5em 0;
-  padding: 0.25em 0.8em;
+  padding: var(--space-2) var(--space-3);
   color: var(--text-secondary);
 }
 
-/* --------------------------------------------------------- Timestamp */
+/* Timestamp — hover to reveal, positioned to the side */
 .bubble__time {
-  display: block;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: var(--text-2xs);
   color: var(--text-muted);
-  margin-top: 4px;
   opacity: 0;
-  letter-spacing: 0.02em;
-  transition: opacity 120ms ease;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
 }
 
 .bubble:hover .bubble__time {
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .row--user .bubble__time {
-  text-align: right;
+  right: calc(100% + var(--space-3));
+  left: auto;
 }
 
 .row--assistant .bubble__time,
 .row--tool .bubble__time {
-  text-align: left;
+  left: calc(100% + var(--space-3));
+  right: auto;
 }
 
-/* ------------------------------------------------- Image overlay */
+/* Image overlay */
 .image-overlay {
   position: fixed;
   inset: 0;
@@ -295,74 +293,46 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  animation: fadeIn 0.25s ease;
+  background: var(--black-overlay);
+  animation: overlayFadeIn 200ms ease both;
 }
 
 .image-overlay__close {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-full);
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: none;
+  border: none;
+  padding: var(--space-2);
   cursor: pointer;
-  color: var(--text-primary);
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
 }
 
 .image-overlay__close:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
+  color: var(--text-primary);
 }
 
 .image-overlay__img {
   max-width: 90vw;
-  max-height: 90vh;
+  max-height: 88vh;
   object-fit: contain;
   border-radius: var(--radius-md);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
-  animation: overlayZoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: overlayZoomIn 250ms ease both;
 }
 
-/* ------------------------------------------------------------- Keyframes */
-@keyframes slideInUser {
+/* Keyframes */
+@keyframes bubbleFadeIn {
   from {
     opacity: 0;
-    transform: translateX(14px);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
-@keyframes slideInAssistant {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes fadeIn {
+@keyframes overlayFadeIn {
   from {
     opacity: 0;
   }
@@ -375,7 +345,7 @@ onUnmounted(() => {
 @keyframes overlayZoomIn {
   from {
     opacity: 0;
-    transform: scale(0.92);
+    transform: scale(0.96);
   }
 
   to {
@@ -384,29 +354,17 @@ onUnmounted(() => {
   }
 }
 
-/* ------------------------------------------------- Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 
   .bubble--user,
   .bubble--assistant,
-  .bubble--tool {
-    animation: none;
-  }
-
-  .bubble--user:hover {
-    transform: none;
-  }
-
-  .image-overlay {
-    animation: none;
-  }
-
+  .bubble--tool,
+  .image-overlay,
   .image-overlay__img {
     animation: none;
   }
 
   .bubble__time,
-  .bubble--assistant,
   .bubble__attachment,
   .image-overlay__close {
     transition: none;

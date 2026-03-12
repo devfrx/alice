@@ -47,6 +47,7 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped>
+/* Ultra-subtle ambient background — barely visible */
 .ambient {
     position: absolute;
     inset: 0;
@@ -57,204 +58,79 @@ withDefaults(defineProps<{
 
 .ambient--subtle .ambient__particles,
 .ambient--subtle .ambient__waves {
-    opacity: 0.4;
+    opacity: 0.2;
 }
 
-/* ── Gradient Mesh ─────────────────────────────────────── */
+/* ── Gradient Mesh — single soft radial ── */
 .ambient__mesh {
     position: absolute;
     inset: 0;
-    background:
-        radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76, 0.04) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.03) 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, rgba(201, 168, 76, 0.02) 0%, transparent 50%);
-    animation: meshDrift 20s ease-in-out infinite;
+    background: radial-gradient(ellipse at 50% 40%, var(--accent-faint) 0%, transparent 70%);
+    transition: background var(--transition-slow);
 }
 
 .ambient--listening .ambient__mesh {
-    background:
-        radial-gradient(ellipse at 20% 50%, rgba(231, 76, 60, 0.04) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.03) 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, rgba(231, 76, 60, 0.02) 0%, transparent 50%);
+    background: radial-gradient(ellipse at 50% 40%, var(--listening-dim) 0%, transparent 70%);
 }
 
 .ambient--thinking .ambient__mesh {
-    background:
-        radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.05) 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, rgba(201, 168, 76, 0.04) 0%, transparent 50%);
-    animation: meshDrift 10s ease-in-out infinite;
+    background: radial-gradient(ellipse at 50% 40%, var(--thinking-dim) 0%, transparent 70%);
 }
 
 .ambient--speaking .ambient__mesh {
-    background:
-        radial-gradient(ellipse at 20% 50%, rgba(46, 204, 113, 0.04) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.03) 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, rgba(46, 204, 113, 0.02) 0%, transparent 50%);
+    background: radial-gradient(ellipse at 50% 40%, var(--speaking-dim) 0%, transparent 70%);
 }
 
-/* ── Particles ─────────────────────────────────────────── */
+/* ── Particles — hidden for clean look ── */
 .ambient__particles {
     position: absolute;
     inset: 0;
+    display: none;
 }
 
 .ambient__particle {
-    position: absolute;
-    width: var(--size);
-    height: var(--size);
-    left: var(--x-start);
-    top: var(--y-start);
-    border-radius: 50%;
-    background: rgba(201, 168, 76, var(--opacity));
-    animation: particleFloat var(--duration) var(--delay) ease-in-out infinite;
+    display: none;
 }
 
-.ambient--listening .ambient__particle:nth-child(odd) {
-    background: rgba(231, 76, 60, var(--opacity));
-}
-
-.ambient--speaking .ambient__particle:nth-child(odd) {
-    background: rgba(46, 204, 113, var(--opacity));
-}
-
-/* ── Waves ─────────────────────────────────────────────── */
+/* ── Waves — hidden ── */
 .ambient__waves {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30%;
+    display: none;
 }
 
 .ambient__wave {
-    position: absolute;
-    bottom: 0;
-    left: -10%;
-    right: -10%;
-    height: 100%;
-    border-radius: 50% 50% 0 0;
-    opacity: 0.5;
+    display: none;
 }
 
-.ambient__wave--1 {
-    background: linear-gradient(0deg, rgba(201, 168, 76, 0.03) 0%, transparent 100%);
-    animation: wave 8s ease-in-out infinite;
-}
-
-.ambient__wave--2 {
-    background: linear-gradient(0deg, rgba(201, 168, 76, 0.02) 0%, transparent 100%);
-    animation: wave 12s ease-in-out infinite reverse;
-    transform: translateX(5%);
-}
-
-.ambient__wave--3 {
-    background: linear-gradient(0deg, rgba(201, 168, 76, 0.015) 0%, transparent 100%);
-    animation: wave 15s ease-in-out infinite;
-    transform: translateX(-5%);
-}
-
-/* ── Spotlight ─────────────────────────────────────────── */
+/* ── Spotlight — very subtle center glow ── */
 .ambient__spotlight {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 60%;
-    height: 60%;
+    width: 50%;
+    height: 50%;
     transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(201, 168, 76, 0.04) 0%, transparent 70%);
-    animation: spotlightBreathing 6s ease-in-out infinite;
+    border-radius: var(--radius-full);
+    background: radial-gradient(circle, var(--accent-faint) 0%, transparent 70%);
+    opacity: 0.5;
+    transition: opacity var(--transition-slow), background var(--transition-slow);
 }
 
 .ambient--thinking .ambient__spotlight {
-    animation: spotlightBreathing 3s ease-in-out infinite;
-    background: radial-gradient(circle, rgba(201, 168, 76, 0.08) 0%, transparent 70%);
+    opacity: 0.7;
 }
 
 .ambient--listening .ambient__spotlight {
-    background: radial-gradient(circle, rgba(231, 76, 60, 0.05) 0%, transparent 70%);
+    background: radial-gradient(circle, var(--listening-dim) 0%, transparent 70%);
+    opacity: 0.4;
 }
 
-/* ── Grid ──────────────────────────────────────────────── */
+.ambient--speaking .ambient__spotlight {
+    background: radial-gradient(circle, var(--speaking-dim) 0%, transparent 70%);
+    opacity: 0.4;
+}
+
+/* ── Grid — hidden ── */
 .ambient__grid {
-    position: absolute;
-    inset: 0;
-    background-image:
-        linear-gradient(rgba(201, 168, 76, 0.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(201, 168, 76, 0.015) 1px, transparent 1px);
-    background-size: 60px 60px;
-    mask-image: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.5) 0%, transparent 70%);
-    -webkit-mask-image: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.5) 0%, transparent 70%);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Keyframes
-   ═══════════════════════════════════════════════════════════ */
-
-@keyframes meshDrift {
-
-    0%,
-    100% {
-        transform: translate(0, 0) scale(1);
-    }
-
-    33% {
-        transform: translate(2%, -1%) scale(1.02);
-    }
-
-    66% {
-        transform: translate(-1%, 2%) scale(0.98);
-    }
-}
-
-@keyframes particleFloat {
-
-    0%,
-    100% {
-        transform: translate(0, 0) scale(1);
-        opacity: var(--opacity);
-    }
-
-    25% {
-        transform: translate(20px, -30px) scale(1.2);
-        opacity: calc(var(--opacity) * 1.5);
-    }
-
-    50% {
-        transform: translate(-10px, -50px) scale(0.8);
-        opacity: calc(var(--opacity) * 0.6);
-    }
-
-    75% {
-        transform: translate(15px, -20px) scale(1.1);
-        opacity: var(--opacity);
-    }
-}
-
-@keyframes wave {
-
-    0%,
-    100% {
-        transform: translateY(0) scaleY(1);
-    }
-
-    50% {
-        transform: translateY(-10px) scaleY(1.1);
-    }
-}
-
-@keyframes spotlightBreathing {
-
-    0%,
-    100% {
-        opacity: 0.8;
-        transform: translate(-50%, -50%) scale(1);
-    }
-
-    50% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.1);
-    }
+    display: none;
 }
 </style>

@@ -49,10 +49,10 @@ withDefaults(defineProps<UiDividerProps>(), {
 
 .ui-divider__label {
     padding: 0 var(--space-3);
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
     font-weight: var(--weight-medium);
     color: var(--text-muted);
-    letter-spacing: var(--tracking-wider);
+    letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
     white-space: nowrap;
 }

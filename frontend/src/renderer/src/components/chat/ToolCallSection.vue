@@ -81,62 +81,60 @@ function formatArgs(args: string): string {
 </template>
 
 <style scoped>
+/* ToolCallSection — Supabase-clean */
+
 .tool-section {
-    margin-bottom: var(--space-2-5);
+    position: relative;
+    margin-bottom: var(--space-2);
 }
 
-/* --------------------------------------------------------- Header / toggle */
 .tool-section__toggle {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 5px 0;
+    padding: var(--space-1-5) 0;
     background: none;
     border: none;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
     cursor: pointer;
     text-align: left;
-    border-radius: var(--radius-sm);
     transition: color var(--transition-fast);
-    user-select: none;
 }
 
 .tool-section__toggle:hover {
-    color: var(--text-secondary);
+    color: var(--text-primary);
 }
 
 .tool-section__icon {
     flex-shrink: 0;
-    opacity: 0.55;
-    color: var(--accent);
+    width: 12px;
+    height: 12px;
+    color: var(--text-secondary);
 }
 
 .tool-section__label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
     flex: 1;
     text-align: left;
+    font-size: var(--text-xs);
+    color: inherit;
 }
 
 .tool-section__count {
-    font-family: var(--font-mono);
     font-size: var(--text-2xs);
-    color: var(--accent);
-    background: var(--accent-dim);
-    border: 1px solid var(--accent-border);
-    padding: var(--space-px) var(--space-2);
-    border-radius: var(--space-2-5);
-    letter-spacing: 0;
-    line-height: var(--leading-loose);
+    color: var(--text-muted);
+    background: var(--surface-3);
+    padding: var(--space-0-5) var(--space-2);
+    border-radius: var(--radius-pill);
+    line-height: var(--leading-snug);
 }
 
 .tool-section__chevron {
     flex-shrink: 0;
-    opacity: var(--opacity-dim);
+    width: 10px;
+    height: 10px;
+    color: var(--text-muted);
     transition: transform var(--transition-fast);
 }
 
@@ -144,14 +142,14 @@ function formatArgs(args: string): string {
     transform: rotate(180deg);
 }
 
-/* --------------------------------------------------------- Chips strip */
+/* Chips (collapsed) */
 .tool-section__chips {
     display: grid;
     grid-template-rows: 1fr;
     opacity: 1;
     transition:
-        grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.25s ease;
+        grid-template-rows var(--duration-normal) ease,
+        opacity var(--duration-normal) ease;
 }
 
 .tool-section__chips--hidden {
@@ -164,8 +162,8 @@ function formatArgs(args: string): string {
     overflow: hidden;
     min-height: 0;
     display: flex;
-    gap: var(--space-1-5);
-    padding: 3px 0 var(--space-2);
+    gap: var(--space-2);
+    padding: var(--space-1) 0 var(--space-2);
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -177,33 +175,38 @@ function formatArgs(args: string): string {
 .tool-section__chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 10px 3px 7px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
+    gap: var(--space-1);
+    padding: var(--space-0-5) var(--space-2);
+    background: var(--surface-3);
+    border: none;
+    border-radius: var(--radius-pill);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-secondary);
     white-space: nowrap;
     flex-shrink: 0;
-    line-height: var(--leading-snug);
+    transition: color var(--transition-fast);
+}
+
+.tool-section__chip:hover {
+    color: var(--text-primary);
 }
 
 .tool-section__chip svg {
     flex-shrink: 0;
-    opacity: var(--opacity-muted);
-    color: var(--accent);
+    width: 8px;
+    height: 8px;
+    color: var(--text-muted);
 }
 
-/* --------------------------------------------------------- Expanded body */
+/* Expanded body */
 .tool-section__body {
     display: grid;
     grid-template-rows: 1fr;
     opacity: 1;
     transition:
-        grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.3s ease;
+        grid-template-rows var(--duration-normal) ease,
+        opacity var(--duration-normal) ease;
 }
 
 .tool-section__body--collapsed {
@@ -217,26 +220,23 @@ function formatArgs(args: string): string {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1-5);
-    padding: 3px 0 var(--space-2);
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
 }
 
-/* --------------------------------------------------------- Tool call card */
 .tool-section__card {
-    background: var(--surface-1);
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    border-left: 2px solid var(--accent-border);
     border-radius: var(--radius-sm);
     overflow: hidden;
+    padding: var(--space-3);
 }
 
 .tool-section__card-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-1-5) var(--space-2-5) 5px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-2);
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
 }
 
 .tool-section__fn-name {
@@ -244,30 +244,44 @@ function formatArgs(args: string): string {
     font-size: var(--text-sm);
     color: var(--accent);
     font-weight: var(--weight-medium);
-    letter-spacing: var(--tracking-tight);
 }
 
 .tool-section__call-id {
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     color: var(--text-muted);
-    letter-spacing: 0.06em;
-    opacity: 0.65;
 }
 
 .tool-section__args {
     margin: 0;
     padding: var(--space-2) var(--space-3);
     font-family: var(--font-mono);
-    font-size: 0.7rem;
-    line-height: 1.65;
+    font-size: var(--text-xs);
+    line-height: 1.6;
     color: var(--text-secondary);
-    background: transparent;
+    background: var(--surface-1);
+    border-radius: var(--radius-sm);
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-word;
     user-select: text;
     cursor: text;
+    max-height: 240px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.tool-section__args::-webkit-scrollbar {
+    width: 3px;
+}
+
+.tool-section__args::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tool-section__args::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: var(--radius-xs);
 }
 
 .tool-section__args code {
@@ -277,20 +291,19 @@ function formatArgs(args: string): string {
     background: none;
 }
 
-/* --------------------------------------------------------- Separator */
 .tool-section__separator {
-    height: var(--space-px);
+    height: 1px;
+    margin: var(--space-2) 0;
     background: var(--border);
-    margin: var(--space-0-5) 0 var(--space-1-5);
 }
 
-/* ------------------------------------------------- Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 
     .tool-section__chips,
     .tool-section__body,
     .tool-section__chevron,
-    .tool-section__toggle {
+    .tool-section__toggle,
+    .tool-section__chip {
         transition: none;
     }
 }

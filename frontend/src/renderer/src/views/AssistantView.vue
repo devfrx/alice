@@ -224,7 +224,7 @@ onMounted(() => {
     padding: var(--space-4) 0;
 }
 
-/* Orb wrapper: no overflow clipping so glow/fog/ripples render fully */
+/* Orb wrapper: no overflow clipping so effects render fully */
 .assistant-view__orb-wrapper {
     position: relative;
     flex-shrink: 0;
@@ -248,13 +248,13 @@ onMounted(() => {
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    transition: background 120ms ease, border-color 120ms ease;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
     z-index: 5;
 }
 
 .assistant-view__stop-hint:hover {
     background: var(--surface-3);
-    border-color: var(--accent-border);
+    border-color: var(--border-hover);
 }
 
 /* Stop hint transitions */
@@ -295,7 +295,7 @@ onMounted(() => {
 /* Transitions */
 .response-fade-enter-active,
 .response-fade-leave-active {
-    transition: opacity 0.3s var(--ease-out-expo), transform 0.3s var(--ease-out-expo);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .response-fade-enter-from {

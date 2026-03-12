@@ -36,27 +36,21 @@ withDefaults(defineProps<UiTooltipProps>(), {
     position: absolute;
     z-index: var(--z-dropdown);
     padding: var(--space-1) var(--space-2);
-    background: var(--surface-4);
+    background: var(--surface-3);
     color: var(--text-primary);
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
     font-weight: var(--weight-medium);
-    letter-spacing: var(--tracking-tight);
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-elevated);
+    box-shadow: var(--shadow-md);
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transform: scale(0.95);
-    transition:
-        opacity 150ms ease,
-        transform 150ms var(--ease-spring);
+    transition: opacity var(--transition-fast);
     transition-delay: 0ms;
 }
 
 .ui-tooltip-wrapper:hover .ui-tooltip {
     opacity: 1;
-    transform: scale(1);
     transition-delay: var(--tooltip-delay);
 }
 
@@ -64,40 +58,24 @@ withDefaults(defineProps<UiTooltipProps>(), {
 .ui-tooltip-wrapper--top .ui-tooltip {
     bottom: calc(100% + 6px);
     left: 50%;
-    transform: translateX(-50%) scale(0.95);
-}
-
-.ui-tooltip-wrapper--top:hover .ui-tooltip {
-    transform: translateX(-50%) scale(1);
+    transform: translateX(-50%);
 }
 
 .ui-tooltip-wrapper--bottom .ui-tooltip {
     top: calc(100% + 6px);
     left: 50%;
-    transform: translateX(-50%) scale(0.95);
-}
-
-.ui-tooltip-wrapper--bottom:hover .ui-tooltip {
-    transform: translateX(-50%) scale(1);
+    transform: translateX(-50%);
 }
 
 .ui-tooltip-wrapper--left .ui-tooltip {
     right: calc(100% + 6px);
     top: 50%;
-    transform: translateY(-50%) scale(0.95);
-}
-
-.ui-tooltip-wrapper--left:hover .ui-tooltip {
-    transform: translateY(-50%) scale(1);
+    transform: translateY(-50%);
 }
 
 .ui-tooltip-wrapper--right .ui-tooltip {
     left: calc(100% + 6px);
     top: 50%;
-    transform: translateY(-50%) scale(0.95);
-}
-
-.ui-tooltip-wrapper--right:hover .ui-tooltip {
-    transform: translateY(-50%) scale(1);
+    transform: translateY(-50%);
 }
 </style>

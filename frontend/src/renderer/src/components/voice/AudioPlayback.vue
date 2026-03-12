@@ -100,17 +100,8 @@ defineExpose({ enqueueChunk, cancelPlayback })
   <Transition name="fade">
     <div v-if="isPlaying" class="ap" role="status" aria-label="Riproduzione audio TTS">
       <!-- Speaking icon -->
-      <svg
-        class="ap__icon"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
+      <svg class="ap__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
         <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
@@ -118,15 +109,8 @@ defineExpose({ enqueueChunk, cancelPlayback })
       <span class="ap__label">TTS</span>
       <!-- Cancel button -->
       <button class="ap__cancel" aria-label="Interrompi audio" @click="cancelPlayback">
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-        >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
@@ -139,17 +123,21 @@ defineExpose({ enqueueChunk, cancelPlayback })
 .ap {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 10px;
-  background: rgba(46, 204, 113, 0.1);
-  color: #2ecc71;
-  font-size: 0.72rem;
-  font-weight: 500;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--speaking-dim);
+  color: var(--speaking);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
 }
 
 .ap__icon {
   flex-shrink: 0;
+}
+
+.ap__label {
+  letter-spacing: 0.02em;
 }
 
 .ap__cancel {
@@ -159,20 +147,20 @@ defineExpose({ enqueueChunk, cancelPlayback })
   width: 18px;
   height: 18px;
   border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  background: var(--surface-hover);
   color: inherit;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 
 .ap__cancel:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--surface-active);
 }
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-fast);
 }
 
 .fade-enter-from,

@@ -57,36 +57,22 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
     position: relative;
     max-width: 420px;
     width: 100%;
-    padding: var(--space-3, 12px) var(--space-4, 16px);
-    background: var(--surface-1, #13161e);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.06));
-    border-radius: var(--radius-lg, 12px);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     overflow: hidden;
-    transition: border-color 0.25s var(--ease-out-expo), box-shadow 0.25s var(--ease-out-expo);
+    transition: border-color var(--transition-fast);
 }
 
 /* ── Phase: Listening ── */
 .assistant-transcript--listening {
-    border-color: rgba(231, 76, 60, 0.3);
-    box-shadow: 0 0 20px rgba(231, 76, 60, 0.06);
-    animation: listening-border-pulse 2s ease-in-out infinite;
-}
-
-@keyframes listening-border-pulse {
-
-    0%,
-    100% {
-        border-color: rgba(231, 76, 60, 0.2);
-    }
-
-    50% {
-        border-color: rgba(231, 76, 60, 0.45);
-    }
+    border-color: var(--listening-border);
 }
 
 /* ── Phase: Processing ── */
 .assistant-transcript--processing {
-    border-color: rgba(201, 168, 76, 0.2);
+    border-color: var(--thinking-border);
 }
 
 /* ── Audio level bar ── */
@@ -96,12 +82,12 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
     left: 0;
     right: 0;
     height: 2px;
-    background: rgba(231, 76, 60, 0.1);
+    background: var(--listening-dim);
 }
 
 .transcript-audio-bar__fill {
     height: 100%;
-    background: var(--listening, #e74c3c);
+    background: var(--listening);
     border-radius: 0 1px 1px 0;
     transition: width 0.08s linear;
 }
@@ -110,7 +96,7 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
 .transcript-inner {
     display: flex;
     align-items: center;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
     position: relative;
     z-index: 1;
 }
@@ -118,13 +104,13 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
 /* ── Mic icon ── */
 .transcript-icon {
     flex-shrink: 0;
-    color: var(--text-secondary, #8a8578);
+    color: var(--text-secondary);
     display: flex;
-    transition: color 0.2s ease;
+    transition: color var(--transition-fast);
 }
 
 .transcript-icon--active {
-    color: var(--listening, #e74c3c);
+    color: var(--listening);
     animation: icon-pulse 1.5s ease-in-out infinite;
 }
 
@@ -142,16 +128,16 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
 
 /* ── Text ── */
 .transcript-text {
-    color: var(--text-primary, #e8e4de);
-    font-size: var(--text-sm, 0.8125rem);
-    line-height: 1.5;
+    color: var(--text-primary);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
 }
 
 .transcript-placeholder {
-    color: var(--text-secondary, #8a8578);
-    font-size: var(--text-sm, 0.8125rem);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
     font-style: italic;
-    opacity: 0.7;
+    opacity: var(--opacity-medium);
 }
 
 /* ── Processing shimmer ── */
@@ -160,7 +146,7 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
     inset: 0;
     background: linear-gradient(90deg,
             transparent 0%,
-            rgba(201, 168, 76, 0.06) 50%,
+            var(--accent-faint) 50%,
             transparent 100%);
     background-size: 200% 100%;
     animation: shimmer 1.8s ease-in-out infinite;
@@ -174,6 +160,14 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
 
     100% {
         background-position: -200% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .transcript-icon--active,
+    .transcript-shimmer {
+        animation: none;
     }
 }
 </style>

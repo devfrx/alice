@@ -62,8 +62,6 @@ function onInput(e: Event) {
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
     color: var(--text-secondary);
-    letter-spacing: var(--tracking-normal);
-    text-transform: uppercase;
 }
 
 .ui-input__wrapper {
@@ -71,11 +69,10 @@ function onInput(e: Event) {
     align-items: center;
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     transition:
-        border-color 150ms ease,
-        box-shadow 150ms ease,
-        background-color 150ms ease;
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast);
 }
 
 .ui-input__wrapper:hover:not(.ui-input--disabled .ui-input__wrapper) {
@@ -84,8 +81,7 @@ function onInput(e: Event) {
 
 .ui-input__wrapper:focus-within {
     border-color: var(--accent-border);
-    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.08);
-    background: var(--surface-0);
+    box-shadow: var(--shadow-focus);
 }
 
 .ui-input__field {
@@ -160,7 +156,7 @@ function onInput(e: Event) {
 }
 
 .ui-input--error .ui-input__wrapper:focus-within {
-    box-shadow: 0 0 0 3px rgba(196, 92, 92, 0.1);
+    box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px var(--danger-border);
 }
 
 .ui-input__error {
@@ -172,5 +168,9 @@ function onInput(e: Event) {
 .ui-input--disabled {
     opacity: var(--opacity-disabled);
     pointer-events: none;
+}
+
+.ui-input--disabled .ui-input__wrapper {
+    background: var(--surface-inset);
 }
 </style>

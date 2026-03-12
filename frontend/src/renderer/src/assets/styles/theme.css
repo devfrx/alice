@@ -1,93 +1,93 @@
 /*
  * ═══════════════════════════════════════════════════════════════
  *  O.M.N.I.A. — Centralized Design Tokens & Theme
- *  World-class AI agent interface
- *  Inspired by: Linear, Apple, Stripe, Notion
+ *  Ultra-clean AI agent interface
+ *  Inspired by: Supabase dashboard — warm cream on dark charcoal
  * ═══════════════════════════════════════════════════════════════
  */
 
 /* ── Backgrounds ───────────────────────────────────────────── */
 :root {
-  --bg-primary: #0c0e12;                       /* Deep dark, slightly warm */
-  --bg-secondary: #13161c;                     /* Panel / sidebar */
-  --bg-tertiary: #1a1e26;                      /* Elevated surfaces (cards, tooltips) */
-  --bg-input: rgba(255, 255, 255, 0.03);       /* Input fields */
-  --bg-tool: rgba(30, 34, 42, 0.6);           /* Tool/code bubble background */
+  --bg-primary: #161616;                       /* Neutral charcoal base */
+  --bg-secondary: #1C1C1C;                     /* Panel / sidebar */
+  --bg-tertiary: #232323;                      /* Elevated surfaces (cards, tooltips) */
+  --bg-input: rgba(237, 227, 213, 0.04);       /* Input fields */
+  --bg-tool: rgba(35, 35, 35, 0.8);           /* Tool/code bubble background */
 }
 
 /* ── Surface Elevation System ──────────────────────────────── */
 :root {
-  --surface-0: #0c0e12;                        /* Base layer — page background */
-  --surface-1: #12151b;                        /* Sidebar, panels */
-  --surface-2: #181c24;                        /* Cards, dropdowns */
-  --surface-3: #1e232d;                        /* Elevated cards, popovers */
-  --surface-4: #252a36;                        /* Maximum elevation */
-  --surface-hover: rgba(255, 255, 255, 0.04);  /* Interactive surface hover */
-  --surface-active: rgba(255, 255, 255, 0.06); /* Interactive surface active/pressed */
-  --surface-selected: rgba(201, 168, 76, 0.08);/* Selected item background */
-  --surface-inset: rgba(0, 0, 0, 0.15);        /* Inset surfaces (well, trough) */
+  --surface-0: #161616;                        /* Base layer — page background */
+  --surface-1: #1C1C1C;                        /* Sidebar, panels */
+  --surface-2: #232323;                        /* Cards, dropdowns */
+  --surface-3: #2A2A2A;                        /* Elevated cards, popovers */
+  --surface-4: #323232;                        /* Maximum elevation */
+  --surface-hover: rgba(237, 227, 213, 0.04);  /* Interactive surface hover */
+  --surface-active: rgba(237, 227, 213, 0.06); /* Interactive surface active/pressed */
+  --surface-selected: rgba(237, 227, 213, 0.08);/* Selected item background */
+  --surface-inset: rgba(0, 0, 0, 0.2);         /* Inset surfaces (well, trough) */
 }
 
 /* ── Typography ────────────────────────────────────────────── */
 :root {
-  --text-primary: #e8e4de;                     /* Warm off-white */
-  --text-secondary: #8a8578;                   /* Muted warm gray */
-  --text-muted: #5c584f;                       /* Very subtle */
+  --text-primary: #EDEDE9;                     /* Warm off-white */
+  --text-secondary: #A09B90;                   /* Muted warm gray */
+  --text-muted: #5F5B53;                       /* Very subtle */
 }
 
-/* ── Accent — Warm Gold ────────────────────────────────────── */
+/* ── Accent — Warm Cream "Panna" ───────────────────────────── */
 :root {
-  --accent: #c9a84c;                           /* Primary gold accent */
-  --accent-hover: #d4b65e;                     /* Lighter gold on hover */
-  --accent-dim: rgba(201, 168, 76, 0.12);     /* Subtle gold fill */
-  --accent-border: rgba(201, 168, 76, 0.25);  /* Gold border */
-  --accent-glow: rgba(201, 168, 76, 0.08);    /* Subtle glow */
-  --accent-faint: rgba(201, 168, 76, 0.03);   /* Barely visible tint */
-  --accent-subtle: rgba(201, 168, 76, 0.06);  /* Subtle tint for banners */
-  --accent-light: rgba(201, 168, 76, 0.10);   /* Light fill */
-  --accent-medium: rgba(201, 168, 76, 0.18);  /* Medium fill / borders */
-  --accent-strong: rgba(201, 168, 76, 0.22);  /* Strong fill on hover */
-  --accent-vivid: rgba(201, 168, 76, 0.35);   /* Scrollbar hover / heavy fill */
-  --accent-text-glow: 0 0 30px rgba(201, 168, 76, 0.15); /* Text shadow glow */
+  --accent: #E8DCC8;                           /* Primary cream accent */
+  --accent-hover: #F5EDE0;                     /* Lighter cream on hover */
+  --accent-dim: rgba(232, 220, 200, 0.10);    /* Subtle cream fill */
+  --accent-border: rgba(232, 220, 200, 0.20); /* Cream border */
+  --accent-glow: rgba(232, 220, 200, 0.06);   /* Subtle glow */
+  --accent-faint: rgba(232, 220, 200, 0.03);  /* Barely visible tint */
+  --accent-subtle: rgba(232, 220, 200, 0.05); /* Subtle tint for banners */
+  --accent-light: rgba(232, 220, 200, 0.08);  /* Light fill */
+  --accent-medium: rgba(232, 220, 200, 0.15); /* Medium fill / borders */
+  --accent-strong: rgba(232, 220, 200, 0.20); /* Strong fill on hover */
+  --accent-vivid: rgba(232, 220, 200, 0.30);  /* Scrollbar hover / heavy fill */
+  --accent-text-glow: 0 0 20px rgba(232, 220, 200, 0.08); /* Text shadow glow */
 }
 
 /* ── Semantic Colors ───────────────────────────────────────── */
 :root {
-  --danger: #c45c5c;                           /* Muted red — destructive actions */
-  --danger-hover: rgba(196, 92, 92, 0.2);
-  --danger-faint: rgba(196, 92, 92, 0.04);    /* Error boundary bg */
-  --danger-light: rgba(196, 92, 92, 0.1);     /* Error state bg */
-  --danger-medium: rgba(196, 92, 92, 0.22);   /* Stop button hover */
-  --danger-border: rgba(196, 92, 92, 0.35);   /* Danger button border */
-  --danger-strong: rgba(196, 92, 92, 0.4);    /* Stop ring/border */
-  --danger-glow: rgba(196, 92, 92, 0.5);      /* Error dot glow */
+  --danger: #B85C5C;                           /* Muted red — destructive actions */
+  --danger-hover: rgba(184, 92, 92, 0.15);
+  --danger-faint: rgba(184, 92, 92, 0.04);    /* Error boundary bg */
+  --danger-light: rgba(184, 92, 92, 0.1);     /* Error state bg */
+  --danger-medium: rgba(184, 92, 92, 0.18);   /* Stop button hover */
+  --danger-border: rgba(184, 92, 92, 0.30);   /* Danger button border */
+  --danger-strong: rgba(184, 92, 92, 0.35);   /* Stop ring/border */
+  --danger-glow: rgba(184, 92, 92, 0.4);      /* Error dot glow */
 
-  --success: #5c9a6e;                          /* Muted green — positive status */
-  --success-glow: rgba(92, 154, 110, 0.5);
+  --success: #5C9A6E;                          /* Muted green — positive status */
+  --success-glow: rgba(92, 154, 110, 0.4);
   --success-faint: rgba(92, 154, 110, 0.03);  /* Loaded model row tint */
   --success-light: rgba(92, 154, 110, 0.1);   /* Status badge bg */
-  --success-medium: rgba(92, 154, 110, 0.15); /* Loaded badge bg */
-  --success-border: rgba(92, 154, 110, 0.3);  /* Loaded badge border */
+  --success-medium: rgba(92, 154, 110, 0.12); /* Loaded badge bg */
+  --success-border: rgba(92, 154, 110, 0.25); /* Loaded badge border */
 
-  --warning: #fbbf24;                          /* Amber — medium risk */
-  --warning-bg: rgba(251, 191, 36, 0.1);
-  --warning-border: rgba(251, 191, 36, 0.3);
+  --warning: #D4A72C;                          /* Amber — medium risk */
+  --warning-bg: rgba(212, 167, 44, 0.1);
+  --warning-border: rgba(212, 167, 44, 0.25);
 
-  --error: #f87171;                            /* Red — dangerous state */
-  --error-bg: rgba(248, 113, 113, 0.1);
-  --error-border: rgba(248, 113, 113, 0.3);
-  --error-bg-hover: rgba(248, 113, 113, 0.2);
-  --error-border-hover: rgba(248, 113, 113, 0.5);
+  --error: #E06060;                            /* Red — dangerous state */
+  --error-bg: rgba(224, 96, 96, 0.1);
+  --error-border: rgba(224, 96, 96, 0.25);
+  --error-bg-hover: rgba(224, 96, 96, 0.15);
+  --error-border-hover: rgba(224, 96, 96, 0.4);
 
-  --error-severe: #ef4444;                     /* Red — forbidden state */
-  --error-severe-bg: rgba(239, 68, 68, 0.15);
-  --error-severe-border: rgba(239, 68, 68, 0.5);
+  --error-severe: #DC3545;                     /* Red — forbidden state */
+  --error-severe-bg: rgba(220, 53, 69, 0.12);
+  --error-severe-border: rgba(220, 53, 69, 0.4);
 
   --approve: #4ade80;                          /* Green — approve action */
-  --approve-bg: rgba(74, 222, 128, 0.15);
-  --approve-border: rgba(74, 222, 128, 0.4);
-  --approve-bg-hover: rgba(74, 222, 128, 0.25);
-  --approve-border-hover: rgba(74, 222, 128, 0.6);
+  --approve-bg: rgba(74, 222, 128, 0.12);
+  --approve-border: rgba(74, 222, 128, 0.3);
+  --approve-bg-hover: rgba(74, 222, 128, 0.2);
+  --approve-border-hover: rgba(74, 222, 128, 0.5);
 }
 
 /* ── White Overlays ────────────────────────────────────────── */
@@ -96,14 +96,14 @@
   --white-subtle: rgba(255, 255, 255, 0.04);  /* Subtle hover/badge bg */
   --white-light: rgba(255, 255, 255, 0.06);   /* Light hover / code bg */
   --white-medium: rgba(255, 255, 255, 0.08);  /* Titlebar hover */
-  --white-strong: rgba(255, 255, 255, 0.12);  /* Strong border / hover */
-  --white-heavy: rgba(255, 255, 255, 0.16);   /* Active overlay close hover */
-  --white-dim: rgba(255, 255, 255, 0.22);     /* Border hover on overlay */
+  --white-strong: rgba(255, 255, 255, 0.10);  /* Strong border / hover */
+  --white-heavy: rgba(255, 255, 255, 0.14);   /* Active overlay close hover */
+  --white-dim: rgba(255, 255, 255, 0.20);     /* Border hover on overlay */
 }
 
 /* ── Black Overlays ────────────────────────────────────────── */
 :root {
-  --black-light: rgba(0, 0, 0, 0.3);          /* Pre block bg */
+  --black-light: rgba(0, 0, 0, 0.25);         /* Pre block bg */
   --black-medium: rgba(0, 0, 0, 0.4);         /* Shadow base */
   --black-heavy: rgba(0, 0, 0, 0.6);          /* Modal/dialog backdrop */
   --black-overlay: rgba(0, 0, 0, 0.8);        /* Image overlay backdrop */
@@ -112,17 +112,17 @@
 /* ── Borders ───────────────────────────────────────────────── */
 :root {
   --border: rgba(255, 255, 255, 0.06);        /* Very subtle borders */
-  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(255, 255, 255, 0.10);
 }
 
 /* ── Shadows ───────────────────────────────────────────────── */
 :root {
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 0 40px rgba(201, 168, 76, 0.12);
-  --shadow-glow: 0 0 20px rgba(201, 168, 76, 0.06);
-  --shadow-dropdown: 0 -4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --shadow-sidebar: 1px 0 16px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.02);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 12px rgba(0, 0, 0, 0.15);
+  --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-sidebar: 1px 0 8px rgba(0, 0, 0, 0.25);
 }
 
 /* ── Radii ─────────────────────────────────────────────────── */
@@ -244,39 +244,39 @@
 
 /* ── Legacy compat (consumed by electron-vite boilerplate) ── */
 :root {
-  --color-background-mute: #1a1e26;
+  --color-background-mute: #232323;
 }
 
-/* ── Glass Morphism ────────────────────────────────────── */
+/* ── Glass Effects ───────────────────────────────────────────── */
 :root {
-  --glass-bg: rgba(19, 22, 28, 0.65);
-  --glass-bg-light: rgba(19, 22, 28, 0.4);
+  --glass-bg: rgba(28, 28, 28, 0.8);
+  --glass-bg-light: rgba(28, 28, 28, 0.5);
   --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-border-hover: rgba(255, 255, 255, 0.1);
-  --glass-blur: 16px;
-  --glass-blur-heavy: 24px;
+  --glass-border-hover: rgba(255, 255, 255, 0.10);
+  --glass-blur: 12px;
+  --glass-blur-heavy: 16px;
 }
 
-/* ── Gradient Accents ──────────────────────────────────── */
+/* ── Gradient Accents ────────────────────────────────────────── */
 :root {
-  --gradient-gold: linear-gradient(135deg, rgba(201, 168, 76, 0.15), rgba(201, 168, 76, 0.05));
-  --gradient-gold-strong: linear-gradient(135deg, rgba(201, 168, 76, 0.25), rgba(201, 168, 76, 0.1));
-  --gradient-crimson: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(231, 76, 60, 0.05));
-  --gradient-emerald: linear-gradient(135deg, rgba(46, 204, 113, 0.15), rgba(46, 204, 113, 0.05));
-  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+  --gradient-gold: linear-gradient(135deg, rgba(232, 220, 200, 0.06), rgba(232, 220, 200, 0.02));
+  --gradient-gold-strong: linear-gradient(135deg, rgba(232, 220, 200, 0.12), rgba(232, 220, 200, 0.04));
+  --gradient-crimson: linear-gradient(135deg, rgba(184, 92, 92, 0.08), rgba(184, 92, 92, 0.02));
+  --gradient-emerald: linear-gradient(135deg, rgba(92, 154, 110, 0.08), rgba(92, 154, 110, 0.02));
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.01) 0%, transparent 100%);
 }
 
 /* ── State Colors ──────────────────────────────────────── */
 :root {
-  --listening: #e74c3c;
-  --listening-dim: rgba(231, 76, 60, 0.12);
-  --listening-border: rgba(231, 76, 60, 0.25);
-  --speaking: #2ecc71;
-  --speaking-dim: rgba(46, 204, 113, 0.12);
-  --speaking-border: rgba(46, 204, 113, 0.25);
-  --thinking: #c9a84c;
-  --thinking-dim: rgba(201, 168, 76, 0.12);
-  --thinking-border: rgba(201, 168, 76, 0.25);
+  --listening: #E06060;
+  --listening-dim: rgba(224, 96, 96, 0.10);
+  --listening-border: rgba(224, 96, 96, 0.20);
+  --speaking: #5C9A6E;
+  --speaking-dim: rgba(92, 154, 110, 0.10);
+  --speaking-border: rgba(92, 154, 110, 0.20);
+  --thinking: #E8DCC8;
+  --thinking-dim: rgba(232, 220, 200, 0.10);
+  --thinking-border: rgba(232, 220, 200, 0.20);
 }
 
 /* ── Enhanced Motion System ────────────────────────────────── */
@@ -297,7 +297,7 @@
 
 /* ── Focus Ring System ─────────────────────────────────────── */
 :root {
-  --focus-ring-color: rgba(201, 168, 76, 0.5);
+  --focus-ring-color: rgba(232, 220, 200, 0.5);
   --focus-ring-offset: 2px;
   --focus-ring-width: 2px;
   --focus-ring: var(--focus-ring-width) solid var(--focus-ring-color);
@@ -332,16 +332,16 @@
 
 /* ── Enhanced Shadow System ────────────────────────────────── */
 :root {
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.15);
   --shadow-accent: 0 0 0 1px var(--accent-border),
-                   0 4px 16px rgba(201, 168, 76, 0.08);
+                   0 2px 8px rgba(0, 0, 0, 0.2);
   --shadow-focus: 0 0 0 2px var(--surface-0),
                   0 0 0 4px var(--focus-ring-color);
-  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.35),
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.3),
                      0 0 0 1px rgba(255, 255, 255, 0.04);
-  --shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.4),
-                     0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-floating: 0 12px 36px rgba(0, 0, 0, 0.35),
+                     0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /*
@@ -380,13 +380,20 @@ body {
   letter-spacing: var(--tracking-tight);
 }
 
-/* ── Focus Ring Utility ────────────────────────────────────── */
+/* ── Focus-visible — Accessibility ─────────────────────────── */
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring-shadow);
 }
 
-/* ── Scrollbar — Minimal, elegant ──────────────────────────── */
+/* Reset for elements that manage their own focus styles */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Scrollbar — Minimal, neutral ──────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -397,12 +404,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: var(--white-medium);
+  border-radius: var(--radius-xs);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--white-strong);
 }
 
 ::-webkit-scrollbar-corner {
@@ -411,7 +418,7 @@ body {
 
 /* ── Selection ─────────────────────────────────────────────── */
 ::selection {
-  background: rgba(201, 168, 76, 0.25);
+  background: rgba(232, 220, 200, 0.20);
   color: var(--text-primary);
 }
 
@@ -430,62 +437,4 @@ body {
 #app {
   width: 100%;
   height: 100%;
-}
-
-/*
- * ═══════════════════════════════════════════════════════════════
- *  Scrollbar — Slim & Gold-tinted
- * ═══════════════════════════════════════════════════════════════
- */
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--accent-medium);
-  border-radius: var(--radius-xs);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-vivid);
-}
-
-/* Hide scrollbar corner */
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/*
- * ═══════════════════════════════════════════════════════════════
- *  Selection — Gold highlight
- * ═══════════════════════════════════════════════════════════════
- */
-
-::selection {
-  background: var(--accent-border);
-  color: var(--text-primary);
-}
-
-/*
- * ═══════════════════════════════════════════════════════════════
- *  Focus-visible — Accessibility
- * ═══════════════════════════════════════════════════════════════
- */
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Reset for elements that manage their own focus styles */
-button:focus:not(:focus-visible),
-input:focus:not(:focus-visible),
-textarea:focus:not(:focus-visible) {
-  outline: none;
 }

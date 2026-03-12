@@ -352,27 +352,27 @@ watch(memoryConnected, (connected) => {
 <style scoped>
 /* ── Subtitle ──────────────────────────────────────────── */
 .kg-subtitle {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-secondary, #8a8578);
-    margin: 0 0 var(--space-3, 12px);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 0 0 var(--space-3);
 }
 
 /* ── Disabled state ────────────────────────────────────── */
 .kg-disabled {
     display: flex;
     align-items: center;
-    gap: var(--space-2, 8px);
-    padding: var(--space-3, 12px) var(--space-4, 16px);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-muted, #5c584f);
-    font-size: var(--text-sm, 0.8125rem);
-    line-height: 1.5;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
 }
 
 .kg-disabled__icon {
-    font-size: 1.1rem;
+    font-size: var(--text-lg);
     flex-shrink: 0;
 }
 
@@ -380,30 +380,30 @@ watch(memoryConnected, (connected) => {
 .kg-stats {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3, 12px);
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: var(--bg-secondary, #13161c);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-3);
 }
 
 .kg-stats__item {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #8a8578);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
 }
 
 .kg-stats__item strong {
-    color: var(--accent, #c9a84c);
-    font-weight: 600;
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
 }
 
 /* ── Toolbar ───────────────────────────────────────────── */
 .kg-toolbar {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2, 8px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
     align-items: center;
 }
 
@@ -411,108 +411,107 @@ watch(memoryConnected, (connected) => {
     display: flex;
     flex: 1;
     min-width: 180px;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1);
 }
 
 .kg-search__input {
     flex: 1;
-    padding: var(--space-1, 4px) var(--space-2, 8px);
-    background: var(--bg-input, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #e8e4de);
-    font-size: var(--text-sm, 0.8125rem);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color var(--transition-fast);
 }
 
 .kg-search__input::placeholder {
-    color: var(--text-muted, #5c584f);
-    opacity: 0.7;
+    color: var(--text-muted);
 }
 
 .kg-search__input:focus {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
+    border-color: var(--accent-border);
 }
 
 .kg-search__btn {
-    padding: var(--space-1, 4px) var(--space-3, 12px);
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
-    border: 1px solid var(--accent-border, rgba(201, 168, 76, 0.25));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--accent, #c9a84c);
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 500;
+    padding: var(--space-1) var(--space-3);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
+    transition: all var(--transition-fast);
 }
 
 .kg-search__btn:hover:not(:disabled) {
-    background: var(--accent-light, rgba(201, 168, 76, 0.10));
-    border-color: var(--accent, #c9a84c);
+    background: var(--accent-light);
+    border-color: var(--accent);
 }
 
 .kg-search__btn:disabled {
-    opacity: 0.4;
+    opacity: var(--opacity-disabled);
     cursor: not-allowed;
 }
 
 .kg-actions {
     display: flex;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 
 /* ── Buttons ───────────────────────────────────────────── */
 .kg-btn {
-    padding: var(--space-1, 4px) var(--space-3, 12px);
-    border-radius: var(--radius-sm, 4px);
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 500;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     cursor: pointer;
     border: 1px solid transparent;
-    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    transition: all var(--transition-fast);
 }
 
 .kg-btn--accent {
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
-    color: var(--accent, #c9a84c);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
 }
 
 .kg-btn--accent:hover:not(:disabled) {
-    background: var(--accent-light, rgba(201, 168, 76, 0.10));
-    border-color: var(--accent, #c9a84c);
+    background: var(--accent-light);
+    border-color: var(--accent);
 }
 
 .kg-btn--secondary {
-    background: var(--bg-tertiary, #1a1e26);
-    border-color: var(--border, rgba(255, 255, 255, 0.08));
-    color: var(--text-secondary, #8a8578);
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--text-secondary);
 }
 
 .kg-btn--secondary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text-primary, #e8e4de);
+    background: var(--surface-hover);
+    color: var(--text-primary);
 }
 
 .kg-btn--danger {
-    background: rgba(220, 80, 80, 0.1);
-    border-color: rgba(220, 80, 80, 0.25);
-    color: rgba(220, 80, 80, 0.9);
+    background: var(--danger-light);
+    border-color: var(--danger-border);
+    color: var(--danger);
 }
 
 .kg-btn--danger:hover:not(:disabled) {
-    background: rgba(220, 80, 80, 0.18);
-    border-color: rgba(220, 80, 80, 0.4);
+    background: var(--danger-hover);
+    border-color: var(--danger);
 }
 
 .kg-btn--text {
     background: none;
     border: none;
-    color: var(--accent, #c9a84c);
+    color: var(--accent);
     padding: 0;
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
 }
 
 .kg-btn--text:hover {
@@ -520,7 +519,7 @@ watch(memoryConnected, (connected) => {
 }
 
 .kg-btn:disabled {
-    opacity: 0.4;
+    opacity: var(--opacity-disabled);
     cursor: not-allowed;
 }
 
@@ -528,83 +527,83 @@ watch(memoryConnected, (connected) => {
 .kg-type-filter {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1, 4px);
-    margin-bottom: var(--space-2, 8px);
+    gap: var(--space-1);
+    margin-bottom: var(--space-2);
 }
 
 .kg-type-tag {
     padding: 2px 10px;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    border-radius: var(--radius-pill);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
+    border: 1px solid var(--border);
     background: transparent;
-    color: var(--text-secondary, #8a8578);
+    color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-fast);
 }
 
 .kg-type-tag:hover {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
-    color: var(--text-primary, #e8e4de);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
 }
 
 .kg-type-tag--active {
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
-    color: var(--accent, #c9a84c);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
 }
 
 /* ── Loading / Error / Empty ───────────────────────────── */
 .kg-loading {
-    color: var(--text-muted, #5c584f);
-    padding: var(--space-2, 8px);
-    font-size: var(--text-sm, 0.8125rem);
+    color: var(--text-muted);
+    padding: var(--space-2);
+    font-size: var(--text-sm);
 }
 
 .kg-error {
-    color: rgba(220, 80, 80, 0.9);
-    padding: var(--space-2, 8px);
-    font-size: var(--text-sm, 0.8125rem);
-    background: rgba(220, 80, 80, 0.06);
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-2, 8px);
+    color: var(--danger);
+    padding: var(--space-2);
+    font-size: var(--text-sm);
+    background: var(--danger-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-2);
 }
 
 .kg-empty {
-    color: var(--text-muted, #5c584f);
-    padding: var(--space-4, 16px);
+    color: var(--text-muted);
+    padding: var(--space-4);
     text-align: center;
-    font-size: var(--text-sm, 0.8125rem);
+    font-size: var(--text-sm);
 }
 
 /* ── Section ───────────────────────────────────────────── */
 .kg-section {
-    margin-bottom: var(--space-3, 12px);
+    margin-bottom: var(--space-3);
 }
 
 .kg-section__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-2, 8px);
+    margin-bottom: var(--space-2);
 }
 
 .kg-section__title {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-secondary, #8a8578);
-    font-weight: 600;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-weight: var(--weight-semibold);
 }
 
 /* ── Entity list ───────────────────────────────────────── */
 .kg-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
     max-height: 500px;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--accent-dim, rgba(201, 168, 76, 0.12)) transparent;
+    scrollbar-color: var(--surface-4) transparent;
 }
 
 .kg-list::-webkit-scrollbar {
@@ -616,108 +615,108 @@ watch(memoryConnected, (connected) => {
 }
 
 .kg-list::-webkit-scrollbar-thumb {
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
+    background: var(--surface-4);
     border-radius: 4px;
 }
 
 .kg-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(201, 168, 76, 0.25);
+    background: var(--border-hover);
 }
 
 /* ── Dialog overlay ────────────────────────────────────── */
 .kg-overlay {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: var(--z-modal);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: var(--black-heavy);
+    backdrop-filter: blur(var(--blur-sm));
+    -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .kg-dialog {
-    background: var(--bg-tertiary, #1a1e26);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-md, 8px);
-    padding: var(--space-6, 24px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
     max-width: 440px;
     width: 90%;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-floating);
 }
 
 .kg-dialog__title {
-    font-size: var(--text-base, 0.875rem);
-    font-weight: 600;
-    color: var(--text-primary, #e8e4de);
-    margin: 0 0 var(--space-4, 16px);
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin: 0 0 var(--space-4);
 }
 
 .kg-dialog__message {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-primary, #e8e4de);
-    line-height: 1.5;
-    margin: 0 0 var(--space-4, 16px);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: var(--leading-normal);
+    margin: 0 0 var(--space-4);
     white-space: pre-line;
 }
 
 .kg-dialog__actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--space-2, 8px);
-    margin-top: var(--space-4, 16px);
+    gap: var(--space-2);
+    margin-top: var(--space-4);
 }
 
 /* ── Form fields ───────────────────────────────────────── */
 .kg-field {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1, 4px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-1);
+    margin-bottom: var(--space-3);
 }
 
 .kg-field__label {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #8a8578);
-    font-weight: 500;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    font-weight: var(--weight-medium);
 }
 
 .kg-input {
-    padding: var(--space-1, 4px) var(--space-2, 8px);
-    background: var(--bg-input, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #e8e4de);
-    font-size: var(--text-sm, 0.8125rem);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color var(--transition-fast);
 }
 
 .kg-input:focus {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
+    border-color: var(--accent-border);
 }
 
 .kg-input option {
-    background: var(--bg-tertiary, #1a1e26);
-    color: var(--text-primary, #e8e4de);
+    background: var(--surface-3);
+    color: var(--text-primary);
 }
 
 .kg-textarea {
-    padding: var(--space-2, 8px);
-    background: var(--bg-input, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #e8e4de);
-    font-size: var(--text-sm, 0.8125rem);
+    padding: var(--space-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
     font-family: inherit;
     outline: none;
     resize: vertical;
-    transition: border-color 0.2s;
+    transition: border-color var(--transition-fast);
 }
 
 .kg-textarea:focus {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
+    border-color: var(--accent-border);
 }
 </style>

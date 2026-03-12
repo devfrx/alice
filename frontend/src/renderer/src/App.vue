@@ -141,7 +141,7 @@ onMounted(() => {
 
 /* ── Mode-specific adjustments ──────────────────────────────────── */
 .omnia-app--assistant .app-body {
-  background: var(--bg-primary);
+  background: var(--surface-0);
 }
 
 .omnia-app--assistant .app-content {
@@ -149,5 +149,4 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
 }
-
 </style>

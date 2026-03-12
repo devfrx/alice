@@ -20,5 +20,7 @@ import CalendarView from '../components/plugins/CalendarView.vue'
     flex-direction: column;
     overflow: hidden;
     align-self: stretch;
+    background: var(--surface-0);
+    color: var(--text-primary);
 }
 </style>

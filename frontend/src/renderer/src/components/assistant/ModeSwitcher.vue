@@ -77,8 +77,8 @@ function switchMode(mode: UIMode): void {
     padding: 3px;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-elevated);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-sm);
     transition:
         width 300ms var(--ease-out-expo, ease),
         height 300ms var(--ease-out-expo, ease),
@@ -105,18 +105,6 @@ function switchMode(mode: UIMode): void {
     opacity: 1;
     transform: scale(1.1);
     border-color: var(--accent);
-}
-
-@keyframes collapsed-pulse {
-
-    0%,
-    100% {
-        box-shadow: 0 0 8px rgba(201, 168, 76, 0.15);
-    }
-
-    50% {
-        box-shadow: 0 0 14px rgba(201, 168, 76, 0.28);
-    }
 }
 
 .mode-switcher--collapsed .mode-switcher__btn,
@@ -153,7 +141,7 @@ function switchMode(mode: UIMode): void {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 120ms ease;
+    transition: color var(--transition-fast);
     padding: 0;
 }
 
@@ -181,7 +169,7 @@ function switchMode(mode: UIMode): void {
     border-radius: var(--radius-sm);
     padding: 3px 8px;
     pointer-events: none;
-    box-shadow: var(--shadow-elevated);
+    box-shadow: var(--shadow-sm);
 }
 
 /* ── Label slide transition (150ms enter delay to prevent flash) ── */

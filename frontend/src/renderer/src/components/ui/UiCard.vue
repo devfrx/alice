@@ -30,19 +30,17 @@ withDefaults(defineProps<UiCardProps>(), {
 
 <style scoped>
 .ui-card {
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    padding: var(--space-4);
+    padding: var(--space-5);
     transition:
-        background-color 150ms ease,
-        border-color 150ms ease,
-        box-shadow 200ms ease,
-        transform 200ms ease;
+        background-color var(--transition-fast),
+        border-color var(--transition-fast);
 }
 
 /* ── Variants ──── */
 .ui-card--default {
-    background: var(--surface-2);
+    background: var(--surface-1);
 }
 
 .ui-card--subtle {
@@ -51,15 +49,12 @@ withDefaults(defineProps<UiCardProps>(), {
 }
 
 .ui-card--elevated {
-    background: var(--surface-3);
+    background: var(--surface-2);
     box-shadow: var(--shadow-elevated);
 }
 
 .ui-card--glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-color: var(--glass-border);
+    background: var(--surface-2);
 }
 
 /* ── Interactive ── */
@@ -69,16 +64,10 @@ withDefaults(defineProps<UiCardProps>(), {
 
 .ui-card--interactive:hover {
     border-color: var(--border-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-}
-
-.ui-card--interactive:active {
-    transform: translateY(0);
 }
 
 .ui-card--interactive:focus-visible {
-    box-shadow: var(--focus-ring-shadow);
+    box-shadow: var(--shadow-focus);
 }
 
 /* ── No padding ── */

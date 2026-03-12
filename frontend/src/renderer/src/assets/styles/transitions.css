@@ -1,7 +1,7 @@
 /*
  * ═══════════════════════════════════════════════════════════════
  *  O.M.N.I.A. — Animation & Transition System
- *  World-class micro-interactions and motion design
+ *  Minimal, functional motion design — cream accent
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -15,39 +15,39 @@
 
 /* ── Slide In (from below) ─────────────────────────────────── */
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Slide In Left ─────────────────────────────────────────── */
 @keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-12px); }
+  from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
 /* ── Slide In Down ─────────────────────────────────────────── */
 @keyframes slideInDown {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Scale In (spring-feel) ────────────────────────────────── */
+/* ── Scale In ──────────────────────────────────────────────── */
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
 
 /* ── Scale Bounce (popover/tooltip) ────────────────────────── */
 @keyframes scaleBounce {
-  0% { opacity: 0; transform: scale(0.9); }
-  70% { transform: scale(1.02); }
+  0% { opacity: 0; transform: scale(0.94); }
+  70% { transform: scale(1.01); }
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* ── Pulse Glow — Subtle gold pulse for active elements ───── */
+/* ── Pulse Glow — Subtle cream pulse for active elements ──── */
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 4px var(--accent-light); }
-  50% { box-shadow: 0 0 14px var(--accent-strong); }
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent-dim); }
+  50% { box-shadow: 0 0 0 2px var(--accent-dim); }
 }
 
 /* ── Breathing — Organic alive feel ────────────────────────── */
@@ -56,7 +56,7 @@
   50% { opacity: 1; }
 }
 
-/* ── Shimmer — Loading state ───────────────────────────────── */
+/* ── Shimmer — Loading state (neutral surface) ─────────────── */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -65,7 +65,7 @@
 /* ── Skeleton Pulse — Smooth loading ───────────────────────── */
 @keyframes skeletonPulse {
   0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
+  50% { opacity: 0.7; }
 }
 
 /* ── Blink — Cursor / caret ────────────────────────────────── */
@@ -82,7 +82,7 @@
 /* ── Gentle Float ──────────────────────────────────────────── */
 @keyframes gentleFloat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-3px); }
 }
 
 /* ── Progress Bar ──────────────────────────────────────────── */
@@ -92,6 +92,12 @@
   100% { transform: translateX(-100%); }
 }
 
+/* ── Content Fade Enter ────────────────────────────────────── */
+@keyframes contentFadeEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 
 /* ═══ UTILITY CLASSES ════════════════════════════════════════ */
 
@@ -99,9 +105,9 @@
 .slide-in      { animation: slideIn var(--duration-moderate) var(--ease-out-expo) both; }
 .slide-in-left { animation: slideInLeft var(--duration-moderate) var(--ease-out-expo) both; }
 .slide-in-down { animation: slideInDown var(--duration-moderate) var(--ease-out-expo) both; }
-.scale-in      { animation: scaleIn var(--duration-moderate) var(--ease-spring) both; }
+.scale-in      { animation: scaleIn var(--duration-moderate) var(--ease-out-expo) both; }
 .scale-bounce  { animation: scaleBounce var(--duration-slow) var(--ease-out-expo) both; }
-.pulse-glow    { animation: pulseGlow 2.5s ease-in-out infinite; }
+.pulse-glow    { animation: pulseGlow 3s ease-in-out infinite; }
 .breathing     { animation: breathing 3s ease-in-out infinite; }
 .blink         { animation: blink 1s step-end infinite; }
 .spin          { animation: spin 1s linear infinite; }
@@ -139,11 +145,11 @@
 }
 .v-slide-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(6px);
 }
 .v-slide-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
 }
 
 /* ── Slide Down ────────────────────────────────────────────── */
@@ -155,11 +161,11 @@
 }
 .slide-down-enter-from {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
 }
 .slide-down-leave-to {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(6px);
 }
 
 /* ── Scale (popover / dropdown) ────────────────────────────── */
@@ -175,11 +181,11 @@
 }
 .scale-enter-from {
   opacity: 0;
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 .scale-leave-to {
   opacity: 0;
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 /* ── Slide Up (for overlays) ───────────────────────────────── */
@@ -191,11 +197,11 @@
 }
 .slide-up-enter-from {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(12px);
 }
 .slide-up-leave-to {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(6px);
 }
 
 /* ── Expand (accordion / collapsible) ──────────────────────── */
@@ -221,7 +227,7 @@
 .list-enter-from,
 .list-leave-to {
   opacity: 0;
-  transform: translateX(-16px);
+  transform: translateX(-12px);
 }
 .list-leave-active {
   position: absolute;
@@ -240,34 +246,29 @@ select {
     background-color var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
     box-shadow var(--duration-fast) ease,
-    transform var(--duration-fast) ease,
     opacity var(--duration-fast) ease;
 }
 
-/* Focus ring with accent glow for inputs */
+/* Focus ring — subtle accent outline for inputs */
 input:focus,
 textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent-border);
-  box-shadow: 0 0 0 2px var(--accent-glow);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
 
-/* ═══ GLASS MORPHISM UTILITY ═════════════════════════════════ */
+/* ═══ FLAT PANEL UTILITY ═════════════════════════════════════ */
 
 .glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
 }
 
 .glass-panel-light {
-  background: var(--glass-bg-light);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 
@@ -281,16 +282,16 @@ select:focus {
     var(--surface-2) 80%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
   border-radius: var(--radius-sm);
 }
 
-/* ── Orb-specific entrance ─────────────────────────────── */
+/* ── Orb-specific entrance ─────────────────────────────────── */
 @keyframes orbEntrance {
   from {
     opacity: 0;
-    transform: scale(0.5);
-    filter: blur(10px);
+    transform: scale(0.6);
+    filter: blur(8px);
   }
   to {
     opacity: 1;

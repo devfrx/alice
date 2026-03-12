@@ -84,43 +84,44 @@ const showStatus = computed(() => props.state !== 'idle')
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     z-index: 3;
     pointer-events: none;
 }
 
-/* ── Primary status capsule ──────────────────────────── */
+/* ── Primary status capsule ── */
 .status-capsule {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 14px 5px 10px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2-5);
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     font-size: var(--text-2xs);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
     color: var(--text-secondary);
     pointer-events: auto;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .status-capsule--listening {
-    border-color: rgba(231, 76, 60, 0.25);
+    border-color: var(--listening-border);
     color: var(--listening);
 }
 
 .status-capsule--thinking {
-    border-color: var(--accent-border);
+    border-color: var(--thinking-border);
     color: var(--thinking);
 }
 
 .status-capsule--speaking {
-    border-color: rgba(46, 204, 113, 0.25);
+    border-color: var(--speaking-border);
     color: var(--speaking);
 }
 
 .status-capsule--processing {
-    border-color: var(--accent-border);
+    border-color: var(--thinking-border);
     color: var(--thinking);
 }
 
@@ -135,7 +136,7 @@ const showStatus = computed(() => props.state !== 'idle')
 .status-capsule__dot {
     width: 5px;
     height: 5px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: currentColor;
     animation: statusPulse 1.5s ease-in-out infinite;
 }
@@ -144,19 +145,19 @@ const showStatus = computed(() => props.state !== 'idle')
     letter-spacing: 0.02em;
 }
 
-/* ── Tool execution capsules ─────────────────────────── */
+/* ── Tool execution capsules ── */
 .status-tools {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .tool-capsule {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 10px 3px 7px;
+    gap: var(--space-1);
+    padding: var(--space-0-5) var(--space-2-5) var(--space-0-5) var(--space-2);
     background: var(--surface-2);
     border: 1px solid var(--accent-border);
     border-radius: var(--radius-pill);
@@ -167,7 +168,7 @@ const showStatus = computed(() => props.state !== 'idle')
 
 .tool-capsule__icon {
     flex-shrink: 0;
-    opacity: 0.8;
+    opacity: 0.7;
 }
 
 .tool-capsule__text {
@@ -177,13 +178,15 @@ const showStatus = computed(() => props.state !== 'idle')
     white-space: nowrap;
 }
 
-/* ── Capsule pop-in transition ───────────────────────── */
+/* ── Capsule pop-in transition ── */
 .capsule-pop-enter-active {
-    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity var(--duration-normal) ease,
+        transform var(--duration-normal) var(--ease-bounce);
 }
 
 .capsule-pop-leave-active {
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity var(--duration-fast) ease,
+        transform var(--duration-fast) ease;
 }
 
 .capsule-pop-enter-from {
@@ -196,13 +199,15 @@ const showStatus = computed(() => props.state !== 'idle')
     transform: scale(0.8) translateY(-4px);
 }
 
-/* ── Tool pop-in transition ──────────────────────────── */
+/* ── Tool pop-in transition ── */
 .tool-pop-enter-active {
-    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity var(--duration-normal) ease,
+        transform var(--duration-normal) var(--ease-bounce);
 }
 
 .tool-pop-leave-active {
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity var(--duration-fast) ease,
+        transform var(--duration-fast) ease;
 }
 
 .tool-pop-enter-from {
@@ -215,7 +220,7 @@ const showStatus = computed(() => props.state !== 'idle')
     transform: scale(0.7);
 }
 
-/* ── Keyframes ───────────────────────────────────────── */
+/* ── Keyframes ── */
 @keyframes statusPulse {
 
     0%,
@@ -235,6 +240,14 @@ const showStatus = computed(() => props.state !== 'idle')
 
     to {
         transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .status-capsule__dot,
+    .status-capsule__icon--spin {
+        animation: none;
     }
 }
 </style>

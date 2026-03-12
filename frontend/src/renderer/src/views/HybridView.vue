@@ -208,6 +208,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background: var(--surface-0);
 }
 
 .hybrid-view__orb-area {
@@ -244,12 +245,12 @@ onUnmounted(() => {
 }
 
 .hybrid-view__messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--border);
     border-radius: 3px;
 }
 
 .hybrid-view__messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-hover);
 }
 
 .hybrid-view__empty {
@@ -284,17 +285,16 @@ onUnmounted(() => {
     height: 30px;
     border-radius: var(--radius-full);
     border: 1px solid var(--border);
-    background: var(--surface-3);
+    background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;
-    box-shadow: var(--shadow-elevated);
     transition:
-        background 120ms ease,
-        color 120ms ease;
+        background var(--transition-fast),
+        color var(--transition-fast);
 }
 
 .hybrid-view__scroll-btn:hover {
-    background: var(--surface-4);
+    background: var(--surface-3);
     color: var(--text-primary);
 }
 

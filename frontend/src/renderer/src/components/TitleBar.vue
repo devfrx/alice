@@ -186,7 +186,6 @@ onUnmounted(() => {
 
 .titlebar__status-dot--connected {
   background: var(--success);
-  box-shadow: 0 0 6px var(--success-glow);
 }
 
 .titlebar__status-dot--loading {

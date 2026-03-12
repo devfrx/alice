@@ -35,12 +35,11 @@ withDefaults(defineProps<UiBadgeProps>(), {
     font-weight: var(--weight-medium);
     white-space: nowrap;
     line-height: 1;
-    letter-spacing: var(--tracking-tight);
 }
 
 /* ── Sizes ────── */
 .ui-badge--sm {
-    padding: 2px var(--space-2);
+    padding: var(--space-0-5) var(--space-2);
     font-size: var(--text-2xs);
 }
 
@@ -51,39 +50,35 @@ withDefaults(defineProps<UiBadgeProps>(), {
 
 /* ── Variants ──── */
 .ui-badge--default {
-    background: var(--white-subtle);
+    background: var(--surface-3);
     color: var(--text-secondary);
 }
 
 .ui-badge--accent {
     background: var(--accent-dim);
     color: var(--accent);
-    border: 1px solid var(--accent-border);
 }
 
 .ui-badge--success {
     background: var(--success-light);
     color: var(--success);
-    border: 1px solid var(--success-border);
 }
 
 .ui-badge--danger {
     background: var(--danger-light);
     color: var(--danger);
-    border: 1px solid var(--danger-border);
 }
 
 .ui-badge--warning {
     background: var(--warning-bg);
     color: var(--warning);
-    border: 1px solid var(--warning-border);
 }
 
 /* ── Dot ───────── */
 .ui-badge__dot {
     width: 6px;
     height: 6px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: currentColor;
     flex-shrink: 0;
 }

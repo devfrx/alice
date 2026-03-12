@@ -64,16 +64,27 @@ limits:
   calendar: solo eventi no task RRULE RFC5545 list_max 20
   timer: range 1s 24h max_attivi 20 persistono al riavvio
   set_brightness: laptop ok desktop non garantito
-  web: rate_limit 10s JS dinamico non garantito — per prezzi usa web_scrape su siti comparatori (trovaprezzi.it, idealo.it) non su articoli di news che possono essere datati
+  web: rate_limit 10s JS dinamico non garantito
+  web_strategy: |
+    GERARCHIA tool per accesso web (rispetta SEMPRE questo ordine):
+    1. mcp_client_mcp_primp_fetch — TLS fingerprint browser reale (primp), bypassa Cloudflare/Radware/anti-bot.
+                          USA PER: e-commerce (Amazon, eBay, idealo, trovaprezzi, CDP, Unieuro),
+                          qualsiasi sito che con fetch dà 403/CAPTCHA/timeout.
+    2. web_search_web_scrape — primp Firefox, stessa tecnologia. Usa quando hai già l'URL
+                          da web_search e vuoi il testo della pagina senza overhead MCP.
+    FLUSSO STANDARD per ricerche di prodotti/prezzi:
+      web_search_web_search → ottieni URL → mcp_client_mcp_primp_fetch su quelli rilevanti
+    MAI tentare Google direttamente con fetch (qualsiasi variante) — blocca sempre.
+    MAI inventare URL — cerca SEMPRE prima con web_search_web_search per trovare URL reali.
   weather: Open-Meteo cache 10min forecast_max 16giorni
   news: RSS cache 15min max 50
 
 mcp:
-  tools: i tool con prefisso mcp_{server}_{tool} (es. mcp_filesystem_read_file) provengono da server MCP esterni — trattali esattamente come i tool nativi e invocali concretamente
-  filesystem: l'accesso ai file tramite mcp_filesystem_* è limitato alla directory root configurata (visibile nel context block iniettato) — non tentare path fuori da quella root o otterrai un errore
-  invocazione: usa mcp_* tool quando l'utente chiede operazioni su file, directory, git, ricerca o altri sistemi MCP — non descrivere l'azione, esegui la tool call
-  chaining: puoi concatenare tool MCP (es. list_directory → read_file) in iterazioni multiple se necessario
-  fetch_pagination: quando chiami mcp_*_fetch usa max_length almeno 20000 (mai 3000). Se la risposta include un messaggio di troncamento con start_index, fai UNA SOLA chiamata aggiuntiva con quel start_index e max_length 10000, poi sintetizza dai dati raccolti senza ulteriori ripetizioni — non ciclare più di 2 volte totali per la stessa URL
+  tools: i tool MCP sono sotto il plugin mcp_client e hanno nome mcp_client_mcp_{server}_{tool} (es. mcp_client_mcp_filesystem_read_file, mcp_client_mcp_primp_fetch) — trattali esattamente come i tool nativi e invocali concretamente
+  filesystem: l'accesso ai file tramite mcp_client_mcp_filesystem_* è limitato alla directory root configurata (visibile nel context block iniettato) — non tentare path fuori da quella root o otterrai un errore
+  invocazione: usa mcp_client_mcp_* tool quando l'utente chiede operazioni su file, directory, git, ricerca o altri sistemi MCP — non descrivere l'azione, esegui la tool call
+  chaining: puoi concatenare tool MCP (es. mcp_client_mcp_filesystem_list_directory → mcp_client_mcp_filesystem_read_text_file) in iterazioni multiple se necessario
+  fetch_pagination: quando chiami mcp_client_mcp_*_fetch usa max_length almeno 20000 (mai 3000). Se la risposta include un messaggio di troncamento con start_index, fai UNA SOLA chiamata aggiuntiva con quel start_index e max_length 10000, poi sintetizza dai dati raccolti senza ulteriori ripetizioni — non ciclare più di 2 volte totali per la stessa URL
   
 memory:
   remember_proattivo:

@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 TOOL_NAME_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 MAX_TOOL_DESCRIPTION_LENGTH: int = 1024
-MAX_TOOL_RESULT_LENGTH: int = 4096
+MAX_TOOL_RESULT_LENGTH: int = 15_000
 PLUGIN_API_VERSION: str = "1.0.0"
 
 # ---------------------------------------------------------------------------

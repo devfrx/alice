@@ -238,11 +238,13 @@ mcp:
       enabled: true
   #
   # PLAYWRIGHT — browser automation reale (naviga, clicca, screenshot, scraping JS)
-  # Prima di abilitare: npx playwright install chromium
-  # - name: browser
-  #   transport: stdio
-  #   command: ["npx", "@playwright/mcp"]
-  #   enabled: true
+  # Chromium installato in: C:\Users\Jays\AppData\Local\ms-playwright
+  #  - name: browser
+  #    transport: stdio
+  #    command: ["npx", "--yes", "@playwright/mcp", "--headless", "--browser", "chromium", "--user-data-dir", "C:\\Users\\Jays\\AppData\\Local\\omnia-browser-profile"]
+  #    env:
+  #      PLAYWRIGHT_BROWSERS_PATH: "C:\\Users\\Jays\\AppData\\Local\\ms-playwright"
+  #    enabled: true
   #
   # ── Richiedono account / installazione extra ──────────────────────────────
   #

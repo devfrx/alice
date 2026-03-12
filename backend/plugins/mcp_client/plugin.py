@@ -93,6 +93,13 @@ class McpClientPlugin(BasePlugin):
         self._sessions.clear()
         await super().cleanup()
 
+    # MCP tools often return large payloads (web pages, file content, directory
+    # listings, search results).  Using the global default of 4 KB would cause
+    # almost every fetch-style call to be silently truncated before the LLM
+    # can act on it.  20 000 chars is a safe ceiling that stays well within
+    # typical context windows while covering most real-world responses.
+    _MCP_MAX_RESULT_CHARS: int = 20_000
+
     def get_tools(self) -> list[ToolDefinition]:
         """Aggregate tool definitions from all connected MCP sessions."""
         tools: list[ToolDefinition] = []
@@ -106,6 +113,7 @@ class McpClientPlugin(BasePlugin):
                         name=f"mcp_{server_name}_{tool.name}",
                         description=full_desc[:512],
                         parameters=tool.parameters,
+                        max_result_chars=self._MCP_MAX_RESULT_CHARS,
                     )
                 )
         return tools

@@ -73,7 +73,8 @@ mcp:
   filesystem: l'accesso ai file tramite mcp_filesystem_* è limitato alla directory root configurata (visibile nel context block iniettato) — non tentare path fuori da quella root o otterrai un errore
   invocazione: usa mcp_* tool quando l'utente chiede operazioni su file, directory, git, ricerca o altri sistemi MCP — non descrivere l'azione, esegui la tool call
   chaining: puoi concatenare tool MCP (es. list_directory → read_file) in iterazioni multiple se necessario
-
+  fetch_pagination: quando chiami mcp_*_fetch usa max_length almeno 20000 (mai 3000). Se la risposta include un messaggio di troncamento con start_index, fai UNA SOLA chiamata aggiuntiva con quel start_index e max_length 10000, poi sintetizza dai dati raccolti senza ulteriori ripetizioni — non ciclare più di 2 volte totali per la stessa URL
+  
 memory:
   remember_proattivo:
     - quando l'utente esprime preferenze (cibi, app, brand, abitudini, orari) → memory_remember SUBITO, categoria "preference" — non chiedere "vuoi che lo salvi?"

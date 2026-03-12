@@ -30,21 +30,62 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Ý\"'(])")
+_CLAUSE_RE = re.compile(r"(?<=[,;:—–])\s+")
+
+# Piper truncates phoneme sequences at 510 and then has an off-by-one crash
+# when the slice boundary lands exactly on index 510.  Keeping each chunk
+# well below ~250 chars (≈ 400 Italian phonemes) avoids the issue entirely.
+_MAX_CHUNK_CHARS = 220
 
 
 def _split_sentences(text: str) -> list[str]:
     """Split *text* into sentence-like chunks for incremental synthesis.
 
-    Avoids splitting on decimal numbers (e.g. ``3.14``) and single-letter
-    abbreviations (e.g. ``U.S.A.``).
+    First splits on sentence-ending punctuation, then subdivides any
+    remaining chunk that exceeds ``_MAX_CHUNK_CHARS`` on clause boundaries
+    (comma, semicolon, colon, em-dash) to prevent Piper's phoneme-length
+    crash.
     """
     if not text or not text.strip():
         return []
-    parts = _SENTENCE_RE.split(text.strip())
-    # If no split occurred (all lowercase or single sentence), return as-is
-    if len(parts) <= 1:
-        return [text.strip()] if text.strip() else []
-    return [p.strip() for p in parts if p.strip()]
+    raw = _SENTENCE_RE.split(text.strip())
+    sentences = [p.strip() for p in raw if p.strip()]
+
+    result: list[str] = []
+    for sentence in sentences:
+        if len(sentence) <= _MAX_CHUNK_CHARS:
+            result.append(sentence)
+            continue
+        # Secondary split on clause boundaries.
+        clauses = [c.strip() for c in _CLAUSE_RE.split(sentence) if c.strip()]
+        current = ""
+        for clause in clauses:
+            candidate = f"{current}, {clause}" if current else clause
+            if len(candidate) <= _MAX_CHUNK_CHARS:
+                current = candidate
+            else:
+                if current:
+                    result.append(current)
+                # If a single clause is still too long, hard-split by words.
+                if len(clause) > _MAX_CHUNK_CHARS:
+                    words = clause.split()
+                    buf = ""
+                    for word in words:
+                        addition = f"{buf} {word}" if buf else word
+                        if len(addition) <= _MAX_CHUNK_CHARS:
+                            buf = addition
+                        else:
+                            if buf:
+                                result.append(buf)
+                            buf = word
+                    if buf:
+                        current = buf
+                else:
+                    current = clause
+        if current:
+            result.append(current)
+
+    return result
 
 
 # ---------------------------------------------------------------------------

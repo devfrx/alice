@@ -3045,6 +3045,1187 @@ Nessun file modificato nei layer esistenti: `app.py`, `protocols.py`, `context.p
 
 ---
 
+---
+
+### Fase 12 — CAD 3D Generativo + Documentazione MCP
+
+> **Obiettivo**: permettere a OMNIA di generare modelli 3D da linguaggio naturale
+> tramite [build123d](https://github.com/gumyr/build123d) (motore OCCT Python) in esecuzione
+> nel container Docker `cad-agent`, visualizzare i modelli interattivamente con Three.js,
+> e fornire all'LLM accesso alla documentazione tecnica (PDF/EPUB) tramite
+> [ebook-mcp](https://github.com/onebirdrocks/ebook-mcp).
+>
+> Fase 12 = **due feature distinte**, architetture complementari, zero overlap:
+> 1. **Documentazione** — puro config: `ebook-mcp` registrato come server MCP nel plugin
+>    `mcp_client` esistente (Fase 11). Zero codice.
+> 2. **CAD 3D** — nuovo plugin `cad_generator` (HTTP client verso Docker) + route proxy
+>    `/api/cad/` + viewer Three.js nel frontend.
+
+- [ ] 12.1 — Documentazione MCP (`ebook-mcp`) — config-only
+- [ ] 12.2 — `CadGeneratorConfig` in `config.py` + `default.yaml`
+- [ ] 12.3 — `CadAgentClient` (`backend/plugins/cad_generator/client.py`)
+- [ ] 12.4 — `CadGeneratorPlugin` (2 tool: `cad_generate` + `cad_list_models`)
+- [ ] 12.5 — REST proxy `backend/api/routes/cad.py` (`/api/cad/`)
+- [ ] 12.6 — Frontend: `CADViewer.vue` (Three.js + STLLoader)
+- [ ] 12.7 — Frontend: estensione `ToolExecutionIndicator.vue` + `types/chat.ts`
+- [ ] 12.8 — System prompt update (`config/system_prompt.md`)
+- [ ] 12.9 — Test suite (3 file, 20+ test case)
+
+---
+
+#### 12.0 — Analisi Vincoli e Scelte Architetturali
+
+**Perché `cad-agent` via HTTP e non via MCP:**
+
+`cad-agent` (Svetlana-DAO-LLC/cad-agent) espone sia un'API HTTP REST (FastAPI, porta
+configurabile) sia un'interfaccia MCP stdio. Usare il plugin `mcp_client` esistente per
+accedere ai tool CAD tramite MCP sarebbe tecnicamente possibile, ma presenterrebbe un
+problema strutturale: i tool MCP restituiscono solo blocchi di testo. Per i modelli 3D
+serve trasmettere un riferimento al file binario (STL), non il file stesso in base64 (troppo
+grande per la pipeline WebSocket). La soluzione corretta è un plugin dedicato che:
+
+1. Chiama il cad-agent HTTP API per creare il modello e fare l'export
+2. Salva il file STL localmente (directory temporanea)
+3. Restituisce un `ToolResult` con `content_type = "application/vnd.omnia.cad-model+json"`
+   e un JSON payload con l'URL di download (`/api/cad/models/{name}/export`)
+4. Il frontend carica il file STL direttamente via HTTP nella route proxy e lo renderizza
+   con Three.js — nessun trasferimento binario via WebSocket
+
+Questo mechanism `content_type` è già completamente implementato in `_tool_loop.py` e
+nel frontend (`ToolExecutionIndicator.vue`) — Phase 5 lo ha introdotto per gli screenshot.
+Zero modifiche alla pipeline esistente.
+
+**Perché `ebook-mcp` via plugin `mcp_client` esistente (puro config):**
+
+`ebook-mcp` è un server MCP stdio puro: legge PDF/EPUB e restituisce testo Markdown.
+Le sue risposte sono sempre testo — esattamente il caso d'uso per cui il plugin `mcp_client`
+è stato costruito in Fase 11. Aggiungere `ebook-mcp` a `config.mcp.servers` è tutto quello
+che serve. Zero codice.
+
+**Perché STL e non GLB:**
+
+`cad-agent` esporta nativamente in STL, STEP e 3MF. Three.js supporta STLLoader
+(disponibile in `three/examples/jsm/loaders/STLLoader`). Aggiungere la conversione
+STL → GLB richiederebbe `trimesh` o `open3d` — dipendenze pesanti e non giustificate per v1.
+L'STL è un subset del dominio (solo mesh, nessun materiale), sufficiente per la
+visualizzazione 3D interattiva richiesta.
+
+**Perché un docker health-check non-bloccante:**
+
+Docker non è sempre disponibile su ogni macchina (es. sviluppo su macchine leggere, CI).
+`CadGeneratorPlugin.initialize()` chiama `health_check()` all'avvio: se cad-agent non
+risponde, il plugin si segna come `DISCONNECTED` (non `ERROR`) e i tool restituiscono
+un messaggio chiaro con istruzioni per avviare Docker — identico al pattern adottato
+dai plugin STT/TTS con fallback graceful.
+
+**Nessuna modifica a layer esistenti (solo aggiunte pure):**
+
+| Layer | Modificato | Motivo |
+|---|---|---|
+| `_tool_loop.py` | NO | `content_type` già propagato a WS per tutti i tool result |
+| `chat.py` | NO | nessuna dispatch speciale necessaria |
+| `plugin_models.py` | NO | `ToolResult.content_type` già esiste |
+| `protocols.py` | NO | nessun nuovo service da iniettare in `AppContext` |
+| `context.py` | NO | plug-in gestito da `PluginManager` come tutti gli altri |
+| `app.py` | NO | plugin registrato nel `PLUGIN_REGISTRY` statico |
+| `plugin_manager.py` | NO | nessuna modifica |
+
+---
+
+#### 12.1 — Documentazione MCP (`ebook-mcp`) — Config-Only
+
+`ebook-mcp` (onebirdrocks/ebook-mcp, Apache 2.0, installabile via `uvx`) è un server MCP
+stdio che legge PDF e EPUB e ne espone il contenuto come tool. Aggiungere un'entry a
+`config/default.yaml` nella sezione `mcp.servers` (introdotta in Fase 11) è l'unica
+azione necessaria.
+
+**Tool esposti all'LLM una volta configurato:**
+
+| Tool MCP | Nome visibile all'LLM (via ToolRegistry) |
+|---|---|
+| `get_all_epub_files` | `mcp_client_mcp_build123d_docs_get_all_epub_files` |
+| `get_metadata` | `mcp_client_mcp_build123d_docs_get_metadata` |
+| `get_toc` | `mcp_client_mcp_build123d_docs_get_toc` |
+| `get_chapter_markdown` | `mcp_client_mcp_build123d_docs_get_chapter_markdown` |
+| `get_all_pdf_files` | `mcp_client_mcp_build123d_docs_get_all_pdf_files` |
+| `get_pdf_metadata` | `mcp_client_mcp_build123d_docs_get_pdf_metadata` |
+| `get_pdf_toc` | `mcp_client_mcp_build123d_docs_get_pdf_toc` |
+| `get_pdf_page_text` | `mcp_client_mcp_build123d_docs_get_pdf_page_text` |
+| `get_pdf_page_markdown` | `mcp_client_mcp_build123d_docs_get_pdf_page_markdown` |
+| `get_pdf_chapter_content` | `mcp_client_mcp_build123d_docs_get_pdf_chapter_content` |
+
+**Aggiunta a `config/default.yaml`** (nella sezione `mcp.servers` esistente):
+
+```yaml
+mcp:
+  servers:
+    # ... server esistenti ...
+    #
+    # - name: build123d_docs
+    #   transport: stdio
+    #   # Installa ebook-mcp con: uvx ebook-mcp
+    #   # Posiziona i PDF/EPUB in una cartella (es. models/docs/)
+    #   command: ["uvx", "ebook-mcp", "--folder", "C:/Users/zagor/Desktop/omnia/models/docs"]
+    #   enabled: true
+    #   # Usa `get_toc` su ogni documento prima di leggere capitoli specifici con get_chapter_markdown
+```
+
+**Configurazione utente** (passo manuale one-shot):
+
+```powershell
+# 1. Installa ebook-mcp (verifica che uvx/uv sia disponibile — già usato dal progetto)
+uvx ebook-mcp --version  # verifica funzionamento
+
+# 2. Crea la cartella documenti e posiziona i PDF/EPUB
+New-Item -ItemType Directory -Path "C:\Users\zagor\Desktop\omnia\models\docs" -Force
+# Copiare qui: build123d docs, CadQuery docs, ecc.
+
+# 3. Decommentare la voce nel default.yaml e aggiornare il path
+# 4. Aggiungere "mcp_client" a plugins.enabled se non già presente
+```
+
+**Dipendenze:** `ebook-mcp` richiede `uvx` (già disponibile) — zero nuove dipendenze nel
+`pyproject.toml` di OMNIA. L'installazione avviene nell'ambiente isolato di `uvx`.
+
+---
+
+#### 12.2 — CadGeneratorConfig (`backend/core/config.py`)
+
+Nuova classe aggiunta in `config.py`, dopo `McpConfig`:
+
+```python
+class CadGeneratorConfig(BaseSettings):
+    """CAD generator plugin configuration — connects to the cad-agent Docker container."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_CAD_GENERATOR__")
+
+    enabled: bool = False
+    """Abilita il plugin. Richiede Docker + cad-agent in esecuzione."""
+
+    docker_url: str = "http://localhost:8080"
+    """URL base del container cad-agent. Deve puntare a un HTTP endpoint locale."""
+
+    request_timeout_s: int = 60
+    """Timeout per le richieste al cad-agent (la generazione CAD può richiedere tempo)."""
+
+    default_export_format: Literal["stl", "step", "3mf"] = "stl"
+    """Formato di export default. STL: mesh-only (Three.js STLLoader). STEP/3MF: per CAD avanzato."""
+
+    max_model_size_mb: int = 50
+    """Dimensione massima accettata per i file STL/STEP (protezione da modelli enormi)."""
+
+    model_ttl_hours: int = 24
+    """TTL stimato dei modelli nel cad-agent (usato solo a scopo documentativo — il cleanup
+    è responsabilità del container cad-agent stesso)."""
+```
+
+Aggiunta a `OmniaConfig` (dopo `mcp`):
+
+```python
+cad_generator: CadGeneratorConfig = Field(default_factory=CadGeneratorConfig)
+```
+
+Aggiunta a `config/default.yaml` (in fondo, dopo la sezione `mcp:`):
+
+```yaml
+# ──────────────────────────────────────────────────
+# Fase 12 — CAD 3D Generativo
+# ──────────────────────────────────────────────────
+cad_generator:
+  enabled: false
+  # Avviare il container cad-agent prima di abilitare il plugin:
+  #   docker pull ghcr.io/svetlana-dao-llc/cad-agent:latest
+  #   docker run -d -p 8080:8000 ghcr.io/svetlana-dao-llc/cad-agent:latest
+  docker_url: "http://localhost:8080"
+  request_timeout_s: 60
+  default_export_format: "stl"
+  max_model_size_mb: 50
+
+# In plugins.enabled, aggiungere (commentato per default-off):
+#   - cad_generator  # abilitare con cad_generator.enabled: true
+```
+
+**SSRF protection**: `docker_url` deve essere un URL locale. La validazione è enforced in
+`CadAgentClient.__init__()` tramite la funzione `validate_url_ssrf()` di `http_security.py`
+— identica al pattern adottato da `WeatherPlugin`, `NewsPlugin` e `WebSearchPlugin`.
+
+---
+
+#### 12.3 — CadAgentClient (`backend/plugins/cad_generator/client.py`)
+
+**Ruolo**: client HTTP asincrono verso l'API REST del container cad-agent.
+Non conosce il plugin, il context OMNIA né il ToolRegistry — solo I/O HTTP.
+
+```python
+"""CAD Agent HTTP client.
+
+Wraps the cad-agent Docker REST API with typed async methods.
+See https://github.com/Svetlana-DAO-LLC/cad-agent for API docs.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+
+import httpx
+from loguru import logger
+
+from backend.core.config import CadGeneratorConfig
+from backend.core.http_security import validate_url_ssrf
+
+
+@dataclass(frozen=True, slots=True)
+class ModelInfo:
+    """Lightweight model descriptor returned by list_models()."""
+
+    name: str
+    created_at: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ExportResult:
+    """Binary export result from the cad-agent."""
+
+    model_name: str
+    format: str          # "stl" | "step" | "3mf"
+    content_bytes: bytes
+    size_bytes: int
+
+
+class CadAgentClient:
+    """Async HTTP client for the cad-agent Docker container REST API.
+
+    The client holds a persistent httpx.AsyncClient to avoid per-request
+    connection overhead. Call close() to release it.
+
+    Args:
+        config: CadGeneratorConfig with docker_url, timeouts, etc.
+
+    Raises:
+        RuntimeError: On construction if docker_url fails SSRF validation.
+    """
+
+    def __init__(self, config: CadGeneratorConfig) -> None:
+        # Validate SSRF guard: docker_url must be localhost / RFC-1918
+        # sse transport urls point to localhost; same check as WeatherPlugin
+        validate_url_ssrf(config.docker_url)
+        self._base_url = config.docker_url.rstrip("/")
+        self._timeout = config.request_timeout_s
+        self._max_bytes = config.max_model_size_mb * 1_048_576
+        self._client = httpx.AsyncClient(
+            base_url=self._base_url,
+            timeout=httpx.Timeout(self._timeout),
+        )
+
+    async def health_check(self) -> bool:
+        """Return True if the cad-agent container is reachable.
+
+        Uses a lightweight GET /health or GET / probe. Does not raise.
+        """
+        try:
+            r = await self._client.get("/health", timeout=5.0)
+            return r.status_code < 500
+        except Exception:
+            return False
+
+    async def create_model(self, build123d_code: str, model_name: str) -> str:
+        """Execute build123d code on the cad-agent and create a named model.
+
+        Args:
+            build123d_code: Valid Python code using the build123d library.
+            model_name: Unique identifier for the model (alphanumeric + underscore).
+
+        Returns:
+            The model name as confirmed by the server (may be sanitised).
+
+        Raises:
+            httpx.HTTPStatusError: If cad-agent returns a 4xx/5xx status.
+            RuntimeError: If the response JSON is missing expected fields.
+        """
+        payload = {"name": model_name, "code": build123d_code}
+        r = await self._client.post("/model/create", json=payload)
+        r.raise_for_status()
+        data = r.json()
+        return data.get("name", model_name)
+
+    async def export_model(
+        self,
+        model_name: str,
+        fmt: str = "stl",
+    ) -> ExportResult:
+        """Export a previously created model as a binary file.
+
+        Args:
+            model_name: Name of the model to export (must exist on cad-agent).
+            fmt: Export format: "stl" | "step" | "3mf".
+
+        Returns:
+            ExportResult with binary content_bytes.
+
+        Raises:
+            httpx.HTTPStatusError: On HTTP error from cad-agent.
+            ValueError: If the exported file exceeds max_model_size_mb.
+        """
+        r = await self._client.post(
+            "/export",
+            json={"name": model_name, "format": fmt},
+        )
+        r.raise_for_status()
+        raw = r.content
+        if len(raw) > self._max_bytes:
+            raise ValueError(
+                f"Exported model '{model_name}' exceeds max size "
+                f"({len(raw) // 1_048_576} MB > {self._max_bytes // 1_048_576} MB)"
+            )
+        logger.debug(
+            "CAD export '{}' ({}) — {} bytes", model_name, fmt, len(raw)
+        )
+        return ExportResult(
+            model_name=model_name,
+            format=fmt,
+            content_bytes=raw,
+            size_bytes=len(raw),
+        )
+
+    async def list_models(self) -> list[ModelInfo]:
+        """List all models currently stored in the cad-agent container.
+
+        Returns:
+            List of ModelInfo. Returns empty list if none exist.
+        """
+        r = await self._client.get("/model/list")
+        r.raise_for_status()
+        data = r.json()
+        models = data if isinstance(data, list) else data.get("models", [])
+        return [
+            ModelInfo(
+                name=m.get("name", str(m)) if isinstance(m, dict) else str(m),
+                created_at=m.get("created_at") if isinstance(m, dict) else None,
+            )
+            for m in models
+        ]
+
+    async def close(self) -> None:
+        """Release the underlying httpx.AsyncClient connection pool."""
+        await self._client.aclose()
+```
+
+**Nota sicurezza `validate_url_ssrf`**: questa funzione è in `backend/core/http_security.py`
+(introdotta in Fase 7.3). Blocca URL che puntano a IP privati RFC-1918, loopback remoto
+e link-local. **Eccezione**: `http://localhost` e `http://127.0.0.1` sono permessi perché
+`CadGeneratorConfig.docker_url` deve per forza essere locale (il container Docker gira
+sulla stessa macchina). La validazione blocca comunque qualsiasi IP non locale nel caso
+l'utente configuri un URL di rete interna remoto (es. Docker su NAS) — coerente con il
+principio di sicurezza del progetto.
+
+**Nota `validate_url_ssrf` per localhost**: verificare che la funzione permetta
+`localhost` / `127.0.0.1` nella sua logica (attualmente usata da weather e news per
+URL remoti pubblici). Se blocca anche localhost, aggiungere il parametro opzionale
+`allow_localhost: bool = False` con default retrocompatibile.
+
+---
+
+#### 12.4 — CadGeneratorPlugin (`backend/plugins/cad_generator/plugin.py`)
+
+**Ruolo**: plugin OMNIA che espone 2 tool LLM per generare modelli 3D e listarli.
+Gestisce il ciclo di vita del `CadAgentClient` e produce `ToolResult` con
+`content_type = "application/vnd.omnia.cad-model+json"` per i modelli generati.
+
+```
+backend/plugins/cad_generator/
+├── __init__.py     ← import + PLUGIN_REGISTRY["cad_generator"] = CadGeneratorPlugin
+├── plugin.py       ← CadGeneratorPlugin(BasePlugin) — 2 tool
+└── client.py       ← CadAgentClient — HTTP I/O verso Docker
+```
+
+**`__init__.py`** — pattern identico a tutti gli altri plugin:
+
+```python
+"""O.M.N.I.A. — CAD Generator plugin package.
+
+Importing this module registers CadGeneratorPlugin in the static PLUGIN_REGISTRY.
+Requires the cad-agent Docker container running on cad_generator.docker_url.
+See https://github.com/Svetlana-DAO-LLC/cad-agent for setup instructions.
+"""
+from backend.core.plugin_manager import PLUGIN_REGISTRY
+from backend.plugins.cad_generator.plugin import CadGeneratorPlugin  # noqa: F401
+
+PLUGIN_REGISTRY["cad_generator"] = CadGeneratorPlugin
+```
+
+**`plugin.py`** — `CadGeneratorPlugin(BasePlugin)`:
+
+```python
+class CadGeneratorPlugin(BasePlugin):
+    """Generates 3D CAD models from build123d Python code via the cad-agent Docker API.
+
+    Uses the cad-agent HTTP REST API (not MCP) to: execute build123d code on the
+    server, export the resulting model as STL, and return a ToolResult with
+    content_type='application/vnd.omnia.cad-model+json' so the Electron frontend
+    can render it with Three.js via the /api/cad/ proxy route.
+    """
+
+    plugin_name = "cad_generator"
+    plugin_version = "1.0.0"
+    plugin_description = (
+        "Genera modelli 3D da codice build123d tramite container Docker cad-agent. "
+        "I modelli vengono visualizzati interattivamente nel frontend via Three.js."
+    )
+    plugin_dependencies: list[str] = []
+    plugin_priority: int = 20
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._client: CadAgentClient | None = None
+
+    async def initialize(self, ctx: AppContext) -> None:
+        """Start the CadAgentClient and check Docker availability."""
+        await super().initialize(ctx)
+        cfg = ctx.config.cad_generator
+        self._client = CadAgentClient(cfg)
+        reachable = await self._client.health_check()
+        if not reachable:
+            logger.warning(
+                "CadGeneratorPlugin: cad-agent non raggiungibile a {}. "
+                "I tool CAD restituiranno un errore descrittivo finché Docker non avvia il container.",
+                cfg.docker_url,
+            )
+            # Nota: NON impostiamo status=ERROR — il plugin carica correttamente.
+            # La connessione viene controllata ad ogni tool call.
+
+    async def cleanup(self) -> None:
+        if self._client:
+            await self._client.close()
+            self._client = None
+        await super().cleanup()
+
+    async def get_connection_status(self) -> ConnectionStatus:
+        if self._client is None:
+            return ConnectionStatus.DISCONNECTED
+        healthy = await self._client.health_check()
+        return ConnectionStatus.CONNECTED if healthy else ConnectionStatus.DISCONNECTED
+```
+
+**Tool definitions** (restituite da `get_tools()`):
+
+| Tool | risk_level | requires_confirmation | timeout_ms | Descrizione |
+|---|---|---|---|---|
+| `cad_generate` | `safe` | `False` | 90000 | Genera un modello 3D da codice build123d, visualizzabile nel frontend |
+| `cad_list_models` | `safe` | `False` | 10000 | Elenca i modelli correntemente nel container cad-agent |
+
+**Schema tool `cad_generate`**:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "build123d_code": {
+      "type": "string",
+      "description": "Codice Python valido che usa la libreria build123d per creare un solido 3D. Deve terminare con una variabile di tipo Shape/Compound assegnata a 'result' (es. `result = Box(10, 20, 30)`).",
+      "maxLength": 8000
+    },
+    "model_name": {
+      "type": "string",
+      "description": "Nome identificativo del modello (solo lettere, numeri, underscore). Se omesso, viene generato automaticamente da timestamp.",
+      "pattern": "^[a-zA-Z0-9_]{1,64}$"
+    },
+    "export_format": {
+      "type": "string",
+      "enum": ["stl", "step", "3mf"],
+      "description": "Formato di export. Usa 'stl' per visualizzazione 3D nel browser (default). Usa 'step' per modifica in CAD tradizionale.",
+      "default": "stl"
+    }
+  },
+  "required": ["build123d_code"]
+}
+```
+
+**Implementazione `execute_tool("cad_generate", args, ctx)`**:
+
+```python
+async def _execute_cad_generate(self, args: dict, context: ExecutionContext) -> ToolResult:
+    if self._client is None:
+        return ToolResult(success=False, error_message="CadGeneratorPlugin non inizializzato.")
+
+    code: str = args["build123d_code"]
+    fmt: str = args.get("export_format", self._ctx.config.cad_generator.default_export_format)
+    # Genera nome univoco se non fornito
+    raw_name = args.get("model_name") or f"model_{context.execution_id[:8]}"
+    # Sanitizza il nome (il container potrebbe rifiutare caratteri speciali)
+    name = re.sub(r"[^a-zA-Z0-9_]", "_", raw_name)[:64]
+
+    # 1. Verifica connessione Docker (non bloccante: prima call after init può riuscire)
+    if not await self._client.health_check():
+        return ToolResult(
+            success=False,
+            error_message=(
+                f"cad-agent non raggiungibile a {self._ctx.config.cad_generator.docker_url}. "
+                "Assicurarsi che Docker sia avviato e il container cad-agent in esecuzione:\n"
+                "  docker run -d -p 8080:8000 ghcr.io/svetlana-dao-llc/cad-agent:latest"
+            ),
+        )
+
+    # 2. Crea modello sul container
+    try:
+        confirmed_name = await self._client.create_model(code, name)
+    except httpx.HTTPStatusError as exc:
+        # Errore build123d (codice non compilabile, eccezione Python, ecc.)
+        error_detail = exc.response.text[:500] if exc.response else str(exc)
+        return ToolResult(
+            success=False,
+            error_message=f"Errore creazione modello: {error_detail}",
+        )
+
+    # 3. Export (restituisce solo URL — il file binario viene servito da /api/cad/)
+    export_url = f"/api/cad/models/{confirmed_name}/export?format={fmt}"
+    payload = {
+        "model_name": confirmed_name,
+        "export_url": export_url,
+        "format": fmt,
+    }
+
+    return ToolResult(
+        success=True,
+        content=json.dumps(payload),
+        content_type="application/vnd.omnia.cad-model+json",
+    )
+```
+
+**Perché l'URL e non i bytes**: il tool restituisce solo il JSON con l'URL al file —
+il front-end carica il binario STL direttamente dalla route proxy `/api/cad/` tramite
+una normale richiesta HTTP GET. Questo evita di passare file potenzialmente da decine
+di MB attraverso il WebSocket, mantenendo il canale WebSocket per soli messaggi di
+controllo leggeri.
+
+**Schema tool `cad_list_models`** (`parameters: {"type": "object", "properties": {}}`):
+
+Restituisce JSON array: `[{"name": "...", "created_at": "ISO"?}, ...]`.
+
+---
+
+#### 12.5 — REST Proxy `/api/cad/` (`backend/api/routes/cad.py`)
+
+**Ruolo**: espone il file binario STL/STEP generato dal container cad-agent al frontend
+Electron. Il proxy è necessario perché il container Docker gira su una porta interna
+non direttamente accessibile dal browser web nel renderer Electron senza CSP issues.
+
+Router con prefix e tag coerenti (pattern `tasks.py`, `memory.py`):
+
+```python
+router = APIRouter(prefix="/cad", tags=["cad"])
+```
+
+**Endpoint esposti:**
+
+```
+GET  /api/cad/models/{model_name}/export    — stream file STL/STEP dal cad-agent
+GET  /api/cad/models                        — lista modelli dal cad-agent
+GET  /api/cad/health                        — health check del container Docker
+```
+
+**Implementazione `/api/cad/models/{model_name}/export`**:
+
+```python
+@router.get("/models/{model_name}/export")
+async def export_model(
+    model_name: str,
+    format: Literal["stl", "step", "3mf"] = "stl",
+    request: Request = None,
+) -> StreamingResponse:
+    """Proxy the CAD model binary export from the cad-agent Docker container.
+
+    Args:
+        model_name: CAD model identifier (alphanumeric + underscore only).
+        format: Export format (default: stl).
+
+    Returns:
+        StreamingResponse with the binary model file.
+
+    Raises:
+        HTTPException 404: If model not found on cad-agent.
+        HTTPException 503: If cad-agent container is unreachable.
+    """
+    # Input validation anti-path-traversal
+    if not re.fullmatch(r"[a-zA-Z0-9_]{1,64}", model_name):
+        raise HTTPException(status_code=400, detail="Nome modello non valido.")
+
+    ctx: AppContext = request.app.state.context
+    plugin: CadGeneratorPlugin | None = (
+        ctx.plugin_manager.get_plugin("cad_generator")
+        if ctx.plugin_manager else None
+    )
+    if plugin is None or plugin._client is None:
+        raise HTTPException(
+            status_code=503, detail="Plugin cad_generator non attivo."
+        )
+
+    try:
+        result = await plugin._client.export_model(model_name, format)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"Modello '{model_name}' non trovato.")
+        raise HTTPException(status_code=502, detail="Errore dal container cad-agent.")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"cad-agent non raggiungibile: {exc}")
+
+    content_type_map = {
+        "stl": "model/stl",
+        "step": "application/octet-stream",
+        "3mf": "model/3mf",
+    }
+    media_type = content_type_map.get(format, "application/octet-stream")
+    filename = f"{model_name}.{format}"
+
+    return StreamingResponse(
+        content=iter([result.content_bytes]),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+```
+
+**Registrazione in `backend/api/routes/__init__.py`**:
+
+```python
+from backend.api.routes import audit, cad, calendar, chat, config, events, models, plugins, settings, tasks, voice
+
+router.include_router(cad.router)  # /api/cad/*
+```
+
+**Sicurezza**:
+
+- Validazione `model_name` con regex `[a-zA-Z0-9_]{1,64}` — previene path traversal
+  (`../../etc/passwd`) e command injection
+- Il proxy chiama solo `config.cad_generator.docker_url` (configurato dall'amministratore
+  di sistema, non dall'utente), quindi non è possibile SSRF arbitrario
+- Nessuna autenticazione richiesta per v1 (OMNIA gira in locale — coerente con il resto delle API)
+
+---
+
+#### 12.6 — Frontend: `CADViewer.vue` (Three.js + STLLoader)
+
+**Dipendenze da aggiungere a `frontend/package.json`**:
+
+```bash
+cd frontend
+npm install three
+npm install --save-dev @types/three
+```
+
+**Componente `frontend/src/renderer/src/components/chat/CADViewer.vue`**:
+
+Il componente è lazy-loaded (`defineAsyncComponent`) per non aumentare il bundle iniziale
+dell'app (Three.js pesa ~600KB gzip).
+
+```vue
+<script setup lang="ts">
+/**
+ * Interactive 3D CAD model viewer using Three.js + STLLoader.
+ *
+ * Renders a CAD model exported as STL from the cad-agent Docker container.
+ * Supports: orbit controls (drag/scroll/right-drag), zoom, auto-rotate toggle,
+ * wireframe toggle, and model download.
+ *
+ * Props:
+ *   modelUrl - Relative URL to the STL file (e.g. /api/cad/models/xxx/export?format=stl)
+ *   modelName - Display name for the model (used in download filename)
+ */
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import * as THREE from 'three'
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+
+const props = defineProps<{
+  modelUrl: string
+  modelName?: string
+}>()
+
+const containerRef = ref<HTMLDivElement | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
+const wireframe = ref(false)
+const autoRotate = ref(false)
+
+let renderer: THREE.WebGLRenderer | null = null
+let frameId: number | null = null
+let controls: InstanceType<typeof OrbitControls> | null = null
+let mesh: THREE.Mesh | null = null
+
+async function initScene(): Promise<void> {
+  const container = containerRef.value
+  if (!container) return
+
+  const w = container.clientWidth
+  const h = container.clientHeight || 320
+
+  // Scene
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x1a1a2e)
+
+  // Camera
+  const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 10000)
+  camera.position.set(0, 0, 200)
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6)
+  scene.add(ambient)
+  const dir = new THREE.DirectionalLight(0xffffff, 0.8)
+  dir.position.set(1, 2, 3)
+  scene.add(dir)
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true })
+  renderer.setSize(w, h)
+  renderer.setPixelRatio(window.devicePixelRatio)
+  container.appendChild(renderer.domElement)
+
+  // Controls
+  controls = new OrbitControls(camera, renderer.domElement)
+  controls.enableDamping = true
+  controls.dampingFactor = 0.05
+  controls.autoRotate = autoRotate.value
+
+  // Load STL
+  const loader = new STLLoader()
+  try {
+    const geometry = await new Promise<THREE.BufferGeometry>((resolve, reject) => {
+      loader.load(props.modelUrl, resolve, undefined, reject)
+    })
+    geometry.computeVertexNormals()
+    geometry.center()
+
+    const material = new THREE.MeshPhongMaterial({
+      color: 0x4fc3f7,
+      specular: 0x111111,
+      shininess: 80,
+      wireframe: wireframe.value,
+    })
+    mesh = new THREE.Mesh(geometry, material)
+
+    // Auto-fit camera to bounding box
+    const box = new THREE.Box3().setFromObject(mesh)
+    const size = box.getSize(new THREE.Vector3()).length()
+    camera.position.set(0, 0, size * 1.5)
+    camera.far = size * 10
+    camera.updateProjectionMatrix()
+    controls.target.set(0, 0, 0)
+    controls.update()
+
+    scene.add(mesh)
+    loading.value = false
+
+    // Render loop
+    const animate = (): void => {
+      frameId = requestAnimationFrame(animate)
+      controls!.autoRotate = autoRotate.value
+      controls!.update()
+      renderer!.render(scene, camera)
+    }
+    animate()
+  } catch (err) {
+    error.value = `Impossibile caricare il modello: ${err}`
+    loading.value = false
+  }
+
+  // Resize observer
+  const resizeObserver = new ResizeObserver(() => {
+    if (!container || !renderer || !camera) return
+    const nw = container.clientWidth
+    const nh = container.clientHeight || 320
+    camera.aspect = nw / nh
+    camera.updateProjectionMatrix()
+    renderer.setSize(nw, nh)
+  })
+  resizeObserver.observe(container)
+}
+
+function toggleWireframe(): void {
+  wireframe.value = !wireframe.value
+  if (mesh) (mesh.material as THREE.MeshPhongMaterial).wireframe = wireframe.value
+}
+
+function download(): void {
+  const link = document.createElement('a')
+  link.href = props.modelUrl
+  link.download = `${props.modelName ?? 'model'}.stl`
+  link.click()
+}
+
+function resetCamera(): void {
+  controls?.reset()
+}
+
+onMounted(initScene)
+
+onUnmounted(() => {
+  if (frameId !== null) cancelAnimationFrame(frameId)
+  renderer?.dispose()
+  controls?.dispose()
+})
+</script>
+
+<template>
+  <div class="cad-viewer-wrapper">
+    <div class="cad-viewer-toolbar">
+      <span class="cad-viewer-title">
+        🧊 {{ modelName ?? 'Modello 3D' }}
+      </span>
+      <div class="cad-viewer-actions">
+        <button @click="autoRotate = !autoRotate" :class="{ active: autoRotate }" title="Auto-rotazione">⟳</button>
+        <button @click="toggleWireframe" :class="{ active: wireframe }" title="Wireframe">⬡</button>
+        <button @click="resetCamera" title="Reset vista">⌖</button>
+        <button @click="download" title="Scarica STL">⬇</button>
+      </div>
+    </div>
+    <div ref="containerRef" class="cad-viewer-canvas" :style="{ height: '360px' }">
+      <div v-if="loading" class="cad-viewer-overlay">Caricamento modello 3D…</div>
+      <div v-if="error" class="cad-viewer-overlay cad-viewer-error">{{ error }}</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.cad-viewer-wrapper {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(79, 195, 247, 0.2);
+  background: #1a1a2e;
+  margin: 8px 0;
+}
+.cad-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  color: #b0bec5;
+}
+.cad-viewer-title { font-weight: 500; color: #4fc3f7; }
+.cad-viewer-actions { display: flex; gap: 8px; }
+.cad-viewer-actions button {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #b0bec5;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+.cad-viewer-actions button:hover { border-color: #4fc3f7; color: #4fc3f7; }
+.cad-viewer-actions button.active { border-color: #4fc3f7; color: #4fc3f7; background: rgba(79,195,247,0.1); }
+.cad-viewer-canvas { position: relative; width: 100%; }
+.cad-viewer-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #b0bec5; font-size: 14px; background: rgba(26, 26, 46, 0.8);
+}
+.cad-viewer-error { color: #ef5350; }
+</style>
+```
+
+**Lazy loading in `ToolExecutionIndicator.vue`** — usando il pattern `defineAsyncComponent`
+già adottato nel progetto per i plugin UI:
+
+```typescript
+// In ToolExecutionIndicator.vue <script setup>
+import { defineAsyncComponent } from 'vue'
+
+const CADViewer = defineAsyncComponent(
+  () => import('./CADViewer.vue')
+)
+```
+
+---
+
+#### 12.7 — Frontend: Estensione `ToolExecutionIndicator.vue` + `types/chat.ts`
+
+**`frontend/src/renderer/src/types/chat.ts`** — aggiunta dell'interfaccia `CadModelPayload`:
+
+```typescript
+/**
+ * Payload JSON del ToolResult con content_type='application/vnd.omnia.cad-model+json'.
+ * Generato da CadGeneratorPlugin.cad_generate().
+ */
+export interface CadModelPayload {
+  model_name: string
+  /** URL relativo della route proxy: /api/cad/models/{name}/export?format=stl */
+  export_url: string
+  /** Formato di export: "stl" | "step" | "3mf" */
+  format: string
+}
+```
+
+**`frontend/src/renderer/src/components/chat/ToolExecutionIndicator.vue`** — aggiunta del
+caso `application/vnd.omnia.cad-model+json` nel template di rendering del risultato. Questo
+viene aggiunto in parallelo alla gestione `image/*` già presente:
+
+La gestione nel componente segue il pattern esistente:
+
+```typescript
+// Nella sezione <script setup> — helper per parsare e validare il payload
+function parseCadPayload(result: string): CadModelPayload | null {
+  try {
+    const parsed = JSON.parse(result) as CadModelPayload
+    if (typeof parsed.model_name === 'string' && typeof parsed.export_url === 'string') {
+      return parsed
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+```
+
+Nel `<template>`, nel blocco che renderizza il risultato per ogni `exec in executions`,
+aggiungere il caso CAD model accanto al caso image esistente:
+
+```vue
+<!-- caso immagini (già esistente) -->
+<img
+  v-if="exec.result && exec.contentType?.startsWith('image/')"
+  :src="`data:${exec.contentType};base64,${exec.result}`"
+  class="tool-result-image"
+/>
+<!-- caso modello 3D CAD (aggiunto in Fase 12) -->
+<template v-else-if="exec.contentType === 'application/vnd.omnia.cad-model+json' && exec.result">
+  <CADViewer
+    :model-url="parseCadPayload(exec.result)?.export_url ?? ''"
+    :model-name="parseCadPayload(exec.result)?.model_name"
+  />
+</template>
+```
+
+**Nessuna modifica a:**
+
+- `useChat.ts` — già passa `content_type` a `store.completeToolExecution()` senza dispatch speciale
+- `chat.ts` Pinia store — già memorizza `contentType?: string` in `ToolExecution`
+- `ws.ts` WebSocket manager — invariato
+- `MessageBubble.vue` — i tool result nelle conversazioni caricate da DB non hanno `contentType`
+  (non persistito in DB) → nessun `CADViewer` in storico (comportamento accettabile per v1,
+  coerente con screenshot che stessa limitazione presentano)
+
+---
+
+#### 12.8 — System Prompt Update (`config/system_prompt.md`)
+
+Aggiungere una sezione `cad_generator` alla sezione `tools`:
+
+```yaml
+cad_generator:
+  description: >
+    Genera modelli 3D da linguaggio naturale usando build123d (Python, OCCT-based).
+    Il modello viene automaticamente visualizzato nel frontend con Three.js.
+  rules:
+    - usa SEMPRE cad_generate() per creare un modello quando l'utente chiede un oggetto fisico
+      da stampare in 3D, visualizzare o esportare in CAD
+    - il parametro build123d_code deve essere Python valido che usa la libreria build123d
+    - assegna il risultato finale alla variabile 'result' (es. `result = Box(10, 20, 30)`)
+    - usa model_name descrittivo e in inglese (es. "tennis_handle", "bracket_v1")
+    - NON usare 'stl' per modelli che l'utente vuole modificare in CAD: usa 'step' invece
+    - se build123d_code genera un errore, correggilo e riprova con cad_generate()
+    - usa cad_list_models() per controllare i modelli già generati in sessione
+    - coordinate: build123d usa mm per default; crea solo geometrie positive (no z negativo)
+  build123d_patterns: |
+    from build123d import *
+    # Solido semplice:
+    result = Box(larghezza_mm, altezza_mm, profondita_mm)
+    # Rivoluzione (es. manico cilindrico):
+    with BuildPart() as p:
+        with BuildSketch(Plane.XZ):
+            RectangleRounded(5, 120, 2)
+        revolve(axis=Axis.Z)
+    result = p.part
+    # L-profile:
+    result = extrude(RectangleRounded(50, 30, 2), amount=100) - extrude(RectangleRounded(40, 20, 2), amount=110)
+
+documentation_access:
+  description: >
+    Accesso in lettura a documenti PDF/EPUB tramite server MCP ebook-mcp (se configurato).
+    Usare per consultare documentazione build123d, CadQuery, o qualsiasi altro manuale tecnico.
+  rules:
+    - usa get_toc() per ottenere la struttura del documento prima di leggere capitoli specifici
+    - usa get_chapter_markdown() per leggere capitoli specifici — evita di leggere tutto il doc
+    - usa questa capability per trovare l'API build123d corretta prima di scrivere build123d_code
+```
+
+---
+
+#### 12.9 — Dipendenze e Compatibilità
+
+**Backend — nessuna nuova dipendenza:**
+
+Il plugin `cad_generator` usa solo `httpx` (già presente) e `json` (stdlib). La libreria
+`build123d` gira nel container Docker di `cad-agent` — non viene installata in OMNIA.
+
+**Frontend — dipendenze Three.js:**
+
+```json
+{
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0"
+  }
+}
+```
+
+Installazione: `cd frontend && npm install three && npm install --save-dev @types/three`
+
+**Docker — requisito esterno:**
+
+| Componente | Requisito |
+|---|---|
+| Docker Desktop | ≥ 4.x (Windows) |
+| cad-agent image | `ghcr.io/svetlana-dao-llc/cad-agent:latest` |
+| Pull command | `docker pull ghcr.io/svetlana-dao-llc/cad-agent:latest` |
+| Run command | `docker run -d -p 8080:8000 ghcr.io/svetlana-dao-llc/cad-agent:latest` |
+| Verifica | `curl http://localhost:8080/health` |
+
+Docker non è un requisito hard di OMNIA: se assente, il plugin si carica, mostra status
+`DISCONNECTED` nella UI plugin, e i tool CAD restituiscono un messaggio di errore
+descrittivo con le istruzioni di avvio. Il resto dell'app funziona normalmente.
+
+**VRAM Impact (tabella aggiornata):**
+
+| Componente | VRAM |
+|---|---|
+| Invariati (LLM, STT, TTS, Memory) | come prima |
+| cad-agent (Docker) | 0 MB VRAM da OMNIA — il container gestisce la propria allocazione |
+| Three.js viewer (Electron GPU) | < 100 MB GPU RAM (non VRAM dedicata) |
+| ebook-mcp (uv subprocess) | 0 MB VRAM — CPU only |
+
+---
+
+#### 12.10 — Test Suite Fase 12
+
+**`backend/tests/test_cad_agent_client.py`**:
+
+- `test_health_check_success`: mock httpx GET /health → `True`
+- `test_health_check_failure_returns_false`: `ConnectError` → `False` (no raise)
+- `test_create_model_success`: mock POST /model/create → nome modello restituito
+- `test_create_model_http_error`: mock 422 → `HTTPStatusError` propagato
+- `test_export_model_success`: mock POST /export → `ExportResult` con bytes
+- `test_export_model_exceeds_size`: mock 60MB response → `ValueError` con dimensioni
+- `test_list_models`: mock GET /model/list → lista `ModelInfo`
+- `test_ssrf_validation_rejects_remote_url`: URL `http://192.168.1.200:8080` → `RuntimeError` al costruttore
+- `test_ssrf_validation_allows_localhost`: `http://localhost:8080` → nessun errore al costruttore
+
+**`backend/tests/test_cad_generator_plugin.py`**:
+
+- `test_initialize_reachable`: mock health_check True → plugin status CONNECTED
+- `test_initialize_unreachable_no_crash`: mock health_check False → plugin carica,
+  warning loggato, nessun crash (graceful degradation)
+- `test_cad_generate_tool_definition`: `get_tools()` restituisce `ToolDefinition` per
+  `cad_generate` con `risk_level="safe"`, `requires_confirmation=False`, `timeout_ms=90000`
+- `test_cad_generate_success`: mock create_model success → `ToolResult.success=True`,
+  `content_type="application/vnd.omnia.cad-model+json"`, `content` è JSON valido con
+  `model_name` e `export_url`
+- `test_cad_generate_docker_offline`: mock health_check False → `ToolResult.success=False`,
+  `error_message` contiene istruzioni Docker
+- `test_cad_generate_build123d_error`: mock create_model → `HTTPStatusError` 422 →
+  `ToolResult.success=False`, errore descrittivo
+- `test_cad_generate_auto_name`: `model_name` assente negli args → nome generato da
+  `execution_id` (non crash, non nome vuoto)
+- `test_cad_generate_sanitizes_name`: `model_name = "test-model/v2"` →
+  nome sanitizzato `"test_model_v2"` (no path traversal)
+- `test_cad_list_models`: mock list_models → `ToolResult.success=True`, JSON array di nomi
+- `test_cleanup_closes_client`: `cleanup()` → `client.close()` chiamato
+
+**`backend/tests/test_cad_proxy_route.py`**:
+
+Pattern identico a `test_confirmation_audit.py` (pytest-asyncio + `AsyncClient`):
+
+- `test_export_model_proxied`: GET `/api/cad/models/test_cube/export?format=stl` →
+  mock CadAgentClient.export_model → `200 OK`, `Content-Type: model/stl`
+- `test_export_model_not_found`: mock `HTTPStatusError(404)` → `404` risposta OMNIA
+- `test_export_model_docker_offline`: mock `ConnectError` → `503` con messaggio
+- `test_export_model_invalid_name`: `model_name = "../../etc/passwd"` → `400 Bad Request`
+  (path traversal bloccato dalla regex)
+- `test_export_model_plugin_not_active`: plugin disabilitato → `503`
+- `test_cad_health`: GET `/api/cad/health` → mock health_check True → `200 {"status": "ok"}`
+- `test_cad_model_list`: GET `/api/cad/models` → mock list_models → JSON array
+
+**Verifica no-regression** (pre-PR): tutta la suite esistente deve passare invariata.
+In particolare, verificare che `_tool_loop.py` (non modificato) soddisfi ancora i test
+esistenti, che `ToolResult` con `content_type` diverso da `image/*` segua il path normale
+(non viene troncato, non genera placeholder in DB), e che le route chat e voice siano invariate.
+
+---
+
+#### 12.11 — File Structure Fase 12
+
+```
+backend/
+├── plugins/
+│   └── cad_generator/
+│       ├── __init__.py                  ← PLUGIN_REGISTRY["cad_generator"] = CadGeneratorPlugin
+│       ├── plugin.py                    ← CadGeneratorPlugin (BasePlugin, 2 tool)
+│       └── client.py                   ← CadAgentClient (httpx, Docker HTTP API)
+├── api/
+│   └── routes/
+│       ├── cad.py                       ← REST /api/cad/* (proxy → Docker)
+│       └── __init__.py                  ← + cad.router
+├── core/
+│   └── config.py                        ← + CadGeneratorConfig + OmniaConfig.cad_generator
+└── tests/
+    ├── test_cad_agent_client.py
+    ├── test_cad_generator_plugin.py
+    └── test_cad_proxy_route.py
+
+config/
+└── default.yaml                         ← + cad_generator: section + ebook-mcp in mcp.servers (commentato)
+
+frontend/
+├── package.json                         ← + three, @types/three
+└── src/renderer/src/
+    ├── components/
+    │   └── chat/
+    │       ├── CADViewer.vue            ← THREE.js + STLLoader + OrbitControls (nuovo)
+    │       └── ToolExecutionIndicator.vue  ← + caso content_type cad-model
+    └── types/
+        └── chat.ts                      ← + CadModelPayload interface
+```
+
+---
+
+#### 12.12 — Ordine di Implementazione Consigliato
+
+1. **`CadGeneratorConfig`** in `config.py` + `default.yaml` entry — zero dipendenze, testabile subito
+2. **`CadAgentClient`** + test unitari `test_cad_agent_client.py` — layer I/O isolabile con mock httpx
+3. **`CadGeneratorPlugin`** + `__init__.py` + test `test_cad_generator_plugin.py`
+4. **`cad.py` route** + registrazione in `routes/__init__.py` + test `test_cad_proxy_route.py`
+5. **`types/chat.ts`** — aggiunta `CadModelPayload` (frontend, zero rischio)
+6. **`CADViewer.vue`** — componente Three.js (frontend, standalone)
+7. **`ToolExecutionIndicator.vue`** — aggiunta caso CAD (frontend, minimale)
+8. **`config/system_prompt.md`** — aggiunta sezioni `cad_generator` e `documentation_access`
+9. **`default.yaml`** — aggiunta entry `ebook-mcp` commentata in `mcp.servers`
+10. **Test manuale**: avviare Docker + cad-agent → attivare plugin → "crea un cubo di 30mm" →
+    verificare Three.js viewer nel frontend
+
+---
+
+#### 12.13 — Verifiche Fase 12
+
+| Scenario | Comportamento atteso |
+|---|---|
+| "Crea un supporto per la racchetta da tennis, 200x50x30mm con slot centrale" | LLM scrive build123d_code → chiama `cad_generate` → plugin OK → `ToolResult(content_type="application/vnd.omnia.cad-model+json", content="{model_name, export_url}")` → frontend mostra `CADViewer.vue` con modello 3D interattivo |
+| Utente ruota il modello | OrbitControls Three.js funzionanti — drag/scroll/pinch |
+| Utente clicca "⬇ Scarica STL" | `GET /api/cad/models/{name}/export?format=stl` → download file |
+| Docker non avviato | `health_check()` → False → `ToolResult(success=False, error_message="cad-agent non raggiungibile... docker run ...")` — nessun crash, messaggio descrittivo |
+| build123d_code errato (sintassi) | cad-agent restituisce 422 → `ToolResult(success=False, error_message="...")` — l'LLM vede l'errore e può correggere |
+| `cad_generator.enabled: false` (default) | Plugin non caricato, zero overhead; altri plugin e chat invariati |
+| LLM chiede consultare docs build123d | Se `ebook-mcp` configurato: chiama `mcp_client_mcp_build123d_docs_get_toc` → tabella contenuti → `get_chapter_markdown` per sezione specifica → risponde con API corretta |
+| `ebook-mcp` non configurato | `mcp_client` non ha quel server; tool ebook non nel ToolRegistry; zero impatto |
+| `model_name = "../../../etc"` via tool | Sanitizzato a `"______etc"` dal plugin prima di passare al cad-agent |
+| GET `/api/cad/models/../../passwd/export` | Regex `[a-zA-Z0-9_]{1,64}` → `400 Bad Request` |
+| Modello STL > `max_model_size_mb` (default 50MB) | `export_model()` → `ValueError` → `ToolResult(success=False, error_message="... supera 50 MB")` |
+| Conversazione ricaricata da DB | `CADViewer` non compare (content_type non persistito in DB, coerente con screenshot) — comportamento documentato, accettabile v1 |
+| `GET /api/plugins` | Card `cad_generator` con status CONNECTED (se Docker up) o DISCONNECTED (se Docker down) |
+
+---
+
 ## Verifiche per Fase
 
 | Fase | Test |
@@ -3072,3 +4253,5 @@ Nessun file modificato nei layer esistenti: `app.py`, `protocols.py`, `context.p
 | 8 (edge) | Multi-user: utente A non vede conversazioni utente B; migration DB → zero data loss |
 | 11 | Server MCP filesystem configurato → LLM chiama `mcp_client_mcp_filesystem_read_file` → contenuto file in risposta |
 | 11 (edge) | Server MCP offline all'avvio → plugin degraded, chat funzionante; server non configurato → zero impatto |
+| 12 | "Crea un supporto 200x50x30mm" → `cad_generate(build123d_code)` → ToolResult con `content_type=cad-model+json` → CADViewer Three.js nel frontend; ebook-mcp configurato → LLM legge documentazione build123d PDF |
+| 12 (edge) | Docker non avviato → errore descrittivo con istruzioni; build123d_code errato → errore 422 → LLM corregge; `model_name="../../../etc"` → sanitizzato; modello > 50MB → ValueError; conversazione ricaricata da DB → viewer non compare (comportamento noto v1) |

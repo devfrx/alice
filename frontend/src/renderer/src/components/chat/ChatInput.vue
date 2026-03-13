@@ -623,6 +623,7 @@ defineExpose({
   line-height: var(--leading-normal);
   resize: none;
   outline: none !important;
+  box-shadow: none !important;
   letter-spacing: 0.01em;
 }
 

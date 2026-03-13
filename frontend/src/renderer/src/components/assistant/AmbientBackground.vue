@@ -52,7 +52,6 @@ withDefaults(defineProps<{
     position: absolute;
     inset: 0;
     z-index: 0;
-    overflow: hidden;
     pointer-events: none;
 }
 

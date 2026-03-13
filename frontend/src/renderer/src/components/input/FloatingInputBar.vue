@@ -735,6 +735,7 @@ defineExpose({
     line-height: var(--leading-normal);
     resize: none;
     outline: none !important;
+    box-shadow: none !important;
     letter-spacing: 0.01em;
 }
 
@@ -760,27 +761,34 @@ defineExpose({
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    background: var(--surface-hover);
-    color: var(--text-secondary);
+    background: var(--accent);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: background var(--transition-fast),
-        color var(--transition-fast),
-        border-color var(--transition-fast);
+    transition:
+        background 120ms ease,
+        color 120ms ease,
+        opacity 120ms ease,
+        box-shadow 120ms ease;
 }
 
 .fib__send:hover:not(:disabled) {
-    background: var(--surface-active);
+    background: var(--surface-2);
     color: var(--text-primary);
-    border-color: var(--border-hover);
+    ;
+}
+
+.fib__send:not(:disabled) {
+    animation: none;
 }
 
 .fib__send:disabled {
     opacity: var(--opacity-disabled);
     cursor: not-allowed;
+    animation: none;
 }
 
 .fib__stop {

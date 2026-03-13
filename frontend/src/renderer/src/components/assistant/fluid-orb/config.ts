@@ -1,0 +1,142 @@
+/**
+ * Per-state visual configurations for the fluid aurora orb.
+ *
+ * Each state defines a unique color palette, motion profile, and energy level.
+ * Colors are chosen to work beautifully with screen-blending against the
+ * dark #161616 background while matching OMNIA's warm design language.
+ */
+import type { OrbState, StateConfig, TransitionConfig } from './types'
+
+export const STATE_CONFIGS: Record<OrbState, StateConfig> = {
+    idle: {
+        primary: [232, 216, 180],
+        secondary: [160, 200, 192],
+        tertiary: [200, 180, 150],
+        glow: [232, 220, 200],
+        morphSpeed: 0.4,
+        turbulence: 0.6,
+        breathSpeed: 1.2,
+        breathAmount: 0.035,
+        orbitRadius: 0.2,
+        orbitSpeed: 0.3,
+        blobOpacity: 0.3,
+        glowIntensity: 0.12,
+        glowSize: 1.5,
+        coreIntensity: 0.6,
+        coreSize: 0.06,
+        particleCount: 4,
+        particleSpeed: 0.15,
+        particleSize: 1.5,
+        pulseRate: 0,
+        audioReactivity: 0.05,
+        energy: 0.15,
+    },
+
+    listening: {
+        primary: [224, 100, 100],
+        secondary: [220, 145, 105],
+        tertiary: [200, 110, 145],
+        glow: [224, 96, 96],
+        morphSpeed: 0.9,
+        turbulence: 1.0,
+        breathSpeed: 2.5,
+        breathAmount: 0.06,
+        orbitRadius: 0.35,
+        orbitSpeed: 0.7,
+        blobOpacity: 0.42,
+        glowIntensity: 0.25,
+        glowSize: 1.65,
+        coreIntensity: 0.8,
+        coreSize: 0.07,
+        particleCount: 12,
+        particleSpeed: 0.45,
+        particleSize: 2.0,
+        pulseRate: 0.4,
+        audioReactivity: 0.35,
+        energy: 0.65,
+    },
+
+    thinking: {
+        primary: [155, 140, 210],
+        secondary: [110, 155, 215],
+        tertiary: [140, 180, 225],
+        glow: [140, 130, 195],
+        morphSpeed: 1.1,
+        turbulence: 0.85,
+        breathSpeed: 1.8,
+        breathAmount: 0.04,
+        orbitRadius: 0.3,
+        orbitSpeed: 1.0,
+        blobOpacity: 0.45,
+        glowIntensity: 0.3,
+        glowSize: 1.7,
+        coreIntensity: 0.9,
+        coreSize: 0.065,
+        particleCount: 18,
+        particleSpeed: 0.55,
+        particleSize: 1.8,
+        pulseRate: 0.8,
+        audioReactivity: 0.05,
+        energy: 0.85,
+    },
+
+    speaking: {
+        primary: [92, 170, 120],
+        secondary: [80, 185, 165],
+        tertiary: [120, 200, 165],
+        glow: [80, 155, 115],
+        morphSpeed: 0.7,
+        turbulence: 0.75,
+        breathSpeed: 2.2,
+        breathAmount: 0.055,
+        orbitRadius: 0.28,
+        orbitSpeed: 0.6,
+        blobOpacity: 0.38,
+        glowIntensity: 0.22,
+        glowSize: 1.6,
+        coreIntensity: 0.75,
+        coreSize: 0.07,
+        particleCount: 10,
+        particleSpeed: 0.35,
+        particleSize: 2.2,
+        pulseRate: 0.35,
+        audioReactivity: 0.3,
+        energy: 0.55,
+    },
+
+    processing: {
+        primary: [100, 140, 210],
+        secondary: [200, 175, 100],
+        tertiary: [145, 135, 195],
+        glow: [100, 130, 185],
+        morphSpeed: 1.3,
+        turbulence: 0.7,
+        breathSpeed: 2.0,
+        breathAmount: 0.045,
+        orbitRadius: 0.32,
+        orbitSpeed: 1.2,
+        blobOpacity: 0.4,
+        glowIntensity: 0.28,
+        glowSize: 1.65,
+        coreIntensity: 0.85,
+        coreSize: 0.06,
+        particleCount: 14,
+        particleSpeed: 0.65,
+        particleSize: 1.6,
+        pulseRate: 0.6,
+        audioReactivity: 0.1,
+        energy: 0.75,
+    },
+}
+
+/**
+ * Transition durations per destination state.
+ * Shorter durations for urgent states, longer for relaxation.
+ */
+export const TRANSITION_CONFIGS: Record<OrbState, TransitionConfig> = {
+    idle: { duration: 1.4 },
+    listening: { duration: 0.5 },
+    thinking: { duration: 0.7 },
+    speaking: { duration: 0.6 },
+    processing: { duration: 0.55 },
+}

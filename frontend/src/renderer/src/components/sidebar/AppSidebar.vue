@@ -307,6 +307,7 @@ async function onOpenFile(id: string): Promise<void> {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4) var(--space-2);
+  margin-top: var(--space-2);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.08em;

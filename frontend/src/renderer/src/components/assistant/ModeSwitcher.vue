@@ -77,7 +77,7 @@ function switchMode(mode: UIMode): void {
     padding: 3px;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     transition:
         width 300ms var(--ease-out-expo, ease),

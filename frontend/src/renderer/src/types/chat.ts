@@ -26,6 +26,7 @@ export interface FileAttachment {
   url: string
   filename: string
   content_type: string
+  file_path?: string
 }
 
 /** Role a message can have. */

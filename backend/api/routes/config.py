@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from backend.api.routes.models import serialise_model
+from backend.api.routes.voice import push_voice_ready
 from backend.core.config import KNOWN_MODELS
 from backend.core.context import AppContext
 from backend.services.stt_service import STTService
@@ -399,6 +400,7 @@ async def update_config(request: Request) -> dict[str, Any]:
         )
         if stt_changed:
             await _apply_stt_changes(ctx, body["stt"])
+            await push_voice_ready(ctx)
 
     if old_tts is not None:
         tts_changed = (
@@ -414,6 +416,7 @@ async def update_config(request: Request) -> dict[str, Any]:
         )
         if tts_changed:
             await _apply_tts_changes(ctx, body["tts"])
+            await push_voice_ready(ctx)
 
     # Return the full config after applying changes.
     return await get_config(request)

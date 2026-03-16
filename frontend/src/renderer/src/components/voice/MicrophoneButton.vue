@@ -369,7 +369,7 @@ const ringOuterStyle = computed(() => ({
   border-radius: var(--radius-md);
   padding: var(--space-1) 0;
   box-shadow: var(--shadow-md);
-  z-index: 100;
+  z-index: var(--z-dropdown);
 }
 
 .mic-menu__title {

@@ -118,6 +118,7 @@ export interface VoiceReadyMessage {
   stt_model?: string | null
   stt_engine?: string | null
   tts_engine?: string | null
+  tts_voice?: string | null
   sample_rate?: number | null
   activation_mode?: string
   wake_word?: string

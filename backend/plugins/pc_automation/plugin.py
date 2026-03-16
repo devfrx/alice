@@ -315,13 +315,25 @@ class PcAutomationPlugin(BasePlugin):
 
         try:
             if tool_name == "open_application":
-                result = await exec_open_app(args["app_name"])
+                app_name = args.get("app_name")
+                if not app_name:
+                    return ToolResult.error("Missing required parameter: app_name")
+                result = await exec_open_app(app_name)
             elif tool_name == "close_application":
-                result = await exec_close_app(args["app_name"])
+                app_name = args.get("app_name")
+                if not app_name:
+                    return ToolResult.error("Missing required parameter: app_name")
+                result = await exec_close_app(app_name)
             elif tool_name == "type_text":
-                result = await exec_type_text(args["text"])
+                text = args.get("text")
+                if not text:
+                    return ToolResult.error("Missing required parameter: text")
+                result = await exec_type_text(text)
             elif tool_name == "press_keys":
-                result = await exec_press_keys(args["keys"])
+                keys = args.get("keys")
+                if not keys:
+                    return ToolResult.error("Missing required parameter: keys")
+                result = await exec_press_keys(keys)
             elif tool_name == "take_screenshot":
                 png_bytes = await exec_take_screenshot()
                 b64 = base64.b64encode(png_bytes).decode("ascii")
@@ -342,12 +354,23 @@ class PcAutomationPlugin(BasePlugin):
                     execution_time_ms=elapsed,
                 )
             elif tool_name == "execute_command":
-                result = await exec_command(args["command"])
+                command = args.get("command")
+                if not command:
+                    return ToolResult.error("Missing required parameter: command")
+                result = await exec_command(command)
             elif tool_name == "move_mouse":
-                result = await exec_move_mouse(args["x"], args["y"])
+                x = args.get("x")
+                y = args.get("y")
+                if x is None or y is None:
+                    return ToolResult.error("Missing required parameters: x and y")
+                result = await exec_move_mouse(x, y)
             elif tool_name == "click":
+                x = args.get("x")
+                y = args.get("y")
+                if x is None or y is None:
+                    return ToolResult.error("Missing required parameters: x and y")
                 button = args.get("button", "left")
-                result = await exec_click(args["x"], args["y"], button)
+                result = await exec_click(x, y, button)
             else:
                 return ToolResult.error(f"Unknown tool: {tool_name}")
 

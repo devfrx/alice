@@ -323,5 +323,6 @@ class MediaControlPlugin(BasePlugin):
         """
         try:
             return self.ctx.config.media_control.volume_step
-        except Exception:
+        except AttributeError:
+            logger.debug("media_control.volume_step not configured, using default 10")
             return 10

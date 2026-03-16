@@ -467,6 +467,21 @@ class TTSService:
         return self._config.engine
 
     @property
+    def voice_name(self) -> str:
+        """Human-readable voice name for the active engine."""
+        engine = self._config.engine
+        if engine == "kokoro":
+            return self._config.kokoro_voice
+        if engine == "xtts":
+            return "xtts-clone"
+        # Piper: extract name from path like "models/tts/it_IT-paola-medium"
+        segment = self._config.voice.rsplit("/", 1)[-1].split(".")[0]
+        parts = segment.split("-")
+        if len(parts) >= 3:
+            return "-".join(parts[1:-1])
+        return segment
+
+    @property
     def sample_rate(self) -> int:
         """Configured audio sample rate in Hz."""
         if isinstance(self._engine, _KokoroEngine):

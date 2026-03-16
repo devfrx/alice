@@ -60,6 +60,9 @@ class AppContext:
     ws_connection_manager: WSConnectionManagerProtocol | None = None
     """Persistent event WebSocket connection manager."""
 
+    plugin_state_repo: Any = None
+    """Persistent plugin toggle-state repository."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

@@ -85,7 +85,7 @@ const showStatus = computed(() => props.state !== 'idle')
     flex-direction: column;
     align-items: center;
     gap: var(--space-1-5);
-    z-index: 3;
+    z-index: var(--z-raised);
     pointer-events: none;
 }
 

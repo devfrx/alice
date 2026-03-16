@@ -54,9 +54,6 @@ export const useChatStore = defineStore('chat', () => {
   /** True while a cancel has been sent but the server hasn't confirmed yet. */
   const isCancelling = ref(false)
 
-  /** Files selected by the user but not yet uploaded. */
-  const pendingAttachments = ref<File[]>([])
-
   /** Tool executions running during the current stream. */
   const activeToolExecutions = ref<ToolExecution[]>([])
 
@@ -486,7 +483,6 @@ export const useChatStore = defineStore('chat', () => {
     streamGeneration,
     isWaitingForResponse,
     isCancelling,
-    pendingAttachments,
     activeToolExecutions,
     pendingConfirmations,
 

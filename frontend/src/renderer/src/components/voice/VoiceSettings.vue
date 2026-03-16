@@ -216,10 +216,18 @@ async function save(): Promise<void> {
     settingsStore.settings.tts.voice = ttsVoice.value
     settingsStore.settings.stt.model = sttModel.value
     settingsStore.settings.stt.language = sttLanguage.value
-    // Keep voice store in sync (used by useVoice composable)
+    // Keep voice store in sync (used by useVoice composable + TitleBar)
     voiceStore.activationMode = activationMode.value as typeof voiceStore.activationMode
     voiceStore.wakeWord = wakeWord.value
     voiceStore.autoTtsResponse = autoTtsResponse.value
+    voiceStore.ttsEngine = ttsEnabled.value ? ttsEngine.value : ''
+    voiceStore.ttsVoice = ttsEnabled.value
+      ? (ttsEngine.value === 'kokoro' ? kokoroVoice.value : ttsVoice.value.split('/').pop()?.split('.')[0]?.split('-').slice(1, -1).join('-') ?? '')
+      : ''
+    voiceStore.sttEngine = sttEnabled.value ? 'faster-whisper' : ''
+    voiceStore.sttModel = sttEnabled.value ? sttModel.value : ''
+    voiceStore.sttAvailable = sttEnabled.value
+    voiceStore.ttsAvailable = ttsEnabled.value
   } catch (err) {
     saveError.value = 'Salvataggio fallito'
     console.warn('[VoiceSettings] Failed to save config:', err)

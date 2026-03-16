@@ -142,21 +142,49 @@ onUnmounted(() => {
   font-size: 13px;
   transition: background 0.2s;
 }
-.weather__compact:hover { background: rgba(255, 255, 255, 0.06); }
 
-.weather__icon { font-size: 16px; line-height: 1; }
-.weather__temp { font-weight: 600; }
-.weather__city { color: var(--text-secondary, #aaa); font-size: 12px; }
-.weather__text--secondary { color: var(--text-secondary, #aaa); }
+.weather__compact:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.weather__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.weather__temp {
+  font-weight: 600;
+}
+
+.weather__city {
+  color: var(--text-secondary, #aaa);
+  font-size: 12px;
+}
+
+.weather__text--secondary {
+  color: var(--text-secondary, #aaa);
+}
 
 /* Pulsing loading placeholder */
 .weather__pulse {
-  width: 14px; height: 14px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--text-secondary, #aaa);
   animation: pulse 1.2s ease-in-out infinite;
 }
-@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
 
 /* Expanded dropdown */
 .weather__details {
@@ -168,18 +196,25 @@ onUnmounted(() => {
   background: var(--bg-secondary, #16213e);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  z-index: var(--z-dropdown);
   font-size: 12px;
   color: var(--text-primary, #eee);
 }
+
 .weather__row {
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
-.weather__row:last-of-type { border-bottom: none; }
-.weather__row span:first-child { color: var(--text-secondary, #aaa); }
+
+.weather__row:last-of-type {
+  border-bottom: none;
+}
+
+.weather__row span:first-child {
+  color: var(--text-secondary, #aaa);
+}
 
 .weather__forecast-btn {
   margin-top: 8px;
@@ -193,13 +228,19 @@ onUnmounted(() => {
   cursor: pointer;
   transition: opacity 0.2s;
 }
-.weather__forecast-btn:hover { opacity: 0.85; }
+
+.weather__forecast-btn:hover {
+  opacity: 0.85;
+}
 
 /* Transition */
-.weather-drop-enter-active, .weather-drop-leave-active {
+.weather-drop-enter-active,
+.weather-drop-leave-active {
   transition: opacity 0.15s, transform 0.15s;
 }
-.weather-drop-enter-from, .weather-drop-leave-to {
+
+.weather-drop-enter-from,
+.weather-drop-leave-to {
   opacity: 0;
   transform: translateY(-4px);
 }

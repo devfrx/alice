@@ -19,7 +19,8 @@ import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
 
 const chatStore = useChatStore()
-const chatApi = inject(ChatApiKey)!
+const chatApi = inject(ChatApiKey)
+if (!chatApi) throw new Error('ChatApiKey not provided')
 const voiceStore = useVoiceStore()
 const { sendMessage: send, isConnected, stopGeneration } = chatApi
 const {
@@ -213,7 +214,7 @@ onUnmounted(() => {
 
 .hybrid-view__orb-area {
     position: relative;
-    z-index: 2;
+    z-index: var(--z-raised);
     display: flex;
     justify-content: center;
     padding: var(--space-3) 0;
@@ -222,7 +223,7 @@ onUnmounted(() => {
 
 .hybrid-view__chat {
     position: relative;
-    z-index: 2;
+    z-index: var(--z-raised);
     flex: 1;
     display: flex;
     flex-direction: column;

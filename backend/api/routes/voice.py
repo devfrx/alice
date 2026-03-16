@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import json
 import uuid
@@ -23,6 +24,9 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 _voice_connections: dict[str, int] = defaultdict(int)
 _voice_lock = asyncio.Lock()
 _MAX_VOICE_PER_IP = 2
+
+# Active voice WebSocket connections (for pushing config updates).
+_active_voice_sockets: set[WebSocket] = set()
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +82,44 @@ async def _cancel_tts(
 
 
 # ---------------------------------------------------------------------------
+# Helpers — voice_ready payload
+# ---------------------------------------------------------------------------
+
+
+def _build_voice_ready_payload(ctx: AppContext) -> dict:
+    """Build a ``voice_ready`` message from current service state."""
+    stt = ctx.stt_service
+    tts = ctx.tts_service
+    return {
+        "type": "voice_ready",
+        "stt_available": stt is not None,
+        "tts_available": tts is not None,
+        "stt_model": stt.model_name if stt else None,
+        "stt_engine": stt.engine if stt else None,
+        "tts_engine": tts.engine if tts else None,
+        "tts_voice": tts.voice_name if tts else None,
+        "sample_rate": tts.sample_rate if tts else None,
+        "activation_mode": ctx.config.voice.activation_mode,
+        "wake_word": ctx.config.voice.wake_word,
+        "auto_tts_response": ctx.config.voice.auto_tts_response,
+    }
+
+
+async def push_voice_ready(ctx: AppContext) -> None:
+    """Push a fresh ``voice_ready`` to all active voice WebSocket connections.
+
+    Called after STT/TTS config changes so the frontend gets updated
+    engine/model/availability info without requiring a WS reconnect.
+    """
+    if not _active_voice_sockets:
+        return
+    payload = _build_voice_ready_payload(ctx)
+    for ws in list(_active_voice_sockets):
+        await _send_json(ws, payload)
+    logger.debug("Pushed voice_ready to {} active connections", len(_active_voice_sockets))
+
+
+# ---------------------------------------------------------------------------
 # WebSocket endpoint
 # ---------------------------------------------------------------------------
 
@@ -111,12 +153,12 @@ async def ws_voice(websocket: WebSocket) -> None:
     # Connection limit check.
     async with _voice_lock:
         if _voice_connections.get(client_ip, 0) >= _MAX_VOICE_PER_IP:
-            await websocket.accept()
             await websocket.close(code=4029, reason="Too many voice connections")
             return
         await websocket.accept()
         _voice_connections[client_ip] += 1
     logger.debug("Voice WS connected: session={} ip={}", session_id, client_ip)
+    _active_voice_sockets.add(websocket)
     await ctx.event_bus.emit(OmniaEvent.VOICE_SESSION_START, session_id=session_id)
 
     # Per-session state.
@@ -125,6 +167,7 @@ async def ws_voice(websocket: WebSocket) -> None:
     client_sample_rate = 16000  # default; updated by voice_start
     cancel_event = asyncio.Event()
     tts_task: asyncio.Task | None = None
+    stt_task_ref: asyncio.Task | None = None
 
     try:
         # Read services dynamically from ctx so that config-driven
@@ -137,18 +180,7 @@ async def ws_voice(websocket: WebSocket) -> None:
             logger.warning("Voice WS {}: STT service not available at connect time", session_id)
         if not tts:
             logger.warning("Voice WS {}: TTS service not available at connect time", session_id)
-        await _send_json(websocket, {
-            "type": "voice_ready",
-            "stt_available": stt is not None,
-            "tts_available": tts is not None,
-            "stt_model": stt.model_name if stt else None,
-            "stt_engine": stt.engine if stt else None,
-            "tts_engine": tts.engine if tts else None,
-            "sample_rate": tts.sample_rate if tts else None,
-            "activation_mode": ctx.config.voice.activation_mode,
-            "wake_word": ctx.config.voice.wake_word,
-            "auto_tts_response": ctx.config.voice.auto_tts_response,
-        })
+        await _send_json(websocket, _build_voice_ready_payload(ctx))
 
         while True:
             message = await websocket.receive()
@@ -270,7 +302,9 @@ async def ws_voice(websocket: WebSocket) -> None:
                             "message": f"Transcription failed: {type(exc).__name__}",
                         })
 
-                asyncio.create_task(_run_stt(wav_bytes, session_id, stt))
+                stt_task_ref = asyncio.create_task(
+                    _run_stt(wav_bytes, session_id, stt),
+                )
 
             elif msg_type == "tts_speak":
                 text = data.get("text", "").strip()
@@ -298,6 +332,11 @@ async def ws_voice(websocket: WebSocket) -> None:
     except Exception as exc:
         logger.error("Voice WS error [{}]: {}", session_id, exc)
     finally:
+        # Cancel any running STT task
+        if stt_task_ref and not stt_task_ref.done():
+            stt_task_ref.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await stt_task_ref
         # Cancel any running TTS task
         if tts_task and not tts_task.done():
             tts_task.cancel()
@@ -311,6 +350,7 @@ async def ws_voice(websocket: WebSocket) -> None:
             )
             if _voice_connections.get(client_ip, 0) <= 0:
                 _voice_connections.pop(client_ip, None)
+        _active_voice_sockets.discard(websocket)
         cancel_event.set()
         try:
             await ctx.event_bus.emit(

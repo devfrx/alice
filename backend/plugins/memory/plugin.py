@@ -338,8 +338,6 @@ class MemoryPlugin(BasePlugin):
                 )
 
         try:
-            assert self._ctx is not None
-            assert self._ctx.memory_service is not None
             entry = await self._ctx.memory_service.add(
                 content=content,
                 scope=scope,
@@ -390,8 +388,6 @@ class MemoryPlugin(BasePlugin):
             search_filter = {"category": category}
 
         try:
-            assert self._ctx is not None
-            assert self._ctx.memory_service is not None
             results = await self._ctx.memory_service.search(
                 query=query,
                 k=limit,
@@ -448,8 +444,6 @@ class MemoryPlugin(BasePlugin):
             )
 
         try:
-            assert self._ctx is not None
-            assert self._ctx.memory_service is not None
             deleted = await self._ctx.memory_service.delete(memory_id)
             elapsed_ms = (time.perf_counter() - start) * 1000
             if deleted:
@@ -492,8 +486,6 @@ class MemoryPlugin(BasePlugin):
             list_filter["category"] = category
 
         try:
-            assert self._ctx is not None
-            assert self._ctx.memory_service is not None
             entries, total = await self._ctx.memory_service.list(
                 filter=list_filter if list_filter else None,
                 limit=limit,
@@ -532,8 +524,6 @@ class MemoryPlugin(BasePlugin):
             ``ToolResult`` confirming deletion count or error.
         """
         try:
-            assert self._ctx is not None
-            assert self._ctx.memory_service is not None
             deleted_count = await self._ctx.memory_service.delete_by_scope(
                 "session",
             )

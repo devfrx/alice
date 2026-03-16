@@ -13,7 +13,10 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from backend.core.http_security import validate_url_ssrf
+from backend.core.http_security import (
+    create_ssrf_safe_event_hooks,
+    validate_url_ssrf,
+)
 
 # -- Lazy import of feedparser ---------------------------------------------
 
@@ -37,7 +40,8 @@ class FeedReader:
 
     def __init__(self, cache_ttl_minutes: int = 15) -> None:
         self._client = httpx.AsyncClient(
-            follow_redirects=False,
+            follow_redirects=True,
+            event_hooks=create_ssrf_safe_event_hooks(),
             headers={"User-Agent": "OMNIA-NewsReader/1.0"},
         )
         self._cache_ttl_s = cache_ttl_minutes * 60

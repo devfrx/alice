@@ -138,7 +138,6 @@ class TestWeatherPluginLifecycle:
         ctx = _make_app_context()
         await plugin.initialize(ctx)
 
-        plugin._client.get_coordinates = AsyncMock(return_value=(41.89, 12.48))  # type: ignore[union-attr]
         status = await plugin.get_connection_status()
         assert status == ConnectionStatus.CONNECTED
         await plugin.cleanup()
@@ -154,14 +153,17 @@ class TestWeatherPluginLifecycle:
         assert status == ConnectionStatus.DISCONNECTED
 
     @pytest.mark.asyncio
-    async def test_connection_status_disconnected_on_error(self):
+    async def test_connection_status_connected_when_client_exists(self):
+        """When _client is set (even if API is unreachable), status is CONNECTED.
+
+        get_connection_status checks initialization state, not live connectivity.
+        """
         plugin = WeatherPlugin()
         ctx = _make_app_context()
         await plugin.initialize(ctx)
 
-        plugin._client.get_coordinates = AsyncMock(side_effect=Exception("offline"))  # type: ignore[union-attr]
         status = await plugin.get_connection_status()
-        assert status == ConnectionStatus.DISCONNECTED
+        assert status == ConnectionStatus.CONNECTED
         await plugin.cleanup()
 
 
@@ -705,17 +707,20 @@ class TestWeatherEdgeCases:
         await plugin.cleanup()
 
     @pytest.mark.asyncio
-    async def test_connection_status_disconnected_on_api_failure(self):
+    async def test_connection_status_connected_despite_api_failure(self):
+        """get_connection_status returns CONNECTED based on init state,
+        not live API reachability."""
         plugin = WeatherPlugin()
         ctx = _make_app_context()
         await plugin.initialize(ctx)
 
+        # Even with a broken API, the client is initialized → CONNECTED
         plugin._client.get_coordinates = AsyncMock(  # type: ignore[union-attr]
             side_effect=httpx.ConnectError("offline"),
         )
 
         status = await plugin.get_connection_status()
-        assert status == ConnectionStatus.DISCONNECTED
+        assert status == ConnectionStatus.CONNECTED
         await plugin.cleanup()
 
     @pytest.mark.asyncio

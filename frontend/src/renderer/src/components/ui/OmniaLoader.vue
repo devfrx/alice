@@ -86,7 +86,7 @@ withDefaults(
 .omnia-splash {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: var(--z-modal);
     display: flex;
     flex-direction: column;
     align-items: center;

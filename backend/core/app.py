@@ -78,7 +78,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     from backend.db.plugin_state import PluginStateRepository
 
     plugin_state_repo = PluginStateRepository(session_factory)
-    ctx.plugin_state_repo = plugin_state_repo  # type: ignore[attr-defined]
+    ctx.plugin_state_repo = plugin_state_repo
 
     if not testing:
         try:
@@ -252,6 +252,29 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     ws_connection_manager = WSConnectionManager()
     ctx.ws_connection_manager = ws_connection_manager
 
+    # -- Bridge MCP events to the events WebSocket ----------------------
+    async def _forward_mcp_connected(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "mcp.server.connected",
+                "server": kwargs.get("server"),
+            })
+
+    async def _forward_mcp_disconnected(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "mcp.server.disconnected",
+                "server": kwargs.get("server"),
+                "reason": kwargs.get("reason"),
+            })
+
+    ctx.event_bus.subscribe(
+        OmniaEvent.MCP_SERVER_CONNECTED, _forward_mcp_connected,
+    )
+    ctx.event_bus.subscribe(
+        OmniaEvent.MCP_SERVER_DISCONNECTED, _forward_mcp_disconnected,
+    )
+
     app.state.context = ctx
     app.state.engine = engine
 
@@ -322,6 +345,16 @@ def create_app(testing: bool = False) -> FastAPI:
     # then CORSMiddleware (outer) so error responses carry CORS headers.
     app.add_middleware(UnhandledExceptionMiddleware)
 
+    # Rate limiting (slowapi).
+    setup_rate_limiting(app, config.server.rate_limit)
+
+    app.add_middleware(
+        OriginGuardMiddleware,
+        trusted_origins=config.server.cors_origins,
+    )
+
+    # CORSMiddleware added LAST so it is outermost in the ASGI stack
+    # and every response (including errors) carries CORS headers.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.server.cors_origins,
@@ -329,14 +362,6 @@ def create_app(testing: bool = False) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    app.add_middleware(
-        OriginGuardMiddleware,
-        trusted_origins=config.server.cors_origins,
-    )
-
-    # Rate limiting (slowapi).
-    setup_rate_limiting(app, config.server.rate_limit)
 
     # -- Global exception handler -------------------------------------------
     # Catches unhandled exceptions so they return a JSON 500 response

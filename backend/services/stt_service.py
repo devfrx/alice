@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import struct
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -309,10 +310,6 @@ class STTService:
         if self._model is None:
             return
         logger.info("Releasing STT model reference")
-        try:
-            del self._model
-        except Exception:
-            pass
         self._model = None
 
     async def _run_transcription(
@@ -433,5 +430,5 @@ class STTService:
                     )
             except ValueError:
                 raise
-            except Exception:
+            except (struct.error, IndexError):
                 logger.warning("Failed to parse WAV header for duration check")

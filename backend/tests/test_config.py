@@ -80,7 +80,8 @@ def test_plugins_enabled_list(config: OmniaConfig) -> None:
     assert "system_info" in enabled
     assert "pc_automation" in enabled
     assert "memory" in enabled
-    assert len(enabled) == 11
+    assert "mcp_client" in enabled
+    assert len(enabled) == 12
 
 
 def test_stt_defaults(config: OmniaConfig) -> None:

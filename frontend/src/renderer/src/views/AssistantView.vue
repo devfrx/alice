@@ -10,7 +10,7 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import OmniaOrb from '../components/assistant/OmniaOrb.vue'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
 import StatusBubbles from '../components/assistant/StatusBubbles.vue'
-import QuickActions from '../components/assistant/QuickActions.vue'
+import AssistantFab from '../components/assistant/AssistantFab.vue'
 import AssistantResponse from '../components/assistant/AssistantResponse.vue'
 import AssistantTranscript from '../components/assistant/AssistantTranscript.vue'
 import FloatingInputBar from '../components/input/FloatingInputBar.vue'
@@ -22,7 +22,8 @@ import { useVoiceStore } from '../stores/voice'
 
 const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
-const chatApi = inject(ChatApiKey)!
+const chatApi = inject(ChatApiKey)
+if (!chatApi) throw new Error('ChatApiKey not provided')
 const { sendMessage: send, stopGeneration } = chatApi
 
 const {
@@ -186,7 +187,7 @@ onMounted(() => {
         </div>
 
         <StatusBubbles :state="orbState" />
-        <QuickActions />
+        <AssistantFab :orb-state="orbState" />
 
         <!-- Tool confirmation dialog -->
         <!-- Floating input bar -->
@@ -209,19 +210,25 @@ onMounted(() => {
     width: 100%;
     height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
     background: var(--surface-0);
+    overflow: hidden;
 }
 
 .assistant-view__center {
     position: relative;
-    z-index: 2;
+    z-index: var(--z-raised);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-6);
-    padding: var(--space-4) 0;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 680px;
+    /* top: StatusBubbles clearance; bottom: FloatingInputBar clearance */
+    padding: var(--space-8) var(--space-4) 100px;
+    gap: var(--space-4);
 }
 
 /* Orb wrapper: no overflow clipping so effects render fully */
@@ -248,90 +255,152 @@ onMounted(() => {
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    transition: background var(--transition-fast), border-color var(--transition-fast);
-    z-index: 5;
+    transition:
+        background 200ms var(--ease-smooth),
+        border-color 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-back);
+    z-index: var(--z-sticky);
 }
 
 .assistant-view__stop-hint:hover {
     background: var(--surface-3);
     border-color: var(--border-hover);
+    transform: translateX(-50%) scale(1.04);
+}
+
+.assistant-view__stop-hint:active {
+    transform: translateX(-50%) scale(0.96);
 }
 
 /* Stop hint transitions */
 .stop-hint-fade-enter-active {
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    transition:
+        opacity 300ms var(--ease-smooth),
+        transform 300ms var(--ease-out-expo);
 }
 
 .stop-hint-fade-leave-active {
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .stop-hint-fade-enter-from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-6px);
+    transform: translateX(-50%) translateY(-8px) scale(0.9);
 }
 
 .stop-hint-fade-leave-to {
     opacity: 0;
-    transform: translateX(-50%) translateY(-6px);
+    transform: translateX(-50%) translateY(-6px) scale(0.95);
 }
 
-/* Scrollable area for response + transcript only */
+/*
+ * Content area: fills remaining space below the orb.
+ * Uses calc-based max-height as a fallback, but flex + min-height: 0
+ * on the parent already constrains it naturally.
+ */
 .assistant-view__content {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
-    max-height: 50vh;
-    overflow-y: auto;
-    scrollbar-width: none;
+    flex: 1;
+    min-height: 0;
     width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    /* Mask fade at top and bottom edges for long content */
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 12px,
+        black calc(100% - 16px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 12px,
+        black calc(100% - 16px),
+        transparent 100%
+    );
+    padding: var(--space-2) 0 var(--space-4);
 }
 
 .assistant-view__content::-webkit-scrollbar {
-    display: none;
+    width: 3px;
 }
 
-/* Transitions */
-.response-fade-enter-active,
+.assistant-view__content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.assistant-view__content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: var(--radius-pill);
+}
+
+.assistant-view__content:hover::-webkit-scrollbar-thumb {
+    background: var(--border-hover);
+}
+
+/* ── Response transition ── */
+.response-fade-enter-active {
+    transition:
+        opacity 400ms var(--ease-smooth),
+        transform 400ms var(--ease-out-expo),
+        filter 400ms var(--ease-smooth);
+}
+
 .response-fade-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition:
+        opacity 250ms ease,
+        transform 250ms ease,
+        filter 250ms ease;
 }
 
 .response-fade-enter-from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(16px) scale(0.97);
+    filter: blur(4px);
 }
 
 .response-fade-leave-to {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-8px) scale(0.98);
+    filter: blur(2px);
 }
 
-.transcript-fade-enter-active,
+/* ── Transcript transition ── */
+.transcript-fade-enter-active {
+    transition:
+        opacity 350ms var(--ease-smooth),
+        transform 350ms var(--ease-out-expo),
+        filter 350ms var(--ease-smooth);
+}
+
 .transcript-fade-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition:
+        opacity 200ms ease,
+        transform 200ms ease,
+        filter 200ms ease;
 }
 
 .transcript-fade-enter-from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.9) translateY(8px);
+    filter: blur(4px);
 }
 
 .transcript-fade-leave-to {
     opacity: 0;
     transform: scale(0.95);
+    filter: blur(2px);
 }
 
 @keyframes blink {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.3;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 </style>

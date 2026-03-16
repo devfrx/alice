@@ -508,8 +508,10 @@ class CalendarPlugin(BasePlugin):
             raise ValueError("end must be after start")
 
         reminder = args.get("reminder_minutes")
-        if reminder is not None and reminder < 1:
-            raise ValueError("reminder_minutes must be at least 1")
+        if reminder is not None:
+            reminder = int(reminder)
+            if reminder < 1:
+                raise ValueError("reminder_minutes must be at least 1")
 
         rrule_val = args.get("recurrence_rule")
         if rrule_val:
@@ -549,7 +551,7 @@ class CalendarPlugin(BasePlugin):
             A formatted string listing the matching events.
         """
         now_local = datetime.now(self._tz)
-        max_results = min(args.get("max_results", 20), 100)
+        max_results = min(int(args.get("max_results", 20)), 100)
 
         if args.get("start_date"):
             range_start = self._parse_to_utc(args["start_date"])
@@ -648,8 +650,10 @@ class CalendarPlugin(BasePlugin):
                 event.end_time = self._parse_to_utc(args["end"])
             if "reminder_minutes" in args:
                 reminder = args["reminder_minutes"]
-                if reminder is not None and reminder < 1:
-                    raise ValueError("reminder_minutes must be at least 1")
+                if reminder is not None:
+                    reminder = int(reminder)
+                    if reminder < 1:
+                        raise ValueError("reminder_minutes must be at least 1")
                 event.reminder_minutes = reminder
             if "recurrence_rule" in args:
                 new_rrule = args["recurrence_rule"]

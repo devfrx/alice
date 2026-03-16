@@ -54,6 +54,9 @@ export const useVoiceStore = defineStore('voice', () => {
   /** TTS engine name (e.g. "piper"). */
   const ttsEngine = ref('')
 
+  /** TTS voice name (e.g. "paola", "im_nicola"). */
+  const ttsVoice = ref('')
+
   /** Voice activation mode. */
   const activationMode = ref<'push_to_talk' | 'wake_word' | 'always_on'>('push_to_talk')
 
@@ -163,6 +166,7 @@ export const useVoiceStore = defineStore('voice', () => {
     sttModel.value = ''
     sttEngine.value = ''
     ttsEngine.value = ''
+    ttsVoice.value = ''
     stopRecordingTimer()
   }
 
@@ -184,6 +188,7 @@ export const useVoiceStore = defineStore('voice', () => {
     sttModel,
     sttEngine,
     ttsEngine,
+    ttsVoice,
     activationMode,
     wakeWord,
     autoTtsResponse,

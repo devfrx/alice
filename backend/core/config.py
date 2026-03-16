@@ -120,12 +120,12 @@ class LLMConfig(BaseSettings):
     base_url: str = "http://localhost:1234"
     model: str = DEFAULT_MODEL
     temperature: float = 0.7
-    max_tokens: int = 8192
+    max_tokens: int = 16384
     api_token: str = ""
     """LM Studio API authentication token (optional)."""
     timeout: float = 120.0
     """HTTP read timeout in seconds for streaming LLM responses."""
-    connect_timeout: float = 10.0
+    connect_timeout: float = 50.0
     """HTTP connect timeout in seconds."""
     system_prompt_file: str = "config/system_prompt.md"
     system_prompt_enabled: bool = True

@@ -76,6 +76,13 @@ class NotificationsPlugin(BasePlugin):
                 "will be logged only"
             )
 
+    async def cleanup(self) -> None:
+        """Shut down the timer manager and release resources."""
+        if self._timer_manager is not None:
+            await self._timer_manager.shutdown()
+            self._timer_manager = None
+        await super().cleanup()
+
     async def on_app_startup(self) -> None:
         """Restore pending timers and subscribe to calendar reminders."""
         if self._timer_manager is not None:

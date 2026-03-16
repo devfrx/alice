@@ -109,7 +109,7 @@ function handleDismiss(): void {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-md);
-  z-index: 10;
+  z-index: var(--z-sticky);
 }
 
 .to__recording,

@@ -253,7 +253,10 @@ class LLMService:
         base = path.read_text(encoding="utf-8").strip()
 
         # Append dynamic environment context
-        username = os.getlogin()
+        try:
+            username = os.getlogin()
+        except OSError:
+            username = os.environ.get("USERNAME") or os.environ.get("USER") or "User"
         home = str(Path.home())
         desktop = str(Path.home() / "Desktop")
         env_block = (

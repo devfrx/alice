@@ -5,6 +5,7 @@ from backend.db.models import (  # noqa: F401
     Attachment,
     Conversation,
     Message,
+    PluginState,
     ToolConfirmationAudit,
     UserPreference,
 )

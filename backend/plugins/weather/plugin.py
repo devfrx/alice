@@ -79,20 +79,14 @@ class WeatherPlugin(BasePlugin):
         return []
 
     async def get_connection_status(self) -> ConnectionStatus:
-        """Check connectivity by attempting a geocoding request.
+        """Check whether the weather client is initialised.
 
         Returns:
-            ``CONNECTED`` if the API responds, ``DISCONNECTED`` otherwise.
+            ``CONNECTED`` if the client exists, ``DISCONNECTED`` otherwise.
         """
         if self._client is None:
             return ConnectionStatus.DISCONNECTED
-        try:
-            cfg = self.ctx.config.weather
-            await self._client.get_coordinates(cfg.default_city, cfg.lang)
-            return ConnectionStatus.CONNECTED
-        except Exception:
-            logger.debug("Weather health-check failed")
-            return ConnectionStatus.DISCONNECTED
+        return ConnectionStatus.CONNECTED
 
     # ------------------------------------------------------------------
     # Tool definitions

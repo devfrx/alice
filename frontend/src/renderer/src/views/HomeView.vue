@@ -110,7 +110,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 .home-view__content {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-raised);
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -75,9 +75,15 @@ async def list_plugins(request: Request) -> list[dict[str, Any]]:
     return results
 
 
+class TogglePluginRequest(BaseModel):
+    """Request body for toggling a plugin."""
+
+    enabled: bool
+
+
 @router.patch("/plugins/{plugin_name}")
 async def toggle_plugin(
-    plugin_name: str, request: Request
+    plugin_name: str, body: TogglePluginRequest, request: Request,
 ) -> dict[str, Any]:
     """Enable or disable a plugin by name.
 
@@ -86,8 +92,7 @@ async def toggle_plugin(
     Actually loads or unloads the plugin via the PluginManager.
     """
     ctx = _ctx(request)
-    body = await request.json()
-    enabled: bool = body.get("enabled", True)
+    enabled = body.enabled
     pm = ctx.plugin_manager
 
     if pm is None:

@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from loguru import logger
+from sqlalchemy import func as sa_func
 from sqlmodel import select, col
 
 from backend.db.models import ToolConfirmationAudit
@@ -32,6 +33,23 @@ async def list_confirmations(
         raise HTTPException(status_code=503, detail="Database not available")
 
     async with ctx.db() as session:
+        # Count query for pagination total.
+        count_stmt = select(sa_func.count(ToolConfirmationAudit.id))
+        if conversation_id is not None:
+            count_stmt = count_stmt.where(
+                ToolConfirmationAudit.conversation_id == conversation_id
+            )
+        if tool_name is not None:
+            count_stmt = count_stmt.where(
+                ToolConfirmationAudit.tool_name == tool_name
+            )
+        if approved is not None:
+            count_stmt = count_stmt.where(
+                ToolConfirmationAudit.user_approved == approved
+            )
+        total = (await session.exec(count_stmt)).one()
+
+        # Data query.
         stmt = select(ToolConfirmationAudit).order_by(
             col(ToolConfirmationAudit.created_at).desc()
         )
@@ -69,6 +87,7 @@ async def list_confirmations(
             }
             for e in entries
         ],
+        "total": total,
         "count": len(entries),
         "offset": offset,
         "limit": limit,

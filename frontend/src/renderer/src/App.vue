@@ -5,7 +5,7 @@ import { onMounted, provide, computed, ref, watchEffect } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import AppSidebar from './components/sidebar/AppSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
-import ModeSwitcher from './components/assistant/ModeSwitcher.vue'
+// ModeSwitcher is managed inside AssistantFab for assistant mode
 import { UiToast, OmniaLoader } from './components/ui'
 import { useChat, ChatApiKey } from './composables/useChat'
 import { usePluginComponents } from './composables/usePluginComponents'
@@ -26,6 +26,7 @@ const pluginsStore = usePluginsStore()
 const { toolbarComponents } = usePluginComponents()
 
 /** Always show sidebar (collapsed in assistant mode). */
+
 const showSidebar = computed(() => true)
 
 // ── Startup loader ────────────────────────────────────────────────
@@ -72,7 +73,7 @@ onMounted(() => {
         <router-view />
       </main>
     </div>
-    <ModeSwitcher />
+    <!-- <ModeSwitcher v-if="uiStore.mode !== 'assistant'" /> NON ATTIVARE! -->
     <ModalContainer />
     <UiToast />
     <OmniaLoader :visible="startupLoading" :message="startupMessage" />

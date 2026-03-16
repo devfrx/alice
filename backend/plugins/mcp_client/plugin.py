@@ -7,6 +7,7 @@ namespaced as ``mcp_{server_name}_{tool_name}`` and exposed via
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from backend.core.context import AppContext
@@ -84,7 +85,7 @@ class McpClientPlugin(BasePlugin):
         for session in self._sessions.values():
             try:
                 await session.stop()
-            except BaseException as exc:
+            except Exception as exc:
                 self.logger.warning(
                     "Error closing MCP '{}': {}",
                     session.server_name,
@@ -106,11 +107,12 @@ class McpClientPlugin(BasePlugin):
         for server_name, session in self._sessions.items():
             if session.status != ConnectionStatus.CONNECTED:
                 continue
+            safe_server = re.sub(r"[^a-zA-Z0-9_-]", "_", server_name)
             for tool in session.get_tools():
                 full_desc = f"[{server_name}] {tool.description}"
                 tools.append(
                     ToolDefinition(
-                        name=f"mcp_{server_name}_{tool.name}",
+                        name=f"mcp_{safe_server}_{tool.name}",
                         description=full_desc[:512],
                         parameters=tool.parameters,
                         max_result_chars=self._MCP_MAX_RESULT_CHARS,
@@ -137,7 +139,8 @@ class McpClientPlugin(BasePlugin):
             reverse=True,
         )
         for server_name, session in sorted_sessions:
-            prefix = f"mcp_{server_name}_"
+            safe_server = re.sub(r"[^a-zA-Z0-9_-]", "_", server_name)
+            prefix = f"mcp_{safe_server}_"
             if tool_name.startswith(prefix):
                 original_name = tool_name[len(prefix):]
                 try:

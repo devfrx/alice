@@ -108,18 +108,24 @@ onMounted(() => {
     position: relative;
     max-width: 560px;
     width: 100%;
-    max-height: 70vh;
+    /* Let parent flex handle height constraint instead of fixed vh */
     overflow-y: auto;
     overflow-x: hidden;
     padding: var(--space-6) var(--space-5);
-    background: var(--surface-1);
-    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: var(--text-md);
     line-height: var(--leading-relaxed);
     font-family: var(--font-sans);
-    transition: opacity var(--transition-fast);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition:
+        opacity 300ms var(--ease-smooth),
+        border-color 300ms var(--ease-smooth),
+        box-shadow 300ms var(--ease-smooth);
 }
 
 /* Scrollbar */
@@ -143,6 +149,14 @@ onMounted(() => {
 /* ── Phase states ── */
 .assistant-response--thinking {
     opacity: var(--opacity-visible);
+    border-color: var(--thinking-border);
+}
+
+.assistant-response--generating {
+    border-color: var(--accent-border);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 0 16px var(--accent-glow);
 }
 
 .assistant-response--generating .response-body {

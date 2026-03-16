@@ -42,7 +42,10 @@ def _get_memory_session(request: Request) -> McpSession:
     if plugin is None:
         raise HTTPException(503, "MCP client plugin not loaded")
 
-    session = plugin._sessions.get(_SERVER_NAME)
+    # Known coupling: McpClientPlugin has no public get_session() method.
+    # Access _sessions safely via getattr until a public API is added.
+    sessions = getattr(plugin, "_sessions", {})
+    session = sessions.get(_SERVER_NAME)
     if session is None:
         raise HTTPException(503, f"MCP server '{_SERVER_NAME}' not connected")
 
@@ -64,14 +67,9 @@ async def _call(session: McpSession, tool: str, args: dict[str, Any]) -> Any:
         logger.warning("MCP memory tool '{}' failed: {}", tool, exc)
         raise HTTPException(502, f"MCP tool '{tool}' failed: {exc}")
 
-    # Detect error messages returned as plain text by the MCP server
-    if raw and ("ENOENT" in raw or "Error" in raw or "error" in raw):
-        logger.warning("MCP memory tool '{}' returned error: {}", tool, raw[:200])
-        raise HTTPException(502, f"MCP tool '{tool}' error: {raw[:200]}")
-
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         return {"result": raw}
 
 

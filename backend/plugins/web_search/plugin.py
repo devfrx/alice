@@ -34,6 +34,10 @@ class WebSearchPlugin(BasePlugin):
     plugin_dependencies: list[str] = []
     plugin_priority: int = 40
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._client: WebSearchClient | None = None
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -65,8 +69,9 @@ class WebSearchPlugin(BasePlugin):
 
     async def cleanup(self) -> None:
         """Close the HTTP client and release resources."""
-        if hasattr(self, "_client"):
+        if self._client is not None:
             await self._client.close()
+            self._client = None
         await super().cleanup()
 
     # ------------------------------------------------------------------
@@ -156,6 +161,9 @@ class WebSearchPlugin(BasePlugin):
         Returns:
             A ``ToolResult`` with the payload or an error.
         """
+        if self._client is None:
+            return ToolResult.error("Web search plugin not initialized")
+
         start = time.perf_counter()
 
         if tool_name == "web_search":

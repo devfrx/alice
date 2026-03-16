@@ -174,6 +174,7 @@ export function useVoice(): UseVoiceReturn {
     store.sttModel = d.stt_model ?? ''
     store.sttEngine = d.stt_engine ?? ''
     store.ttsEngine = d.tts_engine ?? ''
+    store.ttsVoice = d.tts_voice ?? ''
     if (d.activation_mode) store.activationMode = d.activation_mode as typeof store.activationMode
     if (d.wake_word !== undefined) store.wakeWord = d.wake_word
     if (d.auto_tts_response !== undefined) store.autoTtsResponse = d.auto_tts_response

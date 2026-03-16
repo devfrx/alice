@@ -36,19 +36,8 @@ const connectionStatus = computed<'connected' | 'loading' | 'disconnected'>(() =
   return 'disconnected'
 })
 
-/**
- * Extracts a human-readable voice name from the TTS voice path stored in settings.
- * e.g. "models/tts/it_IT-paola-medium" → "paola"
- */
-const ttsVoice = computed(() => {
-  const voice = settingsStore.settings?.tts?.voice ?? ''
-  if (!voice) return ''
-  const segment = (voice.split('/').pop() ?? '').replace(/\.[^.]+$/, '')
-  const parts = segment.split('-')
-  // Format: lang_REGION-name...-quality → return name part(s), skip first (locale) and last (quality)
-  if (parts.length >= 3) return parts.slice(1, -1).join('-')
-  return segment
-})
+/** Human-readable TTS voice name from the voice store (set by voice_ready). */
+const ttsVoice = computed(() => voiceStore.ttsVoice)
 
 const windowControls = window.electron?.windowControls
 

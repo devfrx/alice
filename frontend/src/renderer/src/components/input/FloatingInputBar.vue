@@ -388,30 +388,40 @@ defineExpose({
     bottom: 24px;
     left: calc(50% + var(--sidebar-offset, 0px) / 2);
     transform: translateX(-50%);
-    z-index: 100;
+    z-index: var(--z-dropdown);
     min-width: 360px;
     max-width: 600px;
     width: auto;
 
-    background: var(--surface-1);
-    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur-heavy));
+    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
     padding: var(--space-2) var(--space-3);
 
-    box-shadow: var(--shadow-floating);
+    box-shadow:
+        var(--shadow-floating),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
     transition:
-        border-color var(--duration-normal) var(--ease-smooth),
-        box-shadow var(--duration-normal) var(--ease-smooth),
-        border-radius var(--duration-normal) var(--ease-smooth),
-        padding var(--duration-normal) var(--ease-smooth),
-        min-width var(--duration-normal) var(--ease-smooth),
-        left var(--duration-normal) var(--ease-smooth);
+        border-color 400ms var(--ease-smooth),
+        box-shadow 400ms var(--ease-smooth),
+        border-radius 500ms var(--ease-out-expo),
+        padding 400ms var(--ease-out-expo),
+        min-width 500ms var(--ease-out-expo),
+        max-width 500ms var(--ease-out-expo),
+        left 500ms var(--ease-out-expo),
+        background 400ms var(--ease-smooth);
 
     display: grid;
 }
 
 .fib:focus-within {
-    border-color: var(--border-hover);
+    border-color: var(--glass-border-hover);
+    box-shadow:
+        var(--shadow-floating),
+        0 0 24px var(--accent-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Collapsed pill shape */
@@ -424,6 +434,11 @@ defineExpose({
 .fib--expanded {
     border-radius: var(--radius-lg);
     min-width: 420px;
+    background: var(--glass-bg);
+    box-shadow:
+        var(--shadow-floating),
+        0 0 32px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Active states pill */
@@ -434,24 +449,40 @@ defineExpose({
     padding: var(--space-2) var(--space-4);
 }
 
-/* Listening */
+/* Listening — warm glow */
 .fib--listening {
     border-color: var(--listening-border);
+    box-shadow:
+        var(--shadow-floating),
+        0 0 20px rgba(224, 96, 96, 0.08),
+        inset 0 1px 0 rgba(224, 96, 96, 0.04);
 }
 
-/* Thinking */
+/* Thinking — cream glow */
 .fib--thinking {
     border-color: var(--thinking-border);
+    box-shadow:
+        var(--shadow-floating),
+        0 0 20px rgba(232, 220, 200, 0.06),
+        inset 0 1px 0 rgba(232, 220, 200, 0.03);
 }
 
-/* Speaking */
+/* Speaking — green glow */
 .fib--speaking {
     border-color: var(--speaking-border);
+    box-shadow:
+        var(--shadow-floating),
+        0 0 20px rgba(92, 154, 110, 0.08),
+        inset 0 1px 0 rgba(92, 154, 110, 0.04);
 }
 
-/* Drag over */
+/* Drag over — accent highlight */
 .fib--drag {
     border-color: var(--accent-border);
+    box-shadow:
+        var(--shadow-floating),
+        0 0 28px var(--accent-glow),
+        inset 0 0 12px var(--accent-faint);
 }
 
 /* ── Active state overlay ── */
@@ -507,23 +538,50 @@ defineExpose({
     display: flex;
     align-items: center;
     gap: 3px;
-    height: 20px;
+    height: 22px;
 }
 
 .fib__wave-bar {
     width: 3px;
-    border-radius: 2px;
+    border-radius: 3px;
     background: var(--listening);
-    animation: wave-bounce 0.6s ease-in-out infinite alternate;
+    animation: wave-bounce 0.7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+    transform-origin: center;
+}
+
+.fib__wave-bar:nth-child(1) {
+    animation-duration: 0.65s;
+}
+
+.fib__wave-bar:nth-child(2) {
+    animation-duration: 0.55s;
+}
+
+.fib__wave-bar:nth-child(3) {
+    animation-duration: 0.7s;
+}
+
+.fib__wave-bar:nth-child(4) {
+    animation-duration: 0.5s;
+}
+
+.fib__wave-bar:nth-child(5) {
+    animation-duration: 0.6s;
 }
 
 @keyframes wave-bounce {
     0% {
         height: 4px;
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
     }
 
     100% {
-        height: 16px;
+        height: 18px;
+        opacity: 0.8;
     }
 }
 
@@ -531,10 +589,11 @@ defineExpose({
 .fib__spinner {
     width: 18px;
     height: 18px;
-    border: 2px solid var(--accent-dim);
+    border: 2px solid transparent;
     border-top-color: var(--accent);
+    border-right-color: var(--accent-dim);
     border-radius: var(--radius-full);
-    animation: spin 0.8s linear infinite;
+    animation: spin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     flex-shrink: 0;
 }
 
@@ -552,11 +611,11 @@ defineExpose({
 }
 
 .fib__dots span {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: var(--radius-full);
     background: var(--accent);
-    animation: dot-bounce 1.2s ease-in-out infinite;
+    animation: dot-float 1.6s var(--ease-bounce) infinite;
 }
 
 .fib__dots span:nth-child(2) {
@@ -567,18 +626,22 @@ defineExpose({
     animation-delay: 0.4s;
 }
 
-@keyframes dot-bounce {
+@keyframes dot-float {
 
     0%,
-    80%,
     100% {
         opacity: 0.3;
-        transform: scale(0.8);
+        transform: translateY(0) scale(0.8);
     }
 
     40% {
         opacity: 1;
-        transform: scale(1.1);
+        transform: translateY(-4px) scale(1.15);
+    }
+
+    70% {
+        opacity: 0.6;
+        transform: translateY(1px) scale(0.95);
     }
 }
 
@@ -587,23 +650,50 @@ defineExpose({
     display: flex;
     align-items: center;
     gap: 3px;
-    height: 18px;
+    height: 20px;
 }
 
 .fib__sound-wave span {
     width: 3px;
-    border-radius: 2px;
+    border-radius: 3px;
     background: var(--speaking);
-    animation: sound-bar 0.8s ease-in-out infinite alternate;
+    animation: sound-bar 0.7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+    transform-origin: center;
+}
+
+.fib__sound-wave span:nth-child(1) {
+    animation-duration: 0.55s;
+    height: 4px;
+}
+
+.fib__sound-wave span:nth-child(2) {
+    animation-duration: 0.7s;
+    height: 6px;
+}
+
+.fib__sound-wave span:nth-child(3) {
+    animation-duration: 0.5s;
+    height: 4px;
+}
+
+.fib__sound-wave span:nth-child(4) {
+    animation-duration: 0.65s;
+    height: 5px;
 }
 
 @keyframes sound-bar {
     0% {
         height: 4px;
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
     }
 
     100% {
-        height: 14px;
+        height: 16px;
+        opacity: 0.7;
     }
 }
 
@@ -620,15 +710,23 @@ defineExpose({
     color: var(--text-secondary);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background var(--transition-fast),
-        color var(--transition-fast),
-        border-color var(--transition-fast);
+    transition:
+        background 200ms var(--ease-smooth),
+        color 200ms var(--ease-smooth),
+        border-color 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-back),
+        box-shadow 200ms var(--ease-smooth);
 }
 
 .fib__stop-btn:hover {
     background: var(--surface-3);
     color: var(--text-primary);
     border-color: var(--border-hover);
+    transform: scale(1.08);
+}
+
+.fib__stop-btn:active {
+    transform: scale(0.92);
 }
 
 .fib__stop-btn--rec {
@@ -640,6 +738,7 @@ defineExpose({
     background: var(--listening-dim);
     border-color: var(--listening-border);
     color: var(--listening);
+    box-shadow: 0 0 12px rgba(224, 96, 96, 0.12);
 }
 
 /* ── Input area (idle) ── */
@@ -703,12 +802,20 @@ defineExpose({
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: color var(--transition-fast), background var(--transition-fast);
+    transition:
+        color 200ms var(--ease-smooth),
+        background 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-back);
 }
 
 .fib__attach:hover:not(:disabled) {
     background: var(--surface-hover);
     color: var(--accent);
+    transform: scale(1.08) rotate(-8deg);
+}
+
+.fib__attach:active:not(:disabled) {
+    transform: scale(0.92);
 }
 
 .fib__attach:disabled {
@@ -766,29 +873,34 @@ defineExpose({
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
     background: var(--accent);
-    color: var(--text-muted);
+    color: var(--surface-0);
     cursor: pointer;
     transition:
-        background 120ms ease,
-        color 120ms ease,
-        opacity 120ms ease,
-        box-shadow 120ms ease;
+        background 200ms var(--ease-smooth),
+        color 200ms var(--ease-smooth),
+        opacity 200ms var(--ease-smooth),
+        box-shadow 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-back),
+        border-color 200ms var(--ease-smooth);
 }
 
 .fib__send:hover:not(:disabled) {
-    background: var(--surface-2);
-    color: var(--text-primary);
-    ;
+    background: var(--accent-hover);
+    border-color: var(--accent);
+    transform: scale(1.06);
+    box-shadow: 0 0 16px var(--accent-glow);
 }
 
-.fib__send:not(:disabled) {
-    animation: none;
+.fib__send:active:not(:disabled) {
+    transform: scale(0.92);
 }
 
 .fib__send:disabled {
     opacity: var(--opacity-disabled);
     cursor: not-allowed;
-    animation: none;
+    background: var(--surface-3);
+    color: var(--text-muted);
+    border-color: var(--border);
 }
 
 .fib__stop {
@@ -799,15 +911,24 @@ defineExpose({
     width: 34px;
     height: 34px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--danger);
+    border: 1px solid var(--danger-border);
     background: var(--surface-1);
     color: var(--danger);
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition:
+        background 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-back),
+        box-shadow 200ms var(--ease-smooth);
 }
 
 .fib__stop:hover {
     background: var(--surface-hover);
+    transform: scale(1.06);
+    box-shadow: 0 0 12px var(--danger-glow);
+}
+
+.fib__stop:active {
+    transform: scale(0.92);
 }
 
 /* ── Thumbnails ── */
@@ -856,62 +977,97 @@ defineExpose({
     cursor: pointer;
     padding: 0;
     opacity: 0;
-    transition: opacity var(--transition-fast);
+    transition:
+        opacity 200ms ease,
+        transform 200ms var(--ease-out-back),
+        color 150ms ease;
+    transform: scale(0.7);
 }
 
 .fib__thumb:hover .fib__thumb-rm {
     opacity: 1;
+    transform: scale(1);
 }
 
 .fib__thumb-rm:hover {
     background: var(--surface-hover);
     color: var(--danger);
+    transform: scale(1.15);
 }
 
 /* ── Transitions ── */
-.fib-state-enter-active,
+.fib-state-enter-active {
+    transition:
+        opacity 350ms var(--ease-smooth),
+        transform 350ms var(--ease-out-expo),
+        filter 350ms var(--ease-smooth);
+}
+
 .fib-state-leave-active {
-    transition: opacity var(--duration-normal) ease, transform var(--duration-normal) ease;
+    transition:
+        opacity 200ms ease,
+        transform 200ms ease,
+        filter 200ms ease;
 }
 
 .fib-state-enter-from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.9) translateY(4px);
+    filter: blur(4px);
 }
 
 .fib-state-leave-to {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.94);
+    filter: blur(2px);
 }
 
-.fib-input-enter-active,
+.fib-input-enter-active {
+    transition:
+        opacity 350ms var(--ease-smooth),
+        transform 350ms var(--ease-out-expo),
+        filter 350ms var(--ease-smooth);
+}
+
 .fib-input-leave-active {
-    transition: opacity var(--duration-normal) ease, transform var(--duration-normal) ease;
+    transition:
+        opacity 200ms ease,
+        transform 200ms ease,
+        filter 200ms ease;
 }
 
 .fib-input-enter-from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px) scale(0.97);
+    filter: blur(4px);
 }
 
 .fib-input-leave-to {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
+    filter: blur(2px);
 }
 
-.btn-swap-enter-active,
+.btn-swap-enter-active {
+    transition:
+        opacity 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-back);
+}
+
 .btn-swap-leave-active {
-    transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease;
 }
 
 .btn-swap-enter-from {
     opacity: 0;
-    transform: scale(0.8);
+    transform: scale(0.6) rotate(-12deg);
 }
 
 .btn-swap-leave-to {
     opacity: 0;
-    transform: scale(0.8);
+    transform: scale(0.7) rotate(12deg);
 }
 
 /* ── Reduced motion ── */
@@ -935,6 +1091,25 @@ defineExpose({
     .fib__sound-wave span,
     .fib__spinner {
         animation: none;
+    }
+
+    .fib-state-enter-active,
+    .fib-state-leave-active,
+    .fib-input-enter-active,
+    .fib-input-leave-active,
+    .btn-swap-enter-active,
+    .btn-swap-leave-active {
+        transition: opacity 100ms ease;
+    }
+
+    .fib-state-enter-from,
+    .fib-state-leave-to,
+    .fib-input-enter-from,
+    .fib-input-leave-to,
+    .btn-swap-enter-from,
+    .btn-swap-leave-to {
+        transform: none;
+        filter: none;
     }
 }
 </style>

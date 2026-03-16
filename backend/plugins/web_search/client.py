@@ -15,7 +15,7 @@ import asyncio
 import hashlib
 import time
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -101,7 +101,7 @@ class WebSearchClient:
         # fingerprint, which bypasses 403s on anti-bot sites.
         self._primp = PrimpClient(
             impersonate="firefox",
-            follow_redirects=True,
+            follow_redirects=False,
             timeout=request_timeout_s,
         )
 
@@ -207,6 +207,17 @@ class WebSearchClient:
 
         # Use primp (browser TLS fingerprint) in a thread
         response = await asyncio.to_thread(self._primp.get, url)
+
+        # Handle redirects manually with SSRF validation
+        if response.status_code in (301, 302, 303, 307, 308):
+            location = response.headers.get("location", "")
+            if location:
+                resolved = urljoin(url, location)
+                await async_validate_url_ssrf(resolved)
+                response = await asyncio.to_thread(
+                    self._primp.get, resolved,
+                )
+
         if response.status_code in (403, 429, 503):
             self._scrape_failures[domain] = time.monotonic()
             raise RuntimeError(

@@ -70,6 +70,7 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+/** Module-level singleton — avoids re-creating on every composable call. */
 const md: MarkdownIt = new MarkdownIt({
   html: false,
   linkify: true,

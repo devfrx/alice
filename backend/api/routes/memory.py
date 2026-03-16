@@ -147,6 +147,16 @@ async def search_memories(
     return {"results": serialized}
 
 
+@router.delete("/all")
+async def delete_all_memory(request: Request) -> dict[str, int]:
+    """Delete every memory entry (all scopes)."""
+    svc = _get_memory_service(request)
+
+    count = await svc.delete_all()
+    logger.info("Deleted all {} memories", count)
+    return {"deleted_count": count}
+
+
 @router.delete("/session")
 async def delete_session_memory(request: Request) -> dict[str, int]:
     """Delete all session-scoped memories."""

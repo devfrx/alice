@@ -525,6 +525,22 @@ class MemoryService:
             logger.info("Deleted {} memories with scope={}", count, scope)
         return count
 
+    async def delete_all(self) -> int:
+        """Delete every memory entry and its vector.
+
+        Returns:
+            Number of deleted entries.
+        """
+        if not self._db:
+            raise RuntimeError("MemoryService not initialised")
+
+        cur = await self._db.execute("DELETE FROM memory_entries")
+        await self._db.execute("DELETE FROM memory_vectors")
+        await self._db.commit()
+        count = cur.rowcount
+        logger.info("Deleted all {} memories", count)
+        return count
+
     async def list(
         self,
         *,

@@ -332,6 +332,11 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 .calendar__hour-slot {
   height: 3.5rem;
   border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.calendar__hour-slot:hover {
+  background: var(--bg-secondary);
 }
 
 .calendar__event {
@@ -420,6 +425,7 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   cursor: pointer;
   min-height: 4rem;
   overflow: hidden;
+  transition: background 0.15s ease;
 }
 
 .calendar__month-cell:hover {
@@ -455,5 +461,4 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   font-size: 0.65rem;
   color: var(--text-secondary);
 }
-
 </style>

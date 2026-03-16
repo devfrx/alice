@@ -42,6 +42,9 @@
             <button class="mem-btn mem-btn--danger" :disabled="store.loading" @click="confirmClearSession">
                 Cancella memoria di sessione
             </button>
+            <button class="mem-btn mem-btn--danger" :disabled="store.loading" @click="confirmClearAll">
+                Cancella tutta la memoria
+            </button>
             <button class="mem-btn mem-btn--secondary" :disabled="store.loading" @click="onRefresh">
                 Aggiorna
             </button>
@@ -152,6 +155,14 @@ function confirmClearSession(): void {
     confirmMessage.value = 'Cancellare tutte le memorie di sessione? Questa azione è irreversibile.'
     confirmAction.value = async () => {
         await store.clearSessionMemory()
+        await store.loadStats()
+    }
+}
+
+function confirmClearAll(): void {
+    confirmMessage.value = 'Cancellare TUTTA la memoria (sessione e lungo termine)? Questa azione è irreversibile.'
+    confirmAction.value = async () => {
+        await store.clearAllMemory()
         await store.loadStats()
     }
 }

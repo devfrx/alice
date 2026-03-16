@@ -425,6 +425,10 @@ export const api = {
   clearSessionMemory: (): Promise<{ deleted_count: number }> =>
     request<{ deleted_count: number }>('/memory/session', { method: 'DELETE' }),
 
+  /** Clear ALL memories (every scope). */
+  clearAllMemory: (): Promise<{ deleted_count: number }> =>
+    request<{ deleted_count: number }>('/memory/all', { method: 'DELETE' }),
+
   /** Load memory statistics. */
   getMemoryStats: (): Promise<MemoryStats> =>
     request<MemoryStats>('/memory/stats'),

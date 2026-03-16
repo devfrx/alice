@@ -159,7 +159,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
-  animation: bubbleFadeIn 150ms ease both;
+  animation: slideInRight 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Assistant bubble */
@@ -171,7 +171,7 @@ onUnmounted(() => {
   padding: var(--space-3) var(--space-4);
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
-  animation: bubbleFadeIn 150ms ease both;
+  animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Tool result bubble */
@@ -185,7 +185,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
-  animation: bubbleFadeIn 150ms ease both;
+  animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Attachments */
@@ -322,6 +322,30 @@ onUnmounted(() => {
 }
 
 /* Keyframes */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes bubbleFadeIn {
   from {
     opacity: 0;
@@ -361,7 +385,7 @@ onUnmounted(() => {
   .bubble--tool,
   .image-overlay,
   .image-overlay__img {
-    animation: none;
+    animation: none !important;
   }
 
   .bubble__time,

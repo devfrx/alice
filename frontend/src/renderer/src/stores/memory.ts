@@ -91,6 +91,18 @@ export const useMemoryStore = defineStore('memory', () => {
     }
   }
 
+  /** Clear ALL memories (every scope). */
+  async function clearAllMemory(): Promise<void> {
+    error.value = null
+    try {
+      await api.clearAllMemory()
+      entries.value = []
+      total.value = 0
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+    }
+  }
+
   /** Load memory statistics. */
   async function loadStats(): Promise<void> {
     error.value = null
@@ -117,6 +129,7 @@ export const useMemoryStore = defineStore('memory', () => {
     searchMemories,
     deleteMemory,
     clearSessionMemory,
+    clearAllMemory,
     loadStats,
     clearSearchResults
   }

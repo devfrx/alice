@@ -13,9 +13,10 @@ import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
-import type { ChatMessage, CadModelPayload } from '../../types/chat'
+import type { ChatMessage, CadModelPayload, ChartPayload } from '../../types/chat'
 
 const CADViewer = defineAsyncComponent(() => import('./CADViewer.vue'))
+const ChartViewer = defineAsyncComponent(() => import('./ChartViewer.vue'))
 
 const props = defineProps<{
   /** The message to render. */
@@ -66,6 +67,25 @@ const cadPayload = computed((): CadModelPayload | null => {
       return p as CadModelPayload
     }
   } catch { /* not JSON */ }
+  return null
+})
+
+/**
+ * If this is a tool message with a Chart payload, return the parsed
+ * payload — otherwise null.  Used to render ChartViewer inline.
+ */
+const chartPayload = computed((): ChartPayload | null => {
+  if (props.message.role !== 'tool') return null
+  try {
+    const p = JSON.parse(props.message.content)
+    if (
+      typeof p.chart_id === 'string' &&
+      typeof p.chart_url === 'string' &&
+      typeof p.chart_type === 'string'
+    ) {
+      return p as ChartPayload
+    }
+  } catch { /* not JSON chart payload */ }
   return null
 })
 
@@ -121,9 +141,13 @@ onUnmounted(() => {
       <!-- CAD model viewer (tool message with cad-model payload) -->
       <CADViewer v-if="cadPayload" :model-url="cadPayload.export_url" :model-name="cadPayload.model_name" />
 
-      <!-- Message content (hide raw JSON for CAD tool messages) -->
+      <!-- Chart viewer (tool message with chart payload) -->
+      <ChartViewer v-if="chartPayload" :payload="chartPayload" />
+
+      <!-- Message content (hide raw JSON for CAD/Chart tool messages) -->
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
-      <div v-if="!cadPayload" class="bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
+      <div v-if="!cadPayload && !chartPayload" class="bubble__content" v-html="htmlContent"
+        @click="handleCodeBlockClick" />
       <span class="bubble__time">{{ formattedTime }}</span>
     </div>
 
@@ -210,7 +234,8 @@ onUnmounted(() => {
 
 /* When tool bubble contains a CAD viewer, remove the mono/small styling
    so the viewer renders at full width without text constraints */
-.bubble--tool:has(.cad-viewer) {
+.bubble--tool:has(.cad-viewer),
+.bubble--tool:has(.chart-viewer) {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   background: transparent;

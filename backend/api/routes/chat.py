@@ -485,6 +485,13 @@ async def ws_chat(websocket: WebSocket) -> None:
                         elif etype == "tool_call":
                             tool_calls_collected.append(event)
                             await websocket.send_json(event)
+                        elif etype == "error":
+                            logger.error(
+                                "LLM error during initial stream: {}",
+                                event.get("content", "unknown"),
+                            )
+                            await websocket.send_json(event)
+                            finish_reason = "error"
                         elif etype == "done":
                             finish_reason = event.get(
                                 "finish_reason", "stop",
@@ -591,7 +598,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                     continue
 
                 # --- tool calling loop (if LLM requested tools) -----------
-                if tool_calls_collected and finish_reason != "cancelled":
+                if tool_calls_collected and finish_reason not in ("cancelled", "error"):
                     try:
                         full_content, thinking_content = await run_tool_loop(
                             websocket=websocket,
@@ -609,6 +616,10 @@ async def ws_chat(websocket: WebSocket) -> None:
                             cancel_event=cancel_event,
                             memory_context=memory_context,
                         )
+                        # Update finish_reason to reflect the tool loop
+                        # outcome (the initial value is stale — it came
+                        # from the first LLM response, often "tool_calls").
+                        finish_reason = "stop"
                     except WebSocketDisconnect:
                         # Save any pending assistant content before propagating.
                         logger.debug("WS disconnected during tool loop")
@@ -1018,7 +1029,31 @@ async def create_conversation(request: Request) -> dict[str, Any]:
 
         conv = Conversation(id=conv_id, title=title)
         session.add(conv)
-        await session.commit()
+        try:
+            await session.commit()
+        except sa.exc.IntegrityError:
+            # Race condition: another concurrent request already inserted
+            # this id between our GET check and the INSERT.  Roll back and
+            # return the existing row (idempotent).
+            await session.rollback()
+            existing = await session.get(Conversation, conv_id)
+            if existing is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Conversation id conflict",
+                )
+            message_count: int = await session.scalar(
+                sa.select(sa.func.count(Message.id)).where(
+                    Message.conversation_id == existing.id
+                )
+            ) or 0
+            return {
+                "id": str(existing.id),
+                "title": existing.title,
+                "created_at": existing.created_at.isoformat(),
+                "updated_at": existing.updated_at.isoformat(),
+                "message_count": message_count,
+            }
         await session.refresh(conv)
 
         if ctx.conversation_file_manager:

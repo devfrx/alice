@@ -386,7 +386,7 @@ defineExpose({
 .fib {
     position: fixed;
     bottom: 24px;
-    left: calc(50% + var(--sidebar-offset, 0px) / 2);
+    left: calc(50% + var(--sidebar-offset, 0px) / 2 - var(--panel-offset, 0px) / 2);
     transform: translateX(-50%);
     z-index: var(--z-dropdown);
     min-width: 360px;
@@ -404,6 +404,7 @@ defineExpose({
         var(--shadow-floating),
         inset 0 1px 0 rgba(255, 255, 255, 0.03);
     transition:
+        left 350ms var(--ease-out-expo),
         border-color 400ms var(--ease-smooth),
         box-shadow 400ms var(--ease-smooth),
         border-radius 500ms var(--ease-out-expo),

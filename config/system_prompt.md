@@ -158,3 +158,24 @@ documentation_access:
   rules:
     - usa get_toc per la struttura del documento prima di leggere sezioni specifiche
     - usa get_chapter_markdown per leggere solo i capitoli necessari
+
+chart_generator:
+  principio: genera e gestisce grafici interattivi Apache ECharts da qualsiasi fonte dati
+  workflow:
+    - "raccolta dati PRIMA di chiamare generate_chart: note → read_note/search_notes, immagini/CSV → analisi visiva, web → web_search, prompt → dati già disponibili"
+    - "costruzione echarts_option: costruisci il JSON ECharts mentalmente prima della tool call. Deve essere un object JSON valido, NON una stringa serializzata"
+    - "chiamata generate_chart: passa la spec completa — il grafico è visualizzato nella chat come viewer interattivo"
+  regola_flusso: "In workflow multi-step (es. raccogli dati → genera grafico), chiama i tool IN SEQUENZA nella stessa catena agentica SENZA emettere messaggi di testo tra un tool call e l'altro. Dopo aver ottenuto i dati da un tool, chiama immediatamente il tool successivo. Invia testo all'utente SOLO alla fine, dopo che tutti i tool hanno completato il loro lavoro."
+  tipi_supportati: bar line pie scatter radar heatmap sankey candlestick treemap funnel gauge boxplot parallel themeRiver — e qualsiasi combinazione in series misto
+  limiti:
+    - "echarts_option serializzata: max 10.000 caratteri. Aggrega o campiona i dati prima di chiamare il tool se il dataset è grande"
+    - "max 1.000 grafici nel vault. Usa list_charts / delete_chart per gestirli"
+  update: usa update_chart(chart_id, echarts_option) per modificare un grafico esistente. Recupera prima la spec con get_chart(chart_id) per modifiche puntuali
+  regole_critiche_echarts_option:
+    - "ALLINEAMENTO DATI: ogni series[].data DEVE avere la stessa lunghezza delle categorie in xAxis.data / yAxis.data. Se yAxis.data ha 3 elementi, ogni serie deve avere esattamente 3 valori"
+    - "UNITÀ OMOGENEE: non mischiare mai unità diverse nella stessa serie (es. % e GB sulla stessa scala). Usa series separate con yAxis multipli se necessario, oppure normalizza tutto in percentuale"
+    - "STRUTTURA BAR/LINE CARTESIANA: definisci sempre xAxis e yAxis esplicitamente. Per bar chart orizzontale usa xAxis.type='value' e yAxis.type='category'. Per verticale usa xAxis.type='category' e yAxis.type='value'"
+    - "UNA METRICA PER SERIE: una series è UNA metrica (es. 'Utilizzo %'). NON mettere valori di natura diversa nello stesso data array"
+    - "ESEMPIO CORRETTO per utilizzo risorse (%, stessa scala 0-100): yAxis.data=['CPU','RAM','Disco'], una sola series con data=[8.4, 67.7, 74.8] e nome 'Utilizzo %'. Se vuoi anche i valori assoluti, usa un secondo grafico o aggiunge tooltip custom"
+    - "PIE CHART: usa series[0].type='pie' con data=[{name:'A',value:X},{name:'B',value:Y}]. Non usare xAxis/yAxis per pie"
+    - "NON includere 'title' in echarts_option: il titolo è già mostrato nell'header del viewer sopra il grafico. Includere title in ECharts crea un secondo titolo sovrapposto alle barre/linee"

@@ -547,6 +547,24 @@ class McpServerConfig(BaseModel):
         return self
 
 
+class ChartConfig(BaseSettings):
+    """Configurazione plugin chart_generator."""
+
+    model_config = SettingsConfigDict(env_prefix="OMNIA_CHART__")
+
+    enabled: bool = False
+    """Abilita il plugin chart_generator (opt-in, come tutti i plugin OMNIA)."""
+
+    chart_output_dir: str = "data/charts"
+    """Directory dove vengono salvati i chart spec JSON."""
+
+    max_option_chars: int = 10_000
+    """Dimensione massima della echarts_option serializzata (in caratteri)."""
+
+    max_charts: int = 1_000
+    """Numero massimo di grafici persistiti."""
+
+
 class TrellisServiceConfig(BaseSettings):
     """TRELLIS 3D generation microservice configuration."""
 
@@ -640,6 +658,7 @@ class OmniaConfig(BaseSettings):
     notes: NotesConfig = Field(default_factory=NotesConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)
     trellis: TrellisServiceConfig = Field(default_factory=TrellisServiceConfig)
+    chart: ChartConfig = Field(default_factory=ChartConfig)
 
     @model_validator(mode="before")
     @classmethod

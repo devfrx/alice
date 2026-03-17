@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from backend.api.routes import audit, cad, calendar, chat, config, events, mcp, mcp_memory, memory, models, notes, plugins, settings, voice
+from backend.api.routes import audit, cad, calendar, charts, chat, config, events, mcp, mcp_memory, memory, models, notes, plugins, settings, voice
 
 router = APIRouter(prefix="/api")
 
@@ -22,6 +22,7 @@ router.include_router(events.router)
 router.include_router(mcp.router)
 router.include_router(mcp_memory.router)
 router.include_router(cad.router)
+router.include_router(charts.router)
 
 
 @router.get("/health")

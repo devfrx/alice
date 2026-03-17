@@ -75,6 +75,8 @@ async def run_tool_loop(
         logger.error("Tool registry not available, cannot execute tool loop")
         return full_content, thinking_content
 
+    llm_error_in_requery = False
+
     for iteration in range(max_iterations):
         if not tool_calls_from_llm:
             break
@@ -347,7 +349,7 @@ async def run_tool_loop(
 
             await websocket.send_json(ws_payload)
 
-        await session.flush()
+        await session.commit()
 
         # Check for cancellation AFTER results are persisted (DB consistent).
         if cancel_event and cancel_event.is_set():
@@ -409,6 +411,8 @@ async def run_tool_loop(
             _ws_cancel_reader(websocket, cancel_event),
         ) if cancel_event else None
 
+        llm_error_in_requery = False
+
         try:
             async for event in llm.chat(
                 messages, tools=tools, cancel_event=cancel_event,
@@ -421,25 +425,68 @@ async def run_tool_loop(
                     await websocket.send_json(event)
                 elif event["type"] == "tool_call":
                     tool_calls_from_llm.append(event)
+                    await websocket.send_json(event)
+                elif event["type"] == "error":
+                    logger.error(
+                        "LLM error during tool loop re-query (iter {}): {}",
+                        iteration + 1, event.get("content", "unknown"),
+                    )
+                    # Do NOT forward error to WS here — it would cause
+                    # the frontend to abort the stream prematurely.
+                    # The error is handled internally: the loop stops
+                    # and the accumulated content is returned as-is.
+                    llm_error_in_requery = True
                 elif event["type"] == "done":
                     pass
+        except Exception as exc:
+            # Catch LLM HTTP/connection errors during re-query so the
+            # tool loop returns accumulated content instead of raising.
+            logger.error(
+                "LLM exception during tool loop re-query (iter {}): {}",
+                iteration + 1, exc,
+            )
+            llm_error_in_requery = True
         finally:
             if reader_task and not reader_task.done():
                 reader_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await reader_task
 
-    else:
-        # Loop exhausted max_iterations without a clean break.
-        if tool_calls_from_llm:
+        # If the LLM returned an error during the re-query, stop
+        # the loop — do not attempt further tool calls.
+        if llm_error_in_requery:
             logger.warning(
-                "Tool loop hit max iterations ({}) — forcing final answer",
-                max_iterations,
+                "Aborting tool loop due to LLM error in re-query",
             )
-            await websocket.send_json({
-                "type": "warning",
-                "content": f"Tool loop exceeded maximum iterations ({max_iterations}). Returning partial response.",
-            })
+            tool_calls_from_llm.clear()
+
+        logger.info(
+            "Tool loop iter {} re-query done: content_len={}, "
+            "tool_calls={}, error={}",
+            iteration + 1,
+            len(full_content),
+            len(tool_calls_from_llm),
+            llm_error_in_requery,
+        )
+
+    # Log why the tool loop exited.
+    if cancel_event and cancel_event.is_set():
+        logger.info("Tool loop finished: cancelled")
+    elif tool_calls_from_llm:
+        logger.warning(
+            "Tool loop hit max iterations ({}) — forcing final answer",
+            max_iterations,
+        )
+        await websocket.send_json({
+            "type": "warning",
+            "content": f"Tool loop exceeded maximum iterations ({max_iterations}). Returning partial response.",
+        })
+    else:
+        exit_reason = (
+            "LLM error in re-query" if llm_error_in_requery
+            else "LLM returned final answer (no more tool calls)"
+        )
+        logger.info("Tool loop finished: {}", exit_reason)
 
     return full_content, thinking_content
 

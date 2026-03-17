@@ -129,6 +129,9 @@ export function useChat(): UseChatReturn {
   const onDone = (data: unknown): void => {
     if (store.streamGeneration !== activeGeneration) return // stale event
     const msg = data as WsDoneMessage
+    if (msg.finish_reason && msg.finish_reason !== 'stop') {
+      console.debug('[useChat] Stream finished with reason:', msg.finish_reason)
+    }
     store.finalizeStream(msg.conversation_id, msg.message_id)
   }
 
@@ -190,7 +193,9 @@ export function useChat(): UseChatReturn {
     if (data instanceof Event) return
     const msg = data as WsErrorMessage
     console.error('[useChat] Server error:', msg.content)
-    store.cancelStream()
+    // Don't cancel stream here — transient LLM errors during tool loop
+    // re-queries would kill the entire stream.  The backend sends a
+    // proper "done" event when the response is truly finished.
   }
 
   // -----------------------------------------------------------------------

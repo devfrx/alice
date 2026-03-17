@@ -7,11 +7,14 @@
  */
 import { computed, defineAsyncComponent } from 'vue'
 
-import type { ToolExecution } from '../../types/chat'
+import type { ToolExecution, ChartPayload } from '../../types/chat'
 import OmniaSpinner from '../../components/ui/OmniaSpinner.vue'
 
 const CADViewer = defineAsyncComponent(
     () => import('./CADViewer.vue')
+)
+const ChartViewer = defineAsyncComponent(
+    () => import('./ChartViewer.vue')
 )
 
 const props = defineProps<{
@@ -33,6 +36,20 @@ function parseCadPayload(result: string): { export_url: string; model_name: stri
         if (typeof p.model_name === 'string' && typeof p.export_url === 'string') return p
         return null
     } catch { return null }
+}
+
+/** Try to parse a Chart JSON payload from a tool result string. */
+function parseChartPayload(result: string): ChartPayload | null {
+    try {
+        const p = JSON.parse(result)
+        if (typeof p.chart_id === 'string' && typeof p.chart_url === 'string' && typeof p.chart_type === 'string') return p as ChartPayload
+        return null
+    } catch { return null }
+}
+
+/** Non-null variant used inside guarded template blocks. */
+function chartPayloadOf(result: string): ChartPayload {
+    return parseChartPayload(result) as ChartPayload
 }
 </script>
 
@@ -62,6 +79,10 @@ function parseCadPayload(result: string): { export_url: string; model_name: stri
                 <CADViewer :model-url="parseCadPayload(exec.result)?.export_url ?? ''"
                     :model-name="parseCadPayload(exec.result)?.model_name" />
             </template>
+            <template
+                v-else-if="exec.contentType === 'application/vnd.omnia.chart+json' && exec.result && parseChartPayload(exec.result)">
+                <ChartViewer :payload="chartPayloadOf(exec.result)" />
+            </template>
             <span v-else-if="exec.result" class="tool-exec__result">{{ truncate(exec.result) }}</span>
         </div>
     </div>
@@ -89,6 +110,13 @@ function parseCadPayload(result: string): { export_url: string; model_name: stri
     font-size: var(--text-xs);
     line-height: var(--leading-tight);
     padding: var(--space-1-5) 0;
+    flex-wrap: wrap;
+}
+
+/* Viewers (CAD / Chart) take full row width below the status line */
+.tool-exec__item :deep(.chart-viewer),
+.tool-exec__item :deep(.cad-viewer) {
+    flex-basis: 100%;
 }
 
 .tool-exec__item:not(:last-child) {

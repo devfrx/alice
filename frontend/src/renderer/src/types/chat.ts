@@ -214,6 +214,20 @@ export interface CadModelPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Charts
+// ---------------------------------------------------------------------------
+
+/** Payload from chart_generate tool (content_type='application/vnd.omnia.chart+json'). */
+export interface ChartPayload {
+  chart_id: string
+  title: string
+  chart_type: string
+  /** Relative URL: "/api/charts/{chart_id}" */
+  chart_url: string
+  created_at: string
+}
+
+// ---------------------------------------------------------------------------
 // Tool execution tracking (client-side)
 // ---------------------------------------------------------------------------
 

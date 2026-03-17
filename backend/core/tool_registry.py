@@ -416,6 +416,14 @@ class ToolRegistry:
                         args[key] = parsed
                 except (json.JSONDecodeError, ValueError):
                     pass  # leave as-is; validation will catch it
+            elif expected == "object" and isinstance(val, str):
+                # LLMs sometimes send a JSON-encoded object as a string
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, dict):
+                        args[key] = parsed
+                except (json.JSONDecodeError, ValueError):
+                    pass  # leave as-is; validation will catch it
         return args
 
     async def execute_tool(

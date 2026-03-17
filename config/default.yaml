@@ -73,6 +73,7 @@ plugins:
     - notes
     - mcp_client
     - cad_generator
+    - chart_generator
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -203,6 +204,17 @@ notes:
   max_content_chars_llm: 8000
   semantic_threshold: 0.70
   max_search_results: 20
+
+
+# ──────────────────────────────────────────────────
+# Phase 14 — Chart Generator
+# ──────────────────────────────────────────────────
+
+chart:
+  enabled: true
+  chart_output_dir: "data/charts"
+  max_option_chars: 10000
+  max_charts: 1000
 
 
 # ──────────────────────────────────────────────────

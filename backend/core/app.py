@@ -323,6 +323,39 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         OmniaEvent.EMAIL_SENT, _forward_email_sent,
     )
 
+    # -- Bridge Note events to the events WebSocket ---------------------
+    async def _forward_note_created(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "note.created",
+                "note_id": kwargs.get("note_id"),
+                "title": kwargs.get("title"),
+            })
+
+    async def _forward_note_updated(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "note.updated",
+                "note_id": kwargs.get("note_id"),
+            })
+
+    async def _forward_note_deleted(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "note.deleted",
+                "note_id": kwargs.get("note_id"),
+            })
+
+    ctx.event_bus.subscribe(
+        OmniaEvent.NOTE_CREATED, _forward_note_created,
+    )
+    ctx.event_bus.subscribe(
+        OmniaEvent.NOTE_UPDATED, _forward_note_updated,
+    )
+    ctx.event_bus.subscribe(
+        OmniaEvent.NOTE_DELETED, _forward_note_deleted,
+    )
+
     app.state.context = ctx
     app.state.engine = engine
 

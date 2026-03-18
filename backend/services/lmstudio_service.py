@@ -127,11 +127,9 @@ class LMStudioManager:
         Raises:
             RuntimeError: If another model operation is in progress.
         """
-        if self._operation_lock.locked():
-            raise RuntimeError(
-                "Another model operation is in progress"
-            )
         async with self._operation_lock:
+            if self._current_operation and self._current_operation.status == "in_progress":
+                raise RuntimeError("Another model operation is in progress")
             self._current_operation = ModelOperation("load", model)
             try:
                 payload: dict = {
@@ -187,11 +185,9 @@ class LMStudioManager:
         Raises:
             RuntimeError: If another model operation is in progress.
         """
-        if self._operation_lock.locked():
-            raise RuntimeError(
-                "Another model operation is in progress"
-            )
         async with self._operation_lock:
+            if self._current_operation and self._current_operation.status == "in_progress":
+                raise RuntimeError("Another model operation is in progress")
             self._current_operation = ModelOperation(
                 "unload", instance_id,
             )

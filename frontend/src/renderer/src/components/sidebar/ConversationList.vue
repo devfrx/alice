@@ -425,7 +425,6 @@ function timeAgo(iso: string): string {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
   padding: var(--space-2) var(--space-2-5);
   border-radius: var(--radius-sm);
   cursor: pointer;

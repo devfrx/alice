@@ -514,7 +514,7 @@ defineExpose({
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text-muted);

@@ -74,7 +74,6 @@ function isSelected(id: string): boolean {
 
 async function togglePin(noteId: string, currentPinned: boolean): Promise<void> {
     await store.updateNote(noteId, { pinned: !currentPinned })
-    await store.loadNotes()
 }
 
 async function onDeleteNote(noteId: string, noteTitle: string): Promise<void> {
@@ -89,7 +88,10 @@ async function onDeleteNote(noteId: string, noteTitle: string): Promise<void> {
 
 /** Format relative time in Italian. */
 function relativeTime(dateStr: string): string {
-    const diff = Date.now() - new Date(dateStr).getTime()
+    if (!dateStr) return '—'
+    const ts = new Date(dateStr).getTime()
+    if (isNaN(ts)) return '—'
+    const diff = Date.now() - ts
     const mins = Math.floor(diff / 60_000)
     if (mins < 1) return 'ora'
     if (mins < 60) return `${mins}m fa`
@@ -292,6 +294,9 @@ function preview(content: string): string {
 
         <!-- Loading indicator -->
         <div v-if="store.loading" class="browser__loading">Caricamento…</div>
+
+        <!-- Error banner -->
+        <div v-if="store.error" class="browser__error">{{ store.error }}</div>
     </aside>
 </template>
 
@@ -735,6 +740,14 @@ function preview(content: string): string {
     text-align: center;
     color: var(--text-muted);
     font-size: var(--text-xs);
+}
+
+.browser__error {
+    padding: var(--space-2) var(--space-3);
+    color: var(--error, #f87171);
+    font-size: var(--text-xs);
+    background: rgba(248, 113, 113, 0.08);
+    border-top: 1px solid rgba(248, 113, 113, 0.2);
 }
 
 /* ------------------------------------------------- Reduced motion */

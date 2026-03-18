@@ -115,13 +115,14 @@ class EmailService:
                 await self._idle_task
             except asyncio.CancelledError:
                 pass
-        if self._imap:
-            try:
-                await self._imap.logout()
-            except Exception:
-                pass
-            self._imap = None
-        self._cache.clear()
+        async with self._imap_lock:
+            if self._imap:
+                try:
+                    await self._imap.logout()
+                except Exception:
+                    pass
+                self._imap = None
+            self._cache.clear()
         logger.info("EmailService closed")
 
     # ------------------------------------------------------------------
@@ -144,7 +145,7 @@ class EmailService:
 
         async with self._imap_lock:
             imap = await self._get_imap()
-            sel = await imap.select(folder)
+            sel = await imap.select(self._quote_folder(folder))
             if sel.result != "OK":
                 raise ValueError(
                     f"Cannot select folder '{folder}': {sel.result}"
@@ -185,9 +186,10 @@ class EmailService:
         if cached is not None:
             return cached
 
+        uid = str(uid)
         async with self._imap_lock:
             imap = await self._get_imap()
-            sel = await imap.select(folder)
+            sel = await imap.select(self._quote_folder(folder))
             if sel.result != "OK":
                 raise ValueError(
                     f"Cannot select folder '{folder}': {sel.result}"
@@ -242,7 +244,7 @@ class EmailService:
 
         async with self._imap_lock:
             imap = await self._get_imap()
-            sel = await imap.select(folder)
+            sel = await imap.select(self._quote_folder(folder))
             if sel.result != "OK":
                 raise ValueError(
                     f"Cannot select folder '{folder}': {sel.result}"
@@ -358,9 +360,10 @@ class EmailService:
         self, uid: str, *, folder: str = "INBOX", read: bool = True,
     ) -> bool:
         """Set or clear the \\Seen flag."""
+        uid = str(uid)
         async with self._imap_lock:
             imap = await self._get_imap()
-            sel = await imap.select(folder)
+            sel = await imap.select(self._quote_folder(folder))
             if sel.result != "OK":
                 raise ValueError(
                     f"Cannot select folder '{folder}': {sel.result}"
@@ -378,27 +381,36 @@ class EmailService:
                 raise ConnectionError(
                     f"IMAP timeout marking email {uid}",
                 ) from exc
-        self._cache.clear()
+            self._cache.clear()
         return result == "OK"
 
     async def archive(
         self, uid: str, *, from_folder: str = "INBOX",
     ) -> bool:
-        """Copy email to archive folder then delete from source."""
+        """Archive an email.
+
+        Gmail: removing from the source folder is sufficient because
+        every message already lives in All Mail.
+        Other providers: COPY to the configured archive folder first,
+        then delete from the source.
+        """
+        uid = str(uid)
         async with self._imap_lock:
             imap = await self._get_imap()
-            sel = await imap.select(from_folder)
+            sel = await imap.select(self._quote_folder(from_folder))
             if sel.result != "OK":
                 raise ValueError(
                     f"Cannot select folder '{from_folder}': "
                     f"{sel.result}"
                 )
             try:
-                result, _ = await imap.uid(
-                    "COPY", uid, self._config.archive_folder,
-                )
-                if result != "OK":
-                    return False
+                if not self._is_gmail:
+                    dest = self._quote_folder(
+                        self._config.archive_folder,
+                    )
+                    result, _ = await imap.uid("COPY", uid, dest)
+                    if result != "OK":
+                        return False
                 await imap.uid(
                     "STORE", uid, "+FLAGS", "\\Deleted",
                 )
@@ -411,7 +423,7 @@ class EmailService:
                 raise ConnectionError(
                     f"IMAP timeout archiving email {uid}",
                 ) from exc
-        self._cache.clear()
+            self._cache.clear()
         return True
 
     async def list_folders(self) -> list[str]:
@@ -643,6 +655,28 @@ class EmailService:
                 decoded.append(part)
         return " ".join(decoded)
 
+    @staticmethod
+    def _quote_folder(folder: str) -> str:
+        """Quote IMAP mailbox name for safe use in commands.
+
+        aioimaplib does NOT auto-quote folder arguments, so names
+        containing spaces or special characters (e.g.
+        ``[Gmail]/Tutti i messaggi``) must be wrapped in double-quotes
+        per RFC 3501.  INBOX is a protocol-level atom and never quoted.
+        """
+        if folder.upper() == "INBOX":
+            return "INBOX"
+        # Already quoted — pass through
+        if folder.startswith('"') and folder.endswith('"'):
+            return folder
+        escaped = folder.replace('\\', '\\\\').replace('"', '\\"')
+        return f'"{escaped}"'
+
+    @property
+    def _is_gmail(self) -> bool:
+        """True when the IMAP host belongs to Gmail."""
+        return "gmail" in self._config.imap_host.lower()
+
     async def _idle_watcher(self) -> None:
         """Background task: IMAP IDLE for real-time new-mail events.
 
@@ -677,7 +711,8 @@ class EmailService:
                         OmniaEvent.EMAIL_RECEIVED,
                         folder="INBOX",
                     )
-                    self._cache.clear()
+                    async with self._imap_lock:
+                        self._cache.clear()
             except asyncio.CancelledError:
                 if idle_imap:
                     try:

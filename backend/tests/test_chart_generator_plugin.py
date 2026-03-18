@@ -48,7 +48,7 @@ async def test_generate_chart_option_too_large(plugin) -> None:
         "echarts_option": {"data": list(range(10_000))},
     }, context=None)
     assert result.success is False
-    assert "limite" in result.content.lower()
+    assert "limite" in result.error_message.lower()
 
 
 @pytest.mark.asyncio
@@ -106,3 +106,49 @@ async def test_plugin_disabled_returns_no_tools(mock_ctx) -> None:
     p = ChartGeneratorPlugin()
     await p.initialize(mock_ctx)
     assert p.get_tools() == []
+
+
+@pytest.mark.asyncio
+async def test_disabled_plugin_execute_returns_error(mock_ctx) -> None:
+    """execute_tool() returns ToolResult.error when plugin is disabled."""
+    mock_ctx.config.chart.enabled = False
+    p = ChartGeneratorPlugin()
+    await p.initialize(mock_ctx)
+    result = await p.execute_tool("generate_chart", {
+        "title": "X", "chart_type": "bar", "echarts_option": VALID_OPTION,
+    }, context=None)
+    assert result.success is False
+    assert result.error_message is not None
+
+
+@pytest.mark.asyncio
+async def test_unknown_tool_returns_error(plugin) -> None:
+    """execute_tool() returns ToolResult.error for unrecognised tool names."""
+    result = await plugin.execute_tool("nonexistent_tool", {}, context=None)
+    assert result.success is False
+    assert "sconosciuto" in result.error_message.lower()
+
+
+@pytest.mark.asyncio
+async def test_max_charts_limit_reached(plugin) -> None:
+    """generate_chart fails when max_charts limit is reached."""
+    plugin.ctx.config.chart.max_charts = 1
+    await plugin.execute_tool("generate_chart", {
+        "title": "First", "chart_type": "bar", "echarts_option": VALID_OPTION,
+    }, context=None)
+    result = await plugin.execute_tool("generate_chart", {
+        "title": "Second", "chart_type": "bar", "echarts_option": VALID_OPTION,
+    }, context=None)
+    assert result.success is False
+    assert "limite" in result.error_message.lower()
+
+
+@pytest.mark.asyncio
+async def test_update_chart_not_found(plugin) -> None:
+    """update_chart returns error for a nonexistent chart_id."""
+    result = await plugin.execute_tool("update_chart", {
+        "chart_id": "nonexistent",
+        "echarts_option": VALID_OPTION,
+    }, context=None)
+    assert result.success is False
+    assert result.error_message is not None

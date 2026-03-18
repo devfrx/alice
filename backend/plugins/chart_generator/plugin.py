@@ -224,7 +224,7 @@ class ChartGeneratorPlugin(BasePlugin):
         context: ExecutionContext,
     ) -> ToolResult:
         if not self.ctx.config.chart.enabled:
-            return ToolResult(success=False, content="Plugin chart_generator non abilitato.")
+            return ToolResult.error("Plugin chart_generator non abilitato.")
 
         handlers = {
             "generate_chart": self._generate_chart,
@@ -235,30 +235,24 @@ class ChartGeneratorPlugin(BasePlugin):
         }
         handler = handlers.get(tool_name)
         if handler is None:
-            return ToolResult(success=False, content=f"Tool sconosciuto: {tool_name}")
+            return ToolResult.error(f"Tool sconosciuto: {tool_name}")
         return await handler(args)
 
     async def _generate_chart(self, args: dict[str, Any]) -> ToolResult:
         cfg = self.ctx.config.chart
         count = await self._store.count()
         if count >= cfg.max_charts:
-            return ToolResult(
-                success=False,
-                content=(
-                    f"Limite massimo di grafici raggiunto ({cfg.max_charts}). "
-                    "Usa `delete_chart` per eliminare grafici non più necessari."
-                ),
+            return ToolResult.error(
+                f"Limite massimo di grafici raggiunto ({cfg.max_charts}). "
+                "Usa `delete_chart` per eliminare grafici non più necessari."
             )
 
         option = args["echarts_option"]
         option_str = json.dumps(option, ensure_ascii=False)
         if len(option_str) > cfg.max_option_chars:
-            return ToolResult(
-                success=False,
-                content=(
-                    f"La echarts_option supera il limite di {cfg.max_option_chars} caratteri "
-                    f"(attuale: {len(option_str)}). Aggrega o riduci i dati prima di richiamare il tool."
-                ),
+            return ToolResult.error(
+                f"La echarts_option supera il limite di {cfg.max_option_chars} caratteri "
+                f"(attuale: {len(option_str)}). Aggrega o riduci i dati prima di richiamare il tool."
             )
 
         chart_id = str(uuid4())
@@ -282,9 +276,8 @@ class ChartGeneratorPlugin(BasePlugin):
             chart_url=f"/api/charts/{chart_id}",
             created_at=now,
         )
-        return ToolResult(
-            success=True,
-            content=payload.model_dump_json(),
+        return ToolResult.ok(
+            payload.model_dump_json(),
             content_type="application/vnd.omnia.chart+json",
         )
 
@@ -292,14 +285,13 @@ class ChartGeneratorPlugin(BasePlugin):
         chart_id = args["chart_id"]
         existing = await self._store.load(chart_id)
         if existing is None:
-            return ToolResult(success=False, content=f"Grafico non trovato: {chart_id}")
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
 
         cfg = self.ctx.config.chart
         option_str = json.dumps(args["echarts_option"], ensure_ascii=False)
         if len(option_str) > cfg.max_option_chars:
-            return ToolResult(
-                success=False,
-                content=f"echarts_option supera il limite di {cfg.max_option_chars} caratteri.",
+            return ToolResult.error(
+                f"echarts_option supera il limite di {cfg.max_option_chars} caratteri."
             )
 
         existing.echarts_option = args["echarts_option"]
@@ -317,9 +309,8 @@ class ChartGeneratorPlugin(BasePlugin):
             chart_url=f"/api/charts/{chart_id}",
             created_at=existing.created_at,
         )
-        return ToolResult(
-            success=True,
-            content=payload.model_dump_json(),
+        return ToolResult.ok(
+            payload.model_dump_json(),
             content_type="application/vnd.omnia.chart+json",
         )
 
@@ -327,8 +318,8 @@ class ChartGeneratorPlugin(BasePlugin):
         chart_id = args["chart_id"]
         spec = await self._store.load(chart_id)
         if spec is None:
-            return ToolResult(success=False, content=f"Grafico non trovato: {chart_id}")
-        return ToolResult(success=True, content=spec.model_dump_json())
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
+        return ToolResult.ok(spec.model_dump_json())
 
     async def _list_charts(self, args: dict[str, Any]) -> ToolResult:
         limit = min(int(args.get("limit", 20)), 100)
@@ -341,14 +332,13 @@ class ChartGeneratorPlugin(BasePlugin):
             "limit": limit,
             "offset": offset,
         }
-        return ToolResult(
-            success=True,
-            content=json.dumps(payload, ensure_ascii=False, default=str),
+        return ToolResult.ok(
+            json.dumps(payload, ensure_ascii=False, default=str),
         )
 
     async def _delete_chart(self, args: dict[str, Any]) -> ToolResult:
         chart_id = args["chart_id"]
         deleted = await self._store.delete(chart_id)
         if not deleted:
-            return ToolResult(success=False, content=f"Grafico non trovato: {chart_id}")
-        return ToolResult(success=True, content=f"Grafico eliminato: {chart_id}")
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
+        return ToolResult.ok(f"Grafico eliminato: {chart_id}")

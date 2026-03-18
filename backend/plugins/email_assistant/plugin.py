@@ -188,7 +188,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_READ_EMAILS_SCHEMA,
                 risk_level="safe",
                 requires_confirmation=False,
-                timeout_ms=15_000,
+                timeout_ms=50_000,
             ),
             ToolDefinition(
                 name="get_email",
@@ -201,7 +201,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_GET_EMAIL_SCHEMA,
                 risk_level="safe",
                 requires_confirmation=False,
-                timeout_ms=15_000,
+                timeout_ms=50_000,
             ),
             ToolDefinition(
                 name="search_emails",
@@ -214,7 +214,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_SEARCH_EMAILS_SCHEMA,
                 risk_level="safe",
                 requires_confirmation=False,
-                timeout_ms=20_000,
+                timeout_ms=50_000,
             ),
             ToolDefinition(
                 name="send_email",
@@ -227,7 +227,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_SEND_EMAIL_SCHEMA,
                 risk_level="dangerous",
                 requires_confirmation=True,
-                timeout_ms=30_000,
+                timeout_ms=50_000,
             ),
             ToolDefinition(
                 name="mark_as_read",
@@ -238,7 +238,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_MARK_READ_SCHEMA,
                 risk_level="safe",
                 requires_confirmation=False,
-                timeout_ms=10_000,
+                timeout_ms=50_000,
             ),
             ToolDefinition(
                 name="archive_email",
@@ -251,7 +251,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_ARCHIVE_EMAIL_SCHEMA,
                 risk_level="medium",
                 requires_confirmation=True,
-                timeout_ms=15_000,
+                timeout_ms=50_000,
             ),
             ToolDefinition(
                 name="list_folders",
@@ -265,7 +265,7 @@ class EmailPlugin(BasePlugin):
                 parameters=_LIST_FOLDERS_SCHEMA,
                 risk_level="safe",
                 requires_confirmation=False,
-                timeout_ms=10_000,
+                timeout_ms=50_000,
             ),
         ]
 

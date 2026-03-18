@@ -71,6 +71,19 @@ export function useEventsWebSocket() {
             emailStore.handleEmailReceived(data.folder as string)
           })
         }
+
+        // Handle note events (Phase 13)
+        if (
+          data.type === 'note.created' ||
+          data.type === 'note.updated' ||
+          data.type === 'note.deleted'
+        ) {
+          import('../stores/notes').then(({ useNotesStore }) => {
+            const notesStore = useNotesStore()
+            void notesStore.loadNotes()
+            void notesStore.loadFolders()
+          })
+        }
       } catch {
         console.warn('[OMNIA Events WS] Failed to parse message')
       }

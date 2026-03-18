@@ -48,6 +48,7 @@ def _resolve_vec_extension_path() -> str:
             or name.endswith(".dylib")
         ):
             return str(item)
+    logger.warning("sqlite-vec extension not found in package, falling back to bare 'vec0'")
     return "vec0"
 
 
@@ -56,9 +57,19 @@ def _extract_wikilinks(content: str) -> list[str]:
     return list(dict.fromkeys(_WIKILINK_RE.findall(content)))
 
 
+# Unit separator character — used as delimiter for CSV-stored lists
+# that may contain commas (e.g. wikilinks like [[Hello, World]]).
+_LIST_SEP = "\x1f"
+
+
 def _sanitize_tags(tags: list[str]) -> list[str]:
-    """Strip commas from tags to prevent CSV storage corruption."""
-    return [t.replace(",", "").strip() for t in tags if t.replace(",", "").strip()]
+    """Strip commas and separator chars, deduplicate, preserve order."""
+    seen: dict[str, None] = {}
+    for t in tags:
+        cleaned = t.replace(",", "").replace(_LIST_SEP, "").strip()
+        if cleaned and cleaned not in seen:
+            seen[cleaned] = None
+    return list(seen)
 
 
 # ----------------------------------------------------------------------- #
@@ -115,13 +126,18 @@ def _row_to_entry(row: aiosqlite.Row) -> NoteEntry:
     """Convert a DB row to a ``NoteEntry``."""
     raw_tags = row["tags"] or ""
     raw_wikilinks = row["wikilinks"] or ""
+    # Wikilinks use \x1f separator; legacy rows may still use commas.
+    if _LIST_SEP in raw_wikilinks:
+        wikilinks = [w for w in raw_wikilinks.split(_LIST_SEP) if w]
+    else:
+        wikilinks = [w for w in raw_wikilinks.split(",") if w]
     return NoteEntry(
         id=row["id"],
         title=row["title"],
         content=row["content"],
         folder_path=row["folder_path"] or "",
         tags=[t for t in raw_tags.split(",") if t],
-        wikilinks=[w for w in raw_wikilinks.split(",") if w],
+        wikilinks=wikilinks,
         pinned=bool(row["pinned"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -399,7 +415,7 @@ class NoteService:
         tag_list = _sanitize_tags(tags or [])
         wikilinks = _extract_wikilinks(content)
         tags_csv = ",".join(tag_list)
-        wikilinks_csv = ",".join(wikilinks)
+        wikilinks_csv = _LIST_SEP.join(wikilinks) + _LIST_SEP if wikilinks else ""
 
         await self._db.execute(
             """
@@ -512,7 +528,8 @@ class NoteService:
             """,
             (
                 new_title, new_content, new_folder,
-                ",".join(new_tags), ",".join(new_wikilinks),
+                ",".join(new_tags),
+                _LIST_SEP.join(new_wikilinks) + _LIST_SEP if new_wikilinks else "",
                 int(new_pinned), now, note_id,
             ),
         )
@@ -604,6 +621,9 @@ class NoteService:
         if not self._db:
             raise RuntimeError("NoteService not initialised")
 
+        if not query or not query.strip():
+            return []
+
         limit = min(limit, self._config.max_search_results)
         seen: set[str] = set()
         results: list[dict[str, Any]] = []
@@ -622,13 +642,19 @@ class NoteService:
                 """,
                 (f'"{fts_query}"', limit * 2),
             )
-            for row in await fts_cur.fetchall():
-                entry = _row_to_entry(row)
-                if not self._matches_filters(entry, folder, tags):
-                    continue
-                if entry.id not in seen:
-                    seen.add(entry.id)
-                    results.append({"entry": entry, "score": 1.0})
+            fts_rows = await fts_cur.fetchall()
+            # Normalise FTS5 rank (negative, lower=better) to 0–1 score.
+            if fts_rows:
+                ranks = [abs(r["rank"]) for r in fts_rows]
+                max_rank = max(ranks) or 1.0
+                for row, abs_rank in zip(fts_rows, ranks):
+                    entry = _row_to_entry(row)
+                    if not self._matches_filters(entry, folder, tags):
+                        continue
+                    if entry.id not in seen:
+                        seen.add(entry.id)
+                        score = round(1.0 - abs_rank / (max_rank + 1.0), 4)
+                        results.append({"entry": entry, "score": score})
         except Exception as exc:
             logger.debug("FTS5 search failed (non-fatal): {}", exc)
 
@@ -707,14 +733,16 @@ class NoteService:
             clauses.append("pinned = 1")
         if tags:
             for tag in tags:
+                # Escape LIKE wildcards properly instead of stripping.
                 escaped = (
-                    tag.replace("%", "")
-                    .replace("_", "")
-                    .replace(",", "")
+                    tag.replace(",", "")
+                    .replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
                 )
                 if escaped:
                     clauses.append(
-                        "(',' || tags || ',') LIKE ?"
+                        "(',' || tags || ',') LIKE ? ESCAPE '\\'"
                     )
                     params.append(f"%,{escaped},%")
 
@@ -817,7 +845,8 @@ class NoteService:
         if folder is not None and entry.folder_path != folder:
             return False
         if tags:
+            entry_tags_lower = [t.lower() for t in entry.tags]
             for tag in tags:
-                if tag not in entry.tags:
+                if tag.lower() not in entry_tags_lower:
                     return False
         return True

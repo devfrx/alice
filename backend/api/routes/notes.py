@@ -7,7 +7,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from backend.core.event_bus import OmniaEvent
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -25,6 +27,20 @@ class CreateNoteRequest(BaseModel):
     folder_path: str = Field("", max_length=500)
     tags: list[str] = Field(default_factory=list)
 
+    @field_validator("tags")
+    @classmethod
+    def _clean_tags(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        return [t.strip() for t in v if t.strip()]
+
+    @field_validator("folder_path")
+    @classmethod
+    def _validate_folder_path(cls, v: str) -> str:
+        if v and (".." in v or v.startswith("/")):
+            raise ValueError("Invalid folder path")
+        return v.strip("/")
+
 
 class UpdateNoteRequest(BaseModel):
     """Body for PUT /notes/{note_id}."""
@@ -34,6 +50,22 @@ class UpdateNoteRequest(BaseModel):
     folder_path: str | None = Field(None, max_length=500)
     tags: list[str] | None = None
     pinned: bool | None = None
+
+    @field_validator("tags")
+    @classmethod
+    def _clean_tags(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        return [t.strip() for t in v if t.strip()]
+
+    @field_validator("folder_path")
+    @classmethod
+    def _validate_folder_path(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if v and (".." in v or v.startswith("/")):
+            raise ValueError("Invalid folder path")
+        return v.strip("/")
 
 
 class SearchNotesRequest(BaseModel):
@@ -147,6 +179,11 @@ async def create_note(
         tags=body.tags,
     )
     logger.info("Note created via API: {}", entry.id)
+
+    ctx = request.app.state.context
+    await ctx.event_bus.emit(
+        OmniaEvent.NOTE_CREATED, note_id=entry.id, title=entry.title,
+    )
     return _serialize_note(entry)
 
 
@@ -212,6 +249,10 @@ async def update_note(
     if entry is None:
         raise HTTPException(status_code=404, detail="Note not found")
 
+    ctx = request.app.state.context
+    await ctx.event_bus.emit(
+        OmniaEvent.NOTE_UPDATED, note_id=note_id,
+    )
     logger.info("Note updated via API: {}", note_id)
     return _serialize_note(entry)
 
@@ -229,6 +270,10 @@ async def delete_note(
     if not deleted:
         raise HTTPException(status_code=404, detail="Note not found")
 
+    ctx = request.app.state.context
+    await ctx.event_bus.emit(
+        OmniaEvent.NOTE_DELETED, note_id=note_id,
+    )
     logger.info("Note deleted via API: {}", note_id)
     return {"deleted": True}
 

@@ -289,12 +289,6 @@ class MediaControlPlugin(BasePlugin):
                 execution_time_ms=elapsed,
             )
 
-    # -- Private helpers ----------------------------------------------------
-
-    def _volume_step(self) -> int:
-        """Return the configured volume step percentage."""
-        return self.ctx.config.media_control.volume_step
-
     # -- Dependency / health -----------------------------------------------
 
     def check_dependencies(self) -> list[str]:
@@ -319,7 +313,7 @@ class MediaControlPlugin(BasePlugin):
             return ConnectionStatus.DEGRADED
         return ConnectionStatus.CONNECTED
 
-    # -- Private helpers ---------------------------------------------------
+    # -- Private helpers ----------------------------------------------------
 
     def _volume_step(self) -> int:
         """Read volume_step from plugin config (default 10).

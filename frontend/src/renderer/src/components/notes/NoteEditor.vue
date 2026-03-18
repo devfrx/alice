@@ -32,7 +32,7 @@ const localTitle = ref('')
 const localContent = ref('')
 const localTags = ref<string[]>([])
 const newTagInput = ref('')
-const saveStatus = ref<'idle' | 'saving' | 'saved'>('idle')
+const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 const folderDropdownOpen = ref(false)
 const newFolderInput = ref('')
 const creatingFolder = ref(false)
@@ -79,7 +79,7 @@ function scheduleSave(): void {
             content: localContent.value,
             tags: localTags.value,
         })
-        saveStatus.value = 'saved'
+        saveStatus.value = store.error ? 'error' : 'saved'
     }, 800)
 }
 
@@ -87,13 +87,12 @@ async function saveTitle(): Promise<void> {
     if (!note.value || localTitle.value === note.value.title) return
     saveStatus.value = 'saving'
     await store.updateNote(note.value.id, { title: localTitle.value })
-    saveStatus.value = 'saved'
+    saveStatus.value = store.error ? 'error' : 'saved'
 }
 
 async function togglePin(): Promise<void> {
     if (!note.value) return
     await store.updateNote(note.value.id, { pinned: !note.value.pinned })
-    await store.loadNotes()
 }
 
 async function onDelete(): Promise<void> {
@@ -116,7 +115,7 @@ async function moveToFolder(folderPath: string): Promise<void> {
     saveStatus.value = 'saving'
     await store.updateNote(note.value.id, { folder_path: folderPath })
     await store.loadFolders()
-    saveStatus.value = 'saved'
+    saveStatus.value = store.error ? 'error' : 'saved'
     folderDropdownOpen.value = false
 }
 
@@ -217,9 +216,11 @@ function handleEditorKeydown(e: KeyboardEvent): void {
                     <span class="editor__status" :class="{
                         'editor__status--saving': saveStatus === 'saving',
                         'editor__status--saved': saveStatus === 'saved',
+                        'editor__status--error': saveStatus === 'error',
                     }">
                         <template v-if="saveStatus === 'saving'">Salvataggio…</template>
                         <template v-else-if="saveStatus === 'saved'">Salvato &#10003;</template>
+                        <template v-else-if="saveStatus === 'error'">Errore ✕</template>
                     </span>
 
                     <!-- Preview toggle -->
@@ -384,6 +385,10 @@ function handleEditorKeydown(e: KeyboardEvent): void {
 
 .editor__status--saved {
     color: var(--success);
+}
+
+.editor__status--error {
+    color: var(--error, #f87171);
 }
 
 .editor__btn {

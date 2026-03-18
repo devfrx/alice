@@ -69,12 +69,14 @@ class NotesPlugin(BasePlugin):
                         "title": {
                             "type": "string",
                             "description": "Note title.",
+                            "maxLength": 500,
                         },
                         "content": {
                             "type": "string",
                             "description": (
                                 "Markdown body of the note."
                             ),
+                            "maxLength": 100000,
                         },
                         "folder_path": {
                             "type": "string",
@@ -132,10 +134,12 @@ class NotesPlugin(BasePlugin):
                         "title": {
                             "type": "string",
                             "description": "New title.",
+                            "maxLength": 500,
                         },
                         "content": {
                             "type": "string",
                             "description": "New Markdown body.",
+                            "maxLength": 100000,
                         },
                         "folder_path": {
                             "type": "string",
@@ -246,6 +250,7 @@ class NotesPlugin(BasePlugin):
                             "maximum": 50,
                         },
                     },
+                    "required": [],
                 },
                 result_type="json",
                 risk_level="safe",
@@ -389,6 +394,12 @@ class NotesPlugin(BasePlugin):
         except ValueError:
             return ToolResult.error(f"Invalid note_id: {note_id!r}")
 
+        content = args.get("content")
+        if content is not None and len(content) > 100_000:
+            return ToolResult.error(
+                "Content too long (max 100 000 characters)"
+            )
+
         try:
             entry = await self._ctx.note_service.update(
                 note_id,
@@ -476,11 +487,7 @@ class NotesPlugin(BasePlugin):
                     "folder_path": r["entry"].folder_path,
                     "tags": r["entry"].tags,
                     "score": r.get("score", 0.0),
-                    "updated_at": (
-                        r["entry"].updated_at.isoformat()
-                        if r["entry"].updated_at is not None
-                        else None
-                    ),
+                    "updated_at": r["entry"].updated_at,
                 }
                 for r in results
             ]
@@ -522,11 +529,7 @@ class NotesPlugin(BasePlugin):
                     "folder_path": e.folder_path,
                     "tags": e.tags,
                     "pinned": e.pinned,
-                    "updated_at": (
-                        e.updated_at.isoformat()
-                        if e.updated_at is not None
-                        else None
-                    ),
+                    "updated_at": e.updated_at,
                 }
                 for e in entries
             ]

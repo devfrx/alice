@@ -21,8 +21,12 @@ export interface NoteListResponse {
   total: number
 }
 
+export interface NoteSearchResult extends Note {
+  score: number
+}
+
 export interface NoteSearchResponse {
-  results: Note[]
+  results: NoteSearchResult[]
 }
 
 export interface CreateNoteRequest {

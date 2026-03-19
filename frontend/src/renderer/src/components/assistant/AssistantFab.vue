@@ -14,6 +14,11 @@ import { useUIStore } from '../../stores/ui'
 
 const props = defineProps<{
     orbState: 'idle' | 'listening' | 'thinking' | 'speaking' | 'processing'
+    messageCount?: number
+}>()
+
+const emit = defineEmits<{
+    'toggle-history': []
 }>()
 
 const router = useRouter()
@@ -31,6 +36,7 @@ interface FabAction {
 }
 
 const actions: FabAction[] = [
+    { id: 'history', label: 'Cronologia' },
     { id: 'mode', label: 'Modalità Ibrida' },
     { id: 'new-conv', label: 'Nuova chat' },
     { id: 'settings', label: 'Impostazioni' },
@@ -38,6 +44,9 @@ const actions: FabAction[] = [
 
 function handleAction(id: string): void {
     switch (id) {
+        case 'history':
+            emit('toggle-history')
+            break
         case 'mode':
             uiStore.setMode('hybrid')
             router.push({ name: 'hybrid' })
@@ -74,8 +83,15 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
                 <button v-for="(a, i) in actions" :key="a.id" class="fab__action"
                     :style="{ '--delay': `${(actions.length - 1 - i) * 45}ms` }" @click="handleAction(a.id)">
 
+                    <!-- History icon -->
+                    <svg v-if="a.id === 'history'" class="fab__action-icon" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+
                     <!-- Mode switch icon -->
-                    <svg v-if="a.id === 'mode'" class="fab__action-icon" width="16" height="16" viewBox="0 0 24 24"
+                    <svg v-else-if="a.id === 'mode'" class="fab__action-icon" width="16" height="16" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor" stroke-width="1.5">
                         <circle cx="9" cy="10" r="6" />
                         <path d="M15 9a5 5 0 0 1 5 5v0a2 2 0 0 1-2 2h-5l-2.5 2.5V16" />

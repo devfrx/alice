@@ -116,14 +116,38 @@ function preview(content: string): string {
             <input v-model="localSearch" type="text" class="browser__search-input" placeholder="Cerca note…" />
         </div>
 
-        <!-- New note button -->
-        <button class="browser__new-btn" @click="onCreateNote">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Nuova nota
-        </button>
+        <!-- New note + view toggle row -->
+        <div class="browser__toolbar">
+            <button class="browser__new-btn" @click="onCreateNote">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Nuova nota
+            </button>
+            <div class="browser__view-toggle">
+                <button class="browser__view-btn" :class="{ 'browser__view-btn--active': store.viewMode === 'list' }"
+                    title="Vista lista" @click="store.setViewMode('list')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <line x1="4" y1="6" x2="20" y2="6" />
+                        <line x1="4" y1="12" x2="20" y2="12" />
+                        <line x1="4" y1="18" x2="20" y2="18" />
+                    </svg>
+                </button>
+                <button class="browser__view-btn" :class="{ 'browser__view-btn--active': store.viewMode === 'graph' }"
+                    title="Vista grafo" @click="store.setViewMode('graph')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <circle cx="6" cy="6" r="2" />
+                        <circle cx="18" cy="8" r="2" />
+                        <circle cx="12" cy="18" r="2" />
+                        <line x1="7.5" y1="7.5" x2="10.5" y2="16.5" />
+                        <line x1="16.5" y1="9.5" x2="13.5" y2="16.5" />
+                    </svg>
+                </button>
+            </div>
+        </div>
 
         <!-- Markdown & backlinks guide (collapsible) -->
         <div class="browser__section browser__guide">
@@ -338,11 +362,18 @@ function preview(content: string): string {
     box-shadow: var(--focus-ring-shadow);
 }
 
+.browser__toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+}
+
 .browser__new-btn {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin: var(--space-2) var(--space-3);
+    flex: 1;
     padding: var(--space-2) var(--space-3);
     background: var(--accent-dim);
     border: 1px solid var(--border);
@@ -355,6 +386,39 @@ function preview(content: string): string {
 
 .browser__new-btn:hover {
     background: rgba(232, 220, 200, 0.15);
+}
+
+.browser__view-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.browser__view-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--surface-2);
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.browser__view-btn:first-child {
+    border-right: 1px solid var(--border);
+}
+
+.browser__view-btn:hover {
+    color: var(--text-primary);
+}
+
+.browser__view-btn--active {
+    background: var(--accent-dim);
+    color: var(--accent);
 }
 
 /* ------------------------------------------------- Guide section */

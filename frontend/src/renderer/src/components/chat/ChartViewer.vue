@@ -249,6 +249,89 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
                 if (ser.itemStyle && typeof ser.itemStyle === 'object') {
                     delete (ser.itemStyle as Record<string, unknown>).color
                 }
+
+                const serType = ser.type as string | undefined
+
+                // ── Cartesian labels (bar / line) ──
+                // LLMs often place label show:true with position 'bottom'
+                // or inside, which overlaps with xAxis category labels.
+                // Force them above bars with proper dark-theme styling.
+                if (serType === 'bar' || serType === 'line') {
+                    if (ser.label && typeof ser.label === 'object') {
+                        const lbl = ser.label as Record<string, unknown>
+                        if (lbl.show) {
+                            lbl.position = 'top'
+                            lbl.color = '#C8C5BE'
+                            lbl.fontSize = 11
+                            lbl.fontWeight = 500
+                            delete lbl.backgroundColor
+                            delete lbl.borderColor
+                            delete lbl.borderWidth
+                            delete lbl.padding
+                            delete lbl.borderRadius
+                        }
+                    }
+                    // Also fix labels embedded inside individual data items
+                    if (Array.isArray(ser.data)) {
+                        for (const d of ser.data) {
+                            if (d && typeof d === 'object' && !Array.isArray(d)) {
+                                const item = d as Record<string, unknown>
+                                if (item.label && typeof item.label === 'object') {
+                                    const il = item.label as Record<string, unknown>
+                                    if (il.show) {
+                                        il.position = 'top'
+                                        il.color = '#C8C5BE'
+                                        il.fontSize = 11
+                                        il.fontWeight = 500
+                                        delete il.backgroundColor
+                                        delete il.borderColor
+                                        delete il.borderWidth
+                                        delete il.padding
+                                        delete il.borderRadius
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Pie / donut labels ──
+                // Force a coherent dark-theme style: muted leader lines,
+                // warm-gray text, no ugly default white-on-dark labels.
+                if (serType === 'pie') {
+                    ser.label = {
+                        ...(typeof ser.label === 'object' && ser.label
+                            ? ser.label
+                            : {}),
+                        color: '#C8C5BE',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        fontFamily: 'var(--font-sans)',
+                    } as Record<string, unknown>
+                    ser.labelLine = {
+                        ...(typeof ser.labelLine === 'object' && ser.labelLine
+                            ? ser.labelLine
+                            : {}),
+                        lineStyle: {
+                            color: 'rgba(200, 197, 190, 0.3)',
+                            width: 1,
+                        },
+                        smooth: 0.2,
+                        length: 12,
+                        length2: 16,
+                    } as Record<string, unknown>
+                    // Ensure emphasis label is styled too
+                    ser.emphasis = {
+                        ...(typeof ser.emphasis === 'object' && ser.emphasis
+                            ? ser.emphasis
+                            : {}),
+                        label: {
+                            color: '#EDEDE9',
+                            fontSize: 13,
+                            fontWeight: 600,
+                        },
+                    } as Record<string, unknown>
+                }
             }
         }
     }

@@ -9,20 +9,21 @@
  * When CAD models exist in the conversation, a side panel slides in
  * from the right with an interactive 3D viewer + prev/next navigation.
  */
-import { computed, defineAsyncComponent, inject, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import OmniaOrb from '../components/assistant/OmniaOrb.vue'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
 import StatusBubbles from '../components/assistant/StatusBubbles.vue'
 import AssistantFab from '../components/assistant/AssistantFab.vue'
 import AssistantResponse from '../components/assistant/AssistantResponse.vue'
 import AssistantTranscript from '../components/assistant/AssistantTranscript.vue'
+import ConversationDrawer from '../components/assistant/ConversationDrawer.vue'
 import FloatingInputBar from '../components/input/FloatingInputBar.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
-import type { CadModelPayload, ChartPayload } from '../types/chat'
+import type { CadModelPayload, ChartPayload, ToolCall } from '../types/chat'
 
 const ImmersiveCADCanvas = defineAsyncComponent(
     () => import('../components/assistant/ImmersiveCADCanvas.vue')
@@ -46,6 +47,9 @@ const {
 /** Template ref for the floating input bar. */
 const floatingBarRef = ref<InstanceType<typeof FloatingInputBar> | null>(null)
 
+/** Whether the conversation history drawer is visible. */
+const historyDrawerOpen = ref(false)
+
 /** Whether the right side panel is visible (user can toggle). */
 const sidePanelOpen = ref(false)
 /** Active model index for multi-model navigation. */
@@ -54,6 +58,41 @@ const cadActiveIndex = ref(0)
 const chartActiveIndex = ref(0)
 /** Which tab is active in the side panel: '3d' or 'chart'. */
 const sidePanelTab = ref<'3d' | 'chart'>('3d')
+
+/* ── Resizable side panel ── */
+const SIDE_PANEL_MIN = 280
+const SIDE_PANEL_MAX = 800
+const SIDE_PANEL_DEFAULT = 400
+const sidePanelWidth = ref(SIDE_PANEL_DEFAULT)
+const isDraggingPanel = ref(false)
+
+function onResizeStart(e: MouseEvent): void {
+    e.preventDefault()
+    isDraggingPanel.value = true
+    const startX = e.clientX
+    const startW = sidePanelWidth.value
+
+    function onMove(ev: MouseEvent): void {
+        const delta = startX - ev.clientX
+        sidePanelWidth.value = Math.min(
+            SIDE_PANEL_MAX,
+            Math.max(SIDE_PANEL_MIN, startW + delta)
+        )
+    }
+
+    function onUp(): void {
+        isDraggingPanel.value = false
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+}
+
+onBeforeUnmount(() => {
+    isDraggingPanel.value = false
+})
 
 /**
  * Collects ALL CAD model payloads from the conversation messages.
@@ -161,6 +200,40 @@ const lastResponse = computed(() => {
     return ''
 })
 
+/** Last user message for echo display above OMNIA's response. */
+const lastUserQuery = computed(() => {
+    const msgs = chatStore.messages
+    for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'user' && msgs[i].content?.trim()) {
+            return msgs[i].content
+        }
+    }
+    return ''
+})
+
+/** Whether the conversation is empty (show greeting). */
+const isConversationEmpty = computed(() => chatStore.messages.length === 0)
+
+/** Message count for history badge. */
+const messageCount = computed(() => chatStore.messages.length)
+
+/** Tool calls from the latest turn (all assistant messages after the last user message). */
+const lastToolCalls = computed((): ToolCall[] => {
+    const msgs = chatStore.messages
+    let lastUserIdx = -1
+    for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'user') { lastUserIdx = i; break }
+    }
+    const calls: ToolCall[] = []
+    for (let i = lastUserIdx + 1; i < msgs.length; i++) {
+        const msg = msgs[i]
+        if (msg.role === 'assistant' && msg.tool_calls?.length) {
+            calls.push(...msg.tool_calls)
+        }
+    }
+    return calls
+})
+
 /** Stream content for real-time display. */
 const streamContent = computed(() => chatStore.currentStreamContent)
 
@@ -247,8 +320,11 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="assistant-view" :class="{ 'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts) }"
-        :style="{ '--panel-offset': sidePanelOpen && (hasCadModels || hasCharts) ? '400px' : '0px' }">
+    <div class="assistant-view" :class="{
+        'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts),
+        'assistant-view--dragging': isDraggingPanel
+    }"
+        :style="{ '--panel-width': `${sidePanelWidth}px`, '--panel-offset': sidePanelOpen && (hasCadModels || hasCharts) ? `${sidePanelWidth}px` : '0px' }">
         <AmbientBackground :state="orbState" :audio-level="audioLevel" />
 
         <!-- Main area (orb + content) -->
@@ -268,11 +344,22 @@ onMounted(() => {
                 </div>
 
                 <div class="assistant-view__content">
+                    <!-- Idle greeting when no conversation -->
+                    <Transition name="greeting-fade">
+                        <div v-if="isConversationEmpty && !streamContent && !thinkingContent && orbState === 'idle'"
+                            class="assistant-view__greeting" key="greeting">
+                            <p class="assistant-view__greeting-text">Come posso aiutarti?</p>
+                            <p class="assistant-view__greeting-hint">Parla o scrivi per iniziare</p>
+                        </div>
+                    </Transition>
+
                     <Transition name="response-fade">
-                        <AssistantResponse v-if="streamContent || thinkingContent || (lastResponse && showLastResponse)"
+                        <AssistantResponse
+                            v-if="streamContent || thinkingContent || chatStore.activeToolExecutions.length > 0 || (lastResponse && showLastResponse)"
                             :content="streamContent || (showLastResponse ? lastResponse : '')"
                             :is-streaming="!!streamContent || (!!thinkingContent && !streamContent)"
-                            :thinking-content="thinkingContent || ''" key="response" />
+                            :thinking-content="thinkingContent || ''" :tool-executions="chatStore.activeToolExecutions"
+                            :tool-calls="lastToolCalls" :user-query="lastUserQuery" key="response" />
                     </Transition>
 
                     <Transition name="transcript-fade">
@@ -284,7 +371,8 @@ onMounted(() => {
             </div>
 
             <StatusBubbles :state="orbState" />
-            <AssistantFab :orb-state="orbState" />
+            <AssistantFab :orb-state="orbState" :message-count="messageCount"
+                @toggle-history="historyDrawerOpen = !historyDrawerOpen" />
 
             <!-- Toggle 3D panel button (visible when models exist and panel is closed) -->
             <Transition name="toggle-fade">
@@ -313,7 +401,7 @@ onMounted(() => {
                         <line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
                     <span v-if="chartPayloads.length > 1" class="assistant-view__chart-badge">{{ chartPayloads.length
-                        }}</span>
+                    }}</span>
                 </button>
             </Transition>
 
@@ -327,7 +415,14 @@ onMounted(() => {
 
         <!-- Right Side Panel (3D models or charts) -->
         <Transition name="side-panel-slide">
-            <div v-if="sidePanelOpen && (hasCadModels || hasCharts)" class="assistant-view__side-panel">
+            <div v-if="sidePanelOpen && (hasCadModels || hasCharts)" class="assistant-view__side-panel"
+                :style="{ width: `${sidePanelWidth}px` }">
+                <!-- Resize drag handle -->
+                <div class="side-panel__resize-handle" @mousedown="onResizeStart">
+                    <div class="side-panel__resize-grip">
+                        <span /><span /><span />
+                    </div>
+                </div>
                 <!-- Tab switcher (only when both content types exist) -->
                 <div v-if="hasCadModels && hasCharts" class="side-panel__tabs">
                     <button class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }"
@@ -351,7 +446,7 @@ onMounted(() => {
                         </svg>
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                     </button>
                     <button class="side-panel__close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -390,7 +485,7 @@ onMounted(() => {
                             </svg>
                         </button>
                         <span class="side-panel__chart-counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                         <button class="side-panel__chart-nav-btn"
                             :disabled="chartActiveIndex >= chartPayloads.length - 1"
                             @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
@@ -405,6 +500,10 @@ onMounted(() => {
                 </div>
             </div>
         </Transition>
+
+        <!-- Conversation history drawer -->
+        <ConversationDrawer :open="historyDrawerOpen" :messages="chatStore.messages"
+            @close="historyDrawerOpen = false" />
 
         <ToolConfirmationDialog v-if="pendingConfirmationsList.length > 0"
             :key="pendingConfirmationsList[0].executionId" :confirmation="pendingConfirmationsList[0]"
@@ -451,15 +550,101 @@ onMounted(() => {
 /* ── 3D / Chart Side Panel ── */
 .assistant-view__side-panel {
     position: relative;
-    width: 400px;
+    width: var(--panel-width, 400px);
     flex-shrink: 0;
     height: 100%;
     z-index: var(--z-raised);
     background: var(--surface-1);
     border-left: 1px solid var(--border);
-    overflow: hidden;
+    /* overflow-x: visible;
+    overflow-y: hidden; */
     display: flex;
     flex-direction: column;
+}
+
+/* Prevent text selection while dragging the panel edge */
+.assistant-view--dragging,
+.assistant-view--dragging * {
+    user-select: none !important;
+    cursor: col-resize !important;
+}
+
+/* ── Resize handle ── */
+.side-panel__resize-handle {
+    position: absolute;
+    top: 0;
+    left: -10px;
+    width: 20px;
+    height: 100%;
+    z-index: 10;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Hover highlight strip */
+.side-panel__resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 100%;
+    background: var(--accent);
+    opacity: 0;
+    border-radius: 1px;
+    transition: opacity 200ms var(--ease-smooth);
+}
+
+.side-panel__resize-handle:hover::before,
+.assistant-view--dragging .side-panel__resize-handle::before {
+    opacity: 0.5;
+}
+
+/* Grip knob (3 small lines stacked vertically) */
+.side-panel__resize-grip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    width: 14px;
+    opacity: 0.6;
+    transition:
+        opacity 200ms var(--ease-smooth),
+        transform 200ms var(--ease-out-expo),
+        background 200ms var(--ease-smooth),
+        border-color 200ms var(--ease-smooth);
+    pointer-events: none;
+}
+
+.side-panel__resize-handle:hover .side-panel__resize-grip,
+.assistant-view--dragging .side-panel__resize-grip {
+    opacity: 1;
+}
+
+.assistant-view--dragging .side-panel__resize-grip {
+    background: var(--surface-4);
+    border-color: var(--accent);
+}
+
+.side-panel__resize-grip span {
+    display: block;
+    width: 4px;
+    height: 1.5px;
+    border-radius: 1px;
+    background: var(--text-muted);
+    transition: background 200ms var(--ease-smooth);
+}
+
+.side-panel__resize-handle:hover .side-panel__resize-grip span,
+.assistant-view--dragging .side-panel__resize-grip span {
+    background: var(--accent);
 }
 
 /* ── Toggle 3D panel button ── */
@@ -733,7 +918,7 @@ onMounted(() => {
 
 .side-panel-slide-enter-from,
 .side-panel-slide-leave-to {
-    width: 0;
+    width: 0 !important;
     opacity: 0;
     overflow: hidden;
 }
@@ -848,6 +1033,54 @@ onMounted(() => {
             black calc(100% - 16px),
             transparent 100%);
     padding: var(--space-2) 0 var(--space-4);
+}
+
+/* ── Greeting (idle, empty conversation) ── */
+.assistant-view__greeting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) 0;
+}
+
+.assistant-view__greeting-text {
+    font-size: var(--text-xl);
+    font-weight: 300;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+    margin: 0;
+}
+
+.assistant-view__greeting-hint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin: 0;
+    letter-spacing: 0.03em;
+}
+
+/* Greeting transitions */
+.greeting-fade-enter-active {
+    transition:
+        opacity 600ms var(--ease-smooth),
+        transform 600ms var(--ease-out-expo);
+}
+
+.greeting-fade-leave-active {
+    transition:
+        opacity 300ms ease,
+        transform 300ms ease;
+}
+
+.greeting-fade-enter-from {
+    opacity: 0;
+    transform: translateY(12px);
+}
+
+.greeting-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
 }
 
 .assistant-view__content::-webkit-scrollbar {

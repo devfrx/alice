@@ -1,19 +1,46 @@
 <script setup lang="ts">
 /**
- * AssistantResponse.vue — Rich markdown response display for OMNIA.
+ * AssistantResponse.vue — OMNIA voice output.
  *
- * Renders the assistant's streamed/final response with full markdown support,
- * thinking/reasoning collapse section, streaming cursor, and phase-aware styling.
+ * Renders OMNIA's response as if it's speaking directly — no chat card,
+ * centered flowing text that emanates from the orb. Supports markdown,
+ * thinking/reasoning section, tool call/execution timeline, and streaming.
  */
 import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { renderMarkdown } from '../../utils/markdownRenderer'
 import OmniaSpinner from '../../components/ui/OmniaSpinner.vue'
+import ToolCallSection from '../chat/ToolCallSection.vue'
+import ToolExecutionIndicator from '../chat/ToolExecutionIndicator.vue'
+import type { ToolCall, ToolExecution } from '../../types/chat'
 
-const props = defineProps<{
-    content: string
-    isStreaming: boolean
-    thinkingContent: string
-}>()
+const props = withDefaults(
+    defineProps<{
+        content: string
+        isStreaming: boolean
+        thinkingContent: string
+        /** Live tool executions during streaming. */
+        toolExecutions?: ToolExecution[]
+        /** Completed tool calls from assistant messages. */
+        toolCalls?: ToolCall[]
+        /** The user's original query (for echo display). */
+        userQuery?: string
+    }>(),
+    {
+        toolExecutions: () => [],
+        toolCalls: () => [],
+        userQuery: '',
+    }
+)
+
+/** Whether to show live execution indicator (streaming + has active tools). */
+const showToolExecution = computed(
+    () => props.isStreaming && props.toolExecutions.length > 0
+)
+
+/** Whether to show completed tool calls summary (not streaming, has calls). */
+const showToolCalls = computed(
+    () => !props.isStreaming && props.toolCalls.length > 0
+)
 
 const thinkingExpanded = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
@@ -63,11 +90,26 @@ onMounted(() => {
 </script>
 
 <template>
-    <div ref="scrollContainer" class="assistant-response" :class="{
-        'assistant-response--thinking': isThinkingPhase,
-        'assistant-response--generating': isGenerating,
-        'assistant-response--complete': !isStreaming && !!content
+    <div ref="scrollContainer" class="omnia-voice" :class="{
+        'omnia-voice--thinking': isThinkingPhase,
+        'omnia-voice--generating': isGenerating,
+        'omnia-voice--complete': !isStreaming && !!content
     }">
+        <!-- Glowing connector dot from orb -->
+        <div class="omnia-voice__connector">
+            <span class="omnia-voice__dot" />
+        </div>
+
+        <!-- User query echo -->
+        <p v-if="userQuery" class="omnia-voice__query">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+            </svg>
+            {{ userQuery }}
+        </p>
+
         <!-- Thinking section -->
         <div v-if="thinkingContent" class="thinking-section" :class="{ 'thinking-section--active': isThinkingPhase }">
             <button class="thinking-toggle" @click="thinkingExpanded = !thinkingExpanded">
@@ -95,75 +137,131 @@ onMounted(() => {
         <!-- Streaming cursor -->
         <span v-if="isStreaming && content" class="streaming-cursor" />
 
+        <!-- Tool activity: live executions during streaming -->
+        <Transition name="tool-activity-fade">
+            <div v-if="showToolExecution" class="tool-activity">
+                <ToolExecutionIndicator :executions="toolExecutions" />
+            </div>
+        </Transition>
+
+        <!-- Tool activity: completed tool calls after streaming -->
+        <Transition name="tool-activity-fade">
+            <div v-if="showToolCalls" class="tool-activity">
+                <ToolCallSection :tool-calls="toolCalls" />
+            </div>
+        </Transition>
+
         <!-- Thinking phase placeholder (no content yet) -->
-        <div v-if="isThinkingPhase && !content" class="thinking-placeholder">
+        <div v-if="isThinkingPhase && !content && !showToolExecution" class="thinking-placeholder">
             <OmniaSpinner size="sm" variant="dots" />
         </div>
     </div>
 </template>
 
 <style scoped>
-/* ── Container ── */
-.assistant-response {
+/* ── Container: borderless, open, emanates from orb ── */
+.omnia-voice {
     position: relative;
-    max-width: 560px;
+    max-width: 600px;
     width: 100%;
-    /* Let parent flex handle height constraint instead of fixed vh */
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--space-6) var(--space-5);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-4) var(--space-6);
     color: var(--text-primary);
     font-size: var(--text-md);
     line-height: var(--leading-relaxed);
     font-family: var(--font-sans);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    transition:
-        opacity 300ms var(--ease-smooth),
-        border-color 300ms var(--ease-smooth),
-        box-shadow 300ms var(--ease-smooth);
+    text-align: center;
+    transition: opacity 400ms var(--ease-smooth);
 }
 
 /* Scrollbar */
-.assistant-response::-webkit-scrollbar {
+.omnia-voice::-webkit-scrollbar {
     width: 3px;
 }
 
-.assistant-response::-webkit-scrollbar-track {
+.omnia-voice::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.assistant-response::-webkit-scrollbar-thumb {
+.omnia-voice::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: var(--radius-pill);
 }
 
-.assistant-response:hover::-webkit-scrollbar-thumb {
+.omnia-voice:hover::-webkit-scrollbar-thumb {
     background: var(--border-hover);
 }
 
+/* ── Connector dot from orb ── */
+.omnia-voice__connector {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-3);
+}
+
+.omnia-voice__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    opacity: 0.6;
+    box-shadow: 0 0 10px var(--accent-glow, var(--accent));
+    transition:
+        opacity 300ms var(--ease-smooth),
+        box-shadow 300ms var(--ease-smooth);
+}
+
+.omnia-voice--generating .omnia-voice__dot {
+    opacity: 1;
+    box-shadow: 0 0 16px var(--accent-glow, var(--accent));
+    animation: dot-pulse 2s ease-in-out infinite;
+}
+
+.omnia-voice--thinking .omnia-voice__dot {
+    opacity: 0.8;
+    background: var(--thinking);
+    box-shadow: 0 0 12px var(--thinking);
+    animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+.omnia-voice--complete .omnia-voice__dot {
+    opacity: 0.3;
+    box-shadow: none;
+}
+
+/* ── User query echo ── */
+.omnia-voice__query {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    margin: 0 auto var(--space-4);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-pill);
+    max-width: 80%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.omnia-voice__query svg {
+    flex-shrink: 0;
+    opacity: 0.5;
+}
+
 /* ── Phase states ── */
-.assistant-response--thinking {
+.omnia-voice--thinking {
     opacity: var(--opacity-visible);
-    border-color: var(--thinking-border);
 }
 
-.assistant-response--generating {
-    border-color: var(--accent-border);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.03),
-        0 0 16px var(--accent-glow);
+.omnia-voice--generating .response-body {
+    opacity: 0.92;
 }
 
-.assistant-response--generating .response-body {
-    opacity: 0.9;
-}
-
-.assistant-response--complete .response-body {
+.omnia-voice--complete .response-body {
     opacity: 1;
     transition: opacity var(--transition-fast);
 }
@@ -262,28 +360,40 @@ onMounted(() => {
     margin-top: 0;
 }
 
-/* ── Response Body — Typography ── */
+/* ── Response Body — Typography (centered, speech-like) ── */
 .response-body {
     position: relative;
     overflow-wrap: break-word;
     word-break: break-word;
     transition: opacity var(--transition-fast);
+    text-align: center;
 }
 
 .response-body :deep(p) {
-    font-size: var(--text-md);
-    line-height: var(--leading-relaxed);
-    margin: 0 0 1em;
+    font-size: var(--text-lg);
+    line-height: 1.7;
+    margin: 0 0 0.8em;
     color: var(--text-primary);
+    font-weight: 300;
+    letter-spacing: 0.01em;
 }
 
 .response-body :deep(p:last-child) {
     margin-bottom: 0;
 }
 
+/* Structured content reverts to left-aligned for readability */
+.response-body :deep(pre),
+.response-body :deep(table),
+.response-body :deep(ul),
+.response-body :deep(ol),
+.response-body :deep(blockquote) {
+    text-align: left;
+}
+
 .response-body :deep(h1) {
     font-size: var(--text-xl);
-    font-weight: var(--weight-semibold);
+    font-weight: var(--weight-normal);
     letter-spacing: var(--tracking-tight);
     color: var(--text-primary);
     margin: 1.5em 0 0.6em;
@@ -292,7 +402,7 @@ onMounted(() => {
 
 .response-body :deep(h2) {
     font-size: var(--text-lg);
-    font-weight: var(--weight-medium);
+    font-weight: var(--weight-normal);
     color: var(--text-primary);
     margin: 1.4em 0 0.55em;
     line-height: var(--leading-snug);
@@ -371,6 +481,43 @@ onMounted(() => {
     padding: var(--space-4) 0;
 }
 
+/* ── Tool Activity Section ── */
+.tool-activity {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    text-align: left;
+}
+
+.tool-activity :deep(.tool-section__args),
+.tool-activity :deep(.tool-exec__result-full) {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--border);
+}
+
+/* Transition */
+.tool-activity-fade-enter-active {
+    transition:
+        opacity 350ms var(--ease-smooth),
+        transform 350ms var(--ease-out-expo);
+}
+
+.tool-activity-fade-leave-active {
+    transition:
+        opacity 200ms ease,
+        transform 200ms ease;
+}
+
+.tool-activity-fade-enter-from {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+.tool-activity-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
 /* ── Keyframes ── */
 @keyframes cursor-blink {
     0% {
@@ -394,6 +541,20 @@ onMounted(() => {
     }
 }
 
+@keyframes dot-pulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.5);
+    }
+}
+
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {
 
@@ -411,7 +572,9 @@ onMounted(() => {
     }
 
     .thinking-expand-enter-active,
-    .thinking-expand-leave-active {
+    .thinking-expand-leave-active,
+    .tool-activity-fade-enter-active,
+    .tool-activity-fade-leave-active {
         transition: none;
     }
 }

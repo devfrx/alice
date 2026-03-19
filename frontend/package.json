@@ -22,6 +22,9 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "@types/cytoscape": "^3.21.9",
+    "cytoscape": "^3.33.1",
+    "cytoscape-cola": "^2.5.1",
     "echarts": "^5.6.0",
     "electron-updater": "^6.3.9",
     "highlight.js": "^11.11.1",

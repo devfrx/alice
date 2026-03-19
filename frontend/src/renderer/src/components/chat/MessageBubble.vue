@@ -55,6 +55,22 @@ const bubbleClass = computed(() => `bubble--${props.message.role}`)
 
 const { handleCodeBlockClick } = useCodeBlocks()
 
+/** Whether this is a plain tool result (not CAD/Chart payload). */
+const isPlainToolResult = computed(() =>
+  props.message.role === 'tool' && !cadPayload.value && !chartPayload.value
+)
+
+/** Tool result collapsed state (collapsed by default). */
+const toolResultCollapsed = ref(true)
+
+/** Truncated preview for collapsed tool results. */
+const toolResultPreview = computed(() => {
+  if (!isPlainToolResult.value) return ''
+  const text = props.message.content.trim()
+  const firstLine = text.split('\n')[0] ?? ''
+  return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine
+})
+
 /**
  * If this is a tool message with a CAD model payload, return the parsed
  * payload — otherwise null.  Used to render CADViewer inline.
@@ -144,9 +160,32 @@ onUnmounted(() => {
       <!-- Chart viewer (tool message with chart payload) -->
       <ChartViewer v-if="chartPayload" :payload="chartPayload" />
 
-      <!-- Message content (hide raw JSON for CAD/Chart tool messages) -->
+      <!-- Plain tool result — collapsible -->
+      <template v-if="isPlainToolResult">
+        <button class="tool-result__toggle" @click="toolResultCollapsed = !toolResultCollapsed">
+          <svg class="tool-result__icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span class="tool-result__label">Risultato</span>
+          <span v-if="toolResultCollapsed" class="tool-result__preview">{{ toolResultPreview }}</span>
+          <svg class="tool-result__chevron" :class="{ 'tool-result__chevron--open': !toolResultCollapsed }" width="10"
+            height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="tool-result__body" :class="{ 'tool-result__body--collapsed': toolResultCollapsed }">
+          <div class="tool-result__inner">
+            <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
+            <div class="bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
+          </div>
+        </div>
+      </template>
+
+      <!-- Message content (non-tool or assistant/user) -->
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
-      <div v-if="!cadPayload && !chartPayload" class="bubble__content" v-html="htmlContent"
+      <div v-if="!cadPayload && !chartPayload && !isPlainToolResult" class="bubble__content" v-html="htmlContent"
         @click="handleCodeBlockClick" />
       <span class="bubble__time">{{ formattedTime }}</span>
     </div>
@@ -241,6 +280,99 @@ onUnmounted(() => {
   background: transparent;
   border-color: transparent;
   padding: 0;
+}
+
+/* Collapsible tool result */
+.tool-result__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--transition-fast);
+}
+
+.tool-result__toggle:hover {
+  color: var(--text-primary);
+}
+
+.tool-result__icon {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.tool-result__label {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.tool-result__preview {
+  flex: 1;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.tool-result__chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.tool-result__chevron--open {
+  transform: rotate(180deg);
+}
+
+.tool-result__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--duration-normal) ease,
+    opacity var(--duration-normal) ease;
+}
+
+.tool-result__body--collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tool-result__inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tool-result__inner .bubble__content {
+  margin-top: var(--space-2);
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.tool-result__inner .bubble__content::-webkit-scrollbar {
+  width: 3px;
+}
+
+.tool-result__inner .bubble__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tool-result__inner .bubble__content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-xs);
 }
 
 /* Attachments */

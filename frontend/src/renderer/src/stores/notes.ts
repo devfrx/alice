@@ -15,6 +15,7 @@ export const useNotesStore = defineStore('notes', () => {
   // -----------------------------------------------------------------------
 
   const notes = ref<Note[]>([])
+  const allNotes = ref<Note[]>([])
   const total = ref<number>(0)
   const currentNote = ref<Note | null>(null)
   const folders = ref<NoteFolder[]>([])
@@ -24,6 +25,9 @@ export const useNotesStore = defineStore('notes', () => {
   const loading = ref(false)
   const saving = ref(false)
   const error = ref<string | null>(null)
+
+  /** Current view mode for the notes page. */
+  const viewMode = ref<'list' | 'graph'>('list')
 
   // -----------------------------------------------------------------------
   // Computed
@@ -38,11 +42,11 @@ export const useNotesStore = defineStore('notes', () => {
     return [...tagSet].sort()
   })
 
-  /** Notes that link to the current note via wikilinks. */
+  /** Notes that link to the current note via wikilinks (uses allNotes for cross-folder coverage). */
   const backlinks = computed<Note[]>(() => {
     if (!currentNote.value) return []
     const title = currentNote.value.title.toLowerCase()
-    return notes.value.filter(
+    return allNotes.value.filter(
       (n) =>
         n.id !== currentNote.value!.id &&
         n.wikilinks.some((w) => w.toLowerCase() === title)
@@ -52,6 +56,16 @@ export const useNotesStore = defineStore('notes', () => {
   // -----------------------------------------------------------------------
   // Actions
   // -----------------------------------------------------------------------
+
+  /** Fetch ALL notes (unfiltered) for graph view and backlinks. */
+  async function loadAllNotes(): Promise<void> {
+    try {
+      const data = await api.getNotes({} as Parameters<typeof api.getNotes>[0])
+      allNotes.value = data.notes
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+    }
+  }
 
   /** Fetch notes with current filters applied. */
   async function loadNotes(): Promise<void> {
@@ -96,6 +110,7 @@ export const useNotesStore = defineStore('notes', () => {
         folder_path: activeFolder.value ?? undefined,
       })
       currentNote.value = note
+      allNotes.value.push(note)
       await loadNotes()
       await loadFolders()
     } catch (err) {
@@ -116,6 +131,7 @@ export const useNotesStore = defineStore('notes', () => {
         folder_path: folderPath,
       })
       currentNote.value = note
+      allNotes.value.push(note)
       activeFolder.value = folderPath
       await loadFolders()
       await loadNotes()
@@ -140,6 +156,8 @@ export const useNotesStore = defineStore('notes', () => {
       }
       const idx = notes.value.findIndex((n) => n.id === id)
       if (idx !== -1) notes.value[idx] = updated
+      const allIdx = allNotes.value.findIndex((n) => n.id === id)
+      if (allIdx !== -1) allNotes.value[allIdx] = updated
       if (data.folder_path !== undefined) {
         await loadFolders()
         await loadNotes()
@@ -157,6 +175,7 @@ export const useNotesStore = defineStore('notes', () => {
     try {
       await api.deleteNote(id)
       notes.value = notes.value.filter((n) => n.id !== id)
+      allNotes.value = allNotes.value.filter((n) => n.id !== id)
       total.value = Math.max(0, total.value - 1)
       if (currentNote.value?.id === id) {
         currentNote.value = null
@@ -187,6 +206,7 @@ export const useNotesStore = defineStore('notes', () => {
       }
       await loadFolders()
       await loadNotes()
+      await loadAllNotes()
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
     }
@@ -249,8 +269,14 @@ export const useNotesStore = defineStore('notes', () => {
     await loadNotes()
   }
 
+  /** Toggle between list and graph view modes. */
+  function setViewMode(mode: 'list' | 'graph'): void {
+    viewMode.value = mode
+  }
+
   return {
     notes,
+    allNotes,
     total,
     currentNote,
     folders,
@@ -260,8 +286,10 @@ export const useNotesStore = defineStore('notes', () => {
     loading,
     saving,
     error,
+    viewMode,
     allTags,
     backlinks,
+    loadAllNotes,
     loadNotes,
     loadNote,
     createNote,
@@ -275,5 +303,6 @@ export const useNotesStore = defineStore('notes', () => {
     toggleTag,
     clearCurrentNote,
     clearSearch,
+    setViewMode,
   }
 })

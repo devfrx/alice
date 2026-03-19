@@ -179,7 +179,11 @@ export function useChat(): UseChatReturn {
     // Reset streaming content for the new LLM iteration.
     // The previous iteration's content is already persisted server-side.
     store.currentStreamContent = ''
-    store.currentThinkingContent = ''
+    // Accumulate thinking across iterations so all reasoning stays visible.
+    // Previous iterations are separated by a horizontal rule.
+    if (store.currentThinkingContent) {
+      store.currentThinkingContent += '\n\n---\n\n'
+    }
   }
 
   const onWarning = (data: unknown): void => {

@@ -7,13 +7,16 @@
 import NotesBrowser from '../components/notes/NotesBrowser.vue'
 import NoteEditor from '../components/notes/NoteEditor.vue'
 import NotesBacklinks from '../components/notes/NotesBacklinks.vue'
+import NotesGraphView from '../components/notes/NotesGraphView.vue'
 import { useNotesStore } from '../stores/notes'
 import { computed, onMounted } from 'vue'
 
 const store = useNotesStore()
 const hasCurrentNote = computed(() => store.currentNote !== null)
+const isGraphMode = computed(() => store.viewMode === 'graph')
 
 onMounted(() => {
+    store.loadAllNotes()
     store.loadNotes()
     store.loadFolders()
 })
@@ -22,8 +25,13 @@ onMounted(() => {
 <template>
     <div class="notes-page">
         <NotesBrowser />
-        <NoteEditor />
-        <NotesBacklinks v-if="hasCurrentNote" />
+        <template v-if="isGraphMode">
+            <NotesGraphView />
+        </template>
+        <template v-else>
+            <NoteEditor />
+            <NotesBacklinks v-if="hasCurrentNote" />
+        </template>
     </div>
 </template>
 

@@ -268,10 +268,10 @@
 
 /* ── State Colors ──────────────────────────────────────── */
 :root {
-  --listening: #E06060;
+  --listening: #ae4141;
   --listening-dim: rgba(224, 96, 96, 0.10);
   --listening-border: rgba(224, 96, 96, 0.20);
-  --speaking: #5C9A6E;
+  --speaking: #376744;
   --speaking-dim: rgba(92, 154, 110, 0.10);
   --speaking-border: rgba(92, 154, 110, 0.20);
   --thinking: #E8DCC8;

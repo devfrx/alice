@@ -8,7 +8,6 @@ import ModalContainer from './components/ModalContainer.vue'
 // ModeSwitcher is managed inside AssistantFab for assistant mode
 import { UiToast, OmniaLoader } from './components/ui'
 import { useChat, ChatApiKey } from './composables/useChat'
-import { usePluginComponents } from './composables/usePluginComponents'
 import { useEventsWebSocket } from './composables/useEventsWebSocket'
 import { useSettingsStore } from './stores/settings'
 import { useUIStore } from './stores/ui'
@@ -23,11 +22,6 @@ useEventsWebSocket()
 const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
 const pluginsStore = usePluginsStore()
-const { toolbarComponents } = usePluginComponents()
-
-/** Always show sidebar (collapsed in assistant mode). */
-
-const showSidebar = computed(() => true)
 
 // ── Startup loader ────────────────────────────────────────────────
 const startupLoading = ref(true)
@@ -54,13 +48,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="omnia-app" :class="`omnia-app--${uiStore.mode}`"
-    :style="{ '--sidebar-offset': uiStore.sidebarOpen ? 'var(--sidebar-width)' : 'var(--sidebar-collapsed)' }">
+  <div id="omnia-app" :class="`omnia-app--${uiStore.mode}`">
     <TitleBar />
-    <!-- Plugin toolbar mount point -->
-    <div v-if="toolbarComponents.length" class="plugin-toolbar">
-      <component v-for="entry in toolbarComponents" :is="entry.component" :key="entry.name" />
-    </div>
     <div v-if="settingsStore.isAnyOperationInProgress" class="global-operation-bar">
       <div class="global-operation-bar__track" role="progressbar" aria-label="Operazione modello in corso">
         <div class="global-operation-bar__fill" />
@@ -68,11 +57,12 @@ onMounted(() => {
       <span class="global-operation-bar__text">{{ settingsStore.operationDescription }}</span>
     </div>
     <div class="app-body">
-      <AppSidebar v-if="showSidebar" />
       <main class="app-content">
         <router-view />
       </main>
     </div>
+    <!-- Floating sidebar (renders its own backdrop) -->
+    <AppSidebar />
     <!-- <ModeSwitcher v-if="uiStore.mode !== 'assistant'" /> NON ATTIVARE! -->
     <ModalContainer />
     <UiToast />
@@ -146,17 +136,6 @@ onMounted(() => {
   color: var(--text-muted);
   margin-top: var(--space-0-5);
   letter-spacing: var(--tracking-tight);
-}
-
-/* ── Plugin toolbar mount point ─────────────────────────────────── */
-.plugin-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-4);
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
 }
 
 /* ── Mode-specific adjustments ──────────────────────────────────── */

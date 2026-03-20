@@ -45,6 +45,10 @@ export interface ChatMessage {
   created_at: string
   thinking_content?: string | null
   attachments?: FileAttachment[] | null
+  /** Groups message versions at the same edit point. */
+  version_group_id?: string | null
+  /** Version index within a version group (0 = original). */
+  version_index?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +77,8 @@ export interface ConversationDetail {
   created_at: string
   updated_at: string
   messages: ChatMessage[]
+  /** Map of version_group_id → active version_index. */
+  active_versions?: Record<string, number>
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +112,8 @@ export interface WsSendPayload {
   content: string
   conversation_id?: string
   attachments?: string[]
+  /** When set, this message is an edit of the specified user message. */
+  edit_message_id?: string
 }
 
 /** A streamed token frame from the server. */
@@ -125,7 +133,13 @@ export interface WsDoneMessage {
   type: 'done'
   conversation_id: string
   message_id: string
+  /** Server-assigned ID for the user message. */
+  user_message_id?: string
   finish_reason?: string
+  /** Version group for the completed response (if message was edited). */
+  version_group_id?: string | null
+  /** Version index within the group. */
+  version_index?: number
 }
 
 /** Payload the client sends to cancel an in-progress generation. */
@@ -277,4 +291,27 @@ export interface ConversationExport {
   created_at: string
   updated_at: string
   messages: ChatMessage[]
+  active_versions?: Record<string, number>
+}
+
+/** Response from `POST /api/chat/conversations/{id}/switch-version`. */
+export interface SwitchVersionResponse {
+  id: string
+  active_versions: Record<string, number>
+  updated_at: string
+}
+
+/** Request body for `POST /api/chat/conversations/{id}/branch`. */
+export interface BranchConversationRequest {
+  from_message_id: string
+  title?: string
+}
+
+/** Response from `POST /api/chat/conversations/{id}/branch`. */
+export interface BranchConversationResponse {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+  message_count: number
 }

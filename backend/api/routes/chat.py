@@ -24,6 +24,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from loguru import logger
+from pydantic import BaseModel
 import sqlalchemy as sa
 from sqlalchemy import func as sa_func
 from sqlmodel import select
@@ -126,7 +127,7 @@ async def _build_conversation_data(
     msg_stmt = (
         select(Message)
         .where(Message.conversation_id == conv_id)
-        .order_by(Message.created_at)
+        .order_by(Message.created_at, Message.id)
     )
     results = await session.exec(msg_stmt)
     messages = results.all()
@@ -155,6 +156,7 @@ async def _build_conversation_data(
         "title": conv.title,
         "created_at": conv.created_at.isoformat(),
         "updated_at": conv.updated_at.isoformat(),
+        "active_versions": conv.active_versions or {},
         "messages": [
             {
                 "id": str(m.id),
@@ -165,6 +167,10 @@ async def _build_conversation_data(
                 "tool_call_id": m.tool_call_id,
                 "created_at": m.created_at.isoformat(),
                 "attachments": att_map.get(m.id) or None,
+                "version_group_id": str(m.version_group_id)
+                if m.version_group_id
+                else None,
+                "version_index": m.version_index,
             }
             for m in messages
         ],
@@ -184,6 +190,35 @@ async def _sync_conversation_to_file(
     data = await _build_conversation_data(session, conv_id)
     if data:
         await file_manager.save(data)
+
+
+def _filter_messages_by_active_versions(
+    messages: list[dict[str, Any]],
+    active_versions: dict[str, int],
+) -> list[dict[str, Any]]:
+    """Filter a message list to include only active-version messages.
+
+    Messages without a ``version_group_id`` pass through unchanged.
+    Versioned messages are included only if their ``version_index``
+    matches the active index for their group.
+
+    Args:
+        messages: Ordered list of message dicts.
+        active_versions: Mapping of version_group_id → active index.
+
+    Returns:
+        Filtered list preserving original order.
+    """
+    result: list[dict[str, Any]] = []
+    for m in messages:
+        vg = m.get("version_group_id")
+        if vg is None:
+            result.append(m)
+            continue
+        active_idx = active_versions.get(vg, 0)
+        if m.get("version_index", 0) == active_idx:
+            result.append(m)
+    return result
 
 
 def _build_mcp_context(ctx: AppContext) -> str | None:
@@ -237,6 +272,43 @@ def _format_memory_context(
         lines.append(line)
         total += len(line)
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Pydantic request/response models
+# ---------------------------------------------------------------------------
+
+
+class BranchConversationRequest(BaseModel):
+    """Request body for branching a conversation.
+
+    Args:
+        from_message_id: UUID of the message to branch from (inclusive).
+            All messages up through this one are copied to the new conversation.
+        title: Optional title override for the new conversation.
+            Defaults to "{original_title} (diramazione)".
+    """
+
+    from_message_id: str
+    title: str | None = None
+
+
+class BranchConversationResponse(BaseModel):
+    """Response from the branch-conversation endpoint.
+
+    Args:
+        id: UUID of the newly created conversation.
+        title: Title of the new conversation.
+        created_at: ISO 8601 timestamp of creation.
+        updated_at: ISO 8601 timestamp of last update.
+        message_count: Number of messages copied into the new conversation.
+    """
+
+    id: str
+    title: str | None
+    created_at: str
+    updated_at: str
+    message_count: int
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +396,7 @@ async def ws_chat(websocket: WebSocket) -> None:
 
             conv_id_raw: str | None = data.get("conversation_id")
             attachment_ids: list[str] = data.get("attachments", [])
+            edit_message_id: str | None = data.get("edit_message_id")
 
             async with session_factory() as session:
                 # --- resolve or create conversation -----------------------
@@ -347,13 +420,116 @@ async def ws_chat(websocket: WebSocket) -> None:
                     conv_id = conv.id
 
                 # --- save user message ------------------------------------
-                user_msg = Message(
-                    conversation_id=conv_id,
-                    role="user",
-                    content=user_content,
-                )
-                session.add(user_msg)
-                await session.flush()
+                if edit_message_id:
+                    # --- handle edit-message flow -------------------------
+                    try:
+                        original_msg_id = uuid.UUID(edit_message_id)
+                    except ValueError:
+                        await websocket.send_json(
+                            {"type": "error", "content": "Invalid edit_message_id"},
+                        )
+                        continue
+                    original_msg = await session.get(Message, original_msg_id)
+                    if (
+                        original_msg is None
+                        or original_msg.conversation_id != conv_id
+                        or original_msg.role != "user"
+                    ):
+                        await websocket.send_json(
+                            {"type": "error", "content": "Invalid edit target"},
+                        )
+                        continue
+
+                    # Assign a version_group_id to the original if it
+                    # doesn't have one yet, and tag all subsequent messages
+                    # in the same conversation with the same group+index.
+                    if original_msg.version_group_id is None:
+                        vg_id = uuid.uuid4()
+                        original_msg.version_group_id = vg_id
+                        original_msg.version_index = 0
+                        # Tag all messages from the original onward.
+                        after_stmt = (
+                            select(Message)
+                            .where(
+                                Message.conversation_id == conv_id,
+                                sa.or_(
+                                    Message.created_at > original_msg.created_at,
+                                    (Message.created_at == original_msg.created_at)
+                                    & (Message.id > original_msg.id),
+                                ),
+                                Message.id != original_msg.id,
+                                Message.version_group_id.is_(None),  # type: ignore[union-attr]
+                            )
+                        )
+                        after_results = await session.exec(after_stmt)
+                        for m in after_results.all():
+                            m.version_group_id = vg_id
+                            m.version_index = 0
+                        await session.flush()
+                    else:
+                        vg_id = original_msg.version_group_id
+
+                    # Determine the next version index.
+                    max_idx_result = await session.scalar(
+                        sa.select(sa.func.max(Message.version_index)).where(
+                            Message.version_group_id == vg_id,
+                        )
+                    )
+                    new_version_idx = (max_idx_result or 0) + 1
+
+                    user_msg = Message(
+                        conversation_id=conv_id,
+                        role="user",
+                        content=user_content,
+                        version_group_id=vg_id,
+                        version_index=new_version_idx,
+                    )
+                    session.add(user_msg)
+                    await session.flush()
+
+                    # Update active_versions on the conversation.
+                    av = dict(conv.active_versions or {})
+                    av[str(vg_id)] = new_version_idx
+                    conv.active_versions = av
+                    await session.flush()
+                else:
+                    # Inherit version context from the active branch
+                    # so new messages belong to the currently viewed branch.
+                    inherit_vg: uuid.UUID | None = None
+                    inherit_vi: int = 0
+                    av = dict(conv.active_versions or {})
+                    if av:
+                        conds = [
+                            sa.and_(
+                                Message.version_group_id == uuid.UUID(vg),
+                                Message.version_index == idx,
+                            )
+                            for vg, idx in av.items()
+                        ]
+                        latest = (
+                            await session.exec(
+                                select(Message)
+                                .where(
+                                    Message.conversation_id == conv_id,
+                                    sa.or_(*conds),
+                                )
+                                .order_by(Message.created_at.desc())
+                                .limit(1)
+                            )
+                        ).first()
+                        if latest:
+                            inherit_vg = latest.version_group_id
+                            inherit_vi = latest.version_index
+
+                    user_msg = Message(
+                        conversation_id=conv_id,
+                        role="user",
+                        content=user_content,
+                        version_group_id=inherit_vg,
+                        version_index=inherit_vi,
+                    )
+                    session.add(user_msg)
+                    await session.flush()
 
                 # --- link uploaded attachments to the user message --------
                 attachment_info: list[dict[str, str]] = []
@@ -386,18 +562,29 @@ async def ws_chat(websocket: WebSocket) -> None:
                 stmt = (
                     select(Message)
                     .where(Message.conversation_id == conv_id)
-                    .order_by(Message.created_at)
+                    .order_by(Message.created_at, Message.id)
                 )
                 results = await session.exec(stmt)
-                history: list[dict[str, Any]] = [
+                all_messages = results.all()
+
+                # Build active_versions map for filtering.
+                av_map: dict[str, int] = dict(conv.active_versions or {})
+                raw_history: list[dict[str, Any]] = [
                     {
                         "role": m.role,
                         "content": m.content,
                         "tool_calls": m.tool_calls,
                         "tool_call_id": m.tool_call_id,
+                        "version_group_id": str(m.version_group_id)
+                        if m.version_group_id
+                        else None,
+                        "version_index": m.version_index,
                     }
-                    for m in results.all()
+                    for m in all_messages
                 ]
+                history = _filter_messages_by_active_versions(
+                    raw_history, av_map,
+                )
 
                 # --- fetch available tools for LLM ------------------------
                 tools: list[dict[str, Any]] | None = None
@@ -566,7 +753,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                         "type": "done",
                         "conversation_id": str(conv_id),
                         "message_id": "",
+                        "user_message_id": str(user_msg.id),
                         "finish_reason": "error",
+                        "version_group_id": str(user_msg.version_group_id)
+                        if user_msg.version_group_id
+                        else None,
+                        "version_index": user_msg.version_index,
                     })
                     await session.rollback()
                     continue
@@ -584,6 +776,8 @@ async def ws_chat(websocket: WebSocket) -> None:
                             role="assistant",
                             content=full_content,
                             thinking_content=thinking_content or None,
+                            version_group_id=user_msg.version_group_id,
+                            version_index=user_msg.version_index,
                         )
                         session.add(asst_msg)
                         conv.updated_at = _utcnow()
@@ -600,7 +794,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                         "type": "done",
                         "conversation_id": str(conv_id),
                         "message_id": asst_msg_id,
+                        "user_message_id": str(user_msg.id),
                         "finish_reason": "cancelled",
+                        "version_group_id": str(user_msg.version_group_id)
+                        if user_msg.version_group_id
+                        else None,
+                        "version_index": user_msg.version_index,
                     })
                     continue
 
@@ -625,6 +824,8 @@ async def ws_chat(websocket: WebSocket) -> None:
                             tools=tools,
                             initial_history=history,
                             system_prompt=cached_sys_prompt,
+                            version_group_id=user_msg.version_group_id,
+                            version_index=user_msg.version_index,
                         )
                         # Update finish_reason to reflect the tool loop
                         # outcome (the initial value is stale — it came
@@ -639,6 +840,8 @@ async def ws_chat(websocket: WebSocket) -> None:
                                 role="assistant",
                                 content=full_content,
                                 thinking_content=thinking_content or None,
+                                version_group_id=user_msg.version_group_id,
+                                version_index=user_msg.version_index,
                             )
                             session.add(recovery_msg)
                             conv.updated_at = _utcnow()
@@ -658,7 +861,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                             "type": "done",
                             "conversation_id": str(conv_id),
                             "message_id": "",
+                            "user_message_id": str(user_msg.id),
                             "finish_reason": "error",
+                            "version_group_id": str(user_msg.version_group_id)
+                            if user_msg.version_group_id
+                            else None,
+                            "version_index": user_msg.version_index,
                         })
                         await session.rollback()
                         continue
@@ -678,7 +886,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                         "type": "done",
                         "conversation_id": str(conv_id),
                         "message_id": "",
+                        "user_message_id": str(user_msg.id),
                         "finish_reason": "cancelled",
+                        "version_group_id": str(user_msg.version_group_id)
+                        if user_msg.version_group_id
+                        else None,
+                        "version_index": user_msg.version_index,
                     })
                     continue
 
@@ -695,6 +908,8 @@ async def ws_chat(websocket: WebSocket) -> None:
                             role="assistant",
                             content=full_content,
                             thinking_content=thinking_content or None,
+                            version_group_id=user_msg.version_group_id,
+                            version_index=user_msg.version_index,
                         )
                         session.add(asst_msg)
                         asst_msg_id = str(asst_msg.id)
@@ -722,7 +937,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                         "type": "done",
                         "conversation_id": str(conv_id),
                         "message_id": "",
+                        "user_message_id": str(user_msg.id),
                         "finish_reason": "error",
+                        "version_group_id": str(user_msg.version_group_id)
+                        if user_msg.version_group_id
+                        else None,
+                        "version_index": user_msg.version_index,
                     })
                     continue
 
@@ -731,7 +951,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                         "type": "done",
                         "conversation_id": str(conv_id),
                         "message_id": asst_msg_id,
+                        "user_message_id": str(user_msg.id),
                         "finish_reason": finish_reason,
+                        "version_group_id": str(user_msg.version_group_id)
+                        if user_msg.version_group_id
+                        else None,
+                        "version_index": user_msg.version_index,
                     }
                 )
 
@@ -800,7 +1025,7 @@ async def get_conversation(
         msg_stmt = (
             select(Message)
             .where(Message.conversation_id == conversation_id)
-            .order_by(Message.created_at)
+            .order_by(Message.created_at, Message.id)
         )
         results = await session.exec(msg_stmt)
         messages = results.all()
@@ -828,6 +1053,7 @@ async def get_conversation(
             "title": conv.title,
             "created_at": conv.created_at.isoformat(),
             "updated_at": conv.updated_at.isoformat(),
+            "active_versions": conv.active_versions or {},
             "messages": [
                 {
                     "id": str(m.id),
@@ -838,6 +1064,10 @@ async def get_conversation(
                     "tool_call_id": m.tool_call_id,
                     "created_at": m.created_at.isoformat(),
                     "attachments": att_map.get(m.id, []) or None,
+                    "version_group_id": str(m.version_group_id)
+                    if m.version_group_id
+                    else None,
+                    "version_index": m.version_index,
                 }
                 for m in messages
             ],
@@ -980,6 +1210,258 @@ async def update_conversation_title(
             "title": conv.title,
             "updated_at": conv.updated_at.isoformat(),
         }
+
+
+@router.post("/chat/conversations/{conversation_id}/switch-version")
+async def switch_version(
+    conversation_id: uuid.UUID,
+    request: Request,
+) -> dict[str, Any]:
+    """Switch the active version for a message version group.
+
+    Body::
+
+        {"version_group_id": "uuid", "version_index": 0}
+
+    Returns:
+        Updated ``active_versions`` map and ``updated_at`` timestamp.
+    """
+    ctx = _ctx(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    vg_id_raw: str | None = body.get("version_group_id")
+    version_idx: int | None = body.get("version_index")
+
+    if not vg_id_raw or version_idx is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing version_group_id or version_index",
+        )
+
+    try:
+        vg_id = uuid.UUID(vg_id_raw)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid version_group_id",
+        )
+
+    if isinstance(version_idx, bool) or not isinstance(version_idx, int) or version_idx < 0:
+        raise HTTPException(
+            status_code=400, detail="version_index must be a non-negative integer",
+        )
+
+    async with ctx.db() as session:
+        conv = await session.get(Conversation, conversation_id)
+        if conv is None:
+            raise HTTPException(
+                status_code=404, detail="Conversation not found",
+            )
+
+        # Verify the requested version exists.
+        exists = await session.scalar(
+            sa.select(sa.func.count(Message.id)).where(
+                Message.conversation_id == conversation_id,
+                Message.version_group_id == vg_id,
+                Message.version_index == version_idx,
+            )
+        )
+        if not exists:
+            raise HTTPException(
+                status_code=404,
+                detail="Version not found",
+            )
+
+        av = dict(conv.active_versions or {})
+        av[str(vg_id)] = version_idx
+        conv.active_versions = av
+        conv.updated_at = _utcnow()
+        await session.commit()
+
+        if ctx.conversation_file_manager:
+            await _sync_conversation_to_file(
+                session, conversation_id, ctx.conversation_file_manager,
+            )
+
+        return {
+            "id": str(conv.id),
+            "active_versions": conv.active_versions,
+            "updated_at": conv.updated_at.isoformat(),
+        }
+
+
+# ---------------------------------------------------------------------------
+# REST — branch conversation
+# ---------------------------------------------------------------------------
+
+
+@router.post("/chat/conversations/{conversation_id}/branch")
+async def branch_conversation(
+    conversation_id: str,
+    body: BranchConversationRequest,
+    request: Request,
+) -> BranchConversationResponse:
+    """Create a new conversation by branching from a specific message.
+
+    Copies all messages from the beginning of the source conversation
+    up through ``from_message_id`` (following the active version branch)
+    into a new independent conversation.  File attachments are physically
+    copied under a new upload directory.
+
+    Args:
+        conversation_id: UUID of the source conversation.
+        body: Branch parameters — from_message_id and optional title.
+        request: FastAPI request (used to extract AppContext).
+
+    Returns:
+        Metadata for the newly created conversation.
+
+    Raises:
+        HTTPException 400: ``from_message_id`` is not a valid UUID.
+        HTTPException 404: Source conversation or target message not found.
+        HTTPException 422: Target message is not in the active version branch.
+    """
+    try:
+        src_conv_id = uuid.UUID(conversation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid conversation_id")
+
+    try:
+        from_msg_id = uuid.UUID(body.from_message_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid from_message_id")
+
+    ctx = _ctx(request)
+    async with ctx.db() as session:
+        conv = await session.get(Conversation, src_conv_id)
+        if conv is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        # Load all messages ordered by (created_at, id).
+        msg_stmt = (
+            select(Message)
+            .where(Message.conversation_id == src_conv_id)
+            .order_by(Message.created_at, Message.id)
+        )
+        msg_results = await session.exec(msg_stmt)
+        raw_orm_messages = msg_results.all()
+
+        # Build dicts for the filter helper (same shape as _build_conversation_data).
+        raw_message_dicts = [
+            {
+                "id": str(m.id),
+                "role": m.role,
+                "content": m.content,
+                "thinking_content": m.thinking_content,
+                "tool_calls": m.tool_calls,
+                "tool_call_id": m.tool_call_id,
+                "created_at": m.created_at.isoformat(),
+                "version_group_id": str(m.version_group_id) if m.version_group_id else None,
+                "version_index": m.version_index,
+            }
+            for m in raw_orm_messages
+        ]
+
+        av_map: dict[str, int] = dict(conv.active_versions or {})
+        filtered_dicts = _filter_messages_by_active_versions(raw_message_dicts, av_map)
+
+        from_msg_id_str = str(from_msg_id)
+        target_idx: int | None = None
+        for i, md in enumerate(filtered_dicts):
+            if md["id"] == from_msg_id_str:
+                target_idx = i
+                break
+
+        if target_idx is None:
+            # Check whether message exists but is on an inactive branch.
+            all_ids = {md["id"] for md in raw_message_dicts}
+            if from_msg_id_str in all_ids:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Message belongs to an inactive version branch",
+                )
+            raise HTTPException(
+                status_code=404, detail="Message not found in this conversation"
+            )
+
+        sliced_dicts = filtered_dicts[: target_idx + 1]
+
+        # Build new conversation.
+        new_title = body.title or (
+            f"{conv.title} (diramazione)" if conv.title else "Diramazione"
+        )
+        new_conv = Conversation(title=new_title)
+        session.add(new_conv)
+        await session.flush()  # obtain new_conv.id
+
+        # Copy messages and their attachments.
+        for msg_dict in sliced_dicts:
+            src_msg = await session.get(Message, uuid.UUID(msg_dict["id"]))
+            if src_msg is None:
+                # Should never happen — we just loaded these from the same session.
+                logger.warning("Branch: source message {} missing, skipping", msg_dict["id"])
+                continue
+
+            new_msg = Message(
+                conversation_id=new_conv.id,
+                role=src_msg.role,
+                content=src_msg.content,
+                tool_calls=src_msg.tool_calls,
+                tool_call_id=src_msg.tool_call_id,
+                thinking_content=src_msg.thinking_content,
+                version_group_id=None,
+                version_index=0,
+                created_at=src_msg.created_at,
+            )
+            session.add(new_msg)
+            await session.flush()  # obtain new_msg.id
+
+            att_stmt = select(Attachment).where(Attachment.message_id == src_msg.id)
+            att_results = await session.exec(att_stmt)
+            for src_att in att_results.all():
+                old_path = PROJECT_ROOT / src_att.file_path
+                ext = Path(src_att.file_path).suffix
+                new_att_id = uuid.uuid4()
+                new_file_id_str = str(uuid.uuid4())
+                new_rel_path = (
+                    Path("data") / "uploads" / str(new_conv.id) / f"{new_file_id_str}{ext}"
+                )
+                new_abs_path = PROJECT_ROOT / new_rel_path
+
+                if await asyncio.to_thread(old_path.exists):
+                    await asyncio.to_thread(
+                        new_abs_path.parent.mkdir, parents=True, exist_ok=True
+                    )
+                    await asyncio.to_thread(shutil.copy2, old_path, new_abs_path)
+                else:
+                    logger.warning("Branch: source attachment missing: {}", old_path)
+
+                new_att = Attachment(
+                    id=new_att_id,
+                    message_id=new_msg.id,
+                    filename=src_att.filename,
+                    content_type=src_att.content_type,
+                    file_path=str(new_rel_path),
+                )
+                session.add(new_att)
+
+        new_conv.updated_at = _utcnow()
+        await session.commit()
+
+        if ctx.conversation_file_manager:
+            await _sync_conversation_to_file(
+                session, new_conv.id, ctx.conversation_file_manager
+            )
+
+        return BranchConversationResponse(
+            id=str(new_conv.id),
+            title=new_conv.title,
+            created_at=new_conv.created_at.isoformat(),
+            updated_at=new_conv.updated_at.isoformat(),
+            message_count=len(sliced_dicts),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1201,6 +1683,7 @@ async def import_conversation(request: Request) -> dict[str, Any]:
             updated_at=datetime.fromisoformat(body["updated_at"])
             if body.get("updated_at")
             else _utcnow(),
+            active_versions=body.get("active_versions"),
         )
         session.add(conv)
         await session.flush()
@@ -1209,6 +1692,7 @@ async def import_conversation(request: Request) -> dict[str, Any]:
 
         msg_count = 0
         for msg_data in body.get("messages", []):
+            vg_raw = msg_data.get("version_group_id")
             msg = Message(
                 id=uuid.UUID(msg_data["id"]),
                 conversation_id=conv_id,
@@ -1217,6 +1701,8 @@ async def import_conversation(request: Request) -> dict[str, Any]:
                 tool_calls=msg_data.get("tool_calls"),
                 tool_call_id=msg_data.get("tool_call_id"),
                 thinking_content=msg_data.get("thinking_content"),
+                version_group_id=uuid.UUID(vg_raw) if vg_raw else None,
+                version_index=msg_data.get("version_index", 0),
                 created_at=datetime.fromisoformat(msg_data["created_at"])
                 if msg_data.get("created_at")
                 else _utcnow(),

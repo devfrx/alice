@@ -250,7 +250,7 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 }
 
 .calendar__error {
-  color: #e94560;
+  color: var(--danger);
 }
 
 /* Week view */

@@ -13,15 +13,45 @@ import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
+import MessageVersionNav from './MessageVersionNav.vue'
 import type { ChatMessage, CadModelPayload, ChartPayload } from '../../types/chat'
 
 const CADViewer = defineAsyncComponent(() => import('./CADViewer.vue'))
 const ChartViewer = defineAsyncComponent(() => import('./ChartViewer.vue'))
 
-const props = defineProps<{
-  /** The message to render. */
-  message: ChatMessage
+const props = withDefaults(
+  defineProps<{
+    /** The message to render. */
+    message: ChatMessage
+    /** Total number of edit versions (1 = no edits). */
+    versionCount?: number
+    /** Currently active version index (0-based). */
+    activeVersionIndex?: number
+    /** Whether editing is disabled (e.g. during streaming). */
+    editDisabled?: boolean
+    /** Whether branching is disabled (e.g. during streaming). */
+    branchDisabled?: boolean
+  }>(),
+  { versionCount: 1, activeVersionIndex: 0, editDisabled: false, branchDisabled: false }
+)
+
+const emit = defineEmits<{
+  /** User wants to edit this message. */
+  edit: [messageId: string]
+  /** User wants to switch to a different version. */
+  'switch-version': [versionGroupId: string, versionIndex: number]
+  /** User wants to branch the conversation from this message. */
+  branch: [messageId: string]
 }>()
+
+/** Whether this assistant message can be branched. */
+const isBranchable = computed(() => props.message.role === 'assistant' && !props.branchDisabled)
+
+/** Whether the user message is editable (only user messages). */
+const isEditable = computed(() => props.message.role === 'user' && !props.editDisabled)
+
+/** Whether to show the version navigator. */
+const hasVersions = computed(() => props.versionCount > 1)
 
 /** Pre-rendered HTML from the message's markdown content. */
 const htmlContent = computed(() => renderMarkdown(props.message.content))
@@ -105,6 +135,13 @@ const chartPayload = computed((): ChartPayload | null => {
   return null
 })
 
+/** Emit version switch with the message's version_group_id. */
+function onVersionSwitch(idx: number): void {
+  if (props.message.version_group_id) {
+    emit('switch-version', props.message.version_group_id, idx)
+  }
+}
+
 /** Open full-size image overlay. */
 function openOverlay(url: string, alt: string): void {
   overlayImageUrl.value = url
@@ -139,6 +176,19 @@ onUnmounted(() => {
 
 <template>
   <div class="bubble-row" :class="`row--${message.role}`" role="article" :aria-label="`Messaggio ${message.role}`">
+    <!-- User hover actions — to the left of the bubble -->
+    <div v-if="message.role === 'user'" class="bubble-side-actions">
+      <span class="bubble__time">{{ formattedTime }}</span>
+      <button v-if="isEditable" class="bubble__edit-btn" aria-label="Modifica messaggio"
+        @click="emit('edit', message.id)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+      </button>
+    </div>
+
     <div class="bubble" :class="bubbleClass">
       <!-- Image attachments -->
       <div v-if="message.attachments?.length" class="bubble__attachments">
@@ -187,7 +237,30 @@ onUnmounted(() => {
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
       <div v-if="!cadPayload && !chartPayload && !isPlainToolResult" class="bubble__content" v-html="htmlContent"
         @click="handleCodeBlockClick" />
-      <span class="bubble__time">{{ formattedTime }}</span>
+
+      <!-- Timestamp for assistant/tool messages (inside bubble) -->
+      <span v-if="message.role !== 'user'" class="bubble__time">{{ formattedTime }}</span>
+
+      <!-- Version navigator — only for user messages, inside the bubble -->
+      <MessageVersionNav v-if="hasVersions && message.role === 'user' && message.version_group_id"
+        :active-index="activeVersionIndex" :total-versions="versionCount" :disabled="editDisabled"
+        @switch="onVersionSwitch" />
+    </div>
+
+    <!-- Assistant hover actions — to the right of the assistant bubble -->
+    <div v-if="message.role === 'assistant'" class="bubble-side-actions bubble-side-actions--right">
+      <button v-if="isBranchable" class="bubble__branch-btn" aria-label="Dirama conversazione da qui"
+        :title="`Inizia una nuova conversazione da questo punto`" @click="emit('branch', message.id)">
+        <!-- Git fork icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="6" cy="6" r="3" />
+          <circle cx="18" cy="6" r="3" />
+          <path d="M6 9v6" />
+          <path d="M18 9a9 9 0 0 1-9 9" />
+        </svg>
+      </button>
     </div>
 
     <!-- Full-size image overlay -->
@@ -212,17 +285,92 @@ onUnmounted(() => {
 /* Row layout */
 .bubble-row {
   display: flex;
+  align-items: flex-end;
   margin-bottom: var(--space-4);
   position: relative;
 }
 
 .row--user {
   justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .row--assistant,
 .row--tool {
   justify-content: flex-start;
+}
+
+/* Side actions bar — to the left of user bubbles, visible on row hover */
+.bubble-side-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.row--user:hover .bubble-side-actions {
+  opacity: 1;
+}
+
+/* Branch button — to the right of assistant bubbles, visible on row hover */
+.bubble-side-actions--right {
+  order: 1;
+}
+
+.row--assistant:hover .bubble-side-actions--right,
+.row--tool:hover .bubble-side-actions--right {
+  opacity: 1;
+}
+
+/* Branch button */
+.bubble__branch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.bubble__branch-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+
+.bubble-side-actions .bubble__time {
+  position: static;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Edit button (inside side-actions bar) */
+.bubble__edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.bubble__edit-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-2);
 }
 
 /* Bubble base */
@@ -459,11 +607,6 @@ onUnmounted(() => {
 
 .bubble:hover .bubble__time {
   opacity: 1;
-}
-
-.row--user .bubble__time {
-  right: calc(100% + var(--space-3));
-  left: auto;
 }
 
 .row--assistant .bubble__time,

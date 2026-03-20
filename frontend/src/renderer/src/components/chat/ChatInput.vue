@@ -11,14 +11,25 @@
  * - The send button is disabled when the input is empty (and no files) or streaming.
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type { AudioDevice } from '../../composables/useVoice'
 import ModelSelector from '../settings/ModelSelector.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import { useSettingsStore } from '../../stores/settings'
+import { useUIStore } from '../../stores/ui'
 import { useVoiceStore } from '../../stores/voice'
 
+const router = useRouter()
 const settingsStore = useSettingsStore()
+const uiStore = useUIStore()
 const voiceStore = useVoiceStore()
+
+/** Toggle between assistant and hybrid mode. */
+function toggleMode(): void {
+  const next = uiStore.mode === 'assistant' ? 'hybrid' : 'assistant'
+  uiStore.setMode(next)
+  router.push({ name: next })
+}
 
 const supportsVision = computed(() => settingsStore.activeModel?.capabilities.vision ?? false)
 const supportsToolUse = computed(() => settingsStore.activeModel?.capabilities.trained_for_tool_use ?? false)
@@ -294,6 +305,23 @@ defineExpose({
         </span>
       </div>
 
+      <!-- Mode toggle (assistant ↔ hybrid) -->
+      <button class="ci__mode-toggle"
+        :title="uiStore.mode === 'assistant' ? 'Passa a modalità Ibrida' : 'Passa a modalità Assistente'"
+        @click="toggleMode">
+        <!-- Assistant icon (concentric circles) -->
+        <svg v-if="uiStore.mode === 'assistant'" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+        <!-- Hybrid icon (chat bubble) -->
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      </button>
+
       <div class="ci__gap" />
 
       <!-- Model selectors pushed to the right -->
@@ -369,6 +397,7 @@ defineExpose({
   border: 1px solid var(--border);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: var(--space-3) var(--space-4) var(--space-3);
+  margin-inline: var(--space-4);
   box-shadow: var(--shadow-elevated);
   transition: box-shadow var(--duration-normal) var(--ease-out-expo),
     border-color var(--duration-normal) var(--ease-out-expo);
@@ -534,6 +563,31 @@ defineExpose({
   border-color: rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.04);
+}
+
+/* Mode toggle button */
+.ci__mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-left: var(--space-1);
+  transition:
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+}
+
+.ci__mode-toggle:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Flex spacer */

@@ -186,7 +186,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
     opt.grid = {
         top: hasAxisName ? 36 : (hadTitle ? 24 : 14),
         right: 20,
-        left: hasYAxisName ? 20 : 14,
+        left: hasYAxisName ? 30 : 14,
         ...existingGrid,
         bottom: hasLegend ? 56 : 16,
         containLabel: true,
@@ -226,7 +226,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
                 if (axisKey === 'yAxis') {
                     ax.nameLocation = 'middle'
                     ax.nameRotate = 90
-                    ax.nameGap = 48
+                    ax.nameGap = 64
                 } else {
                     ax.nameLocation = 'middle'
                     ax.nameGap = 28
@@ -478,7 +478,7 @@ onUnmounted(() => {
     border-radius: 8px;
     overflow: hidden;
     background: var(--surface-2);
-    margin: 8px 0;
+    margin: var(--spacing-2) 0;
     display: flex;
     flex-direction: column;
     flex: 1;

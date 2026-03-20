@@ -46,26 +46,26 @@ onMounted(() => {
 // Conversation actions (delegated to store)
 // -----------------------------------------------------------------------
 
-/** Select an existing conversation and navigate to hybrid mode. */
+/** Select an existing conversation — stay in the current mode. */
 async function onSelect(id: string): Promise<void> {
   try {
     await chatStore.loadConversation(id)
   } catch (err) {
-    // Graceful degradation — log the failure and stay on the current view
-    // rather than leaving the UI in an inconsistent state.
     console.error(`[AppSidebar] Failed to load conversation ${id}:`, err)
     return
   }
-  if (router.currentRoute.value.name !== 'hybrid') {
-    await router.push({ name: 'hybrid' })
+  const current = router.currentRoute.value.name as string
+  if (current !== 'assistant' && current !== 'hybrid') {
+    await router.push({ name: uiStore.mode })
   }
 }
 
-/** Create a new conversation and navigate to hybrid mode. */
+/** Create a new conversation — stay in the current mode. */
 async function onCreate(): Promise<void> {
   await chatStore.createConversation()
-  if (router.currentRoute.value.name !== 'hybrid') {
-    await router.push({ name: 'hybrid' })
+  const current = router.currentRoute.value.name as string
+  if (current !== 'assistant' && current !== 'hybrid') {
+    await router.push({ name: uiStore.mode })
   }
 }
 
@@ -112,132 +112,211 @@ async function onOpenFile(id: string): Promise<void> {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--collapsed': !isOpen }">
+  <div class="sidebar__root">
+    <!-- Backdrop overlay — click to close -->
+    <Transition name="sidebar-backdrop">
+      <div v-if="isOpen" class="sidebar__backdrop" @click="toggle" />
+    </Transition>
 
-    <!-- Primary navigation — icons always visible, labels hidden when collapsed -->
-    <nav class="sidebar__nav" aria-label="Navigazione principale">
-      <router-link to="/settings" class="sidebar__link" active-class="sidebar__link--active" title="Impostazioni">
-        <span class="sidebar__link-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
-          </svg>
-        </span>
-        <span class="sidebar__link-label">Impostazioni</span>
-      </router-link>
+    <!-- Floating sidebar panel -->
+    <Transition name="sidebar-slide">
+      <aside v-if="isOpen" class="sidebar">
+        <!-- Header with close button -->
+        <div class="sidebar__header">
+          <span class="sidebar__brand">O.M.N.I.A.</span>
+          <button class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
 
-      <router-link to="/assistant" class="sidebar__link" active-class="sidebar__link--active" title="Assistente">
-        <span class="sidebar__link-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10" />
-            <circle cx="12" cy="12" r="4" />
-          </svg>
-        </span>
-        <span class="sidebar__link-label">Assistente</span>
-      </router-link>
+        <!-- Primary navigation -->
+        <nav class="sidebar__nav" aria-label="Navigazione principale">
+          <router-link to="/settings" class="sidebar__link" active-class="sidebar__link--active" title="Impostazioni"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
+              </svg>
+            </span>
+            <span class="sidebar__link-label">Impostazioni</span>
+          </router-link>
 
-      <router-link to="/hybrid" class="sidebar__link" active-class="sidebar__link--active" title="Ibrido">
-        <span class="sidebar__link-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="8" r="6" />
-            <path d="M4 20h16" opacity="0.5" />
-          </svg>
-        </span>
-        <span class="sidebar__link-label">Ibrido</span>
-      </router-link>
+          <router-link to="/assistant" class="sidebar__link" active-class="sidebar__link--active" title="Assistente"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="4" />
+              </svg>
+            </span>
+            <span class="sidebar__link-label">Assistente</span>
+          </router-link>
 
-      <router-link to="/notes" class="sidebar__link" active-class="sidebar__link--active" title="Note">
-        <span class="sidebar__link-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-            <polyline points="10 9 9 9 8 9" />
-          </svg>
-        </span>
-        <span class="sidebar__link-label">Note</span>
-      </router-link>
+          <router-link to="/hybrid" class="sidebar__link" active-class="sidebar__link--active" title="Ibrido"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="8" r="6" />
+                <path d="M4 20h16" opacity="0.5" />
+              </svg>
+            </span>
+            <span class="sidebar__link-label">Ibrido</span>
+          </router-link>
 
-      <router-link to="/email" class="sidebar__link" active-class="sidebar__link--active" title="Email">
-        <span class="sidebar__link-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="4" width="20" height="16" rx="2" />
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-          </svg>
-        </span>
-        <span class="sidebar__link-label">Email</span>
-        <span v-if="unreadBadge" class="sidebar__badge">{{ unreadBadge }}</span>
-      </router-link>
-    </nav>
+          <router-link to="/notes" class="sidebar__link" active-class="sidebar__link--active" title="Note"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+            </span>
+            <span class="sidebar__link-label">Note</span>
+          </router-link>
 
-    <!-- Calendar widget — shows today's events and next upcoming -->
-    <CalendarWidget :collapsed="!isOpen" />
+          <router-link to="/email" class="sidebar__link" active-class="sidebar__link--active" title="Email"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+            </span>
+            <span class="sidebar__link-label">Email</span>
+            <span v-if="unreadBadge" class="sidebar__badge">{{ unreadBadge }}</span>
+          </router-link>
+        </nav>
 
-    <!-- Conversations section — only shown when expanded -->
-    <div v-show="isOpen" class="sidebar__conversations">
-      <!-- Section divider with micro uppercase label -->
-      <div class="sidebar__section-label">
-        <span>Conversazioni</span>
-      </div>
+        <!-- Calendar widget — shows today's events and next upcoming -->
+        <CalendarWidget :collapsed="false" />
 
-      <!-- Virtualised conversation list -->
-      <ConversationList :conversations="chatStore.conversations" :active-id="chatStore.currentConversation?.id ?? null"
-        :streaming-id="chatStore.streamingConversationId" @select="onSelect" @create="onCreate" @delete="onDelete"
-        @delete-all="onDeleteAll" @rename="onRename" @open-file="onOpenFile" />
-    </div>
+        <!-- Conversations section -->
+        <div class="sidebar__conversations">
+          <div class="sidebar__section-label">
+            <span>Conversazioni</span>
+          </div>
 
-    <!-- Toggle button — bottom of sidebar, circular chevron -->
-    <button class="sidebar__toggle" :aria-label="isOpen ? 'Chiudi sidebar' : 'Apri sidebar'" :aria-expanded="isOpen"
-      @click="toggle">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <polyline v-if="isOpen" points="15 18 9 12 15 6" />
-        <polyline v-else points="9 18 15 12 9 6" />
-      </svg>
-    </button>
-  </aside>
+          <ConversationList :conversations="chatStore.conversations"
+            :active-id="chatStore.currentConversation?.id ?? null" :streaming-id="chatStore.streamingConversationId"
+            @select="onSelect" @create="onCreate" @delete="onDelete" @delete-all="onDeleteAll" @rename="onRename"
+            @open-file="onOpenFile" />
+        </div>
+      </aside>
+    </Transition>
+  </div>
 </template>
 
 <style scoped>
-/* ─── AppSidebar — Supabase-style flat sidebar ─── */
+/* ─── AppSidebar — Floating glass panel ─── */
 
-/* Root */
-.sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-1);
-  border-right: 1px solid var(--border);
-  overflow: hidden;
-  position: relative;
-  z-index: var(--z-sticky);
-  transition:
-    width var(--transition-normal) ease,
-    min-width var(--transition-normal) ease;
+/* Backdrop overlay */
+.sidebar__backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--titlebar-height, 38px);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: calc(var(--z-overlay) - 2);
 }
 
-.sidebar--collapsed {
-  width: var(--sidebar-collapsed);
-  min-width: var(--sidebar-collapsed);
+.sidebar-backdrop-enter-active,
+.sidebar-backdrop-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-backdrop-enter-from,
+.sidebar-backdrop-leave-to {
+  opacity: 0;
+}
+
+/* Sidebar panel */
+.sidebar {
+  position: fixed;
+  top: calc(var(--titlebar-height, 38px) + 8px);
+  left: 12px;
+  width: 280px;
+  height: calc(100vh - var(--titlebar-height, 38px) - 16px);
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-floating);
+  z-index: calc(var(--z-overlay) - 1);
+  overflow: hidden;
+}
+
+/* Slide animation */
+.sidebar-slide-enter-active {
+  transition: transform 0.3s var(--ease-out-expo);
+}
+
+.sidebar-slide-leave-active {
+  transition: transform 0.25s var(--ease-decel);
+}
+
+.sidebar-slide-enter-from,
+.sidebar-slide-leave-to {
+  transform: translateX(calc(-100% - 12px));
+}
+
+/* Header */
+.sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  flex-shrink: 0;
+}
+
+.sidebar__brand {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 3px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.sidebar__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.sidebar__close:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
 /* Navigation */
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4) var(--space-3) var(--space-3);
+  gap: var(--space-0-5);
+  padding: 0 var(--space-3) var(--space-3);
   flex-shrink: 0;
-  transition: padding var(--transition-normal) ease;
-}
-
-.sidebar--collapsed .sidebar__nav {
-  padding: var(--space-4) var(--space-1) var(--space-3);
-  align-items: center;
 }
 
 /* Nav link */
@@ -265,7 +344,7 @@ async function onOpenFile(id: string): Promise<void> {
   color: var(--text-primary);
 }
 
-/* Active state — subtle bg fill only, no accent bar */
+/* Active state */
 .sidebar__link--active {
   background: var(--surface-selected);
   color: var(--text-primary);
@@ -279,21 +358,6 @@ async function onOpenFile(id: string): Promise<void> {
   box-shadow: var(--focus-ring-shadow);
 }
 
-/* Collapsed link — centered icon circle */
-.sidebar--collapsed .sidebar__link {
-  justify-content: center;
-  gap: 0;
-  padding: var(--space-2);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  margin: 0 auto;
-}
-
-.sidebar--collapsed .sidebar__link--active {
-  background: var(--surface-active);
-}
-
 /* Icon */
 .sidebar__link-icon {
   display: flex;
@@ -304,21 +368,9 @@ async function onOpenFile(id: string): Promise<void> {
   transition: color var(--transition-fast) ease;
 }
 
-/* Label — collapses with width + opacity */
+/* Label */
 .sidebar__link-label {
   white-space: nowrap;
-  overflow: hidden;
-  max-width: 160px;
-  opacity: 1;
-  transition:
-    opacity var(--transition-normal) ease,
-    max-width var(--transition-normal) ease;
-}
-
-.sidebar--collapsed .sidebar__link-label {
-  opacity: 0;
-  max-width: 0;
-  pointer-events: none;
 }
 
 /* Conversations section */
@@ -329,7 +381,7 @@ async function onOpenFile(id: string): Promise<void> {
   min-height: 0;
 }
 
-/* Section label — simple uppercase micro text with border line */
+/* Section label */
 .sidebar__section-label {
   display: flex;
   align-items: center;
@@ -345,39 +397,7 @@ async function onOpenFile(id: string): Promise<void> {
   border-top: 1px solid var(--border);
 }
 
-.sidebar__section-label::after {
-  content: none;
-}
-
-/* Toggle button — minimal */
-.sidebar__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-  margin: var(--space-2) auto var(--space-3);
-  transition:
-    color var(--transition-fast) ease,
-    background var(--transition-fast) ease;
-}
-
-.sidebar__toggle:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.sidebar__toggle:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
-}
-
-/* Scrollbar — thin, subtle */
+/* Scrollbar */
 .sidebar :deep(::-webkit-scrollbar) {
   width: 4px;
 }
@@ -395,6 +415,7 @@ async function onOpenFile(id: string): Promise<void> {
   background: var(--surface-4);
 }
 
+/* Badge */
 .sidebar__badge {
   display: inline-flex;
   align-items: center;
@@ -411,19 +432,18 @@ async function onOpenFile(id: string): Promise<void> {
   margin-left: auto;
 }
 
-.sidebar--collapsed .sidebar__badge {
-  display: none;
-}
-
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 
   .sidebar,
-  .sidebar__nav,
+  .sidebar__backdrop,
   .sidebar__link,
   .sidebar__link-icon,
-  .sidebar__link-label,
-  .sidebar__toggle {
+  .sidebar__close,
+  .sidebar-slide-enter-active,
+  .sidebar-slide-leave-active,
+  .sidebar-backdrop-enter-active,
+  .sidebar-backdrop-leave-active {
     transition: none;
   }
 }

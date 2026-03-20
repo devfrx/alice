@@ -8,6 +8,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import { useVoiceStore } from '../stores/voice'
+import { useUIStore } from '../stores/ui'
+import { usePluginsStore } from '../stores/plugins'
+import WeatherWidget from './plugins/WeatherWidget.vue'
 import OmniaSpinner from './ui/OmniaSpinner.vue'
 
 /** Tracks whether the window is currently maximized */
@@ -15,6 +18,13 @@ const isMaximized = ref(false)
 
 const settingsStore = useSettingsStore()
 const voiceStore = useVoiceStore()
+const uiStore = useUIStore()
+const pluginsStore = usePluginsStore()
+
+/** Whether the weather plugin is enabled. */
+const weatherEnabled = computed(() =>
+  pluginsStore.plugins.some((p) => p.name === 'weather' && p.enabled)
+)
 
 /** Display name of the active LLM model, truncated at 30 chars */
 const modelDisplayName = computed(() => {
@@ -78,6 +88,16 @@ onUnmounted(() => {
 
 <template>
   <header class="titlebar">
+    <!-- Sidebar toggle (hamburger) — no-drag so it's clickable -->
+    <button class="titlebar__menu-btn" aria-label="Apri sidebar" @click="uiStore.toggleSidebar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    </button>
+
     <!-- Draggable region -->
     <div class="titlebar__drag-region">
       <span class="titlebar__title">O.M.N.I.A.</span>
@@ -123,6 +143,11 @@ onUnmounted(() => {
       </template>
     </div>
 
+    <!-- Weather widget — right side of drag region -->
+    <div v-if="weatherEnabled" class="titlebar__weather">
+      <WeatherWidget />
+    </div>
+
     <!-- Window controls (no-drag so buttons are clickable) -->
     <div class="titlebar__controls">
       <button class="titlebar__btn titlebar__btn--minimize" aria-label="Minimize" @click="handleMinimize">
@@ -166,6 +191,33 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border);
   z-index: var(--z-sticky);
   user-select: none;
+}
+
+/* Sidebar toggle button (hamburger) */
+.titlebar__menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  transition:
+    color 100ms ease,
+    background 100ms ease;
+}
+
+.titlebar__menu-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.titlebar__menu-btn:active {
+  background: var(--surface-active);
 }
 
 /* Draggable region fills all available space */
@@ -280,6 +332,15 @@ onUnmounted(() => {
   color: var(--text-muted);
   opacity: 0.3;
   margin: 0 1px;
+}
+
+/* Weather widget in titlebar */
+.titlebar__weather {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 var(--space-2);
+  -webkit-app-region: no-drag;
 }
 
 /* Control button group */

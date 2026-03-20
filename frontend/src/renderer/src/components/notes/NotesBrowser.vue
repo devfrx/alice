@@ -331,9 +331,14 @@ function preview(content: string): string {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--surface-1);
-    border-right: 1px solid var(--border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur-heavy));
+    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
     overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 1px rgba(255, 255, 255, 0.04);
+    flex-shrink: 0;
 }
 
 .browser__search {

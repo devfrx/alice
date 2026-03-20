@@ -142,14 +142,12 @@ async function handleDelete(): Promise<void> {
     </div>
 
     <div class="event-form__actions">
-      <button v-if="editingEvent" class="event-form__btn event-form__btn--danger"
-        :disabled="saving" @click="handleDelete">Elimina</button>
+      <button v-if="editingEvent" class="event-form__btn event-form__btn--danger" :disabled="saving"
+        @click="handleDelete">Elimina</button>
       <div class="event-form__spacer" />
-      <button class="event-form__btn event-form__btn--secondary"
-        @click="emit('close', false)">Annulla</button>
+      <button class="event-form__btn event-form__btn--secondary" @click="emit('close', false)">Annulla</button>
       <button class="event-form__btn event-form__btn--primary"
-        :disabled="saving || !form.title || !form.start || !form.end"
-        @click="handleSave">
+        :disabled="saving || !form.title || !form.start || !form.end" @click="handleSave">
         {{ saving ? 'Salvataggio...' : (editingEvent ? 'Aggiorna' : 'Crea') }}
       </button>
     </div>
@@ -170,10 +168,10 @@ async function handleDelete(): Promise<void> {
 
 .event-form__error {
   font-size: 0.85rem;
-  color: #e94560;
+  color: var(--danger);
   margin: 0 0 var(--space-3);
   padding: var(--space-2);
-  background: rgba(233, 69, 96, 0.1);
+  background: var(--danger-light);
   border-radius: var(--radius-sm);
 }
 
@@ -196,9 +194,9 @@ async function handleDelete(): Promise<void> {
 .event-form__field input,
 .event-form__field textarea,
 .event-form__field select {
-  background: var(--bg-tertiary);
+  background: var(--surface-inset);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: var(--space-2);
   color: var(--text-primary);
   font-size: var(--text-sm);
@@ -209,7 +207,7 @@ async function handleDelete(): Promise<void> {
 .event-form__field input:focus,
 .event-form__field textarea:focus,
 .event-form__field select:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-border);
 }
 
 .event-form__row {
@@ -230,9 +228,9 @@ async function handleDelete(): Promise<void> {
 
 .event-form__btn {
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   cursor: pointer;
   border: 1px solid var(--border);
   transition: all var(--transition-fast);
@@ -240,7 +238,7 @@ async function handleDelete(): Promise<void> {
 
 .event-form__btn--primary {
   background: var(--accent);
-  color: #1a1a2e;
+  color: var(--surface-0);
   border-color: var(--accent);
 }
 
@@ -259,17 +257,17 @@ async function handleDelete(): Promise<void> {
 }
 
 .event-form__btn--secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
 .event-form__btn--danger {
   background: transparent;
-  color: #e94560;
-  border-color: rgba(233, 69, 96, 0.3);
+  color: var(--danger);
+  border-color: var(--danger-border);
 }
 
 .event-form__btn--danger:hover:not(:disabled) {
-  background: rgba(233, 69, 96, 0.1);
+  background: var(--danger-light);
 }
 </style>

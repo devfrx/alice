@@ -19,6 +19,7 @@ import AssistantTranscript from '../components/assistant/AssistantTranscript.vue
 import ConversationDrawer from '../components/assistant/ConversationDrawer.vue'
 import FloatingInputBar from '../components/input/FloatingInputBar.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
+import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
 import { useChatStore } from '../stores/chat'
@@ -36,7 +37,7 @@ const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
 const chatApi = inject(ChatApiKey)
 if (!chatApi) throw new Error('ChatApiKey not provided')
-const { sendMessage: send, stopGeneration } = chatApi
+const { sendMessage: send, stopGeneration, editMessage } = chatApi
 
 const {
     startListening, stopListening, cancelProcessing, connect: connectVoice,
@@ -49,6 +50,39 @@ const floatingBarRef = ref<InstanceType<typeof FloatingInputBar> | null>(null)
 
 /** Whether the conversation history drawer is visible. */
 const historyDrawerOpen = ref(false)
+
+/* ── Message editing state ── */
+const editingMessageId = ref<string | null>(null)
+const editingContent = ref('')
+
+function startEdit(messageId: string): void {
+    if (chatStore.isStreamingCurrentConversation) return
+    const msg = chatStore.messages.find((m) => m.id === messageId)
+    if (!msg || msg.role !== 'user') return
+    editingMessageId.value = messageId
+    editingContent.value = msg.content
+}
+
+function submitEdit(newContent: string): void {
+    const msgId = editingMessageId.value
+    editingMessageId.value = null
+    editingContent.value = ''
+    if (msgId) editMessage(msgId, newContent)
+}
+
+function cancelEdit(): void {
+    editingMessageId.value = null
+    editingContent.value = ''
+}
+
+function handleVersionSwitch(versionGroupId: string, versionIndex: number): void {
+    chatStore.switchVersion(versionGroupId, versionIndex)
+}
+
+async function handleBranch(messageId: string): Promise<void> {
+    if (chatStore.isStreamingCurrentConversation) return
+    await chatStore.branchConversation(messageId)
+}
 
 /** Whether the right side panel is visible (user can toggle). */
 const sidePanelOpen = ref(false)
@@ -332,7 +366,7 @@ onMounted(() => {
             <div class="assistant-view__center">
                 <div class="assistant-view__orb-wrapper">
                     <OmniaOrb :state="orbState" :audio-level="audioLevel" @click="handleOrbClick" />
-                    <Transition name="stop-hint-fade">
+                    <!-- <Transition name="stop-hint-fade">
                         <button v-if="isInterruptible" class="assistant-view__stop-hint" @click.stop="handleOrbClick"
                             aria-label="Interrompi">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -340,7 +374,7 @@ onMounted(() => {
                             </svg>
                             <span>Interrompi</span>
                         </button>
-                    </Transition>
+                    </Transition> -->
                 </div>
 
                 <div class="assistant-view__content">
@@ -370,7 +404,7 @@ onMounted(() => {
                 </div>
             </div>
 
-            <StatusBubbles :state="orbState" />
+            <!-- <StatusBubbles :state="orbState" /> -->
             <AssistantFab :orb-state="orbState" :message-count="messageCount"
                 @toggle-history="historyDrawerOpen = !historyDrawerOpen" />
 
@@ -503,7 +537,13 @@ onMounted(() => {
 
         <!-- Conversation history drawer -->
         <ConversationDrawer :open="historyDrawerOpen" :messages="chatStore.messages"
-            @close="historyDrawerOpen = false" />
+            :is-streaming="chatStore.isStreamingCurrentConversation"
+            :branch-disabled="chatStore.isStreamingCurrentConversation" :get-version-count="chatStore.getVersionCount"
+            :get-active-version-index="chatStore.getActiveVersionIndex" @close="historyDrawerOpen = false"
+            @edit="startEdit" @switch-version="handleVersionSwitch" @branch="handleBranch" />
+
+        <MessageEditDialog v-if="editingMessageId" :original-content="editingContent" @submit="submitEdit"
+            @cancel="cancelEdit" />
 
         <ToolConfirmationDialog v-if="pendingConfirmationsList.length > 0"
             :key="pendingConfirmationsList[0].executionId" :confirmation="pendingConfirmationsList[0]"
@@ -552,14 +592,18 @@ onMounted(() => {
     position: relative;
     width: var(--panel-width, 400px);
     flex-shrink: 0;
-    height: 100%;
+    height: calc(100% - 24px);
+    margin: 12px 12px 12px 0;
     z-index: var(--z-raised);
-    background: var(--surface-1);
-    border-left: 1px solid var(--border);
-    /* overflow-x: visible;
-    overflow-y: hidden; */
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur-heavy));
+    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* Prevent text selection while dragging the panel edge */
@@ -572,10 +616,10 @@ onMounted(() => {
 /* ── Resize handle ── */
 .side-panel__resize-handle {
     position: absolute;
-    top: 0;
+    top: 8px;
     left: -10px;
     width: 20px;
-    height: 100%;
+    height: calc(100% - 16px);
     z-index: 10;
     cursor: col-resize;
     display: flex;
@@ -759,8 +803,9 @@ onMounted(() => {
     align-items: center;
     gap: 2px;
     padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-1);
+    border-bottom: 1px solid var(--glass-border);
+    background: transparent;
+    border-radius: 16px 16px 0 0;
 }
 
 .side-panel__tab {
@@ -833,10 +878,10 @@ onMounted(() => {
     position: relative;
 }
 
-/* Remove margin/radius when ChartViewer is inside the side panel */
+/* Match panel corners when ChartViewer is inside the side panel */
 .side-panel__chart-container :deep(.chart-viewer) {
     margin: 0;
-    border-radius: 0;
+    border-radius: 0 0 16px 16px;
 }
 
 .side-panel__chart-close {
@@ -868,8 +913,8 @@ onMounted(() => {
     justify-content: center;
     gap: 8px;
     padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-1);
+    border-bottom: 1px solid var(--glass-border);
+    background: transparent;
 }
 
 .side-panel__chart-nav-btn {
@@ -906,21 +951,20 @@ onMounted(() => {
 /* ── Side panel slide transition ── */
 .side-panel-slide-enter-active {
     transition:
-        width 350ms var(--ease-out-expo),
+        transform 350ms var(--ease-out-expo),
         opacity 350ms var(--ease-smooth);
 }
 
 .side-panel-slide-leave-active {
     transition:
-        width 250ms var(--ease-smooth),
+        transform 250ms var(--ease-smooth),
         opacity 200ms ease;
 }
 
 .side-panel-slide-enter-from,
 .side-panel-slide-leave-to {
-    width: 0 !important;
+    transform: translateX(20px);
     opacity: 0;
-    overflow: hidden;
 }
 
 /* ── Toggle button fade transition ── */
@@ -948,34 +992,40 @@ onMounted(() => {
     flex-shrink: 0;
 }
 
-/* Stop / interrupt pill below the orb */
+/* Stop / interrupt pill below the orb — glass */
 .assistant-view__stop-hint {
     position: absolute;
-    bottom: -36px;
+    bottom: -40px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 14px;
-    border: 1px solid var(--border);
+    padding: 6px 16px;
+    border: 1px solid rgba(196, 92, 92, 0.25);
     border-radius: 20px;
-    background: var(--surface-2);
-    color: var(--accent);
+    background: var(--glass-bg-light);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    color: var(--danger);
     font-size: var(--text-2xs);
     font-weight: 500;
+    letter-spacing: 0.03em;
     white-space: nowrap;
     cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 10px rgba(196, 92, 92, 0.08);
     transition:
         background 200ms var(--ease-smooth),
         border-color 200ms var(--ease-smooth),
+        box-shadow 200ms var(--ease-smooth),
         transform 200ms var(--ease-out-back);
     z-index: var(--z-sticky);
 }
 
 .assistant-view__stop-hint:hover {
-    background: var(--surface-3);
-    border-color: var(--border-hover);
+    background: rgba(196, 92, 92, 0.12);
+    border-color: rgba(196, 92, 92, 0.4);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 16px rgba(196, 92, 92, 0.15);
     transform: translateX(-50%) scale(1.04);
 }
 

@@ -10,6 +10,7 @@ import OmniaOrb from '../components/assistant/OmniaOrb.vue'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
+import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import StreamingIndicator from '../components/chat/StreamingIndicator.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import TranscriptOverlay from '../components/voice/TranscriptOverlay.vue'
@@ -22,7 +23,7 @@ const chatStore = useChatStore()
 const chatApi = inject(ChatApiKey)
 if (!chatApi) throw new Error('ChatApiKey not provided')
 const voiceStore = useVoiceStore()
-const { sendMessage: send, isConnected, stopGeneration } = chatApi
+const { sendMessage: send, isConnected, stopGeneration, editMessage } = chatApi
 const {
     startListening, stopListening, cancelProcessing, connect: connectVoice,
     transcript, audioDevices, selectedDeviceId, refreshDevices, speak, cancelSpeak,
@@ -32,6 +33,45 @@ const {
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollButton = ref(false)
+
+/** ID of the message currently being edited (null = no edit in progress). */
+const editingMessageId = ref<string | null>(null)
+/** Original content of the message being edited. */
+const editingContent = ref('')
+
+/** Open the edit dialog for a user message. */
+function startEdit(messageId: string): void {
+    if (chatStore.isStreamingCurrentConversation) return
+    const msg = chatStore.messages.find((m) => m.id === messageId)
+    if (!msg || msg.role !== 'user') return
+    editingMessageId.value = messageId
+    editingContent.value = msg.content
+}
+
+/** Submit the edited message. */
+function submitEdit(newContent: string): void {
+    const msgId = editingMessageId.value
+    editingMessageId.value = null
+    editingContent.value = ''
+    if (msgId) editMessage(msgId, newContent)
+}
+
+/** Cancel editing. */
+function cancelEdit(): void {
+    editingMessageId.value = null
+    editingContent.value = ''
+}
+
+/** Handle version switch from MessageBubble's version navigator. */
+function handleVersionSwitch(versionGroupId: string, versionIndex: number): void {
+    chatStore.switchVersion(versionGroupId, versionIndex)
+}
+
+/** Branch the current conversation from an assistant message. */
+async function handleBranch(messageId: string): Promise<void> {
+    if (chatStore.isStreamingCurrentConversation) return
+    await chatStore.branchConversation(messageId)
+}
 
 const orbState = computed<'idle' | 'listening' | 'thinking' | 'speaking' | 'processing'>(() => {
     if (voiceStore.isSpeaking) return 'speaking'
@@ -166,7 +206,12 @@ onUnmounted(() => {
                     <p class="hybrid-view__empty-text">Scrivi o parla per iniziare</p>
                 </div>
 
-                <MessageBubble v-for="msg in chatStore.messages" :key="msg.id" :message="msg" />
+                <MessageBubble v-for="msg in chatStore.messages" :key="msg.id" :message="msg" :version-count="msg.version_group_id
+                    ? chatStore.getVersionCount(msg.version_group_id) : 1" :active-version-index="msg.version_group_id
+                        ? chatStore.getActiveVersionIndex(msg.version_group_id) : 0"
+                    :edit-disabled="chatStore.isStreamingCurrentConversation"
+                    :branch-disabled="chatStore.isStreamingCurrentConversation" @edit="startEdit"
+                    @switch-version="handleVersionSwitch" @branch="handleBranch" />
 
                 <StreamingIndicator v-if="chatStore.isStreamingCurrentConversation"
                     :content="chatStore.currentStreamContent" :thinking-content="chatStore.currentThinkingContent" />
@@ -198,6 +243,9 @@ onUnmounted(() => {
         <ToolConfirmationDialog v-if="pendingConfirmationsList.length > 0"
             :key="pendingConfirmationsList[0].executionId" :confirmation="pendingConfirmationsList[0]"
             @respond="chatApi.respondToConfirmation" />
+
+        <MessageEditDialog v-if="editingMessageId" :original-content="editingContent" @submit="submitEdit"
+            @cancel="cancelEdit" />
     </div>
 </template>
 

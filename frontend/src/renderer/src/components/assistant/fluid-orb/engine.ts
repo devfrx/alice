@@ -112,6 +112,12 @@ export class FluidEngine {
     private smoothAudio = 0
     private compact: boolean
     private time = 0
+    /* Phase accumulators — increment at smoothed speed each frame so that
+     * speed changes during state transitions never cause a phase-position
+     * discontinuity (the root cause of the "trembling" artefact). */
+    private breathPhase = 0
+    private morphPhase = 0
+    private orbitPhase = 0
     private animId = 0
     private lastFrame = 0
     private resizeObs: ResizeObserver | null = null
@@ -216,6 +222,12 @@ export class FluidEngine {
         const cfgK = smoothFactor(dt, this.transitionHalfLife)
         this.currentConfig = smoothConfig(this.currentConfig, this.targetConfig, cfgK)
 
+        /* Accumulate phases at the already-smoothed rates so any speed change
+         * during a transition is absorbed gradually with no phase jump. */
+        this.breathPhase += this.currentConfig.breathSpeed * dt
+        this.morphPhase  += this.currentConfig.morphSpeed  * dt
+        this.orbitPhase  += this.currentConfig.orbitSpeed  * dt
+
         this.updateParticles(dt)
         this.updateRings(dt)
     }
@@ -275,7 +287,7 @@ export class FluidEngine {
      */
     private getCurrentRadius(): number {
         const cfg = this.currentConfig
-        const breath = 1 + cfg.breathAmount * Math.sin(this.time * cfg.breathSpeed)
+        const breath = 1 + cfg.breathAmount * Math.sin(this.breathPhase)
         const audio = 1 + this.smoothAudio * cfg.audioReactivity * 0.2
         const hover = 1 + this.hoverT * 0.035
         const click = 1 + this.clickImpulse * 0.06
@@ -286,8 +298,7 @@ export class FluidEngine {
         const N = 80
         const path = new Path2D()
         const { cx, cy } = this
-        const t = this.time
-        const ms = this.currentConfig.morphSpeed
+        const mp = this.morphPhase
         const turb = this.currentConfig.turbulence
 
         const points: Array<{ x: number; y: number }> = []
@@ -295,10 +306,10 @@ export class FluidEngine {
         for (let i = 0; i < N; i++) {
             const a = (i / N) * TAU
             const d =
-                Math.sin(a * 3 + t * ms * 0.5) * 0.035 +
-                Math.sin(a * 5 - t * ms * 0.72) * 0.022 +
-                Math.sin(a * 7 + t * ms * 0.33) * 0.014 +
-                Math.sin(a * 2 + t * ms * 0.91) * 0.028
+                Math.sin(a * 3 + mp * 0.5) * 0.035 +
+                Math.sin(a * 5 - mp * 0.72) * 0.022 +
+                Math.sin(a * 7 + mp * 0.33) * 0.014 +
+                Math.sin(a * 2 + mp * 0.91) * 0.028
             const r = radius * (1 + d * turb)
             points.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
         }
@@ -394,22 +405,23 @@ export class FluidEngine {
         const hbOp = 1 + this.hoverT * 0.3
         const hbSpeed = 1 + this.hoverT * 0.25
 
+        const op = this.orbitPhase
         this.drawLightBlob(
             cfg.primary, radius * 0.52,
             cfg.orbitRadius * radius,
-            this.time * cfg.orbitSpeed * hbSpeed, 0,
+            op * hbSpeed, 0,
             cfg.blobOpacity * 0.4 * hbOp,
         )
         this.drawLightBlob(
             cfg.secondary, radius * 0.42,
             cfg.orbitRadius * radius * 1.1,
-            -this.time * cfg.orbitSpeed * 0.7 * hbSpeed, TAU * 0.33,
+            -op * 0.7 * hbSpeed, TAU * 0.33,
             cfg.blobOpacity * 0.35 * hbOp,
         )
         this.drawLightBlob(
             cfg.tertiary, radius * 0.34,
             cfg.orbitRadius * radius * 0.85,
-            this.time * cfg.orbitSpeed * 1.3 * hbSpeed, TAU * 0.66,
+            op * 1.3 * hbSpeed, TAU * 0.66,
             cfg.blobOpacity * 0.3 * hbOp,
         )
 
@@ -450,7 +462,7 @@ export class FluidEngine {
         ctx.clip(orbPath)
         ctx.globalCompositeOperation = 'screen'
 
-        const a = this.time * cfg.morphSpeed * 0.35
+        const a = this.morphPhase * 0.35
         const intensity = 0.04 * energy
 
         const conic = ctx.createConicGradient(a, this.cx, this.cy)
@@ -499,7 +511,7 @@ export class FluidEngine {
         const ctx = this.ctx
         const cfg = this.currentConfig
         const coreR = radius * cfg.coreSize
-        const pulse = 1 + Math.sin(this.time * cfg.breathSpeed * 1.5) * 0.2
+        const pulse = 1 + Math.sin(this.breathPhase * 1.5) * 0.2
         const hoverPulse = 1 + this.hoverT * 0.4
         const clickFlare = 1 + this.clickImpulse * 1.5
         const r = coreR * pulse * hoverPulse * clickFlare

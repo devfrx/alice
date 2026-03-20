@@ -134,9 +134,9 @@ export const STATE_CONFIGS: Record<OrbState, StateConfig> = {
  * Shorter durations for urgent states, longer for relaxation.
  */
 export const TRANSITION_CONFIGS: Record<OrbState, TransitionConfig> = {
-    idle: { duration: 1.4 },
-    listening: { duration: 0.5 },
-    thinking: { duration: 0.7 },
-    speaking: { duration: 0.6 },
-    processing: { duration: 0.55 },
+    idle: { duration: 1.6 },
+    listening: { duration: 0.8 },
+    thinking: { duration: 0.9 },
+    speaking: { duration: 0.85 },
+    processing: { duration: 0.75 },
 }

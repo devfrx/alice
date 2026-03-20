@@ -61,6 +61,8 @@ async def run_tool_loop(
     tools: list[dict[str, Any]] | None = None,
     initial_history: list[dict[str, Any]] | None = None,
     system_prompt: str | None = None,
+    version_group_id: uuid.UUID | None = None,
+    version_index: int = 0,
 ) -> tuple[str, str]:
     """Execute the tool-calling loop until the LLM produces a final answer.
 
@@ -113,6 +115,12 @@ async def run_tool_loop(
         list(initial_history) if initial_history is not None else None
     )
 
+    # Version metadata applied to every message created in this loop.
+    _ver = {
+        "version_group_id": version_group_id,
+        "version_index": version_index,
+    }
+
     # Tool execution timeout from config.
     tool_exec_timeout: float = ctx.config.llm.tool_execution_timeout
 
@@ -151,6 +159,8 @@ async def run_tool_loop(
             content=full_content,
             tool_calls=normalized_tcs,
             thinking_content=thinking_content or None,
+            version_group_id=version_group_id,
+            version_index=version_index,
         )
         session.add(asst_msg)
         await session.flush()
@@ -182,6 +192,7 @@ async def run_tool_loop(
                         role="tool",
                         content=_err_content,
                         tool_call_id=tc_id,
+                        **_ver,
                     ))
                     await session.flush()
                     if mem_history is not None:
@@ -206,6 +217,7 @@ async def run_tool_loop(
                     role="tool",
                     content=_parse_err,
                     tool_call_id=tc_id,
+                    **_ver,
                 ))
                 await session.flush()
                 if mem_history is not None:
@@ -235,6 +247,7 @@ async def run_tool_loop(
                     role="tool",
                     content=_dedup_content,
                     tool_call_id=tc_id,
+                    **_ver,
                 ))
                 await session.flush()
                 if mem_history is not None:
@@ -261,7 +274,7 @@ async def run_tool_loop(
                     "Blocked FORBIDDEN tool '{}' (exec_id={})",
                     tool_name, exec_id,
                 )
-                _save_rejected_tool_msg(session, conv_id, tc_id)
+                _save_rejected_tool_msg(session, conv_id, tc_id, **_ver)
                 await session.flush()
                 if mem_history is not None:
                     mem_history.append({
@@ -327,7 +340,7 @@ async def run_tool_loop(
 
                 if not approved:
                     _save_rejected_tool_msg(
-                        session, conv_id, tc_id,
+                        session, conv_id, tc_id, **_ver,
                     )
                     await session.flush()
                     if mem_history is not None:
@@ -390,6 +403,7 @@ async def run_tool_loop(
                     role="tool",
                     content=_timeout_content,
                     tool_call_id=tc_id,
+                    **_ver,
                 ))
                 if mem_history is not None:
                     mem_history.append({
@@ -427,6 +441,7 @@ async def run_tool_loop(
                     role="tool",
                     content=_fail_content,
                     tool_call_id=failed_tc_id,
+                    **_ver,
                 ))
                 if mem_history is not None:
                     mem_history.append({
@@ -471,6 +486,7 @@ async def run_tool_loop(
                 role="tool",
                 content=db_content,
                 tool_call_id=tc_id,
+                **_ver,
             )
             session.add(tool_msg)
 
@@ -755,6 +771,8 @@ def _save_rejected_tool_msg(
     session: Any,
     conv_id: uuid.UUID,
     tool_call_id: str,
+    version_group_id: uuid.UUID | None = None,
+    version_index: int = 0,
 ) -> None:
     """Persist a tool message recording that execution was rejected."""
     msg = Message(
@@ -762,6 +780,8 @@ def _save_rejected_tool_msg(
         role="tool",
         content="Tool execution was rejected by user or timed out.",
         tool_call_id=tool_call_id,
+        version_group_id=version_group_id,
+        version_index=version_index,
     )
     session.add(msg)
 

@@ -13,8 +13,8 @@ export type UIMode = 'assistant' | 'hybrid'
 export const useUIStore = defineStore('ui', () => {
   const mode = ref<UIMode>(loadMode())
 
-  /** Sidebar collapsed state (moved from component-local). */
-  const sidebarOpen = ref(true)
+  /** Sidebar open state — floating sidebar starts closed. */
+  const sidebarOpen = ref(false)
 
   /** Whether the ambient background is visible. */
   const ambientEnabled = computed(() => mode.value === 'assistant' || mode.value === 'hybrid')

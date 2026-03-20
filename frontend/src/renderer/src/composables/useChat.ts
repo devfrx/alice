@@ -46,6 +46,12 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 export interface UseChatReturn {
   /** Send a user message with optional attachments. */
   sendMessage: (content: string, conversationId?: string, attachments?: File[]) => Promise<void>
+  /** Edit a previously sent user message and regenerate the response. */
+  editMessage: (
+    messageId: string,
+    newContent: string,
+    attachments?: File[]
+  ) => Promise<void>
   /** Stop the in-progress generation. */
   stopGeneration: () => void
   /** Respond to a tool confirmation request. */
@@ -132,7 +138,13 @@ export function useChat(): UseChatReturn {
     if (msg.finish_reason && msg.finish_reason !== 'stop') {
       console.debug('[useChat] Stream finished with reason:', msg.finish_reason)
     }
-    store.finalizeStream(msg.conversation_id, msg.message_id)
+    store.finalizeStream(
+      msg.conversation_id,
+      msg.message_id,
+      msg.version_group_id,
+      msg.version_index,
+      msg.user_message_id,
+    )
   }
 
   const onToolCall = (data: unknown): void => {
@@ -322,6 +334,103 @@ export function useChat(): UseChatReturn {
   }
 
   /**
+   * Edit a previously sent user message and regenerate the LLM response.
+   *
+   * 1. Cancels any in-progress stream.
+   * 2. Uploads new attachments (if any).
+   * 3. Determines the version_group_id (existing or new).
+   * 4. Computes the next version_index.
+   * 5. Optimistically adds the edited user message with version metadata.
+   * 6. Sends the edit payload over WebSocket.
+   */
+  async function editMessage(
+    messageId: string,
+    newContent: string,
+    attachments?: File[]
+  ): Promise<void> {
+    const trimmed = newContent.trim()
+    if (!trimmed && (!attachments || attachments.length === 0)) return
+
+    if (!store.currentConversation) return
+    const convId = store.currentConversation.id
+
+    // Cancel any in-progress stream.
+    if (store.isStreaming) {
+      const cancel: WsCancelPayload = { type: 'cancel' }
+      wsManager.send(cancel)
+      store.cancelStream()
+    }
+
+    // Find the original message to determine version group.
+    const original = store.currentConversation.messages.find(
+      (m) => m.id === messageId
+    )
+    if (!original || original.role !== 'user') {
+      console.error('[useChat] editMessage: target message not found or not a user message')
+      return
+    }
+
+    // Determine version_group_id and next version_index.
+    const versionGroupId = original.version_group_id ?? crypto.randomUUID()
+    let maxIndex = 0
+    for (const m of store.currentConversation.messages) {
+      if (m.version_group_id === versionGroupId && m.role === 'user') {
+        maxIndex = Math.max(maxIndex, m.version_index ?? 0)
+      }
+    }
+    // If the original didn't have a version_group_id, tag it now.
+    if (!original.version_group_id) {
+      original.version_group_id = versionGroupId
+      original.version_index = 0
+      // Tag subsequent messages from the original onward with version 0.
+      const originalIdx = store.currentConversation.messages.indexOf(original)
+      for (let i = originalIdx + 1; i < store.currentConversation.messages.length; i++) {
+        const m = store.currentConversation.messages[i]
+        if (!m.version_group_id) {
+          m.version_group_id = versionGroupId
+          m.version_index = 0
+        }
+      }
+    }
+    const newVersionIndex = maxIndex + 1
+
+    // Upload attachments.
+    let uploaded: FileAttachment[] | undefined
+    if (attachments?.length) {
+      try {
+        uploaded = await Promise.all(
+          attachments.map((file) => api.uploadFile(file, convId))
+        )
+      } catch (err) {
+        console.error('[useChat] Attachment upload failed:', err)
+      }
+    }
+
+    // Optimistic UI update.
+    store.addUserMessage(trimmed, uploaded, {
+      versionGroupId,
+      versionIndex: newVersionIndex,
+    })
+
+    activeGeneration = store.streamGeneration
+
+    if (!wsManager.isConnected) {
+      console.error('[useChat] Cannot send — WebSocket is not connected')
+      store.cancelStream()
+      return
+    }
+
+    const payload: WsSendPayload = {
+      content: trimmed,
+      conversation_id: convId,
+      attachments: uploaded?.map((a) => a.file_id),
+      edit_message_id: messageId,
+    }
+
+    wsManager.send(payload)
+  }
+
+  /**
    * Request the server to stop the current generation.
    * Does not immediately clear streaming state — waits for the server
    * to send a "done" event with `finish_reason: "cancelled"`.
@@ -356,6 +465,7 @@ export function useChat(): UseChatReturn {
 
   return {
     sendMessage,
+    editMessage,
     stopGeneration,
     respondToConfirmation,
     isConnected,

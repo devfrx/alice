@@ -6,13 +6,16 @@
  */
 
 import type {
+  BranchConversationRequest,
+  BranchConversationResponse,
   ConversationDetail,
   ConversationExport,
   ConversationSummary,
   DeleteAllConversationsResponse,
   DeleteConversationResponse,
   FileAttachment,
-  RenameConversationResponse
+  RenameConversationResponse,
+  SwitchVersionResponse
 } from '../types/chat'
 import type { PluginInfo } from '../types/plugin'
 import type {
@@ -155,6 +158,51 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ title })
     }),
+
+  /** Switch the active version for a message version group. */
+  switchVersion: (
+    conversationId: string,
+    versionGroupId: string,
+    versionIndex: number
+  ): Promise<SwitchVersionResponse> =>
+    request<SwitchVersionResponse>(
+      `/chat/conversations/${encodeURIComponent(conversationId)}/switch-version`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          version_group_id: versionGroupId,
+          version_index: versionIndex
+        })
+      }
+    ),
+
+  /**
+   * Branch a conversation from a specific message.
+   *
+   * Creates a new conversation containing all messages from the start
+   * of {@link conversationId} up through {@link fromMessageId} (inclusive,
+   * following the active version branch).
+   *
+   * @param conversationId - Source conversation UUID.
+   * @param fromMessageId - UUID of the last message to copy (inclusive).
+   * @param title - Optional title override for the new conversation.
+   * @returns Metadata for the newly created conversation.
+   */
+  branchConversation: (
+    conversationId: string,
+    fromMessageId: string,
+    title?: string,
+  ): Promise<BranchConversationResponse> => {
+    const body: BranchConversationRequest = { from_message_id: fromMessageId }
+    if (title) body.title = title
+    return request<BranchConversationResponse>(
+      `/chat/conversations/${encodeURIComponent(conversationId)}/branch`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }
+    )
+  },
 
   // -- Config ---------------------------------------------------------------
 

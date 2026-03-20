@@ -35,6 +35,11 @@ class Conversation(SQLModel, table=True):
     title: Optional[str] = Field(default=None, max_length=256)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
+    active_versions: Optional[Any] = Field(
+        default=None,
+        sa_column=sa.Column(sa.JSON, nullable=True),
+        description="Map of version_group_id → active version_index.",
+    )
 
     # -- relationships ------------------------------------------------------
     messages: list["Message"] = Relationship(
@@ -83,6 +88,14 @@ class Message(SQLModel, table=True):
     thinking_content: Optional[str] = Field(
         default=None,
         description="Reasoning/thinking tokens from models that support it.",
+    )
+    version_group_id: Optional[uuid.UUID] = Field(
+        default=None,
+        description="Groups message versions at the same edit point.",
+    )
+    version_index: int = Field(
+        default=0,
+        description="Version index within a version group (0 = original).",
     )
     created_at: datetime = Field(default_factory=_utcnow)
 

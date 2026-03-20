@@ -7,15 +7,30 @@
  */
 import { ref, watch, nextTick } from 'vue'
 import { renderMarkdown } from '../../utils/markdownRenderer'
+import MessageVersionNav from '../chat/MessageVersionNav.vue'
 import type { ChatMessage } from '../../types/chat'
 
 const props = defineProps<{
     open: boolean
     messages: ChatMessage[]
+    /** Whether the assistant is currently streaming (disables edit/version nav). */
+    isStreaming?: boolean
+    /** Whether branching is disabled (streaming or other guard). */
+    branchDisabled?: boolean
+    /** Getter: returns total version count for a given version_group_id. */
+    getVersionCount?: (groupId: string) => number
+    /** Getter: returns active version index for a given version_group_id. */
+    getActiveVersionIndex?: (groupId: string) => number
 }>()
 
 const emit = defineEmits<{
     close: []
+    /** User wants to edit a message. */
+    edit: [messageId: string]
+    /** User wants to switch version. */
+    'switch-version': [versionGroupId: string, versionIndex: number]
+    /** User wants to branch from this assistant message. */
+    branch: [messageId: string]
 }>()
 
 const scrollContainer = ref<HTMLElement | null>(null)
@@ -86,12 +101,41 @@ function truncateContent(content: string, maxLen = 200): string {
                     <div v-for="msg in messages" :key="msg.id" class="drawer__msg" :class="`drawer__msg--${msg.role}`">
                         <div class="drawer__msg-header">
                             <span class="drawer__msg-role">{{ roleLabel(msg.role) }}</span>
-                            <span class="drawer__msg-time">{{ formatTime(msg.created_at) }}</span>
+                            <div class="drawer__msg-actions">
+                                <button v-if="msg.role === 'user' && !isStreaming" class="drawer__edit-btn"
+                                    aria-label="Modifica messaggio" @click="emit('edit', msg.id)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                    </svg>
+                                </button>
+                                <button v-if="msg.role === 'assistant' && !branchDisabled"
+                                    class="drawer-msg__branch-btn" aria-label="Dirama da qui"
+                                    @click="emit('branch', msg.id)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="6" cy="18" r="3" />
+                                        <circle cx="6" cy="6" r="3" />
+                                        <circle cx="18" cy="6" r="3" />
+                                        <path d="M6 9v6" />
+                                        <path d="M18 9a9 9 0 0 1-9 9" />
+                                    </svg>
+                                </button>
+                                <span class="drawer__msg-time">{{ formatTime(msg.created_at) }}</span>
+                            </div>
                         </div>
                         <div v-if="msg.role === 'tool'" class="drawer__msg-content drawer__msg-content--tool">
                             {{ truncateContent(msg.content) }}
                         </div>
                         <div v-else class="drawer__msg-content" v-html="renderMarkdown(msg.content || '')" />
+                        <!-- Version navigator for user messages with multiple versions -->
+                        <MessageVersionNav v-if="msg.role === 'user' && msg.version_group_id
+                            && getVersionCount && getVersionCount(msg.version_group_id) > 1"
+                            :active-index="getActiveVersionIndex?.(msg.version_group_id) ?? 0"
+                            :total-versions="getVersionCount(msg.version_group_id)" :disabled="isStreaming" @switch="(idx) => {
+                                if (msg.version_group_id) emit('switch-version', msg.version_group_id, idx)
+                            }" />
                     </div>
                 </div>
             </div>
@@ -324,5 +368,62 @@ function truncateContent(content: string, maxLen = 200): string {
 .drawer__msg-content :deep(li) {
     font-size: var(--text-sm);
     margin-bottom: 2px;
+}
+
+/* ── Edit & actions ── */
+.drawer__msg-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+}
+
+.drawer__edit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 150ms, color 150ms, background 150ms;
+}
+
+.drawer__msg:hover .drawer__edit-btn {
+    opacity: 1;
+}
+
+.drawer__edit-btn:hover {
+    color: var(--text-primary);
+    background: var(--surface-3);
+}
+
+.drawer-msg__branch-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 150ms, color 150ms, background 150ms;
+}
+
+.drawer__msg:hover .drawer-msg__branch-btn {
+    opacity: 1;
+}
+
+.drawer-msg__branch-btn:hover {
+    color: var(--text-primary);
+    background: var(--surface-3);
 }
 </style>

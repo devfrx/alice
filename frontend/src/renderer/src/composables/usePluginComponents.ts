@@ -49,14 +49,6 @@ const PLUGIN_COMPONENT_REGISTRY: PluginComponent[] = [
     mountPoint: 'sidebar',
     order: 20,
   },
-  {
-    name: 'weather',
-    component: defineAsyncComponent(
-      () => import('../components/plugins/WeatherWidget.vue')
-    ),
-    mountPoint: 'toolbar',
-    order: 10,
-  },
 ]
 
 /**

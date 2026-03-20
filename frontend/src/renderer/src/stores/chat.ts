@@ -19,7 +19,7 @@ import type {
   ConversationExport,
   ConversationSummary,
   FileAttachment,
-  ToolExecution
+  ToolExecution,
 } from '../types/chat'
 
 export const useChatStore = defineStore('chat', () => {
@@ -64,10 +64,44 @@ export const useChatStore = defineStore('chat', () => {
   // Computed
   // -----------------------------------------------------------------------
 
-  /** Messages of the active conversation (empty array when none). */
-  const messages = computed<ChatMessage[]>(
-    () => currentConversation.value?.messages ?? []
-  )
+  /**
+   * Active-version filtered messages of the current conversation.
+   * Messages without a version_group_id pass through unchanged.
+   * Versioned messages are shown only if their version_index matches
+   * the active index for their group.
+   */
+  const messages = computed<ChatMessage[]>(() => {
+    const conv = currentConversation.value
+    if (!conv) return []
+    const av = conv.active_versions ?? {}
+    return conv.messages.filter((m) => {
+      if (!m.version_group_id) return true
+      const activeIdx = av[m.version_group_id] ?? 0
+      return (m.version_index ?? 0) === activeIdx
+    })
+  })
+
+  /**
+   * Get the total number of versions for a version group.
+   * Counts distinct version indices among user messages only.
+   */
+  function getVersionCount(versionGroupId: string): number {
+    if (!currentConversation.value) return 1
+    const indices = new Set<number>()
+    for (const m of currentConversation.value.messages) {
+      if (m.version_group_id === versionGroupId && m.role === 'user') {
+        indices.add(m.version_index ?? 0)
+      }
+    }
+    return Math.max(indices.size, 1)
+  }
+
+  /**
+   * Get the active version index for a version group.
+   */
+  function getActiveVersionIndex(versionGroupId: string): number {
+    return currentConversation.value?.active_versions?.[versionGroupId] ?? 0
+  }
 
   /** True only when the currently viewed conversation is the one being streamed. */
   const isStreamingCurrentConversation = computed<boolean>(
@@ -289,9 +323,40 @@ export const useChatStore = defineStore('chat', () => {
   // Message / streaming actions
   // -----------------------------------------------------------------------
 
-  /** Append a user message to the active conversation and start streaming. */
-  function addUserMessage(content: string, attachments?: FileAttachment[]): void {
+  /** Append a user message to the active conversation and start streaming.
+   *  When `editInfo` is provided, the message is tagged with version metadata.
+   *  Otherwise, if the conversation has active version groups, the message
+   *  automatically inherits the version context of the currently active branch.
+   */
+  function addUserMessage(
+    content: string,
+    attachments?: FileAttachment[],
+    editInfo?: { versionGroupId: string; versionIndex: number },
+  ): void {
     if (!currentConversation.value) return
+
+    // Determine version metadata: explicit edit > auto-inherit > none.
+    let versionGroupId: string | undefined
+    let versionIndex: number | undefined
+
+    if (editInfo) {
+      versionGroupId = editInfo.versionGroupId
+      versionIndex = editInfo.versionIndex
+    } else {
+      const av = currentConversation.value.active_versions
+      if (av && Object.keys(av).length > 0) {
+        // Inherit from the most recent versioned message in the active view.
+        const filtered = messages.value
+        for (let i = filtered.length - 1; i >= 0; i--) {
+          const gid = filtered[i].version_group_id
+          if (gid) {
+            versionGroupId = gid
+            versionIndex = av[gid] ?? 0
+            break
+          }
+        }
+      }
+    }
 
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -300,10 +365,22 @@ export const useChatStore = defineStore('chat', () => {
       tool_calls: null,
       tool_call_id: null,
       created_at: new Date().toISOString(),
-      attachments: attachments?.length ? attachments : undefined
+      attachments: attachments?.length ? attachments : undefined,
+      version_group_id: versionGroupId,
+      version_index: versionIndex,
     }
 
     currentConversation.value.messages.push(msg)
+
+    // Update active_versions map when editing.
+    if (editInfo) {
+      if (!currentConversation.value.active_versions) {
+        currentConversation.value.active_versions = {}
+      }
+      currentConversation.value.active_versions[editInfo.versionGroupId] =
+        editInfo.versionIndex
+    }
+
     streamGeneration.value++
     isStreaming.value = true
     isWaitingForResponse.value = true
@@ -340,7 +417,13 @@ export const useChatStore = defineStore('chat', () => {
    * streaming state and refresh the sidebar; `loadConversation()` will
    * fetch the complete message list when the user navigates back.
    */
-  function finalizeStream(conversationId: string, messageId: string): void {
+  function finalizeStream(
+    conversationId: string,
+    messageId: string,
+    versionGroupId?: string | null,
+    versionIndex?: number,
+    userMessageId?: string,
+  ): void {
     // Prevent double-finalization.
     if (!isStreaming.value) return
 
@@ -366,12 +449,10 @@ export const useChatStore = defineStore('chat', () => {
       tool_calls: null,
       tool_call_id: null,
       created_at: new Date().toISOString(),
-      thinking_content: currentThinkingContent.value || null
+      thinking_content: currentThinkingContent.value || null,
+      version_group_id: versionGroupId ?? undefined,
+      version_index: versionIndex ?? undefined,
     }
-
-    // Check if tool executions occurred — if so, we need a full reload to get
-    // intermediate tool messages that were persisted server-side.
-    const hadToolExecutions = activeToolExecutions.value.length > 0
 
     currentConversation.value.messages.push(assistantMsg)
     currentStreamContent.value = ''
@@ -386,11 +467,9 @@ export const useChatStore = defineStore('chat', () => {
     // Refresh sidebar list asynchronously (fire-and-forget)
     loadConversations().catch(console.error)
 
-    // After a tool loop, reload the full conversation to pick up
-    // intermediate tool messages persisted server-side.
-    if (hadToolExecutions) {
-      loadConversation(conversationId).catch(console.error)
-    }
+    // Always reload the conversation from server to sync message IDs,
+    // version metadata, and any intermediate tool-loop messages.
+    loadConversation(conversationId).catch(console.error)
   }
 
   /** Export a conversation as JSON from the backend. */
@@ -445,6 +524,9 @@ export const useChatStore = defineStore('chat', () => {
   function cancelStream(): void {
     // If there's accumulated content, save as partial assistant message
     if ((currentStreamContent.value || currentThinkingContent.value) && currentConversation.value) {
+      // Tag the partial message with the same version context as the last user message.
+      const rawMsgs = currentConversation.value.messages
+      const lastUserMsg = [...rawMsgs].reverse().find((m) => m.role === 'user')
       const partialMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -453,11 +535,12 @@ export const useChatStore = defineStore('chat', () => {
         tool_call_id: null,
         created_at: new Date().toISOString(),
         thinking_content: currentThinkingContent.value || null,
+        version_group_id: lastUserMsg?.version_group_id,
+        version_index: lastUserMsg?.version_index,
       }
       currentConversation.value.messages.push(partialMsg)
     }
 
-    streamGeneration.value++
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
     isStreaming.value = false
@@ -466,6 +549,84 @@ export const useChatStore = defineStore('chat', () => {
     streamingConversationId.value = null
     activeToolExecutions.value = []
     pendingConfirmations.value = {}
+  }
+
+  /**
+   * Switch the active version for a message version group.
+   * Updates local state immediately and persists to backend.
+   *
+   * No-op during streaming: switching versions while a response is being
+   * generated would corrupt the context seen by the LLM.
+   */
+  async function switchVersion(
+    versionGroupId: string,
+    versionIndex: number,
+  ): Promise<void> {
+    if (!currentConversation.value) return
+    if (isStreamingCurrentConversation.value) return
+
+    // Optimistic: update local state first.
+    const previousIndex = currentConversation.value.active_versions?.[versionGroupId] ?? 0
+    if (!currentConversation.value.active_versions) {
+      currentConversation.value.active_versions = {}
+    }
+    currentConversation.value.active_versions[versionGroupId] = versionIndex
+
+    // Persist to backend.
+    try {
+      const result = await api.switchVersion(
+        currentConversation.value.id,
+        versionGroupId,
+        versionIndex,
+      )
+      if (currentConversation.value) {
+        currentConversation.value.active_versions = result.active_versions
+        currentConversation.value.updated_at = result.updated_at
+      }
+    } catch (err) {
+      console.error('[chat store] switchVersion failed:', err)
+      if (currentConversation.value.active_versions) {
+        currentConversation.value.active_versions[versionGroupId] = previousIndex
+      }
+    }
+  }
+
+  /**
+   * Branch the current conversation from a specific message.
+   *
+   * Creates a new independent conversation with all messages from the
+   * start through {@link fromMessageId} (following the active version
+   * branch), then navigates to the new conversation.
+   *
+   * No-op during streaming — branching while a response is being
+   * generated would produce an incomplete context in the new branch.
+   *
+   * @param fromMessageId - UUID of the last message to include in the branch.
+   * @param title - Optional title override. Defaults to server-generated.
+   * @returns UUID of the newly created conversation, or empty string on guard.
+   */
+  async function branchConversation(
+    fromMessageId: string,
+    title?: string,
+  ): Promise<string> {
+    if (!currentConversation.value) return ''
+    if (isStreamingCurrentConversation.value) return ''
+
+    try {
+      const result = await api.branchConversation(
+        currentConversation.value.id,
+        fromMessageId,
+        title,
+      )
+      // Refresh sidebar list so the new conversation appears.
+      await loadConversations()
+      // Navigate to the new conversation.
+      await loadConversation(result.id)
+      return result.id
+    } catch (err) {
+      console.error('[chat store] branchConversation failed:', err)
+      throw err
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -506,6 +667,12 @@ export const useChatStore = defineStore('chat', () => {
     appendToThinking,
     finalizeStream,
     cancelStream,
+
+    // version actions
+    switchVersion,
+    branchConversation,
+    getVersionCount,
+    getActiveVersionIndex,
 
     // tool execution actions
     addToolExecution,

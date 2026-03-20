@@ -327,7 +327,10 @@ function handleEditorKeydown(e: KeyboardEvent): void {
     min-width: 0;
     height: 100%;
     overflow: hidden;
-    background: var(--surface-0);
+    background: var(--surface-1);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
 }
 
 .editor__empty {

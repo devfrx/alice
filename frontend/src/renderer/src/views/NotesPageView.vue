@@ -41,8 +41,11 @@ onMounted(() => {
     width: 100%;
     display: flex;
     flex-direction: row;
+    padding: 10px;
+    gap: 10px;
     overflow: hidden;
     background: var(--surface-0);
     color: var(--text-primary);
+    box-sizing: border-box;
 }
 </style>

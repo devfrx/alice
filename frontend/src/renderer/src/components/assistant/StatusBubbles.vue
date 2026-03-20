@@ -84,40 +84,49 @@ const showStatus = computed(() => props.state !== 'idle')
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-1-5);
+    gap: var(--space-2);
     z-index: var(--z-raised);
     pointer-events: none;
 }
 
-/* ── Primary status capsule ── */
+/* ── Primary status capsule — glass ── */
 .status-capsule {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1-5);
-    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2-5);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    padding: 6px var(--space-3) 6px var(--space-2-5);
+    background: var(--glass-bg-light);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
     font-size: var(--text-2xs);
     font-weight: var(--weight-medium);
     color: var(--text-secondary);
     pointer-events: auto;
-    transition: border-color var(--transition-fast), color var(--transition-fast);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transition:
+        border-color 250ms var(--ease-smooth),
+        color 250ms var(--ease-smooth),
+        box-shadow 250ms var(--ease-smooth);
 }
 
 .status-capsule--listening {
     border-color: var(--listening-border);
     color: var(--listening);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 12px rgba(174, 65, 65, 0.12);
 }
 
 .status-capsule--thinking {
     border-color: var(--thinking-border);
     color: var(--thinking);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 12px rgba(232, 220, 200, 0.08);
 }
 
 .status-capsule--speaking {
     border-color: var(--speaking-border);
     color: var(--speaking);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 12px rgba(55, 103, 68, 0.12);
 }
 
 .status-capsule--processing {
@@ -127,6 +136,7 @@ const showStatus = computed(() => props.state !== 'idle')
 
 .status-capsule__icon {
     flex-shrink: 0;
+    opacity: 0.85;
 }
 
 .status-capsule__icon--spin {
@@ -142,10 +152,10 @@ const showStatus = computed(() => props.state !== 'idle')
 }
 
 .status-capsule__text {
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
 }
 
-/* ── Tool execution capsules ── */
+/* ── Tool execution capsules — glass ── */
 .status-tools {
     display: flex;
     flex-direction: column;
@@ -156,68 +166,83 @@ const showStatus = computed(() => props.state !== 'idle')
 .tool-capsule {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-0-5) var(--space-2-5) var(--space-0-5) var(--space-2);
-    background: var(--surface-2);
-    border: 1px solid var(--accent-border);
-    border-radius: var(--radius-pill);
+    gap: var(--space-1-5);
+    padding: 4px var(--space-2-5) 4px var(--space-2);
+    background: var(--glass-bg-light);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
     font-size: var(--text-2xs);
     color: var(--accent);
     pointer-events: auto;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    transition:
+        border-color 200ms ease,
+        box-shadow 200ms ease;
+}
+
+.tool-capsule:hover {
+    border-color: var(--glass-border-hover);
 }
 
 .tool-capsule__icon {
     flex-shrink: 0;
-    opacity: 0.7;
+    opacity: 0.8;
 }
 
 .tool-capsule__text {
-    max-width: 160px;
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    letter-spacing: 0.02em;
 }
 
 /* ── Capsule pop-in transition ── */
 .capsule-pop-enter-active {
-    transition: opacity var(--duration-normal) ease,
-        transform var(--duration-normal) var(--ease-bounce);
+    transition:
+        opacity 250ms var(--ease-smooth),
+        transform 300ms var(--ease-out-expo);
 }
 
 .capsule-pop-leave-active {
-    transition: opacity var(--duration-fast) ease,
-        transform var(--duration-fast) ease;
+    transition:
+        opacity 150ms ease,
+        transform 150ms ease;
 }
 
 .capsule-pop-enter-from {
     opacity: 0;
-    transform: scale(0) translateY(-8px);
+    transform: scale(0.85) translateY(-6px);
 }
 
 .capsule-pop-leave-to {
     opacity: 0;
-    transform: scale(0.8) translateY(-4px);
+    transform: scale(0.9) translateY(-4px);
 }
 
 /* ── Tool pop-in transition ── */
 .tool-pop-enter-active {
-    transition: opacity var(--duration-normal) ease,
-        transform var(--duration-normal) var(--ease-bounce);
+    transition:
+        opacity 250ms var(--ease-smooth),
+        transform 300ms var(--ease-out-expo);
 }
 
 .tool-pop-leave-active {
-    transition: opacity var(--duration-fast) ease,
-        transform var(--duration-fast) ease;
+    transition:
+        opacity 150ms ease,
+        transform 150ms ease;
 }
 
 .tool-pop-enter-from {
     opacity: 0;
-    transform: scale(0);
+    transform: scale(0.85) translateY(4px);
 }
 
 .tool-pop-leave-to {
     opacity: 0;
-    transform: scale(0.7);
+    transform: scale(0.9);
 }
 
 /* ── Keyframes ── */
@@ -229,7 +254,7 @@ const showStatus = computed(() => props.state !== 'idle')
     }
 
     50% {
-        opacity: 0.35;
+        opacity: 0.3;
     }
 }
 

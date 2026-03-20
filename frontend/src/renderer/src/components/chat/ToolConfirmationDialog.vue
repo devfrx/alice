@@ -157,7 +157,9 @@ onUnmounted(() => {
     align-items: center;
     justify-content: center;
     background: var(--black-heavy);
-    animation: overlayFadeIn 200ms ease;
+    backdrop-filter: blur(var(--blur-sm));
+    -webkit-backdrop-filter: blur(var(--blur-sm));
+    animation: modalOverlayIn 200ms ease;
 }
 
 .confirm-card {
@@ -167,10 +169,10 @@ onUnmounted(() => {
     overflow-y: auto;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     padding: var(--space-6);
-    box-shadow: var(--shadow-md);
-    animation: cardSlideIn 200ms ease;
+    box-shadow: var(--shadow-floating);
+    animation: modalCardIn 250ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .confirm-card__header {
@@ -338,9 +340,10 @@ onUnmounted(() => {
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     border: 1px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: background var(--transition-fast), border-color var(--transition-fast);
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+        color var(--transition-fast);
 }
 
 .confirm-card__btn--approve {
@@ -372,7 +375,7 @@ onUnmounted(() => {
     text-align: center;
 }
 
-@keyframes overlayFadeIn {
+@keyframes modalOverlayIn {
     from {
         opacity: 0;
     }
@@ -382,15 +385,15 @@ onUnmounted(() => {
     }
 }
 
-@keyframes cardSlideIn {
+@keyframes modalCardIn {
     from {
         opacity: 0;
-        transform: translateY(-8px) scale(0.98);
+        transform: scale(0.97) translateY(-6px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: scale(1) translateY(0);
     }
 }
 </style>

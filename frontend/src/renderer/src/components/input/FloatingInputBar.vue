@@ -386,7 +386,7 @@ defineExpose({
 .fib {
     position: fixed;
     bottom: 24px;
-    left: calc(50% + var(--sidebar-offset, 0px) / 2 - var(--panel-offset, 0px) / 2);
+    left: calc(50% - var(--panel-offset, 0px) / 2);
     transform: translateX(-50%);
     z-index: var(--z-dropdown);
     min-width: 360px;
@@ -397,7 +397,8 @@ defineExpose({
     backdrop-filter: blur(var(--glass-blur-heavy));
     -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
+    border-radius: 20px;
+    min-width: 320px;
     padding: var(--space-2) var(--space-3);
 
     box-shadow:
@@ -405,14 +406,12 @@ defineExpose({
         inset 0 1px 0 rgba(255, 255, 255, 0.03);
     transition:
         left 350ms var(--ease-out-expo),
-        border-color 400ms var(--ease-smooth),
-        box-shadow 400ms var(--ease-smooth),
-        border-radius 500ms var(--ease-out-expo),
-        padding 400ms var(--ease-out-expo),
-        min-width 500ms var(--ease-out-expo),
-        max-width 500ms var(--ease-out-expo),
-        left 500ms var(--ease-out-expo),
-        background 400ms var(--ease-smooth);
+        border-color 300ms var(--ease-smooth),
+        box-shadow 300ms var(--ease-smooth),
+        padding 250ms var(--ease-out-expo),
+        min-width 250ms var(--ease-out-expo),
+        max-width 250ms var(--ease-out-expo),
+        background 300ms var(--ease-smooth);
 
     display: grid;
 }
@@ -425,15 +424,8 @@ defineExpose({
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* Collapsed pill shape */
-.fib:not(.fib--expanded):not(.fib--active) {
-    border-radius: var(--radius-pill);
-    min-width: 320px;
-}
-
 /* Expanded input */
 .fib--expanded {
-    border-radius: var(--radius-lg);
     min-width: 420px;
     background: var(--glass-bg);
     box-shadow:
@@ -444,7 +436,6 @@ defineExpose({
 
 /* Active states pill */
 .fib--active {
-    border-radius: var(--radius-pill);
     min-width: 280px;
     max-width: 400px;
     padding: var(--space-2) var(--space-4);

@@ -47,18 +47,15 @@ const secondaryFolders = computed(() =>
 
     <!-- Primary folders -->
     <nav class="folders__nav">
-      <button
-        v-for="folder in primaryFolders"
-        :key="folder"
-        class="folders__item"
+      <button v-for="folder in primaryFolders" :key="folder" class="folders__item"
         :class="{ 'folders__item--active': emailStore.currentFolder === folder }"
-        @click="emailStore.fetchInbox(folder)"
-      >
+        @click="emailStore.fetchInbox(folder)">
         <svg class="folders__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <!-- Inbox -->
           <template v-if="getMeta(folder).icon === 'inbox'">
             <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+            <path
+              d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
           </template>
           <!-- Send -->
           <template v-else-if="getMeta(folder).icon === 'send'">
@@ -82,17 +79,14 @@ const secondaryFolders = computed(() =>
 
     <!-- Secondary folders -->
     <nav class="folders__nav folders__nav--secondary">
-      <button
-        v-for="folder in secondaryFolders"
-        :key="folder"
-        class="folders__item"
+      <button v-for="folder in secondaryFolders" :key="folder" class="folders__item"
         :class="{ 'folders__item--active': emailStore.currentFolder === folder }"
-        @click="emailStore.fetchInbox(folder)"
-      >
+        @click="emailStore.fetchInbox(folder)">
         <svg class="folders__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <!-- Star -->
           <template v-if="getMeta(folder).icon === 'star'">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
           </template>
           <!-- Bookmark -->
           <template v-else-if="getMeta(folder).icon === 'bookmark'">
@@ -141,10 +135,14 @@ const secondaryFolders = computed(() =>
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--surface-1);
-  border-right: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
   overflow-y: auto;
   overflow-x: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .folders__header {

@@ -152,7 +152,7 @@ onUnmounted(() => {
     max-width: 90vw;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     padding: var(--space-5) var(--space-6);
     box-shadow: var(--shadow-floating);
 }
@@ -182,7 +182,7 @@ onUnmounted(() => {
     padding: 7px 18px;
     font-size: var(--text-base);
     font-weight: var(--weight-medium);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     border: 1px solid transparent;
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -241,7 +241,7 @@ onUnmounted(() => {
 }
 
 .modal-enter-active .modal-card {
-    animation: cardIn 0.25s ease;
+    animation: cardIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-leave-active .modal-card {

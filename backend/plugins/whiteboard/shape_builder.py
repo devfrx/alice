@@ -95,6 +95,8 @@ def _build_note_shape(
             "growY": 0,
             "url": "",
             "scale": 1,
+            "fontSizeAdjustment": 0,
+            "labelColor": "black",
         },
     }
 

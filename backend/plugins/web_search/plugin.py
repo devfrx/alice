@@ -126,7 +126,8 @@ class WebSearchPlugin(BasePlugin):
                     "Use this to get real-time prices and direct product links from "
                     "e-commerce or price-comparison sites (trovaprezzi.it, idealo.it, "
                     "amazon.it, etc.) after a web_search identifies candidate URLs. "
-                    "Also useful for reading articles or documentation."
+                    "Also useful for reading articles or documentation. "
+                    "PREFER mcp_primp_fetch over this tool for sites returning 403/CAPTCHA/timeout."
                 ),
                 parameters={
                     "type": "object",

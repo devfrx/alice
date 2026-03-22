@@ -101,6 +101,52 @@ class NetworkInfo:
     dns_servers: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class TracerouteHop:
+    """A single hop in a traceroute."""
+
+    hop: int
+    ip: str | None = None
+    hostname: str | None = None
+    rtt_ms: float | None = None
+    timed_out: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class TracerouteResult:
+    """Result of a traceroute operation."""
+
+    host: str
+    hops: list[TracerouteHop] = field(default_factory=list)
+    reached: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DnsResult:
+    """Result of a DNS forward/reverse lookup."""
+
+    query: str
+    query_type: str
+    addresses: list[str] = field(default_factory=list)
+    hostname: str | None = None
+    aliases: list[str] = field(default_factory=list)
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectionInfo:
+    """A single active network connection."""
+
+    protocol: str
+    local_ip: str
+    local_port: int
+    remote_ip: str
+    remote_port: int
+    status: str
+    pid: int | None = None
+    process_name: str | None = None
+
+
 # -- Service hints ---------------------------------------------------------
 
 _SERVICE_HINTS: dict[int, str] = {
@@ -138,6 +184,17 @@ _RE_ARP_ENTRY = re.compile(
     r"([\da-fA-F]{2}[:-][\da-fA-F]{2}[:-][\da-fA-F]{2}"
     r"[:-][\da-fA-F]{2}[:-][\da-fA-F]{2}[:-][\da-fA-F]{2})\s+"
     r"(\w+)"
+)
+
+# -- Traceroute regex (Windows tracert) ------------------------------------
+
+_RE_TRACERT_HOP = re.compile(
+    r"^\s*(\d+)\s+"               # hop number
+    r"(?:(\*)|"                    # timeout star OR
+    r"[<]?\s*(\d+)\s*ms)"         # RTT in ms
+    r".*?"                         # skip remaining RTT columns
+    r"(?:(\d+\.\d+\.\d+\.\d+)|"   # IP without brackets
+    r"\[(\d+\.\d+\.\d+\.\d+)\])?" # IP inside brackets
 )
 
 
@@ -191,6 +248,53 @@ def _parse_windows_ping(output: str, host: str, count: int) -> PingResult:
         min_ms=min_ms,
         max_ms=max_ms,
     )
+
+
+def _parse_windows_tracert(output: str, host: str) -> TracerouteResult:
+    """Parse Windows ``tracert`` output into a :class:`TracerouteResult`.
+
+    Args:
+        output: Raw stdout from the tracert subprocess.
+        host: Target host that was traced.
+
+    Returns:
+        Parsed :class:`TracerouteResult`.
+    """
+    hops: list[TracerouteHop] = []
+    reached = False
+
+    for line in output.splitlines():
+        m = _RE_TRACERT_HOP.match(line)
+        if not m:
+            continue
+
+        hop_num = int(m.group(1))
+        timed_out = m.group(2) is not None  # matched "*"
+        rtt_ms = float(m.group(3)) if m.group(3) else None
+        ip = m.group(4) or m.group(5)  # with or without brackets
+
+        hops.append(TracerouteHop(
+            hop=hop_num,
+            ip=ip,
+            rtt_ms=rtt_ms,
+            timed_out=timed_out,
+        ))
+
+    # Check if final hop matches the target
+    if hops and hops[-1].ip:
+        try:
+            target_ips = {
+                ai[4][0]
+                for ai in socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
+            }
+            if hops[-1].ip in target_ips:
+                reached = True
+        except (socket.gaierror, OSError):
+            # If DNS fails, do a simple string compare
+            if hops[-1].ip == host:
+                reached = True
+
+    return TracerouteResult(host=host, hops=hops, reached=reached)
 
 
 def _get_local_subnets() -> list[tuple[str, int]]:
@@ -523,6 +627,164 @@ class NetworkProber:
                 response_ms=round(elapsed_ms, 2),
                 error=str(exc)[:200],
             )
+
+    # -- Traceroute --------------------------------------------------------
+
+    async def traceroute_host(
+        self, host: str, max_hops: int = 15,
+    ) -> TracerouteResult:
+        """Run ``tracert`` to *host* and parse hop-by-hop results.
+
+        Args:
+            host: Target IP or hostname (must be pre-validated as local).
+            max_hops: Maximum number of hops (clamped to 1-cfg.traceroute_max_hops).
+
+        Returns:
+            :class:`TracerouteResult` with ordered hops.
+        """
+        max_hops = max(1, min(max_hops, self._cfg.traceroute_max_hops))
+        timeout = self._cfg.ping_timeout_s * (max_hops + 5)
+
+        try:
+            result = await asyncio.to_thread(
+                _run_cmd,
+                "tracert", "-d", "-h", str(max_hops), "-w",
+                str(int(self._cfg.ping_timeout_s * 1000)), host,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning("Traceroute to {} timed out", host)
+            return TracerouteResult(host=host)
+        except OSError as exc:
+            logger.error("Failed to execute tracert for {}: {}", host, exc)
+            return TracerouteResult(host=host)
+
+        output = result.stdout.decode("oem", errors="replace")
+        return _parse_windows_tracert(output, host)
+
+    # -- DNS resolve -------------------------------------------------------
+
+    async def resolve_hostname(self, query: str) -> DnsResult:
+        """Perform a DNS forward or reverse lookup for *query*.
+
+        If *query* is an IP address, a reverse lookup (PTR) is performed.
+        Otherwise a forward lookup (A/AAAA) is performed.
+
+        Args:
+            query: Hostname or IP address to resolve.
+
+        Returns:
+            :class:`DnsResult` with resolved addresses/hostname.
+        """
+        is_ip = False
+        try:
+            ipaddress.ip_address(query)
+            is_ip = True
+        except ValueError:
+            pass
+
+        if is_ip:
+            return await self._resolve_reverse(query)
+        return await self._resolve_forward(query)
+
+    async def _resolve_forward(self, hostname: str) -> DnsResult:
+        """Forward DNS lookup via ``socket.gethostbyname_ex``."""
+        try:
+            name, aliases, addrs = await asyncio.wait_for(
+                asyncio.to_thread(socket.gethostbyname_ex, hostname),
+                timeout=self._cfg.ping_timeout_s,
+            )
+            return DnsResult(
+                query=hostname,
+                query_type="forward",
+                addresses=addrs,
+                hostname=name if name != hostname else None,
+                aliases=[a for a in aliases if a != hostname],
+            )
+        except (socket.herror, socket.gaierror) as exc:
+            return DnsResult(
+                query=hostname, query_type="forward",
+                error=f"DNS lookup failed: {exc}",
+            )
+        except asyncio.TimeoutError:
+            return DnsResult(
+                query=hostname, query_type="forward",
+                error="DNS lookup timed out",
+            )
+
+    async def _resolve_reverse(self, ip: str) -> DnsResult:
+        """Reverse DNS lookup via ``socket.gethostbyaddr``."""
+        try:
+            name, aliases, addrs = await asyncio.wait_for(
+                asyncio.to_thread(socket.gethostbyaddr, ip),
+                timeout=self._cfg.ping_timeout_s,
+            )
+            return DnsResult(
+                query=ip,
+                query_type="reverse",
+                hostname=name,
+                addresses=addrs,
+                aliases=aliases,
+            )
+        except (socket.herror, socket.gaierror) as exc:
+            return DnsResult(
+                query=ip, query_type="reverse",
+                error=f"Reverse DNS lookup failed: {exc}",
+            )
+        except asyncio.TimeoutError:
+            return DnsResult(
+                query=ip, query_type="reverse",
+                error="Reverse DNS lookup timed out",
+            )
+
+    # -- Open connections --------------------------------------------------
+
+    async def get_open_connections(
+        self, protocol: str = "tcp",
+    ) -> list[ConnectionInfo]:
+        """Return active network connections via ``psutil.net_connections``.
+
+        Args:
+            protocol: Filter by protocol: ``tcp``, ``udp``, or ``all``.
+
+        Returns:
+            List of :class:`ConnectionInfo` for established connections.
+
+        Raises:
+            RuntimeError: If psutil is not installed.
+        """
+        if not _PSUTIL_AVAILABLE:
+            raise RuntimeError("psutil is required for connection listing")
+
+        kind_map = {"tcp": "tcp", "udp": "udp", "all": "inet"}
+        kind = kind_map.get(protocol.lower(), "tcp")
+
+        raw_conns = await asyncio.to_thread(psutil.net_connections, kind)
+
+        # Build a PID → process name cache for active PIDs
+        pids: set[int] = {c.pid for c in raw_conns if c.pid}
+        pid_names: dict[int, str] = {}
+        if pids:
+            for proc in await asyncio.to_thread(psutil.process_iter, ["pid", "name"]):
+                if proc.info["pid"] in pids:
+                    pid_names[proc.info["pid"]] = proc.info["name"]
+
+        connections: list[ConnectionInfo] = []
+        for c in raw_conns:
+            # Skip connections without remote address (listeners)
+            if not c.raddr:
+                continue
+            connections.append(ConnectionInfo(
+                protocol="tcp" if c.type == socket.SOCK_STREAM else "udp",
+                local_ip=c.laddr.ip if c.laddr else "",
+                local_port=c.laddr.port if c.laddr else 0,
+                remote_ip=c.raddr.ip,
+                remote_port=c.raddr.port,
+                status=c.status if hasattr(c, "status") else "NONE",
+                pid=c.pid,
+                process_name=pid_names.get(c.pid) if c.pid else None,
+            ))
+        return connections[: self._cfg.max_connections_returned]
 
     # -- Device discovery --------------------------------------------------
 

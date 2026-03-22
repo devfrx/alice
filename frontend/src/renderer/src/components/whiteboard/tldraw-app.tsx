@@ -88,6 +88,11 @@ export default function TldrawApp({
           if (record.type === 'text' && record.props.textAlign == null) {
             record.props.textAlign = record.props.align ?? 'start'
           }
+          // note shapes: fontSizeAdjustment + labelColor required since tldraw v3.9
+          if (record.type === 'note') {
+            if (record.props.fontSizeAdjustment == null) record.props.fontSizeAdjustment = 0
+            if (record.props.labelColor == null) record.props.labelColor = 'black'
+          }
         }
       }
     }

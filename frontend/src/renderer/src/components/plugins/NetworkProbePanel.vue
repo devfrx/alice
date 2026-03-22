@@ -7,9 +7,9 @@ import { api } from '../../services/api'
 interface PingResult {
     host: string
     reachable: boolean
-    packets_sent: number
-    packets_received: number
-    packet_loss_pct: number
+    sent: number
+    received: number
+    loss_pct: number
     avg_ms: number | null
     min_ms: number | null
     max_ms: number | null
@@ -57,7 +57,46 @@ interface NetworkInfoResult {
     }[]
 }
 
-type TabKey = 'ping' | 'ports' | 'devices' | 'info'
+interface TracerouteHop {
+    hop: number
+    ip: string | null
+    hostname: string | null
+    rtt_ms: number | null
+    timed_out: boolean
+}
+
+interface TracerouteResult {
+    host: string
+    hops: TracerouteHop[]
+    reached: boolean
+}
+
+interface DnsResult {
+    query: string
+    query_type: string
+    addresses: string[]
+    hostname: string | null
+    aliases: string[]
+    error: string | null
+}
+
+interface ConnectionEntry {
+    protocol: string
+    local_ip: string
+    local_port: number
+    remote_ip: string
+    remote_port: number
+    status: string
+    pid: number | null
+    process_name: string | null
+}
+
+interface ConnectionsResult {
+    count: number
+    connections: ConnectionEntry[]
+}
+
+type TabKey = 'ping' | 'ports' | 'devices' | 'info' | 'traceroute' | 'dns' | 'connections'
 
 /* ── Props / Emits ──────────────────────────────────────────────────── */
 
@@ -70,6 +109,9 @@ const activeTab = ref<TabKey>('ping')
 const tabs: { key: TabKey; icon: string; label: string }[] = [
     { key: 'ping', icon: '🏓', label: 'Ping' },
     { key: 'ports', icon: '🔌', label: 'Ports' },
+    { key: 'traceroute', icon: '🔀', label: 'Route' },
+    { key: 'dns', icon: '🔍', label: 'DNS' },
+    { key: 'connections', icon: '🔗', label: 'Conns' },
     { key: 'devices', icon: '📡', label: 'Devices' },
     { key: 'info', icon: 'ℹ️', label: 'Info' }
 ]
@@ -214,6 +256,85 @@ async function getNetworkInfo(): Promise<void> {
     }
 }
 
+/* ── Traceroute ─────────────────────────────────────────────────────── */
+
+const traceHost = ref('192.168.1.1')
+const traceMaxHops = ref(15)
+const traceResult = ref<TracerouteResult | null>(null)
+const traceLoading = ref(false)
+const traceError = ref('')
+
+async function doTraceroute(): Promise<void> {
+    const host = traceHost.value.trim()
+    if (!host) return
+    traceLoading.value = true
+    traceError.value = ''
+    traceResult.value = null
+    try {
+        const res = await api.executePluginTool<TracerouteResult>(
+            'network_probe', 'traceroute_host',
+            { host, max_hops: traceMaxHops.value }
+        )
+        if (res.success) traceResult.value = res.content
+        else traceError.value = res.error_message ?? 'Traceroute failed'
+    } catch {
+        traceError.value = 'Cannot reach the server'
+    } finally {
+        traceLoading.value = false
+    }
+}
+
+/* ── DNS Resolve ────────────────────────────────────────────────────── */
+
+const dnsQuery = ref('')
+const dnsResult = ref<DnsResult | null>(null)
+const dnsLoading = ref(false)
+const dnsError = ref('')
+
+async function doResolve(): Promise<void> {
+    const query = dnsQuery.value.trim()
+    if (!query) return
+    dnsLoading.value = true
+    dnsError.value = ''
+    dnsResult.value = null
+    try {
+        const res = await api.executePluginTool<DnsResult>(
+            'network_probe', 'resolve_hostname', { query }
+        )
+        if (res.success) dnsResult.value = res.content
+        else dnsError.value = res.error_message ?? 'DNS lookup failed'
+    } catch {
+        dnsError.value = 'Cannot reach the server'
+    } finally {
+        dnsLoading.value = false
+    }
+}
+
+/* ── Open Connections ───────────────────────────────────────────────── */
+
+const connProtocol = ref<'tcp' | 'udp' | 'all'>('tcp')
+const connResult = ref<ConnectionsResult | null>(null)
+const connLoading = ref(false)
+const connError = ref('')
+
+async function getConnections(): Promise<void> {
+    connLoading.value = true
+    connError.value = ''
+    connResult.value = null
+    try {
+        const res = await api.executePluginTool<ConnectionsResult>(
+            'network_probe', 'get_open_connections',
+            { protocol: connProtocol.value }
+        )
+        if (res.success) connResult.value = res.content
+        else connError.value = res.error_message ?? 'Failed to list connections'
+    } catch {
+        connError.value = 'Cannot reach the server'
+    } finally {
+        connLoading.value = false
+    }
+}
+
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
 function fmtMs(v: number | null): string {
@@ -274,11 +395,11 @@ function fmtMs(v: number | null): string {
                         </div>
                         <div class="net-probe__row">
                             <span class="net-probe__label-sm">Packets</span>
-                            <span>{{ pingResult.packets_sent }} sent · {{ pingResult.packets_received }} received</span>
+                            <span>{{ pingResult.sent }} sent · {{ pingResult.received }} received</span>
                         </div>
                         <div class="net-probe__row">
                             <span class="net-probe__label-sm">Loss</span>
-                            <span>{{ pingResult.packet_loss_pct.toFixed(1) }}%</span>
+                            <span>{{ pingResult.loss_pct.toFixed(1) }}%</span>
                         </div>
                         <div v-if="pingResult.reachable" class="net-probe__row">
                             <span class="net-probe__label-sm">Latency</span>
@@ -470,6 +591,144 @@ function fmtMs(v: number | null): string {
                             <div class="net-probe__row">
                                 <span class="net-probe__label-sm">Speed</span>
                                 <span>{{ iface.speed_mbps > 0 ? `${iface.speed_mbps} Mbps` : '—' }}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ─── Traceroute ───────────────────────────────────── -->
+                <div v-if="activeTab === 'traceroute'" class="net-probe__section">
+                    <div class="net-probe__field">
+                        <label class="net-probe__label">Host</label>
+                        <input v-model="traceHost" class="net-probe__input" type="text" placeholder="192.168.1.1"
+                            @keydown.enter="doTraceroute" />
+                    </div>
+                    <div class="net-probe__field">
+                        <label class="net-probe__label">Max Hops</label>
+                        <input v-model.number="traceMaxHops" class="net-probe__input net-probe__input--sm" type="number"
+                            min="1" max="30" />
+                    </div>
+                    <button class="net-probe__btn" :disabled="traceLoading" @click="doTraceroute">
+                        <span v-if="traceLoading" class="net-probe__spinner" />
+                        {{ traceLoading ? 'Tracing…' : '🔀 Traceroute' }}
+                    </button>
+
+                    <div v-if="traceError" class="net-probe__error">⚠️ {{ traceError }}</div>
+
+                    <template v-if="traceResult">
+                        <div class="net-probe__card">
+                            <div class="net-probe__row">
+                                <span class="net-probe__label-sm">Target</span>
+                                <span class="net-probe__mono">{{ traceResult.host }}</span>
+                            </div>
+                            <div class="net-probe__row">
+                                <span class="net-probe__label-sm">Status</span>
+                                <span class="net-probe__dot"
+                                    :class="traceResult.reached ? 'net-probe__dot--ok' : 'net-probe__dot--fail'" />
+                                <span :class="traceResult.reached ? 'net-probe__text--ok' : 'net-probe__text--fail'">
+                                    {{ traceResult.reached ? 'Reached' : 'Not reached' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div v-if="traceResult.hops.length" class="net-probe__sub-title">
+                            Hops ({{ traceResult.hops.length }})
+                        </div>
+                        <div v-for="h in traceResult.hops" :key="h.hop" class="net-probe__card">
+                            <div class="net-probe__row">
+                                <span class="net-probe__label-sm">Hop {{ h.hop }}</span>
+                                <span v-if="h.timed_out" class="net-probe__text--fail">* * *</span>
+                                <template v-else>
+                                    <span class="net-probe__mono">{{ h.ip ?? '—' }}</span>
+                                    <span v-if="h.hostname" class="net-probe__port-svc">({{ h.hostname }})</span>
+                                </template>
+                            </div>
+                            <div v-if="!h.timed_out && h.rtt_ms != null" class="net-probe__row">
+                                <span class="net-probe__label-sm">RTT</span>
+                                <span>{{ fmtMs(h.rtt_ms) }}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ─── DNS ──────────────────────────────────────────── -->
+                <div v-if="activeTab === 'dns'" class="net-probe__section">
+                    <div class="net-probe__field">
+                        <label class="net-probe__label">Hostname or IP</label>
+                        <input v-model="dnsQuery" class="net-probe__input" type="text"
+                            placeholder="my-nas.local or 192.168.1.1" @keydown.enter="doResolve" />
+                    </div>
+                    <button class="net-probe__btn" :disabled="dnsLoading" @click="doResolve">
+                        <span v-if="dnsLoading" class="net-probe__spinner" />
+                        {{ dnsLoading ? 'Resolving…' : '🔍 Resolve' }}
+                    </button>
+
+                    <div v-if="dnsError" class="net-probe__error">⚠️ {{ dnsError }}</div>
+
+                    <div v-if="dnsResult" class="net-probe__card">
+                        <div class="net-probe__row">
+                            <span class="net-probe__label-sm">Query</span>
+                            <span class="net-probe__mono">{{ dnsResult.query }}</span>
+                        </div>
+                        <div class="net-probe__row">
+                            <span class="net-probe__label-sm">Type</span>
+                            <span>{{ dnsResult.query_type === 'forward' ? 'Forward (A)' : 'Reverse (PTR)' }}</span>
+                        </div>
+                        <div v-if="dnsResult.hostname" class="net-probe__row">
+                            <span class="net-probe__label-sm">Hostname</span>
+                            <span class="net-probe__mono">{{ dnsResult.hostname }}</span>
+                        </div>
+                        <div v-if="dnsResult.addresses.length" class="net-probe__row">
+                            <span class="net-probe__label-sm">Addresses</span>
+                            <span class="net-probe__mono">{{ dnsResult.addresses.join(', ') }}</span>
+                        </div>
+                        <div v-if="dnsResult.aliases.length" class="net-probe__row">
+                            <span class="net-probe__label-sm">Aliases</span>
+                            <span class="net-probe__mono">{{ dnsResult.aliases.join(', ') }}</span>
+                        </div>
+                        <div v-if="dnsResult.error" class="net-probe__row">
+                            <span class="net-probe__label-sm">Error</span>
+                            <span class="net-probe__text--fail">{{ dnsResult.error }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Connections ──────────────────────────────────── -->
+                <div v-if="activeTab === 'connections'" class="net-probe__section">
+                    <div class="net-probe__field-row">
+                        <select v-model="connProtocol" class="net-probe__select">
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="all">All</option>
+                        </select>
+                        <button class="net-probe__btn" :disabled="connLoading" @click="getConnections">
+                            <span v-if="connLoading" class="net-probe__spinner" />
+                            {{ connLoading ? 'Loading…' : '🔗 List Connections' }}
+                        </button>
+                    </div>
+
+                    <div v-if="connError" class="net-probe__error">⚠️ {{ connError }}</div>
+
+                    <template v-if="connResult">
+                        <div class="net-probe__count">{{ connResult.count }} active connection(s)</div>
+                        <div v-for="(c, i) in connResult.connections" :key="i" class="net-probe__card">
+                            <div class="net-probe__row">
+                                <span class="net-probe__label-sm">Proto</span>
+                                <span class="net-probe__conn-proto">{{ c.protocol.toUpperCase() }}</span>
+                                <span class="net-probe__conn-status">{{ c.status }}</span>
+                            </div>
+                            <div class="net-probe__row">
+                                <span class="net-probe__label-sm">Local</span>
+                                <span class="net-probe__mono">{{ c.local_ip }}:{{ c.local_port }}</span>
+                            </div>
+                            <div class="net-probe__row">
+                                <span class="net-probe__label-sm">Remote</span>
+                                <span class="net-probe__mono">{{ c.remote_ip }}:{{ c.remote_port }}</span>
+                            </div>
+                            <div v-if="c.process_name" class="net-probe__row">
+                                <span class="net-probe__label-sm">Process</span>
+                                <span>{{ c.process_name }}<span v-if="c.pid" class="net-probe__port-svc"> (PID {{ c.pid
+                                        }})</span></span>
                             </div>
                         </div>
                     </template>
@@ -808,6 +1067,23 @@ function fmtMs(v: number | null): string {
     padding: 1px 5px;
     background: var(--surface-2, #232323);
     border-radius: 3px;
+}
+
+/* ── Connection specifics ───────────────────────────────────────────── */
+
+.net-probe__conn-proto {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+
+.net-probe__conn-status {
+    font-size: 10px;
+    color: var(--text-secondary, #A09B90);
+    padding: 1px 6px;
+    background: var(--surface-2, #232323);
+    border-radius: 3px;
+    margin-left: auto;
 }
 
 /* ── Misc ───────────────────────────────────────────────────────────── */

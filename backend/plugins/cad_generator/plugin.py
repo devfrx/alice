@@ -183,9 +183,12 @@ class CadGeneratorPlugin(BasePlugin):
             ToolDefinition(
                 name="cad_generate",
                 description=(
-                    "Generate a 3D model (GLB) from a text description "
-                    "using the local TRELLIS microservice. Returns the "
-                    "file path and a URL to view the model."
+                    "Generate a 3D model (GLB) from a text description using the local TRELLIS neural network. "
+                    "Returns the file path and a URL to view the model. "
+                    "Write DETAILED descriptions for best results: shape, dimensions, material, style, details. "
+                    "Use descriptive English model_name (e.g. 'phone_stand', 'decorative_vase'). "
+                    "Generation takes 30–90 seconds — warn the user. "
+                    "Do NOT write CAD code — the system uses a neural network."
                 ),
                 parameters={
                     "type": "object",

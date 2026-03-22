@@ -59,9 +59,12 @@ class NotesPlugin(BasePlugin):
             ToolDefinition(
                 name="create_note",
                 description=(
-                    "Create a new Markdown note in the vault. "
-                    "Use for documents the user wants to review "
-                    "and edit later (recipes, plans, summaries)."
+                    "Create a structured Markdown document in the vault. "
+                    "Use for long-form content the user will review and edit in the UI "
+                    "(recipes, project plans, summaries, guides). "
+                    "DISTINCT from memory_remember which stores short atomic facts — "
+                    "use notes for rich, titled, user-visible documents. "
+                    "Never create a duplicate — use update_note if a note already exists."
                 ),
                 parameters={
                     "type": "object",

@@ -68,9 +68,13 @@ class MemoryPlugin(BasePlugin):
             ToolDefinition(
                 name="remember",
                 description=(
-                    "Save a piece of information to persistent memory. "
-                    "Use this to store facts, user preferences, or context "
-                    "that should be recalled in future conversations."
+                    "Save a fact to persistent memory. "
+                    "Call this proactively — WITHOUT asking the user first — when they share: "
+                    "preferences (food, apps, brands, habits) → category='preference'; "
+                    "personal facts (job, hobby, family, birthday, city) → category='fact'; "
+                    "skills or interests → category='skill'. "
+                    "The tool call is mandatory; replying verbally is NOT enough. "
+                    "Do NOT save: casual questions, search results, transient data, obvious conversation context."
                 ),
                 parameters={
                     "type": "object",
@@ -124,8 +128,9 @@ class MemoryPlugin(BasePlugin):
                 name="recall",
                 description=(
                     "Search memories by semantic similarity. "
-                    "Use this to find previously stored facts, preferences, "
-                    "or context relevant to the current conversation."
+                    "Call this proactively when changing topic or when past context "
+                    "would enrich the response — do not wait for the user to ask. "
+                    "Never ask for information already stored in memory — search first."
                 ),
                 parameters={
                     "type": "object",

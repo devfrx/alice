@@ -244,6 +244,8 @@ network_probe:
   discover_timeout_s: 30.0
   max_concurrent_scans: 50
   max_concurrent_pings: 20
+  traceroute_max_hops: 30
+  max_connections_returned: 500
 
 
 # ──────────────────────────────────────────────────

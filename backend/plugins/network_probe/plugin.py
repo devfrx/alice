@@ -1,7 +1,8 @@
 """AL\\CE — Network probe plugin.
 
 Exposes LAN diagnostic tools: ICMP ping, TCP port scan, service
-banner checks, ARP-based device discovery and local interface info.
+banner checks, ARP-based device discovery, local interface info,
+traceroute, DNS resolution, and active connection listing.
 All targets are validated to be RFC-1918 / loopback only.
 """
 
@@ -37,8 +38,9 @@ class NetworkProbePlugin(BasePlugin):
     plugin_name: str = "network_probe"
     plugin_version: str = "1.0.0"
     plugin_description: str = (
-        "Provides LAN diagnostics: ping, port scan, service checks, "
-        "device discovery and local network information."
+        "Provides LAN diagnostics: ping, traceroute, port scan, service "
+        "checks, DNS resolution, device discovery, active connections "
+        "and local network information."
     )
     plugin_dependencies: list[str] = []
     plugin_priority: int = 45
@@ -70,7 +72,7 @@ class NetworkProbePlugin(BasePlugin):
         """Return tool definitions for network probe operations.
 
         Returns:
-            A list of five ``ToolDefinition`` objects.
+            A list of eight ``ToolDefinition`` objects.
         """
         return [
             ToolDefinition(
@@ -204,6 +206,82 @@ class NetworkProbePlugin(BasePlugin):
                 risk_level="safe",
                 timeout_ms=10_000,
             ),
+            ToolDefinition(
+                name="traceroute_host",
+                description=(
+                    "Trace the network path to a local host, showing "
+                    "each hop with its IP and round-trip time."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "host": {
+                            "type": "string",
+                            "description": (
+                                "Target IP address or hostname "
+                                "(must be on the local network)."
+                            ),
+                        },
+                        "max_hops": {
+                            "type": "integer",
+                            "description": "Maximum number of hops.",
+                            "default": 15,
+                            "minimum": 1,
+                            "maximum": 30,
+                        },
+                    },
+                    "required": ["host"],
+                },
+                result_type="json",
+                risk_level="safe",
+                timeout_ms=60_000,
+            ),
+            ToolDefinition(
+                name="resolve_hostname",
+                description=(
+                    "Resolve a hostname to IP addresses (forward lookup) "
+                    "or an IP address to a hostname (reverse lookup)."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": (
+                                "Hostname for forward DNS lookup, or "
+                                "IP address for reverse DNS lookup."
+                            ),
+                        },
+                    },
+                    "required": ["query"],
+                },
+                result_type="json",
+                risk_level="safe",
+                timeout_ms=10_000,
+            ),
+            ToolDefinition(
+                name="get_open_connections",
+                description=(
+                    "List active network connections on this machine: "
+                    "local/remote address, port, protocol, status, "
+                    "and owning process."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "protocol": {
+                            "type": "string",
+                            "description": "Filter by protocol.",
+                            "enum": ["tcp", "udp", "all"],
+                            "default": "tcp",
+                        },
+                    },
+                },
+                result_type="json",
+                risk_level="safe",
+                timeout_ms=10_000,
+                max_result_chars=20_000,
+            ),
         ]
 
     # -- Dispatch ----------------------------------------------------------
@@ -217,7 +295,7 @@ class NetworkProbePlugin(BasePlugin):
         """Dispatch to the requested network probe tool.
 
         Args:
-            tool_name: One of the five registered tool names.
+            tool_name: One of the eight registered tool names.
             args: Caller-supplied keyword arguments.
             context: Execution metadata.
 
@@ -241,6 +319,12 @@ class NetworkProbePlugin(BasePlugin):
                     return await self._handle_discover(start)
                 case "get_local_network_info":
                     return await self._handle_netinfo(start)
+                case "traceroute_host":
+                    return await self._handle_traceroute(args, start)
+                case "resolve_hostname":
+                    return await self._handle_resolve(args, start)
+                case "get_open_connections":
+                    return await self._handle_connections(args, start)
                 case _:
                     return ToolResult.error(f"Unknown tool: {tool_name}")
         except LocalNetworkValidationError as exc:
@@ -350,6 +434,50 @@ class NetworkProbePlugin(BasePlugin):
                 "gateway": info.gateway,
                 "dns_servers": info.dns_servers,
                 "interfaces": [asdict(i) for i in info.interfaces],
+            },
+            content_type="application/json",
+            execution_time_ms=elapsed_ms,
+        )
+
+    async def _handle_traceroute(
+        self, args: dict[str, Any], start: float
+    ) -> ToolResult:
+        """Validate host and run traceroute."""
+        host: str = args["host"]
+        max_hops: int = args.get("max_hops", 15)
+        await async_validate_host_local(host)
+        result = await self._prober.traceroute_host(host, max_hops)  # type: ignore[union-attr]
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return ToolResult.ok(
+            content=asdict(result),
+            content_type="application/json",
+            execution_time_ms=elapsed_ms,
+        )
+
+    async def _handle_resolve(
+        self, args: dict[str, Any], start: float
+    ) -> ToolResult:
+        """Perform DNS forward or reverse lookup."""
+        query: str = args["query"]
+        result = await self._prober.resolve_hostname(query)  # type: ignore[union-attr]
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return ToolResult.ok(
+            content=asdict(result),
+            content_type="application/json",
+            execution_time_ms=elapsed_ms,
+        )
+
+    async def _handle_connections(
+        self, args: dict[str, Any], start: float
+    ) -> ToolResult:
+        """List active network connections."""
+        protocol: str = args.get("protocol", "tcp")
+        connections = await self._prober.get_open_connections(protocol)  # type: ignore[union-attr]
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return ToolResult.ok(
+            content={
+                "count": len(connections),
+                "connections": [asdict(c) for c in connections],
             },
             content_type="application/json",
             execution_time_ms=elapsed_ms,

@@ -162,9 +162,12 @@ class ChartGeneratorPlugin(BasePlugin):
                 name="generate_chart",
                 description=(
                     "Genera un grafico interattivo Apache ECharts e lo persiste su disco. "
-                    "L'output viene visualizzato direttamente nella chat come viewer interattivo. "
-                    "Costruisci l'echarts_option in base ai dati raccolti (note, vision, web, prompt). "
-                    "Usa questo tool SOLO dopo aver raccolto tutti i dati necessari."
+                    "L'output viene visualizzato nella chat come viewer interattivo. "
+                    "Raccogli tutti i dati PRIMA di chiamare questo tool. "
+                    "REGOLE echarts_option: (1) series[].data deve avere la stessa lunghezza di xAxis/yAxis.data; "
+                    "(2) non mischiare unità diverse nella stessa serie; "
+                    "(3) NON includere 'title' — il titolo è già nell'header del viewer; "
+                    "(4) pie chart: series[0].type='pie' con data=[{name,value}], no xAxis/yAxis."
                 ),
                 parameters=_GENERATE_SCHEMA,
                 risk_level="safe",

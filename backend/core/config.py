@@ -679,6 +679,12 @@ class NetworkProbeConfig(BaseSettings):
     max_concurrent_pings: int = 20
     """Maximum concurrent ping subprocesses during device discovery."""
 
+    traceroute_max_hops: int = 30
+    """Hard upper limit on hops for ``traceroute_host``."""
+
+    max_connections_returned: int = 500
+    """Maximum number of connections returned by ``get_open_connections``."""
+
 
 class McpConfig(BaseSettings):
     """MCP client configuration."""

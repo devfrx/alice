@@ -126,9 +126,9 @@ class PcAutomationPlugin(BasePlugin):
             ToolDefinition(
                 name="type_text",
                 description=(
-                    "Type text into the currently focused window "
-                    "using clipboard paste. Max 1000 characters per call; "
-                    "split longer text into multiple calls."
+                    "Type text into the currently focused window using clipboard paste. "
+                    "Max 1000 characters per call; split longer text into multiple calls. "
+                    "ALWAYS call get_active_window first to verify the correct window is focused."
                 ),
                 parameters={
                     "type": "object",
@@ -213,15 +213,14 @@ class PcAutomationPlugin(BasePlugin):
             ToolDefinition(
                 name="execute_command",
                 description=(
-                    "Execute a whitelisted shell command. "
-                    "Informational: dir, echo, type, ipconfig, "
-                    "systeminfo, tasklist, hostname, whoami, ping, "
-                    "nslookup, netstat, ver, vol, where, tree, findstr. "
-                    "File management: mkdir, copy, move, rename, ren, "
-                    "rmdir, robocopy. "
-                    "System directories (C:\\Windows, C:\\Program Files, "
-                    "etc.) are protected. Destructive flags like "
-                    "rmdir /s /q are blocked."
+                    "Execute a whitelisted shell command. Requires explicit confirmation. "
+                    "Informational: dir, echo, type, ipconfig, systeminfo, tasklist, hostname, "
+                    "whoami, ping, nslookup, netstat, ver, vol, where, tree, findstr. "
+                    "File management: mkdir, copy, move, rename, ren, rmdir, robocopy. "
+                    "BLOCKED: system dirs (C:\\Windows, C:\\Program Files, C:\\ProgramData), "
+                    "destructive flags (rmdir /s /q, robocopy /mir /purge /move), "
+                    "shell metacharacters (| & ; ` < > % $). "
+                    "Always use absolute paths."
                 ),
                 parameters={
                     "type": "object",

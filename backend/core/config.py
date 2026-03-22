@@ -650,6 +650,36 @@ class TrellisServiceConfig(BaseSettings):
     """Seed for generation. -1 = random."""
 
 
+class NetworkProbeConfig(BaseSettings):
+    """Network probe plugin configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_NETWORK_PROBE__")
+
+    max_ports_per_scan: int = 100
+    """Hard upper limit on TCP ports per ``scan_ports`` call."""
+
+    max_ping_count: int = 10
+    """Maximum allowed ICMP packet count per ``ping_host`` call."""
+
+    ping_timeout_s: float = 2.0
+    """Seconds to wait for each ICMP reply."""
+
+    port_scan_timeout_s: float = 1.0
+    """Default per-port TCP connect timeout in seconds."""
+
+    service_check_timeout_s: float = 5.0
+    """Timeout for HTTP/SSH/FTP service banner checks in seconds."""
+
+    discover_timeout_s: float = 30.0
+    """Total timeout budget for ``discover_local_devices`` in seconds."""
+
+    max_concurrent_scans: int = 50
+    """Maximum concurrent TCP connections during port scanning."""
+
+    max_concurrent_pings: int = 20
+    """Maximum concurrent ping subprocesses during device discovery."""
+
+
 class McpConfig(BaseSettings):
     """MCP client configuration."""
 
@@ -719,6 +749,9 @@ class AliceConfig(BaseSettings):
     chart: ChartConfig = Field(default_factory=ChartConfig)
     whiteboard: WhiteboardConfig = Field(default_factory=WhiteboardConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)
+    network_probe: NetworkProbeConfig = Field(
+        default_factory=NetworkProbeConfig
+    )
 
     @model_validator(mode="before")
     @classmethod

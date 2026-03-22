@@ -77,6 +77,7 @@ plugins:
     - chart_generator
     - email_assistant
     - whiteboard
+    - network_probe
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -228,6 +229,21 @@ whiteboard:
   enabled: true
   whiteboard_output_dir: "data/whiteboards"
   max_boards: 500
+
+
+# ──────────────────────────────────────────────────
+# Phase 17 — Network Probe
+# ──────────────────────────────────────────────────
+
+network_probe:
+  max_ports_per_scan: 100
+  max_ping_count: 10
+  ping_timeout_s: 2.0
+  port_scan_timeout_s: 1.0
+  service_check_timeout_s: 5.0
+  discover_timeout_s: 30.0
+  max_concurrent_scans: 50
+  max_concurrent_pings: 20
 
 
 # ──────────────────────────────────────────────────

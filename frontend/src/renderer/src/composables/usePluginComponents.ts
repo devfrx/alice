@@ -49,6 +49,14 @@ const PLUGIN_COMPONENT_REGISTRY: PluginComponent[] = [
     mountPoint: 'sidebar',
     order: 20,
   },
+  {
+    name: 'network_probe',
+    component: defineAsyncComponent(
+      () => import('../components/plugins/NetworkProbePanel.vue')
+    ),
+    mountPoint: 'sidebar',
+    order: 30,
+  },
 ]
 
 /**

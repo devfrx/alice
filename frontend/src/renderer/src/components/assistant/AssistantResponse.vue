@@ -24,11 +24,14 @@ const props = withDefaults(
         toolCalls?: ToolCall[]
         /** The user's original query (for echo display). */
         userQuery?: string
+        /** Current orb state for reactive visual effects. */
+        orbState?: 'idle' | 'listening' | 'thinking' | 'speaking' | 'processing'
     }>(),
     {
         toolExecutions: () => [],
         toolCalls: () => [],
         userQuery: '',
+        orbState: 'idle',
     }
 )
 
@@ -90,13 +93,17 @@ onMounted(() => {
 </script>
 
 <template>
-    <div ref="scrollContainer" class="alice-voice" :class="{
-        'alice-voice--thinking': isThinkingPhase,
-        'alice-voice--generating': isGenerating,
-        'alice-voice--complete': !isStreaming && !!content
-    }">
-        <!-- Glowing connector dot from orb -->
-        <div class="alice-voice__connector">
+    <div ref="scrollContainer" class="alice-voice" :class="[
+        {
+            'alice-voice--thinking': isThinkingPhase,
+            'alice-voice--generating': isGenerating,
+            'alice-voice--complete': !isStreaming && !!content
+        },
+        `alice-voice--${orbState}`
+    ]">
+        <!-- Dynamic emanation line from orb -->
+        <div class="alice-voice__emanation">
+            <div class="alice-voice__emanation-line" />
             <span class="alice-voice__dot" />
         </div>
 
@@ -162,11 +169,11 @@ onMounted(() => {
 /* ── Container: borderless, open, emanates from orb ── */
 .alice-voice {
     position: relative;
-    max-width: 600px;
+    max-width: 860px;
     width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--space-2) var(--space-4) var(--space-6);
+    padding: 0 var(--space-6) var(--space-6);
     color: var(--text-primary);
     font-size: var(--text-md);
     line-height: var(--leading-relaxed);
@@ -193,11 +200,50 @@ onMounted(() => {
     background: var(--border-hover);
 }
 
-/* ── Connector dot from orb ── */
-.alice-voice__connector {
+/* ── Dynamic emanation from orb ── */
+.alice-voice__emanation {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     margin-bottom: var(--space-3);
+}
+
+.alice-voice__emanation-line {
+    width: 1px;
+    height: 28px;
+    background: linear-gradient(to bottom,
+            transparent,
+            var(--accent-glow, var(--accent)));
+    opacity: 0.25;
+    transition:
+        height 500ms var(--ease-smooth),
+        opacity 500ms var(--ease-smooth),
+        background 500ms var(--ease-smooth);
+}
+
+.alice-voice--generating .alice-voice__emanation-line {
+    height: 36px;
+    opacity: 0.5;
+    animation: emanation-pulse 2.5s ease-in-out infinite;
+}
+
+.alice-voice--thinking .alice-voice__emanation-line {
+    height: 32px;
+    opacity: 0.4;
+    background: linear-gradient(to bottom,
+            transparent,
+            var(--thinking));
+    animation: emanation-pulse 1.8s ease-in-out infinite;
+}
+
+.alice-voice--speaking .alice-voice__emanation-line {
+    height: 36px;
+    opacity: 0.5;
+}
+
+.alice-voice--complete .alice-voice__emanation-line {
+    height: 20px;
+    opacity: 0.12;
 }
 
 .alice-voice__dot {
@@ -209,24 +255,41 @@ onMounted(() => {
     box-shadow: 0 0 10px var(--accent-glow, var(--accent));
     transition:
         opacity 300ms var(--ease-smooth),
-        box-shadow 300ms var(--ease-smooth);
+        box-shadow 300ms var(--ease-smooth),
+        transform 300ms var(--ease-smooth),
+        width 300ms var(--ease-smooth),
+        height 300ms var(--ease-smooth);
 }
 
 .alice-voice--generating .alice-voice__dot {
+    width: 8px;
+    height: 8px;
     opacity: 1;
-    box-shadow: 0 0 16px var(--accent-glow, var(--accent));
+    box-shadow: 0 0 20px var(--accent-glow, var(--accent)),
+        0 0 40px rgba(140, 180, 160, 0.15);
     animation: dot-pulse 2s ease-in-out infinite;
 }
 
 .alice-voice--thinking .alice-voice__dot {
-    opacity: 0.8;
+    width: 8px;
+    height: 8px;
+    opacity: 0.9;
     background: var(--thinking);
-    box-shadow: 0 0 12px var(--thinking);
+    box-shadow: 0 0 16px var(--thinking),
+        0 0 32px rgba(155, 140, 210, 0.15);
     animation: dot-pulse 1.5s ease-in-out infinite;
 }
 
+.alice-voice--speaking .alice-voice__dot {
+    width: 7px;
+    height: 7px;
+    opacity: 0.9;
+    box-shadow: 0 0 18px var(--accent-glow, var(--accent));
+    animation: dot-pulse 2.2s ease-in-out infinite;
+}
+
 .alice-voice--complete .alice-voice__dot {
-    opacity: 0.3;
+    opacity: 0.2;
     box-shadow: none;
 }
 
@@ -367,6 +430,34 @@ onMounted(() => {
     word-break: break-word;
     transition: opacity var(--transition-fast);
     text-align: center;
+    padding: var(--space-3) var(--space-2);
+    border-radius: var(--radius-lg);
+}
+
+/* Ambient glow behind response during active states */
+.alice-voice--generating .response-body {
+    opacity: 0.92;
+    background: radial-gradient(ellipse at center top,
+            rgba(140, 180, 160, 0.04) 0%,
+            transparent 70%);
+}
+
+.alice-voice--thinking .response-body {
+    background: radial-gradient(ellipse at center top,
+            rgba(155, 140, 210, 0.04) 0%,
+            transparent 70%);
+}
+
+.alice-voice--speaking .response-body {
+    opacity: 1;
+    background: radial-gradient(ellipse at center top,
+            rgba(92, 170, 120, 0.03) 0%,
+            transparent 70%);
+}
+
+.alice-voice--complete .response-body {
+    opacity: 1;
+    transition: opacity var(--transition-fast);
 }
 
 .response-body :deep(p) {
@@ -555,11 +646,24 @@ onMounted(() => {
     }
 }
 
+@keyframes emanation-pulse {
+
+    0%,
+    100% {
+        opacity: 0.3;
+    }
+
+    50% {
+        opacity: 0.65;
+    }
+}
+
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {
 
     .streaming-cursor,
-    .thinking-toggle__indicator {
+    .thinking-toggle__indicator,
+    .alice-voice__emanation-line {
         animation: none;
     }
 

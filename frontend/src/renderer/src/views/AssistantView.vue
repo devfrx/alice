@@ -454,7 +454,8 @@ onMounted(() => {
                             :content="streamContent || (showLastResponse ? lastResponse : '')"
                             :is-streaming="!!streamContent || (!!thinkingContent && !streamContent)"
                             :thinking-content="thinkingContent || ''" :tool-executions="chatStore.activeToolExecutions"
-                            :tool-calls="lastToolCalls" :user-query="lastUserQuery" key="response" />
+                            :tool-calls="lastToolCalls" :user-query="lastUserQuery" :orb-state="orbState"
+                            key="response" />
                     </Transition>
 
                     <Transition name="transcript-fade">
@@ -496,7 +497,7 @@ onMounted(() => {
                         <line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
                     <span v-if="chartPayloads.length > 1" class="assistant-view__chart-badge">{{ chartPayloads.length
-                        }}</span>
+                    }}</span>
                 </button>
             </Transition>
 
@@ -526,8 +527,8 @@ onMounted(() => {
 
         <!-- Right Side Panel (3D models or charts) -->
         <Transition name="side-panel-slide">
-            <div v-if="sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards)" class="assistant-view__side-panel"
-                :style="{ width: `${sidePanelWidth}px` }">
+            <div v-if="sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards)"
+                class="assistant-view__side-panel" :style="{ width: `${sidePanelWidth}px` }">
                 <!-- Resize drag handle -->
                 <div class="side-panel__resize-handle" @mousedown="onResizeStart">
                     <div class="side-panel__resize-grip">
@@ -535,9 +536,10 @@ onMounted(() => {
                     </div>
                 </div>
                 <!-- Tab switcher (when multiple content types exist) -->
-                <div v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length > 1" class="side-panel__tabs">
-                    <button v-if="hasCadModels" class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }"
-                        @click="sidePanelTab = '3d'">
+                <div v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length > 1"
+                    class="side-panel__tabs">
+                    <button v-if="hasCadModels" class="side-panel__tab"
+                        :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }" @click="sidePanelTab = '3d'">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -547,7 +549,8 @@ onMounted(() => {
                         <span>3D</span>
                         <span v-if="cadModels.length > 1" class="side-panel__tab-badge">{{ cadModels.length }}</span>
                     </button>
-                    <button v-if="hasCharts" class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === 'chart' }"
+                    <button v-if="hasCharts" class="side-panel__tab"
+                        :class="{ 'side-panel__tab--active': sidePanelTab === 'chart' }"
                         @click="sidePanelTab = 'chart'">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -557,9 +560,10 @@ onMounted(() => {
                         </svg>
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                     </button>
-                    <button v-if="hasWhiteboards" class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
+                    <button v-if="hasWhiteboards" class="side-panel__tab"
+                        :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
                         @click="sidePanelTab = 'whiteboard'">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -568,7 +572,8 @@ onMounted(() => {
                             <path d="M9 3v18" />
                         </svg>
                         <span>Lavagna</span>
-                        <span v-if="whiteboardPayloads.length > 1" class="side-panel__tab-badge">{{ whiteboardPayloads.length }}</span>
+                        <span v-if="whiteboardPayloads.length > 1" class="side-panel__tab-badge">{{
+                            whiteboardPayloads.length }}</span>
                     </button>
                     <button class="side-panel__close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -580,16 +585,16 @@ onMounted(() => {
                 </div>
 
                 <!-- CAD viewer (visible when on 3D tab or sole content) -->
-                <ImmersiveCADCanvas v-if="hasCadModels && (sidePanelTab === '3d' || (!hasCharts && !hasWhiteboards))" :models="cadModels"
-                    :active-index="cadActiveIndex" @update:active-index="(i) => { cadActiveIndex = i }"
-                    @close="closeSidePanel" />
+                <ImmersiveCADCanvas v-if="hasCadModels && (sidePanelTab === '3d' || (!hasCharts && !hasWhiteboards))"
+                    :models="cadModels" :active-index="cadActiveIndex"
+                    @update:active-index="(i) => { cadActiveIndex = i }" @close="closeSidePanel" />
 
                 <!-- Chart viewer (visible when on chart tab or sole content) -->
                 <div v-if="hasCharts && (sidePanelTab === 'chart' || (!hasCadModels && !hasWhiteboards))"
                     class="side-panel__chart-container">
                     <!-- Close button (only when no tab bar is shown) -->
-                    <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1" class="side-panel__chart-close" aria-label="Chiudi pannello"
-                        @click="closeSidePanel">
+                    <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
+                        class="side-panel__chart-close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -607,7 +612,7 @@ onMounted(() => {
                             </svg>
                         </button>
                         <span class="side-panel__chart-counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                         <button class="side-panel__chart-nav-btn"
                             :disabled="chartActiveIndex >= chartPayloads.length - 1"
                             @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
@@ -626,8 +631,7 @@ onMounted(() => {
                     class="side-panel__wb-container">
                     <!-- Close button (only when sole content) -->
                     <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
-                        class="side-panel__wb-close" aria-label="Chiudi pannello"
-                        @click="closeSidePanel">
+                        class="side-panel__wb-close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -644,7 +648,8 @@ onMounted(() => {
                                 <polyline points="15 18 9 12 15 6" />
                             </svg>
                         </button>
-                        <span class="side-panel__chart-counter">{{ whiteboardActiveIndex + 1 }} / {{ whiteboardPayloads.length }}</span>
+                        <span class="side-panel__chart-counter">{{ whiteboardActiveIndex + 1 }} / {{
+                            whiteboardPayloads.length }}</span>
                         <button class="side-panel__chart-nav-btn"
                             :disabled="whiteboardActiveIndex >= whiteboardPayloads.length - 1"
                             @click="whiteboardActiveIndex = Math.min(whiteboardPayloads.length - 1, whiteboardActiveIndex + 1)">
@@ -655,8 +660,7 @@ onMounted(() => {
                         </button>
                     </div>
 
-                    <TldrawCanvas v-if="activeWhiteboard"
-                        :key="activeWhiteboard.board_id"
+                    <TldrawCanvas v-if="activeWhiteboard" :key="activeWhiteboard.board_id"
                         :board-id="activeWhiteboard.board_id"
                         @change="(snap) => saveWhiteboardSnapshot(activeWhiteboard?.board_id ?? '', snap)" />
                 </div>
@@ -710,9 +714,9 @@ onMounted(() => {
     flex: 1;
     min-height: 0;
     width: 100%;
-    max-width: 680px;
+    max-width: 900px;
     padding: var(--space-8) var(--space-4) 100px;
-    gap: var(--space-4);
+    gap: 0;
 }
 
 /* ── 3D / Chart Side Panel ── */
@@ -1287,7 +1291,7 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
     flex: 1;
     min-height: 0;
     width: 100%;

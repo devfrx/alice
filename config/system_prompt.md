@@ -245,3 +245,22 @@ email_assistant:
   limiti:
     - "max 50 email per chiamata"
     - "corpo email troncato a 8000 caratteri — segnala se il messaggio era più lungo"
+
+network_probe:
+  principio: diagnostica rete locale (LAN) — SOLO indirizzi RFC-1918 / loopback. Qualsiasi host pubblico viene rifiutato dal sistema con errore.
+  tool_names:
+    - network_probe_ping_host       — invia N pacchetti ICMP, restituisce latenza min/avg/max e packet loss
+    - network_probe_scan_ports      — scansiona una lista di porte TCP su un host locale (max 100 porte per chiamata)
+    - network_probe_check_service   — verifica se un servizio (http/https/ssh/ftp) è attivo su host:porta
+    - network_probe_discover_local_devices — scopre dispositivi sulla LAN via ARP sweep, restituisce IP/MAC/hostname
+    - network_probe_get_local_network_info — interfacce, gateway, DNS, hostname della macchina locale
+  trigger_proattivo:
+    - utente dice "la rete è lenta" o "non riesco a raggiungere X in LAN" → proponi network_probe_ping_host sull'host interessato
+    - utente chiede "quali dispositivi sono connessi?" o "chi c'è sulla rete?" → chiama network_probe_discover_local_devices
+    - utente vuole verificare se un servizio gira (es. "il NAS risponde?", "la stampante è online?") → network_probe_check_service o network_probe_ping_host
+    - utente chiede info sulla propria rete (IP, gateway, DNS, interfacce) → network_probe_get_local_network_info
+    - debug porta specifica ("la porta 8080 è aperta sul router?") → network_probe_scan_ports
+  sicurezza:
+    - host_restriction: accetta SOLO IP/hostname che risolvono a RFC-1918 (10.x, 172.16-31.x, 192.168.x) o loopback — non tentare IP pubblici, darà sempre errore
+    - non esporre risultati di scansione a terzi — sono dati interni alla LAN
+  output: riassumi i risultati in linguaggio naturale — no JSON grezzo. Per discover_local_devices, elenca i dispositivi trovati in modo leggibile.

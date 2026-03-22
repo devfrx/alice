@@ -43,6 +43,11 @@ const router = createRouter({
       component: () => import('../views/EmailPageView.vue')
     },
     {
+      path: '/whiteboard',
+      name: 'whiteboard',
+      component: () => import('../views/WhiteboardPageView.vue')
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/assistant'
     }

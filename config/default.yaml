@@ -17,7 +17,7 @@ llm:
   api_token: ""                      # LM Studio API token (optional, leave empty if auth disabled)
   model: "auto"                      # "auto" = use whichever model is already loaded in LM Studio
   temperature: 0.7
-  max_tokens: 30311
+  max_tokens: 25963
   system_prompt_file: "config/system_prompt.md"
   supports_thinking: true    # Enable for reasoning models (QwQ, DeepSeek R1)
   supports_vision: true       # Enable for multimodal models
@@ -76,6 +76,7 @@ plugins:
     - cad_generator
     - chart_generator
     - email_assistant
+    - whiteboard
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -217,6 +218,16 @@ chart:
   chart_output_dir: "data/charts"
   max_option_chars: 10000
   max_charts: 1000
+
+
+# ──────────────────────────────────────────────────
+# Phase 16 — tldraw Whiteboard
+# ──────────────────────────────────────────────────
+
+whiteboard:
+  enabled: true
+  whiteboard_output_dir: "data/whiteboards"
+  max_boards: 500
 
 
 # ──────────────────────────────────────────────────

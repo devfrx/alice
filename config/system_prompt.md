@@ -180,6 +180,38 @@ chart_generator:
     - "PIE CHART: usa series[0].type='pie' con data=[{name:'A',value:X},{name:'B',value:Y}]. Non usare xAxis/yAxis per pie"
     - "NON includere 'title' in echarts_option: il titolo è già mostrato nell'header del viewer sopra il grafico. Includere title in ECharts crea un secondo titolo sovrapposto alle barre/linee"
 
+whiteboard:
+  principio: crea e gestisce lavagne interattive tldraw — usa per diagrammi, flowchart, mindmap, schemi architetturali, brainstorming visivo
+  naming: "I tool sono prefissati whiteboard_ dal registro. Usa SEMPRE i nomi completi: whiteboard_create, whiteboard_get, whiteboard_add_shapes, whiteboard_update, whiteboard_list, whiteboard_delete"
+  trigger: "quando l'utente chiede una lavagna, whiteboard, diagramma, flowchart, mindmap, grafo, schema o qualsiasi visualizzazione spaziale → chiama SEMPRE whiteboard_create"
+  workflow_creazione:
+    - "chiama whiteboard_create(title=..., shapes=[...]) — popola subito con shapes se l'utente descrive un contenuto o struttura"
+    - "la lavagna viene visualizzata automaticamente nel pannello laterale della chat"
+    - "per lavagne vuote: chiama whiteboard_create con shapes=[] — l'utente può disegnare manualmente"
+  workflow_lettura:
+    - "usa whiteboard_get(board_id) per leggere il CONTENUTO COMPLETO di una lavagna (shape, testo, posizioni, connessioni)"
+    - "usa whiteboard_list() per trovare lavagne esistenti e i loro board_id e conversation_id"
+  workflow_shapes:
+    - "usa type='geo' per nodi (rettangoli, ellissi, diamanti, esagoni) con id univoco, posizione (x,y), testo, colore"
+    - "usa type='arrow' con from_id e to_id per collegare nodi — crea prima i nodi, poi le frecce"
+    - "usa type='note' per sticky note colorate, type='text' per testo libero"
+    - "spacing raccomandato: ~250px tra nodi collegati, 300px tra righe di un flowchart"
+  workflow_modifica:
+    - "usa whiteboard_add_shapes(board_id, shapes) per aggiungere senza rimpiazzare"
+    - "usa whiteboard_update(board_id, shapes) per sostituire TUTTO il contenuto"
+  associazione: "ogni lavagna ha un conversation_id che la lega alla chat in cui è stata creata. whiteboard_list mostra anche il conversation_id di ogni lavagna"
+  regola_flusso: "chiama whiteboard_create IMMEDIATAMENTE quando richiesto — NON descrivere cosa farai, NON chiedere conferma per lavagne semplici, NON inventare finzioni di aver già creato qualcosa senza chiamare il tool"
+  esempio_flowchart: |
+    shapes: [
+      {type:'geo', id:'s', x:200, y:50, w:200, h:80, text:'Inizio', geo:'ellipse', color:'sage'},
+      {type:'geo', id:'d', x:200, y:200, w:200, h:80, text:'Decisione', geo:'diamond', color:'amber'},
+      {type:'geo', id:'a', x:50, y:380, w:200, h:80, text:'Azione A', color:'cream'},
+      {type:'geo', id:'b', x:350, y:380, w:200, h:80, text:'Azione B', color:'cream'},
+      {type:'arrow', from_id:'s', to_id:'d'},
+      {type:'arrow', from_id:'d', to_id:'a'},
+      {type:'arrow', from_id:'d', to_id:'b'}
+    ]
+
 email_assistant:
   principio: gestisci email tramite IMAP/SMTP locale — mai condividere credenziali o contenuto privato
   workflow_lettura:

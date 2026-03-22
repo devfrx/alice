@@ -242,6 +242,31 @@ export interface ChartPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Whiteboards
+// ---------------------------------------------------------------------------
+
+/** Payload from whiteboard tools (content_type='application/vnd.alice.whiteboard+json'). */
+export interface WhiteboardPayload {
+  board_id: string
+  title: string
+  /** Relative URL: "/api/whiteboards/{board_id}" */
+  board_url: string
+  conversation_id: string | null
+  created_at: string
+}
+
+/** Type guard: checks if a parsed tool result is a WhiteboardPayload. */
+export function isWhiteboardPayload(obj: unknown): obj is WhiteboardPayload {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'board_id' in obj &&
+    'board_url' in obj &&
+    'title' in obj
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Tool execution tracking (client-side)
 // ---------------------------------------------------------------------------
 

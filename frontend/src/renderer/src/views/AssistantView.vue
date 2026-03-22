@@ -24,13 +24,18 @@ import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
-import type { CadModelPayload, ChartPayload, ToolCall } from '../types/chat'
+import type { CadModelPayload, ChartPayload, WhiteboardPayload, ToolCall } from '../types/chat'
+import { isWhiteboardPayload } from '../types/chat'
+import { api } from '../services/api'
 
 const ImmersiveCADCanvas = defineAsyncComponent(
     () => import('../components/assistant/ImmersiveCADCanvas.vue')
 )
 const ChartViewer = defineAsyncComponent(
     () => import('../components/chat/ChartViewer.vue')
+)
+const TldrawCanvas = defineAsyncComponent(
+    () => import('../components/whiteboard/TldrawCanvas.vue')
 )
 
 const chatStore = useChatStore()
@@ -90,8 +95,10 @@ const sidePanelOpen = ref(false)
 const cadActiveIndex = ref(0)
 /** Active chart index for multi-chart navigation. */
 const chartActiveIndex = ref(0)
-/** Which tab is active in the side panel: '3d' or 'chart'. */
-const sidePanelTab = ref<'3d' | 'chart'>('3d')
+/** Active whiteboard index for multi-board navigation. */
+const whiteboardActiveIndex = ref(0)
+/** Which tab is active in the side panel: '3d', 'chart' or 'whiteboard'. */
+const sidePanelTab = ref<'3d' | 'chart' | 'whiteboard'>('3d')
 
 /* ── Resizable side panel ── */
 const SIDE_PANEL_MIN = 280
@@ -167,6 +174,13 @@ function closeSidePanel(): void {
     sidePanelOpen.value = false
 }
 
+/** Persist whiteboard snapshot changes to backend. */
+function saveWhiteboardSnapshot(boardId: string, snapshot: Record<string, unknown>): void {
+    api.saveWhiteboardSnapshot(boardId, snapshot).catch(() => {
+        /* silent — save is best-effort from the editor */
+    })
+}
+
 /**
  * Collects ALL chart payloads from the conversation messages.
  * Returns them in chronological order (oldest first).
@@ -204,6 +218,45 @@ watch(() => chartPayloads.value.length, (newLen, oldLen) => {
 watch(chartPayloads, (charts) => {
     if (chartActiveIndex.value >= charts.length) {
         chartActiveIndex.value = Math.max(0, charts.length - 1)
+    }
+})
+
+/**
+ * Collects ALL whiteboard payloads from the conversation messages.
+ */
+const whiteboardPayloads = computed((): WhiteboardPayload[] => {
+    const result: WhiteboardPayload[] = []
+    for (const msg of chatStore.messages) {
+        if (msg.role !== 'tool') continue
+        try {
+            const p = JSON.parse(msg.content)
+            if (isWhiteboardPayload(p)) result.push(p)
+        } catch { /* not JSON */ }
+    }
+    return result
+})
+
+/** Whether any whiteboards exist in the conversation. */
+const hasWhiteboards = computed(() => whiteboardPayloads.value.length > 0)
+
+/** The currently active whiteboard for the side panel. */
+const activeWhiteboard = computed((): WhiteboardPayload | null =>
+    whiteboardPayloads.value[whiteboardActiveIndex.value] ?? null
+)
+
+/** Auto-open the side panel on whiteboard tab when a new board appears. */
+watch(() => whiteboardPayloads.value.length, (newLen, oldLen) => {
+    if (newLen > oldLen) {
+        sidePanelOpen.value = true
+        sidePanelTab.value = 'whiteboard'
+        whiteboardActiveIndex.value = newLen - 1
+    }
+})
+
+/** Clamp whiteboard index if boards shrink (conversation change). */
+watch(whiteboardPayloads, (boards) => {
+    if (whiteboardActiveIndex.value >= boards.length) {
+        whiteboardActiveIndex.value = Math.max(0, boards.length - 1)
     }
 })
 
@@ -362,10 +415,10 @@ onMounted(() => {
 
 <template>
     <div class="assistant-view" :class="{
-        'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts),
+        'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards),
         'assistant-view--dragging': isDraggingPanel
     }"
-        :style="{ '--panel-width': `${sidePanelWidth}px`, '--panel-offset': sidePanelOpen && (hasCadModels || hasCharts) ? `${sidePanelWidth}px` : '0px' }">
+        :style="{ '--panel-width': `${sidePanelWidth}px`, '--panel-offset': sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards) ? `${sidePanelWidth}px` : '0px' }">
         <AmbientBackground :state="orbState" :audio-level="audioLevel" />
 
         <!-- Main area (orb + content) -->
@@ -446,6 +499,22 @@ onMounted(() => {
                 </button>
             </Transition>
 
+            <!-- Toggle whiteboard panel button -->
+            <Transition name="toggle-fade">
+                <button v-if="hasWhiteboards && (!sidePanelOpen || sidePanelTab !== 'whiteboard')"
+                    class="assistant-view__wb-toggle" title="Mostra lavagne"
+                    @click="() => { sidePanelOpen = true; sidePanelTab = 'whiteboard' }">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M3 9h18" />
+                        <path d="M9 3v18" />
+                    </svg>
+                    <span v-if="whiteboardPayloads.length > 1" class="assistant-view__wb-badge">{{
+                        whiteboardPayloads.length }}</span>
+                </button>
+            </Transition>
+
             <FloatingInputBar ref="floatingBarRef" :disabled="chatStore.isStreamingCurrentConversation"
                 :is-connected="chatApi.isConnected.value" :is-streaming="chatStore.isStreamingCurrentConversation"
                 :audio-devices="audioDevices" :selected-device-id="selectedDeviceId" :orb-state="orbState"
@@ -456,7 +525,7 @@ onMounted(() => {
 
         <!-- Right Side Panel (3D models or charts) -->
         <Transition name="side-panel-slide">
-            <div v-if="sidePanelOpen && (hasCadModels || hasCharts)" class="assistant-view__side-panel"
+            <div v-if="sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards)" class="assistant-view__side-panel"
                 :style="{ width: `${sidePanelWidth}px` }">
                 <!-- Resize drag handle -->
                 <div class="side-panel__resize-handle" @mousedown="onResizeStart">
@@ -464,9 +533,9 @@ onMounted(() => {
                         <span /><span /><span />
                     </div>
                 </div>
-                <!-- Tab switcher (only when both content types exist) -->
-                <div v-if="hasCadModels && hasCharts" class="side-panel__tabs">
-                    <button class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }"
+                <!-- Tab switcher (when multiple content types exist) -->
+                <div v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length > 1" class="side-panel__tabs">
+                    <button v-if="hasCadModels" class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }"
                         @click="sidePanelTab = '3d'">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -477,7 +546,7 @@ onMounted(() => {
                         <span>3D</span>
                         <span v-if="cadModels.length > 1" class="side-panel__tab-badge">{{ cadModels.length }}</span>
                     </button>
-                    <button class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === 'chart' }"
+                    <button v-if="hasCharts" class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === 'chart' }"
                         @click="sidePanelTab = 'chart'">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -489,6 +558,17 @@ onMounted(() => {
                         <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
                             }}</span>
                     </button>
+                    <button v-if="hasWhiteboards" class="side-panel__tab" :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
+                        @click="sidePanelTab = 'whiteboard'">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="M3 9h18" />
+                            <path d="M9 3v18" />
+                        </svg>
+                        <span>Lavagna</span>
+                        <span v-if="whiteboardPayloads.length > 1" class="side-panel__tab-badge">{{ whiteboardPayloads.length }}</span>
+                    </button>
                     <button class="side-panel__close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round">
@@ -498,16 +578,16 @@ onMounted(() => {
                     </button>
                 </div>
 
-                <!-- CAD viewer (visible when on 3D tab or no charts) -->
-                <ImmersiveCADCanvas v-if="hasCadModels && (sidePanelTab === '3d' || !hasCharts)" :models="cadModels"
+                <!-- CAD viewer (visible when on 3D tab or sole content) -->
+                <ImmersiveCADCanvas v-if="hasCadModels && (sidePanelTab === '3d' || (!hasCharts && !hasWhiteboards))" :models="cadModels"
                     :active-index="cadActiveIndex" @update:active-index="(i) => { cadActiveIndex = i }"
                     @close="closeSidePanel" />
 
-                <!-- Chart viewer (visible when on chart tab or no CAD models) -->
-                <div v-if="hasCharts && (sidePanelTab === 'chart' || !hasCadModels)"
+                <!-- Chart viewer (visible when on chart tab or sole content) -->
+                <div v-if="hasCharts && (sidePanelTab === 'chart' || (!hasCadModels && !hasWhiteboards))"
                     class="side-panel__chart-container">
                     <!-- Close button (only when no tab bar is shown) -->
-                    <button v-if="!hasCadModels" class="side-panel__chart-close" aria-label="Chiudi pannello"
+                    <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1" class="side-panel__chart-close" aria-label="Chiudi pannello"
                         @click="closeSidePanel">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round">
@@ -538,6 +618,46 @@ onMounted(() => {
                     </div>
 
                     <ChartViewer v-if="activeChart" :key="activeChart.chart_id" :payload="activeChart" />
+                </div>
+
+                <!-- Whiteboard viewer (visible when on whiteboard tab or sole content) -->
+                <div v-if="hasWhiteboards && (sidePanelTab === 'whiteboard' || (!hasCadModels && !hasCharts))"
+                    class="side-panel__wb-container">
+                    <!-- Close button (only when sole content) -->
+                    <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
+                        class="side-panel__wb-close" aria-label="Chiudi pannello"
+                        @click="closeSidePanel">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+
+                    <!-- Whiteboard navigation (when multiple boards) -->
+                    <div v-if="whiteboardPayloads.length > 1" class="side-panel__wb-nav">
+                        <button class="side-panel__chart-nav-btn" :disabled="whiteboardActiveIndex <= 0"
+                            @click="whiteboardActiveIndex = Math.max(0, whiteboardActiveIndex - 1)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <span class="side-panel__chart-counter">{{ whiteboardActiveIndex + 1 }} / {{ whiteboardPayloads.length }}</span>
+                        <button class="side-panel__chart-nav-btn"
+                            :disabled="whiteboardActiveIndex >= whiteboardPayloads.length - 1"
+                            @click="whiteboardActiveIndex = Math.min(whiteboardPayloads.length - 1, whiteboardActiveIndex + 1)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <TldrawCanvas v-if="activeWhiteboard"
+                        :key="activeWhiteboard.board_id"
+                        :board-id="activeWhiteboard.board_id"
+                        @change="(snap) => saveWhiteboardSnapshot(activeWhiteboard?.board_id ?? '', snap)" />
                 </div>
             </div>
         </Transition>
@@ -804,6 +924,59 @@ onMounted(() => {
     line-height: 1;
 }
 
+/* ── Whiteboard toggle button ── */
+.assistant-view__wb-toggle {
+    position: absolute;
+    right: 16px;
+    top: calc(50% + 96px);
+    transform: translateY(-50%);
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+        background 200ms var(--ease-smooth),
+        border-color 200ms var(--ease-smooth),
+        color 200ms var(--ease-smooth),
+        transform 200ms var(--ease-smooth);
+}
+
+.assistant-view__wb-toggle:hover {
+    background: var(--surface-3);
+    border-color: var(--border-hover);
+    color: var(--accent);
+    transform: translateY(-50%) scale(1.08);
+}
+
+.assistant-view__wb-toggle:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.assistant-view__wb-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--surface-0);
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
 /* ── Side panel tabs ── */
 .side-panel__tabs {
     display: flex;
@@ -953,6 +1126,49 @@ onMounted(() => {
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
+}
+
+/* ── Side panel whiteboard container ── */
+.side-panel__wb-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.side-panel__wb-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 150ms, color 150ms;
+}
+
+.side-panel__wb-close:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.side-panel__wb-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--glass-border);
+    background: transparent;
 }
 
 /* ── Side panel slide transition ── */

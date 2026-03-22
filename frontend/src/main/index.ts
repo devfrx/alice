@@ -24,20 +24,26 @@ function createWindow(): void {
   })
 
   // --- Content Security Policy (dev-aware) --------------------------------
+  // Hash allows the React Fast Refresh preamble injected by @vitejs/plugin-react
+  const reactRefreshHash = "'sha256-Z2/iFzh9VMlVkEOar1f/oSHWwQk3ve1qk/C2WdsC4Xk='"
+  // tldraw CDN for translations, fonts, and icons
+  const tldrawCdn = 'https://cdn.tldraw.com'
   const devCsp = [
     "default-src 'self'",
-    "script-src 'self' blob: 'wasm-unsafe-eval'",
+    `script-src 'self' blob: 'wasm-unsafe-eval' ${reactRefreshHash}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: http://localhost:8000",
-    "connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ws://localhost:5173"
+    `img-src 'self' data: blob: http://localhost:8000 ${tldrawCdn}`,
+    `font-src 'self' data: ${tldrawCdn}`,
+    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ws://localhost:5173 ${tldrawCdn}`
   ].join('; ')
 
   const prodCsp = [
     "default-src 'self'",
     "script-src 'self' blob: 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: http://localhost:8000",
-    "connect-src 'self' blob: ws://localhost:8000 http://localhost:8000"
+    `img-src 'self' data: blob: http://localhost:8000 ${tldrawCdn}`,
+    `font-src 'self' data: ${tldrawCdn}`,
+    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ${tldrawCdn}`
   ].join('; ')
 
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {

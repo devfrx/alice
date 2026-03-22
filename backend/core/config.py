@@ -570,6 +570,21 @@ class ChartConfig(BaseSettings):
     """Numero massimo di grafici persistiti."""
 
 
+class WhiteboardConfig(BaseSettings):
+    """Configurazione plugin whiteboard (tldraw)."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_WHITEBOARD__")
+
+    enabled: bool = False
+    """Abilita il plugin whiteboard (opt-in)."""
+
+    whiteboard_output_dir: str = "data/whiteboards"
+    """Directory dove vengono salvati i board spec JSON."""
+
+    max_boards: int = 500
+    """Numero massimo di lavagne persistite."""
+
+
 class EmailConfig(BaseSettings):
     """Email assistant (IMAP / SMTP) configuration."""
 
@@ -702,6 +717,7 @@ class AliceConfig(BaseSettings):
     mcp: McpConfig = Field(default_factory=McpConfig)
     trellis: TrellisServiceConfig = Field(default_factory=TrellisServiceConfig)
     chart: ChartConfig = Field(default_factory=ChartConfig)
+    whiteboard: WhiteboardConfig = Field(default_factory=WhiteboardConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)
 
     @model_validator(mode="before")

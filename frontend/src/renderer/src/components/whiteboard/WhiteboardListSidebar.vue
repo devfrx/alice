@@ -64,6 +64,13 @@ function formatDate(iso: string): string {
             </svg>
           </button>
         </div>
+        <div v-if="board.conversation_title" class="wb-sidebar__item-conv">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>{{ board.conversation_title }}</span>
+        </div>
         <div class="wb-sidebar__item-meta">
           <span>{{ board.shape_count }} forme</span>
           <span>{{ formatDate(board.updated_at) }}</span>
@@ -182,5 +189,17 @@ function formatDate(iso: string): string {
   margin-top: 4px;
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.wb-sidebar__item-conv {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

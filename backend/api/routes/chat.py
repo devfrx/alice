@@ -274,6 +274,61 @@ def _format_memory_context(
     return "\n".join(lines)
 
 
+async def _build_whiteboard_context(
+    ctx: AppContext, conversation_id: str
+) -> str | None:
+    """Build a brief context block listing whiteboards for the current conversation.
+
+    Injected into the system prompt so the LLM knows which boards already
+    exist and can reference or update them instead of creating duplicates.
+
+    Args:
+        ctx: Application context with plugin_manager.
+        conversation_id: The current conversation's UUID as a string.
+
+    Returns:
+        A markdown context block, or None if no whiteboards or plugin unavailable.
+    """
+    if not ctx.plugin_manager:
+        return None
+    wb_plugin = ctx.plugin_manager.get_plugin("whiteboard")
+    if not wb_plugin:
+        return None
+    store = getattr(wb_plugin, "store", None)
+    if not store:
+        return None
+    try:
+        items = await store.list(conversation_id=conversation_id)
+    except Exception as exc:
+        logger.warning("Whiteboard context fetch failed for conv={}: {}", conversation_id, exc)
+        return None
+    if not items:
+        return None
+
+    now = datetime.now(timezone.utc)
+    lines = ["[LAVAGNE ASSOCIATE A QUESTA CONVERSAZIONE]"]
+    for item in items:
+        if item.updated_at:
+            delta = now - item.updated_at
+            hours = int(delta.total_seconds() // 3600)
+            if hours < 1:
+                age = "aggiornata poco fa"
+            elif hours < 24:
+                age = f"aggiornata {hours}h fa"
+            else:
+                days = hours // 24
+                age = f"aggiornata {days}g fa"
+        else:
+            age = ""
+        shape_info = f"{item.shape_count} shape" if item.shape_count else "vuota"
+        extra = f", {age}" if age else ""
+        lines.append(
+            f'- "{item.title}" (id: {item.board_id}) — {shape_info}{extra}'
+        )
+    lines.append("[/LAVAGNE ASSOCIATE]")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Pydantic request/response models
 # ---------------------------------------------------------------------------
@@ -634,6 +689,15 @@ async def ws_chat(websocket: WebSocket) -> None:
                         f"{memory_context}\n\n{mcp_ctx}"
                         if memory_context
                         else mcp_ctx
+                    )
+
+                # --- inject whiteboards for current conversation ----------
+                wb_ctx = await _build_whiteboard_context(ctx, str(conv_id))
+                if wb_ctx:
+                    memory_context = (
+                        f"{memory_context}\n\n{wb_ctx}"
+                        if memory_context
+                        else wb_ctx
                     )
 
                 # --- call LLM (streaming) ---------------------------------

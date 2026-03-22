@@ -222,18 +222,19 @@ watch(chartPayloads, (charts) => {
 })
 
 /**
- * Collects ALL whiteboard payloads from the conversation messages.
+ * Collects unique whiteboard payloads from the conversation messages.
+ * Deduplicates by board_id, keeping only the latest payload for each board.
  */
 const whiteboardPayloads = computed((): WhiteboardPayload[] => {
-    const result: WhiteboardPayload[] = []
+    const boardMap = new Map<string, WhiteboardPayload>()
     for (const msg of chatStore.messages) {
         if (msg.role !== 'tool') continue
         try {
             const p = JSON.parse(msg.content)
-            if (isWhiteboardPayload(p)) result.push(p)
+            if (isWhiteboardPayload(p)) boardMap.set(p.board_id, p)
         } catch { /* not JSON */ }
     }
-    return result
+    return Array.from(boardMap.values())
 })
 
 /** Whether any whiteboards exist in the conversation. */

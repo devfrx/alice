@@ -96,7 +96,11 @@ _SIMPLE_SHAPE_SCHEMA: dict[str, Any] = {
         },
         "text": {
             "type": "string",
-            "description": "Testo da mostrare dentro la shape.",
+            "description": (
+                "Testo da mostrare dentro la shape. OBBLIGATORIO per geo, note e text — "
+                "le shape senza testo vengono scartate automaticamente. "
+                "Usa testo breve e chiaro (2-5 parole per nodo)."
+            ),
         },
         "color": {
             "type": "string",
@@ -196,7 +200,11 @@ _LIST_SCHEMA: dict[str, Any] = {
     "properties": {
         "conversation_id": {
             "type": "string",
-            "description": "Filtra per ID conversazione (opzionale).",
+            "description": (
+                "Filtra per ID conversazione. "
+                "Se omesso, mostra automaticamente solo le lavagne "
+                "della conversazione corrente."
+            ),
         },
         "limit": {
             "type": "integer",
@@ -280,8 +288,13 @@ class WhiteboardPlugin(BasePlugin):
                 name="create",
                 description=(
                     "Crea una nuova lavagna tldraw. Fornisci shapes per popolarla "
-                    "subito (flowchart, mindmap, schemi). Le coordinate (x,y) devono "
-                    "essere assolute in pixel; usa spacing di ~250px tra nodi collegati."
+                    "subito (flowchart, mindmap, schemi). REGOLE DIAGRAMMI: "
+                    "1) OGNI shape geo/note/text DEVE avere 'text' non vuoto — shape senza testo vengono scartate. "
+                    "2) Testo breve: 2-5 parole per nodo, NO elenchi lunghi dentro una shape. "
+                    "3) Usa coordinate (x,y) assolute con ~250px di spacing tra nodi collegati. "
+                    "4) Dimensiona w/h in base al testo: min 120x60 per 2 parole, 200x80 per 3-5 parole. "
+                    "5) NON creare shape decorative vuote — ogni shape deve comunicare informazione. "
+                    "6) Max ~25 shape per lavagna per mantenere leggibilità."
                 ),
                 parameters=_CREATE_SCHEMA,
                 risk_level="safe",
@@ -304,7 +317,8 @@ class WhiteboardPlugin(BasePlugin):
                 name="add_shapes",
                 description=(
                     "Aggiunge nuove shape a una lavagna esistente senza rimpiazzare "
-                    "il contenuto corrente."
+                    "il contenuto corrente. REGOLE: ogni shape geo/note/text DEVE "
+                    "avere 'text' non vuoto — shape senza testo vengono scartate."
                 ),
                 parameters=_ADD_SHAPES_SCHEMA,
                 risk_level="safe",
@@ -315,7 +329,9 @@ class WhiteboardPlugin(BasePlugin):
                 name="update",
                 description=(
                     "Sostituisce TUTTO il contenuto di una lavagna con le nuove shapes "
-                    "fornite. Usa add_shapes se vuoi solo aggiungere."
+                    "fornite. Usa add_shapes se vuoi solo aggiungere. "
+                    "REGOLE: ogni shape geo/note/text DEVE avere 'text' non vuoto. "
+                    "Shape senza testo vengono scartate. Max ~25 shape."
                 ),
                 parameters=_UPDATE_SCHEMA,
                 risk_level="medium",
@@ -325,7 +341,8 @@ class WhiteboardPlugin(BasePlugin):
             ToolDefinition(
                 name="list",
                 description=(
-                    "Elenca le lavagne disponibili, opzionalmente filtrate per conversazione. "
+                    "Elenca le lavagne della conversazione corrente (default). "
+                    "Passa conversation_id per filtrare per una conversazione specifica. "
                     "Restituisce board_id, title, description, conversation_id e date."
                 ),
                 parameters=_LIST_SCHEMA,
@@ -512,15 +529,16 @@ class WhiteboardPlugin(BasePlugin):
     async def _list(
         self, args: dict[str, Any], context: ExecutionContext
     ) -> ToolResult:
-        """Elenca le lavagne con paginazione e filtro opzionale."""
+        """Elenca le lavagne con paginazione, con scope di default alla conversazione corrente."""
         limit = min(int(args.get("limit", 20)), 100)
         offset = max(int(args.get("offset", 0)), 0)
-        conversation_id = args.get("conversation_id")
+        # Default to current conversation to prevent cross-conversation leakage.
+        conversation_id = args.get("conversation_id", context.conversation_id)
 
         items = await self._store.list(
             limit=limit, offset=offset, conversation_id=conversation_id
         )
-        total = await self._store.count()
+        total = len(items) if conversation_id else await self._store.count()
 
         payload = {
             "boards": [item.model_dump(mode="json") for item in items],

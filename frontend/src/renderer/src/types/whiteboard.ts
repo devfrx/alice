@@ -17,6 +17,8 @@ export interface WhiteboardListItem {
   title: string
   description: string
   conversation_id: string | null
+  /** Title of the linked conversation (resolved by backend). */
+  conversation_title: string | null
   created_at: string
   updated_at: string
   shape_count: number

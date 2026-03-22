@@ -14,7 +14,8 @@ import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
-import type { ChatMessage, CadModelPayload, ChartPayload } from '../../types/chat'
+import type { ChatMessage, CadModelPayload, ChartPayload, WhiteboardPayload } from '../../types/chat'
+import { isWhiteboardPayload } from '../../types/chat'
 
 const CADViewer = defineAsyncComponent(() => import('./CADViewer.vue'))
 const ChartViewer = defineAsyncComponent(() => import('./ChartViewer.vue'))
@@ -85,9 +86,9 @@ const bubbleClass = computed(() => `bubble--${props.message.role}`)
 
 const { handleCodeBlockClick } = useCodeBlocks()
 
-/** Whether this is a plain tool result (not CAD/Chart payload). */
+/** Whether this is a plain tool result (not CAD/Chart/Whiteboard payload). */
 const isPlainToolResult = computed(() =>
-  props.message.role === 'tool' && !cadPayload.value && !chartPayload.value
+  props.message.role === 'tool' && !cadPayload.value && !chartPayload.value && !whiteboardPayload.value
 )
 
 /** Tool result collapsed state (collapsed by default). */
@@ -132,6 +133,19 @@ const chartPayload = computed((): ChartPayload | null => {
       return p as ChartPayload
     }
   } catch { /* not JSON chart payload */ }
+  return null
+})
+
+/**
+ * If this is a tool message with a Whiteboard payload, return the parsed
+ * payload — otherwise null.  Used to render a whiteboard card inline.
+ */
+const whiteboardPayload = computed((): WhiteboardPayload | null => {
+  if (props.message.role !== 'tool') return null
+  try {
+    const p = JSON.parse(props.message.content)
+    if (isWhiteboardPayload(p)) return p
+  } catch { /* not JSON */ }
   return null
 })
 
@@ -210,6 +224,18 @@ onUnmounted(() => {
       <!-- Chart viewer (tool message with chart payload) -->
       <ChartViewer v-if="chartPayload" :payload="chartPayload" />
 
+      <!-- Whiteboard card (tool message with whiteboard payload) -->
+      <div v-if="whiteboardPayload" class="whiteboard-card">
+        <svg class="whiteboard-card__icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M9 3v18" />
+        </svg>
+        <span class="whiteboard-card__title">{{ whiteboardPayload.title }}</span>
+        <span class="whiteboard-card__badge">Lavagna</span>
+      </div>
+
       <!-- Plain tool result — collapsible -->
       <template v-if="isPlainToolResult">
         <button class="tool-result__toggle" @click="toolResultCollapsed = !toolResultCollapsed">
@@ -235,8 +261,8 @@ onUnmounted(() => {
 
       <!-- Message content (non-tool or assistant/user) -->
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
-      <div v-if="!cadPayload && !chartPayload && !isPlainToolResult" class="bubble__content" v-html="htmlContent"
-        @click="handleCodeBlockClick" />
+      <div v-if="!cadPayload && !chartPayload && !whiteboardPayload && !isPlainToolResult" class="bubble__content"
+        v-html="htmlContent" @click="handleCodeBlockClick" />
 
       <!-- Timestamp for assistant/tool messages (inside bubble) -->
       <span v-if="message.role !== 'user'" class="bubble__time">{{ formattedTime }}</span>
@@ -428,6 +454,49 @@ onUnmounted(() => {
   background: transparent;
   border-color: transparent;
   padding: 0;
+}
+
+/* Whiteboard card — same treatment as CAD/Chart */
+.bubble--tool:has(.whiteboard-card) {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+.whiteboard-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.whiteboard-card__icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.whiteboard-card__title {
+  flex: 1;
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.whiteboard-card__badge {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Collapsible tool result */

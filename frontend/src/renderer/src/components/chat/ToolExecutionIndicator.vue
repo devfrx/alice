@@ -65,12 +65,22 @@ function chartPayloadOf(result: string): ChartPayload {
     return parseChartPayload(result) as ChartPayload
 }
 
+/** Try to parse a Whiteboard payload from a tool result string. */
+function parseWhiteboardPayload(result: string): { board_id: string; title: string } | null {
+    try {
+        const p = JSON.parse(result)
+        if (typeof p.board_id === 'string' && typeof p.title === 'string') return p
+        return null
+    } catch { return null }
+}
+
 /** Check if result is a plain text result (not special payload). */
 function isPlainResult(exec: ToolExecution): boolean {
     if (!exec.result) return false
     if (exec.contentType?.startsWith('image/')) return false
     if (exec.contentType === 'application/vnd.alice.cad-model+json') return false
     if (exec.contentType === 'application/vnd.alice.chart+json' && parseChartPayload(exec.result)) return false
+    if (exec.contentType === 'application/vnd.alice.whiteboard+json') return false
     return true
 }
 </script>
@@ -118,6 +128,19 @@ function isPlainResult(exec: ToolExecution): boolean {
                     <template
                         v-else-if="exec.contentType === 'application/vnd.alice.chart+json' && parseChartPayload(exec.result)">
                         <ChartViewer :payload="chartPayloadOf(exec.result)" />
+                    </template>
+                    <!-- Whiteboard card -->
+                    <template v-else-if="exec.contentType === 'application/vnd.alice.whiteboard+json' && parseWhiteboardPayload(exec.result)">
+                        <div class="tool-exec__wb-card">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <path d="M3 9h18" />
+                                <path d="M9 3v18" />
+                            </svg>
+                            <span class="tool-exec__wb-title">{{ parseWhiteboardPayload(exec.result)?.title }}</span>
+                            <span class="tool-exec__wb-badge">aperta nel pannello</span>
+                        </div>
                     </template>
                     <!-- Plain text result (collapsible) -->
                     <template v-else-if="isPlainResult(exec)">
@@ -295,6 +318,36 @@ function isPlainResult(exec: ToolExecution): boolean {
     grid-template-rows: 0fr;
     opacity: 0;
     pointer-events: none;
+}
+
+/* Whiteboard card in tool execution timeline */
+.tool-exec__wb-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    margin-top: var(--space-1);
+    padding: var(--space-1-5) var(--space-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+.tool-exec__wb-title {
+    flex: 1;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.tool-exec__wb-badge {
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .tool-exec__result-inner {

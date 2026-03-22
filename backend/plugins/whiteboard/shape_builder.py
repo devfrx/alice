@@ -235,6 +235,12 @@ def build_snapshot(shapes: list[SimpleShape]) -> dict[str, Any]:
         "meta": {},
     }
 
+    # Filtra shape senza testo (tranne arrow) — sono inutili nel diagramma
+    shapes = [
+        s for s in shapes
+        if s.type == "arrow" or (s.text and s.text.strip())
+    ]
+
     # Indici per ordinamento stabile
     for i, shape in enumerate(shapes):
         shape_id = _make_shape_id(shape.id)
@@ -319,6 +325,12 @@ def merge_shapes_into_snapshot(
                 max_index = max(max_index, num)
             except (ValueError, IndexError):
                 pass
+
+    # Filtra shape senza testo (tranne arrow)
+    new_shapes = [
+        s for s in new_shapes
+        if s.type == "arrow" or (s.text and s.text.strip())
+    ]
 
     for i, shape in enumerate(new_shapes):
         shape_id = _make_shape_id(shape.id)

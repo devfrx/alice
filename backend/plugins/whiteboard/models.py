@@ -60,6 +60,7 @@ class WhiteboardListItem(BaseModel):
     title: str
     description: str
     conversation_id: str | None = None
+    conversation_title: str | None = None
     created_at: datetime
     updated_at: datetime
     shape_count: int = 0

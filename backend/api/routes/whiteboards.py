@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+from sqlmodel import select
+
+from backend.db.models import Conversation
 
 router = APIRouter(prefix="/whiteboards", tags=["whiteboards"])
 
@@ -45,7 +49,11 @@ async def list_whiteboards(
     limit: int = 50,
     offset: int = 0,
 ) -> dict[str, Any]:
-    """Restituisce la lista paginata delle lavagne, con filtro opzionale."""
+    """Restituisce la lista paginata delle lavagne, con filtro opzionale.
+
+    Ogni item include ``conversation_title`` (risolto dal DB) quando la
+    lavagna è associata a una conversazione.
+    """
     store = _get_store(request)
     items = await store.list(
         limit=min(limit, 100),
@@ -53,8 +61,37 @@ async def list_whiteboards(
         conversation_id=conversation_id,
     )
     total = await store.count()
+
+    # Resolve conversation titles for all board items.
+    conv_ids = {
+        item.conversation_id
+        for item in items
+        if item.conversation_id
+    }
+    title_map: dict[str, str | None] = {}
+    if conv_ids:
+        ctx = request.app.state.context
+        if ctx.db:
+            async with ctx.db() as session:
+                uuids = [uuid.UUID(cid) for cid in conv_ids]
+                result = await session.exec(
+                    select(Conversation.id, Conversation.title).where(
+                        Conversation.id.in_(uuids)  # type: ignore[union-attr]
+                    )
+                )
+                for row in result.all():
+                    title_map[str(row.id)] = row.title
+
+    serialized = []
+    for item in items:
+        d = item.model_dump(mode="json")
+        d["conversation_title"] = title_map.get(
+            item.conversation_id or ""
+        )
+        serialized.append(d)
+
     return {
-        "items": [item.model_dump(mode="json") for item in items],
+        "items": serialized,
         "total": total,
         "limit": limit,
         "offset": offset,

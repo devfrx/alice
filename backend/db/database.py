@@ -1,4 +1,4 @@
-"""AL\CE — Database engine and session helpers."""
+"""AL\\CE — Database engine and session helpers."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""AL\CE — Media Control plugin.
+"""AL\\CE — Media Control plugin.
 
 Exposes tools for system volume, media playback keys, and display
 brightness on Windows.  Volume control uses pycaw (COM), media keys

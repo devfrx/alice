@@ -1,4 +1,4 @@
-"""AL\CE — Clipboard plugin package.
+"""AL\\CE — Clipboard plugin package.
 
 Importing this module registers :class:`ClipboardPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

@@ -1,4 +1,4 @@
-"""AL\CE — Web search client.
+"""AL\\CE — Web search client.
 
 Wraps DDGS metasearch (sync, run via ``asyncio.to_thread``) and
 ``primp``-based page scraping with SSRF protection, rate limiting,

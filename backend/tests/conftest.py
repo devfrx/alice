@@ -1,4 +1,4 @@
-﻿"""Shared fixtures for the AL\CE test suite."""
+"""Shared fixtures for the AL\\CE test suite."""
 
 from __future__ import annotations
 

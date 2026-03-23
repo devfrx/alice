@@ -1,4 +1,4 @@
-﻿"""Tests for the PC Automation plugin (Phase 5).
+"""Tests for the PC Automation plugin (Phase 5).
 
 Covers plugin lifecycle, tool definitions, risk levels,
 and tool execution with mocked dependencies.
@@ -279,7 +279,7 @@ class TestPcAutomationExecuteTool:
         ) as mock_clip:
             mock_clip.paste.return_value = ""
             result = await plugin.execute_tool(
-                "type_text", {"text": "Hello AL\CE"}, exec_context,
+                "type_text", {"text": "Hello AL\\CE"}, exec_context,
             )
             assert result.success
             mock_clip.copy.assert_called()

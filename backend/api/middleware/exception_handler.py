@@ -1,4 +1,4 @@
-"""AL\CE — ASGI middleware for unhandled exception safety net.
+"""AL\\CE — ASGI middleware for unhandled exception safety net.
 
 Placed inside CORSMiddleware so error responses always carry CORS headers,
 even when SlowAPI's BaseHTTPMiddleware interferes with exception propagation.

@@ -1,4 +1,4 @@
-"""AL\CE — Notifications plugin.
+"""AL\\CE — Notifications plugin.
 
 Windows toast notifications and timer management.  Uses *winotify* for
 native Windows notifications and :class:`TimerManager` for persistent

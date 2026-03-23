@@ -1,4 +1,4 @@
-"""AL\CE — FastAPI application factory."""
+"""AL\\CE — FastAPI application factory."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ __version__ = "0.1.0"
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Manage startup / shutdown of the AL\CE backend."""
+    """Manage startup / shutdown of the AL\\CE backend."""
     # -- Startup ------------------------------------------------------------
     config: AliceConfig = app.state._config  # set by create_app
     testing: bool = app.state._testing
@@ -359,7 +359,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.context = ctx
     app.state.engine = engine
 
-    logger.info("AL\CE backend started (v{})", __version__)
+    logger.info("AL\\CE backend started (v{})", __version__)
 
     yield
 
@@ -410,7 +410,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
     except Exception as exc:
         logger.error("Engine disposal error: {}", exc)
-    logger.info("AL\CE backend stopped")
+    logger.info("AL\\CE backend stopped")
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ def create_app(testing: bool = False) -> FastAPI:
     config = load_config()
 
     app = FastAPI(
-        title="AL\CE",
+        title="AL\\CE",
         version=__version__,
         lifespan=_lifespan,
     )

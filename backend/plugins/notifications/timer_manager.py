@@ -1,4 +1,4 @@
-"""AL\CE — Timer management for the notifications plugin.
+"""AL\\CE — Timer management for the notifications plugin.
 
 Manages persistent timers backed by SQLite. Each timer is an
 ``asyncio.Task`` that sleeps until ``fires_at`` and then invokes a

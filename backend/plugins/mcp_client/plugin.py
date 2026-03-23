@@ -1,6 +1,6 @@
-"""AL\CE — MCP Client plugin.
+"""AL\\CE — MCP Client plugin.
 
-Bridges AL\CE to external MCP servers. Each server's tools are
+Bridges AL\\CE to external MCP servers. Each server's tools are
 namespaced as ``mcp_{server_name}_{tool_name}`` and exposed via
 ``get_tools()``, making them available to the LLM automatically.
 """
@@ -23,7 +23,7 @@ from backend.services.mcp_session import McpSession
 
 
 class McpClientPlugin(BasePlugin):
-    """Bridges AL\CE to external MCP servers.
+    """Bridges AL\\CE to external MCP servers.
 
     At startup, connects to every enabled server in ``config.mcp.servers``.
     Each server's tools are namespaced as ``mcp_{server_name}_{tool_name}``
@@ -33,7 +33,7 @@ class McpClientPlugin(BasePlugin):
     plugin_name = "mcp_client"
     plugin_version = "1.0.0"
     plugin_description = (
-        "Bridges AL\CE to external MCP servers "
+        "Bridges AL\\CE to external MCP servers "
         "(filesystem, git, browser, search engine, …)"
     )
     plugin_dependencies: list[str] = []

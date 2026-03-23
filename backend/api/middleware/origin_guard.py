@@ -1,7 +1,7 @@
-"""AL\CE — Origin validation middleware for mutable endpoints.
+"""AL\\CE — Origin validation middleware for mutable endpoints.
 
 Prevents cross-origin requests from untrusted web pages to sensitive
-endpoints (e.g. PUT /config, PUT /settings). Since AL\CE runs locally,
+endpoints (e.g. PUT /config, PUT /settings). Since AL\\CE runs locally,
 this guards against malicious JS on arbitrary websites calling the
 local API to disable security features.
 

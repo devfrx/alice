@@ -1,4 +1,4 @@
-"""AL\CE — Async event bus for inter-component communication."""
+"""AL\\CE — Async event bus for inter-component communication."""
 
 from __future__ import annotations
 

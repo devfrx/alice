@@ -1,4 +1,4 @@
-"""AL\CE — network_probe: Local network address validator.
+"""AL\\CE — network_probe: Local network address validator.
 
 Ensures all probe targets are RFC‑1918 / loopback only — the inverse
 of the SSRF guard in ``backend.core.http_security``.

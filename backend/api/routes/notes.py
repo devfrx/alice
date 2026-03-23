@@ -1,4 +1,4 @@
-"""AL\CE — Notes REST endpoints."""
+"""AL\\CE — Notes REST endpoints."""
 
 from __future__ import annotations
 

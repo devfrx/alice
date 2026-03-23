@@ -1,6 +1,6 @@
-"""AL\CE — Base plugin class.
+"""AL\\CE — Base plugin class.
 
-Every AL\CE plugin **must** subclass :class:`BasePlugin` and implement
+Every AL\\CE plugin **must** subclass :class:`BasePlugin` and implement
 the two abstract methods :meth:`get_tools` and :meth:`execute_tool`.
 The lifecycle methods (:meth:`initialize`, :meth:`cleanup`,
 :meth:`on_app_startup`, :meth:`on_app_shutdown`) provide hooks that
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 class BasePlugin(ABC):
-    """Abstract base class for all AL\CE plugins.
+    """Abstract base class for all AL\\CE plugins.
 
     Subclasses **must** define the four class-level attributes
     (``plugin_name``, ``plugin_version``, ``plugin_description``,

@@ -1,4 +1,4 @@
-"""AL\CE — Plugin manager (discovery, lifecycle, dependency resolution).
+"""AL\\CE — Plugin manager (discovery, lifecycle, dependency resolution).
 
 Manages the full plugin lifecycle: registration, dependency resolution via
 topological sort, initialisation, hot-reload, and graceful shutdown.  The

@@ -1,4 +1,4 @@
-"""AL\CE — Backend entry point with clean shutdown on Windows.
+"""AL\\CE — Backend entry point with clean shutdown on Windows.
 
 Usage:
     python -m backend                  (defaults: host=0.0.0.0, port=8000)
@@ -18,7 +18,7 @@ def main() -> None:
     """Launch uvicorn with graceful signal handling for Windows."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="AL\CE backend server")
+    parser = argparse.ArgumentParser(description="AL\\CE backend server")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action="store_true")

@@ -1,4 +1,4 @@
-"""AL\CE — LM Studio v1 REST API client for model management."""
+"""AL\\CE — LM Studio v1 REST API client for model management."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""AL\CE — PC Automation async execution wrappers.
+"""AL\\CE — PC Automation async execution wrappers.
 
 Each function wraps a blocking Windows automation call in
 ``asyncio.to_thread()`` for async safety. All validation is

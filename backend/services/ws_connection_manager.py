@@ -1,4 +1,4 @@
-"""AL\CE — WebSocket connection manager for background events.
+"""AL\\CE — WebSocket connection manager for background events.
 
 Maintains persistent client connections on ``/api/events/ws`` and
 provides ``broadcast()`` / ``send_to()`` for pushing task status

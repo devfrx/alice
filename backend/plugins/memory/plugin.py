@@ -1,4 +1,4 @@
-"""AL\CE — Memory plugin.
+"""AL\\CE — Memory plugin.
 
 Exposes five tools — ``remember``, ``recall``, ``forget``,
 ``list_memories``, and ``clear_session_memory`` — that delegate to the

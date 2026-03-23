@@ -1,4 +1,4 @@
-"""AL\CE — MCP server management REST endpoints."""
+"""AL\\CE — MCP server management REST endpoints."""
 
 from __future__ import annotations
 

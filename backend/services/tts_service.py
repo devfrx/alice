@@ -1,4 +1,4 @@
-"""AL\CE — Text-to-Speech service.
+"""AL\\CE — Text-to-Speech service.
 
 Supports **Piper TTS** (CPU-only, low RAM) as primary engine,
 **XTTS v2** (GPU, voice-cloning) and **Kokoro** (ONNX, CPU-friendly,

@@ -1,4 +1,4 @@
-"""AL\CE — Configuration system.
+"""AL\\CE — Configuration system.
 
 Loads configuration from ``config/default.yaml`` with environment-variable
 overrides (prefix ``ALICE_``, nested via double-underscore).  Uses Pydantic
@@ -23,7 +23,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # ---------------------------------------------------------------------------
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
-"""Absolute path to the AL\CE project root (two levels up from core/)."""
+"""Absolute path to the AL\\CE project root (two levels up from core/)."""
 
 DEFAULT_CONFIG_PATH: Path = PROJECT_ROOT / "config" / "default.yaml"
 
@@ -558,7 +558,7 @@ class ChartConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_CHART__")
 
     enabled: bool = False
-    """Abilita il plugin chart_generator (opt-in, come tutti i plugin AL\CE)."""
+    """Abilita il plugin chart_generator (opt-in, come tutti i plugin AL\\CE)."""
 
     chart_output_dir: str = "data/charts"
     """Directory dove vengono salvati i chart spec JSON."""

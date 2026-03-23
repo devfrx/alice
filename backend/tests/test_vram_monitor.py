@@ -1,4 +1,4 @@
-"""AL\CE — Tests for VRAM monitor service (Phase 4)."""
+"""AL\\CE — Tests for VRAM monitor service (Phase 4)."""
 
 from __future__ import annotations
 

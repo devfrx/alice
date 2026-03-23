@@ -1,4 +1,4 @@
-"""AL\CE — Web Search plugin package.
+"""AL\\CE — Web Search plugin package.
 
 Importing this module registers :class:`WebSearchPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

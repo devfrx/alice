@@ -1,4 +1,4 @@
-"""AL\CE — Async email service (IMAP read + SMTP send)."""
+"""AL\\CE — Async email service (IMAP read + SMTP send)."""
 
 from __future__ import annotations
 

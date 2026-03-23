@@ -1,4 +1,4 @@
-"""AL\CE — System Info plugin.
+"""AL\\CE — System Info plugin.
 
 Exposes ``get_system_info`` and ``get_process_list`` tools that report
 hardware/OS metrics via *psutil*.  All output is strictly whitelisted

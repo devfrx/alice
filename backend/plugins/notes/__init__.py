@@ -1,4 +1,4 @@
-"""AL\CE — Notes plugin package.
+"""AL\\CE — Notes plugin package.
 
 Importing this module registers :class:`NotesPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

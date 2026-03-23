@@ -1,4 +1,4 @@
-"""AL\CE — Memory plugin package.
+"""AL\\CE — Memory plugin package.
 
 Importing this module registers :class:`MemoryPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

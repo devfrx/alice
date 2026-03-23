@@ -1,4 +1,4 @@
-"""AL\CE — Tests for Phase 3.3 tool calling loop + history normalization."""
+"""AL\\CE — Tests for Phase 3.3 tool calling loop + history normalization."""
 
 from __future__ import annotations
 

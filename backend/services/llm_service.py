@@ -1,4 +1,4 @@
-"""AL\CE — LLM service for OpenAI-compatible APIs."""
+"""AL\\CE — LLM service for OpenAI-compatible APIs."""
 
 from __future__ import annotations
 

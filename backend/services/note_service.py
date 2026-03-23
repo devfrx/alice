@@ -1,4 +1,4 @@
-"""AL\CE — Obsidian-like note vault service.
+"""AL\\CE — Obsidian-like note vault service.
 
 CRUD + FTS5 full-text search + optional vector search via ``sqlite-vec``
 on a dedicated SQLite DB (``data/notes.db``).  All I/O is async via
@@ -198,7 +198,7 @@ class NoteService:
     """Obsidian-like note vault with FTS5 + optional vector search.
 
     Args:
-        config: ``NotesConfig`` sub-section from AL\CE config.
+        config: ``NotesConfig`` sub-section from AL\\CE config.
         llm_base_url: Base URL of the LLM / embedding API server.
     """
 

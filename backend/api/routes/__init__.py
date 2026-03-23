@@ -1,4 +1,4 @@
-"""AL\CE — API route registry."""
+"""AL\\CE — API route registry."""
 
 from __future__ import annotations
 

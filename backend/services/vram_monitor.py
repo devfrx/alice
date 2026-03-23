@@ -1,4 +1,4 @@
-"""AL\CE — VRAM monitoring service with budget tracking and alerts."""
+"""AL\\CE — VRAM monitoring service with budget tracking and alerts."""
 
 from __future__ import annotations
 

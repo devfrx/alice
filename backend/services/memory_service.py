@@ -1,4 +1,4 @@
-"""AL\CE — Persistent semantic memory service.
+"""AL\\CE — Persistent semantic memory service.
 
 CRUD + vector search via ``sqlite-vec`` on a dedicated SQLite DB
 (``data/memory.db``).  All I/O is async via ``aiosqlite``.
@@ -146,7 +146,7 @@ class MemoryService:
     """Persistent semantic memory: embed, store, and search via sqlite-vec.
 
     Args:
-        config: ``MemoryConfig`` sub-section from AL\CE config.
+        config: ``MemoryConfig`` sub-section from AL\\CE config.
         llm_base_url: Base URL of the LLM / embedding API server.
     """
 

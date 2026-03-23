@@ -1,4 +1,4 @@
-"""AL\CE — News/briefing plugin.
+"""AL\\CE — News/briefing plugin.
 
 Provides ``get_news`` and ``get_daily_briefing`` tools for fetching
 RSS feeds and building a daily summary (with optional soft dependencies

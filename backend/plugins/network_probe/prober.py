@@ -1,4 +1,4 @@
-"""AL\CE — network_probe: Async network prober.
+"""AL\\CE — network_probe: Async network prober.
 
 Provides low-level async operations: ICMP ping, TCP port scan,
 service banner checks, ARP device discovery, and local network

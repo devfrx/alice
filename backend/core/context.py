@@ -1,4 +1,4 @@
-"""AL\CE — Application context (lightweight DI container).
+"""AL\\CE — Application context (lightweight DI container).
 
 The ``AppContext`` holds references to every shared service so they can be
 injected where needed without relying on module-level globals.
@@ -111,7 +111,7 @@ def create_context(config: AliceConfig) -> AppContext:
     """Create a fresh application context.
 
     Args:
-        config: The validated AL\CE configuration.
+        config: The validated AL\\CE configuration.
 
     Returns:
         An ``AppContext`` wired with the config and a new ``EventBus``.

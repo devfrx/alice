@@ -1,4 +1,4 @@
-"""AL\CE — MCP Memory (Knowledge Graph) management REST endpoints.
+"""AL\\CE — MCP Memory (Knowledge Graph) management REST endpoints.
 
 Provides a REST API to manage the MCP Memory server's knowledge graph.
 Each endpoint proxies to the corresponding MCP tool via the live session,

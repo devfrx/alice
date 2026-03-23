@@ -1,4 +1,4 @@
-"""AL\CE — Voice WebSocket endpoint (STT + TTS streaming)."""
+"""AL\\CE — Voice WebSocket endpoint (STT + TTS streaming)."""
 
 from __future__ import annotations
 

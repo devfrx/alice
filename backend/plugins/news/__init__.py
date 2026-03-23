@@ -1,4 +1,4 @@
-"""AL\CE — News/briefing plugin package.
+"""AL\\CE — News/briefing plugin package.
 
 Importing this module registers :class:`NewsPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

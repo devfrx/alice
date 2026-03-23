@@ -1,4 +1,4 @@
-"""AL\CE — Notes plugin.
+"""AL\\CE — Notes plugin.
 
 Exposes six tools — ``create_note``, ``read_note``, ``update_note``,
 ``delete_note``, ``search_notes``, ``list_notes`` — that delegate to

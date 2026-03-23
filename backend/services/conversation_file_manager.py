@@ -1,4 +1,4 @@
-"""AL\CE — File-based conversation persistence.
+"""AL\\CE — File-based conversation persistence.
 
 Saves every conversation as an organized JSON file so that conversations
 can be recovered if the SQLite database is lost or corrupted.

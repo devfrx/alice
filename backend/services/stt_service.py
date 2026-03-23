@@ -1,4 +1,4 @@
-"""AL\CE — Speech-to-Text service (faster-whisper + Silero VAD).
+"""AL\\CE — Speech-to-Text service (faster-whisper + Silero VAD).
 
 Lazy-loads the Whisper model on first transcription (or explicit ``start()``)
 to avoid VRAM allocation at startup.  Audio is validated for size, duration,
@@ -75,7 +75,7 @@ class STTService:
     :meth:`transcribe` or via an explicit :meth:`start`.
 
     Args:
-        config: STT configuration section from AL\CE settings.
+        config: STT configuration section from AL\\CE settings.
     """
 
     def __init__(self, config: STTConfig) -> None:

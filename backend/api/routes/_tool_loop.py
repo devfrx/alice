@@ -1,4 +1,4 @@
-"""AL\CE — Tool calling loop for the WebSocket chat handler.
+"""AL\\CE — Tool calling loop for the WebSocket chat handler.
 
 Handles iterative LLM ↔ tool execution cycles, deduplication,
 user confirmation for dangerous tools, and graceful error recovery.

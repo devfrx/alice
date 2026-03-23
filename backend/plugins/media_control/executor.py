@@ -1,4 +1,4 @@
-"""AL\CE — Media Control async execution wrappers.
+"""AL\\CE — Media Control async execution wrappers.
 
 Each function wraps a blocking Windows API call (COM / win32) in
 ``asyncio.to_thread()`` for async safety.  COM interfaces are cached

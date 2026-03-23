@@ -1,4 +1,4 @@
-"""AL\CE — Tool registry (aggregation, validation, dispatch).
+"""AL\\CE — Tool registry (aggregation, validation, dispatch).
 
 Collects tool definitions from all active plugins, validates and
 namespaces them, and provides O(1) lookup plus timeout-enforced

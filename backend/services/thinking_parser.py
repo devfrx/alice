@@ -1,4 +1,4 @@
-"""AL\CE — Streaming parser for reasoning tags.
+"""AL\\CE — Streaming parser for reasoning tags.
 
 Detects and separates thinking/reasoning blocks from regular content
 in a streamed LLM response.  Case-insensitive matching ensures that

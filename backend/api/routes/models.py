@@ -1,4 +1,4 @@
-"""AL\CE — Model management endpoints using LM Studio v1 API."""
+"""AL\\CE — Model management endpoints using LM Studio v1 API."""
 
 from __future__ import annotations
 
@@ -198,7 +198,7 @@ async def models_status(request: Request) -> ModelStatusResponse:
 
 
 def serialise_model(m: dict) -> dict[str, Any]:
-    """Transform a v1 API model object into the AL\CE response shape.
+    """Transform a v1 API model object into the AL\\CE response shape.
 
     Shared by both ``/api/models`` and ``/api/config/models`` to ensure
     a single, consistent serialisation for the frontend ``LMStudioModel``

@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from .models import SimpleShape
 
-# Mapping colori AL\CE → colori tldraw più vicini
+# Mapping colori AL\\CE → colori tldraw più vicini
 _COLOR_MAP: dict[str, str] = {
     "cream": "white",
     "sage": "light-green",

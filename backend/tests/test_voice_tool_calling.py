@@ -1,4 +1,4 @@
-"""AL\CE — Tests for voice + tool calling integration (Phase 4).
+"""AL\\CE — Tests for voice + tool calling integration (Phase 4).
 
 Since the full voice → LLM → tool pipeline (M10) is not yet implemented in
 production, these tests focus on what IS available in voice.py:

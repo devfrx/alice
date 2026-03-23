@@ -1,4 +1,4 @@
-"""AL\CE — CAD Generator plugin package.
+"""AL\\CE — CAD Generator plugin package.
 
 Importing this module registers :class:`CadGeneratorPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

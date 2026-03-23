@@ -1,4 +1,4 @@
-"""AL\CE — Web Search plugin.
+"""AL\\CE — Web Search plugin.
 
 Exposes ``web_search`` and ``web_scrape`` tools powered by DDGS metasearch
 and httpx-based page scraping.  All external requests go through SSRF

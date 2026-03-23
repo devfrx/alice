@@ -1,4 +1,4 @@
-ï»¿"""AL\CE Email Assistant plugin â€” expose email tools to the LLM."""
+"""AL\\CE Email Assistant plugin — expose email tools to the LLM."""
 
 from __future__ import annotations
 
@@ -160,7 +160,7 @@ _LIST_FOLDERS_SCHEMA: dict[str, Any] = {
 
 
 class EmailPlugin(BasePlugin):
-    """Plugin email â€” expose 6 LLM tools for email management.
+    """Plugin email — expose 6 LLM tools for email management.
 
     Delegates all I/O to ``ctx.email_service``.
     """
@@ -180,7 +180,7 @@ class EmailPlugin(BasePlugin):
             ToolDefinition(
                 name="read_emails",
                 description=(
-                    "Elenca le email piÃ¹ recenti nella cartella "
+                    "Elenca le email più recenti nella cartella "
                     "specificata. Restituisce una lista di intestazioni: "
                     "uid, subject, from, to, date, is_read. "
                     "Usa uid per leggere il corpo completo con get_email."
@@ -194,7 +194,7 @@ class EmailPlugin(BasePlugin):
                 name="get_email",
                 description=(
                     "Legge il corpo completo di una email dato l'uid. "
-                    "Il corpo HTML Ã¨ convertito automaticamente in testo "
+                    "Il corpo HTML è convertito automaticamente in testo "
                     "plain. Usa read_emails o search_emails per ottenere "
                     "gli uid."
                 ),
@@ -221,7 +221,7 @@ class EmailPlugin(BasePlugin):
                 description=(
                     "Invia una email via SMTP. "
                     "Usa reply_to_uid per rispondere a una email "
-                    "esistente. ATTENZIONE: operazione irreversibile â€” "
+                    "esistente. ATTENZIONE: operazione irreversibile — "
                     "richiede conferma esplicita."
                 ),
                 parameters=_SEND_EMAIL_SCHEMA,

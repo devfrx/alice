@@ -1,4 +1,4 @@
-"""AL\CE — Configuration endpoints (read/update runtime config)."""
+"""AL\\CE — Configuration endpoints (read/update runtime config)."""
 
 from __future__ import annotations
 

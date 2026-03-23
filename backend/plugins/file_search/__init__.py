@@ -1,4 +1,4 @@
-"""AL\CE — File Search plugin package.
+"""AL\\CE — File Search plugin package.
 
 Importing this module registers :class:`FileSearchPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

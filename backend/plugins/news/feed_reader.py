@@ -1,4 +1,4 @@
-"""AL\CE — RSS/Atom feed reader with caching.
+"""AL\\CE — RSS/Atom feed reader with caching.
 
 Fetches and normalises RSS/Atom feeds using ``feedparser``, with
 SSRF validation on every outbound request and an in-memory TTL cache.

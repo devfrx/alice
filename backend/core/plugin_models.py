@@ -1,6 +1,6 @@
-﻿"""Plugin system data models and enums.
+"""Plugin system data models and enums.
 
-Foundation types for the AL\CE plugin architecture (Phase 3.1).
+Foundation types for the AL\\CE plugin architecture (Phase 3.1).
 Imported by BasePlugin, PluginManager, and protocol definitions.
 """
 

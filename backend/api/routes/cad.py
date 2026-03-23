@@ -1,4 +1,4 @@
-"""AL\CE — CAD / 3D model REST endpoints.
+"""AL\\CE — CAD / 3D model REST endpoints.
 
 Serves generated GLB files and provides a health-check proxy for the
 TRELLIS microservice.

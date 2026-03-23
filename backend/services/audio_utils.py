@@ -1,4 +1,4 @@
-"""AL\CE — Audio utility functions for voice services.
+"""AL\\CE — Audio utility functions for voice services.
 
 Provides audio buffer validation, format detection, temporary file management
 with auto-deletion, and PCM/WAV conversion helpers.  No audio data is ever

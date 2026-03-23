@@ -1,4 +1,4 @@
-"""AL\CE — Clipboard plugin.
+"""AL\\CE — Clipboard plugin.
 
 Exposes ``get_clipboard`` and ``set_clipboard`` tools for reading and
 writing system clipboard text content via *pyperclip*.

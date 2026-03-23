@@ -1,4 +1,4 @@
-"""AL\CE — TRELLIS microservice HTTP client.
+"""AL\\CE — TRELLIS microservice HTTP client.
 
 Async client wrapping the local TRELLIS 3D generation microservice.
 Handles health checks, text/image-to-3D generation, model download,

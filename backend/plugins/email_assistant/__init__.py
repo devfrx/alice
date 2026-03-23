@@ -1,4 +1,4 @@
-"""AL\CE — Email Assistant plugin package.
+"""AL\\CE — Email Assistant plugin package.
 
 Importing this module registers :class:`EmailPlugin` in the
 static ``PLUGIN_REGISTRY`` so the plugin manager can discover it.

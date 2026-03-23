@@ -1,4 +1,4 @@
-"""AL\CE — Calendar plugin.
+"""AL\\CE — Calendar plugin.
 
 Local calendar with events, reminders, and RRULE recurrence support.
 Provides five tools: create_event, list_events, update_event,

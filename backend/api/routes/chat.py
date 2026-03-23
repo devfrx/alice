@@ -1,4 +1,4 @@
-"""AL\CE — Chat endpoints (WebSocket streaming + REST history)."""
+"""AL\\CE — Chat endpoints (WebSocket streaming + REST history)."""
 
 from __future__ import annotations
 

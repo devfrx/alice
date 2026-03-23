@@ -1,4 +1,4 @@
-"""AL\CE — User preferences persistence service."""
+"""AL\\CE — User preferences persistence service."""
 
 from __future__ import annotations
 

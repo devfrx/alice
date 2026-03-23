@@ -1,4 +1,4 @@
-"""AL\CE — Memory management REST endpoints."""
+"""AL\\CE — Memory management REST endpoints."""
 
 from __future__ import annotations
 

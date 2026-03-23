@@ -1,4 +1,4 @@
-"""AL\CE — Service protocols (structural typing for DI).
+"""AL\\CE — Service protocols (structural typing for DI).
 
 Defines :class:`~typing.Protocol` classes that describe the public API
 expected from each pluggable service.  ``AppContext`` references these

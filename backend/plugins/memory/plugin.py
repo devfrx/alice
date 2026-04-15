@@ -148,6 +148,12 @@ class MemoryPlugin(BasePlugin):
                             "description": (
                                 "Optional category filter."
                             ),
+                            "enum": [
+                                "preference",
+                                "fact",
+                                "skill",
+                                "context",
+                            ],
                         },
                         "limit": {
                             "type": "integer",
@@ -201,10 +207,17 @@ class MemoryPlugin(BasePlugin):
                             "description": (
                                 "Filter by scope: 'long_term' or 'session'."
                             ),
+                            "enum": ["long_term", "session"],
                         },
                         "category": {
                             "type": "string",
                             "description": "Filter by category.",
+                            "enum": [
+                                "preference",
+                                "fact",
+                                "skill",
+                                "context",
+                            ],
                         },
                         "limit": {
                             "type": "integer",

@@ -234,10 +234,15 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Synchronous guard to prevent concurrent resumeOperationTracking calls. */
   let _isResumingOperation = false
 
-  /** The active LLM model (ignores embedding models). */
-  const activeModel = computed(() =>
-    models.value.find((m) => m.loaded && m.type !== 'embedding') ?? null
-  )
+  /** The active LLM model (ignores embedding models).
+   *  When multiple models are loaded, prefer the one matching config. */
+  const activeModel = computed(() => {
+    const loaded = models.value.filter((m) => m.loaded && m.type !== 'embedding')
+    if (loaded.length <= 1) return loaded[0] ?? null
+    // Multiple loaded — prefer the one matching the backend config model.
+    const configModel = settings.value.llm.model
+    return loaded.find((m) => m.name === configModel) ?? loaded[0]
+  })
 
   /** The active embedding model (if any). */
   const activeEmbeddingModel = computed(() =>
@@ -404,6 +409,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       await api.loadModel(modelKey, config)
       await loadModels()
+      // Sync backend config with the newly loaded model.
+      await syncModel()
     } catch (err) {
       currentOperation.value = null
       stopOperationPolling()
@@ -424,6 +431,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       await api.unloadModel(instanceId)
       await loadModels()
+      // Sync backend config after unload.
+      await syncModel()
     } catch (err) {
       currentOperation.value = null
       stopOperationPolling()

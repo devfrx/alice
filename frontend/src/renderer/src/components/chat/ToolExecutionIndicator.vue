@@ -114,7 +114,7 @@ function isPlainResult(exec: ToolExecution): boolean {
                     <img v-if="exec.contentType?.startsWith('image/')" class="tool-exec__image"
                         :src="`data:${exec.contentType};base64,${exec.result}`" alt="Screenshot" />
                     <!-- CAD model -->
-                    <template v-else-if="exec.contentType === 'application/vnd.alice.cad-model+json'">
+                    <template v-else-if="exec.contentType === 'application/vnd.alice.cad-model+json' && parseCadPayload(exec.result)">
                         <CADViewer :model-url="parseCadPayload(exec.result)?.export_url ?? ''"
                             :model-name="parseCadPayload(exec.result)?.model_name" />
                     </template>

@@ -346,11 +346,30 @@ class MemoryService:
 
         total = await self._qdrant.count(COLLECTION_MEMORY, query_filter)
 
+        # Qdrant scroll uses cursor-based pagination (point IDs), not
+        # positional offsets.  Skip the first `offset` records by
+        # scrolling past them before fetching the requested page.
+        cursor: str | int | None = None
+        if offset > 0:
+            skipped = 0
+            while skipped < offset:
+                batch = min(100, offset - skipped)
+                skip_records, next_cursor = await self._qdrant.scroll(
+                    COLLECTION_MEMORY,
+                    query_filter=query_filter,
+                    limit=batch,
+                    offset=cursor,
+                )
+                skipped += len(skip_records)
+                if not skip_records or next_cursor is None:
+                    return [], total
+                cursor = next_cursor
+
         records, _ = await self._qdrant.scroll(
             COLLECTION_MEMORY,
             query_filter=query_filter,
             limit=limit,
-            offset=offset if offset > 0 else None,
+            offset=cursor,
         )
 
         entries = [

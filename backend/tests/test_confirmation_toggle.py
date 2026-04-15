@@ -56,8 +56,13 @@ def _build_mocks(*, confirmations_enabled: bool = True):
     pc_auto_cfg = MagicMock()
     pc_auto_cfg.confirmations_enabled = confirmations_enabled
 
+    llm_cfg = MagicMock()
+    llm_cfg.tool_execution_timeout = 120.0
+    llm_cfg.context_compression_enabled = False
+
     cfg = MagicMock()
     cfg.pc_automation = pc_auto_cfg
+    cfg.llm = llm_cfg
 
     # --- Tool registry ---
     tool_registry = MagicMock()

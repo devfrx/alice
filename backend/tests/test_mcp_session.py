@@ -92,6 +92,7 @@ class TestMcpSessionStart:
         mock_write = MagicMock()
 
         with (
+            patch("shutil.which", return_value="/usr/bin/echo"),
             patch("mcp.client.stdio.stdio_client") as mock_stdio,
             patch("mcp.ClientSession") as mock_cs_class,
         ):
@@ -160,7 +161,10 @@ class TestMcpSessionStart:
         config = _make_config(transport="stdio")
         session = McpSession(config)
 
-        with patch("mcp.client.stdio.stdio_client") as mock_stdio:
+        with (
+            patch("shutil.which", return_value="/usr/bin/echo"),
+            patch("mcp.client.stdio.stdio_client") as mock_stdio,
+        ):
             mock_stdio.side_effect = ConnectionError("Server not found")
 
             with pytest.raises(ConnectionError):
@@ -175,6 +179,7 @@ class TestMcpSessionStart:
         session = McpSession(config)
 
         with (
+            patch("shutil.which", return_value="/usr/bin/echo"),
             patch("mcp.client.stdio.stdio_client") as mock_stdio,
             patch("mcp.ClientSession") as mock_cs_class,
         ):
@@ -197,8 +202,8 @@ class TestMcpSessionStart:
             with pytest.raises(RuntimeError, match="Init failed"):
                 await session.start()
 
-        # Exit stack was cleaned up (session is None)
-        assert session._exit_stack is None
+        # Session task completed with error; exit stack was cleaned up
+        # internally by the task's AsyncExitStack context manager.
         assert session.status == ConnectionStatus.ERROR
 
 
@@ -243,15 +248,12 @@ class TestMcpSessionStop:
         config = _make_config()
         session = McpSession(config)
 
-        # Simulate connected state
+        # Simulate connected state (no background task running).
         session._status = ConnectionStatus.CONNECTED
         session._cached_tools = [MagicMock(name="tool1")]
-        mock_stack = AsyncMock()
-        session._exit_stack = mock_stack
 
         await session.stop()
 
         assert session.status == ConnectionStatus.DISCONNECTED
         assert session.get_tools() == []
         assert session._session is None
-        mock_stack.aclose.assert_called_once()

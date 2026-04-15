@@ -647,6 +647,10 @@ async def sync_model(request: Request) -> dict[str, Any]:
     object.__setattr__(cfg.llm, "supports_thinking", supports_thinking)
     object.__setattr__(cfg.llm, "supports_vision", supports_vision)
 
+    # Invalidate auto-model cache so the next chat request uses the new model.
+    if ctx.llm_service is not None:
+        ctx.llm_service._invalidate_model_cache()
+
     logger.info(
         "sync-model: config updated to '{}' (thinking={}, vision={})",
         loaded_key, supports_thinking, supports_vision,

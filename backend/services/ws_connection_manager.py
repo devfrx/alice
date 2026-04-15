@@ -56,18 +56,21 @@ class WSConnectionManager:
         async with self._lock:
             snapshot = list(self._connections.items())
 
-        dead: list[str] = []
+        dead: list[tuple[str, WebSocket]] = []
         for sid, ws in snapshot:
             try:
                 await ws.send_json(event)
             except Exception as exc:
                 logger.debug("Events WS send failed for {}: {}", sid, exc)
-                dead.append(sid)
+                dead.append((sid, ws))
 
         if dead:
             async with self._lock:
-                for sid in dead:
-                    self._connections.pop(sid, None)
+                for sid, ws in dead:
+                    # Only remove if the connection hasn't been replaced
+                    # by a new WebSocket since the snapshot was taken.
+                    if self._connections.get(sid) is ws:
+                        del self._connections[sid]
 
     async def send_to(self, session_id: str, event: dict[str, Any]) -> None:
         """Send event to a specific session. No-op if disconnected.
@@ -84,7 +87,9 @@ class WSConnectionManager:
             except Exception as exc:
                 logger.debug("Events WS send_to failed for {}: {}", session_id, exc)
                 async with self._lock:
-                    self._connections.pop(session_id, None)
+                    # Only remove if the connection hasn't been replaced.
+                    if self._connections.get(session_id) is ws:
+                        del self._connections[session_id]
 
     @property
     def connection_count(self) -> int:

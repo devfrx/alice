@@ -142,7 +142,7 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="fetch",
             description=(
-                "Fetch a URL using real browser TLS fingerprint (Chrome 131 via primp). "
+                "Fetch a URL using real browser TLS fingerprint (Firefox via primp). "
                 "Bypasses Cloudflare, Radware, and most anti-bot systems that block "
                 "plain Python HTTP clients. Returns content as readable text. "
                 "Use this instead of mcp-server-fetch for e-commerce, comparators, "

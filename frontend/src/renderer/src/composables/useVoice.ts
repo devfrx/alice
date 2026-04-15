@@ -411,12 +411,12 @@ export function useVoice(): UseVoiceReturn {
     if (levelTimer) { clearInterval(levelTimer); levelTimer = null }
     if (workletNode) { workletNode.disconnect(); workletNode = null }
     if (analyserNode) { analyserNode.disconnect(); analyserNode = null }
-    if (audioContext) { audioContext.close(); audioContext = null }
+    if (audioContext) { audioContext.close().catch(() => { /* already closed */ }); audioContext = null }
     if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null }
   }
 
   function cleanupPlaybackResources(): void {
-    if (playbackCtx) { playbackCtx.close(); playbackCtx = null }
+    if (playbackCtx) { playbackCtx.close().catch(() => { /* already closed */ }); playbackCtx = null }
     audioQueue.length = 0
     isPlayingQueue = false
     ttsBackendDone = false
@@ -655,7 +655,7 @@ export function useVoice(): UseVoiceReturn {
     cancelSpeak()
     voiceWs.disconnect()
     cleanupAudioResources()
-    if (playbackCtx) { playbackCtx.close(); playbackCtx = null }
+    if (playbackCtx) { playbackCtx.close().catch(() => { /* already closed */ }); playbackCtx = null }
     audioQueue.length = 0
     isPlayingQueue = false
     if (workletBlobUrl) { URL.revokeObjectURL(workletBlobUrl); workletBlobUrl = null }

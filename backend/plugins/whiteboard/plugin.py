@@ -281,7 +281,7 @@ class WhiteboardPlugin(BasePlugin):
         await super().cleanup()
 
     def get_tools(self) -> list[ToolDefinition]:
-        if not self.ctx.config.whiteboard.enabled:
+        if self._ctx is None or not self._ctx.config.whiteboard.enabled:
             return []
         return [
             ToolDefinition(

@@ -103,13 +103,14 @@ async def list_models(request: Request) -> list[dict[str, Any]]:
 @router.post("/models/load")
 async def load_model(body: LoadModelRequest, request: Request) -> dict:
     """Load a model into LM Studio."""
+    ctx = _ctx(request)
     mgr = _manager(request)
     if mgr.is_busy:
         raise HTTPException(
             409, "Another model operation is already in progress",
         )
     try:
-        return await mgr.load_model(
+        result = await mgr.load_model(
             body.model,
             context_length=body.context_length,
             flash_attention=body.flash_attention,
@@ -117,6 +118,10 @@ async def load_model(body: LoadModelRequest, request: Request) -> dict:
             num_experts=body.num_experts,
             offload_kv_cache_to_gpu=body.offload_kv_cache_to_gpu,
         )
+        # Invalidate auto-model cache so the next chat uses the new model.
+        if ctx.llm_service is not None:
+            ctx.llm_service._invalidate_model_cache()
+        return result
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except httpx.HTTPError as exc:
@@ -127,13 +132,18 @@ async def load_model(body: LoadModelRequest, request: Request) -> dict:
 @router.post("/models/unload")
 async def unload_model(body: UnloadModelRequest, request: Request) -> dict:
     """Unload a model from LM Studio."""
+    ctx = _ctx(request)
     mgr = _manager(request)
     if mgr.is_busy:
         raise HTTPException(
             409, "Another model operation is already in progress",
         )
     try:
-        return await mgr.unload_model(body.instance_id)
+        result = await mgr.unload_model(body.instance_id)
+        # Invalidate auto-model cache after unload.
+        if ctx.llm_service is not None:
+            ctx.llm_service._invalidate_model_cache()
+        return result
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except httpx.HTTPError as exc:

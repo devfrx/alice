@@ -7,6 +7,7 @@
  */
 import { ref, watch, nextTick } from 'vue'
 import { renderMarkdown } from '../../composables/useMarkdown'
+import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import MessageVersionNav from '../chat/MessageVersionNav.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import type { ChatMessage } from '../../types/chat'
@@ -35,6 +36,7 @@ const emit = defineEmits<{
 }>()
 
 const scrollContainer = ref<HTMLElement | null>(null)
+const { handleCodeBlockClick } = useCodeBlocks()
 
 /** Auto-scroll to bottom when opened. */
 watch(() => props.open, async (isOpen) => {
@@ -114,7 +116,8 @@ function truncateContent(content: string, maxLen = 200): string {
                         <div v-if="msg.role === 'tool'" class="drawer__msg-content drawer__msg-content--tool">
                             {{ truncateContent(msg.content) }}
                         </div>
-                        <div v-else class="drawer__msg-content" v-html="renderMarkdown(msg.content || '')" />
+                        <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
+                        <div v-else class="drawer__msg-content" v-html="renderMarkdown(msg.content || '')" @click="handleCodeBlockClick" />
                         <!-- Version navigator for user messages with multiple versions -->
                         <MessageVersionNav v-if="msg.role === 'user' && msg.version_group_id
                             && getVersionCount && getVersionCount(msg.version_group_id) > 1"

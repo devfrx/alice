@@ -8,6 +8,8 @@ interface WindowControls {
   maximize: () => void
   /** Close the application window */
   close: () => void
+  /** Register a callback for maximize/unmaximize state changes. Returns cleanup fn. */
+  onMaximizeChange: (callback: (maximized: boolean) => void) => () => void
 }
 
 /** File operations exposed to the renderer process */

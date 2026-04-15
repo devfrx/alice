@@ -295,168 +295,170 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   line-height: 1.5rem;
   text-align: center;
   color: var(--bg-primary);
+}
 
-  .calendar__week-body {
-    display: grid;
-    grid-template-columns: 3.5rem repeat(7, 1fr);
-    flex: 1;
-    overflow-y: auto;
-  }
+.calendar__week-body {
+  display: grid;
+  grid-template-columns: 3.5rem repeat(7, 1fr);
+  flex: 1;
+  overflow-y: auto;
+}
 
-  .calendar__time-gutter {
-    display: flex;
-    flex-direction: column;
-  }
+.calendar__time-gutter {
+  display: flex;
+  flex-direction: column;
+}
 
-  .calendar__hour-label {
-    height: 3.5rem;
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-end;
-    padding-right: 0.4rem;
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-  }
+.calendar__hour-label {
+  height: 3.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
 
-  .calendar__day-col {
-    position: relative;
-    border-left: 1px solid var(--border);
-    cursor: pointer;
-  }
+.calendar__day-col {
+  position: relative;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+}
 
-  .calendar__day-col--today {
-    background: var(--warning-bg);
-  }
+.calendar__day-col--today {
+  background: var(--warning-bg);
+}
 
-  .calendar__hour-slot {
-    height: 3.5rem;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s ease;
-  }
+.calendar__hour-slot {
+  height: 3.5rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
 
-  .calendar__hour-slot:hover {
-    background: var(--bg-secondary);
-  }
+.calendar__hour-slot:hover {
+  background: var(--bg-secondary);
+}
 
-  .calendar__event {
-    position: absolute;
-    border-radius: var(--radius-sm);
-    padding: 0.15rem 0.3rem;
-    font-size: 0.75rem;
-    overflow: hidden;
-    cursor: pointer;
-    z-index: 1;
-    color: var(--bg-primary);
-  }
+.calendar__event {
+  position: absolute;
+  border-radius: var(--radius-sm);
+  padding: 0.15rem 0.3rem;
+  font-size: 0.75rem;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 1;
+  color: var(--bg-primary);
+}
 
-  .calendar__event:hover {
-    filter: brightness(1.2);
-  }
+.calendar__event:hover {
+  filter: brightness(1.2);
+}
 
-  .calendar__event-time {
-    opacity: 0.85;
-    margin-right: 0.25rem;
-  }
+.calendar__event-time {
+  opacity: 0.85;
+  margin-right: 0.25rem;
+}
 
-  .calendar__event-title {
-    font-weight: 600;
-  }
+.calendar__event-title {
+  font-weight: 600;
+}
 
-  .calendar__event-add {
-    display: none;
-    position: absolute;
-    top: 1px;
-    right: 1px;
-    width: 1.1rem;
-    height: 1.1rem;
-    border-radius: 50%;
-    background: var(--black-medium);
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    font-size: 0.75rem;
-    line-height: 1;
-    cursor: pointer;
-    z-index: 2;
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-  }
+.calendar__event-add {
+  display: none;
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--black-medium);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+}
 
-  .calendar__event:hover .calendar__event-add {
-    display: flex;
-  }
+.calendar__event:hover .calendar__event-add {
+  display: flex;
+}
 
-  .calendar__event-add:hover {
-    background: var(--accent);
-    color: var(--bg-primary);
-  }
+.calendar__event-add:hover {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
 
-  /* Month view */
-  .calendar__month {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+/* Month view */
+.calendar__month {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-  .calendar__month-header {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    text-align: center;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    padding: 0.3rem 0;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
+.calendar__month-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
 
-  .calendar__month-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    grid-template-rows: repeat(6, 1fr);
-    flex: 1;
-    overflow: hidden;
-  }
+.calendar__month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  flex: 1;
+  overflow: hidden;
+}
 
-  .calendar__month-cell {
-    border: 1px solid var(--border);
-    padding: 0.25rem;
-    cursor: pointer;
-    min-height: 4rem;
-    overflow: hidden;
-    transition: background 0.15s ease;
-  }
+.calendar__month-cell {
+  border: 1px solid var(--border);
+  padding: 0.25rem;
+  cursor: pointer;
+  min-height: 4rem;
+  overflow: hidden;
+  transition: background 0.15s ease;
+}
 
-  .calendar__month-cell:hover {
-    background: var(--bg-secondary);
-  }
+.calendar__month-cell:hover {
+  background: var(--bg-secondary);
+}
 
-  .calendar__month-cell--today {
-    background: var(--warning-bg);
-  }
+.calendar__month-cell--today {
+  background: var(--warning-bg);
+}
 
-  .calendar__month-cell--dim {
-    opacity: 0.4;
-  }
+.calendar__month-cell--dim {
+  opacity: 0.4;
+}
 
-  .calendar__month-date {
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
+.calendar__month-date {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 
-  .calendar__month-event {
-    font-size: 0.7rem;
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    margin-top: 0.15rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-    color: var(--bg-primary);
-  }
+.calendar__month-event {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  margin-top: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  color: var(--bg-primary);
+}
 
-  .calendar__month-more {
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-  }</style>
+.calendar__month-more {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+</style>

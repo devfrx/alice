@@ -299,11 +299,18 @@ class PluginManager:
                         name,
                     )
                     del self._plugins[name]
+                    self._failed_plugins.add(name)
+                    await self._ctx.event_bus.emit(
+                        AliceEvent.PLUGIN_FAILED,
+                        plugin_name=name,
+                        error="Plugin class not found in registry after reload",
+                    )
                     return False
 
                 new_plugin = plugin_cls()
                 await new_plugin.initialize(self._ctx)
                 self._plugins[name] = new_plugin
+                self._failed_plugins.discard(name)
 
                 try:
                     await new_plugin.on_app_startup()
@@ -314,6 +321,14 @@ class PluginManager:
                         startup_exc,
                     )
 
+                # Ensure DB tables exist for any new/updated models
+                await self._create_plugin_tables()
+
+                await self._ctx.event_bus.emit(
+                    AliceEvent.PLUGIN_LOADED,
+                    plugin_name=name,
+                    version=new_plugin.plugin_version,
+                )
                 self._logger.info("Plugin '{}' reloaded", name)
 
                 if self._ctx.tool_registry:
@@ -327,6 +342,12 @@ class PluginManager:
                     exc,
                 )
                 self._plugins.pop(name, None)
+                self._failed_plugins.add(name)
+                await self._ctx.event_bus.emit(
+                    AliceEvent.PLUGIN_FAILED,
+                    plugin_name=name,
+                    error=str(exc),
+                )
                 return False
 
     async def load_plugin(self, name: str) -> bool:
@@ -377,6 +398,9 @@ class PluginManager:
                 if name not in self._load_order:
                     self._load_order.append(name)
                 self._failed_plugins.discard(name)
+
+                # Ensure DB tables exist for plugin models
+                await self._create_plugin_tables()
 
                 try:
                     await plugin.on_app_startup()

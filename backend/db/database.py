@@ -31,7 +31,6 @@ def create_engine_and_session(
     """
     engine_kwargs: dict[str, Any] = {
         "echo": False,
-        "pool_pre_ping": True,
     }
 
     is_sqlite = db_url.startswith("sqlite")
@@ -56,7 +55,9 @@ def create_engine_and_session(
         engine_kwargs["max_overflow"] = 3
         engine_kwargs["connect_args"] = {"check_same_thread": False}
     else:
-        # Connection pool tuning for non-SQLite databases (e.g. PostgreSQL).
+        # Non-SQLite databases benefit from pool_pre_ping to recover
+        # from dropped connections (e.g. PostgreSQL idle timeout).
+        engine_kwargs["pool_pre_ping"] = True
         engine_kwargs["pool_size"] = 5
         engine_kwargs["max_overflow"] = 10
 
@@ -114,21 +115,61 @@ async def init_db(engine: AsyncEngine) -> None:
         ("conversations", "context_snapshot", "TEXT"),
     ]
 
-    async with engine.begin() as conn:
+    # Batch all column-existence checks in a single run_sync call to
+    # avoid N async→sync context switches (one per column).
+    def _find_missing_columns(sync_conn) -> list[tuple[str, str, str]]:
+        """Return (table, column, col_type) tuples for missing columns."""
+        inspector = sa.inspect(sync_conn)
+        missing: list[tuple[str, str, str]] = []
+        # Cache column names per table to avoid repeated introspection.
+        table_columns: dict[str, set[str]] = {}
         for table, column, col_type in _COLUMN_MIGRATIONS:
-            exists = await conn.run_sync(
-                lambda sync_conn, t=table, c=column: c
-                in [
-                    col["name"]
-                    for col in sa.inspect(sync_conn).get_columns(t)
-                ]
-                if sa.inspect(sync_conn).has_table(t)
-                else True
+            if table not in table_columns:
+                if not inspector.has_table(table):
+                    continue
+                table_columns[table] = {
+                    c["name"] for c in inspector.get_columns(table)
+                }
+            if column not in table_columns.get(table, set()):
+                missing.append((table, column, col_type))
+        return missing
+
+    async with engine.begin() as conn:
+        missing = await conn.run_sync(_find_missing_columns)
+        for table, column, col_type in missing:
+            await conn.execute(
+                sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
             )
-            if not exists:
+            logger.info("Added missing column {}.{}", table, column)
+
+    # -- Lightweight index migrations ---------------------------------------
+    # Ensures indexes added after initial table creation are present in
+    # existing databases (create_all only creates *missing tables*).
+    _INDEX_MIGRATIONS: list[tuple[str, str, list[str]]] = [
+        ("ix_message_conv_created", "messages", ["conversation_id", "created_at"]),
+        ("ix_message_version_group", "messages", ["version_group_id"]),
+        ("ix_attachment_message_id", "attachments", ["message_id"]),
+    ]
+
+    async with engine.begin() as conn:
+        existing_indexes: set[str] = await conn.run_sync(
+            lambda sync_conn: {
+                idx["name"]
+                for tbl in ("messages", "attachments")
+                if sa.inspect(sync_conn).has_table(tbl)
+                for idx in sa.inspect(sync_conn).get_indexes(tbl)
+                if idx["name"]
+            }
+        )
+        for idx_name, table, columns in _INDEX_MIGRATIONS:
+            if idx_name not in existing_indexes:
+                cols = ", ".join(columns)
                 await conn.execute(
-                    sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+                    sa.text(
+                        f"CREATE INDEX IF NOT EXISTS {idx_name} "
+                        f"ON {table} ({cols})"
+                    )
                 )
-                logger.info("Added missing column {}.{}", table, column)
+                logger.info("Created missing index {} on {}", idx_name, table)
 
 

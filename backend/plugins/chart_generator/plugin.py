@@ -162,7 +162,7 @@ class ChartGeneratorPlugin(BasePlugin):
         await super().cleanup()
 
     def get_tools(self) -> list[ToolDefinition]:
-        if not self.ctx.config.chart.enabled:
+        if self._ctx is None or not self._ctx.config.chart.enabled:
             return []
         return [
             ToolDefinition(

@@ -299,6 +299,8 @@ class NewsPlugin(BasePlugin):
         """
         if not self.ctx.plugin_manager:
             return None
+        if not self.ctx.tool_registry:
+            return None
 
         weather_plugin = self.ctx.plugin_manager.get_plugin("weather")
         if weather_plugin is None:
@@ -334,6 +336,8 @@ class NewsPlugin(BasePlugin):
             List of event dicts or None.
         """
         if not self.ctx.plugin_manager:
+            return None
+        if not self.ctx.tool_registry:
             return None
 
         calendar_plugin = self.ctx.plugin_manager.get_plugin("calendar")

@@ -95,7 +95,7 @@ onUnmounted(() => {
         <Transition name="modal">
             <div v-if="state.visible" class="modal-overlay" @click.self="handleOverlayClick" @keydown="handleKeydown">
                 <div ref="cardRef" class="modal-card" role="dialog" aria-modal="true"
-                    :aria-label="state.title || 'Dialogo'" aria-describedby="modal-desc"
+                    :aria-label="state.title || 'Dialogo'" :aria-describedby="isCustom ? undefined : 'modal-desc'"
                     :style="state.width ? { width: state.width } : {}" tabindex="-1">
                     <h3 v-if="state.title" class="modal-card__title">{{ state.title }}</h3>
 

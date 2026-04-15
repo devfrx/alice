@@ -50,8 +50,14 @@ class McpSession:
         """Spawn the background session task and wait until it is ready.
 
         Raises:
-            RuntimeError: If the connection or MCP handshake fails.
+            RuntimeError: If the connection or MCP handshake fails, or
+                if the session is already started.
         """
+        if self._task is not None and not self._task.done():
+            raise RuntimeError(
+                f"MCP session '{self._config.name}' is already running. "
+                "Call stop() before starting again."
+            )
         self._stop_event = asyncio.Event()
         self._ready_event = asyncio.Event()
         self._init_error = None
@@ -97,23 +103,30 @@ class McpSession:
         if self._stop_event is not None:
             self._stop_event.set()
 
-        if self._task is not None and not self._task.done():
-            try:
-                await asyncio.wait_for(asyncio.shield(self._task), timeout=5.0)
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "MCP session '{}' did not stop in time, cancelling",
-                    self._config.name,
-                )
-                self._task.cancel()
-                with contextlib.suppress(BaseException):
-                    await self._task
-            except Exception as exc:
-                logger.warning(
-                    "Error waiting for MCP session '{}' task: {}",
-                    self._config.name,
-                    exc,
-                )
+        if self._task is not None:
+            if not self._task.done():
+                try:
+                    await asyncio.wait_for(asyncio.shield(self._task), timeout=5.0)
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "MCP session '{}' did not stop in time, cancelling",
+                        self._config.name,
+                    )
+                    self._task.cancel()
+                    with contextlib.suppress(BaseException):
+                        await self._task
+                except Exception as exc:
+                    logger.warning(
+                        "Error waiting for MCP session '{}' task: {}",
+                        self._config.name,
+                        exc,
+                    )
+            else:
+                # Retrieve exception from completed task to prevent
+                # asyncio "Task exception was never retrieved" warning.
+                if not self._task.cancelled():
+                    with contextlib.suppress(BaseException):
+                        self._task.result()
 
         self._session = None
         self._status = ConnectionStatus.DISCONNECTED

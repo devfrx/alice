@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import math
-import struct
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,7 +18,7 @@ from loguru import logger
 
 from backend.core.config import STTConfig
 from backend.services.audio_utils import (
-    _find_data_chunk,
+    estimate_audio_duration_s,
     validate_audio_buffer,
 )
 
@@ -165,9 +164,9 @@ class STTService:
         """
         cap = TRANSCRIPTION_TIMEOUT_S
         try:
-            _, data_size = _find_data_chunk(audio_data)
-            sample_rate = 16000  # STT input is always 16 kHz
-            duration_s = data_size / (sample_rate * 2)  # 16-bit mono
+            duration_s = estimate_audio_duration_s(audio_data)
+            if duration_s <= 0:
+                return cap
             return min(max(MIN_TRANSCRIPTION_TIMEOUT_S, duration_s * 1.5), cap)
         except Exception:
             return cap
@@ -420,9 +419,7 @@ class STTService:
         # STT-specific: enforce per-config duration limit for WAV
         if data[:4] == b"RIFF" and len(data) >= 44:
             try:
-                _, data_size = _find_data_chunk(data)
-                sample_rate = 16000  # STT input is always 16 kHz
-                duration = data_size / (sample_rate * 2)  # 16-bit mono
+                duration = estimate_audio_duration_s(data)
                 if duration > self._config.max_audio_duration_s:
                     raise ValueError(
                         f"Audio duration {duration:.1f}s exceeds "
@@ -430,5 +427,5 @@ class STTService:
                     )
             except ValueError:
                 raise
-            except (struct.error, IndexError):
+            except Exception:
                 logger.warning("Failed to parse WAV header for duration check")

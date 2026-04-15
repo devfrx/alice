@@ -95,6 +95,8 @@ class FakeToolDefinition:
         timeout_ms: int = 30_000,
         requires_confirmation: bool = False,
         risk_level: str = "safe",
+        sanitise_output: bool = True,
+        max_result_chars: int = 15_000,
     ):
         self.name = name
         self.description = description
@@ -104,6 +106,8 @@ class FakeToolDefinition:
         self.timeout_ms = timeout_ms
         self.requires_confirmation = requires_confirmation
         self.risk_level = risk_level
+        self.sanitise_output = sanitise_output
+        self.max_result_chars = max_result_chars
 
 
 def _make_tool(

@@ -34,7 +34,8 @@ function createWindow(): void {
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: http://localhost:8000 ${tldrawCdn}`,
     `font-src 'self' data: ${tldrawCdn}`,
-    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ws://localhost:5173 ${tldrawCdn}`
+    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ws://localhost:5173 ${tldrawCdn}`,
+    "object-src 'none'"
   ].join('; ')
 
   const prodCsp = [
@@ -43,7 +44,8 @@ function createWindow(): void {
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: http://localhost:8000 ${tldrawCdn}`,
     `font-src 'self' data: ${tldrawCdn}`,
-    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ${tldrawCdn}`
+    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ${tldrawCdn}`,
+    "object-src 'none'"
   ].join('; ')
 
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
@@ -57,6 +59,20 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
+  })
+
+  // Null reference when window is destroyed — prevents calling methods on
+  // a destroyed BrowserWindow (critical for macOS dock-click re-creation).
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
+  // Forward maximize/unmaximize state to renderer for accurate title bar UI.
+  mainWindow.on('maximize', () => {
+    mainWindow?.webContents.send('window-maximized-change', true)
+  })
+  mainWindow.on('unmaximize', () => {
+    mainWindow?.webContents.send('window-maximized-change', false)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -106,8 +122,10 @@ app.whenReady().then(() => {
     }
   })
   ipcMain.on('window-close', () => mainWindow?.close())
-  ipcMain.on('show-in-folder', (_event, filePath: string) => {
-    shell.showItemInFolder(filePath)
+  ipcMain.on('show-in-folder', (_event, filePath: unknown) => {
+    if (typeof filePath === 'string' && filePath.length > 0) {
+      shell.showItemInFolder(filePath)
+    }
   })
 
   // Native context menu for text selection and editable fields.

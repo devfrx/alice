@@ -73,7 +73,12 @@ class Message(SQLModel, table=True):
             "role IN ('user', 'assistant', 'system', 'tool')",
             name="ck_message_role",
         ),
-        sa.Index("ix_message_conversation_id", "conversation_id"),
+        sa.Index(
+            "ix_message_conv_created",
+            "conversation_id",
+            "created_at",
+        ),
+        sa.Index("ix_message_version_group", "version_group_id"),
     )
 
     id: uuid.UUID = Field(
@@ -142,6 +147,9 @@ class Attachment(SQLModel, table=True):
     """A file attached to a message (e.g. images for vision models)."""
 
     __tablename__ = "attachments"
+    __table_args__ = (
+        sa.Index("ix_attachment_message_id", "message_id"),
+    )
 
     id: uuid.UUID = Field(
         default_factory=_new_uuid,

@@ -229,6 +229,66 @@ def _filter_messages_by_active_versions(
     return result
 
 
+def _build_tool_rag_query(
+    user_content: str,
+    history: list[dict[str, Any]],
+) -> str:
+    """Build an enriched query for tool RAG from user message + recent context.
+
+    When the user sends a short follow-up like "si" or "ok", the bare
+    message has near-zero semantic value for tool retrieval.  This helper
+    augments the query with:
+    * names of tools called in recent assistant messages,
+    * the last substantive user message (>20 chars).
+
+    This way the embedding still matches relevant tools even for terse
+    confirmations.
+
+    Args:
+        user_content: The current user message.
+        history: Filtered conversation history (list of dicts).
+
+    Returns:
+        A combined query string for the tool RAG embedding search.
+    """
+    # Short messages benefit the most from augmentation.
+    if len(user_content.strip()) > 60:
+        return user_content
+
+    parts: list[str] = [user_content]
+
+    # Walk history backwards (skip last entry = current user msg).
+    recent_tools: list[str] = []
+    last_user_msg: str = ""
+    for m in reversed(history[:-1] if history else []):
+        # Collect tool names from recent assistant tool_calls.
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            for tc in m["tool_calls"]:
+                fn = tc.get("function", {})
+                name = fn.get("name", "")
+                if name and name not in recent_tools:
+                    recent_tools.append(name)
+
+        # Find last substantive user message.
+        if (
+            m.get("role") == "user"
+            and not last_user_msg
+            and len((m.get("content") or "").strip()) > 20
+        ):
+            last_user_msg = (m.get("content") or "").strip()
+
+        # Don't scan too far back.
+        if len(recent_tools) >= 6 or (recent_tools and last_user_msg):
+            break
+
+    if recent_tools:
+        parts.append("tools: " + " ".join(recent_tools))
+    if last_user_msg:
+        parts.append(last_user_msg)
+
+    return " | ".join(parts)
+
+
 def _filter_history_for_llm(
     raw_history: list[dict[str, Any]],
     active_versions: dict[str, int],
@@ -878,8 +938,11 @@ async def ws_chat(websocket: WebSocket) -> None:
                         ctx.config.llm.tool_rag_enabled
                         and ctx.qdrant_service is not None
                     ):
+                        tool_query = _build_tool_rag_query(
+                            user_content, history,
+                        )
                         tools = await ctx.tool_registry.get_relevant_tools(
-                            user_content,
+                            tool_query,
                             ctx.config.llm.tool_rag_top_k,
                         )
                     else:
@@ -1387,6 +1450,18 @@ async def ws_chat(websocket: WebSocket) -> None:
 
                 # --- handle cancellation during tool loop -----------------
                 if cancel_event.is_set():
+                    asst_msg_id = ""
+                    if full_content or thinking_content:
+                        cancel_asst_msg = Message(
+                            conversation_id=conv_id,
+                            role="assistant",
+                            content=full_content,
+                            thinking_content=thinking_content or None,
+                            version_group_id=user_msg.version_group_id,
+                            version_index=user_msg.version_index,
+                        )
+                        session.add(cancel_asst_msg)
+                        asst_msg_id = str(cancel_asst_msg.id)
                     conv.updated_at = _utcnow()
                     if conv.title is None and user_content:
                         conv.title = user_content[:100]
@@ -1399,7 +1474,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                     await websocket.send_json({
                         "type": "done",
                         "conversation_id": str(conv_id),
-                        "message_id": "",
+                        "message_id": asst_msg_id,
                         "user_message_id": str(user_msg.id),
                         "finish_reason": "cancelled",
                         "version_group_id": str(user_msg.version_group_id)

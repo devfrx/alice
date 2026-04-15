@@ -8,6 +8,7 @@
  */
 import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { renderMarkdown } from '../../composables/useMarkdown'
+import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import ToolCallSection from '../chat/ToolCallSection.vue'
@@ -62,6 +63,8 @@ const renderedContent = computed(() => renderMarkdown(props.content))
 
 /** Rendered HTML for the thinking content. */
 const renderedThinking = computed(() => renderMarkdown(props.thinkingContent))
+
+const { handleCodeBlockClick } = useCodeBlocks()
 
 /** Truncated thinking preview (first ~2 lines). */
 const thinkingPreview = computed(() => {
@@ -131,12 +134,14 @@ onMounted(() => {
 
             <!-- Expanded content -->
             <Transition name="thinking-expand">
-                <div v-if="thinkingExpanded" class="thinking-body" v-html="renderedThinking" />
+                <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
+                <div v-if="thinkingExpanded" class="thinking-body" v-html="renderedThinking" @click="handleCodeBlockClick" />
             </Transition>
         </div>
 
         <!-- Main response content -->
-        <div v-if="content" class="response-body" v-html="renderedContent" />
+        <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
+        <div v-if="content" class="response-body" v-html="renderedContent" @click="handleCodeBlockClick" />
 
         <!-- Streaming cursor -->
         <span v-if="isStreaming && content" class="streaming-cursor" />

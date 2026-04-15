@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 /** Window control API exposed to the renderer process */
@@ -8,7 +8,13 @@ const windowControls = {
   /** Toggle maximize/restore of the application window */
   maximize: (): void => ipcRenderer.send('window-maximize'),
   /** Close the application window */
-  close: (): void => ipcRenderer.send('window-close')
+  close: (): void => ipcRenderer.send('window-close'),
+  /** Register a callback for maximize/unmaximize state changes. Returns cleanup fn. */
+  onMaximizeChange: (callback: (maximized: boolean) => void): (() => void) => {
+    const handler = (_e: IpcRendererEvent, maximized: boolean): void => { callback(maximized) }
+    ipcRenderer.on('window-maximized-change', handler)
+    return (): void => { ipcRenderer.removeListener('window-maximized-change', handler) }
+  }
 }
 
 const fileOps = {

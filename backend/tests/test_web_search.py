@@ -177,9 +177,10 @@ class TestWebSearchPluginLifecycle:
         """cleanup() calls close() on the underlying client."""
         plugin = _get_plugin()
         await plugin.initialize(ctx)
-        plugin._client.close = AsyncMock()
+        close_mock = AsyncMock()
+        plugin._client.close = close_mock
         await plugin.cleanup()
-        plugin._client.close.assert_awaited_once()
+        close_mock.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_execute_unknown_tool(self, ctx: AppContext, exec_context: ExecutionContext):

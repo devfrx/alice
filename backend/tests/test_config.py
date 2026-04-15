@@ -60,7 +60,8 @@ def test_llm_temperature(config: AliceConfig) -> None:
 
 def test_llm_max_tokens(config: AliceConfig) -> None:
     assert isinstance(config.llm.max_tokens, int)
-    assert config.llm.max_tokens > 0
+    # -1 means "auto-calculate from context window"; any positive value is explicit.
+    assert config.llm.max_tokens == -1 or config.llm.max_tokens > 0
 
 
 def test_system_prompt_file_is_absolute(config: AliceConfig) -> None:

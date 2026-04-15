@@ -43,7 +43,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="AL\\CE backend server")
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action="store_true")
     parser.add_argument("--reload-dir", default="backend")

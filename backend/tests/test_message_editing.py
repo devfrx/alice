@@ -36,6 +36,7 @@ async def _mock_chat_generator(
     attachments: list[dict[str, str]] | None = None,
     memory_context: str | None = None,
     system_prompt: str | None = None,
+    max_output_tokens: int | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     yield {"type": "token", "content": "Reply"}
     yield {"type": "done"}
@@ -58,6 +59,15 @@ def _patch_llm(app: FastAPI) -> None:
     llm = app.state.context.llm_service
     llm.chat = _mock_chat_generator
     llm.build_messages = _mock_build_messages
+
+
+def _recv_done(ws) -> dict:
+    """Drain WS events until a ``done`` event is received and return it."""
+    for _ in range(20):
+        msg = ws.receive_json()
+        if msg.get("type") == "done":
+            return msg
+    raise RuntimeError("Never received a 'done' event")
 
 
 # ---------------------------------------------------------------------------
@@ -184,8 +194,7 @@ class TestSwitchVersion:
         with test_client.websocket_connect("/api/ws/chat") as ws:
             # Send the first message.
             ws.send_json({"content": "original message"})
-            ws.receive_json()  # token
-            done = ws.receive_json()
+            done = _recv_done(ws)
             conv_id = done["conversation_id"]
             msg_id = done["user_message_id"]
 
@@ -195,8 +204,7 @@ class TestSwitchVersion:
                 "conversation_id": conv_id,
                 "edit_message_id": msg_id,
             })
-            ws.receive_json()  # token
-            done2 = ws.receive_json()
+            done2 = _recv_done(ws)
             vg_id = done2.get("version_group_id")
 
         return conv_id, vg_id
@@ -281,8 +289,7 @@ class TestWebSocketEditMessage:
         with client.websocket_connect("/api/ws/chat") as ws:
             # Send original message.
             ws.send_json({"content": "original"})
-            ws.receive_json()  # token
-            done = ws.receive_json()
+            done = _recv_done(ws)
             conv_id = done["conversation_id"]
             user_msg_id = done["user_message_id"]
 
@@ -292,11 +299,7 @@ class TestWebSocketEditMessage:
                 "conversation_id": conv_id,
                 "edit_message_id": user_msg_id,
             })
-            token = ws.receive_json()
-            assert token["type"] == "token"
-
-            done2 = ws.receive_json()
-            assert done2["type"] == "done"
+            done2 = _recv_done(ws)
             assert done2["conversation_id"] == conv_id
             # Should have version metadata.
             assert done2.get("version_group_id") is not None
@@ -311,8 +314,7 @@ class TestWebSocketEditMessage:
         with client.websocket_connect("/api/ws/chat") as ws:
             # Send a message first to get a conversation.
             ws.send_json({"content": "test"})
-            ws.receive_json()  # token
-            done = ws.receive_json()
+            done = _recv_done(ws)
             conv_id = done["conversation_id"]
 
             # Try to edit with a non-existent message_id.
@@ -331,8 +333,7 @@ class TestWebSocketEditMessage:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "test"})
-            ws.receive_json()
-            done = ws.receive_json()
+            done = _recv_done(ws)
             conv_id = done["conversation_id"]
 
             ws.send_json({
@@ -348,8 +349,7 @@ class TestWebSocketEditMessage:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "hello"})
-            ws.receive_json()  # token
-            done = ws.receive_json()
+            done = _recv_done(ws)
             conv_id = done["conversation_id"]
             asst_msg_id = done["message_id"]  # assistant message ID
 
@@ -370,14 +370,12 @@ class TestWebSocketEditMessage:
         with client.websocket_connect("/api/ws/chat") as ws:
             # Create conversation A.
             ws.send_json({"content": "conversation A"})
-            ws.receive_json()  # token
-            done_a = ws.receive_json()
+            done_a = _recv_done(ws)
             msg_a_id = done_a["user_message_id"]
 
             # Create conversation B (no conversation_id → new conversation).
             ws.send_json({"content": "conversation B"})
-            ws.receive_json()  # token
-            done_b = ws.receive_json()
+            done_b = _recv_done(ws)
             conv_b_id = done_b["conversation_id"]
 
             # Attempt to edit a message from A while targeting conversation B.
@@ -396,8 +394,7 @@ class TestWebSocketEditMessage:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "first message"})
-            ws.receive_json()
-            done1 = ws.receive_json()
+            done1 = _recv_done(ws)
             conv_id = done1["conversation_id"]
             user_msg_id = done1["user_message_id"]
 
@@ -406,8 +403,7 @@ class TestWebSocketEditMessage:
                 "conversation_id": conv_id,
                 "edit_message_id": user_msg_id,
             })
-            ws.receive_json()
-            ws.receive_json()
+            _recv_done(ws)
 
         # Verify both versions are in the conversation via REST using the same
         # TestClient so we read from the same in-memory DB.
@@ -426,8 +422,7 @@ class TestWebSocketEditMessage:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "v0"})
-            ws.receive_json()
-            done0 = ws.receive_json()
+            done0 = _recv_done(ws)
             conv_id = done0["conversation_id"]
             msg_id = done0["user_message_id"]
 
@@ -437,8 +432,7 @@ class TestWebSocketEditMessage:
                 "conversation_id": conv_id,
                 "edit_message_id": msg_id,
             })
-            ws.receive_json()
-            done1 = ws.receive_json()
+            done1 = _recv_done(ws)
             assert done1["version_index"] == 1
 
             # Edit #2 — use the same original message_id.
@@ -447,8 +441,7 @@ class TestWebSocketEditMessage:
                 "conversation_id": conv_id,
                 "edit_message_id": msg_id,
             })
-            ws.receive_json()
-            done2 = ws.receive_json()
+            done2 = _recv_done(ws)
             assert done2["version_index"] == 2
 
     def test_new_message_inherits_version_context(
@@ -459,8 +452,7 @@ class TestWebSocketEditMessage:
         with client.websocket_connect("/api/ws/chat") as ws:
             # Send original message.
             ws.send_json({"content": "v0"})
-            ws.receive_json()  # token
-            done0 = ws.receive_json()
+            done0 = _recv_done(ws)
             conv_id = done0["conversation_id"]
             msg_id = done0["user_message_id"]
 
@@ -470,8 +462,7 @@ class TestWebSocketEditMessage:
                 "conversation_id": conv_id,
                 "edit_message_id": msg_id,
             })
-            ws.receive_json()  # token
-            done1 = ws.receive_json()
+            done1 = _recv_done(ws)
             assert done1["version_index"] == 1
             vg_id = done1["version_group_id"]
 
@@ -480,8 +471,7 @@ class TestWebSocketEditMessage:
                 "content": "follow up in v1",
                 "conversation_id": conv_id,
             })
-            ws.receive_json()  # token
-            done2 = ws.receive_json()
+            done2 = _recv_done(ws)
             # The new message should inherit the active version context.
             assert done2["version_group_id"] == vg_id
             assert done2["version_index"] == 1
@@ -493,17 +483,16 @@ class TestWebSocketEditMessage:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "hello"})
-            ws.receive_json()  # token
-            done = ws.receive_json()
+            done = _recv_done(ws)
             assert done.get("version_group_id") is None
-            assert done.get("version_index") == 0
+            # version_index may be 0 or None for unversioned messages.
+            assert done.get("version_index") in (0, None)
 
             # Second message — still no version groups.
             ws.send_json({
                 "content": "follow up",
                 "conversation_id": done["conversation_id"],
             })
-            ws.receive_json()  # token
-            done2 = ws.receive_json()
+            done2 = _recv_done(ws)
             assert done2.get("version_group_id") is None
-            assert done2.get("version_index") == 0
+            assert done2.get("version_index") in (0, None)

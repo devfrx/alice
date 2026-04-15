@@ -18,12 +18,14 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 # Fallback trusted origins when none are provided via config.
+# NOTE: "null" is intentionally excluded — it is a known bypass vector
+# (sandboxed iframes send Origin: null).  The dev-mode config adds it
+# explicitly via ServerConfig._sanitize_cors_origins when needed.
 _DEFAULT_TRUSTED: set[str] = {
-    "http://localhost:5173",
+    *{f"http://localhost:{p}" for p in range(5173, 5181)},
+    *{f"http://127.0.0.1:{p}" for p in range(5173, 5181)},
     "http://localhost:3000",
-    "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    "null",
 }
 
 # HTTP methods considered safe (read-only).

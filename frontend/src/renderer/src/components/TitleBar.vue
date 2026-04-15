@@ -57,7 +57,6 @@ const handleMinimize = (): void => {
 /** Toggle maximize / restore */
 const handleMaximize = (): void => {
   windowControls?.maximize()
-  isMaximized.value = !isMaximized.value
 }
 
 /** Close the application window */
@@ -65,22 +64,17 @@ const handleClose = (): void => {
   windowControls?.close()
 }
 
-/**
- * Sync `isMaximized` when the user double-clicks the drag region
- * or the OS triggers a maximize/unmaximize via snap layouts, etc.
- */
-const syncMaximizedState = (): void => {
-  // matchMedia trick: maximized windows fill the screen
-  isMaximized.value = window.outerWidth >= screen.availWidth && window.outerHeight >= screen.availHeight
-}
+/** Subscribe to accurate maximize/unmaximize events from the main process. */
+let unsubMaximize: (() => void) | undefined
 
 onMounted(() => {
-  window.addEventListener('resize', syncMaximizedState)
-  syncMaximizedState()
+  unsubMaximize = windowControls?.onMaximizeChange((maximized: boolean) => {
+    isMaximized.value = maximized
+  })
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', syncMaximizedState)
+  unsubMaximize?.()
 })
 </script>
 

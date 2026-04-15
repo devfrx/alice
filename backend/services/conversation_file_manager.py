@@ -129,13 +129,19 @@ class ConversationFileManager:
         conv_id = conversation_data["id"]
         directory = self._resolve_dir(user_id)
         target = self._safe_path(directory, f"{conv_id}.json")
-        tmp = target.with_suffix(".tmp")
+        # Use a unique temp file to prevent corruption from concurrent
+        # writes to the same conversation.
+        tmp = target.with_suffix(f".tmp.{uuid.uuid4().hex[:8]}")
 
         payload = json.dumps(conversation_data, ensure_ascii=False, indent=2)
 
         def _write() -> None:
-            tmp.write_text(payload, encoding="utf-8")
-            tmp.replace(target)
+            try:
+                tmp.write_text(payload, encoding="utf-8")
+                tmp.replace(target)
+            except BaseException:
+                tmp.unlink(missing_ok=True)
+                raise
 
         await asyncio.to_thread(_write)
         logger.debug("Saved conversation file {}", target.name)
@@ -212,7 +218,15 @@ class ConversationFileManager:
         if raw is None:
             return None
 
-        data: dict[str, Any] = json.loads(raw)
+        try:
+            data: dict[str, Any] = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning(
+                "Corrupt conversation JSON for {}, returning None",
+                conversation_id,
+            )
+            return None
+
         if data.get("schema_version", 1) < CURRENT_SCHEMA_VERSION:
             data = _migrate_v1_to_v2(data)
             await self.save(data, user_id=user_id)

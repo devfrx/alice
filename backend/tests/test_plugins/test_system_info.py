@@ -71,7 +71,7 @@ class TestGetTools:
 
     def test_returns_two_tools(self, plugin) -> None:
         tools = plugin.get_tools()
-        assert len(tools) == 2
+        assert len(tools) == 3
 
     def test_tool_types(self, plugin) -> None:
         tools = plugin.get_tools()

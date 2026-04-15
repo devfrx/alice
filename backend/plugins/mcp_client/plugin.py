@@ -42,6 +42,7 @@ class McpClientPlugin(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
         self._sessions: dict[str, McpSession] = {}
+        self._tool_dispatch_map: dict[str, tuple[str, str]] = {}
 
     async def initialize(self, ctx: AppContext) -> None:
         """Connect to all enabled MCP servers from configuration."""
@@ -92,6 +93,7 @@ class McpClientPlugin(BasePlugin):
                     exc,
                 )
         self._sessions.clear()
+        self._tool_dispatch_map.clear()
         await super().cleanup()
 
     # MCP tools often return large payloads (web pages, file content, directory
@@ -107,6 +109,7 @@ class McpClientPlugin(BasePlugin):
     def get_tools(self) -> list[ToolDefinition]:
         """Aggregate tool definitions from all connected MCP sessions."""
         tools: list[ToolDefinition] = []
+        dispatch_map: dict[str, tuple[str, str]] = {}
         for server_name, session in self._sessions.items():
             if session.status != ConnectionStatus.CONNECTED:
                 continue
@@ -130,11 +133,15 @@ class McpClientPlugin(BasePlugin):
                             max_result_chars=self._MCP_MAX_RESULT_CHARS,
                         )
                     )
+                    # Map display name → (server, original tool name)
+                    # so truncated names dispatch to the correct tool.
+                    dispatch_map[full_name] = (server_name, tool.name)
                 except ValueError as exc:
                     self.logger.warning(
                         "Skipping invalid MCP tool '{}': {}",
                         full_name, exc,
                     )
+        self._tool_dispatch_map = dispatch_map
         return tools
 
     async def execute_tool(
@@ -145,11 +152,28 @@ class McpClientPlugin(BasePlugin):
     ) -> ToolResult:
         """Dispatch a tool call to the correct MCP session.
 
-        The tool_name arrives as ``mcp_{server}_{original_tool}``.
-        We iterate sessions to find the matching server prefix.
+        Uses the dispatch map populated by :meth:`get_tools` for O(1)
+        lookup that correctly handles truncated tool names.  Falls back
+        to prefix matching when the map has no entry.
         """
-        # Sort by name length descending to avoid prefix ambiguity
-        # (e.g. 'test' vs 'test_data')
+        # Fast path: dispatch map (handles truncated names correctly)
+        if tool_name in self._tool_dispatch_map:
+            server_name, original_name = self._tool_dispatch_map[tool_name]
+            session = self._sessions.get(server_name)
+            if session is None:
+                return ToolResult.error(
+                    f"MCP server '{server_name}' is not connected"
+                )
+            try:
+                content = await session.call_tool(original_name, args)
+                return ToolResult.ok(content)
+            except Exception as exc:
+                return ToolResult.error(
+                    f"MCP tool '{original_name}' on server "
+                    f"'{server_name}' failed: {exc}"
+                )
+
+        # Fallback: prefix matching for tools not yet in the map
         sorted_sessions = sorted(
             self._sessions.items(),
             key=lambda kv: len(kv[0]),

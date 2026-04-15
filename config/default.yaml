@@ -8,6 +8,9 @@ server:
   reload: true          # dev only
   cors_origins:
     - "http://localhost:5173"   # Vite dev
+    - "http://localhost:5174"   # Vite dev (fallback port)
+    - "http://localhost:5175"   # Vite dev (fallback port)
+    - "http://localhost:5176"   # Vite dev (fallback port)
     - "http://localhost:3000"   # Electron dev
     - "null"                    # Electron production (file:// origin)
 
@@ -301,7 +304,6 @@ mcp:
       command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "~"]
       enabled: true
   # ── Plug & Play (zero config, solo Node.js/Python richiesto) ─────────────────
-  #about:blank#blocked
   # PRIMP FETCH — fetch con TLS fingerprint Chrome reale (primp). Bypassa Cloudflare,
   # Radware, anti-bot. Usa per e-commerce, comparatori, qualsiasi sito che ritorna 403.
   # Richiede: backend/.venv (primp + mcp già installati)

@@ -33,9 +33,10 @@ dependencies = [
     # IoT
     "paho-mqtt>=2.1",
 
-    # Web Search
+    # Web Search & Browser-grade HTTP
     "ddgs>=9.0",
     "beautifulsoup4>=4.12",
+    "primp>=1.0",
 
     # Calendar
     "python-dateutil>=2.9",

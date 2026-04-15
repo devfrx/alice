@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import sqlalchemy as sa
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
@@ -68,24 +69,26 @@ class PreferencesService:
         return nested
 
     async def save_preference(self, key: str, value: Any) -> None:
-        """Save a single preference."""
+        """Save a single preference (atomic upsert)."""
         async with self._session_factory() as session:
-            existing = await session.get(UserPreference, key)
-            if existing:
-                existing.value = json.dumps(value)
-                existing.updated_at = _utcnow()
-                session.add(existing)
-            else:
-                pref = UserPreference(
-                    key=key, value=json.dumps(value),
-                )
-                session.add(pref)
+            pref = UserPreference(
+                key=key, value=json.dumps(value), updated_at=_utcnow(),
+            )
+            await session.merge(pref)
             await session.commit()
 
     async def save_section(self, section: str, data: dict[str, Any]) -> None:
-        """Persist all keys in a section."""
-        for key, value in data.items():
-            await self.save_preference(f"{section}.{key}", value)
+        """Persist all keys in a section (single transaction)."""
+        now = _utcnow()
+        async with self._session_factory() as session:
+            for key, value in data.items():
+                pref = UserPreference(
+                    key=f"{section}.{key}",
+                    value=json.dumps(value),
+                    updated_at=now,
+                )
+                await session.merge(pref)
+            await session.commit()
 
     async def persist_from_update(self, body: dict[str, Any]) -> None:
         """Extract persistable preferences from an update body and save them.
@@ -150,10 +153,10 @@ class PreferencesService:
         """Delete all persisted preferences (reset to defaults)."""
         async with self._session_factory() as session:
             result = await session.exec(select(UserPreference))
-            prefs = result.all()
-            count = len(prefs)
-            for pref in prefs:
-                await session.delete(pref)
+            count = len(result.all())
+            await session.execute(
+                sa.delete(UserPreference)  # type: ignore[arg-type]
+            )
             await session.commit()
         logger.info("Deleted {} persisted preferences", count)
         return count

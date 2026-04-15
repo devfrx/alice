@@ -130,8 +130,10 @@ def validate_command(command: str) -> tuple[bool, str]:
         allowed = ", ".join(sorted(COMMAND_WHITELIST.keys()))
         return False, f"Command '{base_cmd}' is not whitelisted. Allowed: {allowed}"
 
-    # Block shell chaining operators (dangerous even with cmd.exe /c)
-    chaining_chars = {";", "|", "&", "`", "<", ">"}
+    # Block shell chaining operators (dangerous even with cmd.exe /c).
+    # Include ^ (cmd.exe escape char) to prevent sequences like ^^& that
+    # produce a literal ^ followed by an unescaped command separator.
+    chaining_chars = {";", "|", "&", "`", "<", ">", "^"}
     for char in chaining_chars:
         if char in command:
             return False, f"Shell metacharacter '{char}' is not allowed in commands"

@@ -78,7 +78,7 @@ class ServerConfig(BaseSettings):
     environment: str = "development"
     cors_origins: list[str] = Field(
         default_factory=lambda: [
-            "http://localhost:5173",
+            *[f"http://localhost:{p}" for p in range(5173, 5181)],
             "http://localhost:3000",
             "null",
         ]

@@ -79,6 +79,10 @@ class PluginStateRepository:
         are never overwritten, preserving user choices on subsequent
         restarts.
 
+        Uses a single session/transaction to avoid TOCTOU races where
+        a concurrent call could insert the same plugin name between
+        the read and write, causing a primary-key conflict.
+
         Args:
             default_enabled: The list from ``config.plugins.enabled``
                 (read from ``default.yaml``).
@@ -87,19 +91,18 @@ class PluginStateRepository:
             result = await session.exec(select(PluginState))
             existing_names = {row.plugin_name for row in result.all()}
 
-        new_rows = [
-            PluginState(
-                plugin_name=name,
-                enabled=True,
-                updated_at=_utcnow(),
-            )
-            for name in default_enabled
-            if name not in existing_names
-        ]
-        if not new_rows:
-            return
+            new_rows = [
+                PluginState(
+                    plugin_name=name,
+                    enabled=True,
+                    updated_at=_utcnow(),
+                )
+                for name in default_enabled
+                if name not in existing_names
+            ]
+            if not new_rows:
+                return
 
-        async with self._session_factory() as session:
             for row in new_rows:
                 session.add(row)
             await session.commit()

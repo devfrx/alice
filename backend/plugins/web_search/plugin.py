@@ -123,9 +123,11 @@ class WebSearchPlugin(BasePlugin):
                 name="web_scrape",
                 description=(
                     "Fetch a web page and return its text content. "
-                    "Use this to get real-time prices and direct product links from "
-                    "e-commerce or price-comparison sites (trovaprezzi.it, idealo.it, "
-                    "amazon.it, etc.) after a web_search identifies candidate URLs. "
+                    "Use after web_search to extract actual data, statistics, "
+                    "tables, player counts, prices, or any structured information "
+                    "from the URLs found in search results. "
+                    "Essential when you need real numbers to build charts or "
+                    "answer with precise data — search snippets alone are rarely enough. "
                     "Also useful for reading articles or documentation. "
                     "PREFER mcp_primp_fetch over this tool for sites returning 403/CAPTCHA/timeout."
                 ),

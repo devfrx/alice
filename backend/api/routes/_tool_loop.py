@@ -398,6 +398,10 @@ async def run_tool_loop(
         else:
             done, pending = set(), set()
 
+        # Build a lookup from future to task metadata — used for
+        # both pending (timeout) and done (exception) handling.
+        future_to_task = dict(zip(coros, tasks))
+
         if pending:
             logger.error(
                 "Tool execution timed out after {}s — {} task(s) still pending",
@@ -408,8 +412,6 @@ async def run_tool_loop(
                 fut.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await fut
-            # Build a lookup from future to task metadata.
-            future_to_task = dict(zip(coros, tasks))
             for fut in pending:
                 tc_id, tool_name, _, exec_ctx = future_to_task[fut]
                 _timeout_content = (
@@ -438,24 +440,20 @@ async def run_tool_loop(
                 })
             await session.commit()
 
-        results = []
-        for fut in done:
-            exc = fut.exception()
-            results.append(exc if exc is not None else fut.result())
-
         # 4. Process results — persist and notify WS.
         # NOTE: Cancel check is AFTER persistence to avoid orphaned tool_calls
         # in the DB (OpenAI API requires a tool response for every tool_call_id).
-        for idx, res in enumerate(results):
-            if isinstance(res, BaseException):
-                if not isinstance(res, Exception):
-                    raise res
-                # Save an error tool message to satisfy the OpenAI contract.
-                failed_tc_id = tasks[idx][0]
-                failed_tool_name = tasks[idx][1]
+        for fut in done:
+            exc = fut.exception()
+            if exc is not None:
+                if not isinstance(exc, Exception):
+                    raise exc
+                # Look up the correct task metadata via the future,
+                # NOT by index — `done` is a set with arbitrary order.
+                failed_tc_id, failed_tool_name, _, failed_ctx = future_to_task[fut]
                 logger.error(
                     "Tool execution exception for '{}': {}",
-                    failed_tool_name, res,
+                    failed_tool_name, exc,
                 )
                 _fail_content = f"Tool '{failed_tool_name}' execution failed."
                 session.add(Message(
@@ -475,12 +473,12 @@ async def run_tool_loop(
                     "type": "tool_execution_done",
                     "tool_name": failed_tool_name,
                     "result": f"Tool '{failed_tool_name}' execution failed.",
-                    "execution_id": tasks[idx][3].execution_id,
+                    "execution_id": failed_ctx.execution_id,
                     "success": False,
                 })
                 continue
 
-            tc_id, tool_name, tool_result, exec_id = res
+            tc_id, tool_name, tool_result, exec_id = fut.result()
 
             content = _result_to_str(tool_result)
             is_image = (

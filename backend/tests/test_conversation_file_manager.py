@@ -135,10 +135,10 @@ class TestSave:
     async def test_save_is_atomic_no_tmp_leftover(
         self, fm: ConversationFileManager, tmp_path: Path,
     ) -> None:
-        """After a successful save, no ``.tmp`` file should remain."""
+        """After a successful save, no ``.tmp.*`` file should remain."""
         data = _sample_conversation()
         await fm.save(data)
-        tmp_files = list(tmp_path.glob("*.tmp"))
+        tmp_files = list(tmp_path.glob("*.tmp*"))
         assert tmp_files == []
 
     async def test_save_complex_conversation(
@@ -178,14 +178,14 @@ class TestLoad:
         result = await fm.load(str(uuid.uuid4()))
         assert result is None
 
-    async def test_load_corrupted_json_raises(
+    async def test_load_corrupted_json_returns_none(
         self, fm: ConversationFileManager, tmp_path: Path,
     ) -> None:
-        """A corrupted JSON file causes a ``JSONDecodeError`` on load."""
+        """A corrupted JSON file returns ``None`` (logged as warning)."""
         cid = str(uuid.uuid4())
         (tmp_path / f"{cid}.json").write_text("{invalid json!!!", encoding="utf-8")
-        with pytest.raises(json.JSONDecodeError):
-            await fm.load(cid)
+        result = await fm.load(cid)
+        assert result is None
 
 
 # ---------------------------------------------------------------------------

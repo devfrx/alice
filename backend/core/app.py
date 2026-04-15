@@ -144,8 +144,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     # Probe actual dims so ensure_collection uses the real vector size,
     # not the potentially stale config value.
-    actual_dim = await embedding_client.probe_dimensions()
-    logger.info("Embedding dimensions probed: {}", actual_dim)
+    try:
+        actual_dim = await embedding_client.probe_dimensions()
+        logger.info("Embedding dimensions probed: {}", actual_dim)
+    except Exception as exc:
+        logger.warning(
+            "Embedding dimension probe failed: {} — using configured dim ({})",
+            exc,
+            config.qdrant.embedding_dim,
+        )
     ctx.embedding_client = embedding_client
 
     qdrant_service = QdrantService(config.qdrant)
@@ -155,6 +162,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Qdrant service started (mode={})", config.qdrant.mode)
     except Exception as exc:
         logger.warning("Qdrant service failed to start: {}", exc)
+        try:
+            await qdrant_service.close()
+        except Exception:
+            pass
         qdrant_service = None
 
     # -- Memory service (Phase 9) ------------------------------------------
@@ -254,7 +265,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 stt_cfg = ctx.stt_service._config
                 if stt_cfg.compute_type == "float16":
                     logger.info("VRAM pressure: downgrading STT compute_type to int8")
-                    object.__setattr__(stt_cfg, "compute_type", "int8")
+                    stt_cfg.compute_type = "int8"
 
         async def _handle_vram_critical(**kwargs):
             """React to critical VRAM — switch TTS to lightweight engine."""
@@ -272,15 +283,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                         "VRAM critical: switching TTS from '{}' to 'piper'",
                         tts_cfg.engine,
                     )
-                    object.__setattr__(tts_cfg, "engine", "piper")
+                    tts_cfg.engine = "piper"
             # Disable VRAM-heavy STT if possible
             if ctx.stt_service and hasattr(ctx.stt_service, '_config'):
                 stt_cfg = ctx.stt_service._config
                 if stt_cfg.device == "cuda":
                     logger.warning("VRAM critical: switching STT device from 'cuda' to 'cpu'")
-                    object.__setattr__(stt_cfg, "device", "cpu")
+                    stt_cfg.device = "cpu"
                     if stt_cfg.compute_type == "float16":
-                        object.__setattr__(stt_cfg, "compute_type", "int8")
+                        stt_cfg.compute_type = "int8"
 
         ctx.event_bus.subscribe(AliceEvent.VRAM_WARNING, _handle_vram_warning)
         ctx.event_bus.subscribe(AliceEvent.VRAM_CRITICAL, _handle_vram_critical)

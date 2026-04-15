@@ -4,6 +4,7 @@ import { onErrorCaptured, onMounted, provide, computed, ref, watchEffect } from 
 import { useRouter } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
+import ErrorBoundary from './components/ErrorBoundary.vue'
 import AppSidebar from './components/sidebar/AppSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
 // ModeSwitcher is managed inside AssistantFab for assistant mode
@@ -75,7 +76,9 @@ onMounted(() => {
     </div>
     <div class="app-body">
       <main class="app-content">
-        <router-view />
+        <ErrorBoundary>
+          <router-view />
+        </ErrorBoundary>
       </main>
     </div>
     <!-- Floating sidebar (renders its own backdrop) -->

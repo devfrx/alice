@@ -261,8 +261,10 @@ class BasePlugin(ABC):
     def get_db_models(cls) -> list[type]:
         """Return SQLModel classes for plugin-owned DB tables.
 
-        The plugin manager will ensure these tables exist before
-        :meth:`initialize` is called.
+        The plugin manager creates these tables after all plugins
+        have been initialised and before :meth:`on_app_startup`
+        is called.  Do **not** query these tables inside
+        :meth:`initialize`; use :meth:`on_app_startup` instead.
 
         Returns:
             A list of SQLModel model classes.

@@ -272,6 +272,43 @@ class TestMcpClientPluginExecuteTool:
     """Tests for McpClientPlugin.execute_tool()."""
 
     @pytest.mark.asyncio
+    async def test_execute_truncated_tool_dispatches_original_name(self) -> None:
+        """Truncated tool names dispatch the original name to the MCP server."""
+        plugin = McpClientPlugin()
+        long_server = "a_very_long_server_name_that_pushes_limits"
+        original_tool = "also_a_very_long_tool_name"
+
+        session = _make_mock_session(
+            long_server,
+            tools=[
+                ToolDefinition(
+                    name=original_tool,
+                    description="Test",
+                    parameters={},
+                ),
+            ],
+        )
+        session.call_tool = AsyncMock(return_value="truncated ok")
+        plugin._sessions = {long_server: session}
+
+        # Build tools to populate dispatch map
+        tools = plugin.get_tools()
+        assert len(tools) == 1
+        truncated_name = tools[0].name
+        assert len(truncated_name) <= 64
+
+        result = await plugin.execute_tool(
+            truncated_name, {"arg": "val"}, _make_exec_context(),
+        )
+
+        assert result.success is True
+        assert result.content == "truncated ok"
+        # The ORIGINAL (non-truncated) tool name must be sent to the server
+        session.call_tool.assert_called_once_with(
+            original_tool, {"arg": "val"},
+        )
+
+    @pytest.mark.asyncio
     async def test_execute_dispatches_to_correct_session(self) -> None:
         plugin = McpClientPlugin()
         fs_session = _make_mock_session("filesystem")

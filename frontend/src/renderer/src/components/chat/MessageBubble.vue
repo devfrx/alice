@@ -226,7 +226,7 @@ onUnmounted(() => {
         </button>
         <div class="context-summary__body" :class="{ 'context-summary__body--collapsed': summaryCollapsed }">
           <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
-          <div class="context-summary__content" v-html="htmlContent" />
+          <div class="context-summary__content" v-html="htmlContent" @click="handleCodeBlockClick" />
         </div>
       </div>
 

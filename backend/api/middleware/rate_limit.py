@@ -26,13 +26,15 @@ async def _rate_limit_exceeded_handler(
 ) -> JSONResponse:
     """Return a JSON 429 response when rate limit is exceeded."""
     logger.warning(
-        "Rate limit exceeded for {} on {}",
+        "Rate limit exceeded for {} on {} ({})",
         _key_func(request),
         request.url.path,
+        exc.detail,
     )
     return JSONResponse(
         status_code=429,
-        content={"detail": f"Rate limit exceeded: {exc.detail}"},
+        content={"detail": "Rate limit exceeded. Try again later."},
+        headers={"Retry-After": str(getattr(exc, 'retry_after', 60))},
     )
 
 

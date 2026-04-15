@@ -76,8 +76,8 @@ async def get_email(
     uid: str, request: Request, folder: str = "INBOX",
 ) -> dict[str, Any]:
     """Restituisce headers + body plain-text di una email."""
-    _validate_uid(uid)
     svc = _get_email_service(request)
+    _validate_uid(uid)
     try:
         mail = await svc.fetch_email(uid, folder=folder)
     except ValueError as exc:
@@ -132,8 +132,8 @@ async def mark_read(
     read: bool = True,
 ) -> dict[str, bool]:
     """Imposta o rimuove il flag \\Seen."""
-    _validate_uid(uid)
     svc = _get_email_service(request)
+    _validate_uid(uid)
     try:
         ok = await svc.mark_read(uid, folder=folder, read=read)
     except ValueError as exc:
@@ -156,8 +156,8 @@ async def archive_email(
     uid: str, request: Request, from_folder: str = "INBOX",
 ) -> dict[str, bool]:
     """Sposta l'email nella cartella di archivio configurata."""
-    _validate_uid(uid)
     svc = _get_email_service(request)
+    _validate_uid(uid)
     try:
         ok = await svc.archive(uid, from_folder=from_folder)
     except ValueError as exc:

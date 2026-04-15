@@ -63,6 +63,10 @@ async def ws_events(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "heartbeat"})
             except WebSocketDisconnect:
                 break
+            except ValueError:
+                # Malformed JSON from client — ignore and continue.
+                logger.debug("Events WS {}: ignoring invalid JSON", session_id)
+                continue
     except Exception as exc:
         logger.debug("Events WS error for {}: {}", session_id, exc)
     finally:

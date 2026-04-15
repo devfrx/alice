@@ -28,6 +28,7 @@ async def _mock_chat_generator(
     attachments: list[dict[str, str]] | None = None,
     memory_context: str | None = None,
     system_prompt: str | None = None,
+    max_output_tokens: int | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Yield a few tokens then done — stands in for ``LLMService.chat``."""
     yield {"type": "token", "content": "Hello"}

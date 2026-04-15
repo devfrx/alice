@@ -216,11 +216,18 @@ class EventBus:
             return_exceptions=True,
         )
 
+        # Build a set of currently-subscribed handlers so we can skip
+        # circuit-breaker bookkeeping for handlers that unsubscribed
+        # themselves during execution (e.g. once() wrappers).
+        current_handlers = set(self._handlers.get(event_name, []))
+
         for handler, result in zip(active, results):
             if isinstance(result, asyncio.CancelledError):
                 # Cancellation is not a handler fault — re-raise so
                 # callers can react to task cancellation properly.
                 raise result
+            if handler not in current_handlers:
+                continue  # Unsubscribed during execution; skip CB tracking
             if isinstance(result, BaseException):
                 logger.error(
                     "Handler error on '{}': {}",

@@ -131,7 +131,7 @@ class LLMService:
         self._response_ids_max = 500
         # Cache for "auto" model resolution: (resolved_id, resolved_at_monotonic)
         self._auto_model_cache: tuple[str, float] | None = None
-        self._auto_model_ttl: float = 300.0  # seconds
+        self._auto_model_ttl: float = 30.0  # seconds
         # None = unknown, True = supported, False = not supported
         self._supports_stream_options: bool | None = None
 
@@ -742,12 +742,26 @@ class LLMService:
                 "Model rejected 'reasoning' param — retrying without it",
             )
             payload.pop("reasoning", None)
-            async for event in self._stream_lmstudio_native_sse(
-                url, payload, _stream_timeout, cancel_event, conversation_id,
-            ):
-                yield event
-                if event.get("type") == "done":
-                    return
+            try:
+                async for event in self._stream_lmstudio_native_sse(
+                    url, payload, _stream_timeout, cancel_event, conversation_id,
+                ):
+                    yield event
+                    if event.get("type") == "done":
+                        return
+            except (
+                httpx.ReadError, httpx.ReadTimeout, httpx.RemoteProtocolError,
+            ) as retry_exc:
+                logger.warning(
+                    "Connection lost during LM Studio native stream "
+                    "(retry): {}", retry_exc,
+                )
+        except (
+            httpx.ReadError, httpx.ReadTimeout, httpx.RemoteProtocolError,
+        ) as exc:
+            logger.warning(
+                "Connection lost during LM Studio native stream: {}", exc,
+            )
 
         # Stream ended without chat.end — cancelled or connection lost.
         cancelled = (
@@ -1198,6 +1212,12 @@ class LLMService:
                     "arguments": tc["arguments"],
                 },
             }
+        if _last_usage:
+            yield {
+                "type": "usage",
+                "input_tokens": _last_usage.get("prompt_tokens", 0),
+                "output_tokens": _last_usage.get("completion_tokens", 0),
+            }
         yield {"type": "done", "finish_reason": finish}
 
     # ------------------------------------------------------------------
@@ -1240,7 +1260,18 @@ class LLMService:
             )
             resp.raise_for_status()
             data = resp.json()
-            return data["choices"][0]["message"]["content"] or ""
+            raw_content = data["choices"][0]["message"]["content"] or ""
+            # Strip <think>…</think> tags that reasoning models may
+            # produce even in non-streaming mode, keeping summaries clean.
+            if raw_content:
+                parser = ThinkTagParser()
+                parts = parser.feed(raw_content)
+                parts.extend(parser.flush())
+                content_only = "".join(
+                    text for kind, text in parts if kind == "content"
+                )
+                return content_only.strip() or raw_content
+            return raw_content
         except Exception as exc:
             logger.warning("Non-streaming completion failed: {}", exc)
             return ""

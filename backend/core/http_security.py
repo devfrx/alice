@@ -53,6 +53,10 @@ def _is_private_ip(addr: str) -> bool:
 
     IPv4-mapped IPv6 addresses (e.g. ``::ffff:127.0.0.1``) are unwrapped
     to their IPv4 equivalent before checking.
+
+    Uses Python's built-in ``ipaddress`` property checks as primary
+    defense (covers unspecified, multicast, reserved ranges) plus an
+    explicit network list as belt-and-suspenders.
     """
     try:
         ip = ipaddress.ip_address(addr)
@@ -61,6 +65,17 @@ def _is_private_ip(addr: str) -> bool:
     # Unwrap IPv4-mapped IPv6 addresses to prevent bypass
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
+    # Primary: stdlib checks cover all RFC-defined non-global ranges
+    if (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    ):
+        return True
+    # Belt-and-suspenders: explicit network list
     return any(ip in net for net in _PRIVATE_NETWORKS)
 
 

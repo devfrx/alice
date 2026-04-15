@@ -175,7 +175,7 @@ class EmailPlugin(BasePlugin):
     plugin_priority: int = 30
 
     def get_tools(self) -> list[ToolDefinition]:
-        if not self.ctx.config.email.enabled:
+        if self._ctx is None or not self._ctx.config.email.enabled:
             return []
         return [
             ToolDefinition(

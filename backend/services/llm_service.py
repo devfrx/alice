@@ -323,8 +323,13 @@ class LLMService:
             logger.warning("Could not auto-resolve model; sending 'auto'")
             return "auto"
 
-    def _invalidate_model_cache(self) -> None:
-        """Invalidate the cached auto-resolved model ID."""
+    def invalidate_model_cache(self) -> None:
+        """Invalidate the cached auto-resolved model ID.
+
+        Call this whenever the active model changes (load, unload,
+        config update, sync) so the next chat request re-resolves the
+        ``"auto"`` model against LM Studio's currently loaded set.
+        """
         self._auto_model_cache = None
 
     def _load_system_prompt(self) -> str:

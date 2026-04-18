@@ -57,7 +57,7 @@ async def get_stats(request: Request) -> dict[str, Any]:
 
     qdrant_svc = ctx.qdrant_service
     mode = ctx.config.qdrant.mode
-    if getattr(qdrant_svc, "_in_memory", False):
+    if qdrant_svc.in_memory:
         mode = "in-memory (fallback)"
 
     return {

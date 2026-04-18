@@ -164,7 +164,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 10px;
+    padding: var(--space-2) var(--space-2-5);
     cursor: pointer;
     transition: background var(--transition-fast);
     user-select: none;
@@ -181,7 +181,7 @@ onUnmounted(() => {
 .cal-widget__header-left {
     display: flex;
     align-items: baseline;
-    gap: 7px;
+    gap: var(--space-1-5);
     min-width: 0;
     overflow: hidden;
 }
@@ -259,7 +259,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: 0 10px 8px;
+    padding: 0 var(--space-2-5) var(--space-2);
 }
 
 .cal-widget__next-dot {
@@ -322,8 +322,8 @@ onUnmounted(() => {
 .cal-widget__event {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 10px;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2-5);
     transition: background var(--transition-fast);
 }
 
@@ -360,7 +360,7 @@ onUnmounted(() => {
 
 /* ── Empty state ──────────────────────────────────────────── */
 .cal-widget__empty {
-    padding: 8px 10px;
+    padding: var(--space-2) var(--space-2-5);
     font-size: var(--text-2xs);
     color: var(--text-muted);
     font-style: italic;

@@ -375,6 +375,7 @@ defineExpose({
                 <div class="fib__body">
                     <!-- Attach button -->
                     <button class="fib__attach" :disabled="disabled || !supportsVision"
+                        :aria-label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
                         :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
                         @click="openFilePicker">
                         <AppIcon name="paperclip" :size="16" />
@@ -437,7 +438,7 @@ defineExpose({
 
     box-shadow:
         var(--shadow-floating),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        inset 0 1px 0 var(--white-subtle);
     transition:
         left 350ms var(--ease-out-expo),
         border-color 300ms var(--ease-smooth),
@@ -481,8 +482,8 @@ defineExpose({
     border-color: var(--listening-border);
     box-shadow:
         var(--shadow-floating),
-        0 0 20px rgba(224, 96, 96, 0.08),
-        inset 0 1px 0 rgba(224, 96, 96, 0.04);
+        0 0 20px var(--listening-dim),
+        inset 0 1px 0 var(--listening-border);
 }
 
 /* Thinking — cream glow */
@@ -490,8 +491,8 @@ defineExpose({
     border-color: var(--thinking-border);
     box-shadow:
         var(--shadow-floating),
-        0 0 20px rgba(232, 220, 200, 0.06),
-        inset 0 1px 0 rgba(232, 220, 200, 0.03);
+        0 0 20px var(--thinking-dim),
+        inset 0 1px 0 var(--accent-faint);
 }
 
 /* Speaking — green glow */
@@ -499,8 +500,8 @@ defineExpose({
     border-color: var(--speaking-border);
     box-shadow:
         var(--shadow-floating),
-        0 0 20px rgba(92, 154, 110, 0.08),
-        inset 0 1px 0 rgba(92, 154, 110, 0.04);
+        0 0 20px var(--speaking-dim),
+        inset 0 1px 0 var(--speaking-border);
 }
 
 /* Drag over — accent highlight */
@@ -765,7 +766,7 @@ defineExpose({
     background: var(--listening-dim);
     border-color: var(--listening-border);
     color: var(--listening);
-    box-shadow: 0 0 12px rgba(224, 96, 96, 0.12);
+    box-shadow: 0 0 12px var(--listening-border);
 }
 
 /* ── Input area (idle) ── */

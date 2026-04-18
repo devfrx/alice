@@ -313,9 +313,8 @@ function handleEditorKeydown(e: KeyboardEvent): void {
     height: 100%;
     overflow: hidden;
     background: var(--surface-1);
-    border: 1px solid var(--glass-border);
-    border-radius: 14px;
-    /* box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15); */
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
 }
 
 .editor__empty {
@@ -376,7 +375,7 @@ function handleEditorKeydown(e: KeyboardEvent): void {
 }
 
 .editor__status--error {
-    color: var(--error, #f87171);
+    color: var(--danger);
 }
 
 .editor__btn {

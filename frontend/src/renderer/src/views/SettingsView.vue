@@ -1,9 +1,9 @@
 <template>
-  <div class="sv">
+  <div class="sv" aria-label="Impostazioni">
     <!-- Sidebar navigation -->
-    <nav class="sv__nav">
+    <nav class="sv__nav" aria-label="Sezioni impostazioni">
       <div class="sv__nav-header">
-        <h2 class="sv__title">Impostazioni</h2>
+        <h1 class="sv__title">Impostazioni</h1>
       </div>
       <ul class="sv__nav-list">
         <li v-for="item in navItems" :key="item.id">

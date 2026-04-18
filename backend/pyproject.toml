@@ -170,7 +170,10 @@ build-backend = "hatchling.build"
 packages = ["core", "api", "db", "services", "plugins"]
 
 [tool.ruff]
-target-version = "py311"
+# Stack target: Python 3.14. py313 is the highest stable target supported by
+# the ruff version we pin (>=0.8). Linting against py313 still produces valid
+# code on 3.14; bump to py314 once the pinned ruff version supports it.
+target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
@@ -181,5 +184,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true

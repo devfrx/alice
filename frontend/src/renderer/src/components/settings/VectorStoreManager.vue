@@ -126,6 +126,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ── Shared settings section typography ── */
+.settings-section__title {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
 /* ── Status bar ────────────────────────────────────────────── */
 .vs-status {
     display: flex;

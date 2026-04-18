@@ -113,6 +113,11 @@ class LMStudioManager:
     ) -> dict:
         """Load a model into LM Studio (mutually exclusive).
 
+        Concurrent calls are serialised by ``self._operation_lock`` —
+        a second caller awaits completion of the first.  Callers that
+        need fail-fast semantics (e.g. HTTP routes returning 409) must
+        check :pyattr:`is_busy` *before* invoking this method.
+
         Args:
             model: The model key to load.
             context_length: Override context window size.
@@ -123,13 +128,8 @@ class LMStudioManager:
 
         Returns:
             The JSON response from ``POST /api/v1/models/load``.
-
-        Raises:
-            RuntimeError: If another model operation is in progress.
         """
         async with self._operation_lock:
-            if self._current_operation and self._current_operation.status == "in_progress":
-                raise RuntimeError("Another model operation is in progress")
             self._current_operation = ModelOperation("load", model)
             try:
                 payload: dict = {
@@ -176,18 +176,18 @@ class LMStudioManager:
     async def unload_model(self, instance_id: str) -> dict:
         """Unload a model from LM Studio (mutually exclusive).
 
+        Concurrent calls are serialised by ``self._operation_lock`` —
+        a second caller awaits completion of the first.  Callers that
+        need fail-fast semantics (e.g. HTTP routes returning 409) must
+        check :pyattr:`is_busy` *before* invoking this method.
+
         Args:
             instance_id: The instance ID of the loaded model.
 
         Returns:
             The JSON response from ``POST /api/v1/models/unload``.
-
-        Raises:
-            RuntimeError: If another model operation is in progress.
         """
         async with self._operation_lock:
-            if self._current_operation and self._current_operation.status == "in_progress":
-                raise RuntimeError("Another model operation is in progress")
             self._current_operation = ModelOperation(
                 "unload", instance_id,
             )

@@ -1,5 +1,5 @@
 <template>
-  <div class="home-view">
+  <div class="home-view" aria-label="Home">
     <AmbientBackground state="idle" :audio-level="0" :subtle="true" />
 
     <div class="home-view__content">

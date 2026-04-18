@@ -38,8 +38,6 @@ llm:
   context_compression_enabled: true
   context_compression_threshold: 0.75
   context_compression_reserve: 4096
-  history_tool_truncate_chars: 1500
-  history_tool_recent_keep: 4
 
 stt:
   engine: "faster-whisper"

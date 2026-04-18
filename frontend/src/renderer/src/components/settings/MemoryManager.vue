@@ -98,7 +98,7 @@
                         <span class="mem-entry__date">{{ formatDate(entry.created_at) }}</span>
                         <button class="mem-entry__delete" title="Elimina memoria" aria-label="Elimina memoria"
                             @click="confirmDelete(entry)">
-                            ✕
+                            <AppIcon name="x" :size="12" :stroke-width="2" />
                         </button>
                     </div>
                 </div>
@@ -124,6 +124,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useMemoryStore } from '../../stores/memory'
 import type { MemoryEntry } from '../../types/memory'
+import AppIcon from '../ui/AppIcon.vue'
 
 const store = useMemoryStore()
 
@@ -234,6 +235,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ── Shared settings section typography ── */
+.settings-section__title {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
 /* ── Stats bar ─────────────────────────────────────────────── */
 .mem-stats {
     display: flex;

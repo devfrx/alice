@@ -51,9 +51,8 @@ function openNote(id: string): void {
     backdrop-filter: blur(var(--glass-blur-heavy));
     -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
     border: 1px solid var(--glass-border);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    /* box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 1px rgba(255, 255, 255, 0.04); */
     flex-shrink: 0;
     transition: width var(--transition-normal), min-width var(--transition-normal);
 }
@@ -77,7 +76,7 @@ function openNote(id: string): void {
     font-size: var(--text-xs);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-wide);
     white-space: nowrap;
     overflow: hidden;
 }
@@ -108,7 +107,7 @@ function openNote(id: string): void {
 
 .backlinks__body::-webkit-scrollbar-thumb {
     background: var(--surface-3);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
 }
 
 .backlinks__item {

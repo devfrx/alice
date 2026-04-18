@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -13,6 +14,11 @@ from sqlmodel import select
 from backend.db.models import Conversation
 
 router = APIRouter(prefix="/whiteboards", tags=["whiteboards"])
+
+# Maximum serialised size of a tldraw snapshot accepted via PATCH.
+# Protects the JSON store and the WS broadcast pipeline from runaway
+# payloads caused by buggy or malicious clients.
+_MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024  # 5 MiB
 
 
 def _get_store(request: Request):
@@ -142,6 +148,23 @@ async def update_snapshot(
 ) -> dict[str, Any]:
     """Aggiorna lo snapshot tldraw (chiamato dal frontend dopo editing)."""
     store = _get_store(request)
+    # Reject oversized snapshots before they hit disk / WS broadcast.
+    try:
+        size = len(
+            json.dumps(body.snapshot, ensure_ascii=False).encode("utf-8"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Snapshot non serializzabile: {exc}",
+        ) from exc
+    if size > _MAX_SNAPSHOT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Snapshot troppo grande ({size} bytes). "
+                f"Massimo consentito: {_MAX_SNAPSHOT_BYTES} bytes."
+            ),
+        )
     try:
         updated = await store.update_snapshot(board_id, body.snapshot)
     except ValueError as exc:

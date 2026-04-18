@@ -105,25 +105,64 @@ export function resolveBackendUrl(path: string): string {
   return `${BACKEND_HOST}${path.startsWith('/') ? '' : '/'}${path}`
 }
 
+/** Default HTTP request timeout (ms). Long enough for slow LLM/model endpoints. */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+
 /**
- * Generic fetch wrapper with JSON parsing and error handling.
+ * Compose an external AbortSignal with an internal timeout signal.
+ * Returns the combined signal plus a cleanup function that clears the timer.
+ */
+function withTimeout(
+  external: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal; cleanup: () => void } {
+  const ctrl = new AbortController()
+  const onAbort = (): void => { ctrl.abort((external as AbortSignal & { reason?: unknown }).reason) }
+  if (external) {
+    if (external.aborted) ctrl.abort((external as AbortSignal & { reason?: unknown }).reason)
+    else external.addEventListener('abort', onAbort, { once: true })
+  }
+  const timer = setTimeout(() => ctrl.abort(new DOMException('Request timeout', 'TimeoutError')), timeoutMs)
+  return {
+    signal: ctrl.signal,
+    cleanup: () => {
+      clearTimeout(timer)
+      external?.removeEventListener('abort', onAbort)
+    },
+  }
+}
+
+/**
+ * Generic fetch wrapper with JSON parsing, timeout and error handling.
  *
  * @typeParam T - Expected response body type.
  * @param endpoint - Path appended to {@link BASE_URL} (must start with `/`).
- * @param options  - Standard `RequestInit` overrides.
+ * @param options  - Standard `RequestInit` overrides; pass `signal` for cancellation.
+ * @param timeoutMs - Per-request timeout in ms (default {@link DEFAULT_REQUEST_TIMEOUT_MS}).
  * @returns Parsed JSON body cast to `T`.
- * @throws {Error} On non-2xx status codes.
+ * @throws {Error} On non-2xx status codes, network failure, timeout, or abort.
  */
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const { headers: customHeaders, ...fetchOptions } = options ?? {}
+async function request<T>(
+  endpoint: string,
+  options?: RequestInit,
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  const { headers: customHeaders, signal: externalSignal, ...fetchOptions } = options ?? {}
   const isJsonBody = !!fetchOptions.body && typeof fetchOptions.body === 'string'
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers: {
-      ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
-      ...(customHeaders as Record<string, string>)
-    }
-  })
+  const { signal, cleanup } = withTimeout(externalSignal ?? undefined, timeoutMs)
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...fetchOptions,
+      signal,
+      headers: {
+        ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
+        ...(customHeaders as Record<string, string>)
+      }
+    })
+  } finally {
+    cleanup()
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')

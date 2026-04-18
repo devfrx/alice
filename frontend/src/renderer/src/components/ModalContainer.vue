@@ -14,23 +14,53 @@ const { state, close } = useModal()
 
 const cardRef = ref<HTMLElement | null>(null)
 
+/** Previously focused element, restored when the modal closes. */
+let previouslyFocused: HTMLElement | null = null
+/** Original `overflow` value of <body>, restored when the modal closes. */
+let previousBodyOverflow = ''
+/** Tracks whether the body scroll lock is currently applied. */
+let scrollLocked = false
+
+/** Lock background scrolling while the modal is open. */
+function lockBodyScroll(): void {
+    if (scrollLocked) return
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    scrollLocked = true
+}
+
+/** Restore the body's original `overflow` value. */
+function unlockBodyScroll(): void {
+    if (!scrollLocked) return
+    document.body.style.overflow = previousBodyOverflow
+    scrollLocked = false
+}
+
 // ── Focus management ──────────────────────────────────────────
 
 /** Auto-focus the primary action button when the modal opens. */
 watch(
     () => state.visible,
     async (visible) => {
-        if (!visible) return
-        await nextTick()
-        if (state.customComponent) {
-            // For custom modals, focus the card itself so the focus trap works
-            cardRef.value?.focus()
-            return
+        if (visible) {
+            previouslyFocused = document.activeElement as HTMLElement | null
+            lockBodyScroll()
+            await nextTick()
+            if (state.customComponent) {
+                // For custom modals, focus the card itself so the focus trap works
+                cardRef.value?.focus()
+                return
+            }
+            const btn = cardRef.value?.querySelector<HTMLElement>(
+                '.modal__btn--confirm, .modal__btn--ok',
+            )
+            btn?.focus()
+        } else {
+            unlockBodyScroll()
+            // Restore focus to the element that had it before the modal opened.
+            previouslyFocused?.focus?.()
+            previouslyFocused = null
         }
-        const btn = cardRef.value?.querySelector<HTMLElement>(
-            '.modal__btn--confirm, .modal__btn--ok',
-        )
-        btn?.focus()
     },
 )
 
@@ -87,6 +117,8 @@ function handleOverlayClick(): void {
 
 onUnmounted(() => {
     if (state.visible) close(false)
+    // Safety: never leave the body in a locked state when the container unmounts.
+    unlockBodyScroll()
 })
 </script>
 

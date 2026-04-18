@@ -5,10 +5,10 @@
  * Provides a comprehensive view of all available models with load/unload
  * controls, a load configuration dialog, download section, and status header.
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
-import AliceSpinner from '../../components/ui/AliceSpinner.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 
 const settingsStore = useSettingsStore()
@@ -88,7 +88,7 @@ async function confirmLoad(): Promise<void> {
             context_length: loadContextLength.value,
             flash_attention: loadFlashAttention.value
         })
-        showLoadDialog.value = false
+        closeLoadDialog()
     } catch (e) {
         errorMessage.value = e instanceof Error ? e.message : 'Errore nel caricamento del modello'
     }
@@ -123,8 +123,34 @@ async function handleDownload(): Promise<void> {
     }
 }
 
+/**
+ * Close the load dialog (used by ESC handler and overlay click).
+ */
+function closeLoadDialog(): void {
+    showLoadDialog.value = false
+    loadDialogModel.value = null
+}
+
+/** Window-level ESC handler — overlay div cannot receive keydown without focus. */
+function onDialogKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Escape') closeLoadDialog()
+}
+
+// Attach/detach the ESC listener only while the dialog is open.
+watch(showLoadDialog, (open) => {
+    if (open) window.addEventListener('keydown', onDialogKeydown)
+    else window.removeEventListener('keydown', onDialogKeydown)
+})
+
 onMounted(() => {
-    settingsStore.loadModels()
+    // Avoid redundant refetch — the store may already be populated by other panels.
+    if (settingsStore.models.length === 0) {
+        settingsStore.loadModels()
+    }
+})
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onDialogKeydown)
 })
 </script>
 
@@ -277,8 +303,7 @@ onMounted(() => {
         <!-- ── Load Configuration Dialog ── -->
         <Teleport to="body">
             <Transition name="dialog">
-                <div v-if="showLoadDialog && loadDialogModel" class="mm-overlay" @click.self="showLoadDialog = false"
-                    @keydown.escape="showLoadDialog = false">
+                <div v-if="showLoadDialog && loadDialogModel" class="mm-overlay" @click.self="closeLoadDialog">
                     <div class="mm-dialog" role="dialog" aria-modal="true" aria-labelledby="mm-dialog-title">
                         <h4 id="mm-dialog-title" class="mm-dialog__title">Carica modello</h4>
                         <p class="mm-dialog__subtitle">{{ loadDialogModel.display_name || loadDialogModel.name }}</p>
@@ -306,12 +331,11 @@ onMounted(() => {
                         </label>
 
                         <div class="mm-dialog__actions">
-                            <button class="mm-btn mm-btn--ghost" @click="showLoadDialog = false">Annulla</button>
+                            <button class="mm-btn mm-btn--ghost" @click="closeLoadDialog">Annulla</button>
                             <button class="mm-btn mm-btn--primary"
-                                :disabled="(loadDialogModel ? settingsStore.isModelLoading(loadDialogModel.name) : false) || settingsStore.isAnyOperationInProgress"
+                                :disabled="settingsStore.isModelLoading(loadDialogModel.name) || settingsStore.isAnyOperationInProgress"
                                 @click="confirmLoad">
-                                {{ loadDialogModel && settingsStore.isModelLoading(loadDialogModel.name) ?
-                                    'Caricamento…' : 'Carica' }}
+                                {{ settingsStore.isModelLoading(loadDialogModel.name) ? 'Caricamento…' : 'Carica' }}
                             </button>
                         </div>
                     </div>
@@ -322,6 +346,15 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* ── Shared settings section typography (mirrors VoiceSettings) ── */
+.settings-section__title {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
 /* ── Section header ── */
 .mm-status-row {
     display: flex;
@@ -479,12 +512,6 @@ onMounted(() => {
 
 .mm-model:hover {
     border-color: var(--border-hover);
-}
-
-.mm-model--loaded {
-    /* background: var(--success-faint); */
-    /* border-color: var(--success-border); */
-    /* border-left: 2px solid var(--success); */
 }
 
 .mm-model--busy {

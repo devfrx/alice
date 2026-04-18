@@ -4,16 +4,35 @@
  *
  * Variants: primary | secondary | ghost | danger
  * Sizes:    sm | md | lg
- * States:   default | hover | active | focus | disabled | loading
+ * States:   default | hover | active | focus-visible | disabled | loading
+ *
+ * All interactive primitives in the UI library share the same prop contract:
+ *   size, variant, disabled, loading, iconPosition, ariaLabel.
+ *
+ * `type` defaults to "button" to avoid accidental form submits when the
+ * component is rendered inside a <form>. Pass `type="submit"` explicitly
+ * on a real submit button.
  */
 
 export interface UiButtonProps {
+    /** Visual style of the button. */
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+    /** Sizing scale — shared with UiInput. */
     size?: 'sm' | 'md' | 'lg'
+    /** Shows an inline spinner, sets aria-busy, blocks activation. */
     loading?: boolean
+    /** Greys out and blocks pointer + keyboard activation. */
     disabled?: boolean
+    /** Render as icon-only (square) — requires `ariaLabel`. */
     icon?: boolean
+    /** Stretch to fill the parent width. */
     fullWidth?: boolean
+    /** Native button type — defaults to "button" to prevent form submit. */
+    type?: 'button' | 'submit' | 'reset'
+    /** Position of the `#icon` slot relative to the label. */
+    iconPosition?: 'start' | 'end'
+    /** Accessible label — required when icon-only or when label is non-textual. */
+    ariaLabel?: string
 }
 
 withDefaults(defineProps<UiButtonProps>(), {
@@ -23,6 +42,9 @@ withDefaults(defineProps<UiButtonProps>(), {
     disabled: false,
     icon: false,
     fullWidth: false,
+    type: 'button',
+    iconPosition: 'start',
+    ariaLabel: undefined,
 })
 
 defineEmits<{
@@ -34,11 +56,19 @@ defineEmits<{
     <button class="ui-btn" :class="[
         `ui-btn--${variant}`,
         `ui-btn--${size}`,
+        `ui-btn--icon-${iconPosition}`,
         { 'ui-btn--loading': loading, 'ui-btn--icon': icon, 'ui-btn--full': fullWidth },
-    ]" :disabled="disabled || loading" @click="$emit('click', $event)">
-        <span v-if="loading" class="ui-btn__spinner" />
+    ]" :type="type" :disabled="disabled || loading" :aria-busy="loading || undefined"
+        :aria-disabled="disabled || undefined" :aria-label="ariaLabel" @click="$emit('click', $event)">
+        <span v-if="loading" class="ui-btn__spinner" aria-hidden="true" />
         <span class="ui-btn__content" :class="{ 'ui-btn__content--hidden': loading }">
+            <span v-if="$slots.icon && iconPosition === 'start'" class="ui-btn__icon">
+                <slot name="icon" />
+            </span>
             <slot />
+            <span v-if="$slots.icon && iconPosition === 'end'" class="ui-btn__icon">
+                <slot name="icon" />
+            </span>
         </span>
     </button>
 </template>
@@ -59,9 +89,10 @@ defineEmits<{
     white-space: nowrap;
     outline: none;
     transition:
-        background-color var(--transition-fast),
-        border-color var(--transition-fast),
-        color var(--transition-fast);
+        background-color var(--duration-fast) var(--ease-out-quart),
+        border-color var(--duration-fast) var(--ease-out-quart),
+        color var(--duration-fast) var(--ease-out-quart),
+        transform var(--duration-fast) var(--ease-out-quart);
 }
 
 .ui-btn:active:not(:disabled) {
@@ -71,6 +102,7 @@ defineEmits<{
 .ui-btn:disabled {
     opacity: var(--opacity-disabled);
     cursor: not-allowed;
+    pointer-events: none;
 }
 
 .ui-btn:focus-visible {
@@ -159,18 +191,37 @@ defineEmits<{
     width: 100%;
 }
 
+/* ── Slot wrappers ─────────────────── */
+.ui-btn__content {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.ui-btn__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
 /* ── Loading ───────────────────────── */
 .ui-btn__spinner {
     position: absolute;
-    width: 16px;
-    height: 16px;
+    width: 1em;
+    height: 1em;
     border: 2px solid transparent;
     border-top-color: currentColor;
     border-radius: var(--radius-full);
-    animation: spin 0.6s linear infinite;
+    animation: ui-btn-spin 0.6s linear infinite;
 }
 
 .ui-btn__content--hidden {
     visibility: hidden;
+}
+
+@keyframes ui-btn-spin {
+    to { transform: rotate(360deg); }
 }
 </style>

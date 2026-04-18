@@ -749,10 +749,10 @@ function fmtMs(v: number | null): string {
     width: 400px;
     display: flex;
     flex-direction: column;
-    background: var(--bg-primary, #161616);
+    background: var(--bg-primary);
     border-left: 1px solid var(--border);
     z-index: var(--z-dropdown);
-    color: var(--text-primary, #EDEDE9);
+    color: var(--text-primary);
     font-size: 13px;
 }
 
@@ -779,19 +779,19 @@ function fmtMs(v: number | null): string {
     border-radius: 10px;
     font-size: 11px;
     font-weight: 700;
-    background: var(--accent, #E8DCC8);
-    color: var(--bg-primary, #161616);
+    background: var(--accent);
+    color: var(--bg-primary);
 }
 
 .net-probe__close {
     background: none;
     border: none;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     font-size: 16px;
     cursor: pointer;
     padding: 2px 6px;
-    border-radius: var(--radius-sm, 6px);
-    transition: background var(--transition-fast, 0.15s ease);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
 }
 
 .net-probe__close:hover {
@@ -812,22 +812,22 @@ function fmtMs(v: number | null): string {
     padding: 8px 4px 6px;
     border: none;
     background: none;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     font-size: 12px;
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    transition: color var(--transition-fast, 0.15s ease),
-        border-color var(--transition-fast, 0.15s ease);
+    transition: color var(--transition-fast),
+        border-color var(--transition-fast);
     white-space: nowrap;
 }
 
 .net-probe__tab:hover {
-    color: var(--text-primary, #EDEDE9);
+    color: var(--text-primary);
 }
 
 .net-probe__tab--active {
-    color: var(--accent, #E8DCC8);
-    border-bottom-color: var(--accent, #E8DCC8);
+    color: var(--accent);
+    border-bottom-color: var(--accent);
 }
 
 /* ── Body ───────────────────────────────────────────────────────────── */
@@ -859,7 +859,7 @@ function fmtMs(v: number | null): string {
 
 .net-probe__label {
     font-size: 11px;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
@@ -867,22 +867,22 @@ function fmtMs(v: number | null): string {
     width: 100%;
     box-sizing: border-box;
     padding: 7px 10px;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--surface-2, #232323);
-    color: var(--text-primary, #EDEDE9);
+    background: var(--surface-2);
+    color: var(--text-primary);
     font-size: 13px;
     font-family: inherit;
     outline: none;
-    transition: border-color var(--transition-fast, 0.15s ease);
+    transition: border-color var(--transition-fast);
 }
 
 .net-probe__input::placeholder {
-    color: var(--text-muted, #5F5B53);
+    color: var(--text-muted);
 }
 
 .net-probe__input:focus {
-    border-color: var(--accent, #E8DCC8);
+    border-color: var(--accent);
 }
 
 .net-probe__input--sm {
@@ -892,10 +892,10 @@ function fmtMs(v: number | null): string {
 
 .net-probe__select {
     padding: 7px 8px;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--surface-2, #232323);
-    color: var(--text-primary, #EDEDE9);
+    background: var(--surface-2);
+    color: var(--text-primary);
     font-size: 12px;
     font-family: inherit;
     outline: none;
@@ -904,7 +904,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__select:focus {
-    border-color: var(--accent, #E8DCC8);
+    border-color: var(--accent);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */
@@ -915,20 +915,20 @@ function fmtMs(v: number | null): string {
     justify-content: center;
     gap: 6px;
     padding: 7px 14px;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--surface-3, #2A2A2A);
-    color: var(--text-primary, #EDEDE9);
+    background: var(--surface-3);
+    color: var(--text-primary);
     font-size: 12px;
     font-family: inherit;
     cursor: pointer;
-    transition: background var(--transition-fast, 0.15s ease),
-        border-color var(--transition-fast, 0.15s ease);
+    transition: background var(--transition-fast),
+        border-color var(--transition-fast);
 }
 
 .net-probe__btn:hover:not(:disabled) {
-    background: var(--accent-dim, rgba(232, 220, 200, 0.10));
-    border-color: var(--accent, #E8DCC8);
+    background: var(--accent-dim);
+    border-color: var(--accent);
 }
 
 .net-probe__btn:disabled {
@@ -944,25 +944,25 @@ function fmtMs(v: number | null): string {
 .net-probe__btn-link {
     background: none;
     border: none;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     font-size: 12px;
     cursor: pointer;
     padding: 4px 0;
     text-align: left;
-    transition: color var(--transition-fast, 0.15s ease);
+    transition: color var(--transition-fast);
 }
 
 .net-probe__btn-link:hover {
-    color: var(--text-primary, #EDEDE9);
+    color: var(--text-primary);
 }
 
 /* ── Cards & rows ───────────────────────────────────────────────────── */
 
 .net-probe__card {
     padding: 10px;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--surface-1, #1C1C1C);
+    background: var(--surface-1);
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -972,7 +972,7 @@ function fmtMs(v: number | null): string {
     margin-top: 4px;
     padding: 8px;
     border-radius: 4px;
-    background: var(--surface-2, #232323);
+    background: var(--surface-2);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -994,7 +994,7 @@ function fmtMs(v: number | null): string {
 
 .net-probe__label-sm {
     font-size: 11px;
-    color: var(--text-muted, #5F5B53);
+    color: var(--text-muted);
     min-width: 64px;
     flex-shrink: 0;
 }
@@ -1014,22 +1014,22 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__dot--ok {
-    background: var(--success, #5C9A6E);
-    box-shadow: 0 0 4px var(--success, #5C9A6E);
+    background: var(--success);
+    box-shadow: 0 0 4px var(--success);
 }
 
 .net-probe__dot--fail {
-    background: var(--danger, #B85C5C);
-    box-shadow: 0 0 4px var(--danger, #B85C5C);
+    background: var(--danger);
+    box-shadow: 0 0 4px var(--danger);
 }
 
 .net-probe__text--ok {
-    color: var(--success, #5C9A6E);
+    color: var(--success);
     font-weight: 500;
 }
 
 .net-probe__text--fail {
-    color: var(--danger, #B85C5C);
+    color: var(--danger);
     font-weight: 500;
 }
 
@@ -1049,7 +1049,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__port-svc {
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     font-size: 11px;
 }
 
@@ -1063,9 +1063,9 @@ function fmtMs(v: number | null): string {
 .net-probe__closed-port {
     font-size: 11px;
     font-family: 'Cascadia Code', 'Fira Code', monospace;
-    color: var(--text-muted, #5F5B53);
+    color: var(--text-muted);
     padding: 1px 5px;
-    background: var(--surface-2, #232323);
+    background: var(--surface-2);
     border-radius: 3px;
 }
 
@@ -1079,9 +1079,9 @@ function fmtMs(v: number | null): string {
 
 .net-probe__conn-status {
     font-size: 10px;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     padding: 1px 6px;
-    background: var(--surface-2, #232323);
+    background: var(--surface-2);
     border-radius: 3px;
     margin-left: auto;
 }
@@ -1097,19 +1097,19 @@ function fmtMs(v: number | null): string {
 .net-probe__sub-title {
     font-size: 12px;
     font-weight: 600;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     margin-top: 4px;
 }
 
 .net-probe__count {
     font-size: 12px;
-    color: var(--text-secondary, #A09B90);
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
 .net-probe__error {
     font-size: 12px;
-    color: var(--danger, #B85C5C);
+    color: var(--danger);
 }
 
 /* ── Spinner ────────────────────────────────────────────────────────── */
@@ -1118,7 +1118,7 @@ function fmtMs(v: number | null): string {
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    border: 2px solid var(--text-secondary, #A09B90);
+    border: 2px solid var(--text-secondary);
     border-top-color: transparent;
     animation: net-probe-spin 0.7s linear infinite;
 }

@@ -184,7 +184,7 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-primary);
+  background: var(--surface-0);
   color: var(--text-primary);
   overflow: hidden;
 }
@@ -193,48 +193,52 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
-  background: var(--bg-secondary);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-1);
   border-bottom: 1px solid var(--border);
-  gap: 1rem;
+  gap: var(--space-4);
   flex-shrink: 0;
 }
 
 .calendar__nav,
 .calendar__mode {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .calendar__title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
   margin: 0;
   white-space: nowrap;
 }
 
 .calendar__btn {
-  background: var(--glass-bg);
-  color: var(--text-primary);
-  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 0.35rem 0.7rem;
+  padding: var(--space-1-5) var(--space-3);
   cursor: pointer;
-  font-size: 0.85rem;
-  backdrop-filter: blur(var(--glass-blur));
-  transition: all var(--transition-fast);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .calendar__btn:hover {
-  background: var(--accent);
-  color: var(--bg-primary);
-  box-shadow: var(--accent-glow);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
 }
 
 .calendar__btn--active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg-primary);
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .calendar__loading,
@@ -243,10 +247,10 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 2rem;
+  gap: var(--space-2);
+  padding: var(--space-8);
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .calendar__error {
@@ -263,43 +267,43 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 
 .calendar__week-header {
   display: grid;
-  grid-template-columns: 3.5rem repeat(7, 1fr);
+  grid-template-columns: 56px repeat(7, 1fr);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .calendar__day-label {
   text-align: center;
-  padding: 0.4rem 0;
-  font-size: 0.8rem;
+  padding: var(--space-2) 0;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 
 .calendar__day-label--today {
   color: var(--accent);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 
 .calendar__day-num {
-  margin-left: 0.25rem;
-  font-weight: 600;
+  margin-left: var(--space-1);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
 }
 
 .calendar__day-label--today .calendar__day-num {
   background: var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   display: inline-block;
-  width: 1.5rem;
-  height: 1.5rem;
-  line-height: 1.5rem;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
   text-align: center;
-  color: var(--bg-primary);
+  color: var(--text-on-accent);
 }
 
 .calendar__week-body {
   display: grid;
-  grid-template-columns: 3.5rem repeat(7, 1fr);
+  grid-template-columns: 56px repeat(7, 1fr);
   flex: 1;
   overflow-y: auto;
 }
@@ -310,13 +314,14 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 }
 
 .calendar__hour-label {
-  height: 3.5rem;
+  height: 56px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding-right: 0.4rem;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
+  padding-right: var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .calendar__day-col {
@@ -326,41 +331,42 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 }
 
 .calendar__day-col--today {
-  background: var(--warning-bg);
+  background: var(--accent-faint);
 }
 
 .calendar__hour-slot {
-  height: 3.5rem;
+  height: 56px;
   border-bottom: 1px solid var(--border);
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
 }
 
 .calendar__hour-slot:hover {
-  background: var(--bg-secondary);
+  background: var(--surface-hover);
 }
 
 .calendar__event {
   position: absolute;
   border-radius: var(--radius-sm);
-  padding: 0.15rem 0.3rem;
-  font-size: 0.75rem;
+  padding: var(--space-0-5) var(--space-1-5);
+  font-size: var(--text-xs);
   overflow: hidden;
   cursor: pointer;
-  z-index: 1;
-  color: var(--bg-primary);
+  z-index: var(--z-raised);
+  color: var(--text-on-accent);
 }
 
 .calendar__event:hover {
-  filter: brightness(1.2);
+  filter: brightness(1.15);
 }
 
 .calendar__event-time {
   opacity: 0.85;
-  margin-right: 0.25rem;
+  margin-right: var(--space-1);
+  font-variant-numeric: tabular-nums;
 }
 
 .calendar__event-title {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .calendar__event-add {
@@ -368,16 +374,16 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   position: absolute;
   top: 1px;
   right: 1px;
-  width: 1.1rem;
-  height: 1.1rem;
-  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
   background: var(--black-medium);
   color: var(--accent);
   border: 1px solid var(--accent);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1;
   cursor: pointer;
-  z-index: 2;
+  z-index: var(--z-sticky);
   padding: 0;
   align-items: center;
   justify-content: center;
@@ -389,7 +395,7 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 
 .calendar__event-add:hover {
   background: var(--accent);
-  color: var(--bg-primary);
+  color: var(--text-on-accent);
 }
 
 /* Month view */
@@ -404,11 +410,13 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
-  padding: 0.3rem 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 .calendar__month-grid {
@@ -421,44 +429,49 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 
 .calendar__month-cell {
   border: 1px solid var(--border);
-  padding: 0.25rem;
+  padding: var(--space-1);
   cursor: pointer;
-  min-height: 4rem;
+  min-height: 64px;
   overflow: hidden;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
 }
 
 .calendar__month-cell:hover {
-  background: var(--bg-secondary);
+  background: var(--surface-hover);
 }
 
 .calendar__month-cell--today {
-  background: var(--warning-bg);
+  background: var(--accent-faint);
+}
+
+.calendar__month-cell--today .calendar__month-date {
+  color: var(--accent);
 }
 
 .calendar__month-cell--dim {
-  opacity: 0.4;
+  opacity: var(--opacity-dim);
 }
 
 .calendar__month-date {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 .calendar__month-event {
-  font-size: 0.7rem;
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
-  margin-top: 0.15rem;
+  font-size: var(--text-2xs);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-xs);
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  color: var(--bg-primary);
+  color: var(--text-on-accent);
 }
 
 .calendar__month-more {
-  font-size: 0.65rem;
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
 }
 </style>

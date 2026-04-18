@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Any
 
@@ -13,6 +14,11 @@ from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext
 
 router = APIRouter(tags=["plugins"])
+
+# Serialises concurrent enable/disable operations on the same plugin so
+# that the ``ctx.config.plugins.enabled`` list and the PluginManager state
+# never disagree if two clients toggle the same plugin in parallel.
+_toggle_lock = asyncio.Lock()
 
 
 def _ctx(request: Request) -> AppContext:
@@ -100,29 +106,40 @@ async def toggle_plugin(
             detail="Plugin manager not available",
         )
 
-    current = ctx.config.plugins.enabled
+    async with _toggle_lock:
+        current = ctx.config.plugins.enabled
 
-    if enabled:
-        if plugin_name not in current:
-            current.append(plugin_name)
-        ok = await pm.load_plugin(plugin_name)
-        if not ok:
-            logger.warning(
-                "Plugin '{}' was enabled but failed to load",
-                plugin_name,
-            )
-    else:
-        if plugin_name in current:
-            current.remove(plugin_name)
-        await pm.unload_plugin(plugin_name)
+        if enabled:
+            if plugin_name not in current:
+                current.append(plugin_name)
+            ok = await pm.load_plugin(plugin_name)
+            if not ok:
+                # Roll back the enable so config and PluginManager stay in
+                # sync, then surface the failure to the caller.
+                if plugin_name in current:
+                    current.remove(plugin_name)
+                logger.warning(
+                    "Plugin '{}' was enabled but failed to load",
+                    plugin_name,
+                )
+                if ctx.tool_registry:
+                    await ctx.tool_registry.refresh()
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Plugin '{plugin_name}' failed to load",
+                )
+        else:
+            if plugin_name in current:
+                current.remove(plugin_name)
+            await pm.unload_plugin(plugin_name)
 
-    # Persist the new state so it survives restarts.
-    if ctx.plugin_state_repo:
-        await ctx.plugin_state_repo.set(plugin_name, enabled)
+        # Persist the new state so it survives restarts.
+        if ctx.plugin_state_repo:
+            await ctx.plugin_state_repo.set(plugin_name, enabled)
 
-    # Refresh tool registry so the LLM sees updated tool definitions.
-    if ctx.tool_registry:
-        await ctx.tool_registry.refresh()
+        # Refresh tool registry so the LLM sees updated tool definitions.
+        if ctx.tool_registry:
+            await ctx.tool_registry.refresh()
 
     # Build full plugin info for the response.
     plugin = pm.get_plugin(plugin_name) if pm else None

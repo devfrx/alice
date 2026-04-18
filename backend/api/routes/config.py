@@ -207,8 +207,8 @@ async def update_config(request: Request) -> dict[str, Any]:
                 raise HTTPException(400, "model must be a non-empty string (max 256 chars)")
             object.__setattr__(cfg.llm, "model", model_val)
             # Invalidate auto-resolved model cache when model changes.
-            if ctx.llm_service is not None and hasattr(ctx.llm_service, "_invalidate_model_cache"):
-                ctx.llm_service._invalidate_model_cache()
+            if ctx.llm_service is not None:
+                ctx.llm_service.invalidate_model_cache()
         if "temperature" in llm_updates:
             try:
                 temp = float(llm_updates["temperature"])
@@ -656,7 +656,7 @@ async def sync_model(request: Request) -> dict[str, Any]:
 
     # Invalidate auto-model cache so the next chat request uses the new model.
     if ctx.llm_service is not None:
-        ctx.llm_service._invalidate_model_cache()
+        ctx.llm_service.invalidate_model_cache()
 
     logger.info(
         "sync-model: config updated to '{}' (thinking={}, vision={})",

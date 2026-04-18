@@ -105,10 +105,12 @@ if (-not $Model) {
 $portInUse = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
     Where-Object { $_.State -eq "Listen" -or ($_.OwningProcess -gt 0 -and $_.State -eq "Established") }
 if ($portInUse) {
-    $pid = $portInUse[0].OwningProcess
-    $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+    # NOTE: $pid is a PowerShell automatic variable (current shell PID) and is
+    # read-only — assigning to it raises an error. Use $procId instead.
+    $procId = $portInUse[0].OwningProcess
+    $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
     Write-Host "  [!] Port $Port already in use - TRELLIS might be running" -ForegroundColor Yellow
-    Write-Host "      PID: $pid  ($($proc.ProcessName))" -ForegroundColor DarkGray
+    Write-Host "      PID: $procId  ($($proc.ProcessName))" -ForegroundColor DarkGray
     Write-Host ""
     $answer = Read-Host "  Continue anyway? (y/N)"
     if ($answer -ne "y" -and $answer -ne "Y") { exit 0 }

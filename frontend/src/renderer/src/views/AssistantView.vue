@@ -429,7 +429,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="assistant-view" :class="{
+    <div class="assistant-view" aria-label="Assistente" :class="{
         'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards),
         'assistant-view--dragging': isDraggingPanel
     }"
@@ -712,7 +712,7 @@ onMounted(() => {
     left: -10px;
     width: 20px;
     height: calc(100% - 16px);
-    z-index: 10;
+    z-index: var(--z-sticky);
     cursor: col-resize;
     display: flex;
     align-items: center;
@@ -1033,7 +1033,7 @@ onMounted(() => {
     position: absolute;
     top: 8px;
     right: 8px;
-    z-index: 1;
+    z-index: var(--z-raised);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1107,7 +1107,7 @@ onMounted(() => {
     position: absolute;
     top: 8px;
     right: 8px;
-    z-index: 1;
+    z-index: var(--z-raised);
     display: flex;
     align-items: center;
     justify-content: center;

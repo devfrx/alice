@@ -56,11 +56,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ── Shared settings section typography ── */
+.settings-section__title {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
 .plugins-hint {
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
     color: var(--text-muted);
-    margin: 0 0 var(--space-3, 12px) 0;
-    line-height: 1.4;
+    margin: 0 0 var(--space-3) 0;
+    line-height: var(--leading-snug);
 }
 
 .plugins-loading,
@@ -81,14 +90,19 @@ onMounted(() => {
     align-items: flex-start;
     justify-content: space-between;
     padding: var(--space-3);
-    background: var(--bg-secondary);
-    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     gap: var(--space-3);
-    transition: opacity var(--transition-fast, 0.15s);
+    transition: opacity var(--transition-fast), border-color var(--transition-fast);
+}
+
+.plugin-item:hover {
+    border-color: var(--border-hover);
 }
 
 .plugin-item--disabled {
-    opacity: 0.6;
+    opacity: var(--opacity-soft);
 }
 
 .plugin-info {
@@ -108,16 +122,16 @@ onMounted(() => {
 .plugin-name {
     font-size: var(--text-sm);
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
 }
 
 .plugin-badge {
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    border-radius: 9999px;
-    font-weight: 500;
+    font-size: var(--text-2xs);
+    padding: 1px var(--space-1-5);
+    border-radius: var(--radius-pill);
+    font-weight: var(--weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-normal);
 }
 
 .plugin-badge--active {
@@ -133,7 +147,7 @@ onMounted(() => {
 .plugin-description {
     font-size: var(--text-xs);
     color: var(--text-secondary);
-    line-height: 1.3;
+    line-height: var(--leading-snug);
 }
 
 .plugin-footer {
@@ -145,65 +159,64 @@ onMounted(() => {
 .plugin-meta {
     font-size: var(--text-xs);
     color: var(--text-muted);
-    opacity: 0.7;
+    opacity: var(--opacity-medium);
 }
 
 .plugin-tools-count {
     font-size: var(--text-xs);
-    color: var(--accent, #c8a23c);
-    opacity: 0.8;
+    color: var(--accent);
+    opacity: var(--opacity-medium);
 }
 
 .plugin-tools {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: var(--space-1, 4px);
+    gap: var(--space-1);
+    margin-top: var(--space-1);
 }
 
 .plugin-tool-tag {
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm, 4px);
-    background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    font-size: var(--text-2xs);
+    padding: 2px var(--space-1-5);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
     cursor: default;
 }
 
-/* Toggle switch — mirrors SettingsView toggle styles */
+/* Toggle switch — aligned with sv__toggle design in SettingsView */
 .settings-toggle {
     position: relative;
-    width: 40px;
-    height: 22px;
-    border-radius: 11px;
-    border: 1px solid var(--border);
-    background: var(--bg-tertiary);
+    width: 36px;
+    height: 20px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: var(--surface-3);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background var(--transition-fast);
     flex-shrink: 0;
     padding: 0;
 }
 
 .settings-toggle--on {
-    background: var(--accent-medium);
-    border-color: var(--accent);
-    box-shadow: 0 0 8px var(--accent-glow);
+    background: var(--accent);
 }
 
 .settings-toggle__thumb {
     position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    transition: transform 0.2s, background 0.2s;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--radius-full);
+    background: var(--text-primary);
+    transition:
+        transform var(--transition-fast),
+        background var(--transition-fast);
 }
 
 .settings-toggle--on .settings-toggle__thumb {
-    transform: translateX(18px);
-    background: var(--accent);
+    transform: translateX(16px);
 }
 </style>

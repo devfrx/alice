@@ -316,7 +316,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="hybrid-view" :class="{ 'hybrid-view--dragging': isDraggingDivider }">
+    <div class="hybrid-view" aria-label="Ibrido" :class="{ 'hybrid-view--dragging': isDraggingDivider }">
         <AmbientBackground :state="orbState" :audio-level="voiceStore.audioLevel" :subtle="true" />
 
         <!-- ── Left: compact conversation pane ── -->

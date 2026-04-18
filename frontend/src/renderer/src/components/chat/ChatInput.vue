@@ -634,7 +634,7 @@ defineExpose({
 /* Drag-over: subtle glow on the input border */
 .ci--drag .ci__body {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(140, 180, 255, 0.12);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 /* Hidden file input */
@@ -727,7 +727,6 @@ defineExpose({
 .ci__send:hover:not(:disabled) {
   background: var(--surface-2);
   color: var(--text-primary);
-  ;
 }
 
 .ci__send:not(:disabled) {
@@ -775,15 +774,15 @@ defineExpose({
 
 @keyframes stop-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(196, 92, 92, 0.5);
+    box-shadow: 0 0 0 0 var(--danger-glow);
   }
 
   70% {
-    box-shadow: 0 0 0 6px rgba(196, 92, 92, 0);
+    box-shadow: 0 0 0 6px transparent;
   }
 
   100% {
-    box-shadow: 0 0 0 0 rgba(196, 92, 92, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 

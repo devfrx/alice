@@ -73,7 +73,7 @@ function formatDate(iso: string): string {
   display: flex;
   flex-direction: column;
   background: var(--surface-1);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   overflow: hidden;
 }
@@ -82,29 +82,29 @@ function formatDate(iso: string): string {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px 10px;
+  padding: var(--space-3) var(--space-4) var(--space-2-5);
   border-bottom: 1px solid var(--border);
 }
 
 .wb-sidebar__title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
   margin: 0;
 }
 
 .wb-sidebar__count {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   background: var(--surface-3);
-  padding: 1px 7px;
-  border-radius: var(--radius-pill, 999px);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
 }
 
 .wb-sidebar__loading,
 .wb-sidebar__empty {
-  padding: 24px 16px;
-  font-size: 12px;
+  padding: var(--space-6) var(--space-4);
+  font-size: var(--text-xs);
   color: var(--text-muted);
   text-align: center;
 }
@@ -112,16 +112,16 @@ function formatDate(iso: string): string {
 .wb-sidebar__list {
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: var(--space-1-5);
   overflow-y: auto;
   flex: 1;
 }
 
 .wb-sidebar__item {
-  padding: 10px 12px;
-  border-radius: var(--radius-md, 8px);
+  padding: var(--space-2-5) var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--transition-fast);
 }
 
 .wb-sidebar__item:hover {
@@ -137,12 +137,12 @@ function formatDate(iso: string): string {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .wb-sidebar__item-title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -156,9 +156,9 @@ function formatDate(iso: string): string {
   color: var(--text-muted);
   cursor: pointer;
   padding: 2px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   opacity: 0;
-  transition: opacity 150ms ease, color 150ms ease;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
 .wb-sidebar__item:hover .wb-sidebar__item-delete {
@@ -166,23 +166,23 @@ function formatDate(iso: string): string {
 }
 
 .wb-sidebar__item-delete:hover {
-  color: var(--error, #ef4444);
+  color: var(--danger);
 }
 
 .wb-sidebar__item-meta {
   display: flex;
   justify-content: space-between;
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
 .wb-sidebar__item-conv {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;

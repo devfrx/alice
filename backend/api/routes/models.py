@@ -183,7 +183,7 @@ async def load_model(body: LoadModelRequest, request: Request) -> dict:
         )
         # Invalidate auto-model cache so the next chat uses the new model.
         if ctx.llm_service is not None:
-            ctx.llm_service._invalidate_model_cache()
+            ctx.llm_service.invalidate_model_cache()
         # Refresh registry so newly loaded model has up-to-date caps.
         if ctx.model_registry is not None:
             try:
@@ -214,7 +214,7 @@ async def unload_model(body: UnloadModelRequest, request: Request) -> dict:
         result = await mgr.unload_model(body.instance_id)
         # Invalidate auto-model cache after unload.
         if ctx.llm_service is not None:
-            ctx.llm_service._invalidate_model_cache()
+            ctx.llm_service.invalidate_model_cache()
         return result
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))

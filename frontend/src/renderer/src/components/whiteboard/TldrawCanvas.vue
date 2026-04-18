@@ -131,7 +131,7 @@ onBeforeUnmount(() => {
   height: 100%;
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
 }
 
 .tldraw-orphaned {
@@ -172,26 +172,33 @@ onBeforeUnmount(() => {
 }
 
 /* ── AL\CE theme overrides for tldraw ─────────────────────── */
+/*
+ * tldraw reads these CSS variables from its own --color-* namespace.
+ * We map them to our design-system tokens here so tldraw picks up
+ * the active theme (dark/light) automatically. Literal hex fallbacks
+ * below are required because tldraw internals sometimes expect
+ * resolved colors — they match the dark palette.
+ */
 .tldraw-canvas :deep(.tl-container) {
-  --color-background: var(--surface-0, #161616);
-  --color-text-0: var(--text-primary, #EDEDE9);
-  --color-text-1: var(--text-secondary, #A09B90);
-  --color-text-3: var(--text-muted, #5F5B53);
-  --color-panel: var(--surface-2, #232323);
-  --color-low: var(--surface-1, #1C1C1C);
-  --color-muted-0: var(--surface-3, #2A2A2A);
-  --color-muted-1: var(--surface-4, #323232);
+  --color-background: var(--surface-0);
+  --color-text-0: var(--text-primary);
+  --color-text-1: var(--text-secondary);
+  --color-text-3: var(--text-muted);
+  --color-panel: var(--surface-2);
+  --color-low: var(--surface-1);
+  --color-muted-0: var(--surface-3);
+  --color-muted-1: var(--surface-4);
   --color-muted-2: #3a3a3a;
-  --color-hint: var(--text-muted, #5F5B53);
-  --color-overlay: rgba(0, 0, 0, 0.5);
-  --color-divider: var(--border, rgba(237, 227, 213, 0.08));
-  --color-focus: var(--accent, #E8DCC8);
-  --color-selected: var(--accent, #E8DCC8);
-  --color-selection-stroke: var(--accent, #E8DCC8);
+  --color-hint: var(--text-muted);
+  --color-overlay: var(--black-heavy);
+  --color-divider: var(--border);
+  --color-focus: var(--accent);
+  --color-selected: var(--accent);
+  --color-selection-stroke: var(--accent);
   --color-selection-fill: var(--accent-dim);
-  --color-primary: var(--accent, #E8DCC8);
+  --color-primary: var(--accent);
   --color-warn: #e8a87c;
   --color-text-shadow: none;
-  --radius: 8px;
+  --radius: var(--radius-md);
 }
 </style>

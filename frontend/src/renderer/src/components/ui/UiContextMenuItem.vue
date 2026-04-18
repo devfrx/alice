@@ -22,9 +22,10 @@ const emit = defineEmits<{ click: [] }>()
 </script>
 
 <template>
-    <button class="ctx-item" :class="{ 'ctx-item--danger': danger, 'ctx-item--disabled': disabled }"
-        :disabled="disabled" @click="emit('click')">
-        <span class="ctx-item__icon">
+    <button type="button" role="menuitem" class="ctx-item"
+        :class="{ 'ctx-item--danger': danger, 'ctx-item--disabled': disabled }" :disabled="disabled"
+        :aria-disabled="disabled || undefined" @click="emit('click')">
+        <span class="ctx-item__icon" aria-hidden="true">
             <slot name="icon" />
         </span>
         <span class="ctx-item__label">{{ label }}</span>
@@ -47,29 +48,27 @@ const emit = defineEmits<{ click: [] }>()
     cursor: pointer;
     text-align: left;
     white-space: nowrap;
-    transition: background var(--transition-fast);
+    outline: none;
+    transition: background-color var(--duration-fast) var(--ease-out-quart);
 }
 
-.ctx-item:hover:not(:disabled) {
+.ctx-item:hover:not(:disabled),
+.ctx-item:focus-visible:not(:disabled) {
     background: var(--surface-hover);
 }
 
-.ctx-item:active:not(:disabled) {
-    background: var(--surface-active);
-}
+.ctx-item:focus-visible { box-shadow: var(--shadow-focus); }
 
-.ctx-item--danger {
-    color: var(--danger);
-}
+.ctx-item:active:not(:disabled) { background: var(--surface-active); }
 
-.ctx-item--danger:hover:not(:disabled) {
-    background: var(--danger-faint);
-}
+.ctx-item--danger { color: var(--danger); }
+.ctx-item--danger:hover:not(:disabled),
+.ctx-item--danger:focus-visible:not(:disabled) { background: var(--danger-faint); }
 
 .ctx-item--disabled {
     color: var(--text-muted);
     cursor: not-allowed;
-    opacity: 0.5;
+    opacity: var(--opacity-dim);
 }
 
 .ctx-item__icon {
@@ -82,12 +81,12 @@ const emit = defineEmits<{ click: [] }>()
     color: var(--text-secondary);
 }
 
-.ctx-item--danger .ctx-item__icon {
-    color: var(--danger);
-}
+.ctx-item--danger .ctx-item__icon { color: var(--danger); }
 
 .ctx-item__label {
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .ctx-item__hint {

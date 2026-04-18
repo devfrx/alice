@@ -37,7 +37,7 @@ function onSnapshotChange(snapshot: Record<string, unknown>): void {
 </script>
 
 <template>
-  <div class="whiteboard-page">
+  <div class="whiteboard-page" aria-label="Lavagna">
     <WhiteboardListSidebar @select="onSelectBoard" @delete="onDeleteBoard" />
 
     <div class="whiteboard-page__canvas">

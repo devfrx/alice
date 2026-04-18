@@ -26,9 +26,9 @@ const remainingSeconds = ref(TIMEOUT_S)
 let timerInterval: ReturnType<typeof setInterval> | null = null
 
 const timerColor = computed(() => {
-    if (remainingSeconds.value <= 10) return 'var(--error, #e74c3c)'
-    if (remainingSeconds.value <= 20) return 'var(--warning, #d4a843)'
-    return 'var(--text-secondary, #8a8a8a)'
+    if (remainingSeconds.value <= 10) return 'var(--danger)'
+    if (remainingSeconds.value <= 20) return 'var(--warning)'
+    return 'var(--text-secondary)'
 })
 
 const formattedTime = computed(() => {

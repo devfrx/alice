@@ -352,13 +352,18 @@ onUnmounted(() => {
 }
 
 .titlebar__btn--close:hover {
-  background: rgba(232, 17, 35, 0.85);
-  color: #ffffff;
-  transition: background 0.2s ease, color 0.15s ease;
+  background: var(--danger);
+  color: var(--text-primary);
 }
 
 .titlebar__btn--close:active {
-  background: rgba(232, 17, 35, 0.7);
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--text-primary);
+  filter: brightness(0.9);
+}
+
+.titlebar__btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 </style>

@@ -76,8 +76,35 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // Forward only safe external schemes to the OS handler; deny everything else.
+    try {
+      const url = new URL(details.url)
+      if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:') {
+        shell.openExternal(details.url)
+      }
+    } catch {
+      // Invalid URL — silently deny.
+    }
     return { action: 'deny' }
+  })
+
+  // Block in-app navigation away from the renderer entry point. Any attempt to
+  // navigate (e.g. malicious link click, drag-drop URL) is opened externally so
+  // the renderer process can never load untrusted content.
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    const currentUrl = mainWindow?.webContents.getURL() ?? ''
+    try {
+      const target = new URL(navigationUrl)
+      const current = currentUrl ? new URL(currentUrl) : null
+      // Allow same-origin navigation (HMR, hash routing) but block everything else.
+      if (current && target.origin === current.origin) return
+      event.preventDefault()
+      if (target.protocol === 'http:' || target.protocol === 'https:') {
+        shell.openExternal(navigationUrl)
+      }
+    } catch {
+      event.preventDefault()
+    }
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -107,9 +134,6 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
 
   // IPC handlers (registered once to avoid duplicates on macOS window re-creation)
   ipcMain.on('window-minimize', () => mainWindow?.minimize())

@@ -20,7 +20,8 @@ import asyncio
 import ipaddress
 import socket
 import sys
-from urllib.parse import urlparse
+from typing import Any
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 from mcp.server import Server
@@ -66,8 +67,12 @@ def _is_private_ip(addr: str) -> bool:
     return any(ip in net for net in _PRIVATE_NETWORKS)
 
 
-def _validate_url(url: str) -> None:
-    """Raise ValueError if *url* targets a private / local network or uses a blocked scheme."""
+def _validate_url_sync(url: str) -> None:
+    """Raise ValueError if *url* targets a private / local network or uses a blocked scheme.
+
+    Performs a **blocking** DNS lookup; prefer :func:`_validate_url` from
+    async code so the event loop is not stalled.
+    """
     if url.startswith("\\\\"):
         raise ValueError("UNC paths are not allowed")
 
@@ -99,6 +104,14 @@ def _validate_url(url: str) -> None:
             raise ValueError(f"'{hostname}' resolves to private address {ip_str}")
 
 
+async def _validate_url(url: str) -> None:
+    """Async wrapper around :func:`_validate_url_sync` that runs DNS in a thread.
+
+    Keeps the event loop responsive when the resolver blocks.
+    """
+    await asyncio.to_thread(_validate_url_sync, url)
+
+
 # ---------------------------------------------------------------------------
 # HTML → text conversion
 # ---------------------------------------------------------------------------
@@ -124,14 +137,27 @@ def _html_to_text(html: str) -> str:
 # ---------------------------------------------------------------------------
 
 _DEFAULT_MAX_LENGTH = 20_000
+_HARD_MAX_LENGTH = 200_000
+"""Absolute upper bound on returned characters per call."""
+
+_MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+"""Drop responses larger than 10 MiB to bound memory use."""
+
+_MAX_REDIRECTS = 5
+"""Maximum number of redirects to follow (each re-validated for SSRF)."""
+
+_TEXT_CONTENT_PREFIXES = ("text/", "application/xhtml", "application/xml", "application/json")
 
 server = Server("mcp-fetch-primp")
 
 # Single shared primp client (thread-safe for read operations).
 # Uses "firefox" fingerprint — same as web_search/client.py web_scrape.
+# Redirects are disabled here so we can re-validate the next hop against
+# the SSRF allow-list (otherwise an attacker-controlled host could 302 to
+# 169.254.169.254 or another internal address).
 _primp = PrimpClient(
     impersonate="firefox",
-    follow_redirects=True,
+    follow_redirects=False,
     timeout=30,
 )
 
@@ -157,13 +183,19 @@ async def list_tools() -> list[Tool]:
                     },
                     "max_length": {
                         "type": "integer",
-                        "description": f"Maximum characters to return (default {_DEFAULT_MAX_LENGTH})",
+                        "description": (
+                            f"Maximum characters to return (default {_DEFAULT_MAX_LENGTH}, "
+                            f"max {_HARD_MAX_LENGTH})."
+                        ),
                         "default": _DEFAULT_MAX_LENGTH,
+                        "minimum": 1,
+                        "maximum": _HARD_MAX_LENGTH,
                     },
                     "start_index": {
                         "type": "integer",
-                        "description": "Start content from this character index (default 0)",
+                        "description": "Start content from this character index (default 0).",
                         "default": 0,
+                        "minimum": 0,
                     },
                     "raw": {
                         "type": "boolean",
@@ -177,24 +209,89 @@ async def list_tools() -> list[Tool]:
     ]
 
 
+def _clamp_int(value: object, default: int, *, low: int, high: int) -> int:
+    """Coerce *value* to ``int`` and clamp it to ``[low, high]``.
+
+    LLMs occasionally pass strings, floats, or wildly out-of-range values;
+    this normalises them into a safe range without raising.
+    """
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError):
+        ivalue = default
+    return max(low, min(high, ivalue))
+
+
+async def _fetch_with_redirect_validation(url: str) -> Any:
+    """Issue ``GET url`` and follow up to ``_MAX_REDIRECTS`` redirects.
+
+    Each redirect target is re-validated for SSRF before being requested,
+    so a malicious server cannot trick the client into talking to an
+    internal address by returning a 3xx response.
+    """
+    current = url
+    for _ in range(_MAX_REDIRECTS + 1):
+        await _validate_url(current)
+        response = await asyncio.to_thread(_primp.get, current)
+        status = getattr(response, "status_code", 0)
+        if status in (301, 302, 303, 307, 308):
+            location = response.headers.get("location") if hasattr(response, "headers") else None
+            if not location:
+                return response
+            current = urljoin(current, location)
+            continue
+        return response
+    raise ValueError(f"Too many redirects (>{_MAX_REDIRECTS}) for '{url}'")
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if name != "fetch":
         raise ValueError(f"Unknown tool: '{name}'")
 
-    url: str = arguments["url"]
-    max_length: int = int(arguments.get("max_length", _DEFAULT_MAX_LENGTH))
-    start_index: int = int(arguments.get("start_index", 0))
-    raw: bool = bool(arguments.get("raw", False))
+    url = arguments.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("'url' is required and must be a non-empty string")
 
-    # SSRF check before making any network request
-    _validate_url(url)
+    max_length = _clamp_int(
+        arguments.get("max_length", _DEFAULT_MAX_LENGTH),
+        default=_DEFAULT_MAX_LENGTH,
+        low=1,
+        high=_HARD_MAX_LENGTH,
+    )
+    start_index = _clamp_int(
+        arguments.get("start_index", 0),
+        default=0,
+        low=0,
+        high=2_000_000,
+    )
+    raw = bool(arguments.get("raw", False))
 
-    # Fetch in a thread (primp is a sync client)
-    response = await asyncio.to_thread(_primp.get, url)
+    # SSRF check + redirect-aware fetch
+    response = await _fetch_with_redirect_validation(url)
     response.raise_for_status()
 
-    content = response.text if raw else _html_to_text(response.text)
+    # Reject obviously non-textual responses (PDF, images, archives, …)
+    content_type = ""
+    if hasattr(response, "headers"):
+        content_type = (response.headers.get("content-type") or "").lower()
+    if content_type and not any(content_type.startswith(p) for p in _TEXT_CONTENT_PREFIXES):
+        raise ValueError(
+            f"Refusing to fetch non-text content-type '{content_type}'"
+        )
+
+    # Bound response size before decoding to text
+    body_bytes = getattr(response, "content", None)
+    if isinstance(body_bytes, (bytes, bytearray)) and len(body_bytes) > _MAX_RESPONSE_BYTES:
+        raise ValueError(
+            f"Response body too large ({len(body_bytes):,} bytes, max {_MAX_RESPONSE_BYTES:,})"
+        )
+
+    text = response.text
+    content = text if raw else _html_to_text(text)
+
+    if start_index >= len(content):
+        return [TextContent(type="text", text="")]
 
     chunk = content[start_index : start_index + max_length]
 

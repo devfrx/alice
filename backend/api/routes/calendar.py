@@ -261,8 +261,17 @@ def _parse_to_utc(value: str, tz: ZoneInfo) -> datetime:
     """Parse an ISO 8601 string to a UTC-aware datetime.
 
     If the input has no timezone info, assumes it is in the given tz.
+
+    Raises:
+        HTTPException 400: When *value* is not a parseable date/time.
     """
-    dt = dt_parser.parse(value)
+    try:
+        dt = dt_parser.parse(value)
+    except (ValueError, TypeError, OverflowError, dt_parser.ParserError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid datetime format: {value!r} ({exc})",
+        ) from exc
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tz)
     return dt.astimezone(timezone.utc)

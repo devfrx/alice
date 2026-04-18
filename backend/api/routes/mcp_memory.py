@@ -42,10 +42,8 @@ def _get_memory_session(request: Request) -> McpSession:
     if plugin is None:
         raise HTTPException(503, "MCP client plugin not loaded")
 
-    # Known coupling: McpClientPlugin has no public get_session() method.
-    # Access _sessions safely via getattr until a public API is added.
-    sessions = getattr(plugin, "_sessions", {})
-    session = sessions.get(_SERVER_NAME)
+    # Use the plugin's public accessor to fetch the live session.
+    session = plugin.get_session(_SERVER_NAME)
     if session is None:
         raise HTTPException(503, f"MCP server '{_SERVER_NAME}' not connected")
 

@@ -133,6 +133,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ── Shared settings section typography ── */
+.settings-section__title {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
 .mcp-hint {
     font-size: var(--text-xs, 0.75rem);
     color: var(--text-muted);
@@ -141,11 +150,12 @@ onMounted(() => {
 }
 
 .mcp-hint code {
-    font-size: 0.7rem;
-    padding: 1px 4px;
-    background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
-    border-radius: var(--radius-sm, 4px);
+    font-size: var(--text-2xs);
+    padding: 1px var(--space-1);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
     color: var(--text-secondary);
+    font-family: var(--font-mono);
 }
 
 /* ── Stats bar ──────────────────────────────────────────────── */
@@ -166,7 +176,7 @@ onMounted(() => {
 
 .mcp-stat strong {
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
 }
 
 /* ── Loading / Empty ────────────────────────────────────────── */
@@ -180,74 +190,71 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-2, 8px);
-    padding: var(--space-6, 24px) var(--space-4, 16px);
+    gap: var(--space-2);
+    padding: var(--space-6) var(--space-4);
     text-align: center;
 }
 
 .mcp-empty__icon {
     color: var(--text-muted);
-    opacity: 0.4;
+    opacity: var(--opacity-faint);
 }
 
 .mcp-empty__text {
     margin: 0;
     font-size: var(--text-sm);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
 }
 
 .mcp-empty__sub {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: var(--leading-snug);
     max-width: 380px;
 }
 
 .mcp-empty__sub code {
-    font-size: 0.7rem;
-    padding: 1px 4px;
-    background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
-    border-radius: var(--radius-sm, 4px);
+    font-size: var(--text-2xs);
+    padding: 1px var(--space-1);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
     color: var(--text-secondary);
+    font-family: var(--font-mono);
 }
 
 /* ── Server list ────────────────────────────────────────────── */
 .mcp-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 
 .mcp-server {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: var(--space-3, 12px);
-    background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
-    border-radius: var(--radius-sm, 4px);
-    gap: var(--space-3, 12px);
-    transition: opacity var(--transition-fast, 0.15s);
-    border-left: 3px solid transparent;
+    padding: var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    gap: var(--space-3);
+    transition: opacity var(--transition-fast), border-color var(--transition-fast);
 }
 
-.mcp-server--connected {
-    /* border-left-color: #2ecc71; */
-}
-
-.mcp-server--error {
-    /* border-left-color: #e74c3c; */
+.mcp-server:hover {
+    border-color: var(--border-hover);
 }
 
 .mcp-server--disabled {
-    opacity: 0.5;
+    opacity: var(--opacity-soft);
 }
 
 .mcp-server__info {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1);
     flex: 1;
     min-width: 0;
 }
@@ -255,43 +262,43 @@ onMounted(() => {
 .mcp-server__header {
     display: flex;
     align-items: center;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
     flex-wrap: wrap;
 }
 
 .mcp-server__name {
     font-size: var(--text-sm);
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
 }
 
 .mcp-server__detail {
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
     color: var(--text-muted);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     word-break: break-all;
 }
 
 .mcp-server__footer {
     display: flex;
     align-items: center;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 
 .mcp-server__tools-count {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--accent, #c8a23c);
-    opacity: 0.8;
+    font-size: var(--text-xs);
+    color: var(--accent);
+    opacity: var(--opacity-medium);
 }
 
 /* ── Badges ─────────────────────────────────────────────────── */
 .mcp-badge {
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    border-radius: 9999px;
-    font-weight: 500;
+    font-size: var(--text-2xs);
+    padding: 1px var(--space-1-5);
+    border-radius: var(--radius-pill);
+    font-weight: var(--weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-normal);
 }
 
 .mcp-badge--connected {
@@ -315,26 +322,26 @@ onMounted(() => {
 }
 
 .mcp-badge--transport {
-    background: var(--white-light);
+    background: var(--surface-2);
     color: var(--text-secondary);
-    font-family: var(--font-mono, monospace);
-    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
 }
 
 /* ── Tool tags ──────────────────────────────────────────────── */
 .mcp-server__tools {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: var(--space-1, 4px);
+    gap: var(--space-1);
+    margin-top: var(--space-1);
 }
 
 .mcp-tool-tag {
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm, 4px);
-    background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    font-size: var(--text-2xs);
+    padding: 2px var(--space-1-5);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
     cursor: default;
 }
@@ -350,7 +357,7 @@ onMounted(() => {
     display: inline-block;
     width: 8px;
     height: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--success);
     box-shadow: 0 0 6px var(--success-glow);
 }
@@ -358,26 +365,34 @@ onMounted(() => {
 .mcp-btn {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1, 4px);
-    padding: 4px 10px;
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
     color: var(--text-secondary);
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
     font-family: var(--font-sans);
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    transition:
+        background var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast);
 }
 
 .mcp-btn:hover:not(:disabled) {
-    background: var(--white-medium);
+    background: var(--surface-hover);
     color: var(--text-primary);
     border-color: var(--border-hover);
 }
 
+.mcp-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring-shadow);
+}
+
 .mcp-btn:disabled {
-    opacity: 0.5;
+    opacity: var(--opacity-dim);
     cursor: not-allowed;
 }
 
@@ -400,9 +415,9 @@ onMounted(() => {
 }
 
 .mcp-actions {
-    margin-top: var(--space-3, 12px);
+    margin-top: var(--space-3);
     display: flex;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 
 .mcp-btn--refresh {

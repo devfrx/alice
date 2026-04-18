@@ -123,6 +123,19 @@ class McpClientPlugin(BasePlugin):
                         full_name, self._MAX_TOOL_NAME_LEN,
                     )
                     full_name = full_name[:self._MAX_TOOL_NAME_LEN]
+                # Truncation may collide with another tool that already
+                # mapped to the same prefix.  Skip the duplicate so we do
+                # not silently route both names to the wrong server/tool.
+                if full_name in dispatch_map:
+                    existing_server, existing_tool = dispatch_map[full_name]
+                    self.logger.warning(
+                        "MCP tool name collision after truncation: '{}' "
+                        "already maps to ({}, {}); skipping ({}, {})",
+                        full_name,
+                        existing_server, existing_tool,
+                        server_name, tool.name,
+                    )
+                    continue
                 full_desc = f"[{server_name}] {tool.description}"
                 try:
                     tools.append(
@@ -222,6 +235,24 @@ class McpClientPlugin(BasePlugin):
         if session and session.status == ConnectionStatus.CONNECTED:
             return session.get_tools()
         return []
+
+    def get_session(self, server_name: str) -> McpSession | None:
+        """Return the live :class:`McpSession` for ``server_name``.
+
+        Public accessor used by REST endpoints (e.g. the MCP memory
+        routes) that need to invoke tools on a specific server without
+        going through the LLM tool-dispatch path.
+
+        Args:
+            server_name: Name of the configured MCP server.
+
+        Returns:
+            The live session if the server is connected, otherwise
+            ``None``. The returned session may be in any
+            :class:`ConnectionStatus`; callers should check
+            ``session.status`` if they require a healthy connection.
+        """
+        return self._sessions.get(server_name)
 
     async def reconnect_server(
         self, server_name: str, config: Any,

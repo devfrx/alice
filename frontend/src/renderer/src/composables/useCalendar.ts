@@ -278,19 +278,27 @@ export function useCalendar() {
 
   // ── Data fetching ────────────────────────────────────────────
 
+  /** Monotonic token used to discard stale `fetchEvents` responses (race-safe). */
+  let fetchToken = 0
+
   async function fetchEvents(): Promise<void> {
+    const token = ++fetchToken
     loading.value = true
     error.value = null
     const days = visibleDays.value
     const startDate = days[0].toISOString()
     const endDate = new Date(days[days.length - 1].getTime() + MS_PER_DAY).toISOString()
     try {
-      events.value = await api.getCalendarEvents(startDate, endDate, 100)
+      const result = await api.getCalendarEvents(startDate, endDate, 100)
+      // Drop the response if a newer fetch was started in the meantime.
+      if (token !== fetchToken) return
+      events.value = result
     } catch (e) {
+      if (token !== fetchToken) return
       error.value = e instanceof Error ? e.message : 'Errore di rete'
       events.value = []
     } finally {
-      loading.value = false
+      if (token === fetchToken) loading.value = false
     }
   }
 

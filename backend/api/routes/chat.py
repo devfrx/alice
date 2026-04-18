@@ -24,7 +24,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import sqlalchemy as sa
 from sqlalchemy import func as sa_func
 from sqlmodel import select
@@ -48,11 +48,29 @@ router = APIRouter(tags=["chat"])
 _UPLOADS_BASE: Path = (PROJECT_ROOT / "data" / "uploads").resolve()
 
 # Magic byte signatures for allowed image types.
-_MAGIC_BYTES: dict[str, list[bytes]] = {
-    "image/jpeg": [b"\xff\xd8"],
-    "image/png": [b"\x89PNG"],
-    "image/gif": [b"GIF87a", b"GIF89a"],
-    "image/webp": [b"RIFF"],
+# Each value is a list of (offset, signature) tuples that must all match.
+_MAGIC_BYTES: dict[str, list[tuple[int, bytes]]] = {
+    "image/jpeg": [(0, b"\xff\xd8")],
+    "image/png": [(0, b"\x89PNG\r\n\x1a\n")],
+    "image/gif": [(0, b"GIF87a")],
+    # GIF89a is the second accepted signature; handled by the second list below.
+    "image/webp": [(0, b"RIFF"), (8, b"WEBP")],
+}
+
+# Extra alternative signatures (any-of for the same MIME type).
+_MAGIC_ALT: dict[str, list[list[tuple[int, bytes]]]] = {
+    "image/gif": [[(0, b"GIF89a")]],
+}
+
+# Canonical extension per validated MIME type — used to build upload paths.
+# Filenames from the client are NEVER used to derive the extension served
+# back, so an attacker cannot trick a static-file server into executing a
+# disguised file (e.g. ``foo.png.html``).
+_EXT_BY_TYPE: dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
 }
 
 # Active WebSocket connections per IP (for rate limiting).
@@ -95,7 +113,10 @@ def _attachment_url(file_path: str) -> str:
     """
     try:
         relative = Path(file_path).resolve().relative_to(_UPLOADS_BASE)
-        return f"/uploads/{quote(str(relative), safe='/')}"
+        # Use POSIX-style separators so the URL works on Windows where
+        # ``Path.__str__`` would otherwise yield backslashes (which the
+        # static-file mount at ``/uploads`` does not match).
+        return f"/uploads/{quote(relative.as_posix(), safe='/')}"
     except ValueError:
         logger.warning("Attachment path outside uploads base: {}", file_path)
         return ""
@@ -104,11 +125,28 @@ def _attachment_url(file_path: str) -> str:
 def _verify_magic_bytes(
     data: bytes, claimed_type: str,
 ) -> bool:
-    """Return ``True`` if the file's magic bytes match *claimed_type*."""
-    signatures = _MAGIC_BYTES.get(claimed_type)
-    if signatures is None:
+    """Return ``True`` if the file's magic bytes match *claimed_type*.
+
+    Each MIME type defines a primary list of ``(offset, signature)`` tuples
+    that must ALL match.  Optional alternative signature sets in
+    :data:`_MAGIC_ALT` are also accepted (any-of).  This catches multi-part
+    formats such as ``RIFF????WEBP`` that a single-prefix check would miss.
+    """
+    primary = _MAGIC_BYTES.get(claimed_type)
+    if primary is None:
         return False
-    return any(data[:len(sig)] == sig for sig in signatures)
+
+    def _matches(checks: list[tuple[int, bytes]]) -> bool:
+        return all(
+            data[offset:offset + len(sig)] == sig for offset, sig in checks
+        )
+
+    if _matches(primary):
+        return True
+    for alt in _MAGIC_ALT.get(claimed_type, []):
+        if _matches(alt):
+            return True
+    return False
 
 
 async def _build_conversation_data(
@@ -631,7 +669,7 @@ class BranchConversationRequest(BaseModel):
     """
 
     from_message_id: str
-    title: str | None = None
+    title: str | None = Field(None, max_length=500)
 
 
 class BranchConversationResponse(BaseModel):
@@ -2539,6 +2577,11 @@ async def create_conversation(request: Request) -> dict[str, Any]:
     else:
         conv_id = uuid.uuid4()
     title: str | None = body.get("title")
+    if title is not None:
+        if not isinstance(title, str):
+            raise HTTPException(status_code=400, detail="title must be a string")
+        if len(title) > 500:
+            raise HTTPException(status_code=400, detail="Title too long (max 500 chars)")
 
     async with ctx.db() as session:
         existing = await session.get(Conversation, conv_id)
@@ -2639,6 +2682,14 @@ async def get_conversation_file_path(
             status_code=503,
             detail="File manager not available",
         )
+
+    # Verify the conversation actually exists \u2014 otherwise the frontend
+    # would open a non-existent path in the system explorer.
+    async with ctx.db() as session:
+        if await session.get(Conversation, conversation_id) is None:
+            raise HTTPException(
+                status_code=404, detail="Conversation not found",
+            )
 
     file_path = fm.base_dir / f"{conversation_id}.json"
     return {"path": str(file_path)}
@@ -2886,16 +2937,20 @@ async def upload_image(
         )
 
     file_id = uuid.uuid4()
-    ext = (
-        Path(file.filename).suffix.lstrip(".") if file.filename else "bin"
-    )
+    # Derive extension from the validated MIME type \u2014 NEVER from the
+    # client-supplied filename \u2014 to prevent extension-confusion attacks
+    # (e.g. ``foo.png.html`` being served with an HTML content-type by a
+    # naive static-file server).  ``content_type`` is already whitelisted.
+    ext = _EXT_BY_TYPE[file.content_type]  # type: ignore[index]
     relative_path = (
         f"data/uploads/{conv_uuid}/{file_id}.{ext}"
     )
     abs_path = PROJECT_ROOT / relative_path
 
-    # Ensure the upload directory exists.
-    abs_path.parent.mkdir(parents=True, exist_ok=True)
+    # Ensure the upload directory exists (off-loop to keep async safe).
+    await asyncio.to_thread(
+        abs_path.parent.mkdir, parents=True, exist_ok=True,
+    )
     await asyncio.to_thread(abs_path.write_bytes, content)
 
     # Persist an attachment record (message_id linked later via WS handler).
@@ -2910,8 +2965,8 @@ async def upload_image(
             session.add(attachment)
             await session.commit()
     except Exception:
-        # Cleanup orphan file if DB transaction fails.
-        abs_path.unlink(missing_ok=True)
+        # Cleanup orphan file if DB transaction fails (off-loop).
+        await asyncio.to_thread(abs_path.unlink, True)
         logger.exception("DB error during upload — cleaned up {}", abs_path)
         raise HTTPException(
             status_code=500, detail="Failed to save attachment record",

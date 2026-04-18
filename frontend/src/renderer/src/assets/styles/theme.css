@@ -388,6 +388,10 @@ body {
   overflow: hidden;
   font-size: var(--text-base);
   letter-spacing: var(--tracking-tight);
+  /* Enable Geist contextual alternates + tabular nums for aligned numerics
+   * in lists, timestamps, token counts. Disable discretionary ligatures. */
+  font-feature-settings: 'cv11', 'ss01', 'ss03', 'tnum' 1;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Focus-visible — Accessibility ─────────────────────────── */
@@ -404,6 +408,13 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* ── Scrollbar — Minimal, neutral ──────────────────────────── */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--white-medium) transparent;
+}
+
+/* WebKit (Chromium, Electron) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -428,7 +439,7 @@ textarea:focus:not(:focus-visible) {
 
 /* ── Selection ─────────────────────────────────────────────── */
 ::selection {
-  background: rgba(232, 220, 200, 0.20);
+  background: var(--selection-bg, rgba(232, 220, 200, 0.20));
   color: var(--text-primary);
 }
 
@@ -567,4 +578,169 @@ textarea:focus:not(:focus-visible) {
 [data-theme="light"] ::selection {
   background: rgba(122, 85, 64, 0.18);
   color: var(--text-primary);
+}
+
+/*
+ * ═══════════════════════════════════════════════════════════════
+ *  AL\CE — Design System Extensions (additive, non-breaking)
+ *
+ *  These tokens complement the existing system above. Components
+ *  should prefer these semantic aliases for new code; existing
+ *  tokens remain valid and unchanged.
+ * ═══════════════════════════════════════════════════════════════
+ */
+
+/* ── Text Hierarchy (semantic extensions) ──────────────────── */
+:root {
+  /* --text-primary / --text-secondary / --text-muted already defined above */
+  --text-tertiary: var(--text-muted);           /* Alias: least prominent readable text */
+  --text-disabled: rgba(237, 227, 213, 0.28);   /* Disabled form labels/buttons */
+  --text-inverse: #161616;                      /* For text on accent-filled surfaces */
+  --text-on-accent: #161616;                    /* Text rendered on accent bg */
+  --text-link: var(--accent);
+  --text-link-hover: var(--accent-hover);
+  --selection-bg: rgba(232, 220, 200, 0.20);    /* Drives ::selection */
+}
+
+/* ── Border Hierarchy (semantic aliases) ───────────────────── */
+:root {
+  --border-subtle: var(--white-subtle);         /* Very faint dividers */
+  --border-default: var(--border);              /* Default 1px borders */
+  --border-strong: var(--border-hover);         /* Emphasized borders */
+  --border-focus: var(--focus-ring-color);      /* Focused input border */
+}
+
+/* ── State Colors — Info (new) + semantic aliases ──────────── */
+:root {
+  --info: #5C8AB8;                              /* Muted blue — informational */
+  --info-bg: rgba(92, 138, 184, 0.10);
+  --info-border: rgba(92, 138, 184, 0.25);
+  --info-glow: rgba(92, 138, 184, 0.35);
+
+  /* Semantic state aliases (prefer these in new code) */
+  --state-success: var(--success);
+  --state-warning: var(--warning);
+  --state-danger: var(--danger);
+  --state-error: var(--error);
+  --state-info: var(--info);
+}
+
+/* ── Motion — Canonical easing & duration aliases ──────────── */
+:root {
+  /* Short, memorable names alongside the existing -expo/-quart/-back set */
+  --ease-out: var(--ease-out-quart);            /* Default "out" curve */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: var(--ease-in-out-quint);
+  --ease-linear: linear;
+
+  /* Canonical fast/base/slow (aligned with existing fast/normal/slow) */
+  --duration-base: var(--duration-normal);      /* Alias for default 200ms */
+}
+
+/* ── Spacing Scale — Upper-range extensions ────────────────── */
+:root {
+  /* Existing scale stops at --space-8 (32px). Extend for large layout gaps. */
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+}
+
+/* ── Typography — Modular scale additions ──────────────────── */
+:root {
+  --text-4xl: 4rem;                             /* 64px — extra-large hero */
+  --text-5xl: 5rem;                             /* 80px — splash displays */
+
+  /* Optical line-height helper for headings */
+  --leading-none: 1;
+  --leading-heading: 1.15;                      /* For h1–h3 style display text */
+}
+
+/* ── Z-Index — Extended UI layer stack ─────────────────────── */
+:root {
+  /* Canonical layer stack. Order matters; higher = closer to viewer. */
+  --z-below: -1;                                /* Behind normal flow */
+  --z-popover: 200;                             /* Context menus, select popovers */
+  --z-tooltip: 1100;                            /* Above overlays, below modals */
+  --z-toast: 10000;                             /* Above modals, notifications */
+  --z-max: 2147483647;                          /* Absolute top — OS-level overlays */
+}
+
+/* ── Breakpoints — Media query reference values ────────────── */
+/* NOTE: CSS vars can't be used inside @media, but are kept here as a
+ *       single source of truth for JS/TS matchMedia() and dev reference.
+ *       Use these literal px values in stylesheets:
+ *         --bp-xs: 480, --bp-sm: 640, --bp-md: 768,
+ *         --bp-lg: 1024, --bp-xl: 1280, --bp-2xl: 1536
+ */
+:root {
+  --bp-xs: 480px;
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+  --bp-2xl: 1536px;
+}
+
+/* ── Light Theme Parallels for Extensions ──────────────────── */
+[data-theme="light"] {
+  --text-disabled: rgba(30, 27, 24, 0.32);
+  --text-inverse: #FAFAF7;
+  --text-on-accent: #FAFAF7;
+  --text-link: var(--accent);
+  --text-link-hover: var(--accent-hover);
+  --selection-bg: rgba(122, 85, 64, 0.18);
+
+  --info: #3B6FA0;
+  --info-bg: rgba(59, 111, 160, 0.08);
+  --info-border: rgba(59, 111, 160, 0.28);
+  --info-glow: rgba(59, 111, 160, 0.30);
+}
+
+/* ── Global Link Defaults ──────────────────────────────────── */
+a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--text-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Disabled State Utility ────────────────────────────────── */
+[aria-disabled="true"],
+:disabled {
+  cursor: not-allowed;
+}
+
+/* ── Image defaults ────────────────────────────────────────── */
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/*
+ * Opt-in reduced motion hook.
+ *
+ * The global `@media (prefers-reduced-motion: reduce)` block above is
+ * intentionally minimal (see comment there — Windows "Custom" accessibility
+ * settings were false-positive triggering). Components that define purely
+ * decorative animations (not loaders, spinners, or state indicators)
+ * should gate them with this hook so users can opt in explicitly via
+ *   document.documentElement.dataset.reduceMotion = 'true'
+ * without breaking functional animations.
+ */
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
 }

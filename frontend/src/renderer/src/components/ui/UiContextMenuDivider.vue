@@ -33,6 +33,6 @@ withDefaults(defineProps<UiContextMenuDividerProps>(), {
     font-size: var(--text-2xs);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-wide);
 }
 </style>

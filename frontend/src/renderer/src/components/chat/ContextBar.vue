@@ -44,7 +44,7 @@ const fillColor = computed(() => {
     const pct = fillPercent.value
     if (pct >= 95) return 'var(--danger)'
     if (pct >= 85) return 'var(--warning)'
-    if (pct >= 60) return '#C49A3C'
+    if (pct >= 60) return 'var(--warning)'
     return 'var(--success)'
 })
 

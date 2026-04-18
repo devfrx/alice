@@ -24,8 +24,11 @@ export class WebSocketManager {
   private readonly url: string
   private handlers: Map<string, MessageHandler[]> = new Map()
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 10
-  private reconnectDelay = 1000
+  private readonly maxReconnectAttempts = 10
+  /** Base delay for exponential backoff (ms). */
+  private readonly reconnectDelay = 1000
+  /** Maximum delay between reconnect attempts (ms). Prevents 8+ minute stalls. */
+  private readonly maxReconnectDelay = 30_000
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private intentionalClose = false
 
@@ -51,6 +54,12 @@ export class WebSocketManager {
     // Prevent duplicate connections
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return
+    }
+
+    // Cancel any pending reconnect — manual connect supersedes the schedule.
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
 
     this.intentionalClose = false
@@ -121,14 +130,18 @@ export class WebSocketManager {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[ALICE WS] Max reconnect attempts reached, will retry after delay')
       this.emit('reconnect_failed', null)
-      // Reset and try again after a long delay (30s)
+      // Reset and try again after the capped delay.
       this.reconnectAttempts = 0
-      this.reconnectTimer = setTimeout(() => this.connect(), 30_000)
+      this.reconnectTimer = setTimeout(() => this.connect(), this.maxReconnectDelay)
       return
     }
 
     this.reconnectAttempts++
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1)
+    // Exponential backoff capped at maxReconnectDelay to avoid multi-minute stalls.
+    const delay = Math.min(
+      this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+      this.maxReconnectDelay,
+    )
     console.log(`[ALICE WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
     this.reconnectTimer = setTimeout(() => this.connect(), delay)
   }
@@ -209,9 +222,24 @@ export class WebSocketManager {
     if (idx !== -1) list.splice(idx, 1)
   }
 
-  /** Dispatch an event to all registered handlers. */
+  /**
+   * Dispatch an event to all registered handlers.
+   *
+   * Snapshots the handler list before iterating so handlers that
+   * register/unregister during dispatch don't corrupt the loop, and
+   * isolates exceptions so a single faulty handler can't break the
+   * underlying WebSocket onmessage callback.
+   */
   private emit(event: string, data: unknown): void {
-    this.handlers.get(event)?.forEach((handler) => handler(data))
+    const list = this.handlers.get(event)
+    if (!list || list.length === 0) return
+    for (const handler of list.slice()) {
+      try {
+        handler(data)
+      } catch (err) {
+        console.error(`[ALICE WS] Handler for '${event}' threw:`, err)
+      }
+    }
   }
 }
 

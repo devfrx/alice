@@ -1,5 +1,10 @@
 ﻿appId: com.alice.app
-productName: AL\CE
+# productName is used by electron-builder to construct file paths (installer
+# output dir, NSIS shortcuts, app data folder, etc.). On Windows the backslash
+# in "AL\CE" is the path separator and produces broken paths/shortcuts, so we
+# keep a filesystem-safe identifier here. The visual brand "AL\CE" is rendered
+# inside the running app (window title, splash, UI) — see frontend code.
+productName: ALICE
 directories:
   buildResources: build
 files:

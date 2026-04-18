@@ -161,13 +161,13 @@ async function handleDelete(): Promise<void> {
 }
 
 .event-form__warn {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   color: var(--accent);
   margin: 0 0 var(--space-3);
 }
 
 .event-form__error {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--danger);
   margin: 0 0 var(--space-3);
   padding: var(--space-2);
@@ -233,7 +233,10 @@ async function handleDelete(): Promise<void> {
   font-weight: var(--weight-medium);
   cursor: pointer;
   border: 1px solid var(--border);
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .event-form__btn--primary {
@@ -247,7 +250,7 @@ async function handleDelete(): Promise<void> {
 }
 
 .event-form__btn--primary:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-dim);
   cursor: not-allowed;
 }
 

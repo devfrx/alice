@@ -443,21 +443,22 @@ async function onOpenFile(id: string): Promise<void> {
   background: var(--surface-4);
 }
 
-/* Badge */
+/* Badge — unread count indicator */
 .sidebar__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
+  min-width: var(--space-4);
+  height: var(--space-4);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--bg-primary);
-  font-size: 0.65rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
   line-height: 1;
   margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Reduced motion */

@@ -1,26 +1,42 @@
 <script setup lang="ts">
 /**
- * EmailPageView — Vista principale Email Assistant.
+ * EmailPageView — Vista principale dell'Email Assistant.
  *
  * Layout a tre colonne: EmailFoldersSidebar | InboxList | EmailViewer.
  * Le notifiche EMAIL_RECEIVED arrivano tramite useEventsWebSocket.ts (singleton).
+ *
+ * Deep-link contract (route `/email/:id?`): se `id` è presente nel path,
+ * la pagina tenta di caricare l'email corrispondente dalla cartella di
+ * default (INBOX). Se non esiste, il viewer mostra l'empty state.
  */
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useEmailStore } from '../stores/email'
 import EmailFoldersSidebar from '../components/email/EmailFoldersSidebar.vue'
 import InboxList from '../components/email/InboxList.vue'
 import EmailViewer from '../components/email/EmailViewer.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 
+const props = defineProps<{ id?: string }>()
+
 const emailStore = useEmailStore()
+
+async function syncDeepLink(uid: string | undefined): Promise<void> {
+  const trimmed = uid?.trim()
+  if (!trimmed) return
+  if (emailStore.currentEmail?.uid === trimmed) return
+  await emailStore.fetchEmail(trimmed)
+}
 
 onMounted(async () => {
   await Promise.all([emailStore.fetchInbox(), emailStore.fetchFolders()])
+  await syncDeepLink(props.id)
 })
+
+watch(() => props.id, (id) => { void syncDeepLink(id) })
 </script>
 
 <template>
-  <div class="email-page">
+  <div class="email-page" aria-label="Email">
     <EmailFoldersSidebar />
 
     <section class="email-page__inbox">

@@ -5,8 +5,8 @@
         </p>
 
         <!-- Disabled state when memory server is not connected -->
-        <div v-if="!memoryConnected" class="kg-disabled">
-            <span class="kg-disabled__icon">⚠</span>
+        <div v-if="!memoryConnected" class="kg-disabled" role="alert">
+            <AppIcon name="alert-triangle" :size="14" :stroke-width="2" class="kg-disabled__icon" />
             <span>Il server MCP <strong>memory</strong> non è connesso. Abilitalo nella sezione Server MCP per
                 gestire il Knowledge Graph.</span>
         </div>
@@ -205,6 +205,7 @@ import { useMcpMemoryStore } from '../../stores/mcpMemory'
 import { useMcpStore } from '../../stores/mcp'
 import type { KGRelation } from '../../types/mcpMemory'
 import EntityCard from './EntityCard.vue'
+import AppIcon from '../ui/AppIcon.vue'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
@@ -350,6 +351,14 @@ watch(memoryConnected, (connected) => {
 </script>
 
 <style scoped>
+/* ── Shared settings section typography ── */
+.settings-section__title {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
 /* ── Subtitle ──────────────────────────────────────────── */
 .kg-subtitle {
     font-size: var(--text-sm);

@@ -50,6 +50,18 @@ class QdrantService:
         self._client: AsyncQdrantClient | None = None
         self._in_memory: bool = False
 
+    @property
+    def in_memory(self) -> bool:
+        """Return True if running in the volatile in-memory fallback mode.
+
+        Set when :meth:`initialize` cannot acquire the embedded data
+        directory after the configured retries and falls back to
+        ``AsyncQdrantClient(":memory:")``.  Callers (status endpoints,
+        UI badges) should surface this so the user knows persisted
+        writes are not durable.
+        """
+        return self._in_memory
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------

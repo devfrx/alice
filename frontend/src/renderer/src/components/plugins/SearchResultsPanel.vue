@@ -154,10 +154,10 @@ function openUrl(url: string): void {
   width: 360px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary, #1a1a2e);
-  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border);
   z-index: var(--z-dropdown);
-  color: var(--text-primary, #eee);
+  color: var(--text-primary);
   font-size: 13px;
 }
 
@@ -166,7 +166,7 @@ function openUrl(url: string): void {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-bottom: 1px solid var(--border);
 }
 
 .search-panel__title {
@@ -180,14 +180,14 @@ function openUrl(url: string): void {
   border-radius: 10px;
   font-size: 11px;
   font-weight: 700;
-  background: var(--accent, #e94560);
+  background: var(--accent);
   color: var(--bg-primary);
 }
 
 .search-panel__close {
   background: none;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
@@ -207,15 +207,15 @@ function openUrl(url: string): void {
   box-sizing: border-box;
   padding: 8px 10px;
   border-radius: 6px;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
-  background: var(--bg-secondary, #16213e);
-  color: var(--text-primary, #eee);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 13px;
   outline: none;
 }
 
 .search-panel__input:focus {
-  border-color: var(--accent, #e94560);
+  border-color: var(--accent);
 }
 
 .search-panel__body {
@@ -227,7 +227,7 @@ function openUrl(url: string): void {
 .search-panel__status {
   text-align: center;
   padding: 32px 0;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -235,14 +235,14 @@ function openUrl(url: string): void {
 }
 
 .search-panel__status--error {
-  color: var(--accent, #e94560);
+  color: var(--accent);
 }
 
 .search-panel__spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--text-secondary, #aaa);
+  border: 2px solid var(--text-secondary);
   border-top-color: transparent;
   animation: spin 0.7s linear infinite;
 }
@@ -262,18 +262,18 @@ function openUrl(url: string): void {
 .search-panel__card {
   padding: 10px;
   border-radius: 6px;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
-  background: var(--bg-secondary, #16213e);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
   transition: border-color 0.15s;
 }
 
 .search-panel__card:hover {
-  border-color: var(--accent, #e94560);
+  border-color: var(--accent);
 }
 
 .search-panel__card-title {
   font-weight: 600;
-  color: var(--accent, #e94560);
+  color: var(--accent);
   cursor: pointer;
   text-decoration: none;
   display: block;
@@ -288,7 +288,7 @@ function openUrl(url: string): void {
 .search-panel__card-url {
   display: block;
   font-size: 11px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -298,7 +298,7 @@ function openUrl(url: string): void {
 .search-panel__card-snippet {
   margin: 0;
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -316,8 +316,8 @@ function openUrl(url: string): void {
   border-radius: 4px;
   border: none;
   font-size: 11px;
-  background: var(--bg-tertiary, #0f3460);
-  color: var(--text-primary, #eee);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   cursor: pointer;
   transition: opacity 0.15s;
 }
@@ -332,27 +332,27 @@ function openUrl(url: string): void {
 }
 
 .search-panel__btn--accent {
-  background: var(--accent, #e94560);
+  background: var(--accent);
   color: var(--bg-primary);
 }
 
 .search-panel__scrape-error {
   margin-top: 6px;
   font-size: 11px;
-  color: var(--accent, #e94560);
+  color: var(--accent);
 }
 
 .search-panel__scraped {
   margin: 8px 0 0;
   padding: 8px;
   border-radius: 4px;
-  background: var(--bg-primary, #1a1a2e);
+  background: var(--bg-primary);
   font-size: 11px;
   max-height: 200px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 /* Slide transition */

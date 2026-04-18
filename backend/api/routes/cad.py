@@ -6,8 +6,8 @@ TRELLIS microservice.
 
 from __future__ import annotations
 
+import asyncio
 import re
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import FileResponse
@@ -59,9 +59,13 @@ async def list_models(request: Request) -> dict:
     """
     ctx = request.app.state.context
     output_dir = PROJECT_ROOT / ctx.config.trellis.model_output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+    await asyncio.to_thread(
+        output_dir.mkdir, parents=True, exist_ok=True,
+    )
 
-    models = sorted(p.stem for p in output_dir.glob("*.glb"))
+    models = await asyncio.to_thread(
+        lambda: sorted(p.stem for p in output_dir.glob("*.glb")),
+    )
     return {"models": models}
 
 

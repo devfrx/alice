@@ -310,9 +310,8 @@ function preview(content: string): string {
     backdrop-filter: blur(var(--glass-blur-heavy));
     -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
     border: 1px solid var(--glass-border);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    /* box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 1px rgba(255, 255, 255, 0.04); */
     flex-shrink: 0;
 }
 
@@ -543,7 +542,7 @@ function preview(content: string): string {
     font-size: var(--text-xs);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-wide);
     margin-bottom: var(--space-1);
 }
 
@@ -655,7 +654,7 @@ function preview(content: string): string {
 
 .browser__list::-webkit-scrollbar-thumb {
     background: var(--surface-3);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
 }
 
 .browser__item {
@@ -788,7 +787,7 @@ function preview(content: string): string {
 
 .browser__error {
     padding: var(--space-2) var(--space-3);
-    color: var(--error, #f87171);
+    color: var(--danger);
     font-size: var(--text-xs);
     background: var(--danger-faint);
     border-top: 1px solid var(--danger-hover);

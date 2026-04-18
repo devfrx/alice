@@ -6,7 +6,7 @@ import CalendarView from '../components/plugins/CalendarView.vue'
 </script>
 
 <template>
-    <div class="calendar-page">
+    <div class="calendar-page" aria-label="Calendario">
         <CalendarView />
     </div>
 </template>

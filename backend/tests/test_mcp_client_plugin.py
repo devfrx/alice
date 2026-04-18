@@ -237,6 +237,30 @@ class TestMcpClientPluginGetTools:
         assert len(tools) == 1
         assert len(tools[0].name) <= 64
 
+    def test_get_tools_skips_truncation_collisions(self) -> None:
+        """Two tools whose namespaced names truncate to the same 64-char prefix
+        must not silently overwrite each other in the dispatch map."""
+        plugin = McpClientPlugin()
+        long_server = "a_very_long_server_name_that_pushes_limits"
+        # Both names share the same first ~64 chars after the
+        # ``mcp_<server>_`` prefix, so truncation produces a collision.
+        shared_prefix = "shared_prefix_that_makes_truncated_name_identical_xxxxxxxx"
+        plugin._sessions = {
+            long_server: _make_mock_session(
+                long_server,
+                tools=[
+                    ToolDefinition(name=f"{shared_prefix}_AAA", description="A"),
+                    ToolDefinition(name=f"{shared_prefix}_BBB", description="B"),
+                ],
+            ),
+        }
+
+        tools = plugin.get_tools()
+        # Only one of the two colliding tools should be registered.
+        assert len(tools) == 1
+        # And the dispatch map must contain a single entry for that name.
+        assert len(plugin._tool_dispatch_map) == 1
+
     def test_get_tools_isolates_invalid_tool(self) -> None:
         """A single invalid tool doesn't crash the entire get_tools()."""
         plugin = McpClientPlugin()

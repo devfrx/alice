@@ -597,8 +597,8 @@ onUnmounted(() => {
     border-radius: var(--radius-sm);
     max-height: 160px;
     overflow-y: auto;
-    opacity: 0.85;
-    transition: opacity 0.2s ease;
+    opacity: var(--opacity-visible);
+    transition: opacity var(--transition-fast);
 }
 
 .graph-legend:hover {
@@ -667,7 +667,7 @@ onUnmounted(() => {
     color: var(--text-secondary);
     font-size: var(--text-xs);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .graph-linking-bar__cancel:hover {

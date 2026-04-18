@@ -57,13 +57,22 @@ const emit = defineEmits<{ click: [] }>()
     background: var(--surface-hover);
 }
 
-.ctx-item:focus-visible { box-shadow: var(--shadow-focus); }
+.ctx-item:focus-visible {
+    box-shadow: var(--shadow-focus);
+}
 
-.ctx-item:active:not(:disabled) { background: var(--surface-active); }
+.ctx-item:active:not(:disabled) {
+    background: var(--surface-active);
+}
 
-.ctx-item--danger { color: var(--danger); }
+.ctx-item--danger {
+    color: var(--danger);
+}
+
 .ctx-item--danger:hover:not(:disabled),
-.ctx-item--danger:focus-visible:not(:disabled) { background: var(--danger-faint); }
+.ctx-item--danger:focus-visible:not(:disabled) {
+    background: var(--danger-faint);
+}
 
 .ctx-item--disabled {
     color: var(--text-muted);
@@ -81,7 +90,9 @@ const emit = defineEmits<{ click: [] }>()
     color: var(--text-secondary);
 }
 
-.ctx-item--danger .ctx-item__icon { color: var(--danger); }
+.ctx-item--danger .ctx-item__icon {
+    color: var(--danger);
+}
 
 .ctx-item__label {
     flex: 1;

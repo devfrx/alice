@@ -359,6 +359,7 @@ watch(memoryConnected, (connected) => {
     letter-spacing: -0.01em;
     color: var(--text-primary);
 }
+
 /* ── Subtitle ──────────────────────────────────────────── */
 .kg-subtitle {
     font-size: var(--text-sm);

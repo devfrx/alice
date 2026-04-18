@@ -27,7 +27,8 @@ withDefaults(defineProps<UiTooltipProps>(), {
 </script>
 
 <template>
-    <div class="ui-tooltip-wrapper" :class="[`ui-tooltip-wrapper--${position}`, { 'ui-tooltip-wrapper--disabled': disabled }]"
+    <div class="ui-tooltip-wrapper"
+        :class="[`ui-tooltip-wrapper--${position}`, { 'ui-tooltip-wrapper--disabled': disabled }]"
         :style="{ '--tooltip-delay': `${delay}ms` }">
         <slot />
         <div v-if="!disabled && text" class="ui-tooltip" role="tooltip">{{ text }}</div>
@@ -63,7 +64,9 @@ withDefaults(defineProps<UiTooltipProps>(), {
     transition-delay: var(--tooltip-delay);
 }
 
-.ui-tooltip-wrapper--disabled .ui-tooltip { display: none; }
+.ui-tooltip-wrapper--disabled .ui-tooltip {
+    display: none;
+}
 
 /* ── Positions ─── */
 .ui-tooltip-wrapper--top .ui-tooltip {

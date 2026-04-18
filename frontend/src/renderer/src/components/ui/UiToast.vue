@@ -36,8 +36,7 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
         :aria-live="isAssertive(toast.type) ? 'assertive' : 'polite'" @click="dismiss(toast.id)">
         <span class="ui-toast__icon" aria-hidden="true">{{ ICONS[toast.type] }}</span>
         <span class="ui-toast__text">{{ toast.message }}</span>
-        <button type="button" class="ui-toast__close" aria-label="Dismiss notification"
-          @click.stop="dismiss(toast.id)">
+        <button type="button" class="ui-toast__close" aria-label="Dismiss notification" @click.stop="dismiss(toast.id)">
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
             <path d="M2 2 L8 8 M8 2 L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
           </svg>
@@ -75,16 +74,42 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
   pointer-events: auto;
 }
 
-.ui-toast--info    { border-left: 3px solid var(--accent); }
-.ui-toast--success { border-left: 3px solid var(--success); }
-.ui-toast--warning { border-left: 3px solid var(--warning); }
-.ui-toast--error   { border-left: 3px solid var(--danger); }
+.ui-toast--info {
+  border-left: 3px solid var(--accent);
+}
 
-.ui-toast__icon { flex-shrink: 0; font-size: var(--text-sm); }
-.ui-toast--info    .ui-toast__icon { color: var(--accent); }
-.ui-toast--success .ui-toast__icon { color: var(--success); }
-.ui-toast--warning .ui-toast__icon { color: var(--warning); }
-.ui-toast--error   .ui-toast__icon { color: var(--danger); }
+.ui-toast--success {
+  border-left: 3px solid var(--success);
+}
+
+.ui-toast--warning {
+  border-left: 3px solid var(--warning);
+}
+
+.ui-toast--error {
+  border-left: 3px solid var(--danger);
+}
+
+.ui-toast__icon {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+
+.ui-toast--info .ui-toast__icon {
+  color: var(--accent);
+}
+
+.ui-toast--success .ui-toast__icon {
+  color: var(--success);
+}
+
+.ui-toast--warning .ui-toast__icon {
+  color: var(--warning);
+}
+
+.ui-toast--error .ui-toast__icon {
+  color: var(--danger);
+}
 
 .ui-toast__text {
   flex: 1;
@@ -114,20 +139,46 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
     opacity var(--duration-fast) var(--ease-out-quart);
 }
 
-.ui-toast__close:hover { background: var(--surface-hover); opacity: 1; color: var(--text-primary); }
-.ui-toast__close:focus-visible { box-shadow: var(--shadow-focus); }
+.ui-toast__close:hover {
+  background: var(--surface-hover);
+  opacity: 1;
+  color: var(--text-primary);
+}
+
+.ui-toast__close:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
 
 /* ── Transition: slide in/out from right ────────────────────── */
-.ui-toast-enter-active { animation: uiToastIn var(--duration-moderate) var(--ease-out-expo); }
-.ui-toast-leave-active { animation: uiToastOut var(--duration-normal) ease-in forwards; }
+.ui-toast-enter-active {
+  animation: uiToastIn var(--duration-moderate) var(--ease-out-expo);
+}
+
+.ui-toast-leave-active {
+  animation: uiToastOut var(--duration-normal) ease-in forwards;
+}
 
 @keyframes uiToastIn {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes uiToastOut {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(40px); }
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+  }
 }
 </style>

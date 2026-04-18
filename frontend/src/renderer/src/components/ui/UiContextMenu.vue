@@ -119,8 +119,8 @@ onUnmounted(() => {
     <Teleport to="body">
         <Transition name="ctx-fade">
             <div v-if="visible" ref="menuEl" class="ctx-menu" role="menu" tabindex="-1"
-                :aria-label="title || 'Context menu'"
-                :style="{ left: `${adjustedX}px`, top: `${adjustedY}px` }" @contextmenu.prevent>
+                :aria-label="title || 'Context menu'" :style="{ left: `${adjustedX}px`, top: `${adjustedY}px` }"
+                @contextmenu.prevent>
                 <div v-if="title" class="ctx-menu__title">{{ title }}</div>
                 <slot />
             </div>
@@ -144,7 +144,9 @@ onUnmounted(() => {
     outline: none;
 }
 
-.ctx-menu:focus-visible { box-shadow: var(--shadow-focus); }
+.ctx-menu:focus-visible {
+    box-shadow: var(--shadow-focus);
+}
 
 .ctx-menu__title {
     padding: var(--space-2) var(--space-3) var(--space-1-5);

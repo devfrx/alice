@@ -64,9 +64,20 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 /* ── Variants ──── */
-.ui-card--default  { background: var(--surface-1); }
-.ui-card--subtle   { background: var(--surface-1); border-color: transparent; }
-.ui-card--elevated { background: var(--surface-2); box-shadow: var(--shadow-elevated); }
+.ui-card--default {
+    background: var(--surface-1);
+}
+
+.ui-card--subtle {
+    background: var(--surface-1);
+    border-color: transparent;
+}
+
+.ui-card--elevated {
+    background: var(--surface-2);
+    box-shadow: var(--shadow-elevated);
+}
+
 .ui-card--glass {
     background: var(--glass-bg);
     border-color: var(--glass-border);
@@ -75,11 +86,25 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 /* ── Interactive ── */
-.ui-card--interactive { cursor: pointer; outline: none; }
-.ui-card--interactive:hover { border-color: var(--border-hover); }
-.ui-card--interactive:active { transform: scale(0.995); }
-.ui-card--interactive:focus-visible { box-shadow: var(--shadow-focus); }
+.ui-card--interactive {
+    cursor: pointer;
+    outline: none;
+}
+
+.ui-card--interactive:hover {
+    border-color: var(--border-hover);
+}
+
+.ui-card--interactive:active {
+    transform: scale(0.995);
+}
+
+.ui-card--interactive:focus-visible {
+    box-shadow: var(--shadow-focus);
+}
 
 /* ── No padding ── */
-.ui-card--no-padding { padding: 0; }
+.ui-card--no-padding {
+    padding: 0;
+}
 </style>

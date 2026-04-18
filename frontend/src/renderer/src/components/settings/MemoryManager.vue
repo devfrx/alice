@@ -243,6 +243,7 @@ onMounted(() => {
     letter-spacing: -0.01em;
     color: var(--text-primary);
 }
+
 /* ── Stats bar ─────────────────────────────────────────────── */
 .mem-stats {
     display: flex;

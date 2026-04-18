@@ -50,13 +50,34 @@ const monogram = (): string => {
 }
 
 /* ── Sizes ─── */
-.ui-avatar--sm { width: 24px; height: 24px; font-size: var(--text-2xs); }
-.ui-avatar--md { width: 32px; height: 32px; font-size: var(--text-xs); }
-.ui-avatar--lg { width: 40px; height: 40px; font-size: var(--text-sm); }
+.ui-avatar--sm {
+    width: 24px;
+    height: 24px;
+    font-size: var(--text-2xs);
+}
+
+.ui-avatar--md {
+    width: 32px;
+    height: 32px;
+    font-size: var(--text-xs);
+}
+
+.ui-avatar--lg {
+    width: 40px;
+    height: 40px;
+    font-size: var(--text-sm);
+}
 
 /* ── Variants ─── */
-.ui-avatar--agent { background: var(--accent-dim); color: var(--accent); }
-.ui-avatar--user  { background: var(--surface-3); color: var(--text-secondary); }
+.ui-avatar--agent {
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+.ui-avatar--user {
+    background: var(--surface-3);
+    color: var(--text-secondary);
+}
 
 .ui-avatar__letter {
     line-height: var(--leading-tight);
@@ -75,7 +96,15 @@ const monogram = (): string => {
     transform: translate(15%, 15%);
 }
 
-.ui-avatar__status--online  { background: var(--success); }
-.ui-avatar__status--busy    { background: var(--warning); }
-.ui-avatar__status--offline { background: var(--text-muted); }
+.ui-avatar__status--online {
+    background: var(--success);
+}
+
+.ui-avatar__status--busy {
+    background: var(--warning);
+}
+
+.ui-avatar__status--offline {
+    background: var(--text-muted);
+}
 </style>

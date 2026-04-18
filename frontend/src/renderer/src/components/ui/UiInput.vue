@@ -92,11 +92,10 @@ function onInput(e: Event): void {
                 <slot name="prefix" />
             </span>
             <input :id="inputId" class="ui-input__field" :type="type" :value="modelValue" :placeholder="placeholder"
-                :disabled="disabled" :readonly="readonly" :required="required" :name="name"
-                :autocomplete="autocomplete" :maxlength="maxlength" :aria-label="ariaLabel || undefined"
-                :aria-invalid="!!error || undefined" :aria-describedby="describedBy"
-                :aria-busy="loading || undefined" @input="onInput" @focus="emit('focus', $event)"
-                @blur="emit('blur', $event)" />
+                :disabled="disabled" :readonly="readonly" :required="required" :name="name" :autocomplete="autocomplete"
+                :maxlength="maxlength" :aria-label="ariaLabel || undefined" :aria-invalid="!!error || undefined"
+                :aria-describedby="describedBy" :aria-busy="loading || undefined" @input="onInput"
+                @focus="emit('focus', $event)" @blur="emit('blur', $event)" />
             <span v-if="loading" class="ui-input__spinner" aria-hidden="true" />
             <span v-else-if="$slots.suffix" class="ui-input__suffix">
                 <slot name="suffix" />
@@ -122,7 +121,9 @@ function onInput(e: Event): void {
     gap: var(--space-1);
 }
 
-.ui-input__required { color: var(--danger); }
+.ui-input__required {
+    color: var(--danger);
+}
 
 .ui-input__wrapper {
     display: flex;
@@ -140,7 +141,10 @@ function onInput(e: Event): void {
     border-color: var(--border-hover);
 }
 
-.ui-input__wrapper:focus-within { box-shadow: var(--shadow-focus); }
+.ui-input__wrapper:focus-within {
+    box-shadow: var(--shadow-focus);
+}
+
 .ui-input:not(.ui-input--error) .ui-input__wrapper:focus-within {
     border-color: var(--accent-border);
 }
@@ -157,8 +161,13 @@ function onInput(e: Event): void {
     width: 100%;
 }
 
-.ui-input__field::placeholder { color: var(--text-muted); }
-.ui-input__field:read-only { cursor: default; }
+.ui-input__field::placeholder {
+    color: var(--text-muted);
+}
+
+.ui-input__field:read-only {
+    cursor: default;
+}
 
 .ui-input__prefix,
 .ui-input__suffix,
@@ -179,36 +188,84 @@ function onInput(e: Event): void {
     animation: ui-input-spin 0.6s linear infinite;
 }
 
-@keyframes ui-input-spin { to { transform: rotate(360deg); } }
+@keyframes ui-input-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 
 /* ── Sizes ──────────── */
-.ui-input--sm .ui-input__wrapper { height: var(--input-height-sm); }
-.ui-input--sm .ui-input__field   { font-size: var(--text-xs); padding: 0 var(--space-2); }
+.ui-input--sm .ui-input__wrapper {
+    height: var(--input-height-sm);
+}
+
+.ui-input--sm .ui-input__field {
+    font-size: var(--text-xs);
+    padding: 0 var(--space-2);
+}
+
 .ui-input--sm .ui-input__prefix,
 .ui-input--sm .ui-input__suffix,
-.ui-input--sm .ui-input__spinner { padding: 0 var(--space-1-5); }
+.ui-input--sm .ui-input__spinner {
+    padding: 0 var(--space-1-5);
+}
 
-.ui-input--md .ui-input__wrapper { height: var(--input-height-md); }
-.ui-input--md .ui-input__field   { font-size: var(--text-sm); padding: 0 var(--space-3); }
+.ui-input--md .ui-input__wrapper {
+    height: var(--input-height-md);
+}
+
+.ui-input--md .ui-input__field {
+    font-size: var(--text-sm);
+    padding: 0 var(--space-3);
+}
+
 .ui-input--md .ui-input__prefix,
 .ui-input--md .ui-input__suffix,
-.ui-input--md .ui-input__spinner { padding: 0 var(--space-2); }
+.ui-input--md .ui-input__spinner {
+    padding: 0 var(--space-2);
+}
 
-.ui-input--lg .ui-input__wrapper { height: var(--input-height-lg); }
-.ui-input--lg .ui-input__field   { font-size: var(--text-md); padding: 0 var(--space-4); }
+.ui-input--lg .ui-input__wrapper {
+    height: var(--input-height-lg);
+}
+
+.ui-input--lg .ui-input__field {
+    font-size: var(--text-md);
+    padding: 0 var(--space-4);
+}
+
 .ui-input--lg .ui-input__prefix,
 .ui-input--lg .ui-input__suffix,
-.ui-input--lg .ui-input__spinner { padding: 0 var(--space-3); }
+.ui-input--lg .ui-input__spinner {
+    padding: 0 var(--space-3);
+}
 
 /* ── Error State ───── */
-.ui-input--error .ui-input__wrapper { border-color: var(--danger-border); }
+.ui-input--error .ui-input__wrapper {
+    border-color: var(--danger-border);
+}
+
 .ui-input--error .ui-input__wrapper:focus-within {
     box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px var(--danger-border);
 }
-.ui-input__error { font-size: var(--text-xs); color: var(--danger); }
-.ui-input__hint  { font-size: var(--text-xs); color: var(--text-muted); }
+
+.ui-input__error {
+    font-size: var(--text-xs);
+    color: var(--danger);
+}
+
+.ui-input__hint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
 
 /* ── Disabled ──────── */
-.ui-input--disabled { opacity: var(--opacity-disabled); pointer-events: none; }
-.ui-input--disabled .ui-input__wrapper { background: var(--surface-inset); }
+.ui-input--disabled {
+    opacity: var(--opacity-disabled);
+    pointer-events: none;
+}
+
+.ui-input--disabled .ui-input__wrapper {
+    background: var(--surface-inset);
+}
 </style>

@@ -389,7 +389,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="bar-chart" :size="13" />
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="workspace-tab__badge">{{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                     </button>
                     <button v-if="hasWhiteboards" class="workspace-tab"
                         :class="{ 'workspace-tab--active': workspaceTab === 'whiteboard' }"
@@ -434,7 +434,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="chevron-left" :size="14" />
                     </button>
                     <span class="workspace-viewer__counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                        }}</span>
+                    }}</span>
                     <button class="workspace-viewer__nav-btn" :disabled="chartActiveIndex >= chartPayloads.length - 1"
                         @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
                         <AppIcon name="chevron-right" :size="14" />

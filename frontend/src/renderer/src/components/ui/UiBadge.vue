@@ -36,7 +36,9 @@ const emit = defineEmits<{
 <template>
     <span class="ui-badge" :class="[`ui-badge--${variant}`, `ui-badge--${size}`, { 'ui-badge--dot': dot }]">
         <span v-if="dot" class="ui-badge__dot" aria-hidden="true" />
-        <span class="ui-badge__label"><slot /></span>
+        <span class="ui-badge__label">
+            <slot />
+        </span>
         <button v-if="removable" type="button" class="ui-badge__remove" :aria-label="removeLabel"
             @click.stop="emit('remove', $event)">
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
@@ -66,17 +68,51 @@ const emit = defineEmits<{
 }
 
 /* ── Sizes ────── */
-.ui-badge--sm { padding: var(--space-0-5) var(--space-2); font-size: var(--text-2xs); }
-.ui-badge--md { padding: var(--space-1) var(--space-3); font-size: var(--text-xs); }
-.ui-badge--lg { padding: var(--space-1-5) var(--space-3); font-size: var(--text-sm); }
+.ui-badge--sm {
+    padding: var(--space-0-5) var(--space-2);
+    font-size: var(--text-2xs);
+}
+
+.ui-badge--md {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+}
+
+.ui-badge--lg {
+    padding: var(--space-1-5) var(--space-3);
+    font-size: var(--text-sm);
+}
 
 /* ── Variants ──── */
-.ui-badge--default { background: var(--surface-3); color: var(--text-secondary); }
-.ui-badge--accent  { background: var(--accent-dim); color: var(--accent); }
-.ui-badge--success { background: var(--success-light); color: var(--success); }
-.ui-badge--danger  { background: var(--danger-light); color: var(--danger); }
-.ui-badge--warning { background: var(--warning-bg); color: var(--warning); }
-.ui-badge--info    { background: var(--accent-subtle); color: var(--text-secondary); }
+.ui-badge--default {
+    background: var(--surface-3);
+    color: var(--text-secondary);
+}
+
+.ui-badge--accent {
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+.ui-badge--success {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+.ui-badge--danger {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.ui-badge--warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+}
+
+.ui-badge--info {
+    background: var(--accent-subtle);
+    color: var(--text-secondary);
+}
 
 /* ── Dot ───────── */
 .ui-badge__dot {
@@ -104,8 +140,15 @@ const emit = defineEmits<{
     cursor: pointer;
     outline: none;
     transition: background-color var(--duration-fast) var(--ease-out-quart),
-                opacity var(--duration-fast) var(--ease-out-quart);
+        opacity var(--duration-fast) var(--ease-out-quart);
 }
-.ui-badge__remove:hover { background: var(--surface-hover); opacity: 1; }
-.ui-badge__remove:focus-visible { box-shadow: var(--shadow-focus); }
+
+.ui-badge__remove:hover {
+    background: var(--surface-hover);
+    opacity: 1;
+}
+
+.ui-badge__remove:focus-visible {
+    box-shadow: var(--shadow-focus);
+}
 </style>

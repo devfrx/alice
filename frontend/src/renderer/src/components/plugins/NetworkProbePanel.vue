@@ -728,7 +728,7 @@ function fmtMs(v: number | null): string {
                             <div v-if="c.process_name" class="net-probe__row">
                                 <span class="net-probe__label-sm">Process</span>
                                 <span>{{ c.process_name }}<span v-if="c.pid" class="net-probe__port-svc"> (PID {{ c.pid
-                                }})</span></span>
+                                        }})</span></span>
                             </div>
                         </div>
                     </template>

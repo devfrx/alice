@@ -557,9 +557,26 @@ class LLMService:
         # Build the user message — multimodal when vision attachments exist.
         # Use the cached model ID to check vision capability via registry.
         _vision_capable = self.supports_vision
+
+        # Build a machine-readable attachment manifest so the LLM can
+        # forward the exact ``file_path`` to tools (e.g.
+        # ``cad_generate_from_image``) instead of hallucinating one.
+        # This is appended to the text regardless of vision capability,
+        # because path-based tools work without seeing the image.
+        path_hints = "\n".join(
+            f"- {att.get('filename', 'file')}: {att['file_path']}"
+            for att in (attachments or [])
+            if att.get("file_path")
+        )
+        text_with_hints = (
+            f"{user_content}\n\n[Allegati disponibili (usa esattamente "
+            f"questi file_path con i tool):\n{path_hints}]"
+            if path_hints else user_content
+        )
+
         if attachments and _vision_capable:
             content_parts: list[dict[str, Any]] = [
-                {"type": "text", "text": user_content},
+                {"type": "text", "text": text_with_hints},
             ]
             for att in attachments:
                 image_bytes = (
@@ -581,7 +598,7 @@ class LLMService:
                 "Built multimodal message with {} image(s)", len(attachments)
             )
         else:
-            messages.append({"role": "user", "content": user_content})
+            messages.append({"role": "user", "content": text_with_hints})
 
         return messages
 

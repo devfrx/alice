@@ -93,7 +93,27 @@ class ContextManager:
         """
         tokens = 4  # role/metadata overhead
         content = msg.get("content") or ""
-        tokens += self.estimate_tokens(content)
+        if isinstance(content, list):
+            # Multimodal content: list of parts (text/image_url/...).
+            # Sum text-part tokens and apply a flat cost per image.
+            # Image cost mirrors OpenAI's ~765 tokens for high-detail vision
+            # tiles — a coarse but safe upper bound for context budgeting.
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                part_type = part.get("type")
+                if part_type == "text":
+                    tokens += self.estimate_tokens(part.get("text") or "")
+                elif part_type in ("image_url", "image"):
+                    tokens += 765
+                else:
+                    # Unknown part: fall back to JSON-stringified estimate.
+                    try:
+                        tokens += self.estimate_tokens(json.dumps(part))
+                    except (TypeError, ValueError):
+                        pass
+        else:
+            tokens += self.estimate_tokens(content)
         tool_calls = msg.get("tool_calls")
         if tool_calls:
             try:

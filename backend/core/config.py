@@ -142,8 +142,13 @@ class LLMConfig(BaseSettings):
     """Enable for multimodal models (LLaVA, Qwen2-VL) that accept images."""
     max_tool_iterations: int = 25
     """Maximum number of tool calling rounds before forcing a final answer."""
-    tool_execution_timeout: float = 120.0
+    tool_execution_timeout: float = 1300.0
     """Timeout in seconds for parallel tool execution per iteration.
+
+    Default 1300s (~22 min) covers the slowest tool: TRELLIS / TRELLIS.2
+    image-to-3D generation, which can take up to ``trellis*.request_timeout_s``
+    (1200s) plus client overhead. Faster tools complete in a few seconds and
+    are unaffected.
 
     If any tool takes longer than this, the gather is cancelled and
     a timeout error is recorded for the stuck tool(s)."""
@@ -657,10 +662,10 @@ class TrellisServiceConfig(BaseSettings):
     service_url: str = "http://localhost:8090"
     """Base URL of the TRELLIS microservice (separate Python 3.10-3.12 process)."""
 
-    request_timeout_s: int = 600
-    """Timeout for 3D generation in seconds.
+    request_timeout_s: int = 1200
+    """Timeout for 3D generation in seconds (default 20 min).
     First run downloads model weights (~60s) + two sampling passes (~180s).
-    Subsequent runs still need ~180s for inference. 600s gives ample margin."""
+    Long timeout covers cold starts and high-quality presets on consumer GPUs."""
 
     max_model_size_mb: int = 100
     """Maximum accepted size for generated GLB files."""
@@ -680,6 +685,69 @@ class TrellisServiceConfig(BaseSettings):
     trellis_dir: str = ""
     """Path to the TRELLIS-for-windows installation directory.
     Used by start-trellis.ps1. Empty = auto-detect (../TRELLIS-for-windows)."""
+
+    seed: int = -1
+    """Seed for generation. -1 = random."""
+
+
+class Trellis2ServiceConfig(BaseSettings):
+    """TRELLIS.2 (microsoft/TRELLIS.2-4B) microservice configuration.
+
+    Sibling of :class:`TrellisServiceConfig` for the next-generation
+    image-to-3D model.  The two services run side by side on different
+    ports and use independent Python venvs.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_TRELLIS2__")
+
+    enabled: bool = False
+    """Enable the TRELLIS.2 microservice integration."""
+
+    service_url: str = "http://localhost:8091"
+    """Base URL of the TRELLIS.2 microservice (separate Python 3.10-3.12 process)."""
+
+    request_timeout_s: int = 1200
+    """Timeout for 3D generation in seconds (default 20 min). First call
+    downloads ~8GB of weights; pipeline 1536_cascade can take minutes on
+    consumer GPUs."""
+
+    max_model_size_mb: int = 100
+    """Maximum accepted size for generated GLB files."""
+
+    model_output_dir: str = "data/3d_models"
+    """Local directory for generated GLB files (relative to PROJECT_ROOT)."""
+
+    auto_vram_swap: bool = True
+    """If True, automatically unload the LLM from VRAM before 3D generation
+    and reload it after. Required on GPUs with < 24GB VRAM (4B model)."""
+
+    trellis2_model: str = "microsoft/TRELLIS.2-4B"
+    """TRELLIS.2 model to load in the microservice (HuggingFace repo ID).
+    Currently only the 4B image-to-3D checkpoint is published."""
+
+    trellis2_dir: str = ""
+    """Path to the TRELLIS.2 installation directory.
+    Used by start-trellis2.ps1. Empty = auto-detect (../TRELLIS.2)."""
+
+    pipeline_type: str = "1024"
+    """Default generation resolution: 512 (~3s), 1024 (~17s),
+    1024_cascade or 1536_cascade (~60s on H100)."""
+
+    allowed_pipeline_types: list[str] = ["512", "1024"]
+    """Whitelist of pipeline_type values the LLM is allowed to pick.
+    On consumer GPUs (16 GB VRAM) ``512`` and ``1024`` reliably fit
+    CuMesh's post-processing buffers; the ``*_cascade`` variants
+    produce mesh densities that go OOM in ``fill_holes``/``simplify``.
+    Add them back here only on 24 GB+ cards."""
+
+    decimation_target: int = 500_000
+    """Target triangle count for the exported GLB. 500k is the tested
+    maximum for RTX 5080 (16 GB VRAM); raise to 1M+ on 24 GB+ cards."""
+
+    texture_size: int = 4096
+    """Square PBR texture resolution for the exported GLB. 4096 works
+    on 16 GB VRAM with pipeline_type 512 and 1024; lower to 2048 if
+    running into OOM during texture baking."""
 
     seed: int = -1
     """Seed for generation. -1 = random."""
@@ -788,6 +856,7 @@ class AliceConfig(BaseSettings):
     notes: NotesConfig = Field(default_factory=NotesConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)
     trellis: TrellisServiceConfig = Field(default_factory=TrellisServiceConfig)
+    trellis2: Trellis2ServiceConfig = Field(default_factory=Trellis2ServiceConfig)
     chart: ChartConfig = Field(default_factory=ChartConfig)
     whiteboard: WhiteboardConfig = Field(default_factory=WhiteboardConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)

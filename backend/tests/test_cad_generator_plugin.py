@@ -7,11 +7,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.core.config import TrellisServiceConfig, load_config
+from backend.core.config import (
+    Trellis2ServiceConfig,
+    TrellisServiceConfig,
+    load_config,
+)
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
 from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
 from backend.plugins.cad_generator.client import GenerationResult
+from backend.plugins.cad_generator.client_v2 import Trellis2GenerationResult
 from backend.plugins.cad_generator.plugin import CadGeneratorPlugin
 
 
@@ -43,12 +48,40 @@ def _make_trellis_config(tmp_path: Path, **overrides) -> TrellisServiceConfig:
     return TrellisServiceConfig(**defaults)
 
 
-def _make_app_context(tmp_path: Path, **config_overrides) -> AppContext:
+def _make_trellis2_config(tmp_path: Path, **overrides) -> Trellis2ServiceConfig:
+    """Build a Trellis2ServiceConfig pointing at *tmp_path* output dir."""
+    defaults = {
+        "enabled": True,
+        "service_url": "http://localhost:8091",
+        "request_timeout_s": 10,
+        "max_model_size_mb": 100,
+        "model_output_dir": str(tmp_path / "3d_models_v2"),
+        "auto_vram_swap": True,
+        "trellis2_model": "microsoft/TRELLIS.2-4B",
+        "pipeline_type": "512",
+        "decimation_target": 100_000,
+        "texture_size": 1024,
+        "seed": 42,
+    }
+    defaults.update(overrides)
+    return Trellis2ServiceConfig(**defaults)
+
+
+def _make_app_context(
+    tmp_path: Path,
+    *,
+    trellis2_overrides: dict | None = None,
+    **config_overrides,
+) -> AppContext:
     """Build a minimal AppContext with mocked services."""
     config = load_config()
     trellis_cfg = _make_trellis_config(tmp_path, **config_overrides)
     # Override trellis config on the loaded config
     object.__setattr__(config, "trellis", trellis_cfg)
+    # TRELLIS.2 config: disabled by default, opt-in via trellis2_overrides
+    if trellis2_overrides is not None:
+        trellis2_cfg = _make_trellis2_config(tmp_path, **trellis2_overrides)
+        object.__setattr__(config, "trellis2", trellis2_cfg)
     object.__setattr__(config, "project_root", str(tmp_path))
 
     lmstudio = AsyncMock()
@@ -86,6 +119,32 @@ def _mock_client() -> AsyncMock:
         file_path="/outputs/test_cube.glb",
     ))
     mock.download_model = AsyncMock(return_value=b"glTF" + b"\x00" * 100)
+    mock.unload_model = AsyncMock()
+    mock.close = AsyncMock()
+    return mock
+
+
+def _mock_client_v2() -> AsyncMock:
+    """Create a mock Trellis2Client with default successful responses."""
+    mock = AsyncMock()
+    mock.health_check = AsyncMock(return_value=True)
+    mock.get_status = AsyncMock(return_value={
+        "status": "ok",
+        "model_name": "microsoft/TRELLIS.2-4B",
+        "model_loaded": True,
+    })
+    mock.request_model = AsyncMock(return_value=True)
+    mock.generate_from_image = AsyncMock(return_value=Trellis2GenerationResult(
+        base=GenerationResult(
+            model_name="from_image_test",
+            format="glb",
+            size_bytes=4096,
+            file_path="/outputs/from_image_test.glb",
+        ),
+        pipeline_type="512",
+        seed=42,
+    ))
+    mock.download_model = AsyncMock(return_value=b"glTF" + b"\x00" * 200)
     mock.unload_model = AsyncMock()
     mock.close = AsyncMock()
     return mock
@@ -165,7 +224,7 @@ class TestToolDefinition:
         assert len(tools) >= 1
         cad_tool = next((t for t in tools if t.name == "cad_generate"), None)
         assert cad_tool is not None
-        assert cad_tool.timeout_ms == 630_000  # (600 + 30) * 1000
+        assert cad_tool.timeout_ms == 1_230_000  # (1200 + 30) * 1000
         assert cad_tool.risk_level == "safe"
         assert "description" in cad_tool.parameters.get("properties", {})
 
@@ -408,3 +467,259 @@ class TestVRAMSwap:
         # LLM must be reloaded even after TRELLIS failure
         lmstudio.load_model.assert_awaited()
         await plugin.cleanup()
+
+
+# ===========================================================================
+# 5. TRELLIS.2 image-to-3D tool
+# ===========================================================================
+
+
+def _stage_uploaded_image(
+    name: str = "test.png",
+    payload: bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32,
+) -> tuple[Path, str]:
+    """Place a fake image under PROJECT_ROOT/data/uploads/<conv>/.
+
+    Returns ``(absolute_path, relative_path)``.  We use the real
+    ``PROJECT_ROOT`` because the plugin resolves uploads against that
+    constant; the file lives under a uniquely-named conversation dir
+    so concurrent test runs do not clash.
+    """
+    from backend.core.config import PROJECT_ROOT
+
+    conv_dir = PROJECT_ROOT / "data" / "uploads" / "_pytest_cad_v2"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    abs_path = conv_dir / name
+    abs_path.write_bytes(payload)
+    rel_path = abs_path.relative_to(PROJECT_ROOT).as_posix()
+    return abs_path, rel_path
+
+
+class TestCadGenerateFromImage:
+    """execute_tool('cad_generate_from_image', ...) — TRELLIS.2 flow."""
+
+    @pytest.mark.asyncio
+    async def test_tool_hidden_when_trellis2_disabled(self, tmp_path: Path) -> None:
+        """trellis2.enabled=False → cad_generate_from_image not exposed."""
+        plugin = CadGeneratorPlugin()
+        ctx = _make_app_context(tmp_path)  # trellis2 default = disabled
+
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+            MockClient.return_value = _mock_client()
+            await plugin.initialize(ctx)
+
+        names = [t.name for t in plugin.get_tools()]
+        assert "cad_generate" in names
+        assert "cad_generate_from_image" not in names
+        await plugin.cleanup()
+
+    @pytest.mark.asyncio
+    async def test_tool_exposed_when_trellis2_enabled(self, tmp_path: Path) -> None:
+        """trellis2.enabled=True → cad_generate_from_image present with image_path."""
+        plugin = CadGeneratorPlugin()
+        ctx = _make_app_context(
+            tmp_path, trellis2_overrides={"auto_vram_swap": False},
+        )
+
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+             patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+            MockClient.return_value = _mock_client()
+            MockClient2.return_value = _mock_client_v2()
+            await plugin.initialize(ctx)
+
+        tools = {t.name: t for t in plugin.get_tools()}
+        assert "cad_generate_from_image" in tools
+        params = tools["cad_generate_from_image"].parameters
+        assert "image_path" in params.get("properties", {})
+        assert "image_path" in params.get("required", [])
+        await plugin.cleanup()
+
+    @pytest.mark.asyncio
+    async def test_generate_from_image_success(self, tmp_path: Path) -> None:
+        """End-to-end: valid upload → GLB downloaded and saved on disk."""
+        abs_path, rel_path = _stage_uploaded_image("ok.png")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": False},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                result = await plugin.execute_tool(
+                    "cad_generate_from_image",
+                    {"image_path": rel_path, "model_name": "from_image_test",
+                     "pipeline_type": "512"},
+                    _make_exec_ctx(),
+                )
+
+            assert result.success is True
+            payload = result.content
+            assert payload["model_name"] == "from_image_test"
+            assert payload["pipeline_type"] == "512"
+            assert payload["source_image"] == rel_path
+            assert payload["export_url"] == "/api/cad/models/from_image_test"
+            # File written under cfg2.model_output_dir (tmp_path/3d_models_v2)
+            output_file = Path(payload["file_path"])
+            assert output_file.exists()
+            mock2.generate_from_image.assert_awaited_once()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_path_traversal_rejected(self, tmp_path: Path) -> None:
+        """image_path outside data/uploads/ → error, no client call."""
+        plugin = CadGeneratorPlugin()
+        ctx = _make_app_context(
+            tmp_path, trellis2_overrides={"auto_vram_swap": False},
+        )
+
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+             patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+            MockClient.return_value = _mock_client()
+            mock2 = _mock_client_v2()
+            MockClient2.return_value = mock2
+            await plugin.initialize(ctx)
+
+            result = await plugin.execute_tool(
+                "cad_generate_from_image",
+                {"image_path": "../../etc/passwd"},
+                _make_exec_ctx(),
+            )
+
+        assert result.success is False
+        assert "data/uploads" in (result.error_message or result.content or "")
+        mock2.generate_from_image.assert_not_awaited()
+        await plugin.cleanup()
+
+    @pytest.mark.asyncio
+    async def test_unsupported_extension_rejected(self, tmp_path: Path) -> None:
+        """image_path with non-image extension → error, no generation."""
+        abs_path, rel_path = _stage_uploaded_image("evil.exe", payload=b"MZ\x90\x00")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": False},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                result = await plugin.execute_tool(
+                    "cad_generate_from_image",
+                    {"image_path": rel_path},
+                    _make_exec_ctx(),
+                )
+
+            assert result.success is False
+            assert "extension" in (result.error_message or result.content or "").lower()
+            mock2.generate_from_image.assert_not_awaited()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_invalid_pipeline_type_rejected(self, tmp_path: Path) -> None:
+        """pipeline_type not in allowed set → error before any service call."""
+        abs_path, rel_path = _stage_uploaded_image("img.png")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": False},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                result = await plugin.execute_tool(
+                    "cad_generate_from_image",
+                    {"image_path": rel_path, "pipeline_type": "9999"},
+                    _make_exec_ctx(),
+                )
+
+            assert result.success is False
+            assert "pipeline_type" in (result.error_message or result.content or "")
+            mock2.generate_from_image.assert_not_awaited()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_microservice_offline(self, tmp_path: Path) -> None:
+        """Trellis2 health_check False → error, no generation attempted."""
+        abs_path, rel_path = _stage_uploaded_image("img.png")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": False},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                mock2.health_check = AsyncMock(return_value=False)
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                result = await plugin.execute_tool(
+                    "cad_generate_from_image",
+                    {"image_path": rel_path},
+                    _make_exec_ctx(),
+                )
+
+            assert result.success is False
+            assert "not reachable" in (result.error_message or result.content or "")
+            mock2.generate_from_image.assert_not_awaited()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_vram_swap_reload_after_failure(self, tmp_path: Path) -> None:
+        """generate_from_image raises → LLM still reloaded (safety guarantee)."""
+        abs_path, rel_path = _stage_uploaded_image("img.png")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": True},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                mock2.generate_from_image = AsyncMock(
+                    side_effect=Exception("CUDA OOM"),
+                )
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                result = await plugin.execute_tool(
+                    "cad_generate_from_image",
+                    {"image_path": rel_path},
+                    _make_exec_ctx(),
+                )
+
+            assert result.success is False
+            lmstudio = ctx.lmstudio_manager
+            lmstudio.unload_model.assert_awaited()
+            lmstudio.load_model.assert_awaited()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+

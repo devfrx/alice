@@ -101,6 +101,20 @@ def test_estimate_message_tokens_tool_calls_string(cm: ContextManager) -> None:
     assert tokens > 4
 
 
+def test_estimate_message_tokens_multimodal_content(cm: ContextManager) -> None:
+    """Multimodal content (list of parts) must not crash and account for images."""
+    msg = {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "describe this"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
+        ],
+    }
+    tokens = cm.estimate_message_tokens(msg)
+    # 4 (overhead) + text tokens + 765 (image flat cost)
+    assert tokens > 765
+
+
 # ---------------------------------------------------------------------------
 # get_usage_estimated / get_usage_real — boundary conditions
 # ---------------------------------------------------------------------------

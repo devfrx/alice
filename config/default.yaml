@@ -23,7 +23,9 @@ llm:
   supports_thinking: true    # Enable for reasoning models (QwQ, DeepSeek R1)
   supports_vision: true       # Enable for multimodal models
   max_tool_iterations: 25
-  tool_execution_timeout: 120.0     # Seconds per parallel tool-gather before timeout
+  # 1300s (~22 min) — must cover the slowest tool (TRELLIS image-to-3D,
+  # up to trellis*.request_timeout_s = 1200s).  Faster tools are unaffected.
+  tool_execution_timeout: 1300.0
   max_tools: 0               # 0 = unlimited. Qwen3.5-9B handles 49 tools correctly.
   priority_plugins:           # always included regardless of tool_rag results
     - memory
@@ -406,7 +408,9 @@ trellis:
   #   Oppure con start-dev: .\scripts\start-dev.ps1 -Trellis
   trellis_dir: ""  # vuoto = auto-detect (../TRELLIS-for-windows)
   service_url: "http://localhost:8090"
-  request_timeout_s: 600
+  # 1200s (20 min) — copre pipeline lente (1536_cascade ~60s) e prima
+  # generazione che scarica i pesi del modello (~8GB) in background.
+  request_timeout_s: 1200
   max_model_size_mb: 10000
   model_output_dir: "data/3d_models"
   auto_vram_swap: true
@@ -422,3 +426,48 @@ trellis:
 
 # In plugins.enabled, aggiungere (commentato per default-off):
 #   - cad_generator  # abilitare con trellis.enabled: true
+
+# ──────────────────────────────────────────────────
+# Phase 12.2 — TRELLIS.2 (microsoft/TRELLIS.2-4B, image-to-3D 4B)
+# ──────────────────────────────────────────────────
+# Microservizio gemello di TRELLIS, gira in parallelo su porta 8091 con
+# il proprio venv Python 3.10 dentro ../TRELLIS.2/.venv.
+#
+# Installazione e avvio:
+#   1. git clone --recurse-submodules https://github.com/microsoft/TRELLIS.2.git ../TRELLIS.2
+#   2. .\scripts\start-trellis2.ps1 -Install    (una tantum, ~30-60min)
+#   3. .\scripts\start-trellis2.ps1              (avvia il microservizio)
+#
+# Note:
+# - TRELLIS.2 e' SOLO image-to-3D (non esiste variante text). Richiede
+#   sempre un'immagine in input.
+# - Il modello 4B richiede ~24GB VRAM in inference. Usa pipeline_type
+#   piu' basso (512) su GPU con meno memoria.
+trellis2:
+  enabled: true
+  trellis2_dir: ""  # vuoto = auto-detect (../TRELLIS.2)
+  service_url: "http://localhost:8091"
+  # 1200s (20 min) — modello 4B: pipeline 1536_cascade richiede ~60s su
+  # H100 ma molto piu' su GPU consumer; prima generazione scarica ~8GB.
+  request_timeout_s: 1200
+  max_model_size_mb: 10000
+  model_output_dir: "data/3d_models"
+  auto_vram_swap: true
+  trellis2_model: "microsoft/TRELLIS.2-4B"
+  # Pipeline disponibili (resolution / quality tradeoff, tempi su H100):
+  # - "512"          ~3s   — voxel 512^3, qualita' base
+  # - "1024"         ~17s  — voxel 1024^3, qualita' alta
+  # - "1024_cascade" ~17s  — cascade 512->1024, dettagli migliori
+  # - "1536_cascade" ~60s  — cascade 512->1024->1536, massima qualita'
+  pipeline_type: "1024"
+  # Whitelist delle pipeline esposte all'LLM. Su GPU consumer (16 GB)
+  # "512" e "1024" entrano nei buffer CuMesh; le varianti "*_cascade"
+  # producono mesh troppo densi → OOM. Aggiungi le altre solo su 24 GB+.
+  allowed_pipeline_types:
+    - "512"
+    - "1024"
+  # 500k triangoli + texture 4096: testato OK su RTX 5080 (16 GB).
+  # Su 24 GB+ puoi alzare a 1_000_000.
+  decimation_target: 500000
+  texture_size: 4096
+  seed: -1

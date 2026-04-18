@@ -18,6 +18,10 @@ import httpx
 from loguru import logger
 
 from backend.core.config import LLMConfig
+from backend.services.model_capability_registry import (
+    ModelCapabilityRegistry,
+    ModelProfile,
+)
 from backend.services.thinking_parser import ThinkTagParser
 
 
@@ -113,10 +117,19 @@ class LLMService:
 
     Args:
         config: The ``LLMConfig`` holding provider URL, model name, etc.
+        model_registry: Dynamic per-model capability registry.  When
+            provided, per-request capability checks (thinking, vision,
+            reasoning param) use the registry instead of static config
+            flags.  Passing ``None`` preserves the legacy behaviour.
     """
 
-    def __init__(self, config: LLMConfig) -> None:
+    def __init__(
+        self,
+        config: LLMConfig,
+        model_registry: ModelCapabilityRegistry | None = None,
+    ) -> None:
         self._config = config
+        self._model_registry = model_registry
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(
                 connect=config.connect_timeout,
@@ -131,7 +144,8 @@ class LLMService:
         self._response_ids_max = 500
         # Cache for "auto" model resolution: (resolved_id, resolved_at_monotonic)
         self._auto_model_cache: tuple[str, float] | None = None
-        self._auto_model_ttl: float = 30.0  # seconds
+        self._auto_model_ttl: float = 300.0  # seconds
+        self._auto_model_lock: asyncio.Lock = asyncio.Lock()
         # None = unknown, True = supported, False = not supported
         self._supports_stream_options: bool | None = None
 
@@ -156,12 +170,42 @@ class LLMService:
         return False
 
     # ------------------------------------------------------------------
+    # Per-model capability helpers
+    # ------------------------------------------------------------------
+
+    def _get_model_profile(self, model_id: str) -> ModelProfile:
+        """Return the capability profile for a specific model.
+
+        Uses the dynamic registry when available; falls back to
+        a profile built from static config flags.
+        """
+        if self._model_registry is not None:
+            return self._model_registry.get_profile(model_id)
+        # Legacy fallback: build profile from static config flags.
+        return ModelProfile(
+            model_id=model_id,
+            supports_thinking=self._config.supports_thinking,
+            supports_vision=self._config.supports_vision,
+            source="config",
+        )
+
+    # ------------------------------------------------------------------
     # System prompt
     # ------------------------------------------------------------------
 
     @property
     def supports_vision(self) -> bool:
-        """Whether the active model supports multimodal (vision) input."""
+        """Whether the active model supports multimodal (vision) input.
+
+        Checks the registry first (if available), falling back to the
+        static config flag.  Uses the cached auto-resolved model when
+        available to avoid an async call.
+        """
+        if self._model_registry is not None and self._auto_model_cache:
+            profile = self._model_registry.get_profile(
+                self._auto_model_cache[0],
+            )
+            return profile.supports_vision
         return self._config.supports_vision
 
     async def _resolve_model(self) -> str:
@@ -185,82 +229,99 @@ class LLMService:
         ):
             return self._auto_model_cache[0]
 
-        # Try LM Studio v1 API first, then OAI-compat fallback.
-        resolved: str | None = None
-        v1_url = (
-            f"{self._config.base_url}/api/v1/models"
-            if not self._is_ollama
-            else f"{self._config.base_url}/api/tags"
-        )
-        try:
-            resp = await self._client.get(
-                v1_url,
-                timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            items = data.get("models") or data.get("data") or []
-            if items:
-                # Prefer a loaded LLM (skip embedding models — LM Studio v1 API
-                # returns "type": "llm" | "embedding" for each entry, and
-                # sending chat/completions to an embedding model will fail).
-                for item in items:
-                    if self._is_embedding_model(item):
-                        continue
-                    state = item.get("state", "")
-                    if state in ("loaded", "loading", ""):
-                        resolved = item.get("path") or item.get("id") or item.get("name")
-                        if resolved:
-                            break
-                if not resolved:
-                    # Fall back to first non-embedding model regardless of state
-                    for item in items:
-                        if not self._is_embedding_model(item):
-                            resolved = item.get("path") or item.get("id") or item.get("name")
-                            break
-                if not resolved:
-                    logger.debug(
-                        "LM Studio v1 API returned {} model(s), all "
-                        "embedding — falling back to OAI-compat",
-                        len(items),
-                    )
-        except Exception as exc:
-            logger.debug("LM Studio v1 model query failed ({}), trying OAI-compat", exc)
+        async with self._auto_model_lock:
+            # Re-check cache after acquiring lock (another task may
+            # have resolved while we waited).
+            now = time.monotonic()
+            if (
+                self._auto_model_cache is not None
+                and now - self._auto_model_cache[1] < self._auto_model_ttl
+            ):
+                return self._auto_model_cache[0]
 
-        if not resolved:
-            # Final fallback: OAI-compat /v1/models
+            # Try LM Studio v1 API first, then OAI-compat fallback.
+            resolved: str | None = None
+            v1_url = (
+                f"{self._config.base_url}/api/v1/models"
+                if not self._is_ollama
+                else f"{self._config.base_url}/api/tags"
+            )
             try:
                 resp = await self._client.get(
-                    f"{self._config.base_url}/v1/models",
+                    v1_url,
                     timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
                 )
                 resp.raise_for_status()
-                items = resp.json().get("data", [])
-                # Skip embedding models in OAI-compat responses too
-                for item in items:
-                    if not self._is_embedding_model(item):
-                        resolved = item.get("id")
-                        if resolved:
-                            break
-                if not resolved and items:
-                    logger.warning(
-                        "All {} model(s) from OAI-compat API are embedding "
-                        "models — cannot use for chat",
-                        len(items),
+                data = resp.json()
+                items = data.get("models") or data.get("data") or []
+
+                # Opportunistically refresh the capability registry
+                # from this v1 API response.
+                if items and self._model_registry is not None:
+                    await self._model_registry.refresh_from_api(items)
+
+                if items:
+                    # Prefer a loaded LLM (skip embedding models — LM Studio v1
+                    # API returns "type": "llm" | "embedding" for each entry,
+                    # and sending chat/completions to an embedding model will
+                    # fail).
+                    for item in items:
+                        if self._is_embedding_model(item):
+                            continue
+                        state = item.get("state", "")
+                        if state in ("loaded", "loading", ""):
+                            resolved = item.get("path") or item.get("id") or item.get("name")
+                            if resolved:
+                                break
+                    if not resolved:
+                        # Fall back to first non-embedding model regardless of state
+                        for item in items:
+                            if not self._is_embedding_model(item):
+                                resolved = item.get("path") or item.get("id") or item.get("name")
+                                break
+                    if not resolved:
+                        logger.debug(
+                            "LM Studio v1 API returned {} model(s), all "
+                            "embedding — falling back to OAI-compat",
+                            len(items),
+                        )
+            except Exception as exc:
+                logger.debug("LM Studio v1 model query failed ({}), trying OAI-compat", exc)
+
+            if not resolved:
+                # Final fallback: OAI-compat /v1/models
+                try:
+                    resp = await self._client.get(
+                        f"{self._config.base_url}/v1/models",
+                        timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
                     )
-            except Exception as exc2:
-                logger.warning("OAI-compat auto model resolution failed: {}", exc2)
+                    resp.raise_for_status()
+                    items = resp.json().get("data", [])
+                    # Skip embedding models in OAI-compat responses too
+                    for item in items:
+                        if not self._is_embedding_model(item):
+                            resolved = item.get("id")
+                            if resolved:
+                                break
+                    if not resolved and items:
+                        logger.warning(
+                            "All {} model(s) from OAI-compat API are embedding "
+                            "models — cannot use for chat",
+                            len(items),
+                        )
+                except Exception as exc2:
+                    logger.warning("OAI-compat auto model resolution failed: {}", exc2)
 
-        if resolved:
-            prev = self._auto_model_cache
-            self._auto_model_cache = (resolved, now)
-            if prev is None or prev[0] != resolved:
-                logger.info("Auto-resolved LLM model: {}", resolved)
-            return resolved
+            if resolved:
+                prev = self._auto_model_cache
+                self._auto_model_cache = (resolved, now)
+                if prev is None or prev[0] != resolved:
+                    logger.info("Auto-resolved LLM model: {}", resolved)
+                return resolved
 
-        # Could not resolve — let the server decide.
-        logger.warning("Could not auto-resolve model; sending 'auto'")
-        return "auto"
+            # Could not resolve — let the server decide.
+            logger.warning("Could not auto-resolve model; sending 'auto'")
+            return "auto"
 
     def _invalidate_model_cache(self) -> None:
         """Invalidate the cached auto-resolved model ID."""
@@ -432,6 +493,10 @@ class LLMService:
                             *content,
                         ],
                     }
+                    logger.debug(
+                        "Folded system prompt into multimodal user message ({} parts)",
+                        len(content) + 1,
+                    )
                 break
         else:
             # No user message found — prepend as a user message.
@@ -485,7 +550,9 @@ class LLMService:
             messages.extend(normalize_history(history))
 
         # Build the user message — multimodal when vision attachments exist.
-        if attachments and self._config.supports_vision:
+        # Use the cached model ID to check vision capability via registry.
+        _vision_capable = self.supports_vision
+        if attachments and _vision_capable:
             content_parts: list[dict[str, Any]] = [
                 {"type": "text", "text": user_content},
             ]
@@ -653,11 +720,14 @@ class LLMService:
         """
         url = f"{self._config.base_url}/api/v1/chat"
 
+        active_model = await self._resolve_model()
+        profile = self._get_model_profile(active_model)
+
         # Build the input field — multimodal array or plain string.
         input_field: str | list[dict[str, Any]]
-        if attachments and self._config.supports_vision:
+        if attachments and profile.supports_vision:
             parts: list[dict[str, Any]] = [
-                {"type": "message", "content": user_content},
+                {"type": "text", "content": user_content},
             ]
             for att in attachments:
                 if "_bytes" in att:
@@ -684,7 +754,6 @@ class LLMService:
                 sys_prompt = f"{sys_prompt}\n\n{memory_context}"
             elif memory_context:
                 sys_prompt = memory_context
-        active_model = await self._resolve_model()
         payload: dict[str, Any] = {
             "model": active_model,
             "input": input_field,
@@ -713,15 +782,23 @@ class LLMService:
             pool=10.0,
         )
 
-        # Try with explicit reasoning parameter first; some models
-        # reject it, so fall back to a request without it.
-        if self._config.supports_thinking:
+        # Decide whether to send "reasoning": "on" based on the model
+        # profile.  accepts_reasoning_param tracks runtime learning:
+        #   None  = unknown → try it (model might support it)
+        #   True  = confirmed accepted
+        #   False = previously rejected → skip to avoid wasted retry
+        send_reasoning = (
+            profile.supports_thinking
+            and profile.accepts_reasoning_param is not False
+        )
+        if send_reasoning:
             payload["reasoning"] = "on"
 
         logger.debug(
-            "LM Studio native chat — model={}, reasoning={}",
+            "LM Studio native chat — model={}, reasoning={}, profile={}",
             active_model,
             payload.get("reasoning", "off"),
+            profile.source,
         )
 
         try:
@@ -730,38 +807,37 @@ class LLMService:
             ):
                 yield event
                 if event.get("type") == "done":
+                    # Reasoning param was accepted — remember for next time.
+                    if send_reasoning and self._model_registry:
+                        self._model_registry.mark_reasoning_param_accepted(
+                            active_model,
+                        )
                     return
         except httpx.HTTPStatusError as exc:
             if not (
-                self._config.supports_thinking
+                send_reasoning
                 and exc.response.status_code == 400
                 and "reasoning" in payload
             ):
                 raise
-            logger.warning(
-                "Model rejected 'reasoning' param — retrying without it",
-            )
-            payload.pop("reasoning", None)
-            try:
-                async for event in self._stream_lmstudio_native_sse(
-                    url, payload, _stream_timeout, cancel_event, conversation_id,
-                ):
-                    yield event
-                    if event.get("type") == "done":
-                        return
-            except (
-                httpx.ReadError, httpx.ReadTimeout, httpx.RemoteProtocolError,
-            ) as retry_exc:
-                logger.warning(
-                    "Connection lost during LM Studio native stream "
-                    "(retry): {}", retry_exc,
+            # Model rejected the reasoning param — learn and retry once.
+            if self._model_registry:
+                self._model_registry.mark_reasoning_param_rejected(
+                    active_model,
                 )
-        except (
-            httpx.ReadError, httpx.ReadTimeout, httpx.RemoteProtocolError,
-        ) as exc:
-            logger.warning(
-                "Connection lost during LM Studio native stream: {}", exc,
-            )
+            else:
+                logger.warning(
+                    "Model '{}' rejected 'reasoning' param — "
+                    "retrying without it",
+                    active_model,
+                )
+            payload.pop("reasoning", None)
+            async for event in self._stream_lmstudio_native_sse(
+                url, payload, _stream_timeout, cancel_event, conversation_id,
+            ):
+                yield event
+                if event.get("type") == "done":
+                    return
 
         # Stream ended without chat.end — cancelled or connection lost.
         cancelled = (
@@ -799,10 +875,22 @@ class LLMService:
         # When the model emits native reasoning.delta events, disable
         # the tag parser to avoid duplicate extraction.
         saw_reasoning_event = False
+        # Track whether the caller explicitly requested reasoning param.
+        # Used to distinguish "reasoning param accepted" from
+        # "model reasons natively without the param".
+        explicit_reasoning = "reasoning" in payload
+        active_model: str = payload.get("model", "")
 
         async with self._client.stream(
             "POST", url, json=payload, timeout=timeout,
         ) as resp:
+            if resp.status_code >= 400:
+                body = (await resp.aread()).decode(errors="replace")
+                logger.error(
+                    "LM Studio native API returned {} — body: {}",
+                    resp.status_code,
+                    body[:500],
+                )
             resp.raise_for_status()
 
             async for raw_line in resp.aiter_lines():
@@ -829,7 +917,14 @@ class LLMService:
                 if evt_type == "reasoning.delta":
                     chunk = data.get("content", "")
                     if chunk:
-                        saw_reasoning_event = True
+                        if not saw_reasoning_event:
+                            saw_reasoning_event = True
+                            # If reasoning events appear without the param,
+                            # the model has thinking baked in — learn this.
+                            if not explicit_reasoning and self._model_registry and active_model:
+                                self._model_registry.mark_emits_reasoning_natively(
+                                    active_model,
+                                )
                         yield {
                             "type": "thinking",
                             "content": chunk,
@@ -855,6 +950,12 @@ class LLMService:
                                 "type": "thinking" if kind == "thinking" else "token",
                                 "content": text,
                             }
+                        # No reasoning events seen and no param was sent →
+                        # this model definitely doesn't reason natively.
+                        if not explicit_reasoning and self._model_registry and active_model:
+                            self._model_registry.mark_no_reasoning_natively(
+                                active_model,
+                            )
                     result = data.get("result", {})
                     resp_id = result.get("response_id")
                     stats = result.get("stats", {})
@@ -1212,12 +1313,6 @@ class LLMService:
                     "arguments": tc["arguments"],
                 },
             }
-        if _last_usage:
-            yield {
-                "type": "usage",
-                "input_tokens": _last_usage.get("prompt_tokens", 0),
-                "output_tokens": _last_usage.get("completion_tokens", 0),
-            }
         yield {"type": "done", "finish_reason": finish}
 
     # ------------------------------------------------------------------
@@ -1260,18 +1355,7 @@ class LLMService:
             )
             resp.raise_for_status()
             data = resp.json()
-            raw_content = data["choices"][0]["message"]["content"] or ""
-            # Strip <think>…</think> tags that reasoning models may
-            # produce even in non-streaming mode, keeping summaries clean.
-            if raw_content:
-                parser = ThinkTagParser()
-                parts = parser.feed(raw_content)
-                parts.extend(parser.flush())
-                content_only = "".join(
-                    text for kind, text in parts if kind == "content"
-                )
-                return content_only.strip() or raw_content
-            return raw_content
+            return data["choices"][0]["message"]["content"] or ""
         except Exception as exc:
             logger.warning("Non-streaming completion failed: {}", exc)
             return ""

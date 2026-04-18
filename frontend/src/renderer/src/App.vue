@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 // AL\CE — Root App Component
-import { onErrorCaptured, onMounted, provide, computed, ref, watchEffect } from 'vue'
+import { onErrorCaptured, onMounted, onUnmounted, provide, computed, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
@@ -14,12 +14,13 @@ import { useEventsWebSocket } from './composables/useEventsWebSocket'
 import { useSettingsStore } from './stores/settings'
 import { useUIStore } from './stores/ui'
 import { usePluginsStore } from './stores/plugins'
+import { waitForBackend } from './services/api'
 
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
 
 // Persistent WebSocket for real-time calendar and backend events.
-useEventsWebSocket()
+const eventsWs = useEventsWebSocket()
 
 const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
@@ -34,22 +35,19 @@ onErrorCaptured((err) => {
     router.replace({ name: 'home' })
     return false
   }
+  return undefined
 })
 
 // ── Startup loader ────────────────────────────────────────────────
 const startupLoading = ref(true)
+const backendReady = ref(false)
 
 const startupMessage = computed(() => {
+  if (!backendReady.value) return 'In attesa del backend…'
   switch (chatApi.connectionStatus.value) {
     case 'connecting': return 'Connessione al backend…'
     case 'error': return 'Errore di connessione…'
-    default: return 'Avvio in corso…'
-  }
-})
-
-watchEffect(() => {
-  if (chatApi.isConnected.value) {
-    startupLoading.value = false
+    default: return 'Caricamento dati…'
   }
 })
 
@@ -58,10 +56,37 @@ watchEffect(() => {
   document.documentElement.setAttribute('data-theme', settingsStore.settings.ui.theme)
 })
 
-onMounted(() => {
-  settingsStore.resumeOperationTracking()
-  pluginsStore.loadPlugins()
-  setTimeout(() => { startupLoading.value = false }, 10_000)
+// AbortController so we can cancel the health poll if the component unmounts.
+let startupAbort: AbortController | null = null
+
+onMounted(async () => {
+  startupAbort = new AbortController()
+
+  // 1. Wait for backend to be reachable
+  const ready = await waitForBackend(1000, startupAbort.signal)
+  if (!ready) return // component was unmounted
+  backendReady.value = true
+
+  // 2. Connect WebSockets now that the backend is up
+  const { wsManager } = await import('./services/ws')
+  wsManager.connect()
+  eventsWs.connect()
+
+  // 3. Load all stores in parallel
+  await Promise.all([
+    settingsStore.initialize(),
+    pluginsStore.loadPlugins(),
+    settingsStore.resumeOperationTracking(),
+  ])
+
+  // 4. Guard: component may have unmounted during async ops
+  if (startupAbort.signal.aborted) return
+
+  startupLoading.value = false
+})
+
+onUnmounted(() => {
+  startupAbort?.abort()
 })
 </script>
 

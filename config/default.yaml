@@ -7,10 +7,8 @@ server:
   port: 8000
   reload: true          # dev only
   cors_origins:
-    - "http://localhost:5173"   # Vite dev
-    - "http://localhost:5174"   # Vite dev (fallback port)
-    - "http://localhost:5175"   # Vite dev (fallback port)
-    - "http://localhost:5176"   # Vite dev (fallback port)
+    - "http://localhost:5173"   # Vite dev (primary)
+    - "http://localhost:5174"   # Vite dev (fallback when 5173 is taken)
     - "http://localhost:3000"   # Electron dev
     - "null"                    # Electron production (file:// origin)
 
@@ -40,6 +38,8 @@ llm:
   context_compression_enabled: true
   context_compression_threshold: 0.75
   context_compression_reserve: 4096
+  history_tool_truncate_chars: 1500
+  history_tool_recent_keep: 4
 
 stt:
   engine: "faster-whisper"
@@ -121,7 +121,7 @@ vram:
   monitoring_enabled: true
   warning_threshold_mb: 14000
   critical_threshold_mb: 15000
-  poll_interval_s: 10
+  poll_interval_s: 30
   total_budget_mb: 16000
 
 ui:
@@ -304,6 +304,7 @@ mcp:
       command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "~"]
       enabled: true
   # ── Plug & Play (zero config, solo Node.js/Python richiesto) ─────────────────
+  #about:blank#blocked
   # PRIMP FETCH — fetch con TLS fingerprint Chrome reale (primp). Bypassa Cloudflare,
   # Radware, anti-bot. Usa per e-commerce, comparatori, qualsiasi sito che ritorna 403.
   # Richiede: backend/.venv (primp + mcp già installati)

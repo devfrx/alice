@@ -20,6 +20,7 @@ from backend.db.database import create_engine_and_session, init_db
 from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.llm_service import LLMService
 from backend.services.lmstudio_service import LMStudioManager
+from backend.services.model_capability_registry import ModelCapabilityRegistry
 from backend.services.stt_service import STTService
 from backend.services.tts_service import TTSService
 from backend.services.vram_monitor import VRAMMonitor
@@ -98,7 +99,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception as exc:
             logger.warning("Failed to restore plugin states: {}", exc)
 
-    llm_service = LLMService(config.llm)
+    # -- Model capability registry ------------------------------------------
+    model_registry = ModelCapabilityRegistry()
+    ctx.model_registry = model_registry
+
+    llm_service = LLMService(config.llm, model_registry=model_registry)
     ctx.llm_service = llm_service
 
     from backend.services.context_manager import ContextManager
@@ -518,8 +523,8 @@ def create_app(testing: bool = False) -> FastAPI:
         CORSMiddleware,
         allow_origins=config.server.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
 
     # -- Global exception handler -------------------------------------------

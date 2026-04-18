@@ -72,11 +72,35 @@ export const BACKEND_HOST = BACKEND_BASE
 /**
  * Resolve a backend-relative path (e.g. `/uploads/...`) to an absolute URL.
  * Passes through URLs that are already absolute or blob/data URIs.
+ * Rejects any path containing URL-encoded traversal sequences.
  */
 export function resolveBackendUrl(path: string): string {
   if (!path) return path
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:') || path.startsWith('data:')) {
+  if (
+    path.startsWith('http://') ||
+    path.startsWith('https://') ||
+    path.startsWith('blob:') ||
+    path.startsWith('data:')
+  ) {
+    // Only allow absolute URLs pointing to the known backend host.
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      try {
+        const url = new URL(path)
+        const backend = new URL(BACKEND_HOST)
+        if (url.origin !== backend.origin) {
+          console.warn('[resolveBackendUrl] Rejected external URL:', path)
+          return ''
+        }
+      } catch {
+        return ''
+      }
+    }
     return path
+  }
+  // Reject path traversal attempts
+  if (path.includes('..')) {
+    console.warn('[resolveBackendUrl] Rejected path traversal:', path)
+    return ''
   }
   return `${BACKEND_HOST}${path.startsWith('/') ? '' : '/'}${path}`
 }
@@ -111,6 +135,37 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   }
 
   return response.json()
+}
+
+// ---------------------------------------------------------------------------
+// Backend readiness gate
+// ---------------------------------------------------------------------------
+
+/**
+ * Poll the backend health endpoint until it responds, then resolve.
+ * Used at startup to gate all API/WS connections until the server is up.
+ *
+ * @param intervalMs - Polling interval in milliseconds (default 1 s).
+ * @param signal - Optional AbortSignal for cancellation.
+ * @returns `true` once the backend is reachable.
+ */
+export async function waitForBackend(
+  intervalMs = 1000,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  while (!signal?.aborted) {
+    try {
+      const res = await fetch(`${BASE_URL}/health`, { signal })
+      if (res.ok) return true
+    } catch {
+      // Backend not up yet — continue polling
+    }
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, intervalMs)
+      signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+    })
+  }
+  return false
 }
 
 // ---------------------------------------------------------------------------

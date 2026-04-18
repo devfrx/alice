@@ -36,7 +36,11 @@ async def list_models(request: Request) -> list[dict[str, Any]]:
     if mgr is not None:
         try:
             data = await mgr.list_models()
-            return _models_from_v1(data)
+            models = data.get("models", [])
+            # Refresh the registry with fresh data.
+            if ctx.model_registry is not None:
+                await ctx.model_registry.refresh_from_api(models)
+            return _models_from_v1(models, ctx.model_registry)
         except Exception:
             logger.debug("v1 API unavailable, falling back to legacy")
 
@@ -44,11 +48,14 @@ async def list_models(request: Request) -> list[dict[str, Any]]:
     return await _models_legacy(ctx)
 
 
-def _models_from_v1(data: dict) -> list[dict[str, Any]]:
+def _models_from_v1(
+    models: list[dict[str, Any]],
+    registry: Any | None = None,
+) -> list[dict[str, Any]]:
     """Map LM Studio v1 response to the frontend-expected shape."""
     return [
-        serialise_model(m)
-        for m in data.get("models", [])
+        serialise_model(m, registry)
+        for m in models
     ]
 
 

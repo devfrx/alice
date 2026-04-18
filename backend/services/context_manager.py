@@ -8,6 +8,13 @@ from typing import Any
 
 from loguru import logger
 
+try:
+    import tiktoken
+
+    _TIKTOKEN_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _TIKTOKEN_AVAILABLE = False
+
 from backend.core.config import LLMConfig
 
 
@@ -47,16 +54,30 @@ class ContextManager:
 
     def __init__(self, config: LLMConfig) -> None:
         self._config = config
+        self._enc: tiktoken.Encoding | None = None
+        if _TIKTOKEN_AVAILABLE:
+            try:
+                self._enc = tiktoken.get_encoding("o200k_base")
+                logger.info("Token counting: tiktoken o200k_base loaded")
+            except Exception:
+                logger.warning(
+                    "tiktoken available but failed to load encoding, "
+                    "falling back to char÷4 heuristic",
+                )
 
     def estimate_tokens(self, text: str) -> int:
-        """Estimate token count from text length (char ÷ 4).
+        """Count tokens using tiktoken if available, else char ÷ 4.
 
         Args:
             text: The text to estimate.
 
         Returns:
-            Estimated token count (minimum 1).
+            Token count (minimum 1).
         """
+        if not text:
+            return 1
+        if self._enc is not None:
+            return max(1, len(self._enc.encode(text, disallowed_special=())))
         return max(1, len(text) // 4)
 
     def estimate_message_tokens(self, msg: dict[str, Any]) -> int:

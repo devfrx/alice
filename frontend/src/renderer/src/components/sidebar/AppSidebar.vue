@@ -10,7 +10,7 @@
  * The component owns no data — it reads from the Pinia chat store
  * and delegates mutations back through events / store actions.
  */
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
@@ -38,10 +38,8 @@ function toggle(): void {
   uiStore.toggleSidebar()
 }
 
-/** Load conversations on mount so the sidebar is populated immediately. */
-onMounted(() => {
-  chatStore.loadConversations().catch(console.error)
-})
+// Conversations are loaded by useChat's onConnected handler after the
+// WebSocket connects; no need to fire a potentially premature REST call here.
 
 // -----------------------------------------------------------------------
 // Conversation actions (delegated to store)

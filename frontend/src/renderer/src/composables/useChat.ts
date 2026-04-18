@@ -274,8 +274,9 @@ export function useChat(): UseChatReturn {
   wsManager.on('context_compression_done', onContextCompressionDone)
   wsManager.on('context_compression_failed', onContextCompressionFailed)
 
+  // WebSocket connection is deferred — App.vue calls wsManager.connect()
+  // after the backend health check passes.
   connectionStatus.value = 'connecting'
-  wsManager.connect()
 
   // Sync initial state (connect may have already opened)
   if (wsManager.isConnected) {

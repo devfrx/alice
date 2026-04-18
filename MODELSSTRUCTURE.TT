@@ -1,0 +1,681 @@
+2026-04-16 11:58:37 [DEBUG]
+ Received request: POST to /api/v1/chat with body  {
+  "model": "gemma-4-e4b-uncensored-hauhaucs-aggressive",
+  "input": "rispondi solo A",
+  "stream": true,
+  "temperature": 0.7,
+  "store": true,
+  "max_output_tokens": 26222,
+  "system_prompt": "[RELEVANT MEMORIES]\n- [preference] Preferenza di f... <Truncated in logs> ...primp (stdio)\n- time (stdio)\n[/MCP SERVERS ATTIVI]",
+  "reasoning": "on"
+}
+2026-04-16 11:58:37 [ERROR]
+ [LM STUDIO SERVER]  {
+  "error": {
+    "message": "Model 'gemma-4-e4b-uncensored-hauhaucs-aggressive' does not expose reasoning configuration.",
+    "type": "invalid_request",
+    "param": "reasoning",
+    "code": "invalid_value"
+  }
+}
+2026-04-16 11:58:38 [DEBUG]
+ Received request: POST to /api/v1/chat with body  {
+  "model": "gemma-4-e4b-uncensored-hauhaucs-aggressive",
+  "input": "rispondi solo A",
+  "stream": true,
+  "temperature": 0.7,
+  "store": true,
+  "max_output_tokens": 26222,
+  "system_prompt": "[RELEVANT MEMORIES]\n- [preference] Preferenza di f... <Truncated in logs> ...primp (stdio)\n- time (stdio)\n[/MCP SERVERS ATTIVI]"
+}
+2026-04-16 11:58:38  [INFO]
+ [gemma-4-e4b-uncensored-hauhaucs-aggressive] Running api/v1/chat on history with 2 messages.
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "chat.start",
+  "model_instance_id": "gemma-4-e4b-uncensored-hauhaucs-aggressive"
+}
+2026-04-16 11:58:38  [INFO]
+ [gemma-4-e4b-uncensored-hauhaucs-aggressive] Streaming response...
+2026-04-16 11:58:38  [INFO]
+ [gemma-4-e4b-uncensored-hauhaucs-aggressive] Prompt processing progress: 0.00%
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.start"
+}
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 0
+}
+2026-04-16 11:58:38  [INFO]
+ [gemma-4-e4b-uncensored-hauhaucs-aggressive] Prompt processing progress: 60.00%
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 0.6
+}
+2026-04-16 11:58:38  [INFO]
+ [gemma-4-e4b-uncensored-hauhaucs-aggressive] Prompt processing progress: 100.00%
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 1
+}
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.end"
+}
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "message.start"
+}
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "message.delta",
+  "content": "A"
+}
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "message.end"
+}
+2026-04-16 11:58:38  [INFO]
+ Generated packet:  {
+  "type": "chat.end",
+  "result": {
+    "model_instance_id": "gemma-4-e4b-uncensored-hauhaucs-aggressive",
+    "output": [
+      {
+        "type": "message",
+        "content": "A"
+      }
+    ],
+    "stats": {
+      "input_tokens": 152,
+      "total_output_tokens": 2,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 159.1343093570974,
+      "time_to_first_token_seconds": 0.073
+    },
+    "response_id": "resp_795b236e977d494d787f5d3c05ba1acaad294b1c7489e867"
+  }
+}
+2026-04-16 11:58:38  [INFO]
+ [gemma-4-e4b-uncensored-hauhaucs-aggressive] Finished streaming response
+2026-04-16 11:58:38 [DEBUG]
+ Received request: GET to /api/v1/models
+
+
+ ================================================================
+
+ 2026-04-16 13:14:45 [DEBUG]
+ Received request: POST to /api/v1/chat with body  {
+  "model": "qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2",
+  "input": "rispondi solo B",
+  "stream": true,
+  "temperature": 0.7,
+  "store": true,
+  "max_output_tokens": 15465,
+  "system_prompt": "[RELEVANT MEMORIES]\n- [preference] Preferenza di f... <Truncated in logs> ...primp (stdio)\n- time (stdio)\n[/MCP SERVERS ATTIVI]",
+  "reasoning": "on"
+}
+2026-04-16 13:14:46 [ERROR]
+ [LM STUDIO SERVER]  {
+  "error": {
+    "message": "Model 'qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2' does not expose reasoning configuration.",
+    "type": "invalid_request",
+    "param": "reasoning",
+    "code": "invalid_value"
+  }
+}
+2026-04-16 13:14:46 [DEBUG]
+ Received request: POST to /api/v1/chat with body  {
+  "model": "qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2",
+  "input": "rispondi solo B",
+  "stream": true,
+  "temperature": 0.7,
+  "store": true,
+  "max_output_tokens": 15465,
+  "system_prompt": "[RELEVANT MEMORIES]\n- [preference] Preferenza di f... <Truncated in logs> ...primp (stdio)\n- time (stdio)\n[/MCP SERVERS ATTIVI]"
+}
+2026-04-16 13:14:46  [INFO]
+ [qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2] Running api/v1/chat on history with 2 messages.
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "chat.start",
+  "model_instance_id": "qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2"
+}
+2026-04-16 13:14:46  [INFO]
+ [qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2] Streaming response...
+2026-04-16 13:14:46  [INFO]
+ [qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2] Prompt processing progress: 0.00%
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.start"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 0
+}
+2026-04-16 13:14:46  [INFO]
+ [qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2] Prompt processing progress: 97.39%
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 0.9738562091503268
+}
+2026-04-16 13:14:46  [INFO]
+ [qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2] Prompt processing progress: 100.00%
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 1
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.end"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.start"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "The"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " user"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " is"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " asking"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " me"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " to"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " \""
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "respond"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " only"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " with"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " B"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "\""
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " in"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " Italian"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "."
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " This"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " appears"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " to"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " be"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " a"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " simple"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " request"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " for"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " me"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " to"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " output"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " just"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " the"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " letter"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " B"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " as"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " my"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " response"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": ","
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " not"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " an"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " actual"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " question"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " requiring"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " analysis"
+}
+2026-04-16 13:14:46  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " or"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " problem"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "-solving"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "."
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "\n\n"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "This"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " doesn"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "'t"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " involve"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " any"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " reasoning"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": ","
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " calculation"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": ","
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " or"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " complex"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " task"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " -"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " it"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "'s"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " literally"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " just"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " asking"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " for"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " a"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " single"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " character"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": " output"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "."
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.delta",
+  "content": "\n"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "reasoning.end"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "message.start"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "message.delta",
+  "content": "\n\n"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "message.delta",
+  "content": "B"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "message.end"
+}
+2026-04-16 13:14:47  [INFO]
+ Generated packet:  {
+  "type": "chat.end",
+  "result": {
+    "model_instance_id": "qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2",
+    "output": [
+      {
+        "type": "reasoning",
+        "content": "The user is asking me to \"respond only with B\" in Italian. This appears to be a simple request for me to output just the letter B as my response, not an actual question requiring analysis or problem-solving.\n\nThis doesn't involve any reasoning, calculation, or complex task - it's literally just asking for a single character output.\n"
+      },
+      {
+        "type": "message",
+        "content": "\n\nB"
+      }
+    ],
+    "stats": {
+      "input_tokens": 153,
+      "total_output_tokens": 74,
+      "reasoning_output_tokens": 70,
+      "tokens_per_second": 106.764081677408,
+      "time_to_first_token_seconds": 0.102
+    },
+    "response_id": "resp_e298df7eb7e0ef3aca7dd4e4d5833de8d2046eaefa8f1d9b"
+  }
+}
+2026-04-16 13:14:47  [INFO]
+ [qwen3.5-9b-claude-4.6-opus-reasoning-distilled-v2] Finished streaming response
+
+
+ =================================================================
+ 2026-04-16 14:01:44 [DEBUG]
+ Received request: POST to /v1/embeddings with body  {
+  "input": "rispondi solo con A",
+  "model": "text-embedding-mxbai-embed-large-v1"
+}
+2026-04-16 14:01:45  [INFO]
+ Received request to embed:  rispondi solo con A
+2026-04-16 14:01:45  [INFO]
+ Returning embeddings (not shown in logs)
+2026-04-16 14:01:45 [DEBUG]
+ Received request: GET to /api/v1/models
+2026-04-16 14:01:45  [INFO]
+ Returning 23 models from v1 API
+2026-04-16 14:01:45 [DEBUG]
+ Received request: POST to /api/v1/chat with body  {
+  "model": "google/gemma-4-e4b",
+  "input": "rispondi solo con A",
+  "stream": true,
+  "temperature": 0.7,
+  "store": true,
+  "max_output_tokens": 25779,
+  "system_prompt": "[RELEVANT MEMORIES]\n- [preference] Preferenza di f... <Truncated in logs> ...primp (stdio)\n- time (stdio)\n[/MCP SERVERS ATTIVI]"
+}
+2026-04-16 14:01:46  [INFO]
+ [google/gemma-4-e4b] Running api/v1/chat on history with 2 messages.
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "chat.start",
+  "model_instance_id": "google/gemma-4-e4b"
+}
+2026-04-16 14:01:46  [INFO]
+ [google/gemma-4-e4b] Streaming response...
+2026-04-16 14:01:46  [INFO]
+ [google/gemma-4-e4b] Prompt processing progress: 0.00%
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.start"
+}
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 0
+}
+2026-04-16 14:01:46  [INFO]
+ [google/gemma-4-e4b] Prompt processing progress: 63.64%
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 0.6363636363636364
+}
+2026-04-16 14:01:46  [INFO]
+ [google/gemma-4-e4b] Prompt processing progress: 100.00%
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.progress",
+  "progress": 1
+}
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "prompt_processing.end"
+}
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "message.start"
+}
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "message.delta",
+  "content": "A"
+}
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "message.end"
+}
+2026-04-16 14:01:46  [INFO]
+ Generated packet:  {
+  "type": "chat.end",
+  "result": {
+    "model_instance_id": "google/gemma-4-e4b",
+    "output": [
+      {
+        "type": "message",
+        "content": "A"
+      }
+    ],
+    "stats": {
+      "input_tokens": 155,
+      "total_output_tokens": 2,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 156.06710885680843,
+      "time_to_first_token_seconds": 0.058
+    },
+    "response_id": "resp_efd33c2c41d92a050ac51560e8de38916eb0b92ff96a23cd"
+  }
+}
+2026-04-16 14:01:46  [INFO]
+ [google/gemma-4-e4b] Finished streaming response

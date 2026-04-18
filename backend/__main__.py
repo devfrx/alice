@@ -55,8 +55,19 @@ def main() -> None:
         "port": args.port,
     }
     if args.reload:
+        # Resolve reload directory to absolute path for reliable
+        # directory exclusion matching on Windows.
+        from pathlib import Path
+
+        reload_dir = Path(args.reload_dir).resolve()
         kwargs["reload"] = True
-        kwargs["reload_dirs"] = [args.reload_dir]
+        kwargs["reload_dirs"] = [str(reload_dir)]
+        kwargs["reload_excludes"] = [
+            str(reload_dir / ".venv"),
+            str(reload_dir / "__pycache__"),
+            str(reload_dir / "tests"),
+            "*.pyc",
+        ]
 
     # Suppress the benign CancelledError that uvicorn logs as ERROR on
     # Python 3.13+ when Ctrl+C re-triggers asyncio's internal signal handler

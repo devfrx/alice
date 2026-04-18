@@ -56,6 +56,9 @@ class AppContext:
     lmstudio_manager: LMStudioManagerProtocol | None = None
     vram_monitor: VRAMMonitorProtocol | None = None
 
+    model_registry: Any = None
+    """Dynamic per-model capability registry."""
+
     preferences_service: PreferencesServiceProtocol | None = None
     """User preferences persistence service."""
 

@@ -712,6 +712,7 @@ async def ws_chat(websocket: WebSocket) -> None:
         while True:
             if message_buffer:
                 raw = message_buffer.pop(0)
+                await asyncio.sleep(0)  # yield to event loop
             else:
                 raw = await websocket.receive_text()
             try:
@@ -1256,7 +1257,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                     while not stream_task.done():
                         try:
                             raw_cancel = await asyncio.wait_for(
-                                websocket.receive_text(), timeout=0.5,
+                                websocket.receive_text(), timeout=2.0,
                             )
                             cancel_data = json.loads(raw_cancel)
                             if cancel_data.get("type") == "cancel":

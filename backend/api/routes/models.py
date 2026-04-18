@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.core.config import KNOWN_MODELS
 from backend.core.context import AppContext
@@ -31,11 +31,46 @@ class LoadModelRequest(BaseModel):
     num_experts: int | None = None
     offload_kv_cache_to_gpu: bool | None = None
 
+    @field_validator("model")
+    @classmethod
+    def model_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("model must not be empty")
+        return v
+
+    @field_validator("context_length")
+    @classmethod
+    def context_length_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("context_length must be a positive integer")
+        return v
+
+    @field_validator("eval_batch_size")
+    @classmethod
+    def eval_batch_size_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("eval_batch_size must be a positive integer")
+        return v
+
+    @field_validator("num_experts")
+    @classmethod
+    def num_experts_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("num_experts must be a positive integer")
+        return v
+
 
 class UnloadModelRequest(BaseModel):
     """Body for ``POST /models/unload``."""
 
     instance_id: str
+
+    @field_validator("instance_id")
+    @classmethod
+    def instance_id_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("instance_id must not be empty")
+        return v
 
 
 class DownloadModelRequest(BaseModel):
@@ -43,6 +78,13 @@ class DownloadModelRequest(BaseModel):
 
     model: str
     quantization: str | None = None
+
+    @field_validator("model")
+    @classmethod
+    def model_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("model must not be empty")
+        return v
 
 
 class ModelStatusResponse(BaseModel):
@@ -87,6 +129,21 @@ async def get_current_operation(request: Request) -> dict:
     return op
 
 
+@router.get("/models/capabilities")
+async def model_capabilities(request: Request) -> dict[str, Any]:
+    """Return the capability registry state for all known models."""
+    ctx = _ctx(request)
+    if ctx.model_registry is None:
+        return {"profiles": {}, "last_refresh": 0}
+    profiles = ctx.model_registry.all_profiles()
+    return {
+        "profiles": {
+            k: v.to_dict() for k, v in profiles.items()
+        },
+        "last_refresh": ctx.model_registry.last_refresh,
+    }
+
+
 @router.get("/models")
 async def list_models(request: Request) -> list[dict[str, Any]]:
     """List all models via LM Studio v1 API."""
@@ -97,7 +154,13 @@ async def list_models(request: Request) -> list[dict[str, Any]]:
         raise HTTPException(503, "LM Studio is unreachable")
 
     models = data.get("models", [])
-    return [serialise_model(m) for m in models]
+
+    # Refresh the model capability registry with fresh API data.
+    ctx = _ctx(request)
+    if ctx.model_registry is not None:
+        await ctx.model_registry.refresh_from_api(models)
+
+    return [serialise_model(m, ctx.model_registry) for m in models]
 
 
 @router.post("/models/load")
@@ -121,6 +184,15 @@ async def load_model(body: LoadModelRequest, request: Request) -> dict:
         # Invalidate auto-model cache so the next chat uses the new model.
         if ctx.llm_service is not None:
             ctx.llm_service._invalidate_model_cache()
+        # Refresh registry so newly loaded model has up-to-date caps.
+        if ctx.model_registry is not None:
+            try:
+                data = await mgr.list_models()
+                await ctx.model_registry.refresh_from_api(
+                    data.get("models", []),
+                )
+            except Exception:
+                pass  # non-critical; next list_models will refresh
         return result
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
@@ -209,8 +281,14 @@ async def models_status(request: Request) -> ModelStatusResponse:
 # ---------------------------------------------------------------------------
 
 
-def serialise_model(m: dict) -> dict[str, Any]:
+def serialise_model(
+    m: dict,
+    registry: Any | None = None,
+) -> dict[str, Any]:
     """Transform a v1 API model object into the AL\\CE response shape.
+
+    Uses the ``ModelCapabilityRegistry`` when available for consistent
+    capability resolution; falls back to ``KNOWN_MODELS`` otherwise.
 
     Shared by both ``/api/models`` and ``/api/config/models`` to ensure
     a single, consistent serialisation for the frontend ``LMStudioModel``
@@ -218,8 +296,26 @@ def serialise_model(m: dict) -> dict[str, Any]:
     """
     key = m.get("key", "")
     caps = m.get("capabilities", {})
-    known = KNOWN_MODELS.get(key, {})
     quant = m.get("quantization")
+
+    # Resolve capabilities: registry → API response → KNOWN_MODELS
+    if registry is not None:
+        profile = registry.get_profile(key)
+        resolved_caps = {
+            "vision": profile.supports_vision,
+            "thinking": profile.supports_thinking,
+            "trained_for_tool_use": profile.supports_tool_use,
+        }
+    else:
+        known = KNOWN_MODELS.get(key, {})
+        resolved_caps = {
+            "vision": caps.get("vision", False),
+            "thinking": caps.get(
+                "thinking", known.get("thinking", False),
+            ),
+            "trained_for_tool_use": caps.get("trained_for_tool_use", False),
+        }
+
     return {
         "name": key,
         "display_name": m.get("display_name", key),
@@ -237,9 +333,5 @@ def serialise_model(m: dict) -> dict[str, Any]:
         "params_string": m.get("params_string"),
         "format": m.get("format"),
         "max_context_length": m.get("max_context_length", 0),
-        "capabilities": {
-            "vision": caps.get("vision", False),
-            "thinking": caps.get("thinking", known.get("thinking", False)),
-            "trained_for_tool_use": caps.get("trained_for_tool_use", False),
-        },
+        "capabilities": resolved_caps,
     }

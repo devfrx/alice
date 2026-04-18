@@ -68,6 +68,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Guard flag: skip watchers while loading from backend. */
   let _loadingToggles = false
+  /** Guard flag: skip deep settings watcher while loading from backend. */
+  let _loadingSettings = false
 
   watch(toolConfirmations, (val) => {
     if (_loadingToggles) return
@@ -106,8 +108,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  // Load persisted toggle states from backend on startup
-  loadToggles()
+  // NOTE: loadToggles() is deferred — called by initialize() after backend is ready.
 
   /** Load settings from the backend. */
   async function loadSettings(): Promise<void> {
@@ -190,16 +191,13 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
-  /** Guard flag: skip deep watcher while loading from backend. */
-  let _loadingSettings = false
   watch(settings, () => {
     if (_loadingSettings) return
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => saveSettings(), 1000)
   }, { deep: true })
 
-  // Load settings from backend on startup
-  loadSettings()
+  // NOTE: loadSettings() is deferred — called by initialize() after backend is ready.
 
   /** All models available on the backend. */
   const models = ref<LMStudioModel[]>([])
@@ -320,20 +318,28 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /** In-flight loadModels promise — used to coalesce concurrent calls. */
+  let _loadModelsInFlight: Promise<void> | null = null
+
   /** Fetch the list of available models from the backend. */
   async function loadModels(): Promise<void> {
+    if (_loadModelsInFlight) return _loadModelsInFlight
     if (models.value.length === 0) {
       isLoadingModels.value = true
     }
-    try {
-      models.value = await api.getModels()
-      // Derive connection state from the freshly-fetched model list instead
-      // of making a redundant /models/status round-trip via checkConnection().
-      lmStudioConnected.value = true
-      loadedModelCount.value = models.value.filter(m => m.loaded).length
-    } finally {
-      isLoadingModels.value = false
-    }
+    _loadModelsInFlight = (async () => {
+      try {
+        models.value = await api.getModels()
+        // Derive connection state from the freshly-fetched model list instead
+        // of making a redundant /models/status round-trip via checkConnection().
+        lmStudioConnected.value = true
+        loadedModelCount.value = models.value.filter(m => m.loaded).length
+      } finally {
+        isLoadingModels.value = false
+        _loadModelsInFlight = null
+      }
+    })()
+    return _loadModelsInFlight
   }
 
   /** Check backend for active operation and resume polling if needed. */
@@ -509,8 +515,18 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  // Start connection polling on store init
-  startConnectionPolling()
+  // NOTE: startConnectionPolling() is deferred — called by initialize() after backend is ready.
+
+  /**
+   * Initialise backend-dependent state.
+   *
+   * Must be called once from App.vue after the backend health check passes.
+   * Loads persisted toggles, settings, and starts connection polling.
+   */
+  async function initialize(): Promise<void> {
+    await Promise.all([loadToggles(), loadSettings()])
+    startConnectionPolling()
+  }
 
   /** Cancel all active polling timers. */
   function stopAllPolling(): void {
@@ -561,6 +577,7 @@ export const useSettingsStore = defineStore('settings', () => {
     stopConnectionPolling,
     loadSettings,
     saveSettings,
-    loadToggles
+    loadToggles,
+    initialize
   }
 })

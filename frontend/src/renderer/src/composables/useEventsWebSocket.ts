@@ -8,7 +8,9 @@
 
 import { onScopeDispose, ref } from 'vue'
 import { useCalendarStore } from '../stores/calendar'
+import { useEmailStore } from '../stores/email'
 import { useMcpStore } from '../stores/mcp'
+import { useNotesStore } from '../stores/notes'
 import { BACKEND_HOST } from '../services/api'
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
 
@@ -16,7 +18,9 @@ export function useEventsWebSocket() {
   const isConnected = ref(false)
   const isError = ref(false)
   const calendarStore = useCalendarStore()
+  const emailStore = useEmailStore()
   const mcpStore = useMcpStore()
+  const notesStore = useNotesStore()
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -71,12 +75,7 @@ export function useEventsWebSocket() {
 
         // Handle email events (Phase 15)
         if (data.type === 'email.received' && typeof data.folder === 'string') {
-          import('../stores/email').then(({ useEmailStore }) => {
-            const emailStore = useEmailStore()
-            emailStore.handleEmailReceived(data.folder as string)
-          }).catch((err) => {
-            console.warn('[ALICE Events WS] email handler error:', err)
-          })
+          emailStore.handleEmailReceived(data.folder as string)
         }
 
         // Handle note events (Phase 13)
@@ -85,13 +84,8 @@ export function useEventsWebSocket() {
           data.type === 'note.updated' ||
           data.type === 'note.deleted'
         ) {
-          import('../stores/notes').then(({ useNotesStore }) => {
-            const notesStore = useNotesStore()
-            void notesStore.loadNotes()
-            void notesStore.loadFolders()
-          }).catch((err) => {
-            console.warn('[ALICE Events WS] notes handler error:', err)
-          })
+          void notesStore.loadNotes()
+          void notesStore.loadFolders()
         }
       } catch {
         console.warn('[ALICE Events WS] Failed to parse message')
@@ -151,8 +145,8 @@ export function useEventsWebSocket() {
     }, delay)
   }
 
-  // Auto-connect and cleanup
-  connect()
+  // Auto-connect only when autoConnect is not explicitly false.
+  // App.vue defers connection until the backend is ready.
   onScopeDispose(() => disconnect())
 
   return { isConnected, isError, connect, disconnect }

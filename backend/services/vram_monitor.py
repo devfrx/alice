@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 VRAM_WARNING_THRESHOLD_MB: int = 14_000   # 14 GB
 VRAM_CRITICAL_THRESHOLD_MB: int = 15_000  # 15 GB
-DEFAULT_POLL_INTERVAL_S: float = 10.0
+DEFAULT_POLL_INTERVAL_S: float = 30.0
 
 # ---------------------------------------------------------------------------
 # pynvml — optional dependency
@@ -165,9 +165,18 @@ class VRAMMonitor:
     # -- internal: polling --------------------------------------------------
 
     async def _poll_loop(self) -> None:
-        """Periodically sample VRAM and emit threshold events."""
+        """Periodically sample VRAM and emit threshold events.
+
+        Uses adaptive polling: normal interval when GPU consumers are
+        registered, double interval when idle (no registered components).
+        """
         while True:
             try:
+                # Adaptive interval: poll less when nothing uses the GPU
+                interval = self._poll_interval
+                if not self._budget:
+                    interval = self._poll_interval * 2
+
                 usage = await self.get_usage()
                 if usage.used_mb >= self._critical_mb:
                     if not self._critical_warned:
@@ -192,7 +201,7 @@ class VRAMMonitor:
                 raise
             except Exception:
                 logger.opt(exception=True).error("VRAM poll error")
-            await asyncio.sleep(self._poll_interval)
+            await asyncio.sleep(interval)
 
     # -- internal: backends -------------------------------------------------
 

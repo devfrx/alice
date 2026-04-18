@@ -434,7 +434,7 @@ trellis:
 # il proprio venv Python 3.10 dentro ../TRELLIS.2/.venv.
 #
 # Installazione e avvio:
-#   1. git clone --recurse-submodules https://github.com/microsoft/TRELLIS.2.git ../TRELLIS.2
+#   1. git clone --recurse-submodules https://github.com/devfrx/TRELLIS.2.git ../TRELLIS.2
 #   2. .\scripts\start-trellis2.ps1 -Install    (una tantum, ~30-60min)
 #   3. .\scripts\start-trellis2.ps1              (avvia il microservizio)
 #

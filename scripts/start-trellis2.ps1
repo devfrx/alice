@@ -47,7 +47,7 @@ if (-not (Test-Path $Trellis2Dir)) {
     Write-Host "      $Trellis2Dir" -ForegroundColor Red
     Write-Host ""
     Write-Host "  Clone it with:" -ForegroundColor Yellow
-    Write-Host "    git clone --recurse-submodules https://github.com/microsoft/TRELLIS.2.git `"$Trellis2Dir`"" -ForegroundColor Cyan
+    Write-Host "    git clone --recurse-submodules https://github.com/devfrx/TRELLIS.2.git `"$Trellis2Dir`"" -ForegroundColor Cyan
     exit 1
 }
 

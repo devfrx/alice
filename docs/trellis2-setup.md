@@ -35,7 +35,7 @@ config separate. Possono coesistere o essere avviati uno alla volta.
 
 ```powershell
 cd C:\Users\Jays\Desktop\alice
-git clone --recurse-submodules https://github.com/microsoft/TRELLIS.2.git
+git clone --recurse-submodules https://github.com/devfrx/TRELLIS.2.git
 ```
 
 Layout risultante:
@@ -61,7 +61,7 @@ C:\Users\Jays\Desktop\alice\
 .\scripts\start-trellis2.ps1 -Install
 ```
 
-Lo script porta su Windows i passi di [`setup.sh`](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh):
+Lo script porta su Windows i passi di [`setup.sh`](https://github.com/devfrx/TRELLIS.2/blob/main/setup.sh):
 
 | Step | Pacchetto | Note |
 | --- | --- | --- |

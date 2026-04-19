@@ -418,11 +418,15 @@ defineExpose({
 </template>
 
 <style scoped>
-/* ── Root — Floating input pill ── */
+/* ── Root — Floating input pill ──
+ * Anchored to the nearest positioned ancestor (e.g. `.assistant-view__main`)
+ * so it stays centered in the same column as the orb / conversation,
+ * regardless of any side panel that might shrink the main area.
+ */
 .fib {
-    position: fixed;
+    position: absolute;
     bottom: 24px;
-    left: calc(50% - var(--panel-offset, 0px) / 2);
+    left: 50%;
     transform: translateX(-50%);
     z-index: var(--z-dropdown);
     min-width: 320px;

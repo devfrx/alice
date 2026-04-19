@@ -456,8 +456,7 @@ onMounted(() => {
     <div class="assistant-view" aria-label="Assistente" :class="{
         'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards),
         'assistant-view--dragging': isDraggingPanel
-    }"
-        :style="{ '--panel-width': `${sidePanelWidth}px`, '--panel-offset': sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards) ? `${sidePanelWidth}px` : '0px' }">
+    }" :style="{ '--panel-width': `${sidePanelWidth}px` }">
         <AmbientBackground :state="orbState" :audio-level="audioLevel" />
 
         <!-- Main area (orb + content) -->

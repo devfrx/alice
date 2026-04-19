@@ -86,9 +86,18 @@ function onHoverLeave(): void {
 
 .alice-orb__canvas {
     position: absolute;
-    inset: -30%;
+    /* Anchor only top-left; over-constraining with right/bottom lets the
+       canvas' intrinsic aspect-ratio drift the box off-square. */
+    top: -30%;
+    left: -30%;
     width: 160%;
     height: 160%;
+    /* Override the global reset (`canvas { max-width: 100% }`) which
+       would otherwise clamp the canvas to the parent's width and shift
+       the painted orb off-center. */
+    max-width: none;
+    max-height: none;
+    aspect-ratio: 1 / 1;
     pointer-events: none;
 }
 </style>

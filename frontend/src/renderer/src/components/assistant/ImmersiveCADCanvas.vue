@@ -42,6 +42,15 @@ let controls: OrbitControls | null = null
 let animFrameId = 0
 let resizeObserver: ResizeObserver | null = null
 let loadedModel: THREE.Group | null = null
+/**
+ * Monotonic counter incremented on every ``loadModel`` call.  The
+ * GLTFLoader callback compares its captured token against the current
+ * value and aborts when a newer load has been started in the meantime,
+ * preventing stale models from being added on top of the active one
+ * (visible as two overlapping/compenetrating meshes when the user
+ * switches model while the first load is still in flight).
+ */
+let loadToken = 0
 
 let initialCameraPos = new THREE.Vector3()
 let initialControlsTarget = new THREE.Vector3()
@@ -140,18 +149,26 @@ function loadModel(url: string): void {
     loadedModel = null
   }
 
+  const myToken = ++loadToken
   const resolved = resolveBackendUrl(url)
   const loader = new GLTFLoader()
   loader.load(
     resolved,
     (gltf) => {
+      // A newer load has started — discard this stale result so it
+      // doesn't get added on top of the active model.
+      if (myToken !== loadToken || !scene) {
+        disposeModel(gltf.scene)
+        return
+      }
       loadedModel = gltf.scene
-      scene!.add(loadedModel)
+      scene.add(loadedModel)
       fitCameraToModel(loadedModel)
       loading.value = false
     },
     undefined,
     (err) => {
+      if (myToken !== loadToken) return
       errorMsg.value = err instanceof Error ? err.message : 'Errore caricamento modello 3D'
       loading.value = false
     },

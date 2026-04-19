@@ -510,6 +510,13 @@ async def run_tool_loop(
             )
             session.add(tool_msg)
             await session.flush()  # need tool_msg.id for artifact FK
+            # Commit immediately to release the SQLite write lock held
+            # by the pending transaction.  The artifact registry opens
+            # its own connection to insert into ``artifacts`` and would
+            # otherwise hit ``database is locked`` (busy_timeout
+            # cannot wait for a transaction held by the same process).
+            tool_msg_id = tool_msg.id
+            await session.commit()
 
             # Append to in-memory history so DB re-fetch is avoided.
             if mem_history is not None:
@@ -535,12 +542,23 @@ async def run_tool_loop(
                 and isinstance(artifact_payload, dict)
                 and getattr(ctx, "artifact_registry", None) is not None
             ):
+                # Parsers are keyed by the bare tool name (e.g.
+                # ``cad_generate_from_image``) but ``tool_name`` here is
+                # the namespaced form exposed to the LLM
+                # (``cad_generator_cad_generate_from_image``).  Resolve
+                # back to the bare name via the tool registry so the
+                # parser lookup succeeds.
+                bare_tool_name = tool_name
+                if ctx.tool_registry is not None:
+                    tool_def = ctx.tool_registry.get_tool_definition(tool_name)
+                    if tool_def is not None:
+                        bare_tool_name = tool_def.name
                 try:
                     artifact = await ctx.artifact_registry.register_from_tool_result(
                         conversation_id=conv_id,
-                        message_id=tool_msg.id,
+                        message_id=tool_msg_id,
                         tool_call_id=tc_id,
-                        tool_name=tool_name,
+                        tool_name=bare_tool_name,
                         payload=artifact_payload,
                         content_type=tool_result.content_type,
                     )

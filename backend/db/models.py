@@ -1,5 +1,6 @@
 """AL\\CE — SQLModel database models."""
 
+import enum
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -54,6 +55,10 @@ class Conversation(SQLModel, table=True):
 
     # -- relationships ------------------------------------------------------
     messages: list["Message"] = Relationship(
+        back_populates="conversation",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    artifacts: list["Artifact"] = Relationship(
         back_populates="conversation",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
@@ -277,4 +282,108 @@ class PluginState(SQLModel, table=True):
 
     updated_at: datetime = Field(default_factory=_utcnow)
 
+
+# ---------------------------------------------------------------------------
+# Artifact (generated tool output: 3D models, images, audio, charts, …)
+# ---------------------------------------------------------------------------
+
+
+class ArtifactKind(str, enum.Enum):
+    """Type of artifact produced by a tool.
+
+    Extend with new members when adding new artifact-producing tools
+    (e.g. ``IMAGE``, ``AUDIO``, ``CHART``, ``WHITEBOARD``).  The string
+    value is what gets persisted in SQLite, so values must remain stable.
+    """
+
+    CAD_3D_TEXT = "cad_3d_text"
+    """3D model generated from text via TRELLIS (cad_generate)."""
+
+    CAD_3D_IMAGE = "cad_3d_image"
+    """3D model generated from an image via TRELLIS.2 (cad_generate_from_image)."""
+
+
+class Artifact(SQLModel, table=True):
+    """Persistent record of a file produced by a tool.
+
+    An artifact is the unified abstraction for any binary output that
+    the user may want to browse, pin or download from the UI: GLB
+    models today, images / audio / charts tomorrow.  It always points
+    to a file on disk via ``file_path`` (relative to ``PROJECT_ROOT``)
+    and carries enough metadata to render a thumbnail/preview without
+    needing to load the file itself.
+    """
+
+    __tablename__ = "artifacts"
+    __table_args__ = (
+        sa.Index("ix_artifact_conv_created", "conversation_id", "created_at"),
+        sa.Index("ix_artifact_kind_created", "kind", "created_at"),
+    )
+
+    id: uuid.UUID = Field(default_factory=_new_uuid, primary_key=True)
+    conversation_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+        description=(
+            "Source conversation.  Set to NULL when the conversation "
+            "is deleted but the artifact was pinned (preserved on "
+            "the board)."
+        ),
+    )
+    message_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("messages.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+        description="The tool-result message that produced this artifact.",
+    )
+    tool_call_id: Optional[str] = Field(
+        default=None, max_length=64, index=True,
+        description="OpenAI tool_call_id that produced this artifact.",
+    )
+    kind: ArtifactKind = Field(
+        sa_column=sa.Column(
+            sa.Enum(
+                ArtifactKind,
+                values_callable=lambda e: [m.value for m in e],
+                native_enum=False,
+                length=32,
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    title: str = Field(max_length=256)
+    """Human-readable label (e.g. truncated description, source filename)."""
+
+    file_path: str = Field(
+        description="Path on disk relative to PROJECT_ROOT.",
+    )
+    mime: str = Field(max_length=128)
+    size_bytes: int = Field(default=0, ge=0)
+
+    artifact_metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=sa.Column(sa.JSON, nullable=False, default=dict),
+        description=(
+            "Free-form JSON metadata; the ``metadata`` name is reserved "
+            "by SQLAlchemy Declarative so we use ``artifact_metadata``."
+        ),
+    )
+    pinned: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+    # -- relationships ------------------------------------------------------
+    conversation: Optional[Conversation] = Relationship(
+        back_populates="artifacts"
+    )
 

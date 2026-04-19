@@ -86,6 +86,9 @@ class AppContext:
     plugin_state_repo: Any = None
     """Persistent plugin toggle-state repository."""
 
+    artifact_registry: Any = None
+    """Unified registry for tool-generated artifacts (3D, images, audio, …)."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

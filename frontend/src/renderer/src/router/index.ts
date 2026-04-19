@@ -104,6 +104,12 @@ const router = createRouter({
       meta: { title: 'Lavagna', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
+      path: '/board',
+      name: 'board',
+      component: () => import('../views/ArtifactBoardView.vue'),
+      meta: { title: 'Bacheca', transition: DEFAULT_PAGE_TRANSITION }
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/assistant'
     }

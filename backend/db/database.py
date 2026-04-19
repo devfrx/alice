@@ -172,4 +172,102 @@ async def init_db(engine: AsyncEngine) -> None:
                 )
                 logger.info("Created missing index {} on {}", idx_name, table)
 
+    # -- Schema rebuilds ----------------------------------------------------
+    # SQLite cannot ALTER COLUMN; structural changes require copying the
+    # table.  Each rebuild is idempotent: it inspects the live schema and
+    # only acts when the desired state has not been reached yet.
+    async with engine.begin() as conn:
+        await conn.run_sync(_rebuild_artifacts_if_needed)
+
+
+def _rebuild_artifacts_if_needed(sync_conn: Any) -> None:
+    """Make ``artifacts.conversation_id`` nullable + FK SET NULL.
+
+    Older databases were created with ``conversation_id NOT NULL`` and
+    ``ON DELETE CASCADE``.  Pinned artifacts must survive deletion of
+    their source conversation, so the column has to allow ``NULL`` and
+    the FK has to ``SET NULL`` instead of cascading.  This routine
+    rebuilds the table only when needed (cheap inspection on startup).
+    """
+    inspector = sa.inspect(sync_conn)
+    if not inspector.has_table("artifacts"):
+        return
+
+    cols = {c["name"]: c for c in inspector.get_columns("artifacts")}
+    conv_col = cols.get("conversation_id")
+    fks = inspector.get_foreign_keys("artifacts")
+    conv_fk = next(
+        (fk for fk in fks if fk["constrained_columns"] == ["conversation_id"]),
+        None,
+    )
+
+    needs_rebuild = (
+        conv_col is not None and not conv_col.get("nullable", True)
+    ) or (
+        conv_fk is not None
+        and (conv_fk.get("options") or {}).get("ondelete", "").upper()
+        != "SET NULL"
+    )
+    if not needs_rebuild:
+        return
+
+    logger.info(
+        "Rebuilding 'artifacts' table to allow NULL conversation_id "
+        "with ON DELETE SET NULL (preserves pinned artifacts when a "
+        "conversation is deleted)."
+    )
+    sync_conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    sync_conn.exec_driver_sql("ALTER TABLE artifacts RENAME TO artifacts__old")
+    sync_conn.exec_driver_sql(
+        """
+        CREATE TABLE artifacts (
+            id CHAR(32) NOT NULL PRIMARY KEY,
+            conversation_id CHAR(32),
+            message_id CHAR(32),
+            tool_call_id VARCHAR(64),
+            kind VARCHAR(32) NOT NULL,
+            title VARCHAR(256) NOT NULL,
+            file_path VARCHAR NOT NULL,
+            mime VARCHAR(128) NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            artifact_metadata JSON NOT NULL,
+            pinned BOOLEAN NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id)
+                ON DELETE SET NULL,
+            FOREIGN KEY(message_id) REFERENCES messages(id)
+                ON DELETE SET NULL
+        )
+        """
+    )
+    sync_conn.exec_driver_sql(
+        """
+        INSERT INTO artifacts (
+            id, conversation_id, message_id, tool_call_id, kind,
+            title, file_path, mime, size_bytes, artifact_metadata,
+            pinned, created_at, updated_at
+        )
+        SELECT id, conversation_id, message_id, tool_call_id, kind,
+               title, file_path, mime, size_bytes, artifact_metadata,
+               pinned, created_at, updated_at
+        FROM artifacts__old
+        """
+    )
+    sync_conn.exec_driver_sql("DROP TABLE artifacts__old")
+    sync_conn.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_artifact_conv_created "
+        "ON artifacts (conversation_id, created_at)"
+    )
+    sync_conn.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_artifact_kind_created "
+        "ON artifacts (kind, created_at)"
+    )
+    sync_conn.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_artifacts_tool_call_id "
+        "ON artifacts (tool_call_id)"
+    )
+    sync_conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+    logger.success("'artifacts' table rebuild complete.")
+
 

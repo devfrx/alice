@@ -31,7 +31,7 @@ from sqlmodel import select
 
 from backend.core.config import PROJECT_ROOT
 from backend.core.context import AppContext
-from backend.db.models import Attachment, Conversation, Message
+from backend.db.models import Artifact, Attachment, Conversation, Message
 from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.context_manager import (
     CompressionError,
@@ -2210,6 +2210,34 @@ async def delete_conversation(
                 )
             )
 
+        # ── Artifacts ──────────────────────────────────────────────────
+        # Pinned artifacts must survive the conversation deletion: they
+        # are detached (conversation_id=NULL) so they remain visible on
+        # the board.  Unpinned artifacts are removed (row + on-disk file)
+        # to avoid orphaning binary blobs the user no longer cares about.
+        unpinned_paths_q = await session.exec(
+            select(Artifact.id, Artifact.file_path).where(
+                Artifact.conversation_id == conversation_id,
+                Artifact.pinned == False,  # noqa: E712 (SQL boolean)
+            )
+        )
+        unpinned: list[tuple[uuid.UUID, str]] = list(unpinned_paths_q.all())
+        unpinned_ids = [aid for aid, _ in unpinned]
+        if unpinned_ids:
+            await conn.execute(
+                sa.delete(Artifact).where(
+                    Artifact.id.in_(unpinned_ids)  # type: ignore[union-attr]
+                )
+            )
+        await conn.execute(
+            sa.update(Artifact)
+            .where(
+                Artifact.conversation_id == conversation_id,
+                Artifact.pinned == True,  # noqa: E712
+            )
+            .values(conversation_id=None)
+        )
+
         # Bulk-delete messages.
         await conn.execute(
             sa.delete(Message).where(
@@ -2225,6 +2253,20 @@ async def delete_conversation(
         )
 
         await session.commit()
+
+        # Best-effort cleanup of orphaned artifact files (after commit
+        # so a transient FS failure does not roll back the deletion).
+        for _aid, file_path in unpinned:
+            try:
+                p = Path(file_path)
+                if not p.is_absolute():
+                    p = PROJECT_ROOT / p
+                if p.exists() and p.is_file():
+                    await asyncio.to_thread(p.unlink)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to unlink artifact file {}: {}", file_path, exc,
+                )
 
         # Remove JSON conversation file.
         file_manager: ConversationFileManager | None = (

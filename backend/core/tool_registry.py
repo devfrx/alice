@@ -8,6 +8,7 @@ execution with result sanitisation.
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import re
 import time
@@ -72,6 +73,20 @@ def _sanitise_dict(obj: dict[str, Any]) -> dict[str, Any]:
         else:
             cleaned[key] = value
     return cleaned
+
+
+def _deep_copy_content(
+    content: str | dict | list | None,
+) -> str | dict | list | None:
+    """Return a deep copy of *content* preserving its original shape.
+
+    Used to snapshot a tool's payload before sanitisation so consumers
+    that need un-redacted data (e.g. the artifact registry) can keep
+    operating on the real values while the LLM-facing copy is scrubbed.
+    """
+    if content is None or isinstance(content, str):
+        return content
+    return copy.deepcopy(content)
 
 
 def _sanitise_content(text: str) -> str:
@@ -759,6 +774,11 @@ class ToolRegistry:
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         result.execution_time_ms = elapsed_ms
+
+        # Snapshot the un-sanitised payload so downstream consumers (e.g.
+        # the artifact registry) can still see the real file paths even
+        # when ``sanitise_output`` is enabled for LLM-facing content.
+        result.raw_content = _deep_copy_content(result.content)
 
         # --- sanitise (conditional) ---
         if tool_def.sanitise_output:

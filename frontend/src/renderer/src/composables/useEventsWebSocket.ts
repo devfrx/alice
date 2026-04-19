@@ -11,6 +11,7 @@ import { useCalendarStore } from '../stores/calendar'
 import { useEmailStore } from '../stores/email'
 import { useMcpStore } from '../stores/mcp'
 import { useNotesStore } from '../stores/notes'
+import { useArtifactsStore } from '../stores/artifacts'
 import { BACKEND_HOST } from '../services/api'
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
 
@@ -21,6 +22,7 @@ export function useEventsWebSocket() {
   const emailStore = useEmailStore()
   const mcpStore = useMcpStore()
   const notesStore = useNotesStore()
+  const artifactsStore = useArtifactsStore()
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -86,6 +88,11 @@ export function useEventsWebSocket() {
         ) {
           void notesStore.loadNotes()
           void notesStore.loadFolders()
+        }
+
+        // Handle artifact events: lazy-fetch the new artifact and add to store.
+        if (data.type === 'artifact.created' && typeof data.artifact_id === 'string') {
+          void artifactsStore.fetchById(data.artifact_id as string)
         }
       } catch {
         console.warn('[ALICE Events WS] Failed to parse message')

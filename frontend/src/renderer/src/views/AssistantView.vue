@@ -23,12 +23,15 @@ import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vu
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
+import { useGenerationState } from '../composables/useGenerationState'
+import { useArtifactsStore } from '../stores/artifacts'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
 import type { CadModelPayload, ChartPayload, WhiteboardPayload, ToolCall } from '../types/chat'
 import { isWhiteboardPayload } from '../types/chat'
 import { api } from '../services/api'
 import AppIcon from '../components/ui/AppIcon.vue'
+import CADGenerationPlaceholder from '../components/chat/CADGenerationPlaceholder.vue'
 
 const ImmersiveCADCanvas = defineAsyncComponent(
     () => import('../components/assistant/ImmersiveCADCanvas.vue')
@@ -42,6 +45,8 @@ const TldrawCanvas = defineAsyncComponent(
 
 const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
+const artifactsStore = useArtifactsStore()
+const { cadGenerationInProgress } = useGenerationState()
 const chatApi = inject(ChatApiKey, null)
 const _router = useRouter()
 if (!chatApi) {
@@ -182,6 +187,25 @@ watch(cadModels, (models) => {
         cadActiveIndex.value = Math.max(0, models.length - 1)
     }
 })
+
+/* When a CAD generation starts, surface the side panel on the 3D tab so
+   the user sees the loading placeholder (and the final model afterwards). */
+watch(cadGenerationInProgress, (info) => {
+    if (info) {
+        sidePanelOpen.value = true
+        sidePanelTab.value = '3d'
+    }
+})
+
+/* Keep artifacts loaded for the active conversation so any CADViewer in
+   the message stream knows whether its artifact is pinned. */
+watch(
+    () => chatStore.currentConversation?.id ?? null,
+    (id) => {
+        if (id) artifactsStore.ensureForConversation(id).catch(() => { /* best-effort */ })
+    },
+    { immediate: true },
+)
 
 function closeSidePanel(): void {
     sidePanelOpen.value = false
@@ -501,7 +525,7 @@ onMounted(() => {
                     @click="() => { sidePanelOpen = true; sidePanelTab = 'chart' }">
                     <AppIcon name="bar-chart" :size="16" :stroke-width="1.5" />
                     <span v-if="chartPayloads.length > 1" class="assistant-view__chart-badge">{{ chartPayloads.length
-                    }}</span>
+                        }}</span>
                 </button>
             </Transition>
 
@@ -549,7 +573,7 @@ onMounted(() => {
                         <AppIcon name="bar-chart" :size="14" :stroke-width="1.5" />
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
-                        }}</span>
+                            }}</span>
                     </button>
                     <button v-if="hasWhiteboards" class="side-panel__tab"
                         :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
@@ -569,6 +593,12 @@ onMounted(() => {
                     :models="cadModels" :active-index="cadActiveIndex"
                     @update:active-index="(i) => { cadActiveIndex = i }" @close="closeSidePanel" />
 
+                <!-- CAD generation in progress: shown either as overlay over an
+                     existing canvas or as the sole 3D content while waiting. -->
+                <div v-if="cadGenerationInProgress && sidePanelTab === '3d'" class="side-panel__cad-loading">
+                    <CADGenerationPlaceholder :generation="cadGenerationInProgress" />
+                </div>
+
                 <!-- Chart viewer (visible when on chart tab or sole content) -->
                 <div v-if="hasCharts && (sidePanelTab === 'chart' || (!hasCadModels && !hasWhiteboards))"
                     class="side-panel__chart-container">
@@ -585,7 +615,7 @@ onMounted(() => {
                             <AppIcon name="chevron-left" :size="14" />
                         </button>
                         <span class="side-panel__chart-counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                        }}</span>
+                            }}</span>
                         <button class="side-panel__chart-nav-btn"
                             :disabled="chartActiveIndex >= chartPayloads.length - 1"
                             @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
@@ -1011,6 +1041,16 @@ onMounted(() => {
 .side-panel__close:hover {
     background: var(--danger);
     color: white;
+}
+
+/* ── Side panel CAD loading overlay ── */
+.side-panel__cad-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    border-radius: 0 0 16px 16px;
+    overflow: hidden;
 }
 
 /* ── Side panel chart container ── */

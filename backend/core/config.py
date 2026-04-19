@@ -740,7 +740,7 @@ class Trellis2ServiceConfig(BaseSettings):
     produce mesh densities that go OOM in ``fill_holes``/``simplify``.
     Add them back here only on 24 GB+ cards."""
 
-    decimation_target: int = 500_000
+    decimation_target: int = 600_000
     """Target triangle count for the exported GLB. 500k is the tested
     maximum for RTX 5080 (16 GB VRAM); raise to 1M+ on 24 GB+ cards."""
 

@@ -129,6 +129,11 @@ class ToolResult:
         execution_time_ms: Wall-clock time spent executing.
         truncated: True if the result was trimmed for size.
         error_message: Human-readable error detail on failure.
+        raw_content: Pre-sanitisation snapshot of ``content`` (set by
+            :class:`backend.core.tool_registry.ToolRegistry`).  Consumers
+            that need un-redacted data (e.g. the artifact registry,
+            which has to keep the real ``file_path``) should prefer
+            this field over :attr:`content`.
     """
 
     success: bool
@@ -137,6 +142,7 @@ class ToolResult:
     execution_time_ms: float = 0.0
     truncated: bool = False
     error_message: str | None = None
+    raw_content: str | dict | list | None = None
 
     # -- convenience constructors -------------------------------------------
 

@@ -509,6 +509,7 @@ async def run_tool_loop(
                 **_ver,
             )
             session.add(tool_msg)
+            await session.flush()  # need tool_msg.id for artifact FK
 
             # Append to in-memory history so DB re-fetch is avoided.
             if mem_history is not None:
@@ -517,6 +518,39 @@ async def run_tool_loop(
                     "content": db_content,
                     "tool_call_id": tc_id,
                 })
+
+            # Optional: register an artifact when the tool produced a
+            # binary file (3D model, image, audio, …).  Failures here
+            # must never break the tool loop.  We prefer ``raw_content``
+            # (pre-sanitisation snapshot) so on-disk paths stay intact
+            # even when the tool registry redacts them for the LLM.
+            artifact_id: str | None = None
+            artifact_payload = (
+                tool_result.raw_content
+                if isinstance(tool_result.raw_content, dict)
+                else tool_result.content
+            )
+            if (
+                tool_result.success
+                and isinstance(artifact_payload, dict)
+                and getattr(ctx, "artifact_registry", None) is not None
+            ):
+                try:
+                    artifact = await ctx.artifact_registry.register_from_tool_result(
+                        conversation_id=conv_id,
+                        message_id=tool_msg.id,
+                        tool_call_id=tc_id,
+                        tool_name=tool_name,
+                        payload=artifact_payload,
+                        content_type=tool_result.content_type,
+                    )
+                    if artifact is not None:
+                        artifact_id = str(artifact.id)
+                except Exception as exc:
+                    logger.warning(
+                        "Artifact registration failed for tool '{}': {}",
+                        tool_name, exc,
+                    )
 
             ws_payload: dict[str, Any] = {
                 "type": "tool_execution_done",
@@ -527,6 +561,8 @@ async def run_tool_loop(
             }
             if tool_result.content_type:
                 ws_payload["content_type"] = tool_result.content_type
+            if artifact_id:
+                ws_payload["artifact_id"] = artifact_id
 
             await websocket.send_json(ws_payload)
 

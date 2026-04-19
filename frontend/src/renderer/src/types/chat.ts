@@ -184,6 +184,13 @@ export interface WsToolExecutionDoneMessage {
   success: boolean
   /** MIME type of the result content (e.g. "image/png"). */
   content_type?: string
+  /**
+   * UUID of the artifact registered for this tool result, when the tool
+   * produced a binary output that the artifacts registry parsed
+   * (e.g. ``cad_generate``). Absent for tools without a parser or when
+   * registration failed silently.
+   */
+  artifact_id?: string
 }
 
 /** Server requests user confirmation before running a tool. */

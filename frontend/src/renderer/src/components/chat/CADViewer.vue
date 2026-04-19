@@ -6,11 +6,12 @@
  * interaction. Auto-fits the camera to the loaded model bounding box.
  * Visual style matches the AL\CE dark charcoal + warm cream theme.
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { resolveBackendUrl } from '../../services/api'
+import { useArtifactsStore } from '../../stores/artifacts'
 import AppIcon from '../ui/AppIcon.vue'
 
 const props = defineProps<{
@@ -18,7 +19,31 @@ const props = defineProps<{
     modelUrl: string
     /** Display name for the model (shown in toolbar). */
     modelName?: string
+    /** Optional artifact id; when provided, exposes pin/unpin in the toolbar. */
+    artifactId?: string
 }>()
+
+const artifactsStore = useArtifactsStore()
+
+/** Reactive pin status looked up from the artifacts store. */
+const pinned = computed<boolean>(() => {
+    if (!props.artifactId) return false
+    return artifactsStore.findById(props.artifactId)?.pinned ?? false
+})
+
+const togglePinPending = ref(false)
+
+async function togglePin(): Promise<void> {
+    if (!props.artifactId || togglePinPending.value) return
+    togglePinPending.value = true
+    try {
+        await artifactsStore.togglePin(props.artifactId)
+    } catch (err) {
+        console.error('[CADViewer] togglePin failed:', err)
+    } finally {
+        togglePinPending.value = false
+    }
+}
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const loading = ref(true)
@@ -224,6 +249,12 @@ onMounted(() => {
 
     resizeObserver = new ResizeObserver(handleResize)
     resizeObserver.observe(container)
+
+    /* Lazy-fetch artifact so the pin state reflects the persisted value
+       even on first render after a fresh app load. */
+    if (props.artifactId && !artifactsStore.findById(props.artifactId)) {
+        artifactsStore.fetchById(props.artifactId).catch(() => { /* best-effort */ })
+    }
 })
 
 onUnmounted(() => {
@@ -279,6 +310,11 @@ onUnmounted(() => {
                     <AppIcon name="crosshair" :size="14" />
                 </button>
                 <div class="cad-viewer__divider" />
+                <button v-if="artifactId" class="cad-viewer__btn" :class="{ 'cad-viewer__btn--active': pinned }"
+                    :title="pinned ? 'Rimuovi dalla bacheca' : 'Salva in bacheca'" :disabled="togglePinPending"
+                    @click="togglePin">
+                    <AppIcon name="pin" :size="14" />
+                </button>
                 <button class="cad-viewer__btn cad-viewer__btn--download" title="Download GLB" @click="downloadModel">
                     <AppIcon name="download" :size="14" />
                 </button>

@@ -11,6 +11,8 @@ import { computed, ref, watch, onUnmounted, defineAsyncComponent } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
+import { useGenerationState } from '../../composables/useGenerationState'
+import { useArtifactsStore } from '../../stores/artifacts'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
@@ -20,6 +22,7 @@ import { isWhiteboardPayload } from '../../types/chat'
 
 const CADViewer = defineAsyncComponent(() => import('./CADViewer.vue'))
 const ChartViewer = defineAsyncComponent(() => import('./ChartViewer.vue'))
+const CADGenerationPlaceholder = defineAsyncComponent(() => import('./CADGenerationPlaceholder.vue'))
 
 const props = withDefaults(
   defineProps<{
@@ -154,6 +157,30 @@ const whiteboardPayload = computed((): WhiteboardPayload | null => {
   return null
 })
 
+/* ── Artifact lookup + in-progress generation overlay ──────────────────── */
+
+const artifactsStore = useArtifactsStore()
+const { cadGenerationInProgress } = useGenerationState()
+
+/** Artifact id matched by ``tool_call_id``, when this is a tool message. */
+const artifactId = computed<string | undefined>(() => {
+  if (props.message.role !== 'tool' || !props.message.tool_call_id) return undefined
+  return artifactsStore.byToolCallId(props.message.tool_call_id)?.id
+})
+
+/**
+ * Show the inline CAD generation placeholder on the assistant message that
+ * issued the in-flight cad tool call. Matched by tool_call id presence
+ * inside ``message.tool_calls``.
+ */
+const showInlineGenerationPlaceholder = computed(() => {
+  if (props.message.role !== 'assistant') return false
+  const gen = cadGenerationInProgress.value
+  if (!gen) return false
+  const calls = props.message.tool_calls ?? []
+  return calls.some((c) => c.function?.name === gen.toolName)
+})
+
 /** Emit version switch with the message's version_group_id. */
 function onVersionSwitch(idx: number): void {
   if (props.message.version_group_id) {
@@ -233,8 +260,14 @@ onUnmounted(() => {
       <!-- Tool calls section (assistant only) -->
       <ToolCallSection v-if="message.tool_calls?.length" :tool-calls="message.tool_calls ?? []" />
 
+      <!-- Inline placeholder while a CAD generation tied to this assistant
+           message is still running. -->
+      <CADGenerationPlaceholder v-if="showInlineGenerationPlaceholder && cadGenerationInProgress" compact
+        :generation="cadGenerationInProgress" />
+
       <!-- CAD model viewer (tool message with cad-model payload) -->
-      <CADViewer v-if="cadPayload" :model-url="cadPayload.export_url" :model-name="cadPayload.model_name" />
+      <CADViewer v-if="cadPayload" :model-url="cadPayload.export_url" :model-name="cadPayload.model_name"
+        :artifact-id="artifactId" />
 
       <!-- Chart viewer (tool message with chart payload) -->
       <ChartViewer v-if="chartPayload" :payload="chartPayload" />

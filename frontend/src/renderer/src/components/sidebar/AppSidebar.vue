@@ -164,6 +164,14 @@ async function onOpenFile(id: string): Promise<void> {
             <span class="sidebar__link-label">Lavagna</span>
           </router-link>
 
+          <router-link to="/board" class="sidebar__link" active-class="sidebar__link--active" title="Bacheca artefatti"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <AppIcon name="bookmark" :size="15" />
+            </span>
+            <span class="sidebar__link-label">Bacheca</span>
+          </router-link>
+
           <router-link to="/email" class="sidebar__link" active-class="sidebar__link--active" title="Email"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">

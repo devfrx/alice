@@ -409,6 +409,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         AliceEvent.NOTE_DELETED, _forward_note_deleted,
     )
 
+    # -- Artifact registry (unified tool-output store) ------------------
+    from backend.services.artifacts import ArtifactRegistry
+
+    artifact_registry = ArtifactRegistry(session_factory=session_factory)
+
+    async def _broadcast_artifact_event(event: dict) -> None:
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast(event)
+
+    artifact_registry.set_event_callback(_broadcast_artifact_event)
+    ctx.artifact_registry = artifact_registry
+
     app.state.context = ctx
     app.state.engine = engine
 

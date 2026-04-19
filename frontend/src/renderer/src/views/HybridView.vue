@@ -11,7 +11,7 @@
  * HybridView is workspace-centric / text-first.
  */
 import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
@@ -21,8 +21,11 @@ import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vu
 import TranscriptOverlay from '../components/voice/TranscriptOverlay.vue'
 import AliceSpinner from '../components/ui/AliceSpinner.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
+import CADGenerationPlaceholder from '../components/chat/CADGenerationPlaceholder.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
+import { useGenerationState } from '../composables/useGenerationState'
+import { useArtifactsStore } from '../stores/artifacts'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
 import type { CadModelPayload, ChartPayload, WhiteboardPayload } from '../types/chat'
@@ -42,11 +45,14 @@ const TldrawCanvas = defineAsyncComponent(
 const chatStore = useChatStore()
 const chatApi = inject(ChatApiKey, null)
 const _router = useRouter()
+const _route = useRoute()
 if (!chatApi) {
     console.error('[HybridView] ChatApiKey injection failed — redirecting to home')
     _router.replace({ name: 'home' })
 }
 const voiceStore = useVoiceStore()
+const artifactsStore = useArtifactsStore()
+const { cadGenerationInProgress } = useGenerationState()
 const _noop = (): void => { }
 const _asyncNoop = async (): Promise<void> => { }
 const send = chatApi?.sendMessage ?? _asyncNoop
@@ -227,6 +233,22 @@ watch(cadModels, (m) => { if (cadActiveIndex.value >= m.length) cadActiveIndex.v
 watch(chartPayloads, (c) => { if (chartActiveIndex.value >= c.length) chartActiveIndex.value = Math.max(0, c.length - 1) })
 watch(whiteboardPayloads, (w) => { if (whiteboardActiveIndex.value >= w.length) whiteboardActiveIndex.value = Math.max(0, w.length - 1) })
 
+/* Auto-focus the 3D tab the moment a CAD generation starts so the user
+   sees the placeholder + final model in the workspace. */
+watch(cadGenerationInProgress, (info) => {
+    if (info) workspaceTab.value = '3d'
+})
+
+/* Keep the artifacts store warm for the active conversation so pin state
+   on existing CAD viewers reflects the persisted value. */
+watch(
+    () => chatStore.currentConversation?.id ?? null,
+    (id) => {
+        if (id) artifactsStore.ensureForConversation(id).catch(() => { /* best-effort */ })
+    },
+    { immediate: true },
+)
+
 function saveWhiteboardSnapshot(boardId: string, snapshot: Record<string, unknown>): void {
     api.saveWhiteboardSnapshot(boardId, snapshot).catch(() => { /* best-effort */ })
 }
@@ -305,9 +327,40 @@ watch(() => chatStore.isStreamingCurrentConversation, (streaming) => {
     }
 })
 
+/**
+ * If navigated with ``?conv=<uuid>`` (e.g. "open in conversation" from
+ * the artifact board), switch the chat store to that conversation.
+ * Falls back to creating a fresh one only when no query is given and
+ * no conversation is currently selected.
+ */
+async function applyRouteConversation(): Promise<void> {
+    const raw = _route.query.conv
+    const requested = Array.isArray(raw) ? raw[0] : raw
+    if (typeof requested === 'string' && requested.length > 0) {
+        if (chatStore.currentConversation?.id === requested) return
+        try {
+            if (!chatStore.conversations.length) {
+                await chatStore.loadConversations()
+            }
+            await chatStore.loadConversation(requested)
+        } catch (err) {
+            console.error('[HybridView] Failed to load conversation', requested, err)
+        }
+        return
+    }
+    if (!chatStore.currentConversation) {
+        await chatStore.createConversation().catch(console.error)
+    }
+}
+
+watch(
+    () => _route.query.conv,
+    () => { applyRouteConversation().catch(console.error) },
+)
+
 onMounted(() => {
     connectVoice()
-    if (!chatStore.currentConversation) chatStore.createConversation().catch(console.error)
+    applyRouteConversation().catch(console.error)
 })
 
 onBeforeUnmount(() => {
@@ -389,7 +442,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="bar-chart" :size="13" />
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="workspace-tab__badge">{{ chartPayloads.length
-                        }}</span>
+                            }}</span>
                     </button>
                     <button v-if="hasWhiteboards" class="workspace-tab"
                         :class="{ 'workspace-tab--active': workspaceTab === 'whiteboard' }"
@@ -410,7 +463,11 @@ onBeforeUnmount(() => {
 
             <!-- ── Empty state (no artifacts yet) ── -->
             <div v-if="!hasAnyOutput" class="hybrid-view__workspace-body">
-                <div class="workspace-empty">
+                <!-- CAD generation in progress with no prior model -->
+                <div v-if="cadGenerationInProgress" class="workspace-viewer workspace-viewer--placeholder">
+                    <CADGenerationPlaceholder :generation="cadGenerationInProgress" />
+                </div>
+                <div v-else class="workspace-empty">
                     <div class="workspace-empty__orb">
                         <AppIcon name="orb" :size="40" />
                     </div>
@@ -424,6 +481,7 @@ onBeforeUnmount(() => {
             <div v-else-if="workspaceTab === '3d' && hasCadModels" class="workspace-viewer">
                 <ImmersiveCADCanvas :models="cadModels" :active-index="cadActiveIndex"
                     @update:active-index="(i) => { cadActiveIndex = i }" @close="dismissWorkspaceTab" />
+                <CADGenerationPlaceholder v-if="cadGenerationInProgress" :generation="cadGenerationInProgress" />
             </div>
 
             <!-- ── Chart tab ── -->
@@ -434,7 +492,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="chevron-left" :size="14" />
                     </button>
                     <span class="workspace-viewer__counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                    }}</span>
+                        }}</span>
                     <button class="workspace-viewer__nav-btn" :disabled="chartActiveIndex >= chartPayloads.length - 1"
                         @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
                         <AppIcon name="chevron-right" :size="14" />
@@ -771,6 +829,11 @@ onBeforeUnmount(() => {
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+    position: relative;
+}
+
+.workspace-viewer--placeholder {
+    background: var(--surface-0);
 }
 
 .workspace-viewer--chart,

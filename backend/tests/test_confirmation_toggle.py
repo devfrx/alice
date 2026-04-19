@@ -81,7 +81,7 @@ def _build_mocks(*, confirmations_enabled: bool = True):
 
     # --- WebSocket ---
     ws = AsyncMock()
-    ws.send_json = AsyncMock()
+    ws.send = AsyncMock()
 
     # --- DB session ---
     session = MagicMock()
@@ -138,7 +138,7 @@ async def test_confirmations_enabled_requests_approval():
         return_value=True,
     ) as mock_confirm:
         await run_tool_loop(
-            websocket=ws,
+            channel=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,
@@ -173,7 +173,7 @@ async def test_confirmations_disabled_auto_approves():
         return_value=True,
     ) as mock_confirm:
         await run_tool_loop(
-            websocket=ws,
+            channel=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,
@@ -205,7 +205,7 @@ async def test_forbidden_blocked_even_when_confirmations_disabled():
     conv_id = uuid.uuid4()
 
     await run_tool_loop(
-        websocket=ws,
+        channel=ws,
         ctx=ctx,
         session=session,
         conv_id=conv_id,
@@ -243,7 +243,7 @@ async def test_audit_logged_when_auto_approved():
     conv_id = uuid.uuid4()
 
     await run_tool_loop(
-        websocket=ws,
+        channel=ws,
         ctx=ctx,
         session=session,
         conv_id=conv_id,
@@ -283,7 +283,7 @@ async def test_safe_tool_no_confirmation_regardless_of_toggle():
             new_callable=AsyncMock,
         ) as mock_confirm:
             await run_tool_loop(
-                websocket=ws,
+                channel=ws,
                 ctx=ctx,
                 session=session,
                 conv_id=conv_id,
@@ -323,7 +323,7 @@ async def test_confirmations_enabled_rejected_by_user():
         return_value=False,
     ):
         await run_tool_loop(
-            websocket=ws,
+            channel=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,

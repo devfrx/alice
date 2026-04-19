@@ -41,6 +41,13 @@ from backend.services.context_manager import (
 )
 from backend.services.llm_service import LLMService
 from backend.api.routes._tool_loop import run_tool_loop
+from backend.services.turn import (
+    TurnInput,
+    TurnResult,
+    WebSocketEventSink,
+    WSEventSink,
+    create_turn_executor,
+)
 
 router = APIRouter(tags=["chat"])
 
@@ -695,6 +702,386 @@ class BranchConversationResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _build_done_event(
+    *,
+    conv_id: uuid.UUID,
+    user_msg: Message,
+    asst_msg_id: str,
+    finish_reason: str,
+) -> dict[str, Any]:
+    """Build the standard ``done`` WS event payload."""
+    return {
+        "type": "done",
+        "conversation_id": str(conv_id),
+        "message_id": asst_msg_id,
+        "user_message_id": str(user_msg.id),
+        "finish_reason": finish_reason,
+        "version_group_id": (
+            str(user_msg.version_group_id)
+            if user_msg.version_group_id
+            else None
+        ),
+        "version_index": user_msg.version_index,
+    }
+
+
+async def _persist_final_turn(
+    session: Any,
+    conv: Conversation,
+    conv_id: uuid.UUID,
+    user_msg: Message,
+    result: TurnResult,
+    sink: WSEventSink,
+    *,
+    ctx: AppContext,
+    llm: LLMService,
+    user_content: str,
+    was_compressed: bool,
+    pre_comp: CompressionResult | None,
+    context_window: int,
+    tool_tokens: int,
+    messages: list[dict[str, Any]],
+    av_map: dict[str, int],
+    cached_sys_prompt: str | None,
+) -> None:
+    """Persist the final assistant message and run post-stream side effects.
+
+    Owns the full post-turn pipeline that previously lived inline in
+    ``ws_chat`` (~lines 1480–1830 of the legacy implementation):
+
+    * Fast paths for ``finish_reason in {"cancelled", "error"}`` —
+      identical behaviour to the legacy cancel/error branches (v3-4).
+    * Normal path: save assistant ``Message`` (when content or no tool
+      calls), emit real ``context_info`` (v2-6), update
+      ``Conversation.title``/``updated_at``/``context_snapshot`` (v2-5),
+      commit, sync to file, optionally trigger post-stream compression
+      (v2-1), then emit the WS ``done`` event.
+
+    Args:
+        session: Active async DB session.
+        conv: Conversation ORM instance.
+        conv_id: Conversation UUID.
+        user_msg: User ORM message that triggered the turn.
+        result: Outcome from the executor.
+        sink: WebSocket event sink.
+        ctx: Application context.
+        llm: Active LLM service.
+        user_content: Raw user text (used for default title).
+        was_compressed: Whether pre-generation compression ran.
+        pre_comp: Result of pre-gen compression (``None`` if not run).
+        context_window: Effective context window for the active model.
+        tool_tokens: Token count of serialized tool definitions.
+        messages: Fully-assembled prompt list (used for breakdown).
+        av_map: Active version map for archival.
+        cached_sys_prompt: Pre-built system prompt for re-compression.
+    """
+    finish_reason = result.finish_reason
+
+    # ------------------------------------------------------------------
+    # Fast path: error (v3-4).  ``run_tool_loop`` may have flushed
+    # intermediate messages; rollback to keep DB consistent with the
+    # legacy behaviour.
+    # ------------------------------------------------------------------
+    if finish_reason == "error":
+        with contextlib.suppress(Exception):
+            await session.rollback()
+        await sink.send(_build_done_event(
+            conv_id=conv_id, user_msg=user_msg,
+            asst_msg_id="", finish_reason="error",
+        ))
+        return
+
+    # ------------------------------------------------------------------
+    # Fast path: cancelled (v3-4).  Two sub-cases depending on whether
+    # the tool loop ran (legacy behaviour preserved exactly).
+    # ------------------------------------------------------------------
+    if finish_reason == "cancelled":
+        asst_msg_id = ""
+        if result.content or result.thinking:
+            cancel_msg = Message(
+                conversation_id=conv_id,
+                role="assistant",
+                content=result.content,
+                thinking_content=result.thinking or None,
+                version_group_id=user_msg.version_group_id,
+                version_index=user_msg.version_index,
+            )
+            session.add(cancel_msg)
+            asst_msg_id = str(cancel_msg.id)
+        if result.had_tool_calls or result.content or result.thinking:
+            conv.updated_at = _utcnow()
+            if conv.title is None and user_content:
+                conv.title = user_content[:100]
+            await session.commit()
+            if ctx.conversation_file_manager:
+                await _sync_conversation_to_file(
+                    session, conv_id, ctx.conversation_file_manager,
+                )
+        await sink.send(_build_done_event(
+            conv_id=conv_id, user_msg=user_msg,
+            asst_msg_id=asst_msg_id, finish_reason="cancelled",
+        ))
+        return
+
+    # ------------------------------------------------------------------
+    # Normal path: persist final assistant message + post-stream work.
+    # ------------------------------------------------------------------
+    asst_msg_id = ""
+    asst_msg: Message | None = None
+
+    try:
+        # Skip the final save when the tool loop already produced
+        # intermediate assistant messages and the LLM emitted no
+        # additional text (matches legacy semantics).
+        if result.content.strip() or not result.had_tool_calls:
+            asst_msg = Message(
+                conversation_id=conv_id,
+                role="assistant",
+                content=result.content,
+                thinking_content=result.thinking or None,
+                version_group_id=user_msg.version_group_id,
+                version_index=user_msg.version_index,
+            )
+            session.add(asst_msg)
+            asst_msg_id = str(asst_msg.id)
+
+        # v2-6: emit context_info with REAL token counts when available.
+        if (
+            result.input_tokens > 0
+            and ctx.context_manager
+            and context_window > 0
+        ):
+            real_usage = ctx.context_manager.get_usage_real(
+                result.input_tokens, context_window,
+            )
+            await sink.send({
+                "type": "context_info",
+                "used": real_usage.used_tokens,
+                "available": real_usage.available_tokens,
+                "context_window": context_window,
+                "percentage": real_usage.percentage,
+                "was_compressed": was_compressed,
+                "messages_summarized": (
+                    pre_comp.usage.messages_summarized if pre_comp else 0
+                ),
+                "is_estimated": False,
+                "breakdown": _compute_context_breakdown(
+                    messages, tool_tokens, ctx.context_manager,
+                ),
+            })
+            # v2-7: persist token count on the assistant message.
+            if asst_msg is not None:
+                asst_msg.token_count = result.input_tokens
+                session.add(asst_msg)
+                await session.flush()
+
+        conv.updated_at = _utcnow()
+        if conv.title is None and user_content:
+            conv.title = user_content[:100]
+
+        # v2-5: persist anchor for next-turn token estimate.
+        if result.input_tokens > 0 and context_window > 0:
+            conv.context_snapshot = {
+                "prompt_tokens": result.input_tokens,
+                "completion_tokens": result.output_tokens,
+                "context_window": context_window,
+            }
+
+        await session.commit()
+
+        if ctx.conversation_file_manager:
+            await _sync_conversation_to_file(
+                session, conv_id, ctx.conversation_file_manager,
+            )
+
+        # v2-1: post-stream compression (truncated output OR token usage
+        # over threshold).  Triggers a fresh compression pass so the
+        # NEXT turn has room to breathe.
+        post_compress = finish_reason == "length"
+        if (
+            not post_compress
+            and result.input_tokens > 0
+            and result.output_tokens > 0
+            and context_window > 0
+        ):
+            real_pct = (
+                (result.input_tokens + result.output_tokens) / context_window
+            )
+            if real_pct >= ctx.config.llm.context_compression_threshold:
+                post_compress = True
+                logger.info(
+                    "Token usage {:.1f}% >= threshold {}%, triggering "
+                    "post-stream compression",
+                    real_pct * 100,
+                    ctx.config.llm.context_compression_threshold * 100,
+                )
+
+        if (
+            post_compress
+            and ctx.config.llm.context_compression_enabled
+            and ctx.context_manager is not None
+            and context_window > 0
+        ):
+            await _run_post_stream_compression(
+                session=session,
+                conv=conv,
+                conv_id=conv_id,
+                ctx=ctx,
+                llm=llm,
+                sink=sink,
+                cached_sys_prompt=cached_sys_prompt,
+                tool_tokens=tool_tokens,
+                context_window=context_window,
+                av_map=av_map,
+                finish_reason=finish_reason,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+            )
+    except Exception:
+        logger.exception("DB commit error after streaming")
+        with contextlib.suppress(Exception):
+            await session.rollback()
+        await sink.send({
+            "type": "error", "content": "Failed to save response",
+        })
+        await sink.send(_build_done_event(
+            conv_id=conv_id, user_msg=user_msg,
+            asst_msg_id="", finish_reason="error",
+        ))
+        return
+
+    await sink.send(_build_done_event(
+        conv_id=conv_id, user_msg=user_msg,
+        asst_msg_id=asst_msg_id, finish_reason=finish_reason,
+    ))
+
+
+def _msg_to_raw_dict(m: Message, db_pos: int) -> dict[str, Any]:
+    """Build the raw history dict shape used by the compression pipeline."""
+    return {
+        "role": m.role,
+        "content": m.content,
+        "tool_calls": m.tool_calls,
+        "tool_call_id": m.tool_call_id,
+        "version_group_id": (
+            str(m.version_group_id) if m.version_group_id else None
+        ),
+        "version_index": m.version_index,
+        "context_excluded": getattr(m, "context_excluded", False),
+        "is_context_summary": getattr(m, "is_context_summary", False),
+        "_db_pos": db_pos,
+    }
+
+
+async def _run_post_stream_compression(
+    *,
+    session: Any,
+    conv: Conversation,
+    conv_id: uuid.UUID,
+    ctx: AppContext,
+    llm: LLMService,
+    sink: WSEventSink,
+    cached_sys_prompt: str | None,
+    tool_tokens: int,
+    context_window: int,
+    av_map: dict[str, int],
+    finish_reason: str,
+    input_tokens: int,
+    output_tokens: int,
+) -> None:
+    """Run a compression pass after the final assistant message is saved.
+
+    Mirrors the legacy "post-stream compression" block from ``ws_chat``
+    1:1.  Failures are caught and surfaced as a
+    ``context_compression_failed`` WS event so the turn still completes.
+    """
+    try:
+        logger.info(
+            "Triggering post-stream compression (finish_reason={}, "
+            "tokens={}/{})",
+            finish_reason,
+            input_tokens + output_tokens,
+            context_window,
+        )
+        await sink.send({"type": "context_compression_start"})
+        post_stmt = (
+            select(Message)
+            .where(Message.conversation_id == conv_id)
+            .order_by(Message.created_at, Message.id)
+        )
+        post_results = await session.exec(post_stmt)
+        post_all_msgs = post_results.all()
+        post_raw = [
+            _msg_to_raw_dict(m, i) for i, m in enumerate(post_all_msgs)
+        ]
+        post_hist = _filter_history_for_llm(post_raw, av_map)
+        post_msgs = llm.build_continuation_messages(
+            post_hist, system_prompt=cached_sys_prompt,
+        )
+        post_comp = await ctx.context_manager.compress(
+            post_msgs,
+            llm,
+            context_window,
+            ctx.config.llm.context_compression_reserve,
+            tool_tokens=tool_tokens,
+        )
+        await _archive_messages_in_db(
+            session, post_all_msgs, post_raw,
+            post_comp.split_index,
+            active_versions=av_map,
+        )
+        post_summary = (
+            f"[Context summary of {post_comp.split_index} earlier "
+            f"messages]:\n{post_comp.summary_text}"
+        )
+        post_sum_msg = Message(
+            conversation_id=conv_id,
+            role="assistant",
+            content=post_summary,
+            is_context_summary=True,
+        )
+        session.add(post_sum_msg)
+        await session.commit()
+
+        if ctx.conversation_file_manager:
+            await _sync_conversation_to_file(
+                session, conv_id, ctx.conversation_file_manager,
+            )
+
+        await sink.send({
+            "type": "context_compression_done",
+            "messages_summarized": post_comp.usage.messages_summarized,
+            "summary_message_id": str(post_sum_msg.id),
+        })
+        await sink.send({
+            "type": "context_info",
+            "used": post_comp.usage.used_tokens,
+            "available": post_comp.usage.available_tokens,
+            "context_window": context_window,
+            "percentage": post_comp.usage.percentage,
+            "was_compressed": True,
+            "messages_summarized": post_comp.usage.messages_summarized,
+            "is_estimated": True,
+            "breakdown": _compute_context_breakdown(
+                post_comp.messages, tool_tokens, ctx.context_manager,
+            ),
+        })
+        logger.info(
+            "Post-stream compression done: {} messages archived",
+            post_comp.split_index,
+        )
+        conv.context_snapshot = {
+            "prompt_tokens": post_comp.usage.used_tokens,
+            "completion_tokens": 0,
+            "context_window": context_window,
+        }
+        await session.commit()
+    except Exception as exc:
+        logger.warning("Post-stream compression failed: {}", exc)
+        with contextlib.suppress(Exception):
+            await sink.send({"type": "context_compression_failed"})
+
+
 @router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket) -> None:
     """Accept a WebSocket, stream LLM responses token-by-token.
@@ -1214,158 +1601,91 @@ async def ws_chat(websocket: WebSocket) -> None:
                 finish_reason = "stop"
                 cancel_event = asyncio.Event()
 
-                async def _stream_and_collect() -> None:
-                    """Consume LLM stream, accumulate content and relay to WS."""
-                    nonlocal full_content, thinking_content, finish_reason
-                    nonlocal last_input_tokens, last_output_tokens
-                    # When compression happened, force OAI-compat
-                    # path — the native API uses response_id chaining
-                    # which bypasses our compressed messages list.
-                    effective_user_content = (
-                        None if comp is not None else user_content
+                # Resolve max_output_tokens once when the global cap is
+                # unset — mirrors the legacy ``_stream_and_collect`` logic.
+                resolved_max: int | None = None
+                if (
+                    ctx.config.llm.max_tokens <= 0
+                    and context_window > 0
+                    and ctx.context_manager is not None
+                ):
+                    resolved_max = max(
+                        1024,
+                        usage_est.available_tokens
+                        - ctx.config.llm.context_compression_reserve,
                     )
 
-                    # When max_tokens is unset (-1), calculate the
-                    # available output budget from context info so
-                    # LM Studio doesn't silently cap at a small default.
-                    resolved_max: int | None = None
-                    if (
-                        ctx.config.llm.max_tokens <= 0
-                        and context_window > 0
-                        and ctx.context_manager is not None
-                    ):
-                        resolved_max = max(
-                            1024,
-                            usage_est.available_tokens
-                            - ctx.config.llm.context_compression_reserve,
-                        )
+                # Build the immutable turn input.  When pre-gen
+                # compression ran, the executor must use the compressed
+                # history (so the tool loop does not re-compress) and the
+                # OAI-compat path (forced by user_content=None inside
+                # the executor when ``was_compressed=True``).
+                turn = TurnInput(
+                    conv_id=conv_id,
+                    user_msg_id=user_msg.id,
+                    user_content=user_content,
+                    history=history,
+                    messages=messages,
+                    tools=tools,
+                    memory_context=memory_context,
+                    cached_sys_prompt=cached_sys_prompt,
+                    attachment_info=attachment_info or None,
+                    context_window=context_window,
+                    version_group_id=user_msg.version_group_id,
+                    version_index=user_msg.version_index,
+                    client_ip=client_ip,
+                    resolved_max_tokens=resolved_max,
+                    was_compressed=comp is not None,
+                    compressed_history=(
+                        [
+                            m for m in comp.messages
+                            if m.get("role") != "system"
+                        ]
+                        if comp is not None else None
+                    ),
+                    tool_tokens=_tool_tokens if context_window > 0 else 0,
+                )
 
-                    async for event in llm.chat(
-                        messages,
-                        tools=tools,
-                        cancel_event=cancel_event,
-                        user_content=effective_user_content,
-                        conversation_id=str(conv_id),
-                        attachments=attachment_info or None,
-                        system_prompt=cached_sys_prompt,
-                        max_output_tokens=resolved_max,
-                    ):
-                        etype = event["type"]
-                        if etype == "token":
-                            full_content += event["content"]
-                            await websocket.send_json(event)
-                        elif etype == "thinking":
-                            thinking_content += event["content"]
-                            await websocket.send_json(event)
-                        elif etype == "tool_call":
-                            tool_calls_collected.append(event)
-                            await websocket.send_json(event)
-                        elif etype == "usage":
-                            last_input_tokens = event.get(
-                                "input_tokens", 0,
-                            )
-                            last_output_tokens = event.get(
-                                "output_tokens", 0,
-                            )
-                        elif etype == "error":
-                            logger.error(
-                                "LLM error during initial stream: {}",
-                                event.get("content", "unknown"),
-                            )
-                            await websocket.send_json(event)
-                            finish_reason = "error"
-                        elif etype == "done":
-                            finish_reason = event.get(
-                                "finish_reason", "stop",
-                            )
+                executor = create_turn_executor(
+                    ctx, llm, sync_fn=_sync_conversation_to_file,
+                )
+                sink = WebSocketEventSink(websocket)
 
-                async def _listen_for_cancel(
-                    stream_task: asyncio.Task[None],
-                    msg_buffer: list[str],
-                ) -> None:
-                    """Read WS messages while streaming; set cancel on request.
-
-                    When the client sends ``{"type": "cancel"}`` or disconnects,
-                    we set *cancel_event* **and** cancel the *stream_task* so that
-                    even a blocked ``httpx.stream()`` call (waiting for response
-                    headers from a slow reasoning model) is interrupted immediately.
-                    Non-cancel messages are buffered in *msg_buffer* for later
-                    processing by the main loop.
-                    """
-                    while not stream_task.done():
-                        try:
-                            raw_cancel = await asyncio.wait_for(
-                                websocket.receive_text(), timeout=2.0,
-                            )
-                            cancel_data = json.loads(raw_cancel)
-                            if cancel_data.get("type") == "cancel":
-                                cancel_event.set()
-                                stream_task.cancel()
-                                logger.debug("Client requested stream cancel")
-                                return
-                            else:
-                                msg_buffer.append(raw_cancel)
-                                logger.debug("Buffered non-cancel message during streaming")
-                        except asyncio.TimeoutError:
-                            continue
-                        except WebSocketDisconnect:
-                            cancel_event.set()
-                            stream_task.cancel()
-                            return
-                        except Exception:
-                            logger.warning(
-                                "Non-fatal error in cancel listener, ignoring"
-                            )
-                            continue
-
-                stream_task = asyncio.create_task(_stream_and_collect())
-                cancel_task = asyncio.create_task(
-                    _listen_for_cancel(stream_task, message_buffer),
+                executor_task = asyncio.create_task(
+                    executor.execute(turn, sink, cancel_event, session),
                 )
 
                 try:
-                    await stream_task
+                    result: TurnResult = await executor_task
                 except asyncio.CancelledError:
-                    # Task was cancelled by _listen_for_cancel (user
-                    # pressed stop or disconnected while the LLM was
-                    # still preparing its response).  Treat as cancel.
-                    logger.debug("LLM stream task cancelled")
                     cancel_event.set()
-                except Exception as exc:
-                    logger.exception("LLM streaming error")
-                    finish_reason = "error"
-                    # Surface the server's error message to the user
-                    err_detail = "LLM error"
-                    if hasattr(exc, "response"):
-                        err_detail = (
-                            f"LLM returned {exc.response.status_code}"
-                        )
-                    await websocket.send_json(
-                        {"type": "error", "content": err_detail},
+                    logger.debug("Executor task cancelled")
+                    result = TurnResult(
+                        content=full_content,
+                        thinking=thinking_content,
+                        input_tokens=0,
+                        output_tokens=0,
+                        finish_reason="cancelled",
+                        final_assistant_message_id=None,
+                        had_tool_calls=bool(tool_calls_collected),
                     )
-                    await websocket.send_json({
-                        "type": "done",
-                        "conversation_id": str(conv_id),
-                        "message_id": "",
-                        "user_message_id": str(user_msg.id),
-                        "finish_reason": "error",
-                        "version_group_id": str(user_msg.version_group_id)
-                        if user_msg.version_group_id
-                        else None,
-                        "version_index": user_msg.version_index,
-                    })
-                    await session.rollback()
-                    continue
-                finally:
-                    cancel_task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await cancel_task
 
-                # --- handle cancellation before tool loop -----------------
-                if cancel_event.is_set():
-                    asst_msg_id = ""
-                    if full_content or thinking_content:
-                        asst_msg = Message(
+                # Mirror legacy behaviour: feed locals from the result so
+                # disconnect-recovery has access to partial content.
+                full_content = result.content
+                thinking_content = result.thinking
+                last_input_tokens = result.input_tokens
+                last_output_tokens = result.output_tokens
+                finish_reason = result.finish_reason
+                tool_calls_collected = (
+                    [{"_": "_"}] if result.had_tool_calls else []
+                )
+
+                # FIX v2-4: disconnect recovery — save partial content
+                # then propagate so the outer WS loop exits cleanly.
+                if finish_reason == "disconnected":
+                    if full_content:
+                        recovery_msg = Message(
                             conversation_id=conv_id,
                             role="assistant",
                             content=full_content,
@@ -1373,461 +1693,37 @@ async def ws_chat(websocket: WebSocket) -> None:
                             version_group_id=user_msg.version_group_id,
                             version_index=user_msg.version_index,
                         )
-                        session.add(asst_msg)
+                        session.add(recovery_msg)
                         conv.updated_at = _utcnow()
-                        if conv.title is None and user_content:
-                            conv.title = user_content[:100]
-                        await session.commit()
-                        asst_msg_id = str(asst_msg.id)
+                        with contextlib.suppress(Exception):
+                            await session.commit()
                         if ctx.conversation_file_manager:
-                            await _sync_conversation_to_file(
-                                session, conv_id,
-                                ctx.conversation_file_manager,
-                            )
-                    await websocket.send_json({
-                        "type": "done",
-                        "conversation_id": str(conv_id),
-                        "message_id": asst_msg_id,
-                        "user_message_id": str(user_msg.id),
-                        "finish_reason": "cancelled",
-                        "version_group_id": str(user_msg.version_group_id)
-                        if user_msg.version_group_id
-                        else None,
-                        "version_index": user_msg.version_index,
-                    })
-                    continue
-
-                # --- tool calling loop (if LLM requested tools) -----------
-                if tool_calls_collected and finish_reason not in ("cancelled", "error"):
-                    try:
-                        (
-                            full_content,
-                            thinking_content,
-                            loop_in_tokens,
-                            loop_out_tokens,
-                            loop_finish,
-                        ) = await run_tool_loop(
-                            websocket=websocket,
-                            ctx=ctx,
-                            session=session,
-                            conv_id=conv_id,
-                            llm=llm,
-                            tool_calls_from_llm=tool_calls_collected,
-                            full_content=full_content,
-                            thinking_content=thinking_content,
-                            max_iterations=ctx.config.llm.max_tool_iterations,
-                            confirmation_timeout_s=ctx.config.pc_automation.confirmation_timeout_s,
-                            client_ip=client_ip,
-                            sync_fn=_sync_conversation_to_file,
-                            cancel_event=cancel_event,
-                            memory_context=memory_context,
-                            tools=tools,
-                            # When pre-gen compression ran, the in-memory
-                            # history passed to the tool loop must reflect
-                            # the compressed state, not the pre-compression
-                            # history — otherwise the loop would re-trigger
-                            # compression on every iteration.
-                            initial_history=(
-                                [
-                                    m for m in comp.messages
-                                    if m.get("role") != "system"
-                                ]
-                                if comp is not None
-                                else history
-                            ),
-                            system_prompt=cached_sys_prompt,
-                            version_group_id=user_msg.version_group_id,
-                            version_index=user_msg.version_index,
-                            context_window=context_window,
-                        )
-                        # Use token data from the final tool-loop
-                        # re-query when available (the initial
-                        # stream values are stale after tool calls).
-                        if loop_in_tokens > 0:
-                            last_input_tokens = loop_in_tokens
-                            last_output_tokens = loop_out_tokens
-                        finish_reason = loop_finish
-                    except WebSocketDisconnect:
-                        # Save any pending assistant content before propagating.
-                        logger.debug("WS disconnected during tool loop")
-                        if full_content:
-                            recovery_msg = Message(
-                                conversation_id=conv_id,
-                                role="assistant",
-                                content=full_content,
-                                thinking_content=thinking_content or None,
-                                version_group_id=user_msg.version_group_id,
-                                version_index=user_msg.version_index,
-                            )
-                            session.add(recovery_msg)
-                            conv.updated_at = _utcnow()
-                            await session.commit()
-                            if ctx.conversation_file_manager:
+                            with contextlib.suppress(Exception):
                                 await _sync_conversation_to_file(
                                     session, conv_id,
                                     ctx.conversation_file_manager,
                                 )
-                        raise
-                    except Exception:
-                        logger.exception("Tool loop error")
-                        await websocket.send_json(
-                            {"type": "error", "content": "Tool execution error"}
-                        )
-                        await websocket.send_json({
-                            "type": "done",
-                            "conversation_id": str(conv_id),
-                            "message_id": "",
-                            "user_message_id": str(user_msg.id),
-                            "finish_reason": "error",
-                            "version_group_id": str(user_msg.version_group_id)
-                            if user_msg.version_group_id
-                            else None,
-                            "version_index": user_msg.version_index,
-                        })
-                        await session.rollback()
-                        continue
+                    raise WebSocketDisconnect()
 
-                # --- handle cancellation during tool loop -----------------
-                if cancel_event.is_set():
-                    asst_msg_id = ""
-                    if full_content or thinking_content:
-                        cancel_asst_msg = Message(
-                            conversation_id=conv_id,
-                            role="assistant",
-                            content=full_content,
-                            thinking_content=thinking_content or None,
-                            version_group_id=user_msg.version_group_id,
-                            version_index=user_msg.version_index,
-                        )
-                        session.add(cancel_asst_msg)
-                        asst_msg_id = str(cancel_asst_msg.id)
-                    conv.updated_at = _utcnow()
-                    if conv.title is None and user_content:
-                        conv.title = user_content[:100]
-                    await session.commit()
-                    if ctx.conversation_file_manager:
-                        await _sync_conversation_to_file(
-                            session, conv_id,
-                            ctx.conversation_file_manager,
-                        )
-                    await websocket.send_json({
-                        "type": "done",
-                        "conversation_id": str(conv_id),
-                        "message_id": asst_msg_id,
-                        "user_message_id": str(user_msg.id),
-                        "finish_reason": "cancelled",
-                        "version_group_id": str(user_msg.version_group_id)
-                        if user_msg.version_group_id
-                        else None,
-                        "version_index": user_msg.version_index,
-                    })
-                    continue
-
-                # --- save assistant message --------------------------------
-                try:
-                    asst_msg_id = ""
-                    asst_msg = None
-
-                    # Only save a final assistant message if there is actual
-                    # content.  When tool_calls were executed, intermediate
-                    # messages are already persisted by the tool loop.
-                    if full_content.strip() or not tool_calls_collected:
-                        asst_msg = Message(
-                            conversation_id=conv_id,
-                            role="assistant",
-                            content=full_content,
-                            thinking_content=thinking_content or None,
-                            version_group_id=user_msg.version_group_id,
-                            version_index=user_msg.version_index,
-                        )
-                        session.add(asst_msg)
-                        asst_msg_id = str(asst_msg.id)
-
-                    # Update context_info with real tokens (if available).
-                    if (
-                        last_input_tokens > 0
-                        and ctx.context_manager
-                        and context_window > 0
-                    ):
-                        real_usage = ctx.context_manager.get_usage_real(
-                            last_input_tokens, context_window,
-                        )
-                        await websocket.send_json({
-                            "type": "context_info",
-                            "used": real_usage.used_tokens,
-                            "available": real_usage.available_tokens,
-                            "context_window": context_window,
-                            "percentage": real_usage.percentage,
-                            "was_compressed": comp is not None,
-                            "messages_summarized": (
-                                comp.usage.messages_summarized
-                                if comp else 0
-                            ),
-                            "is_estimated": False,
-                            "breakdown": _compute_context_breakdown(
-                                messages, _tool_tokens, ctx.context_manager,
-                            ),
-                        })
-                        # Persist token count on assistant message.
-                        if asst_msg is not None:
-                            asst_msg.token_count = last_input_tokens
-                            session.add(asst_msg)
-                            await session.flush()
-
-                    # --- update conversation timestamp -------------------------
-                    conv.updated_at = _utcnow()
-                    if conv.title is None and user_content:
-                        conv.title = user_content[:100]
-
-                    # Persist real token snapshot for accurate GET
-                    # estimates.  Only overwrite when we have real data.
-                    if last_input_tokens > 0 and context_window > 0:
-                        conv.context_snapshot = {
-                            "prompt_tokens": last_input_tokens,
-                            "completion_tokens": last_output_tokens,
-                            "context_window": context_window,
-                        }
-
-                    await session.commit()
-
-                    # Sync conversation to JSON file.
-                    if ctx.conversation_file_manager:
-                        await _sync_conversation_to_file(
-                            session, conv_id,
-                            ctx.conversation_file_manager,
-                        )
-
-                    # --- Post-stream compression on truncated output ------
-                    # When the LLM hit max_tokens / context limit, the
-                    # response was truncated.  Compress now so the NEXT
-                    # turn has enough room.
-                    # Determine whether post-stream compression
-                    # is needed.  Two triggers:
-                    # 1) finish_reason=="length" (OAI-compat path)
-                    # 2) Real token usage above threshold (covers
-                    #    native LM Studio path which always returns
-                    #    finish_reason="stop" even when truncated).
-                    post_compress = finish_reason == "length"
-                    if (
-                        not post_compress
-                        and last_input_tokens > 0
-                        and last_output_tokens > 0
-                        and context_window > 0
-                    ):
-                        total_tokens = (
-                            last_input_tokens + last_output_tokens
-                        )
-                        real_pct = total_tokens / context_window
-                        if real_pct >= (
-                            ctx.config.llm
-                            .context_compression_threshold
-                        ):
-                            post_compress = True
-                            logger.info(
-                                "Token usage {:.1f}% >= threshold "
-                                "{}%, triggering post-stream "
-                                "compression",
-                                real_pct * 100,
-                                ctx.config.llm
-                                .context_compression_threshold
-                                * 100,
-                            )
-                    if (
-                        post_compress
-                        and ctx.config.llm.context_compression_enabled
-                        and ctx.context_manager is not None
-                        and context_window > 0
-                    ):
-                        try:
-                            logger.info(
-                                "Triggering post-stream compression"
-                                " (finish_reason={}, tokens={}/{})",
-                                finish_reason,
-                                last_input_tokens + last_output_tokens,
-                                context_window,
-                            )
-                            await websocket.send_json(
-                                {"type": "context_compression_start"},
-                            )
-                            # Re-query messages including the
-                            # just-saved assistant response.
-                            post_stmt = (
-                                select(Message)
-                                .where(
-                                    Message.conversation_id == conv_id,
-                                )
-                                .order_by(
-                                    Message.created_at, Message.id,
-                                )
-                            )
-                            post_results = await session.exec(
-                                post_stmt,
-                            )
-                            post_all_msgs = post_results.all()
-                            post_raw = [
-                                {
-                                    "role": m.role,
-                                    "content": m.content,
-                                    "tool_calls": m.tool_calls,
-                                    "tool_call_id": m.tool_call_id,
-                                    "version_group_id": (
-                                        str(m.version_group_id)
-                                        if m.version_group_id
-                                        else None
-                                    ),
-                                    "version_index": m.version_index,
-                                    "context_excluded": getattr(
-                                        m, "context_excluded", False,
-                                    ),
-                                    "is_context_summary": getattr(
-                                        m, "is_context_summary", False,
-                                    ),
-                                    "_db_pos": i,
-                                }
-                                for i, m in enumerate(post_all_msgs)
-                            ]
-                            post_hist = _filter_history_for_llm(
-                                post_raw, av_map,
-                            )
-                            post_msgs = (
-                                llm.build_continuation_messages(
-                                    post_hist,
-                                    system_prompt=cached_sys_prompt,
-                                )
-                            )
-                            post_comp = (
-                                await ctx.context_manager.compress(
-                                    post_msgs,
-                                    llm,
-                                    context_window,
-                                    ctx.config.llm
-                                    .context_compression_reserve,
-                                    tool_tokens=_tool_tokens
-                                    if tools else 0,
-                                )
-                            )
-                            await _archive_messages_in_db(
-                                session,
-                                post_all_msgs,
-                                post_raw,
-                                post_comp.split_index,
-                                active_versions=av_map,
-                            )
-                            post_summary = (
-                                f"[Context summary of "
-                                f"{post_comp.split_index} earlier "
-                                f"messages]:\n"
-                                f"{post_comp.summary_text}"
-                            )
-                            post_sum_msg = Message(
-                                conversation_id=conv_id,
-                                role="assistant",
-                                content=post_summary,
-                                is_context_summary=True,
-                            )
-                            session.add(post_sum_msg)
-                            await session.commit()
-
-                            if ctx.conversation_file_manager:
-                                await _sync_conversation_to_file(
-                                    session, conv_id,
-                                    ctx.conversation_file_manager,
-                                )
-
-                            await websocket.send_json({
-                                "type": "context_compression_done",
-                                "messages_summarized": (
-                                    post_comp.usage
-                                    .messages_summarized
-                                ),
-                                "summary_message_id": str(
-                                    post_sum_msg.id,
-                                ),
-                            })
-                            # Send updated context_info after
-                            # compression so ContextBar refreshes.
-                            await websocket.send_json({
-                                "type": "context_info",
-                                "used": (
-                                    post_comp.usage.used_tokens
-                                ),
-                                "available": (
-                                    post_comp.usage.available_tokens
-                                ),
-                                "context_window": context_window,
-                                "percentage": (
-                                    post_comp.usage.percentage
-                                ),
-                                "was_compressed": True,
-                                "messages_summarized": (
-                                    post_comp.usage
-                                    .messages_summarized
-                                ),
-                                "is_estimated": True,
-                                "breakdown": _compute_context_breakdown(
-                                    post_comp.messages,
-                                    _tool_tokens,
-                                    ctx.context_manager,
-                                ),
-                            })
-                            logger.info(
-                                "Post-stream compression done: "
-                                "{} messages archived",
-                                post_comp.split_index,
-                            )
-                            # Update snapshot with compressed data.
-                            conv.context_snapshot = {
-                                "prompt_tokens": (
-                                    post_comp.usage.used_tokens
-                                ),
-                                "completion_tokens": 0,
-                                "context_window": context_window,
-                            }
-                            await session.commit()
-                        except Exception as exc:
-                            logger.warning(
-                                "Post-stream compression failed: "
-                                "{}",
-                                exc,
-                            )
-                            await websocket.send_json(
-                                {
-                                    "type":
-                                    "context_compression_failed",
-                                },
-                            )
-
-                except Exception:
-                    logger.exception("DB commit error after streaming")
-                    await session.rollback()
-                    await websocket.send_json(
-                        {"type": "error", "content": "Failed to save response"}
-                    )
-                    await websocket.send_json({
-                        "type": "done",
-                        "conversation_id": str(conv_id),
-                        "message_id": "",
-                        "user_message_id": str(user_msg.id),
-                        "finish_reason": "error",
-                        "version_group_id": str(user_msg.version_group_id)
-                        if user_msg.version_group_id
-                        else None,
-                        "version_index": user_msg.version_index,
-                    })
-                    continue
-
-                await websocket.send_json(
-                    {
-                        "type": "done",
-                        "conversation_id": str(conv_id),
-                        "message_id": asst_msg_id,
-                        "user_message_id": str(user_msg.id),
-                        "finish_reason": finish_reason,
-                        "version_group_id": str(user_msg.version_group_id)
-                        if user_msg.version_group_id
-                        else None,
-                        "version_index": user_msg.version_index,
-                    }
+                await _persist_final_turn(
+                    session=session,
+                    conv=conv,
+                    conv_id=conv_id,
+                    user_msg=user_msg,
+                    result=result,
+                    sink=sink,
+                    ctx=ctx,
+                    llm=llm,
+                    user_content=user_content,
+                    was_compressed=comp is not None,
+                    pre_comp=comp,
+                    context_window=context_window,
+                    tool_tokens=(
+                        _tool_tokens if context_window > 0 else 0
+                    ),
+                    messages=messages,
+                    av_map=av_map,
+                    cached_sys_prompt=cached_sys_prompt,
                 )
 
     except WebSocketDisconnect:

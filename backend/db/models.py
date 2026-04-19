@@ -387,3 +387,85 @@ class Artifact(SQLModel, table=True):
         back_populates="artifacts"
     )
 
+
+# ---------------------------------------------------------------------------
+# Agent Run (Agent Loop v2)
+# ---------------------------------------------------------------------------
+
+
+class AgentRun(SQLModel, table=True):
+    """Persistence of a single agent-loop execution.
+
+    Optional: conversations that do not use the agent loop have NO rows in
+    this table.  There is no mandatory FK from :class:`Message` back to
+    :class:`AgentRun` — runs are looked up by ``conversation_id`` /
+    ``user_message_id``.
+
+    Lifecycle:
+        ``planning`` → ``running`` → (``done`` | ``failed`` | ``cancelled``
+        | ``asked_user``)
+
+    Fields:
+        goal:         Free-form text goal extracted by the planner.
+        complexity:   ``TaskComplexity`` enum value (string).
+        plan_json:    JSON-serialized list of ``Step`` objects.
+        state:        Current state of the run.
+        current_step: Index of the step being executed (0-based).
+        total_steps:  Total number of steps in the active plan.
+        replans:      Number of times the planner re-planned mid-run.
+        retries_total: Cumulative per-step retries across the run.
+        total_tokens_in / total_tokens_out: Token accounting for the run.
+        total_tool_calls: Number of tool invocations across all steps.
+    """
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        sa.Index("ix_agent_run_conversation_id", "conversation_id"),
+        sa.Index("ix_agent_run_started_at", "started_at"),
+    )
+
+    id: uuid.UUID = Field(default_factory=_new_uuid, primary_key=True)
+    conversation_id: uuid.UUID = Field(
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
+        description="Conversation this run belongs to.",
+    )
+    user_message_id: uuid.UUID = Field(
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("messages.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        description="The user message that triggered this run.",
+    )
+    final_assistant_message_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("messages.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        description="The persisted final assistant message (set on success).",
+    )
+
+    goal: str = Field(default="")
+    complexity: str = Field(default="", max_length=32)
+    plan_json: str = Field(default="[]")
+    state: str = Field(default="planning", max_length=32)
+    current_step: int = Field(default=0)
+    total_steps: int = Field(default=0)
+    replans: int = Field(default=0)
+    retries_total: int = Field(default=0)
+
+    total_tokens_in: int = Field(default=0)
+    total_tokens_out: int = Field(default=0)
+    total_tool_calls: int = Field(default=0)
+
+    started_at: datetime = Field(default_factory=_utcnow)
+    finished_at: Optional[datetime] = Field(default=None)
+    error: Optional[str] = Field(default=None)
+

@@ -117,6 +117,35 @@ pc_automation:
   confirmations_enabled: true
   confirmation_timeout_s: 60
 
+agent:
+  enabled: false                  # OFF by default (legacy direct execution)
+  voice_mode_bypass: true         # voice mode always uses DirectTurnExecutor
+  max_steps: 8
+  max_retries_per_step: 2
+  max_replans: 2
+  step_timeout_seconds: 60        # max wall-clock for ONE step (excl. user wait)
+  total_timeout_seconds: 240      # max wall-clock for entire run (excl. user wait)
+  pause_timeout_during_confirmation: true   # clock paused during tool confirmation
+
+  classifier:
+    enabled: true                 # if false → always full agent loop
+    cache_ttl_seconds: 300
+    max_output_tokens: 20
+    temperature: 0.0
+
+  planner:
+    max_output_tokens: 600
+    temperature: 0.2
+    require_json_object: true     # response_format={"type":"json_object"}
+
+  critic:
+    max_output_tokens: 80
+    temperature: 0.0
+    fail_open: true               # parse error → verdict OK (don't block user)
+
+  persistence:
+    save_runs: true
+
 vram:
   monitoring_enabled: true
   warning_threshold_mb: 14000

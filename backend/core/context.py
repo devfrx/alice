@@ -89,6 +89,14 @@ class AppContext:
     artifact_registry: Any = None
     """Unified registry for tool-generated artifacts (3D, images, audio, …)."""
 
+    agent_components: Any = None
+    """Agent Loop v2 components (classifier/planner/critic) when enabled.
+
+    Populated at startup only if ``config.agent.enabled`` is True; otherwise
+    ``None``.  Typed as :class:`Any` to avoid a hard import dependency on
+    ``backend.services.agent`` (which may be wired in a later phase).
+    """
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

@@ -421,6 +421,33 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     artifact_registry.set_event_callback(_broadcast_artifact_event)
     ctx.artifact_registry = artifact_registry
 
+    # -- Agent Loop v2 components (optional) --------------------------------
+    # Only instantiated if ``agent.enabled`` is True.  The actual service
+    # classes live in ``backend.services.agent`` (created by a sibling
+    # subagent) — we wrap the import in try/except so a missing module
+    # cannot break startup.  When components cannot be built we keep the
+    # legacy direct-execution path.
+    if config.agent.enabled:
+        try:
+            from backend.services.agent import (  # type: ignore
+                AgentComponents,
+                ClassifierService,
+                PlannerService,
+                CriticService,
+            )
+
+            ctx.agent_components = AgentComponents(
+                classifier=ClassifierService(llm_service, config.agent.classifier),
+                planner=PlannerService(llm_service, config.agent.planner),
+                critic=CriticService(llm_service, config.agent.critic),
+            )
+            logger.info("Agent loop enabled")
+        except Exception as exc:
+            logger.warning("Failed to init agent components: {}", exc)
+            ctx.agent_components = None
+    else:
+        ctx.agent_components = None
+
     app.state.context = ctx
     app.state.engine = engine
 

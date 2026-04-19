@@ -799,6 +799,112 @@ class McpConfig(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
+# Agent loop (Agent Loop v2)
+# ---------------------------------------------------------------------------
+
+
+class AgentClassifierConfig(BaseSettings):
+    """Transport config for the task-complexity classifier service."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__CLASSIFIER__")
+
+    enabled: bool = True
+    """If False the executor always runs the full agent loop (no fast path)."""
+
+    cache_ttl_seconds: int = 300
+    """How long classifier verdicts are cached for identical inputs."""
+
+    max_output_tokens: int = 20
+    """Cap on the classifier LLM response (verdict is a short label)."""
+
+    temperature: float = 0.0
+    """Sampling temperature (0.0 = deterministic)."""
+
+
+class AgentPlannerConfig(BaseSettings):
+    """Transport config for the planner service."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__PLANNER__")
+
+    max_output_tokens: int = 600
+    """Cap on planner output (full JSON plan)."""
+
+    temperature: float = 0.2
+    """Slight randomness keeps the planner from repeating identical plans."""
+
+    require_json_object: bool = True
+    """Forward ``response_format={\"type\":\"json_object\"}`` to the LLM."""
+
+
+class AgentCriticConfig(BaseSettings):
+    """Transport config for the critic / verdict service."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__CRITIC__")
+
+    max_output_tokens: int = 80
+    """Critic responses are short (verdict + brief reason)."""
+
+    temperature: float = 0.0
+    """Deterministic verdicts."""
+
+    fail_open: bool = True
+    """On parse error, default to verdict OK so the user is not blocked."""
+
+
+class AgentPersistenceConfig(BaseSettings):
+    """Persistence options for agent runs."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__PERSISTENCE__")
+
+    save_runs: bool = True
+    """If True, every agent run is recorded in the ``agent_runs`` table."""
+
+
+class AgentConfig(BaseSettings):
+    """Configuration for the Agent Loop v2 execution strategy.
+
+    The agent loop is OFF by default (``enabled: False``).  When disabled
+    the chat path uses :class:`DirectTurnExecutor` and behavior is
+    bit-equivalent to the pre-v2 implementation.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
+
+    enabled: bool = False
+    """Master switch for the agent loop. False = legacy direct execution."""
+
+    voice_mode_bypass: bool = True
+    """In voice mode always fall back to :class:`DirectTurnExecutor`."""
+
+    max_steps: int = 8
+    """Hard cap on the number of plan steps executed in a single run."""
+
+    max_retries_per_step: int = 2
+    """How many times a single step may be retried after a failed verdict."""
+
+    max_replans: int = 2
+    """How many times the planner may rewrite the plan mid-run."""
+
+    step_timeout_seconds: int = 60
+    """Maximum wall-clock seconds for a single step (excludes user wait)."""
+
+    total_timeout_seconds: int = 240
+    """Maximum wall-clock seconds for the entire run (excludes user wait)."""
+
+    pause_timeout_during_confirmation: bool = True
+    """If True the timeout clock is paused while awaiting tool confirmation."""
+
+    classifier: AgentClassifierConfig = Field(
+        default_factory=AgentClassifierConfig
+    )
+    planner: AgentPlannerConfig = Field(default_factory=AgentPlannerConfig)
+    critic: AgentCriticConfig = Field(default_factory=AgentCriticConfig)
+    persistence: AgentPersistenceConfig = Field(
+        default_factory=AgentPersistenceConfig
+    )
+
+
+# ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
 
@@ -837,6 +943,7 @@ class AliceConfig(BaseSettings):
     pc_automation: PcAutomationConfig = Field(
         default_factory=PcAutomationConfig
     )
+    agent: AgentConfig = Field(default_factory=AgentConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
     web_search: WebSearchConfig = Field(default_factory=WebSearchConfig)

@@ -34,6 +34,8 @@ async def collect_text(
     system_prompt: str | None,
     max_output_tokens: int | None,
     cancel_event: asyncio.Event | None,
+    response_format: dict[str, Any] | None = None,
+    temperature: float | None = None,
 ) -> str:
     """Run an LLM chat call and return the concatenated assistant text.
 
@@ -49,18 +51,29 @@ async def collect_text(
         system_prompt: Optional system prompt forwarded to ``llm.chat``.
         max_output_tokens: Cap on generated tokens.
         cancel_event: Optional cooperative cancellation event.
+        response_format: Optional structured-output hint forwarded to
+            ``llm.chat`` (e.g. ``{"type": "json_object"}``).  Backends
+            that don't support it degrade gracefully (see
+            :meth:`LLMService._chat_openai_compat`).
+        temperature: Optional per-call temperature override.
 
     Returns:
         The plain-text response.  Empty string if the stream produced no
         ``token`` events (caller decides how to handle that).
     """
     chunks: list[str] = []
+    extra: dict[str, Any] = {}
+    if response_format is not None:
+        extra["response_format"] = response_format
+    if temperature is not None:
+        extra["temperature"] = temperature
     async for event in llm.chat(
         messages,
         tools=None,
         cancel_event=cancel_event,
         system_prompt=system_prompt,
         max_output_tokens=max_output_tokens,
+        **extra,
     ):
         etype = event.get("type")
         if etype == "token":

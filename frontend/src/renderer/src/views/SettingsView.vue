@@ -151,6 +151,46 @@
               <span>Le richieste con strumenti potrebbero richiedere più chiamate al modello e impiegare più tempo.</span>
             </div>
           </Transition>
+
+          <div class="sv__divider" />
+
+          <div class="sv__row">
+            <div class="sv__row-text">
+              <span class="sv__row-label">Mostra Plan Card sotto i messaggi</span>
+              <span class="sv__row-hint">Aggiunge una checklist collassabile con il piano dell'agente sotto ogni risposta.</span>
+            </div>
+            <button class="sv__toggle" :class="{ 'sv__toggle--on': uiStore.agentPlanCardEnabled }" role="switch"
+              :aria-checked="uiStore.agentPlanCardEnabled"
+              @click="uiStore.agentPlanCardEnabled = !uiStore.agentPlanCardEnabled">
+              <span class="sv__toggle-thumb" />
+            </button>
+          </div>
+
+          <div class="sv__divider" />
+
+          <div class="sv__row">
+            <div class="sv__row-text">
+              <span class="sv__row-label">Apri Activity Sidebar automaticamente</span>
+              <span class="sv__row-hint">Apre il pannello laterale al primo evento dell'agente.</span>
+            </div>
+            <button class="sv__toggle" :class="{ 'sv__toggle--on': uiStore.agentSidebarAutoOpen }" role="switch"
+              :aria-checked="uiStore.agentSidebarAutoOpen"
+              @click="uiStore.agentSidebarAutoOpen = !uiStore.agentSidebarAutoOpen">
+              <span class="sv__toggle-thumb" />
+            </button>
+          </div>
+
+          <div class="sv__divider" />
+
+          <div class="sv__row">
+            <div class="sv__row-text">
+              <span class="sv__row-label">Modalità agente</span>
+              <span class="sv__row-hint">Stato corrente, gestito dalla configurazione del backend.</span>
+            </div>
+            <span class="sv__readonly-pill" :class="{ 'sv__readonly-pill--on': settingsStore.settings.agent.enabled }">
+              {{ settingsStore.settings.agent.enabled ? 'Attiva' : 'Inattiva' }}
+            </span>
+          </div>
         </div>
       </section>
 
@@ -226,8 +266,10 @@ import VectorStoreManager from '../components/settings/VectorStoreManager.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 import type { AppIconName } from '../assets/icons'
 import { useSettingsStore } from '../stores/settings'
+import { useUIStore } from '../stores/ui'
 
 const settingsStore = useSettingsStore()
+const uiStore = useUIStore()
 
 /* ── Navigation ─────────────────────────────────────────────── */
 type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
@@ -554,6 +596,23 @@ onUnmounted(() => {
   flex-shrink: 0;
   margin-top: 1px;
   color: var(--warning);
+}
+
+/* ── Read-only pill (Modalità agente status) ─────────────── */
+.sv__readonly-pill {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sv__readonly-pill--on {
+  background: rgba(110, 200, 140, 0.14);
+  color: rgb(150, 220, 175);
 }
 
 /* Warning transition */

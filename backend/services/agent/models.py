@@ -14,6 +14,7 @@ parameterize each service.  The aggregating ``AgentConfig`` lives in
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -29,6 +30,29 @@ class TaskComplexity(str, Enum):
     OPEN_ENDED = "open_ended"
     SINGLE_TOOL = "single_tool"
     MULTI_STEP = "multi_step"
+
+
+ClassificationSource = Literal["heuristic", "llm", "default"]
+"""Where a :class:`ClassificationResult` came from.
+
+* ``heuristic`` — deterministic regex match, LLM not invoked.
+* ``llm``       — produced by the classifier model.
+* ``default``   — safe fallback used on LLM/parse errors.
+"""
+
+
+class ClassificationResult(BaseModel):
+    """Structured classifier output.
+
+    The legacy :meth:`ClassifierService.classify` method still returns a
+    bare :class:`TaskComplexity` for backwards compatibility; this model
+    is exposed for callers that need the provenance metadata (logging,
+    metrics, future WS events).
+    """
+
+    complexity: TaskComplexity
+    source: ClassificationSource = "llm"
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
 class Step(BaseModel):
@@ -80,6 +104,14 @@ class Verdict(BaseModel):
         default=None,
         description="Required when action=ASK_USER — what to ask the user.",
     )
+    source: str | None = Field(
+        default=None,
+        description=(
+            "Origin of the verdict: ``\"detector\"`` for the local "
+            "degeneration detector, ``\"llm\"`` for the model call, "
+            "``None`` when produced by tests / fallbacks."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -118,10 +150,14 @@ class CriticConfig(BaseModel):
     max_output_tokens: int = Field(default=80, ge=1)
     temperature: float = Field(default=0.0, ge=0.0)
     fail_open: bool = True
+    always_run: bool = True
+    degeneration_detector_enabled: bool = True
 
 
 __all__ = [
     "TaskComplexity",
+    "ClassificationSource",
+    "ClassificationResult",
     "Step",
     "Plan",
     "VerdictAction",

@@ -55,6 +55,42 @@ _UNIX_PATH_RE: re.Pattern[str] = re.compile(
 )
 
 
+def _format_schema_error(
+    ve: Any,
+    args: dict[str, Any],
+    schema: dict[str, Any],
+) -> str:
+    """Render a jsonschema ValidationError into an LLM-actionable message.
+
+    The default ``ve.message`` is too terse for small local models —
+    e.g. ``'title' is a required property`` doesn't tell Gemma which
+    keys it actually sent vs which are missing.  This helper enriches
+    the error with the diff between provided and expected top-level
+    keys whenever the failure is a missing-required at the root.
+
+    Falls back to the bare ``ve.message`` for any non-trivial error.
+    """
+    try:
+        message = str(ve.message)
+        path = list(getattr(ve, "absolute_path", []) or [])
+        validator = getattr(ve, "validator", None)
+        if validator == "required" and not path and isinstance(args, dict):
+            required = list(schema.get("required", []) or [])
+            sent = sorted(args.keys())
+            missing = [k for k in required if k not in args]
+            return (
+                f"{message}. Hai inviato keys={sent}, mancano: {missing}. "
+                "Inserisci le chiavi mancanti come proprietà top-level "
+                "dell'oggetto arguments (NON dentro echarts_option o altri "
+                "oggetti annidati)."
+            )
+        if path:
+            return f"{message} (path: {'.'.join(str(p) for p in path)})"
+        return message
+    except Exception:  # noqa: BLE001 — never block on formatting
+        return str(getattr(ve, "message", ve))
+
+
 def _sanitise_dict(obj: dict[str, Any]) -> dict[str, Any]:
     """Recursively sanitise string values in a dictionary."""
     cleaned: dict[str, Any] = {}
@@ -711,18 +747,19 @@ class ToolRegistry:
             try:
                 _jsonschema.validate(instance=args, schema=tool_def.parameters)
             except _jsonschema.ValidationError as ve:
+                detail = _format_schema_error(ve, args, tool_def.parameters)
                 self._logger.warning(
                     "Tool '{}' args validation failed: {}",
-                    tool_name, ve.message,
+                    tool_name, detail,
                 )
                 await self._event_bus.emit(
                     AliceEvent.TOOL_EXECUTION_FAILED,
                     tool_name=tool_name,
                     execution_id=execution_id,
-                    error=f"Invalid arguments: {ve.message}",
+                    error=f"Invalid arguments: {detail}",
                 )
                 return ToolResult.error(
-                    f"Tool '{tool_name}' argument validation failed: {ve.message}"
+                    f"Tool '{tool_name}' argument validation failed: {detail}"
                 )
             except _jsonschema.SchemaError:
                 # Schema itself is malformed — log but don't block execution

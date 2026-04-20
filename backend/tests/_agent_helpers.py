@@ -144,9 +144,15 @@ class MockCritic:
         plan: Plan,
         retries_used: int,
         cancel_event: asyncio.Event | None = None,
+        finish_reason: str | None = None,
     ) -> Verdict:
         self.calls.append(
-            {"step_index": step.index, "output": output, "retries_used": retries_used}
+            {
+                "step_index": step.index,
+                "output": output,
+                "retries_used": retries_used,
+                "finish_reason": finish_reason,
+            }
         )
         if self._verdicts:
             return self._verdicts.pop(0)
@@ -169,8 +175,15 @@ def make_agent_cfg(
     total_timeout_seconds: int = 0,
     save_runs: bool = False,
     voice_mode_bypass: bool = True,
+    critic_always_run: bool = False,
+    critic_degeneration_detector_enabled: bool = True,
 ) -> Any:
-    """Lightweight ``AgentConfig`` stub matching the attribute surface used."""
+    """Lightweight ``AgentConfig`` stub matching the attribute surface used.
+
+    ``critic_always_run`` defaults to ``False`` so legacy bypass tests
+    keep their original semantics; opt-in tests pass ``True`` to
+    exercise the always-on critic path.
+    """
     return SimpleNamespace(
         enabled=enabled,
         voice_mode_bypass=voice_mode_bypass,
@@ -182,7 +195,10 @@ def make_agent_cfg(
         pause_timeout_during_confirmation=True,
         classifier=SimpleNamespace(enabled=classifier_enabled),
         planner=SimpleNamespace(),
-        critic=SimpleNamespace(),
+        critic=SimpleNamespace(
+            always_run=critic_always_run,
+            degeneration_detector_enabled=critic_degeneration_detector_enabled,
+        ),
         persistence=SimpleNamespace(save_runs=save_runs),
     )
 

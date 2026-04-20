@@ -20,6 +20,7 @@ import { computed, reactive, ref, type ComputedRef, type Ref } from 'vue'
 import type {
   AgentEvent,
   AgentRun,
+  AgentRunMode,
   AgentRunState,
   Plan,
   Step,
@@ -46,7 +47,11 @@ const pendingRunId = ref<string | null>(null)
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function _newEmptyRun(runId: string, complexity: AgentRun['complexity']): AgentRun {
+function _newEmptyRun(
+  runId: string,
+  complexity: AgentRun['complexity'],
+  mode: AgentRunMode = 'agent',
+): AgentRun {
   return {
     id: runId,
     conversation_id: '',
@@ -54,6 +59,7 @@ function _newEmptyRun(runId: string, complexity: AgentRun['complexity']): AgentR
     final_assistant_message_id: null,
     goal: '',
     complexity,
+    mode,
     plan: null,
     state: 'planning',
     current_step: 0,
@@ -64,6 +70,8 @@ function _newEmptyRun(runId: string, complexity: AgentRun['complexity']): AgentR
     total_tokens_out: 0,
     total_tool_calls: 0,
     verdicts: {},
+    critic_sources: {},
+    warnings: [],
     pending_question: null,
     started_at: new Date().toISOString(),
     finished_at: null,
@@ -81,11 +89,15 @@ function _withRun(runId: string | null, mutator: (run: AgentRun) => void): void 
   runs.set(runId, run)
 }
 
-function _ensureRun(runId: string | null, complexity: AgentRun['complexity'] = ''): AgentRun | null {
+function _ensureRun(
+  runId: string | null,
+  complexity: AgentRun['complexity'] = '',
+  mode: AgentRunMode = 'agent',
+): AgentRun | null {
   if (!runId) return null
   let run = runs.get(runId)
   if (!run) {
-    run = _newEmptyRun(runId, complexity)
+    run = _newEmptyRun(runId, complexity, mode)
     runs.set(runId, run)
   }
   return run
@@ -145,10 +157,18 @@ export function useAgentRun(): UseAgentRunReturn {
   function applyAgentEvent(event: AgentEvent): void {
     switch (event.type) {
       case 'agent.run_started': {
-        const run = _ensureRun(event.run_id, event.complexity)
+        const mode: AgentRunMode = event.mode ?? 'agent'
+        const run = _ensureRun(event.run_id, event.complexity, mode)
         if (run) {
           run.complexity = event.complexity
+          run.mode = mode
           run.state = 'planning'
+          // Capture the originating user message id when supplied so
+          // the activity feed can slice the run's conversation window
+          // before the final assistant message arrives.
+          if (event.user_message_id) {
+            run.user_message_id = event.user_message_id
+          }
           pendingRunId.value = event.run_id
         }
         break
@@ -187,7 +207,24 @@ export function useAgentRun(): UseAgentRunReturn {
         _withRun(event.run_id, (run) => {
           run.plan = _normalizePlan(event.new_plan)
           run.total_steps = event.new_plan.steps.length
-          run.replans += 1
+          // Trust the backend counter when present, fall back to local
+          // increment for backwards compatibility.
+          run.replans =
+            typeof event.replan_count === 'number'
+              ? event.replan_count
+              : run.replans + 1
+        })
+        break
+      }
+      case 'agent.critic_invoked': {
+        _withRun(event.run_id, (run) => {
+          run.critic_sources[event.step_index] = event.source
+        })
+        break
+      }
+      case 'agent.warning': {
+        _withRun(event.run_id, (run) => {
+          run.warnings.push({ code: event.code, message: event.message })
         })
         break
       }

@@ -37,6 +37,10 @@ from loguru import logger
 
 from backend.services.turn.models import TurnInput, TurnResult
 from backend.services.turn.sink import WSEventSink
+from backend.services.turn._critic_bypass import (
+    emit_critic_invoked,
+    emit_warning,
+)
 
 if TYPE_CHECKING:  # pragma: no cover — typing only
     from fastapi import WebSocket
@@ -184,7 +188,10 @@ class AgentTurnExecutor:
         # Bypass path 1: classifier off / no tools.
         # ------------------------------------------------------------------
         if not self._cfg.classifier.enabled or not turn.tools:
-            return await self._direct.execute(turn, sink, cancel_event, session)
+            label = "classifier_disabled" if not self._cfg.classifier.enabled else "no_tools"
+            return await self._direct_with_optional_critic(
+                turn, sink, cancel_event, session, label=label,
+            )
 
         # ------------------------------------------------------------------
         # Classification (fail-safe — never raises).
@@ -199,7 +206,9 @@ class AgentTurnExecutor:
         # Bypass path 2: trivial / open-ended.
         # ------------------------------------------------------------------
         if complexity in (TaskComplexity.TRIVIAL, TaskComplexity.OPEN_ENDED):
-            return await self._direct.execute(turn, sink, cancel_event, session)
+            return await self._direct_with_optional_critic(
+                turn, sink, cancel_event, session, label=complexity.value,
+            )
 
         # ------------------------------------------------------------------
         # Persist a fresh AgentRun row (best-effort).
@@ -212,13 +221,30 @@ class AgentTurnExecutor:
             complexity=complexity.value,
         )
         run_id = run.id if run is not None else None
-        await sink.send(
-            {
-                "type": "agent.run_started",
-                "run_id": str(run_id) if run_id is not None else None,
-                "complexity": complexity.value,
-            },
+        # ``mode`` is "bypass" for the SINGLE_TOOL fast path (no real
+        # plan ever produced) and "agent" for the full MULTI_STEP loop
+        # below.  Older clients that don't read the field continue to
+        # work — the addition is strictly additive.
+        run_started_mode = (
+            "bypass" if complexity == TaskComplexity.SINGLE_TOOL else "agent"
         )
+        run_started_payload: dict[str, Any] = {
+            "type": "agent.run_started",
+            "run_id": str(run_id) if run_id is not None else None,
+            "complexity": complexity.value,
+            "mode": run_started_mode,
+            # Carry the originating user message id so the frontend can
+            # slice the conversation window owned by this run before the
+            # final assistant message id is known.
+            "user_message_id": str(turn.user_msg_id),
+        }
+        if run_started_mode == "bypass":
+            # Bypass paths never produce a structured plan visible to
+            # the client.  Surfacing ``plan=None`` / ``total_steps=0``
+            # makes that explicit so the UI can hide the plan tray.
+            run_started_payload["plan"] = None
+            run_started_payload["total_steps"] = 0
+        await sink.send(run_started_payload)
 
         # ------------------------------------------------------------------
         # SINGLE_TOOL: skip planner / critic, but still track the run.
@@ -245,8 +271,102 @@ class AgentTurnExecutor:
         session: Any,
         run: Any,
     ) -> TurnResult:
-        """Execute as a single direct turn, persisting the run as ``done``."""
+        """Execute as a single direct turn, persisting the run as ``done``.
+
+        When ``cfg.critic.always_run`` is true the critic is invoked on
+        the produced content.  A ``REPLAN`` verdict is honoured by
+        promoting the turn to a 1-N-step mini-plan via the planner;
+        ``RETRY`` re-runs the same direct execution up to
+        ``cfg.max_retries_per_step`` with a reinforced user prompt.
+        """
+        from backend.services.agent.models import VerdictAction
+
         result = await self._direct.execute(turn, sink, cancel_event, session)
+
+        # SINGLE_TOOL bypass: if the classifier said a tool was needed
+        # but the model didn't call any, surface a soft warning so the
+        # frontend can flag the mismatch.  Non-blocking: the critic
+        # below still gets to render the final verdict.
+        if not result.had_tool_calls and not cancel_event.is_set():
+            await emit_warning(
+                sink,
+                run_id=run.id if run is not None else None,
+                code="bypass_single_tool_no_call",
+                message=(
+                    "Il classificatore prevedeva l'uso di uno strumento "
+                    "ma il modello non l'ha invocato."
+                ),
+            )
+
+        if self._critic_always_run() and not cancel_event.is_set():
+            verdict = await self._critique_bypass(
+                turn=turn,
+                sink=sink,
+                cancel_event=cancel_event,
+                run_id=run.id if run is not None else None,
+                output=result.content,
+                finish_reason=result.finish_reason,
+                label="single_tool",
+            )
+
+            retries = 0
+            while (
+                verdict.action == VerdictAction.RETRY
+                and retries < self._cfg.max_retries_per_step
+                and not cancel_event.is_set()
+            ):
+                retries += 1
+                result = await self._direct.execute(
+                    self._reinforce_turn(turn, verdict.reason, retries),
+                    sink, cancel_event, session,
+                )
+                verdict = await self._critique_bypass(
+                    turn=turn,
+                    sink=sink,
+                    cancel_event=cancel_event,
+                    run_id=run.id if run is not None else None,
+                    output=result.content,
+                    finish_reason=result.finish_reason,
+                    label="single_tool",
+                )
+
+            if verdict.action == VerdictAction.REPLAN and not cancel_event.is_set():
+                # Promote to a real mini-plan and run it through the
+                # multi-step machinery.  The original direct result is
+                # discarded — the planner will re-do the work with a
+                # structured plan that the critic can guard end-to-end.
+                logger.info(
+                    "SINGLE_TOOL promoted to MULTI_STEP after REPLAN: {}",
+                    verdict.reason,
+                )
+                await emit_warning(
+                    sink,
+                    run_id=run.id if run is not None else None,
+                    code="single_tool_promoted",
+                    message=(
+                        "La richiesta richiede una pianificazione: "
+                        "riformulo come piano in più passi."
+                    ),
+                )
+                if run is not None:
+                    run.complexity = "multi_step"
+                    await self._flush(session)
+                return await self._run_multi_step(
+                    turn, sink, cancel_event, session, run, VerdictAction,
+                )
+
+            if verdict.action in (VerdictAction.RETRY, VerdictAction.REPLAN):
+                # Retries exhausted (or REPLAN under cancel) — surface as warning.
+                await emit_warning(
+                    sink,
+                    run_id=run.id if run is not None else None,
+                    code="critic_unsatisfied",
+                    message=(
+                        "La verifica non è stata superata e non posso "
+                        "riprovare oltre."
+                    ),
+                )
+
         if run is not None:
             state = self._final_state_from_finish_reason(result.finish_reason)
             run.state = state
@@ -276,6 +396,151 @@ class AgentTurnExecutor:
         )
 
     # ------------------------------------------------------------------
+    # Bypass critic helpers
+    # ------------------------------------------------------------------
+
+    def _critic_always_run(self) -> bool:
+        """Return True when ``cfg.critic.always_run`` is enabled.
+
+        ``getattr`` is used to keep compatibility with stub configs
+        used in unit tests that may omit the attribute.
+        """
+        return bool(getattr(self._cfg.critic, "always_run", False))
+
+    async def _critique_bypass(
+        self,
+        *,
+        turn: TurnInput,
+        sink: WSEventSink,
+        cancel_event: asyncio.Event,
+        run_id: Any,
+        output: str,
+        finish_reason: str | None,
+        label: str,
+    ) -> Any:
+        """Invoke the critic on a bypass turn output and emit the WS event.
+
+        Builds a minimal generic 1-step :class:`Plan` *inline* (no fake
+        per-user-content step is materialised — the user's request is
+        passed only as the goal so the critic prompt has the necessary
+        context) and calls :meth:`CriticService.evaluate`.
+        """
+        from backend.services.agent.models import Plan, Step
+
+        step = Step(
+            index=0,
+            description="Risposta diretta all'utente.",
+            expected_outcome=(
+                "Risposta coerente con la richiesta, senza degenerazioni."
+            ),
+            tool_hint=None,
+        )
+        plan = Plan(goal=turn.user_content or "(richiesta vuota)", steps=[step])
+        verdict = await self._critic.evaluate(
+            step=step,
+            output=output,
+            plan=plan,
+            retries_used=0,
+            cancel_event=cancel_event,
+            finish_reason=finish_reason,
+        )
+        # ``label`` is logged for traceability but never surfaced in
+        # ``verdict.reason`` (which must stay user-facing italian).
+        logger.debug("Bypass critique label={} verdict={}", label, verdict.action)
+        await emit_critic_invoked(
+            sink, run_id=run_id, step_index=0, verdict=verdict,
+        )
+        return verdict
+
+    async def _direct_with_optional_critic(
+        self,
+        turn: TurnInput,
+        sink: WSEventSink,
+        cancel_event: asyncio.Event,
+        session: Any,
+        *,
+        label: str,
+    ) -> TurnResult:
+        """Run the direct executor and optionally critique its output.
+
+        Used by the *non-tool-flow* bypass paths (TRIVIAL,
+        OPEN_ENDED, classifier disabled, no tools).  Recovery is not
+        attempted: a non-OK verdict is surfaced as a soft
+        ``agent.warning`` event and the original result is returned
+        untouched — it is up to the user / UI to react.
+
+        When ``cfg.critic.always_run`` is true the executor wraps the
+        delegated direct turn with ``agent.run_started`` (mode=bypass)
+        and ``agent.run_finished`` so the WS contract stays uniform
+        with the SINGLE_TOOL / MULTI_STEP paths.  When it's off, no
+        ``agent.*`` event is emitted and the path is bit-equivalent to
+        :class:`DirectTurnExecutor` alone.
+        """
+        from backend.services.agent.models import VerdictAction
+
+        critic_on = self._critic_always_run()
+        if critic_on:
+            await sink.send(
+                {
+                    "type": "agent.run_started",
+                    "run_id": None,
+                    "complexity": label,
+                    "mode": "bypass",
+                    "plan": None,
+                    "total_steps": 0,
+                },
+            )
+
+        result = await self._direct.execute(turn, sink, cancel_event, session)
+        if not critic_on or cancel_event.is_set():
+            return result
+
+        verdict = await self._critique_bypass(
+            turn=turn,
+            sink=sink,
+            cancel_event=cancel_event,
+            run_id=None,
+            output=result.content,
+            finish_reason=result.finish_reason,
+            label=label,
+        )
+        if verdict.action != VerdictAction.OK:
+            logger.warning(
+                "Bypass critic non-OK ({}): {}", verdict.action.value, verdict.reason,
+            )
+            await emit_warning(
+                sink,
+                run_id=None,
+                code="degenerated_output",
+                message=(
+                    "La verifica ha rilevato un problema con la risposta."
+                ),
+            )
+        await sink.send(
+            {
+                "type": "agent.run_finished",
+                "run_id": None,
+                "state": "done",
+            },
+        )
+        return result
+
+    @staticmethod
+    def _reinforce_turn(turn: TurnInput, reason: str, attempt: int) -> TurnInput:
+        """Append a reinforcement message before retrying a bypass turn."""
+        nudge = (
+            f"[Retry {attempt}] La risposta precedente è stata giudicata "
+            f"insufficiente dal validatore: {reason}\n"
+            "Riprova rispettando rigorosamente il formato richiesto, "
+            "evitando ripetizioni e SENZA emettere blocchi <tool_code> o "
+            "JSON tool-call testuali (usa la function-call API)."
+        )
+        new_messages = list(turn.messages) + [{"role": "user", "content": nudge}]
+        from dataclasses import replace as _replace
+
+        return _replace(turn, messages=new_messages)
+
+    # ------------------------------------------------------------------
     # MULTI_STEP strategy
     # ------------------------------------------------------------------
 
@@ -289,6 +554,8 @@ class AgentTurnExecutor:
         verdict_action_cls: Any,
     ) -> TurnResult:
         """Plan, then iterate steps with critic-driven control flow."""
+        # Local imports to avoid module-load cycles.
+        from backend.services.agent.models import Verdict, VerdictAction
         # Plan generation -------------------------------------------------
         plan = await self._planner.plan(
             goal=turn.user_content,
@@ -372,12 +639,47 @@ class AgentTurnExecutor:
                 end_error = "step_error"
                 break
 
-            verdict = await self._critic.evaluate(
-                step=step,
-                output=sub_result.content,
-                plan=plan,
-                retries_used=retries.get(i, 0),
-                cancel_event=cancel_event,
+            # --- Structural intent-mismatch check -------------------
+            # When the planner explicitly declared a tool for this step
+            # (``step.tool_hint``) but the inner LLM produced no tool
+            # call at all, short-circuit straight to REPLAN — there is
+            # no point burning a critic LLM call on an output that
+            # objectively missed the planner's intent.  No regex on
+            # the output text is involved.
+            if step.tool_hint and not sub_result.had_tool_calls:
+                logger.info(
+                    "Structural intent mismatch on step {} (hint={!r}, no tool_calls)",
+                    i,
+                    step.tool_hint,
+                )
+                await emit_warning(
+                    sink,
+                    run_id=run.id if run is not None else None,
+                    code="intent_mismatch_no_tool",
+                    message=(
+                        f"Lo step {i + 1} prevedeva l'uso di "
+                        f"'{step.tool_hint}' ma il modello non l'ha invocato."
+                    ),
+                )
+                verdict = Verdict(
+                    action=VerdictAction.REPLAN,
+                    reason="Lo step prevedeva uno strumento ma il modello non lo ha invocato.",
+                    source="detector",
+                )
+            else:
+                verdict = await self._critic.evaluate(
+                    step=step,
+                    output=sub_result.content,
+                    plan=plan,
+                    retries_used=retries.get(i, 0),
+                    cancel_event=cancel_event,
+                    finish_reason=sub_result.finish_reason,
+                )
+            await emit_critic_invoked(
+                sink,
+                run_id=run.id if run is not None else None,
+                step_index=i,
+                verdict=verdict,
             )
             await sink.send(
                 {
@@ -420,6 +722,7 @@ class AgentTurnExecutor:
                             "type": "agent.replanned",
                             "run_id": str(run.id) if run is not None else None,
                             "new_plan": plan.model_dump(mode="json"),
+                            "replan_count": replans,
                         },
                     )
                     i += 1

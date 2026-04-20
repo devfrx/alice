@@ -1,26 +1,45 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
- * AgentPlanCard.vue — Collapsible checklist of an agent loop's plan.
+ * AgentPlanCard.vue — Inline collapsible card showing what the agent
+ * is actually doing for a single assistant message.
  *
- * Renders the live plan attached to an assistant message: each step
- * shows a status icon (pending / in-progress / done / retry / failed),
- * its description, and any verdict reason once the critic has spoken.
+ * Surfaces:
+ *   • a compact header with the run state, retry/replan counters and
+ *     the total number of tool calls observed so far;
+ *   • the optional run goal as a plain italic sentence;
+ *   • the *real* tool-call timeline derived from the conversation
+ *     messages via `useAgentActivity`;
+ *   • a secondary collapsible plan checklist when the planner emitted
+ *     more than one step (a one-step plan is implicit and is not
+ *     shown twice).
  *
- * Default expansion follows the run state: expanded while
- * `planning` / `running` / `asked_user`, collapsed once the run has
- * settled (`done` / `failed` / `cancelled`).  The user can override
- * the toggle at any time.
+ * Visual idiom: neutral surface + 3-px accent stripe on the left edge
+ * coloured by run state (running / done / failed / asked_user).  All
+ * colours come from the shared design tokens; nothing is hard-coded.
  */
 
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 
 import AppIcon from '../ui/AppIcon.vue'
-import type { AgentRun, Step, StepStatus, Verdict } from '../../types/agent'
+import { useAgentActivity } from '../../composables/useAgentActivity'
+import type { AgentRun, AgentRunState } from '../../types/agent'
 
 const props = defineProps<{
-  /** The run to render. */
+  /** The agent run to render. */
   run: AgentRun
 }>()
+
+// ---------------------------------------------------------------------------
+// Activity feed (real tool calls + plan steps)
+// ---------------------------------------------------------------------------
+
+const runRef = toRef(props, 'run')
+const feed = useAgentActivity(runRef)
+
+const toolActivity = computed(() => feed.value?.toolActivity ?? [])
+const planSteps = computed(() => feed.value?.planSteps ?? [])
+const stats = computed(() => feed.value?.stats ?? null)
+const showPlanSection = computed(() => planSteps.value.length > 1)
 
 // ---------------------------------------------------------------------------
 // Expansion state
@@ -28,6 +47,7 @@ const props = defineProps<{
 
 const userToggled = ref<boolean>(false)
 const collapsed = ref<boolean>(_defaultCollapsed(props.run.state))
+const planOpen = ref<boolean>(false)
 
 watch(
   () => props.run.state,
@@ -37,7 +57,11 @@ watch(
   },
 )
 
-function _defaultCollapsed(state: AgentRun['state']): boolean {
+watch(() => props.run.id, () => {
+  planOpen.value = false
+})
+
+function _defaultCollapsed(state: AgentRunState): boolean {
   return state === 'done' || state === 'failed' || state === 'cancelled'
 }
 
@@ -46,58 +70,13 @@ function toggle(): void {
   userToggled.value = true
 }
 
-// ---------------------------------------------------------------------------
-// Derived state
-// ---------------------------------------------------------------------------
-
-interface RenderedStep {
-  step: Step
-  status: StepStatus
-  verdict: Verdict | null
+function togglePlan(): void {
+  planOpen.value = !planOpen.value
 }
 
-const steps = computed<RenderedStep[]>(() => {
-  const plan = props.run.plan
-  if (!plan) return []
-  return plan.steps.map((step, idx) => ({
-    step,
-    status: _statusFor(idx),
-    verdict: props.run.verdicts[idx] ?? null,
-  }))
-})
-
-function _statusFor(index: number): StepStatus {
-  const verdict = props.run.verdicts[index]
-  const runState = props.run.state
-  const current = props.run.current_step
-
-  if (verdict) {
-    switch (verdict.action) {
-      case 'ok':
-        return 'done'
-      case 'retry':
-        return index === current ? 'in_progress' : 'retry'
-      case 'replan':
-        return 'done'
-      case 'ask_user':
-        return 'in_progress'
-      case 'abort':
-        return 'failed'
-    }
-  }
-
-  if (runState === 'cancelled' || runState === 'failed') {
-    if (index < current) return 'done'
-    if (index === current) return 'failed'
-    return 'skipped'
-  }
-
-  if (index < current) return 'done'
-  if (index === current && (runState === 'running' || runState === 'planning')) {
-    return 'in_progress'
-  }
-  return 'pending'
-}
+// ---------------------------------------------------------------------------
+// Header label
+// ---------------------------------------------------------------------------
 
 const headerLabel = computed<string>(() => {
   const state = props.run.state
@@ -105,17 +84,21 @@ const headerLabel = computed<string>(() => {
     case 'planning':
       return 'Pianificazione…'
     case 'running':
-      return `Step ${props.run.current_step + 1} / ${props.run.total_steps || '?'}`
+      if (props.run.total_steps > 1) {
+        const cur = Math.min(props.run.current_step + 1, props.run.total_steps)
+        return `Passo ${cur} di ${props.run.total_steps}`
+      }
+      return 'In esecuzione'
     case 'done':
-      return 'Piano completato'
+      return 'Completato'
     case 'failed':
-      return 'Piano fallito'
+      return 'Fallito'
     case 'cancelled':
-      return 'Piano annullato'
+      return 'Annullato'
     case 'asked_user':
       return 'In attesa di una tua risposta'
     default:
-      return 'Piano agente'
+      return 'Agente'
   }
 })
 
@@ -123,324 +106,457 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
 </script>
 
 <template>
-  <section class="agent-plan" :class="stateClass" aria-label="Piano dell'agente">
-    <button
-      class="agent-plan__head"
-      type="button"
-      :aria-expanded="!collapsed"
-      @click="toggle"
-    >
+  <section class="agent-plan" :class="stateClass" aria-label="Attività dell'agente">
+    <button class="agent-plan__head" type="button" :aria-expanded="!collapsed" @click="toggle">
       <span class="agent-plan__badge">Agente</span>
       <span class="agent-plan__title">{{ headerLabel }}</span>
-      <span v-if="run.replans > 0" class="agent-plan__meta" :title="`Ripianificazioni: ${run.replans}`">
-        ↻ {{ run.replans }}
+
+      <span v-if="stats && stats.toolCallsTotal > 0" class="agent-plan__chip"
+        :title="`${stats.toolCallsTotal} chiamata${stats.toolCallsTotal === 1 ? '' : 'e'} a strumenti`">
+        <AppIcon name="bar-chart" :size="10" :stroke-width="1.75" />
+        {{ stats.toolCallsTotal }}
       </span>
-      <span v-if="run.retries_total > 0" class="agent-plan__meta" :title="`Retry totali: ${run.retries_total}`">
-        ⟳ {{ run.retries_total }}
+      <span v-if="run.replans > 0" class="agent-plan__chip" :title="`Ripianificazioni: ${run.replans}`">
+        <AppIcon name="refresh-cw" :size="10" :stroke-width="1.75" />
+        {{ run.replans }}
       </span>
-      <AppIcon
-        name="chevron-down"
-        :size="12"
-        :stroke-width="1.5"
-        class="agent-plan__chevron"
-        :class="{ 'agent-plan__chevron--open': !collapsed }"
-      />
+      <span v-if="run.retries_total > 0" class="agent-plan__chip agent-plan__chip--warn"
+        :title="`Retry totali: ${run.retries_total}`">
+        <AppIcon name="refresh-cw" :size="10" :stroke-width="1.75" />
+        {{ run.retries_total }}
+      </span>
+
+      <AppIcon name="chevron-down" :size="12" :stroke-width="1.75" class="agent-plan__chevron"
+        :class="{ 'agent-plan__chevron--open': !collapsed }" />
     </button>
 
     <div class="agent-plan__body" :class="{ 'agent-plan__body--collapsed': collapsed }">
-      <p v-if="run.plan?.goal" class="agent-plan__goal">{{ run.plan.goal }}</p>
+      <div class="agent-plan__body-inner">
+        <p v-if="run.plan?.goal" class="agent-plan__goal">{{ run.plan.goal }}</p>
 
-      <ol v-if="steps.length" class="agent-plan__steps">
-        <li
-          v-for="(item, idx) in steps"
-          :key="idx"
-          class="agent-plan__step"
-          :class="`agent-plan__step--${item.status}`"
-        >
-          <span class="agent-plan__step-icon" :aria-label="item.status">
-            <AppIcon
-              v-if="item.status === 'done'"
-              name="check"
-              :size="12"
-              :stroke-width="2.5"
-            />
-            <AppIcon
-              v-else-if="item.status === 'failed'"
-              name="x"
-              :size="12"
-              :stroke-width="2.5"
-            />
-            <AppIcon
-              v-else-if="item.status === 'retry'"
-              name="refresh-cw"
-              :size="12"
-              :stroke-width="2"
-            />
-            <span v-else-if="item.status === 'in_progress'" class="agent-plan__spinner" aria-hidden="true" />
-            <span v-else class="agent-plan__dot" aria-hidden="true" />
-          </span>
-
-          <div class="agent-plan__step-text">
-            <span class="agent-plan__step-num">{{ idx + 1 }}.</span>
-            <span class="agent-plan__step-desc">{{ item.step.description }}</span>
-            <span
-              v-if="item.step.tool_hint"
-              class="agent-plan__step-tool"
-              :title="`Tool suggerito: ${item.step.tool_hint}`"
-            >
-              [{{ item.step.tool_hint }}]
+        <ol v-if="toolActivity.length" class="agent-plan__activity">
+          <li v-for="item in toolActivity" :key="item.callId" class="agent-plan__activity-item"
+            :class="`agent-plan__activity-item--${item.status}`">
+            <span class="agent-plan__dot" :aria-label="item.status">
+              <AppIcon v-if="item.status === 'done'" name="check" :size="10" :stroke-width="2.5" />
+              <AppIcon v-else-if="item.status === 'failed'" name="x" :size="10" :stroke-width="2.5" />
+              <span v-else-if="item.status === 'running'" class="agent-plan__pulse" aria-hidden="true" />
+              <span v-else class="agent-plan__bullet" aria-hidden="true" />
             </span>
-            <span v-if="item.verdict" class="agent-plan__step-verdict">
-              {{ item.verdict.reason }}
-            </span>
-          </div>
-        </li>
-      </ol>
-      <p v-else class="agent-plan__empty">Nessun passo ancora pianificato.</p>
 
-      <div v-if="run.pending_question" class="agent-plan__ask">
-        <strong>Domanda:</strong> {{ run.pending_question }}
-      </div>
-      <div v-if="run.error && run.state !== 'done'" class="agent-plan__error">
-        {{ run.error }}
+            <div class="agent-plan__activity-text">
+              <span class="agent-plan__activity-label">{{ item.toolLabel }}</span>
+              <span v-if="item.argsSummary" class="agent-plan__activity-args">
+                {{ item.argsSummary }}
+              </span>
+              <span v-if="item.resultPreview" class="agent-plan__activity-result"
+                :class="{ 'agent-plan__activity-result--err': item.resultIsError }">
+                {{ item.resultPreview }}
+              </span>
+            </div>
+          </li>
+        </ol>
+
+        <p v-else-if="run.state === 'planning'" class="agent-plan__empty">In attesa del piano…</p>
+        <p v-else-if="run.state === 'running'" class="agent-plan__empty">Sto preparando la prima chiamata…</p>
+
+        <!-- Secondary plan section: only when planner emitted >1 step -->
+        <div v-if="showPlanSection" class="agent-plan__plan">
+          <button type="button" class="agent-plan__plan-head" :aria-expanded="planOpen" @click="togglePlan">
+            <AppIcon name="chevron-down" :size="10" :stroke-width="1.75" class="agent-plan__plan-chevron"
+              :class="{ 'agent-plan__plan-chevron--open': planOpen }" />
+            <span>Piano in {{ planSteps.length }} passi</span>
+          </button>
+          <ol v-if="planOpen" class="agent-plan__plan-list">
+            <li v-for="step in planSteps" :key="step.index" class="agent-plan__plan-item"
+              :class="`agent-plan__plan-item--${step.status}`">
+              <span class="agent-plan__plan-num">{{ step.index + 1 }}</span>
+              <span class="agent-plan__plan-desc">{{ step.description }}</span>
+              <span v-if="step.verdict" class="agent-plan__plan-verdict">
+                {{ step.verdict.reason }}
+              </span>
+            </li>
+          </ol>
+        </div>
+
+        <div v-if="run.pending_question" class="agent-plan__ask">
+          <strong>Domanda:</strong> {{ run.pending_question }}
+        </div>
+        <div v-if="run.error && run.state !== 'done'" class="agent-plan__error">{{ run.error }}</div>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
+/* ── Container ─────────────────────────────────────────── */
 .agent-plan {
-  --agent-accent: rgb(120 160 230);
-  margin: 6px 0 4px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  position: relative;
+  margin: var(--space-2) 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
-.agent-plan--running,
-.agent-plan--planning {
-  border-color: rgba(120, 160, 230, 0.35);
-  background: rgba(120, 160, 230, 0.06);
+.agent-plan:hover {
+  border-color: var(--border-hover);
 }
 
-.agent-plan--failed,
-.agent-plan--cancelled {
-  border-color: rgba(220, 110, 110, 0.35);
-  background: rgba(220, 110, 110, 0.05);
+/* Status stripe (3px on the left edge) */
+.agent-plan::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--surface-3);
+  transition: background var(--transition-normal);
 }
 
-.agent-plan--done {
-  border-color: rgba(110, 200, 140, 0.25);
+.agent-plan--planning::before,
+.agent-plan--running::before,
+.agent-plan--asked_user::before {
+  background: var(--accent);
 }
 
-.agent-plan--asked_user {
-  border-color: rgba(230, 190, 110, 0.35);
-  background: rgba(230, 190, 110, 0.05);
+.agent-plan--done::before {
+  background: var(--success);
 }
 
+.agent-plan--failed::before,
+.agent-plan--cancelled::before {
+  background: var(--danger);
+}
+
+/* ── Header ────────────────────────────────────────────── */
 .agent-plan__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + 3px);
   background: transparent;
   border: 0;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--transition-fast);
 }
 
 .agent-plan__head:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-hover);
 }
 
 .agent-plan__badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(120, 160, 230, 0.18);
-  color: var(--agent-accent);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-medium);
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .agent-plan__title {
   flex: 1;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.agent-plan__meta {
-  font-size: 11px;
-  opacity: 0.75;
+.agent-plan__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.agent-plan__chip--warn {
+  color: var(--warning);
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
 }
 
 .agent-plan__chevron {
-  transition: transform 120ms ease;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .agent-plan__chevron--open {
   transform: rotate(180deg);
 }
 
+/* ── Body (collapse via grid-template-rows trick) ──────── */
 .agent-plan__body {
-  padding: 0 12px 10px;
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 160ms ease, padding 160ms ease;
-  overflow: hidden;
+  transition: grid-template-rows var(--transition-normal);
 }
 
 .agent-plan__body--collapsed {
   grid-template-rows: 0fr;
-  padding-top: 0;
-  padding-bottom: 0;
 }
 
-.agent-plan__body > * {
+.agent-plan__body-inner {
   min-height: 0;
+  overflow: hidden;
+  padding: 0 var(--space-3) var(--space-3) calc(var(--space-3) + 3px);
 }
 
 .agent-plan__goal {
-  margin: 4px 0 8px;
+  margin: 0 0 var(--space-2);
   font-style: italic;
-  opacity: 0.8;
+  color: var(--text-secondary);
+  line-height: var(--leading-snug);
 }
 
-.agent-plan__steps {
+/* ── Activity timeline ─────────────────────────────────── */
+.agent-plan__activity {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-.agent-plan__step {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 0;
+.agent-plan__activity-item {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: var(--space-2);
+  align-items: start;
+  color: var(--text-primary);
+  transition: opacity var(--transition-fast);
 }
 
-.agent-plan__step--pending {
+.agent-plan__activity-item--pending {
   opacity: 0.55;
-}
-
-.agent-plan__step--skipped {
-  opacity: 0.4;
-  text-decoration: line-through;
-}
-
-.agent-plan__step-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.agent-plan__step--done .agent-plan__step-icon {
-  background: rgba(110, 200, 140, 0.18);
-  color: rgb(140, 220, 170);
-}
-
-.agent-plan__step--failed .agent-plan__step-icon {
-  background: rgba(220, 110, 110, 0.18);
-  color: rgb(240, 140, 140);
-}
-
-.agent-plan__step--retry .agent-plan__step-icon {
-  background: rgba(230, 190, 110, 0.18);
-  color: rgb(240, 200, 130);
-}
-
-.agent-plan__step--in_progress .agent-plan__step-icon {
-  background: rgba(120, 160, 230, 0.2);
-  color: var(--agent-accent);
 }
 
 .agent-plan__dot {
-  width: 6px;
-  height: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.agent-plan__activity-item--done .agent-plan__dot {
+  background: var(--success-medium);
+  color: var(--success);
+}
+
+.agent-plan__activity-item--failed .agent-plan__dot {
+  background: var(--danger-medium);
+  color: var(--danger);
+}
+
+.agent-plan__activity-item--running .agent-plan__dot {
+  background: var(--accent-medium);
+  color: var(--accent);
+}
+
+.agent-plan__bullet {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
-  opacity: 0.45;
+  opacity: 0.7;
 }
 
-.agent-plan__spinner {
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid currentColor;
-  border-top-color: transparent;
+.agent-plan__pulse {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  animation: agent-plan-spin 0.9s linear infinite;
+  background: currentColor;
+  animation: agent-plan-pulse 1.4s ease-in-out infinite;
 }
 
-@keyframes agent-plan-spin {
-  to {
-    transform: rotate(360deg);
+@keyframes agent-plan-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.4);
+    opacity: 0.55;
   }
 }
 
-.agent-plan__step-text {
+.agent-plan__activity-text {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 6px;
-  line-height: 1.45;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.agent-plan__step-num {
-  opacity: 0.55;
-  font-variant-numeric: tabular-nums;
+.agent-plan__activity-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  line-height: var(--leading-snug);
 }
 
-.agent-plan__step-tool {
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 11px;
-  opacity: 0.7;
-  color: var(--agent-accent);
+.agent-plan__activity-args {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.agent-plan__step-verdict {
-  flex-basis: 100%;
-  margin-left: 14px;
-  font-size: 11px;
-  opacity: 0.7;
-  font-style: italic;
+.agent-plan__activity-result {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  line-height: var(--leading-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-plan__activity-result--err {
+  color: var(--danger);
 }
 
 .agent-plan__empty {
-  margin: 4px 0;
-  opacity: 0.6;
+  margin: 0;
+  color: var(--text-muted);
   font-style: italic;
+  font-size: var(--text-xs);
 }
 
+/* ── Plan secondary section ───────────────────────────── */
+.agent-plan__plan {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border);
+}
+
+.agent-plan__plan-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  padding: 2px 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.agent-plan__plan-head:hover {
+  color: var(--text-primary);
+}
+
+.agent-plan__plan-chevron {
+  transition: transform var(--transition-fast);
+}
+
+.agent-plan__plan-chevron--open {
+  transform: rotate(180deg);
+}
+
+.agent-plan__plan-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+}
+
+.agent-plan__plan-item {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-snug);
+}
+
+.agent-plan__plan-item--done {
+  color: var(--text-primary);
+}
+
+.agent-plan__plan-item--failed,
+.agent-plan__plan-item--skipped {
+  opacity: 0.55;
+}
+
+.agent-plan__plan-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.agent-plan__plan-desc {
+  color: var(--text-secondary);
+}
+
+.agent-plan__plan-verdict {
+  grid-column: 2;
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: var(--text-2xs);
+}
+
+/* ── Auxiliary banners ────────────────────────────────── */
 .agent-plan__ask {
-  margin-top: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(230, 190, 110, 0.1);
-  border: 1px solid rgba(230, 190, 110, 0.25);
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
 }
 
 .agent-plan__error {
-  margin-top: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(220, 110, 110, 0.1);
-  border: 1px solid rgba(220, 110, 110, 0.25);
-  color: rgb(240, 160, 160);
-  font-size: 11px;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--danger-medium);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
 }
 </style>

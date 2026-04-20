@@ -850,6 +850,17 @@ class AgentCriticConfig(BaseSettings):
     fail_open: bool = True
     """On parse error, default to verdict OK so the user is not blocked."""
 
+    always_run: bool = True
+    """If True the critic is invoked after every turn — including TRIVIAL,
+    OPEN_ENDED and SINGLE_TOOL — so degenerations (loops, fake tool_code)
+    can be caught even outside the MULTI_STEP path."""
+
+    degeneration_detector_enabled: bool = True
+    """If True the critic runs a local rule-based degeneration detector
+    BEFORE issuing the LLM call.  Saves one round-trip when an obvious
+    pathological output (paragraph repetition, inline ``<tool_code>`` /
+    fake JSON tool calls, ``finish_reason=length``) is present."""
+
 
 class AgentPersistenceConfig(BaseSettings):
     """Persistence options for agent runs."""

@@ -13,6 +13,7 @@ from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolRes
 
 from .chart_store import ChartStore
 from .models import ChartPayload, ChartSpec
+from .option_validator import ChartOptionError, validate_and_normalize_option
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -266,18 +267,26 @@ class ChartGeneratorPlugin(BasePlugin):
             return ToolResult.error("Missing required parameter: echarts_option")
 
         cfg = self.ctx.config.chart
-        count = await self._store.count()
-        if count >= cfg.max_charts:
-            return ToolResult.error(
-                f"Limite massimo di grafici raggiunto ({cfg.max_charts}). "
-                "Usa `delete_chart` per eliminare grafici non più necessari."
-            )
-
         option_str = json.dumps(option, ensure_ascii=False)
         if len(option_str) > cfg.max_option_chars:
             return ToolResult.error(
                 f"La echarts_option supera il limite di {cfg.max_option_chars} caratteri "
                 f"(attuale: {len(option_str)}). Aggrega o riduci i dati prima di richiamare il tool."
+            )
+
+        try:
+            option = validate_and_normalize_option(option, chart_type)
+        except ChartOptionError as exc:
+            self.logger.warning(
+                f"echarts_option non valida per '{title}': {exc}"
+            )
+            return ToolResult.error(str(exc))
+
+        count = await self._store.count()
+        if count >= cfg.max_charts:
+            return ToolResult.error(
+                f"Limite massimo di grafici raggiunto ({cfg.max_charts}). "
+                "Usa `delete_chart` per eliminare grafici non più necessari."
             )
 
         chart_id = str(uuid4())
@@ -316,6 +325,14 @@ class ChartGeneratorPlugin(BasePlugin):
         existing = await self._store.load(chart_id)
         if existing is None:
             return ToolResult.error(f"Grafico non trovato: {chart_id}")
+
+        try:
+            option = validate_and_normalize_option(option, existing.chart_type)
+        except ChartOptionError as exc:
+            self.logger.warning(
+                f"echarts_option non valida per update {chart_id}: {exc}"
+            )
+            return ToolResult.error(str(exc))
 
         cfg = self.ctx.config.chart
         option_str = json.dumps(option, ensure_ascii=False)

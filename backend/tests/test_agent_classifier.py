@@ -59,12 +59,13 @@ async def test_classify_cache_partitioned_by_has_tools() -> None:
 
 @pytest.mark.asyncio
 async def test_classify_unknown_output_falls_back() -> None:
-    """Garbage output -> safe default depending on ``has_tools``."""
+    """Garbage output -> MULTI_STEP safe default (safety > speed)."""
     llm = RecordingLLM(["banana", "banana"])
     svc = ClassifierService(llm, ClassifierConfig(cache_ttl_seconds=0))
 
-    assert await svc.classify("x", has_tools=True) == TaskComplexity.MULTI_STEP
-    assert await svc.classify("x", has_tools=False) == TaskComplexity.TRIVIAL
+    # Use plain prompts that don't match the heuristic patterns.
+    assert await svc.classify("hi", has_tools=True) == TaskComplexity.MULTI_STEP
+    assert await svc.classify("hi", has_tools=False) == TaskComplexity.MULTI_STEP
 
 
 @pytest.mark.asyncio
@@ -90,3 +91,34 @@ async def test_classify_passes_system_prompt_and_max_tokens() -> None:
     assert call["max_output_tokens"] == 7
     assert call["system_prompt"] is not None
     assert "trivial" in call["system_prompt"]
+
+
+# ---------------------------------------------------------------------------
+# Aggressive multi_step prompt rules (S6 tuning).
+# ---------------------------------------------------------------------------
+
+
+def test_classifier_prompt_contains_aggressive_multi_step_examples() -> None:
+    """The system prompt must include the few-shot examples added in S6."""
+    from backend.services.agent.prompts import CLASSIFIER_SYSTEM_PROMPT
+
+    expected_snippets = [
+        "analisi dei dati",         # "fammi un'analisi dei dati X e mostrami i grafici"
+        "scheda riassuntiva",       # "trova info Y, poi crea Z"
+        "tendenze AI",              # ricerca + report + grafici
+        "TRE o più tool",           # promotion rule
+        "preferisci multi_step",    # bias instruction
+    ]
+    for snippet in expected_snippets:
+        assert snippet in CLASSIFIER_SYSTEM_PROMPT, (
+            f"Classifier prompt missing aggressive marker: {snippet!r}"
+        )
+
+
+def test_planner_prompt_enforces_atomic_steps_and_verifiable_outcomes() -> None:
+    """The planner system prompt must demand atomic steps and verifiability."""
+    from backend.services.agent.prompts import PLANNER_SYSTEM_PROMPT
+
+    assert "ATOMICO" in PLANNER_SYSTEM_PROMPT
+    assert "VERIFICABILE" in PLANNER_SYSTEM_PROMPT
+    assert "concettuali" in PLANNER_SYSTEM_PROMPT

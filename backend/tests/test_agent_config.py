@@ -67,7 +67,11 @@ def test_agent_subconfig_defaults() -> None:
 def test_alice_config_exposes_agent_section() -> None:
     cfg = load_config()
     assert isinstance(cfg.agent, AgentConfig)
-    assert cfg.agent.enabled is False  # default in default.yaml
+    # Agent loop is enabled by default in default.yaml (S6+S7 rollout).
+    assert cfg.agent.enabled is True
+    # Critic always-run + degeneration detector are also on by default.
+    assert cfg.agent.critic.always_run is True
+    assert cfg.agent.critic.degeneration_detector_enabled is True
 
 
 # ---------------------------------------------------------------------------

@@ -657,6 +657,8 @@ class LLMService:
         memory_context: str | None = None,
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
+        response_format: dict[str, Any] | None = None,
+        temperature: float | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion, choosing the best backend.
 
@@ -703,6 +705,8 @@ class LLMService:
             async for event in self._chat_openai_compat(
                 messages, tools=tools, cancel_event=cancel_event,
                 max_output_tokens=max_output_tokens,
+                response_format=response_format,
+                temperature=temperature,
             ):
                 yield event
 
@@ -1056,6 +1060,8 @@ class LLMService:
         tools: list[dict[str, Any]] | None = None,
         cancel_event: asyncio.Event | None = None,
         max_output_tokens: int | None = None,
+        response_format: dict[str, Any] | None = None,
+        temperature: float | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion via the OAI-compatible endpoint.
 
@@ -1098,7 +1104,9 @@ class LLMService:
         payload: dict[str, Any] = {
             "model": active_model,
             "messages": actual_messages,
-            "temperature": self._config.temperature,
+            "temperature": (
+                temperature if temperature is not None else self._config.temperature
+            ),
             "stream": True,
             "stream_options": {"include_usage": True},
         }
@@ -1107,6 +1115,11 @@ class LLMService:
         )
         if effective_max is not None and effective_max > 0:
             payload["max_tokens"] = effective_max
+        if response_format is not None:
+            # LM Studio / OpenAI accept ``{"type": "json_object"}``.  When
+            # the server rejects it (legacy backends), the OAI-compat
+            # retry loop below strips it on the first 400 (see fallback).
+            payload["response_format"] = response_format
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
@@ -1162,6 +1175,15 @@ class LLMService:
                     self._supports_stream_options = False
                     payload.pop("stream_options")
                     continue  # exit async with, try again without stream_options
+                if resp.status_code == 400 and _attempt == 0 and "response_format" in payload:
+                    body = (await resp.aread()).decode(errors="replace")
+                    logger.warning(
+                        "OAI-compat 400 with response_format — retrying without it. "
+                        "Server said: {}",
+                        body[:300],
+                    )
+                    payload.pop("response_format", None)
+                    continue
                 if resp.status_code >= 400:
                     body = (await resp.aread()).decode(errors="replace")
                     logger.error(

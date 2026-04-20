@@ -18,6 +18,7 @@ import MessageBubble from '../components/chat/MessageBubble.vue'
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import StreamingIndicator from '../components/chat/StreamingIndicator.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
+import AgentActivitySidebar from '../components/chat/AgentActivitySidebar.vue'
 import TranscriptOverlay from '../components/voice/TranscriptOverlay.vue'
 import AliceSpinner from '../components/ui/AliceSpinner.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
@@ -283,6 +284,15 @@ async function handleSend(content: string, attachments: File[]): Promise<void> {
     await send(content, undefined, attachments)
 }
 
+/**
+ * Reply submitted from the AgentActivitySidebar when the agent is in
+ * `asked_user` state.  Forwarded as a normal user message — the backend
+ * handles correlation via the in-flight run.
+ */
+async function onAgentReply(payload: { text: string; runId: string }): Promise<void> {
+    await send(payload.text, undefined, undefined)
+}
+
 watch(() => voiceStore.transcript, (text) => {
     if (!text.trim() || voiceStore.confirmTranscript) return
     const toSend = text.trim()
@@ -529,6 +539,8 @@ onBeforeUnmount(() => {
 
         <MessageEditDialog v-if="editingMessageId" :original-content="editingContent" @submit="submitEdit"
             @cancel="cancelEdit" />
+
+        <AgentActivitySidebar @reply="onAgentReply" />
     </div>
 </template>
 

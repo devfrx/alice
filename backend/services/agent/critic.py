@@ -1,9 +1,14 @@
 """Critic service: judges step outputs and emits a :class:`Verdict`.
 
-The critic is intentionally simple — it makes one LLM call and parses
-a JSON object.  Parse failures degrade according to ``cfg.fail_open``:
-``True`` returns ``OK`` (don't block the user), ``False`` returns
-``RETRY`` (give the orchestrator another shot).
+The critic is intentionally simple — it makes one LLM call (with
+``response_format={"type":"json_object"}`` and ``temperature=0``) and
+parses a JSON object.  Parse / call failures degrade according to
+``cfg.fail_open``: ``True`` returns ``OK`` (don't block the user),
+``False`` returns ``RETRY`` (give the orchestrator another shot).
+
+Reasons surfaced via :class:`Verdict.reason` are always plain Italian
+sentences for end users; the underlying technical detail (parse
+exception, raw output, ...) is logged via :mod:`loguru` for debugging.
 """
 
 from __future__ import annotations
@@ -11,16 +16,18 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import Any
+from typing import Any, Final
 
 from loguru import logger
 from pydantic import ValidationError
 
 from .models import CriticConfig, Plan, Step, Verdict, VerdictAction
 from .prompts import CRITIC_SYSTEM_PROMPT
+from ._degeneration import detect_degeneration
 from ._runner import collect_text
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+_RESPONSE_FORMAT: Final[dict[str, Any]] = {"type": "json_object"}
 
 
 class CriticService:
@@ -44,23 +51,20 @@ class CriticService:
         plan: Plan,
         retries_used: int,
         cancel_event: asyncio.Event | None = None,
+        finish_reason: str | None = None,
     ) -> Verdict:
         """Return a :class:`Verdict` for the just-executed step.
 
-        Args:
-            step: The step whose output we're judging.
-            output: Plain-text result of the step (typically the
-                assistant message produced by the inner executor).
-            plan: The full plan (provides context about what comes next).
-            retries_used: How many times this step has already been
-                retried — surfaced to the prompt so the model can avoid
-                infinite retry loops.
-            cancel_event: Optional cooperative cancellation event.
-
-        Returns:
-            A validated :class:`Verdict`.  On parse error returns the
-            safe default dictated by ``cfg.fail_open``.
+        See module docstring for the contract.  Never raises — every
+        failure mode is mapped to a :class:`Verdict` so the orchestrator
+        keeps a single happy path.
         """
+        # --- Local detector (no LLM round-trip on obvious degenerations).
+        if getattr(self._cfg, "degeneration_detector_enabled", True):
+            verdict = detect_degeneration(output, finish_reason)
+            if verdict is not None:
+                return verdict
+
         user_prompt = self._build_user_prompt(step, output, plan, retries_used)
         messages = [{"role": "user", "content": user_prompt}]
 
@@ -71,16 +75,19 @@ class CriticService:
                 system_prompt=CRITIC_SYSTEM_PROMPT,
                 max_output_tokens=self._cfg.max_output_tokens,
                 cancel_event=cancel_event,
+                response_format=_RESPONSE_FORMAT,
+                temperature=self._cfg.temperature,
             )
         except Exception as exc:  # noqa: BLE001 — degrade gracefully
             logger.warning("Critic LLM call failed: {}", exc)
-            return self._fallback("LLM call failed")
+            return self._fallback(detail=f"LLM call failed: {exc}")
 
         verdict = self._try_parse(raw)
         if verdict is not None:
+            verdict.source = "llm"
             return verdict
-        logger.debug("Critic JSON parse failed; raw={!r}", raw)
-        return self._fallback("parse error")
+        logger.warning("Critic JSON parse failed; raw={!r}", raw)
+        return self._fallback(detail="parse error")
 
     @staticmethod
     def _build_user_prompt(
@@ -120,16 +127,24 @@ class CriticService:
         except (ValueError, ValidationError):
             return None
 
-    def _fallback(self, reason: str) -> Verdict:
-        """Return the configured fail-open / fail-closed default verdict."""
+    def _fallback(self, *, detail: str) -> Verdict:
+        """Return the configured fail-open / fail-closed default verdict.
+
+        Reasons are intentionally short, generic, and italian — they may
+        bubble up to the user via ``agent.critic_invoked``.  The
+        ``detail`` argument is only logged.
+        """
+        logger.debug("Critic fallback ({}): fail_open={}", detail, self._cfg.fail_open)
         if self._cfg.fail_open:
             return Verdict(
                 action=VerdictAction.OK,
-                reason=f"fail-open: {reason}",
+                reason="Verifica completata.",
+                source="fallback",
             )
         return Verdict(
             action=VerdictAction.RETRY,
-            reason=f"fail-closed: {reason}",
+            reason="Verifica non riuscita, riprovo lo step.",
+            source="fallback",
         )
 
 

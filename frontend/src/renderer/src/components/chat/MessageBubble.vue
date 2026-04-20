@@ -14,6 +14,7 @@ import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import { useGenerationState } from '../../composables/useGenerationState'
 import { useArtifactsStore } from '../../stores/artifacts'
 import { useChatStore } from '../../stores/chat'
+import { useUIStore } from '../../stores/ui'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
@@ -103,11 +104,61 @@ const summaryCollapsed = ref(true)
 
 /** Agent loop run associated with this assistant message (if any). */
 const chatStore = useChatStore()
+const uiStore = useUIStore()
 const agentRun = computed(() =>
   props.message.role === 'assistant'
     ? chatStore.getAgentRunByMessageId(props.message.id)
     : null,
 )
+
+/** True for assistant messages produced by a `bypass`-mode agent run. */
+const isBypassRun = computed<boolean>(() => agentRun.value?.mode === 'bypass')
+
+/**
+ * Latest critic verdict on the run — used to colour the bypass
+ * micro-banner.  Bypass runs always receive a single verdict on
+ * `step_index = 0` (the synthetic critic-only step), but we look up
+ * the highest index defensively.
+ */
+const bypassVerdict = computed(() => {
+  const run = agentRun.value
+  if (!run || run.mode !== 'bypass') return null
+  const indices = Object.keys(run.verdicts).map((k) => Number(k))
+  if (!indices.length) return null
+  return run.verdicts[Math.max(...indices)] ?? null
+})
+
+/**
+ * Visual tone of the bypass banner: ok / warn / error.  Falls back
+ * to `ok` while no verdict is in yet (the bubble is rendering
+ * optimistically — the verdict arrives moments later).
+ */
+const bypassTone = computed<'ok' | 'warn' | 'error'>(() => {
+  const v = bypassVerdict.value
+  if (!v) return 'ok'
+  switch (v.action) {
+    case 'ok': return 'ok'
+    case 'abort': return 'error'
+    default: return 'warn'
+  }
+})
+
+const bypassBannerText = computed<string>(() => {
+  switch (bypassTone.value) {
+    case 'ok': return 'Risposta diretta · verifica passata'
+    case 'warn': return 'Risposta diretta · verifica con avviso'
+    case 'error': return 'Risposta diretta · errore di verifica'
+  }
+  return 'Risposta diretta'
+})
+
+/** Open the activity sidebar focused on this message's run. */
+function openAgentSidebar(): void {
+  if (!agentRun.value) return
+  // Re-opening explicitly: clear any prior dismissal for this run.
+  uiStore.agentSidebarDismissedRunIds.delete(agentRun.value.id)
+  uiStore.openAgentSidebar(agentRun.value.id)
+}
 
 /** Tool result collapsed state (collapsed by default). */
 const toolResultCollapsed = ref(true)
@@ -311,8 +362,48 @@ onUnmounted(() => {
       <div v-if="!cadPayload && !chartPayload && !whiteboardPayload && !isPlainToolResult && !isContextSummary"
         class="bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
 
-      <!-- Agent loop plan card (assistant only, when an agent run produced this message) -->
-      <AgentPlanCard v-if="agentRun" :run="agentRun" />
+      <!-- Agent loop plan card (assistant only, agent-mode runs only) -->
+      <template v-if="agentRun && uiStore.agentPlanCardEnabled && !isBypassRun">
+        <AgentPlanCard :run="agentRun" />
+        <button
+          type="button"
+          class="bubble__agent-open"
+          aria-label="Apri l'attività dell'agente"
+          @click="openAgentSidebar"
+        >
+          Apri attività
+        </button>
+      </template>
+
+      <!-- Bypass micro-banner (assistant only, bypass-mode runs) -->
+      <button
+        v-if="agentRun && isBypassRun"
+        type="button"
+        class="bubble__bypass-banner"
+        :class="`bubble__bypass-banner--${bypassTone}`"
+        :aria-label="`${bypassBannerText} — apri dettagli`"
+        @click="openAgentSidebar"
+      >
+        <AppIcon
+          v-if="bypassTone === 'ok'"
+          name="check"
+          :size="11"
+          :stroke-width="2.5"
+        />
+        <AppIcon
+          v-else-if="bypassTone === 'error'"
+          name="x"
+          :size="11"
+          :stroke-width="2.5"
+        />
+        <AppIcon
+          v-else
+          name="refresh-cw"
+          :size="11"
+          :stroke-width="2"
+        />
+        <span class="bubble__bypass-text">{{ bypassBannerText }}</span>
+      </button>
 
       <!-- Timestamp for assistant/tool messages (inside bubble) -->
       <span v-if="message.role !== 'user'" class="bubble__time">{{ formattedTime }}</span>
@@ -900,5 +991,59 @@ onUnmounted(() => {
   .image-overlay__close {
     transition: none;
   }
+}
+
+/* ── "Open agent activity" affordance ──────────────────── */
+.bubble__agent-open {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: var(--space-0-5) var(--space-2);
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-xs);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.bubble__agent-open:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-medium);
+}
+
+/* ── Bypass micro-banner ──────────────────────────────── */
+.bubble__bypass-banner {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-top: var(--space-1-5);
+  padding: var(--space-0-5) var(--space-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  cursor: pointer;
+  transition: background var(--transition-fast),
+    color var(--transition-fast);
+}
+.bubble__bypass-banner:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.bubble__bypass-banner--ok { color: var(--text-secondary); }
+.bubble__bypass-banner--ok:hover { color: var(--success); }
+.bubble__bypass-banner--warn { color: var(--warning); }
+.bubble__bypass-banner--error { color: var(--danger); }
+
+.bubble__bypass-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

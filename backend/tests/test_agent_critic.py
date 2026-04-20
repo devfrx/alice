@@ -98,7 +98,9 @@ async def test_evaluate_fail_open_returns_ok_on_parse_error() -> None:
     )
 
     assert verdict.action == VerdictAction.OK
-    assert "fail-open" in verdict.reason
+    # Italian, user-facing reason — no "fail-open" / "parse error" jargon.
+    assert verdict.reason == "Verifica completata."
+    assert verdict.source == "fallback"
 
 
 @pytest.mark.asyncio
@@ -112,7 +114,8 @@ async def test_evaluate_fail_closed_returns_retry_on_parse_error() -> None:
     )
 
     assert verdict.action == VerdictAction.RETRY
-    assert "fail-closed" in verdict.reason
+    assert verdict.reason == "Verifica non riuscita, riprovo lo step."
+    assert verdict.source == "fallback"
 
 
 @pytest.mark.asyncio
@@ -142,3 +145,60 @@ async def test_evaluate_user_prompt_includes_retries_and_output() -> None:
     assert "risultato xyz" in user_msg
     assert "Retry usati per questo step: 2" in user_msg
     assert "Step #0" in user_msg
+
+
+# ---------------------------------------------------------------------------
+# Degeneration detector integration
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_evaluate_detector_short_circuits_llm() -> None:
+    """When the local detector fires, no LLM call must be made."""
+    llm = RecordingLLM([_verdict_json("ok")])  # would only matter if called
+    svc = CriticService(llm, CriticConfig(degeneration_detector_enabled=True))
+
+    bad_output = "Risposta con un blocco vietato: <tool_code>print(1)</tool_code> fine."
+    verdict = await svc.evaluate(
+        step=_step(), output=bad_output, plan=_plan(), retries_used=0,
+    )
+
+    assert verdict.action == VerdictAction.REPLAN
+    assert verdict.source == "detector"
+    assert llm.calls == [], "LLM must not be invoked when detector fires"
+
+
+@pytest.mark.asyncio
+async def test_evaluate_detector_disabled_falls_back_to_llm() -> None:
+    """With the detector off, even a degenerate output goes through the LLM."""
+    llm = RecordingLLM([_verdict_json("ok")])
+    svc = CriticService(llm, CriticConfig(degeneration_detector_enabled=False))
+
+    bad_output = "Output ripetuto " * 30
+    content = f"{bad_output}\n\n{bad_output}"
+    verdict = await svc.evaluate(
+        step=_step(), output=content, plan=_plan(), retries_used=0,
+    )
+
+    assert verdict.action == VerdictAction.OK
+    assert verdict.source == "llm"
+    assert len(llm.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_evaluate_finish_reason_length_triggers_detector() -> None:
+    """``finish_reason='length'`` must short-circuit to REPLAN via detector."""
+    llm = RecordingLLM([_verdict_json("ok")])
+    svc = CriticService(llm, CriticConfig())
+
+    verdict = await svc.evaluate(
+        step=_step(),
+        output="risposta troncata",
+        plan=_plan(),
+        retries_used=0,
+        finish_reason="length",
+    )
+
+    assert verdict.action == VerdictAction.REPLAN
+    assert verdict.source == "detector"
+    assert llm.calls == []

@@ -18,6 +18,25 @@
 /** Complexity classes inferred by the classifier. */
 export type TaskComplexity = 'trivial' | 'open_ended' | 'single_tool' | 'multi_step'
 
+/**
+ * Execution mode of an agent run.
+ *
+ * - `agent`  : full plan/execute/critic loop.
+ * - `bypass` : direct LLM answer with critic verification only — no
+ *              plan, no per-step events.  Used for trivial / single-shot
+ *              requests.
+ */
+export type AgentRunMode = 'agent' | 'bypass'
+
+/**
+ * Origin of the complexity classification.
+ *
+ * - `heuristic`: deterministic regex/length rules.
+ * - `llm`      : an LLM call decided.
+ * - `default`  : fallback when both above failed.
+ */
+export type ClassificationSource = 'heuristic' | 'llm' | 'default'
+
 /** Outcome action proposed by the critic for a completed step. */
 export type VerdictAction = 'ok' | 'retry' | 'replan' | 'ask_user' | 'abort'
 
@@ -48,11 +67,27 @@ export interface Plan {
   steps: Step[]
 }
 
+/**
+ * Source of a critic verdict.
+ *
+ * - `detector`: the verdict was produced by the local pre-LLM
+ *   degeneration detector (no LLM round-trip).
+ * - `llm`     : the verdict was produced by the critic LLM.
+ * - `fallback`: the verdict was synthesised when the critic could not
+ *   produce a structured response (parse error, timeout, …).
+ */
+export type VerdictSource = 'detector' | 'llm' | 'fallback'
+
 /** Critic decision about a step's output. */
 export interface Verdict {
   action: VerdictAction
   reason: string
   question?: string | null
+  /**
+   * Origin of the verdict — populated by `CriticService.evaluate`.
+   * Optional for forward compatibility with older backends.
+   */
+  source?: VerdictSource | null
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +108,12 @@ export interface AgentRun {
 
   goal: string
   complexity: TaskComplexity | ''
+  /**
+   * Execution mode: `agent` runs through the full plan/execute/critic
+   * loop, `bypass` is a direct LLM answer with critic verification
+   * only.  Defaults to `agent` for backwards compatibility.
+   */
+  mode: AgentRunMode
   /** Live plan (kept in sync with `agent.plan_created` / `agent.replanned`). */
   plan: Plan | null
   state: AgentRunState
@@ -87,6 +128,15 @@ export interface AgentRun {
 
   /** Per-step verdicts, indexed by `step_index`. */
   verdicts: Record<number, Verdict>
+  /**
+   * Per-step source of the latest critic verdict, indexed by
+   * `step_index`.  Populated by `agent.critic_invoked` events; used
+   * by the UI to render an "auto" badge for detector-driven
+   * verdicts (no LLM call).
+   */
+  critic_sources: Record<number, VerdictSource>
+  /** Soft warnings emitted by the agent loop during this run. */
+  warnings: { code: string; message: string }[]
   /** Question raised by an `agent.ask_user` event, if any. */
   pending_question: string | null
 
@@ -104,6 +154,18 @@ export interface AgentRunStartedMessage {
   /** Null when persistence failed and no row could be created. */
   run_id: string | null
   complexity: TaskComplexity
+  /**
+   * Execution mode chosen by the dispatcher.  Backwards-compatible:
+   * older backends omit it and the UI defaults to `agent`.
+   */
+  mode?: AgentRunMode
+  /**
+   * Id of the user message that triggered this run.  Used by the
+   * activity feed to slice the conversation window owned by the run
+   * before the final assistant message id is known.  Optional for
+   * backwards compatibility with older backends.
+   */
+  user_message_id?: string
 }
 
 export interface AgentPlanCreatedMessage {
@@ -131,6 +193,36 @@ export interface AgentReplannedMessage {
   type: 'agent.replanned'
   run_id: string | null
   new_plan: Plan
+  /** Total number of replans performed for this run so far. */
+  replan_count: number
+}
+
+/**
+ * Emitted every time the critic produces a verdict for a step,
+ * regardless of whether the verdict came from the local detector or
+ * an actual LLM call.  Allows the UI to surface a small "auto" badge
+ * for detector-driven verdicts.
+ */
+export interface AgentCriticInvokedMessage {
+  type: 'agent.critic_invoked'
+  run_id: string | null
+  step_index: number
+  source: VerdictSource
+}
+
+/**
+ * Soft, non-blocking diagnostic from the agent loop (e.g. critic
+ * unsatisfied on a bypass path with no recovery, single_tool promoted
+ * to mini-plan).  The user-visible result is still returned, but the
+ * UI can surface this to explain that something was suboptimal.
+ */
+export interface AgentWarningMessage {
+  type: 'agent.warning'
+  run_id: string | null
+  /** Short machine-readable identifier (e.g. `degenerated_output`). */
+  code: string
+  /** Human-readable diagnostic. */
+  message: string
 }
 
 export interface AgentAskUserMessage {
@@ -152,6 +244,8 @@ export type AgentEvent =
   | AgentStepStartedMessage
   | AgentStepCompletedMessage
   | AgentReplannedMessage
+  | AgentCriticInvokedMessage
+  | AgentWarningMessage
   | AgentAskUserMessage
   | AgentRunFinishedMessage
 

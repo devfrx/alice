@@ -144,6 +144,48 @@ async def test_max_charts_limit_reached(plugin) -> None:
 
 
 @pytest.mark.asyncio
+async def test_generate_chart_rejects_corrupted_llm_option(plugin) -> None:
+    """Regression: l'LLM emette ``"name":"X`,type:"`` → series senza type.
+
+    Prima del validator il plugin salvava la spec e ECharts renderizzava
+    vuoto.  Ora deve rispondere con error parlante che permetta al
+    modello di ritentare correttamente.
+    """
+    corrupted_option = {
+        "xAxis": {"data": ["A", "B"]},
+        "yAxis": {"type": "value"},
+        "series": [
+            {
+                "data": [3.6, 40],
+                "name": "Valore in Miliardi/Milioni`,type:",
+            },
+        ],
+    }
+    result = await plugin.execute_tool("generate_chart", {
+        "title": "Vendite",
+        "chart_type": "bar",
+        "echarts_option": corrupted_option,
+    }, context=None)
+    assert result.success is False
+    assert "sospetto" in result.error_message.lower()
+
+
+@pytest.mark.asyncio
+async def test_generate_chart_autofills_missing_series_type(plugin) -> None:
+    """``series[].type`` mancante viene riempito dal ``chart_type`` top-level."""
+    result = await plugin.execute_tool("generate_chart", {
+        "title": "Auto",
+        "chart_type": "bar",
+        "echarts_option": {
+            "xAxis": {"data": ["X"]},
+            "yAxis": {"type": "value"},
+            "series": [{"data": [42]}],
+        },
+    }, context=None)
+    assert result.success is True
+
+
+@pytest.mark.asyncio
 async def test_update_chart_not_found(plugin) -> None:
     """update_chart returns error for a nonexistent chart_id."""
     result = await plugin.execute_tool("update_chart", {

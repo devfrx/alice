@@ -158,6 +158,9 @@ async def get_config(request: Request) -> dict[str, Any]:
             "confirmations_enabled": cfg.pc_automation.confirmations_enabled,
             "screenshot_lockout_s": cfg.pc_automation.screenshot_lockout_s,
         },
+        "agent": {
+            "enabled": cfg.agent.enabled,
+        },
     }
 
 
@@ -449,6 +452,15 @@ async def update_config(request: Request) -> dict[str, Any]:
                 cfg.pc_automation, "confirmations_enabled",
                 pc_updates["confirmations_enabled"],
             )
+
+    if "agent" in body:
+        agent_updates = body["agent"]
+        if not isinstance(agent_updates, dict):
+            raise HTTPException(400, "agent must be a JSON object")
+        if "enabled" in agent_updates:
+            if not isinstance(agent_updates["enabled"], bool):
+                raise HTTPException(400, "agent.enabled must be a boolean")
+            object.__setattr__(cfg.agent, "enabled", agent_updates["enabled"])
 
     # -- Persist independent preferences to database -------------------------
     if ctx.preferences_service is not None:

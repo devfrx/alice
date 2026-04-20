@@ -125,6 +125,35 @@
         <VectorStoreManager />
       </section>
 
+      <!-- Agent Loop -->
+      <section :ref="(el) => setSectionRef('agent', el)" id="section-agent" class="sv__section">
+        <div class="sv__section-head">
+          <h3 class="sv__section-title">Modalità agente</h3>
+          <p class="sv__section-desc">Pianifica, esegui e verifica le richieste complesse passo dopo passo</p>
+        </div>
+        <div class="sv__group">
+          <div class="sv__row">
+            <div class="sv__row-text">
+              <span class="sv__row-label">Agent Loop</span>
+              <span class="sv__row-hint">
+                Attiva il classificatore + planner + critic. Quando disattivato il chat usa l'esecuzione diretta.
+              </span>
+            </div>
+            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.settings.agent.enabled }" role="switch"
+              :aria-checked="settingsStore.settings.agent.enabled"
+              @click="settingsStore.settings.agent.enabled = !settingsStore.settings.agent.enabled">
+              <span class="sv__toggle-thumb" />
+            </button>
+          </div>
+          <Transition name="sv-warn">
+            <div v-if="settingsStore.settings.agent.enabled" class="sv__warn">
+              <AppIcon name="alert-triangle" :size="14" :stroke-width="2" />
+              <span>Le richieste con strumenti potrebbero richiedere più chiamate al modello e impiegare più tempo.</span>
+            </div>
+          </Transition>
+        </div>
+      </section>
+
       <!-- Security -->
       <section :ref="(el) => setSectionRef('security', el)" id="section-security" class="sv__section">
         <div class="sv__section-head">
@@ -201,7 +230,7 @@ import { useSettingsStore } from '../stores/settings'
 const settingsStore = useSettingsStore()
 
 /* ── Navigation ─────────────────────────────────────────────── */
-type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'security' | 'ui'
+type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
 
 const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'model', label: 'Modello', iconName: 'package' },
@@ -212,6 +241,7 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'knowledge', label: 'Knowledge Graph', iconName: 'share-graph' },
   { id: 'memory', label: 'Memoria', iconName: 'book' },
   { id: 'vectorstore', label: 'Vector Store', iconName: 'database' },
+  { id: 'agent', label: 'Modalità agente', iconName: 'cpu' },
   { id: 'security', label: 'Sicurezza', iconName: 'shield' },
   { id: 'ui', label: 'Interfaccia', iconName: 'settings' },
 ]
@@ -219,7 +249,7 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
 const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
-  model: null, llm: null, voice: null, plugins: null, mcp: null, knowledge: null, memory: null, vectorstore: null, security: null, ui: null,
+  model: null, llm: null, voice: null, plugins: null, mcp: null, knowledge: null, memory: null, vectorstore: null, agent: null, security: null, ui: null,
 })
 
 function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null) {

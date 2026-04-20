@@ -24,6 +24,7 @@ import { api } from '../services/api'
 import { wsManager } from '../services/ws'
 import { useChatStore } from '../stores/chat'
 import { useSettingsStore } from '../stores/settings'
+import type { AgentEvent } from '../types/agent'
 import type {
   FileAttachment,
   WsCancelPayload,
@@ -240,6 +241,15 @@ export function useChat(): UseChatReturn {
     store.setCompressingContext(false)
   }
 
+  // -- Agent Loop v2 events ----------------------------------------------
+
+  const onAgentEvent = (data: unknown): void => {
+    // Apply unconditionally — agent runs are persisted server-side and the
+    // tracker is keyed by `run_id`, so stale-generation checks would just
+    // drop legitimate events when the user navigates away mid-run.
+    store.applyAgentEvent(data as AgentEvent)
+  }
+
   const onWsError = (data: unknown): void => {
     // Only handle server-side error frames (JSON objects with content),
     // skip native WebSocket error Events.
@@ -273,6 +283,13 @@ export function useChat(): UseChatReturn {
   wsManager.on('context_compression_start', onContextCompressionStart)
   wsManager.on('context_compression_done', onContextCompressionDone)
   wsManager.on('context_compression_failed', onContextCompressionFailed)
+  wsManager.on('agent.run_started', onAgentEvent)
+  wsManager.on('agent.plan_created', onAgentEvent)
+  wsManager.on('agent.step_started', onAgentEvent)
+  wsManager.on('agent.step_completed', onAgentEvent)
+  wsManager.on('agent.replanned', onAgentEvent)
+  wsManager.on('agent.ask_user', onAgentEvent)
+  wsManager.on('agent.run_finished', onAgentEvent)
 
   // WebSocket connection is deferred — App.vue calls wsManager.connect()
   // after the backend health check passes.
@@ -307,6 +324,13 @@ export function useChat(): UseChatReturn {
     wsManager.off('context_compression_start', onContextCompressionStart)
     wsManager.off('context_compression_done', onContextCompressionDone)
     wsManager.off('context_compression_failed', onContextCompressionFailed)
+    wsManager.off('agent.run_started', onAgentEvent)
+    wsManager.off('agent.plan_created', onAgentEvent)
+    wsManager.off('agent.step_started', onAgentEvent)
+    wsManager.off('agent.step_completed', onAgentEvent)
+    wsManager.off('agent.replanned', onAgentEvent)
+    wsManager.off('agent.ask_user', onAgentEvent)
+    wsManager.off('agent.run_finished', onAgentEvent)
     wsManager.disconnect()
   })
 

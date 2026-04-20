@@ -678,3 +678,50 @@ class WSConnectionManagerProtocol(Protocol):
     def connection_count(self) -> int:
         """Number of active WebSocket connections."""
         ...
+
+
+# ---------------------------------------------------------------------------
+# Turn execution (Agent Loop v2 — see alice/agent_loop_plan.md §4.4)
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class WSEventSinkProtocol(Protocol):
+    """Structural type for outbound event sinks used by turn executors.
+
+    Concrete implementations live in
+    :mod:`backend.services.turn.sink` (``WebSocketEventSink``,
+    ``RecordingEventSink``).  Defined here so other modules can type
+    against the contract without importing the ``turn`` package.
+    """
+
+    async def send(self, event: dict[str, Any]) -> None:
+        """Deliver ``event`` to the underlying transport."""
+        ...
+
+    @property
+    def is_connected(self) -> bool:
+        """Whether the underlying transport is still usable."""
+        ...
+
+
+@runtime_checkable
+class TurnExecutorProtocol(Protocol):
+    """Structural type for turn execution strategies.
+
+    Concrete implementations live in :mod:`backend.services.turn`
+    (``DirectTurnExecutor``, ``AgentTurnExecutor``).  ``turn`` and
+    ``result`` are intentionally typed as :class:`Any` to avoid pulling
+    the DTO definitions into this protocol layer (they would create an
+    import cycle through the executors).
+    """
+
+    async def execute(
+        self,
+        turn: Any,
+        sink: WSEventSinkProtocol,
+        cancel_event: asyncio.Event,
+        session: Any,
+    ) -> Any:
+        """Run a single turn and return a ``TurnResult``."""
+        ...

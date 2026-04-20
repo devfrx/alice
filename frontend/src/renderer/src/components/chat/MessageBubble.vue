@@ -13,9 +13,11 @@ import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import { useGenerationState } from '../../composables/useGenerationState'
 import { useArtifactsStore } from '../../stores/artifacts'
+import { useChatStore } from '../../stores/chat'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
+import AgentPlanCard from './AgentPlanCard.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import type { ChatMessage, CadModelPayload, ChartPayload, WhiteboardPayload } from '../../types/chat'
 import { isWhiteboardPayload } from '../../types/chat'
@@ -98,6 +100,14 @@ const isPlainToolResult = computed(() =>
 /** Whether this message is a context summary (compressed context archive). */
 const isContextSummary = computed(() => props.message.is_context_summary === true)
 const summaryCollapsed = ref(true)
+
+/** Agent loop run associated with this assistant message (if any). */
+const chatStore = useChatStore()
+const agentRun = computed(() =>
+  props.message.role === 'assistant'
+    ? chatStore.getAgentRunByMessageId(props.message.id)
+    : null,
+)
 
 /** Tool result collapsed state (collapsed by default). */
 const toolResultCollapsed = ref(true)
@@ -300,6 +310,9 @@ onUnmounted(() => {
       <!-- eslint-disable-next-line vue/no-v-html — content is sanitised by markdown-it -->
       <div v-if="!cadPayload && !chartPayload && !whiteboardPayload && !isPlainToolResult && !isContextSummary"
         class="bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
+
+      <!-- Agent loop plan card (assistant only, when an agent run produced this message) -->
+      <AgentPlanCard v-if="agentRun" :run="agentRun" />
 
       <!-- Timestamp for assistant/tool messages (inside bubble) -->
       <span v-if="message.role !== 'user'" class="bubble__time">{{ formattedTime }}</span>

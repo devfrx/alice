@@ -28,6 +28,9 @@ export interface AliceSettings {
     theme: 'dark' | 'light'
     language: string
   }
+  agent: {
+    enabled: boolean
+  }
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -54,6 +57,9 @@ export const useSettingsStore = defineStore('settings', () => {
     ui: {
       theme: 'dark',
       language: 'it'
+    },
+    agent: {
+      enabled: false
     }
   })
 
@@ -147,6 +153,10 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value.ui.theme = (ui.theme as 'dark' | 'light') ?? settings.value.ui.theme
         settings.value.ui.language = (ui.language as string) ?? settings.value.ui.language
       }
+      if (config.agent) {
+        const agent = config.agent as Record<string, unknown>
+        settings.value.agent.enabled = (agent.enabled as boolean) ?? settings.value.agent.enabled
+      }
     } catch (err) {
       console.warn('[settings store] loadSettings failed:', err)
     } finally {
@@ -183,6 +193,9 @@ export const useSettingsStore = defineStore('settings', () => {
         ui: {
           theme: settings.value.ui.theme,
           language: settings.value.ui.language
+        },
+        agent: {
+          enabled: settings.value.agent.enabled
         }
       })
     } catch (err) {

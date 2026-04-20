@@ -19,6 +19,7 @@ PERSISTABLE_SECTIONS: frozenset[str] = frozenset({
     "tts", "stt", "voice", "ui", "plugins",
     "pc_automation", "web_search", "calendar", "weather",
     "clipboard", "notifications", "media_control", "file_search", "news",
+    "agent",
 })
 
 # Within the 'llm' section, only these keys are user preferences.

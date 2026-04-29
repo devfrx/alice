@@ -193,6 +193,42 @@ class QdrantService:
             points=points,
         )
 
+    async def set_payload(
+        self,
+        collection: str,
+        *,
+        payload: dict,
+        ids: list[str] | None = None,
+        query_filter: models.Filter | None = None,
+    ) -> None:
+        """Patch the payload of points (selected by IDs or filter).
+
+        Only the keys present in *payload* are overwritten — other
+        payload fields are preserved.  Exactly one of *ids* or
+        *query_filter* must be provided; if both are ``None`` the call
+        is a no-op so callers are free to pass an empty ID list without
+        accidentally rewriting the whole collection.
+
+        Args:
+            collection: Target collection name.
+            payload: Partial payload to merge into matching points.
+            ids: List of point IDs to update.
+            query_filter: Alternative filter-based selector.
+        """
+        assert self._client is not None, "QdrantService not initialized"
+        if ids is None and query_filter is None:
+            return
+        if ids is not None and not ids:
+            return
+        kwargs: dict = {"collection_name": collection, "payload": payload}
+        if ids is not None:
+            kwargs["points"] = ids
+        else:
+            kwargs["points_selector"] = models.FilterSelector(
+                filter=query_filter,
+            )
+        await self._client.set_payload(**kwargs)
+
     async def search(
         self,
         collection: str,

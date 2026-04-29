@@ -176,8 +176,17 @@ async def init_db(engine: AsyncEngine) -> None:
     # SQLite cannot ALTER COLUMN; structural changes require copying the
     # table.  Each rebuild is idempotent: it inspects the live schema and
     # only acts when the desired state has not been reached yet.
-    async with engine.begin() as conn:
-        await conn.run_sync(_rebuild_artifacts_if_needed)
+    #
+    # NOTE: ``PRAGMA foreign_keys = OFF/ON`` is silently ignored when run
+    # inside an active transaction (SQLite documented behaviour).  We
+    # therefore execute the rebuild on a connection at AUTOCOMMIT
+    # isolation so the pragma actually takes effect, then rely on the
+    # rebuild routine to wrap its own DDL in an explicit BEGIN/COMMIT.
+    async with engine.connect() as conn:
+        autocommit_conn = await conn.execution_options(
+            isolation_level="AUTOCOMMIT",
+        )
+        await autocommit_conn.run_sync(_rebuild_artifacts_if_needed)
 
 
 def _rebuild_artifacts_if_needed(sync_conn: Any) -> None:
@@ -216,57 +225,69 @@ def _rebuild_artifacts_if_needed(sync_conn: Any) -> None:
         "with ON DELETE SET NULL (preserves pinned artifacts when a "
         "conversation is deleted)."
     )
+    # PRAGMA foreign_keys must be set OUTSIDE any transaction; the
+    # caller is expected to provide an AUTOCOMMIT connection so this
+    # statement actually takes effect.
     sync_conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
-    sync_conn.exec_driver_sql("ALTER TABLE artifacts RENAME TO artifacts__old")
-    sync_conn.exec_driver_sql(
-        """
-        CREATE TABLE artifacts (
-            id CHAR(32) NOT NULL PRIMARY KEY,
-            conversation_id CHAR(32),
-            message_id CHAR(32),
-            tool_call_id VARCHAR(64),
-            kind VARCHAR(32) NOT NULL,
-            title VARCHAR(256) NOT NULL,
-            file_path VARCHAR NOT NULL,
-            mime VARCHAR(128) NOT NULL,
-            size_bytes INTEGER NOT NULL,
-            artifact_metadata JSON NOT NULL,
-            pinned BOOLEAN NOT NULL,
-            created_at DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL,
-            FOREIGN KEY(conversation_id) REFERENCES conversations(id)
-                ON DELETE SET NULL,
-            FOREIGN KEY(message_id) REFERENCES messages(id)
-                ON DELETE SET NULL
+    try:
+        sync_conn.exec_driver_sql("BEGIN")
+        sync_conn.exec_driver_sql(
+            "ALTER TABLE artifacts RENAME TO artifacts__old"
         )
-        """
-    )
-    sync_conn.exec_driver_sql(
-        """
-        INSERT INTO artifacts (
-            id, conversation_id, message_id, tool_call_id, kind,
-            title, file_path, mime, size_bytes, artifact_metadata,
-            pinned, created_at, updated_at
+        sync_conn.exec_driver_sql(
+            """
+            CREATE TABLE artifacts (
+                id CHAR(32) NOT NULL PRIMARY KEY,
+                conversation_id CHAR(32),
+                message_id CHAR(32),
+                tool_call_id VARCHAR(64),
+                kind VARCHAR(32) NOT NULL,
+                title VARCHAR(256) NOT NULL,
+                file_path VARCHAR NOT NULL,
+                mime VARCHAR(128) NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                artifact_metadata JSON NOT NULL,
+                pinned BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                FOREIGN KEY(conversation_id) REFERENCES conversations(id)
+                    ON DELETE SET NULL,
+                FOREIGN KEY(message_id) REFERENCES messages(id)
+                    ON DELETE SET NULL
+            )
+            """
         )
-        SELECT id, conversation_id, message_id, tool_call_id, kind,
-               title, file_path, mime, size_bytes, artifact_metadata,
-               pinned, created_at, updated_at
-        FROM artifacts__old
-        """
-    )
-    sync_conn.exec_driver_sql("DROP TABLE artifacts__old")
-    sync_conn.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_artifact_conv_created "
-        "ON artifacts (conversation_id, created_at)"
-    )
-    sync_conn.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_artifact_kind_created "
-        "ON artifacts (kind, created_at)"
-    )
-    sync_conn.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_artifacts_tool_call_id "
-        "ON artifacts (tool_call_id)"
-    )
+        sync_conn.exec_driver_sql(
+            """
+            INSERT INTO artifacts (
+                id, conversation_id, message_id, tool_call_id, kind,
+                title, file_path, mime, size_bytes, artifact_metadata,
+                pinned, created_at, updated_at
+            )
+            SELECT id, conversation_id, message_id, tool_call_id, kind,
+                   title, file_path, mime, size_bytes, artifact_metadata,
+                   pinned, created_at, updated_at
+            FROM artifacts__old
+            """
+        )
+        sync_conn.exec_driver_sql("DROP TABLE artifacts__old")
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_artifact_conv_created "
+            "ON artifacts (conversation_id, created_at)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_artifact_kind_created "
+            "ON artifacts (kind, created_at)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_artifacts_tool_call_id "
+            "ON artifacts (tool_call_id)"
+        )
+        sync_conn.exec_driver_sql("COMMIT")
+    except Exception:
+        sync_conn.exec_driver_sql("ROLLBACK")
+        sync_conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        raise
     sync_conn.exec_driver_sql("PRAGMA foreign_keys=ON")
     logger.success("'artifacts' table rebuild complete.")
 

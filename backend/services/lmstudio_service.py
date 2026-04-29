@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -58,6 +59,18 @@ class LMStudioManager:
         )
         self._operation_lock = asyncio.Lock()
         self._current_operation: ModelOperation | None = None
+        # Short-lived cache for ``list_models`` so concurrent callers
+        # (status endpoint, context-window probe, capability registry,
+        # embedding refresh, …) don't each issue an independent
+        # ``GET /api/v1/models``.  LM Studio is single-threaded on
+        # inference; without coalescing these probes pile up into
+        # ``ReadTimeout`` warnings whenever the server is busy with
+        # a chat completion or a JIT model swap.
+        self._models_cache: dict | None = None
+        self._models_cache_expires: float = 0.0
+        self._models_cache_lock = asyncio.Lock()
+        self._models_cache_ttl: float = 5.0
+        self._models_cache_ttl_failure: float = 20.0
 
     # -- Operation tracking -------------------------------------------------
 
@@ -90,16 +103,56 @@ class LMStudioManager:
     async def list_models(self) -> dict:
         """List all models known to LM Studio.
 
+        Coalesced behind a short TTL cache so concurrent or repeated
+        callers do not each round-trip to LM Studio.  The cache is
+        invalidated automatically by :meth:`invalidate_models_cache`,
+        which load/unload paths call to make state changes visible
+        immediately.
+
         Returns:
             The JSON response from ``GET /api/v1/models``.
         """
-        try:
-            resp = await self._client.get("/api/v1/models")
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPError as exc:
-            logger.warning("LM Studio list_models failed: {}", exc)
-            raise
+        now = time.monotonic()
+        cached = self._models_cache
+        if cached is not None and now < self._models_cache_expires:
+            return cached
+
+        async with self._models_cache_lock:
+            cached = self._models_cache
+            now = time.monotonic()
+            if cached is not None and now < self._models_cache_expires:
+                return cached
+            try:
+                resp = await self._client.get(
+                    "/api/v1/models",
+                    timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0),
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            except httpx.HTTPError as exc:
+                logger.warning(
+                    "LM Studio list_models failed: {}: {}",
+                    type(exc).__name__, exc,
+                )
+                # On failure, suppress repeated calls for a longer window
+                # so we don't keep hammering an unreachable / busy server.
+                self._models_cache_expires = (
+                    time.monotonic() + self._models_cache_ttl_failure
+                )
+                raise
+            self._models_cache = data
+            self._models_cache_expires = (
+                time.monotonic() + self._models_cache_ttl
+            )
+            return data
+
+    def invalidate_models_cache(self) -> None:
+        """Drop the cached ``list_models`` response.
+
+        Called after load/unload so the next caller sees fresh state.
+        """
+        self._models_cache = None
+        self._models_cache_expires = 0.0
 
     async def load_model(
         self,
@@ -160,6 +213,7 @@ class LMStudioManager:
                 result = resp.json()
                 self._current_operation.status = "completed"
                 self._current_operation.progress = 1.0
+                self.invalidate_models_cache()
                 return result
             except Exception as exc:
                 if self._current_operation:
@@ -200,6 +254,7 @@ class LMStudioManager:
                 result = resp.json()
                 self._current_operation.status = "completed"
                 self._current_operation.progress = 1.0
+                self.invalidate_models_cache()
                 return result
             except Exception as exc:
                 if self._current_operation:

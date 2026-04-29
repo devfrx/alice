@@ -507,6 +507,14 @@ class FileSearchPlugin(BasePlugin):
         def _open_with_system() -> None:
             if not resolved.exists():
                 raise ValueError(f"File not found: {resolved}")
+            # ``os.startfile`` exists only on Windows.  On other
+            # platforms we surface a clear error rather than letting
+            # an ``AttributeError`` bubble up from the worker thread.
+            if sys.platform != "win32":
+                raise ValueError(
+                    "open_file is only supported on Windows "
+                    f"(current platform: {sys.platform})"
+                )
             os.startfile(resolved)  # type: ignore[attr-defined]  # Windows-only
 
         await asyncio.to_thread(_open_with_system)
@@ -529,9 +537,11 @@ class FileSearchPlugin(BasePlugin):
         if not raw_path:
             raise ValueError("'path' parameter is required")
 
-        content: str = args.get("content", "")
-        if not content:
+        content = args.get("content")
+        if content is None:
             raise ValueError("'content' parameter is required")
+        if not isinstance(content, str):
+            raise ValueError("'content' must be a string")
 
         cfg = self.ctx.config.file_search
         resolved = _validate_path(

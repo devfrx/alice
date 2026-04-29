@@ -23,10 +23,42 @@ Write-Host "  AL\CE - Dev Mode" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host ""
 
+# -- 0. Resolve backend port (with fallback if 8000 is held by another process) --
+function Test-PortFree {
+    param([int]$Port)
+    $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    return -not $listeners
+}
+
+$BackendPort = 8000
+if (-not (Test-PortFree -Port 8000)) {
+    $owners = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
+        ForEach-Object { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName } |
+        Sort-Object -Unique
+    Write-Host "  [!] Port 8000 already in use by: $($owners -join ', ')" -ForegroundColor Yellow
+    $picked = $null
+    foreach ($p in 8001..8010) {
+        if (Test-PortFree -Port $p) { $picked = $p; break }
+    }
+    if (-not $picked) {
+        Write-Host "  [X] No free port in 8001-8010 — aborting." -ForegroundColor Red
+        exit 1
+    }
+    $BackendPort = $picked
+    Write-Host "  [OK] Falling back to port $BackendPort" -ForegroundColor Green
+}
+
+# Propagate the resolved port to every downstream consumer via env vars.
+# - BACKEND_PORT  : read by any tool that needs the backend URL.
+# - VITE_API_BASE_URL : read by Vite (frontend) and Electron main process for CSP.
+$BackendBase = "http://localhost:$BackendPort"
+$env:BACKEND_PORT = "$BackendPort"
+$env:VITE_API_BASE_URL = $BackendBase
+
 # -- 1. Check LM Studio is reachable (optional, non-blocking) --
 if (-not $FrontendOnly) {
     try {
-        $null = Invoke-WebRequest -Uri "http://localhost:1234/v1/models" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        $null = Invoke-WebRequest -Uri "http://127.0.0.1:1234/v1/models" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
         Write-Host "  [OK] LM Studio running on :1234" -ForegroundColor Green
     } catch {
         Write-Host "  [!] LM Studio not detected on :1234 - start it manually if needed" -ForegroundColor Yellow
@@ -61,8 +93,10 @@ $secondaryProcs = @()
 
 if (-not $BackendOnly) {
     Write-Host "  -> Starting Electron + Vue dev (new window)..." -ForegroundColor Yellow
+    # Inject the resolved backend URL so Vite + Electron main pick up the right port.
+    $frontendCmd = "`$env:VITE_API_BASE_URL='$BackendBase'; `$env:BACKEND_PORT='$BackendPort'; Set-Location '$Root\frontend'; npm run dev"
     $frontendProc = Start-Process powershell `
-        -ArgumentList "-NoExit", "-Command", "Set-Location '$Root\frontend'; npm run dev" `
+        -ArgumentList "-NoExit", "-Command", $frontendCmd `
         -PassThru
     $secondaryProcs += $frontendProc
     Write-Host "  [OK] Frontend window opened (PID: $($frontendProc.Id))" -ForegroundColor Green
@@ -97,8 +131,8 @@ Write-Host "=======================================" -ForegroundColor Green
 Write-Host "  All services started!" -ForegroundColor Green
 Write-Host "=======================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Backend API:    http://localhost:8000" -ForegroundColor Cyan
-Write-Host "  API Docs:       http://localhost:8000/docs" -ForegroundColor Cyan
+Write-Host "  Backend API:    $BackendBase" -ForegroundColor Cyan
+Write-Host "  API Docs:       $BackendBase/docs" -ForegroundColor Cyan
 if (-not $FrontendOnly) {
     Write-Host "  Ollama:         http://localhost:11434" -ForegroundColor Cyan
 }
@@ -113,7 +147,7 @@ Write-Host ""
 try {
     if (-not $FrontendOnly) {
         Set-Location $Root
-        & "backend\.venv\Scripts\python.exe" -m backend --reload --reload-dir backend
+        & "backend\.venv\Scripts\python.exe" -m backend --reload --reload-dir backend --port $BackendPort
     } else {
         # Frontend-only: run npm run dev in this terminal
         Set-Location "$Root\frontend"

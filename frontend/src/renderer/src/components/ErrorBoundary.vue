@@ -7,7 +7,7 @@
  * the full stack trace is displayed for debugging. A "report" action
  * copies diagnostic information to the clipboard.
  */
-import { onErrorCaptured, ref } from 'vue'
+import { onBeforeUnmount, onErrorCaptured, ref } from 'vue'
 import AppIcon from './ui/AppIcon.vue'
 
 const emit = defineEmits<{
@@ -20,6 +20,7 @@ const errorMessage = ref('')
 const errorStack = ref('')
 const errorInfo = ref('')
 const reportCopied = ref(false)
+let copyResetTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Is the app running in development mode? */
 const isDev = import.meta.env.DEV
@@ -58,11 +59,22 @@ async function copyReport(): Promise<void> {
     try {
         await navigator.clipboard.writeText(payload)
         reportCopied.value = true
-        setTimeout(() => { reportCopied.value = false }, 2000)
+        if (copyResetTimer) clearTimeout(copyResetTimer)
+        copyResetTimer = setTimeout(() => {
+            reportCopied.value = false
+            copyResetTimer = null
+        }, 2000)
     } catch (err) {
         console.warn('[ErrorBoundary] clipboard write failed:', err)
     }
 }
+
+onBeforeUnmount(() => {
+    if (copyResetTimer) {
+        clearTimeout(copyResetTimer)
+        copyResetTimer = null
+    }
+})
 </script>
 
 <template>

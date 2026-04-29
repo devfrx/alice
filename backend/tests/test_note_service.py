@@ -596,6 +596,40 @@ class TestFolders:
         assert total == 1
         assert entries[0].folder_path == "keep"
 
+    @pytest.mark.asyncio
+    async def test_delete_folder_move_syncs_qdrant_payload(
+        self, tmp_path: Path, mock_qdrant_service, mock_embedding_client,
+    ):
+        """Bug-fix: ``mode='move'`` must rewrite Qdrant ``folder_path``.
+
+        Without the fix, semantic search filtered by folder kept
+        returning the moved notes under their old folder name.
+        """
+        cfg = _make_config(
+            db_path=str(tmp_path / "notes.db"),
+            embedding_enabled=True,
+        )
+        svc = NoteService(
+            config=cfg,
+            qdrant_service=mock_qdrant_service,
+            embedding_client=mock_embedding_client,
+        )
+        await svc.initialize()
+        try:
+            n1 = await svc.create("A", "a", folder_path="old")
+            n2 = await svc.create("B", "b", folder_path="old")
+
+            mock_qdrant_service.set_payload.reset_mock()
+            affected = await svc.delete_folder("old", mode="move")
+
+            assert affected == 2
+            mock_qdrant_service.set_payload.assert_awaited_once()
+            kwargs = mock_qdrant_service.set_payload.await_args.kwargs
+            assert kwargs["payload"] == {"folder_path": ""}
+            assert sorted(kwargs["ids"]) == sorted([n1.id, n2.id])
+        finally:
+            await svc.close()
+
 
 # ----------------------------------------------------------------------- #
 # Edge cases and integration

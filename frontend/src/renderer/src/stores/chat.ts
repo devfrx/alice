@@ -9,7 +9,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { api, resolveBackendUrl } from '../services/api'
 import { useAgentRun } from '../composables/useAgentRun'
@@ -38,6 +38,38 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Whether the LLM is currently streaming a response. */
   const isStreaming = ref(false)
+
+  /**
+   * Epoch (ms) at which the last stream ended.  Used by background
+   * pollers (LM Studio status, weather, calendar, …) to honour a short
+   * grace period after a chat finishes so the backend can drain its
+   * tool / embedding work without competing with renderer traffic.
+   */
+  const lastStreamEndedAt = ref(0)
+
+  /** Grace window (ms) during which background pollers stay quiet. */
+  const POST_STREAM_QUIET_MS = 10_000
+
+  /**
+   * Returns true when background polling should be skipped — either a
+   * stream is currently active or it ended less than
+   * ``POST_STREAM_QUIET_MS`` milliseconds ago.
+   */
+  function isPollingPaused(): boolean {
+    if (isStreaming.value) return true
+    if (lastStreamEndedAt.value === 0) return false
+    return Date.now() - lastStreamEndedAt.value < POST_STREAM_QUIET_MS
+  }
+
+  // Stamp lastStreamEndedAt whenever streaming transitions true → false.
+  // Centralised here so every code path that ends a stream (normal
+  // finalize, cancel, error, conversation switch) is covered without
+  // having to remember the bookkeeping at each call site.
+  watch(isStreaming, (streaming, wasStreaming) => {
+    if (wasStreaming && !streaming) {
+      lastStreamEndedAt.value = Date.now()
+    }
+  })
 
   /** The conversation ID for which streaming is currently active. */
   const streamingConversationId = ref<string | null>(null)
@@ -733,6 +765,7 @@ export const useChatStore = defineStore('chat', () => {
     conversations,
     currentConversation,
     isStreaming,
+    lastStreamEndedAt,
     streamingConversationId,
     currentStreamContent,
     currentThinkingContent,
@@ -748,6 +781,9 @@ export const useChatStore = defineStore('chat', () => {
     // computed
     messages,
     isStreamingCurrentConversation,
+
+    // helpers
+    isPollingPaused,
 
     // REST actions
     loadConversations,

@@ -116,6 +116,9 @@ const PANE_MAX = 900
 const PANE_DEFAULT = 840
 const leftPaneWidth = ref(PANE_DEFAULT)
 const isDraggingDivider = ref(false)
+/** Cleanup callback for the in-flight drag, used to release document
+ *  listeners if the component unmounts mid-drag. */
+let resizeCleanup: (() => void) | null = null
 
 function onResizeStart(e: MouseEvent): void {
     e.preventDefault()
@@ -129,6 +132,12 @@ function onResizeStart(e: MouseEvent): void {
 
     function onUp(): void {
         isDraggingDivider.value = false
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        resizeCleanup = null
+    }
+
+    resizeCleanup = (): void => {
         document.removeEventListener('mousemove', onMove)
         document.removeEventListener('mouseup', onUp)
     }
@@ -375,6 +384,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     isDraggingDivider.value = false
+    resizeCleanup?.()
+    resizeCleanup = null
 })
 </script>
 

@@ -12,6 +12,10 @@ export const useEmailStore = defineStore('email', () => {
   const currentFolder = ref('INBOX')
   const unreadCount = computed(() => inbox.value.filter((e) => !e.is_read).length)
 
+  function _toErrorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err)
+  }
+
   async function fetchInbox(folder = 'INBOX', limit = 20, unreadOnly = false): Promise<void> {
     loading.value = true
     error.value = null
@@ -19,7 +23,7 @@ export const useEmailStore = defineStore('email', () => {
       inbox.value = await api.getEmailInbox({ folder, limit, unread_only: unreadOnly })
       currentFolder.value = folder
     } catch (err) {
-      error.value = (err as Error).message
+      error.value = _toErrorMessage(err)
     } finally {
       loading.value = false
     }
@@ -39,7 +43,7 @@ export const useEmailStore = defineStore('email', () => {
       detail.is_read = detail.is_read ?? true
       currentEmail.value = detail
     } catch (err) {
-      error.value = (err as Error).message
+      error.value = _toErrorMessage(err)
     } finally {
       loading.value = false
     }
@@ -51,7 +55,7 @@ export const useEmailStore = defineStore('email', () => {
     try {
       inbox.value = await api.searchEmails(req)
     } catch (err) {
-      error.value = (err as Error).message
+      error.value = _toErrorMessage(err)
     } finally {
       loading.value = false
     }

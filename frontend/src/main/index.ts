@@ -28,13 +28,20 @@ function createWindow(): void {
   const reactRefreshHash = "'sha256-Z2/iFzh9VMlVkEOar1f/oSHWwQk3ve1qk/C2WdsC4Xk='"
   // tldraw CDN for translations, fonts, and icons
   const tldrawCdn = 'https://cdn.tldraw.com'
+
+  // Resolve the backend origin from the environment so a port fallback in
+  // start-dev.ps1 (e.g. 8001 when 8000 is held by another process) is
+  // automatically reflected in the CSP.  Falls back to localhost:8000.
+  const backendHttp = (process.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '')
+  const backendWs = backendHttp.replace(/^http/, 'ws')
+
   const devCsp = [
     "default-src 'self'",
     `script-src 'self' blob: 'wasm-unsafe-eval' ${reactRefreshHash}`,
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: http://localhost:8000 ${tldrawCdn}`,
+    `img-src 'self' data: blob: ${backendHttp} ${tldrawCdn}`,
     `font-src 'self' data: ${tldrawCdn}`,
-    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ws://localhost:5173 ${tldrawCdn}`,
+    `connect-src 'self' blob: ${backendWs} ${backendHttp} ws://localhost:5173 ${tldrawCdn}`,
     "object-src 'none'"
   ].join('; ')
 
@@ -42,9 +49,9 @@ function createWindow(): void {
     "default-src 'self'",
     "script-src 'self' blob: 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: http://localhost:8000 ${tldrawCdn}`,
+    `img-src 'self' data: blob: ${backendHttp} ${tldrawCdn}`,
     `font-src 'self' data: ${tldrawCdn}`,
-    `connect-src 'self' blob: ws://localhost:8000 http://localhost:8000 ${tldrawCdn}`,
+    `connect-src 'self' blob: ${backendWs} ${backendHttp} ${tldrawCdn}`,
     "object-src 'none'"
   ].join('; ')
 

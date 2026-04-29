@@ -45,6 +45,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     config: AliceConfig = app.state._config  # set by create_app
     testing: bool = app.state._testing
 
+    # Pre-bind every resource referenced from the ``finally`` block so a
+    # startup failure before they are constructed cannot raise
+    # ``UnboundLocalError`` and mask the original exception.
+    engine = None
+    plugin_manager = None
+    lmstudio_manager = None
+    llm_service = None
+    ctx: AppContext | None = None
+
     if testing:
         db_url = "sqlite+aiosqlite://"  # in-memory
     else:
@@ -58,7 +67,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine, session_factory = create_engine_and_session(db_url)
     await init_db(engine)
 
-    ctx: AppContext = create_context(config)
+    ctx = create_context(config)
     ctx.db = session_factory  # type: ignore[assignment]
     ctx.engine = engine
 
@@ -256,47 +265,29 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("VRAM monitor failed to start: {}", exc)
 
     # -- VRAM event handlers ------------------------------------------------
+    # These handlers ONLY log VRAM pressure.  Mutating ``stt_cfg`` /
+    # ``tts_cfg`` here would not actually downgrade the running services
+    # (they cache their own config snapshot at start()), so we deliberately
+    # avoid touching live config to prevent misleading "we mitigated"
+    # signals.  Real mitigation (restart STT/TTS with new settings) lives
+    # in the settings/config REST handlers and must be triggered explicitly
+    # by the user or a future orchestrator.
     if ctx.vram_monitor:
         async def _handle_vram_warning(**kwargs):
-            """React to VRAM pressure — downgrade STT compute type."""
             usage = kwargs.get("usage")
             if usage:
                 logger.warning(
                     "VRAM warning: {}MB used / {}MB total",
                     usage.used_mb, usage.total_mb,
                 )
-            # Downgrade STT compute type if available
-            if ctx.stt_service and hasattr(ctx.stt_service, '_config'):
-                stt_cfg = ctx.stt_service._config
-                if stt_cfg.compute_type == "float16":
-                    logger.info("VRAM pressure: downgrading STT compute_type to int8")
-                    stt_cfg.compute_type = "int8"
 
         async def _handle_vram_critical(**kwargs):
-            """React to critical VRAM — switch TTS to lightweight engine."""
             usage = kwargs.get("usage")
             if usage:
                 logger.error(
                     "VRAM critical: {}MB used / {}MB total",
                     usage.used_mb, usage.total_mb,
                 )
-            # Switch TTS engine to Piper (CPU-based, no VRAM)
-            if ctx.tts_service and hasattr(ctx.tts_service, '_config'):
-                tts_cfg = ctx.tts_service._config
-                if tts_cfg.engine not in ("piper", "kokoro"):
-                    logger.warning(
-                        "VRAM critical: switching TTS from '{}' to 'piper'",
-                        tts_cfg.engine,
-                    )
-                    tts_cfg.engine = "piper"
-            # Disable VRAM-heavy STT if possible
-            if ctx.stt_service and hasattr(ctx.stt_service, '_config'):
-                stt_cfg = ctx.stt_service._config
-                if stt_cfg.device == "cuda":
-                    logger.warning("VRAM critical: switching STT device from 'cuda' to 'cpu'")
-                    stt_cfg.device = "cpu"
-                    if stt_cfg.compute_type == "float16":
-                        stt_cfg.compute_type = "int8"
 
         ctx.event_bus.subscribe(AliceEvent.VRAM_WARNING, _handle_vram_warning)
         ctx.event_bus.subscribe(AliceEvent.VRAM_CRITICAL, _handle_vram_critical)
@@ -457,62 +448,66 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         # -- Shutdown -----------------------------------------------------------
-        try:
-            await plugin_manager.shutdown()
-        except Exception as exc:
-            logger.error("Plugin system shutdown error: {}", exc)
-        try:
-            await lmstudio_manager.close()
-        except Exception as exc:
-            logger.error("LMStudio manager shutdown error: {}", exc)
-        try:
-            await llm_service.close()
-        except Exception as exc:
-            logger.error("LLM service shutdown error: {}", exc)
-        if ctx.stt_service:
+        if plugin_manager is not None:
+            try:
+                await plugin_manager.shutdown()
+            except Exception as exc:
+                logger.error("Plugin system shutdown error: {}", exc)
+        if lmstudio_manager is not None:
+            try:
+                await lmstudio_manager.close()
+            except Exception as exc:
+                logger.error("LMStudio manager shutdown error: {}", exc)
+        if llm_service is not None:
+            try:
+                await llm_service.close()
+            except Exception as exc:
+                logger.error("LLM service shutdown error: {}", exc)
+        if ctx is not None and ctx.stt_service:
             try:
                 await ctx.stt_service.stop()
             except Exception as exc:
                 logger.error("STT shutdown error: {}", exc)
-        if ctx.tts_service:
+        if ctx is not None and ctx.tts_service:
             try:
                 await ctx.tts_service.stop()
             except Exception as exc:
                 logger.error("TTS shutdown error: {}", exc)
-        if ctx.vram_monitor:
+        if ctx is not None and ctx.vram_monitor:
             try:
                 await ctx.vram_monitor.stop()
             except Exception as exc:
                 logger.error("VRAM monitor shutdown error: {}", exc)
-        if ctx.memory_service:
+        if ctx is not None and ctx.memory_service:
             try:
                 await ctx.memory_service.close()
             except Exception as exc:
                 logger.error("Memory service shutdown error: {}", exc)
-        if ctx.note_service:
+        if ctx is not None and ctx.note_service:
             try:
                 await ctx.note_service.close()
             except Exception as exc:
                 logger.error("Note service shutdown error: {}", exc)
-        if ctx.email_service:
+        if ctx is not None and ctx.email_service:
             try:
                 await ctx.email_service.close()
             except Exception as exc:
                 logger.error("Email service shutdown error: {}", exc)
-        if ctx.qdrant_service:
+        if ctx is not None and ctx.qdrant_service:
             try:
                 await ctx.qdrant_service.close()
             except Exception as exc:
                 logger.error("Qdrant service shutdown error: {}", exc)
-        if ctx.embedding_client:
+        if ctx is not None and ctx.embedding_client:
             try:
                 await ctx.embedding_client.close()
             except Exception as exc:
                 logger.error("Embedding client shutdown error: {}", exc)
-        try:
-            await engine.dispose()
-        except Exception as exc:
-            logger.error("Engine disposal error: {}", exc)
+        if engine is not None:
+            try:
+                await engine.dispose()
+            except Exception as exc:
+                logger.error("Engine disposal error: {}", exc)
         logger.info("AL\\CE backend stopped")
 
 

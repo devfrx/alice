@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 import httpx
@@ -14,6 +16,21 @@ from backend.core.context import AppContext
 from backend.core.protocols import LMStudioManagerProtocol
 
 router = APIRouter(tags=["models"])
+
+# ---------------------------------------------------------------------------
+# /models/status cache
+# ---------------------------------------------------------------------------
+# A handful of components in the renderer poll ``/models/status`` every few
+# seconds (connection badge, ModelSelector, etc.).  Each call would otherwise
+# hit ``GET /api/v1/models`` on LM Studio, which is expensive when the server
+# is busy generating or loading a model and quickly degrades into a stream of
+# 500 / ReadTimeout warnings in the backend log.  We coalesce concurrent
+# callers behind a short TTL cache so LM Studio is queried at most once per
+# ``_STATUS_CACHE_TTL`` window (longer when the previous probe failed).
+_STATUS_CACHE_TTL: float = 4.0
+_STATUS_CACHE_TTL_DOWN: float = 15.0
+_status_cache: dict[str, Any] = {"value": None, "expires_at": 0.0}
+_status_cache_lock = asyncio.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +201,9 @@ async def load_model(body: LoadModelRequest, request: Request) -> dict:
         # Invalidate auto-model cache so the next chat uses the new model.
         if ctx.llm_service is not None:
             ctx.llm_service.invalidate_model_cache()
+        # Drop the cached /models/status snapshot so the UI reflects the
+        # newly loaded model on the next poll.
+        _invalidate_status_cache()
         # Refresh registry so newly loaded model has up-to-date caps.
         if ctx.model_registry is not None:
             try:
@@ -215,6 +235,7 @@ async def unload_model(body: UnloadModelRequest, request: Request) -> dict:
         # Invalidate auto-model cache after unload.
         if ctx.llm_service is not None:
             ctx.llm_service.invalidate_model_cache()
+        _invalidate_status_cache()
         return result
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
@@ -251,29 +272,59 @@ async def download_status(job_id: str, request: Request) -> dict:
 async def models_status(request: Request) -> ModelStatusResponse:
     """Quick health-check + summary of loaded models.
 
-    Uses a single ``list_models()`` call to both verify connectivity and
-    retrieve model state — avoids the previous double-hit to LM Studio
-    that happened when ``check_health()`` and ``list_models()`` were
-    called sequentially.
+    Cached for a few seconds so concurrent renderer pollers do not
+    hammer LM Studio with one ``GET /api/v1/models`` per call.  When
+    the previous probe failed the cache TTL is extended so a slow or
+    unreachable LM Studio is not retried on every request.
     """
     mgr = _manager(request)
-    try:
-        data = await mgr.list_models()
-    except httpx.HTTPError:
-        return ModelStatusResponse(connected=False)
 
-    all_models = data.get("models", [])
-    loaded = [
-        m["key"]
-        for m in all_models
-        if m.get("loaded_instances")
-    ]
-    return ModelStatusResponse(
-        connected=True,
-        loaded_model_count=len(loaded),
-        total_model_count=len(all_models),
-        loaded_models=loaded,
-    )
+    now = time.monotonic()
+    cached = _status_cache["value"]
+    if cached is not None and now < _status_cache["expires_at"]:
+        return cached
+
+    async with _status_cache_lock:
+        # Re-check inside the lock: another coroutine may have refreshed
+        # the cache while we were waiting.
+        cached = _status_cache["value"]
+        now = time.monotonic()
+        if cached is not None and now < _status_cache["expires_at"]:
+            return cached
+
+        try:
+            data = await mgr.list_models()
+        except httpx.HTTPError:
+            response = ModelStatusResponse(connected=False)
+            _status_cache["value"] = response
+            _status_cache["expires_at"] = time.monotonic() + _STATUS_CACHE_TTL_DOWN
+            return response
+
+        all_models = data.get("models", [])
+        loaded = [
+            m["key"]
+            for m in all_models
+            if m.get("loaded_instances")
+        ]
+        response = ModelStatusResponse(
+            connected=True,
+            loaded_model_count=len(loaded),
+            total_model_count=len(all_models),
+            loaded_models=loaded,
+        )
+        _status_cache["value"] = response
+        _status_cache["expires_at"] = time.monotonic() + _STATUS_CACHE_TTL
+        return response
+
+
+def _invalidate_status_cache() -> None:
+    """Force the next ``/models/status`` request to re-query LM Studio.
+
+    Called by load/unload routes so the UI reflects the new state
+    immediately instead of waiting for the cache TTL to expire.
+    """
+    _status_cache["value"] = None
+    _status_cache["expires_at"] = 0.0
 
 
 # ---------------------------------------------------------------------------

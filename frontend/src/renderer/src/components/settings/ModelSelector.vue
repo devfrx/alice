@@ -139,7 +139,12 @@ function handleClickOutside(event: MouseEvent): void {
 }
 
 watch(isOpen, (val) => {
-  if (val) adjustDropdownPosition()
+  if (val) {
+    adjustDropdownPosition()
+    document.addEventListener('keydown', handleKeydown)
+  } else {
+    document.removeEventListener('keydown', handleKeydown)
+  }
 })
 
 onMounted(() => {
@@ -151,6 +156,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('resize', handleResize)
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

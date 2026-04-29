@@ -705,23 +705,28 @@ class BranchConversationResponse(BaseModel):
 def _build_done_event(
     *,
     conv_id: uuid.UUID,
-    user_msg: Message,
+    user_msg_id: uuid.UUID,
+    version_group_id: uuid.UUID | None,
+    version_index: int,
     asst_msg_id: str,
     finish_reason: str,
 ) -> dict[str, Any]:
-    """Build the standard ``done`` WS event payload."""
+    """Build the standard ``done`` WS event payload.
+
+    Takes primitives instead of the ORM ``Message`` so callers can run
+    it after a commit (which expires SQLAlchemy attributes and would
+    otherwise trigger a sync lazy-load → ``MissingGreenlet``).
+    """
     return {
         "type": "done",
         "conversation_id": str(conv_id),
         "message_id": asst_msg_id,
-        "user_message_id": str(user_msg.id),
+        "user_message_id": str(user_msg_id),
         "finish_reason": finish_reason,
         "version_group_id": (
-            str(user_msg.version_group_id)
-            if user_msg.version_group_id
-            else None
+            str(version_group_id) if version_group_id else None
         ),
-        "version_index": user_msg.version_index,
+        "version_index": version_index,
     }
 
 
@@ -777,6 +782,15 @@ async def _persist_final_turn(
     """
     finish_reason = result.finish_reason
 
+    # Snapshot user_msg primitives ONCE up front.  After ``session.commit()``
+    # SQLAlchemy expires loaded attributes; reading them later from this
+    # async-session-bound ORM object would trigger a sync lazy-load and
+    # raise ``MissingGreenlet``.  Capturing here is safe — these fields
+    # are immutable for the lifetime of the turn.
+    user_msg_id = user_msg.id
+    user_msg_version_group_id = user_msg.version_group_id
+    user_msg_version_index = user_msg.version_index
+
     # ------------------------------------------------------------------
     # Fast path: error (v3-4).  ``run_tool_loop`` may have flushed
     # intermediate messages; rollback to keep DB consistent with the
@@ -786,7 +800,10 @@ async def _persist_final_turn(
         with contextlib.suppress(Exception):
             await session.rollback()
         await sink.send(_build_done_event(
-            conv_id=conv_id, user_msg=user_msg,
+            conv_id=conv_id,
+            user_msg_id=user_msg_id,
+            version_group_id=user_msg_version_group_id,
+            version_index=user_msg_version_index,
             asst_msg_id="", finish_reason="error",
         ))
         return
@@ -803,8 +820,8 @@ async def _persist_final_turn(
                 role="assistant",
                 content=result.content,
                 thinking_content=result.thinking or None,
-                version_group_id=user_msg.version_group_id,
-                version_index=user_msg.version_index,
+                version_group_id=user_msg_version_group_id,
+                version_index=user_msg_version_index,
             )
             session.add(cancel_msg)
             asst_msg_id = str(cancel_msg.id)
@@ -818,7 +835,10 @@ async def _persist_final_turn(
                     session, conv_id, ctx.conversation_file_manager,
                 )
         await sink.send(_build_done_event(
-            conv_id=conv_id, user_msg=user_msg,
+            conv_id=conv_id,
+            user_msg_id=user_msg_id,
+            version_group_id=user_msg_version_group_id,
+            version_index=user_msg_version_index,
             asst_msg_id=asst_msg_id, finish_reason="cancelled",
         ))
         return
@@ -839,8 +859,8 @@ async def _persist_final_turn(
                 role="assistant",
                 content=result.content,
                 thinking_content=result.thinking or None,
-                version_group_id=user_msg.version_group_id,
-                version_index=user_msg.version_index,
+                version_group_id=user_msg_version_group_id,
+                version_index=user_msg_version_index,
             )
             session.add(asst_msg)
             asst_msg_id = str(asst_msg.id)
@@ -945,13 +965,19 @@ async def _persist_final_turn(
             "type": "error", "content": "Failed to save response",
         })
         await sink.send(_build_done_event(
-            conv_id=conv_id, user_msg=user_msg,
+            conv_id=conv_id,
+            user_msg_id=user_msg_id,
+            version_group_id=user_msg_version_group_id,
+            version_index=user_msg_version_index,
             asst_msg_id="", finish_reason="error",
         ))
         return
 
     await sink.send(_build_done_event(
-        conv_id=conv_id, user_msg=user_msg,
+        conv_id=conv_id,
+        user_msg_id=user_msg_id,
+        version_group_id=user_msg_version_group_id,
+        version_index=user_msg_version_index,
         asst_msg_id=asst_msg_id, finish_reason=finish_reason,
     ))
 
@@ -2046,12 +2072,38 @@ async def delete_all_conversations(request: Request) -> dict[str, Any]:
     """Delete ALL conversations, messages, attachments, and associated files."""
     ctx = _ctx(request)
     async with ctx.db() as session:
+        # Snapshot every artifact file path BEFORE wiping the table so we
+        # can unlink the on-disk blobs after commit (artifacts have
+        # ``ON DELETE SET NULL`` on conversation_id and would otherwise
+        # survive as orphan rows + dangling files).
+        art_paths_q = await session.exec(
+            select(Artifact.id, Artifact.file_path)
+        )
+        artifact_paths: list[tuple[uuid.UUID, str]] = list(art_paths_q.all())
+
         # Use the underlying SA connection for DML (avoids SQLModel exec() warning).
         conn = await session.connection()
         await conn.execute(sa.delete(Attachment))
+        # Wipe all artifacts (rows) — pinned status is irrelevant here
+        # because the user explicitly asked to delete EVERYTHING.
+        await conn.execute(sa.delete(Artifact))
         await conn.execute(sa.delete(Message))
         await conn.execute(sa.delete(Conversation))
         await session.commit()
+
+    # Best-effort cleanup of artifact files (after commit so a transient
+    # FS failure cannot roll back the row deletion).
+    for _aid, file_path in artifact_paths:
+        try:
+            p = Path(file_path)
+            if not p.is_absolute():
+                p = PROJECT_ROOT / p
+            if p.exists() and p.is_file():
+                await asyncio.to_thread(p.unlink)
+        except Exception as exc:
+            logger.warning(
+                "Failed to unlink artifact file {}: {}", file_path, exc,
+            )
 
     # Remove all JSON conversation files.
     file_manager: ConversationFileManager | None = ctx.conversation_file_manager
@@ -2762,7 +2814,11 @@ async def import_conversation(request: Request) -> dict[str, Any]:
                             file_path,
                         )
                 att = Attachment(
-                    id=uuid.UUID(att_data["file_id"]),
+                    # Always allocate a fresh UUID for the imported row.
+                    # Re-using the exported ``file_id`` as a primary key
+                    # would collide on the second import of the same
+                    # export (Attachment.id is the PK).
+                    id=uuid.uuid4(),
                     message_id=msg.id,
                     filename=att_data["filename"],
                     content_type=att_data["content_type"],

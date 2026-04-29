@@ -88,39 +88,78 @@ class OpenAIEmbeddingClient:
         data = resp.json()
         return data["data"][0]["embedding"]
 
-    async def encode_batch(self, texts: list[str]) -> list[list[float]]:
-        """Encode multiple texts, chunking to avoid server limits.
+    # Chunk sizes tried in order when the server rejects a batch.
+    # 32 is the empirical safe cap for LM Studio with LM Link relaying:
+    # batches >=64 trigger ``LM Link connection closed`` (HTTP 400).
+    _BATCH_CHUNK_SIZES: tuple[int, ...] = (32, 8)
 
-        Tries the full batch first; on failure, falls back to
-        sequential single-text calls so it works even on servers
-        that reject batch ``input`` (e.g. some LM Studio versions).
+    async def encode_batch(self, texts: list[str]) -> list[list[float]]:
+        """Encode multiple texts, chunking to survive server limits.
+
+        Strategy (each step only kicks in if the previous one fails):
+
+        1. Send the full list in one request (fast path).
+        2. Retry by splitting into smaller batches (``_BATCH_CHUNK_SIZES``).
+           Needed for LM Studio when the model is served via LM Link
+           — the relay closes the connection on payloads above ~48 items.
+        3. Last resort: sequential one-by-one calls.
         """
         if not texts:
             return []
 
-        # Fast path — try as a single batch
+        # 1. Fast path — try as a single batch
         try:
-            resp = await self._client.post(
-                "/v1/embeddings",
-                json={"input": texts, "model": self._model},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            items = sorted(data["data"], key=lambda d: d["index"])
-            return [item["embedding"] for item in items]
-        except httpx.HTTPStatusError:
-            # Batch rejected — fall back to one-by-one
+            return await self._embed_chunk(texts)
+        except httpx.HTTPStatusError as exc:
             logger.debug(
-                "Batch embedding rejected, falling back to sequential "
-                "({} texts)",
-                len(texts),
+                "Embedding batch of {} rejected (HTTP {}: {!r}); "
+                "falling back to chunked requests",
+                len(texts), exc.response.status_code,
+                (exc.response.text or "")[:120],
             )
 
-        results: list[list[float]] = []
+        # 2. Chunked retries
+        for chunk_size in self._BATCH_CHUNK_SIZES:
+            if chunk_size >= len(texts):
+                continue
+            try:
+                results: list[list[float]] = []
+                for start in range(0, len(texts), chunk_size):
+                    sub = texts[start:start + chunk_size]
+                    results.extend(await self._embed_chunk(sub))
+                return results
+            except httpx.HTTPStatusError as exc:
+                logger.debug(
+                    "Embedding chunk size {} also rejected (HTTP {}); "
+                    "trying smaller",
+                    chunk_size, exc.response.status_code,
+                )
+
+        # 3. Last resort — sequential
+        logger.warning(
+            "Embedding server rejected all batch sizes; falling back to "
+            "{} sequential calls (slow path)", len(texts),
+        )
+        results = []
         for text in texts:
             vec = await self.encode(text)
             results.append(vec)
         return results
+
+    async def _embed_chunk(self, texts: list[str]) -> list[list[float]]:
+        """POST one batch and return ordered embeddings.
+
+        Raises ``httpx.HTTPStatusError`` so the caller can decide whether
+        to retry with a smaller chunk.
+        """
+        resp = await self._client.post(
+            "/v1/embeddings",
+            json={"input": texts, "model": self._model},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        items = sorted(data["data"], key=lambda d: d["index"])
+        return [item["embedding"] for item in items]
 
     async def is_model_loaded(self) -> bool:
         """Return True if the embedding model is currently loaded in LM Studio.

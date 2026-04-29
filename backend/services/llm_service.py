@@ -148,6 +148,12 @@ class LLMService:
         self._auto_model_lock: asyncio.Lock = asyncio.Lock()
         # None = unknown, True = supported, False = not supported
         self._supports_stream_options: bool | None = None
+        # Same idea for ``response_format`` — some LM Studio builds only
+        # accept ``json_schema``/``text`` and reject ``json_object`` with
+        # a 400.  Once we observe the rejection we stop sending it to
+        # avoid a wasted round-trip on every classifier/planner/critic
+        # call.
+        self._supports_response_format: bool | None = None
 
     # ------------------------------------------------------------------
     # Model resolution helpers
@@ -249,7 +255,7 @@ class LLMService:
             try:
                 resp = await self._client.get(
                     v1_url,
-                    timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
+                    timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0),
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -286,14 +292,17 @@ class LLMService:
                             len(items),
                         )
             except Exception as exc:
-                logger.debug("LM Studio v1 model query failed ({}), trying OAI-compat", exc)
+                logger.debug(
+                    "LM Studio v1 model query failed ({}: {}), trying OAI-compat",
+                    type(exc).__name__, exc,
+                )
 
             if not resolved:
                 # Final fallback: OAI-compat /v1/models
                 try:
                     resp = await self._client.get(
                         f"{self._config.base_url}/v1/models",
-                        timeout=httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0),
+                        timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0),
                     )
                     resp.raise_for_status()
                     items = resp.json().get("data", [])
@@ -310,7 +319,10 @@ class LLMService:
                             len(items),
                         )
                 except Exception as exc2:
-                    logger.warning("OAI-compat auto model resolution failed: {}", exc2)
+                    logger.warning(
+                        "OAI-compat auto model resolution failed: {}: {}",
+                        type(exc2).__name__, exc2,
+                    )
 
             if resolved:
                 prev = self._auto_model_cache
@@ -1115,10 +1127,12 @@ class LLMService:
         )
         if effective_max is not None and effective_max > 0:
             payload["max_tokens"] = effective_max
-        if response_format is not None:
+        if response_format is not None and self._supports_response_format is not False:
             # LM Studio / OpenAI accept ``{"type": "json_object"}``.  When
             # the server rejects it (legacy backends), the OAI-compat
-            # retry loop below strips it on the first 400 (see fallback).
+            # retry loop below strips it on the first 400 and we cache the
+            # rejection in ``_supports_response_format`` so subsequent
+            # requests skip the field entirely.
             payload["response_format"] = response_format
         if tools:
             payload["tools"] = tools
@@ -1161,29 +1175,42 @@ class LLMService:
         if self._supports_stream_options is False:
             payload.pop("stream_options", None)
 
-        for _attempt in range(2):
+        # Up to 3 attempts: each 400 may flag a different offending field
+        # (stream_options, response_format, or a combination).  We inspect
+        # the body to drop the right one rather than guessing.
+        for _attempt in range(3):
             async with self._client.stream(
                 "POST", url, json=payload, timeout=_stream_timeout,
             ) as resp:
-                if resp.status_code == 400 and _attempt == 0 and "stream_options" in payload:
+                if resp.status_code == 400 and _attempt < 2:
                     body = (await resp.aread()).decode(errors="replace")
-                    logger.warning(
-                        "OAI-compat 400 with stream_options — retrying without it. "
-                        "Server said: {}",
-                        body[:300],
-                    )
-                    self._supports_stream_options = False
-                    payload.pop("stream_options")
-                    continue  # exit async with, try again without stream_options
-                if resp.status_code == 400 and _attempt == 0 and "response_format" in payload:
-                    body = (await resp.aread()).decode(errors="replace")
-                    logger.warning(
-                        "OAI-compat 400 with response_format — retrying without it. "
-                        "Server said: {}",
-                        body[:300],
-                    )
-                    payload.pop("response_format", None)
-                    continue
+                    body_lc = body.lower()
+                    # Detect which field the server complained about.
+                    # Inspect response_format FIRST: some servers reject
+                    # the field outright (e.g. require json_schema/text),
+                    # which has nothing to do with stream_options.
+                    if (
+                        "response_format" in body_lc
+                        and "response_format" in payload
+                    ):
+                        logger.warning(
+                            "OAI-compat 400 with response_format — retrying "
+                            "without it. Server said: {}", body[:300],
+                        )
+                        self._supports_response_format = False
+                        payload.pop("response_format", None)
+                        continue
+                    if (
+                        "stream_options" in body_lc
+                        and "stream_options" in payload
+                    ):
+                        logger.warning(
+                            "OAI-compat 400 with stream_options — retrying "
+                            "without it. Server said: {}", body[:300],
+                        )
+                        self._supports_stream_options = False
+                        payload.pop("stream_options", None)
+                        continue
                 if resp.status_code >= 400:
                     body = (await resp.aread()).decode(errors="replace")
                     logger.error(
@@ -1193,6 +1220,8 @@ class LLMService:
                     resp.raise_for_status()
                 if self._supports_stream_options is None and "stream_options" in payload:
                     self._supports_stream_options = True
+                if self._supports_response_format is None and "response_format" in payload:
+                    self._supports_response_format = True
 
                 async for raw_line in resp.aiter_lines():
                     # Check for cancellation before processing each SSE line.

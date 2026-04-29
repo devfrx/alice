@@ -167,6 +167,9 @@ const SIDE_PANEL_MAX = 800
 const SIDE_PANEL_DEFAULT = 400
 const sidePanelWidth = ref(SIDE_PANEL_DEFAULT)
 const isDraggingPanel = ref(false)
+/** Cleanup callback for the in-flight drag, used to release document
+ *  listeners if the component unmounts mid-drag. */
+let resizeCleanup: (() => void) | null = null
 
 function onResizeStart(e: MouseEvent): void {
     e.preventDefault()
@@ -186,6 +189,12 @@ function onResizeStart(e: MouseEvent): void {
         isDraggingPanel.value = false
         document.removeEventListener('mousemove', onMove)
         document.removeEventListener('mouseup', onUp)
+        resizeCleanup = null
+    }
+
+    resizeCleanup = (): void => {
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
     }
 
     document.addEventListener('mousemove', onMove)
@@ -194,6 +203,8 @@ function onResizeStart(e: MouseEvent): void {
 
 onBeforeUnmount(() => {
     isDraggingPanel.value = false
+    resizeCleanup?.()
+    resizeCleanup = null
 })
 
 /**

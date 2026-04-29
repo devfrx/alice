@@ -96,11 +96,19 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   watch(confirmTranscript, (val) => {
-    localStorage.setItem('alice_voice_confirm_transcript', String(val))
+    try {
+      localStorage.setItem('alice_voice_confirm_transcript', String(val))
+    } catch {
+      /* localStorage may be unavailable */
+    }
   })
 
   watch(sttIncludeAttachments, (val) => {
-    localStorage.setItem('alice_stt_include_attachments', String(val))
+    try {
+      localStorage.setItem('alice_stt_include_attachments', String(val))
+    } catch {
+      /* localStorage may be unavailable */
+    }
   })
 
   // ---------------------------------------------------------------------------

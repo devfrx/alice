@@ -662,6 +662,16 @@ class NoteService:
             raise ValueError(f"Invalid mode: {mode!r}")
 
         if mode == "move":
+            # Collect IDs first so we can also patch the Qdrant payload —
+            # otherwise vector search filtered by ``folder_path`` keeps
+            # returning the moved notes under their old folder.
+            move_ids: list[str] = []
+            if self._config.embedding_enabled:
+                id_cur = await self._db.execute(
+                    "SELECT id FROM note_entries WHERE folder_path = ?",
+                    (folder_path,),
+                )
+                move_ids = [r["id"] for r in await id_cur.fetchall()]
             cur = await self._db.execute(
                 "UPDATE note_entries SET folder_path = '', updated_at = ? "
                 "WHERE folder_path = ?",
@@ -669,6 +679,18 @@ class NoteService:
             )
             await self._db.commit()
             affected = cur.rowcount
+            if self._config.embedding_enabled and move_ids:
+                try:
+                    await self._qdrant.set_payload(
+                        COLLECTION_NOTES,
+                        payload={"folder_path": ""},
+                        ids=move_ids,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to update folder vectors after move: {}",
+                        exc,
+                    )
             logger.info(
                 "Folder {!r} dissolved — {} notes moved to root",
                 folder_path, affected,

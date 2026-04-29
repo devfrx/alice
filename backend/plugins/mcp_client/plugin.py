@@ -273,8 +273,15 @@ class McpClientPlugin(BasePlugin):
         if old_session:
             try:
                 await old_session.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                # Stale connection cleanup is best-effort; the new
+                # session will be created regardless.  Log so operators
+                # can spot zombie subprocesses / leaked file handles.
+                logger.warning(
+                    "Failed to stop stale MCP session for '{}': {}",
+                    server_name,
+                    exc,
+                )
 
         session = McpSession(config)
         await session.start()

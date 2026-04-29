@@ -29,10 +29,10 @@ if TYPE_CHECKING:
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_TRANSCRIPTION_TIMEOUT_S: float = 120.0  # fallback when duration unknown
+DEFAULT_TRANSCRIPTION_TIMEOUT_S: float = 600.0  # absolute cap (covers 300 s × 2)
 MIN_TRANSCRIPTION_TIMEOUT_S: float = 30.0  # minimum timeout
 
-# Backward-compatible alias (referenced by tests)
+# Backward-compatible alias (referenced by tests, may be monkey-patched).
 TRANSCRIPTION_TIMEOUT_S: float = DEFAULT_TRANSCRIPTION_TIMEOUT_S
 
 
@@ -158,9 +158,12 @@ class STTService:
         """Calculate a proportional transcription timeout from audio duration.
 
         Uses ``duration * 1.5`` with a minimum of 30 s and a fallback of
-        120 s when the duration cannot be determined.  The result is also
-        capped by ``TRANSCRIPTION_TIMEOUT_S`` so the module-level
-        constant still acts as an absolute upper bound.
+        ``TRANSCRIPTION_TIMEOUT_S`` when the duration cannot be determined.
+        The result is capped by ``TRANSCRIPTION_TIMEOUT_S``, which acts as
+        the absolute upper bound and is sized to cover a fully-allowed
+        ``max_audio_duration_s`` audio file (default: 300 s × 2 = 600 s)
+        so a request that just barely passes validation still gets enough
+        wall-clock to actually finish.
         """
         cap = TRANSCRIPTION_TIMEOUT_S
         try:

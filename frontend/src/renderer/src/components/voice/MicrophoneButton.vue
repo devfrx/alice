@@ -7,7 +7,7 @@
  * Shows multi-ring audio visualization while recording,
  * conic gradient + bouncing dots when processing STT.
  */
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import type { AudioDevice } from '../../composables/useVoice'
 import { useVoiceStore } from '../../stores/voice'
 import AppIcon from '../ui/AppIcon.vue'
@@ -77,13 +77,20 @@ function onClickOutside(e: MouseEvent): void {
 function onContextMenu(e: MouseEvent): void {
   e.preventDefault()
   emit('refresh-devices')
-  if (!showDeviceMenu.value) {
-    showDeviceMenu.value = true
-    document.addEventListener('click', onClickOutside, { once: true })
-  } else {
-    showDeviceMenu.value = false
-  }
+  showDeviceMenu.value = !showDeviceMenu.value
 }
+
+// Keep the document-level click listener strictly in sync with menu visibility.
+// Using `{ once: true }` previously leaked listeners when the menu was closed
+// programmatically (right-click toggle, selectDevice) before any document click
+// fired — every reopen stacked another listener on document.
+watch(showDeviceMenu, (open) => {
+  if (open) {
+    document.addEventListener('click', onClickOutside)
+  } else {
+    document.removeEventListener('click', onClickOutside)
+  }
+})
 
 /** Cleanup on unmount: remove stale document listener if menu is still open. */
 onBeforeUnmount(() => {

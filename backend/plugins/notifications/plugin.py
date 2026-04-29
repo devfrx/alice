@@ -78,6 +78,20 @@ class NotificationsPlugin(BasePlugin):
 
     async def cleanup(self) -> None:
         """Shut down the timer manager and release resources."""
+        # Unsubscribe the calendar-reminder handler registered in
+        # on_app_startup so the event_bus does not retain a reference
+        # to this (now-defunct) plugin instance.  Without this the
+        # plugin would leak across hot-reloads in development.
+        try:
+            self.ctx.event_bus.unsubscribe(
+                AliceEvent.CALENDAR_REMINDER,
+                self._on_calendar_reminder,
+            )
+        except Exception as exc:
+            self.logger.debug(
+                "Calendar-reminder unsubscribe skipped: {}", exc,
+            )
+
         if self._timer_manager is not None:
             await self._timer_manager.shutdown()
             self._timer_manager = None

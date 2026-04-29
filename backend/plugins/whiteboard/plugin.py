@@ -467,6 +467,7 @@ class WhiteboardPlugin(BasePlugin):
         }
         return ToolResult.ok(
             json.dumps(result, ensure_ascii=False, default=str),
+            content_type="application/json",
         )
 
     async def _add_shapes(

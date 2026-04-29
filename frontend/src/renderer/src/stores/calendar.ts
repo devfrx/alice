@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../services/api'
 import type { CalendarEvent, TodaySummary } from '../types/calendar'
+import { useChatStore } from './chat'
 
 export const useCalendarStore = defineStore('calendar', () => {
   const todaySummary = ref<TodaySummary | null>(null)
@@ -45,7 +46,13 @@ export const useCalendarStore = defineStore('calendar', () => {
   function startPolling(): void {
     if (refreshInterval) return
     refresh()
-    refreshInterval = setInterval(refresh, 5 * 60 * 1000)
+    const chatStore = useChatStore()
+    // Skip the periodic refresh while a chat is streaming or during the
+    // post-stream grace window so the calendar plugin doesn't compete
+    // for backend resources mid-conversation.
+    refreshInterval = setInterval(() => {
+      if (!chatStore.isPollingPaused()) refresh()
+    }, 5 * 60 * 1000)
   }
 
   /** Stop periodic refresh. */

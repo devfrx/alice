@@ -754,6 +754,11 @@ class AgentTurnExecutor:
                 await self._flush(session)
 
         # Finalize --------------------------------------------------------
+        # Capture run.id BEFORE _finalize_run: if the flush fails the session
+        # ends up in a rolled-back state and any subsequent attribute access
+        # on ``run`` would trigger a lazy-load on a dead session, raising
+        # PendingRollbackError and crashing the WebSocket.
+        run_id_str: str | None = str(run.id) if run is not None else None
         if run is not None:
             run.state = end_state
             run.error = end_error
@@ -767,7 +772,7 @@ class AgentTurnExecutor:
         await sink.send(
             {
                 "type": "agent.run_finished",
-                "run_id": str(run.id) if run is not None else None,
+                "run_id": run_id_str,
                 "state": end_state,
             },
         )
@@ -794,7 +799,7 @@ class AgentTurnExecutor:
             finish_reason=finish_reason,
             final_assistant_message_id=None,
             had_tool_calls=agg.tool_calls > 0,
-            agent_run_id=run.id if run is not None else None,
+            agent_run_id=uuid.UUID(run_id_str) if run_id_str else None,
         )
 
     # ------------------------------------------------------------------
@@ -936,27 +941,60 @@ class AgentTurnExecutor:
             return None
 
     async def _finalize_run(self, session: Any, run: Any) -> None:
-        """Set ``finished_at`` and flush the run row (best-effort)."""
+        """Set ``finished_at`` and flush the run row (best-effort).
+
+        Failure handling (rollback on flush error) is delegated to
+        :meth:`_flush` so the session is always left in a usable state.
+        """
         if run is None or session is None:
             return
-        try:
-            from datetime import datetime, timezone
+        from datetime import datetime, timezone
 
+        try:
             run.finished_at = datetime.now(timezone.utc)
             session.add(run)
-            await self._flush(session)
         except Exception as exc:  # noqa: BLE001 — non-fatal
-            logger.warning("AgentRun finalize failed: {}", exc)
+            logger.warning("AgentRun finalize prepare failed: {}", exc)
+            return
+        await self._flush(session)
 
     @staticmethod
     async def _flush(session: Any) -> None:
-        """Async flush that tolerates sync test doubles."""
+        """Async best-effort flush that tolerates sync test doubles.
+
+        Persistence of ``AgentRun`` rows is non-essential for the user
+        experience — if a flush fails (e.g. transient aiosqlite error,
+        constraint violation, cancelled task) we MUST roll back the
+        session to keep it usable.  Without rollback the session ends
+        up in ``SessionTransactionState.DEACTIVE`` and every subsequent
+        attribute access on a tracked instance triggers a lazy-load
+        that raises ``PendingRollbackError`` — historically the cause
+        of WebSocket crashes mid-turn.
+
+        Exceptions are swallowed and logged; callers continue without
+        a persisted row.
+        """
         flush = getattr(session, "flush", None)
         if flush is None:
             return
-        result = flush()
-        if hasattr(result, "__await__"):
-            await result
+        try:
+            result = flush()
+            if hasattr(result, "__await__"):
+                await result
+        except Exception as exc:  # noqa: BLE001 — non-fatal
+            logger.warning("AgentRun flush failed: {}", exc)
+            rollback = getattr(session, "rollback", None)
+            if rollback is None:
+                return
+            try:
+                rb_result = rollback()
+                if hasattr(rb_result, "__await__"):
+                    await rb_result
+            except Exception as rb_exc:  # noqa: BLE001
+                logger.warning(
+                    "Session rollback after flush failure also failed: {}",
+                    rb_exc,
+                )
 
     @staticmethod
     def _final_state_from_finish_reason(reason: str) -> str:

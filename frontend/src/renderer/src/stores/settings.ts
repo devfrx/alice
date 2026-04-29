@@ -505,26 +505,55 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /** Interval ID for periodic LM Studio connection checks. */
-  let _connectionPollInterval: ReturnType<typeof setInterval> | null = null
+  let _connectionPollTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** Start polling LM Studio connection status every 5 seconds. */
-  function startConnectionPolling(): void {
-    if (_connectionPollInterval !== null) return
-    _connectionPollInterval = setInterval(() => {
+  /**
+   * Schedule the next LM Studio connection probe.
+   *
+   * When the connection is healthy we poll at a relaxed cadence (15 s) so
+   * the backend doesn't have to forward `GET /api/v1/models` to LM Studio
+   * too often.  When the previous probe failed we back off further (30 s)
+   * to avoid generating a stream of `ReadTimeout` warnings while LM Studio
+   * is offline or busy.  Probing is also skipped while a model operation
+   * is in flight or the chat is actively streaming, since both paths
+   * already keep the backend talking to LM Studio.
+   */
+  function scheduleNextConnectionProbe(): void {
+    if (_connectionPollTimer !== null) {
+      clearTimeout(_connectionPollTimer)
+      _connectionPollTimer = null
+    }
+    const delay = lmStudioConnected.value ? 15000 : 30000
+    _connectionPollTimer = setTimeout(async () => {
+      _connectionPollTimer = null
       const chatStore = useChatStore()
-      // Skip if a model operation is in progress or the LLM is actively
-      // generating — both cases have inflight backend activity already.
-      if (!isAnyOperationInProgress.value && !chatStore.isStreaming) {
-        checkConnection()
+      // Skip the probe while a chat is streaming or during the
+      // post-stream grace window so LM Studio is not pestered with a
+      // ``GET /api/v1/models`` while it is busy generating tokens or
+      // swapping models for the embedding step.
+      if (!isAnyOperationInProgress.value && !chatStore.isPollingPaused()) {
+        await checkConnection()
       }
-    }, 5000)
+      // Re-arm only if polling wasn't stopped in the meantime.
+      if (_connectionPollEnabled) scheduleNextConnectionProbe()
+    }, delay)
   }
 
-  /** Stop the connection status polling interval. */
+  let _connectionPollEnabled = false
+
+  /** Start polling LM Studio connection status with adaptive backoff. */
+  function startConnectionPolling(): void {
+    if (_connectionPollEnabled) return
+    _connectionPollEnabled = true
+    scheduleNextConnectionProbe()
+  }
+
+  /** Stop the connection status polling timer. */
   function stopConnectionPolling(): void {
-    if (_connectionPollInterval !== null) {
-      clearInterval(_connectionPollInterval)
-      _connectionPollInterval = null
+    _connectionPollEnabled = false
+    if (_connectionPollTimer !== null) {
+      clearTimeout(_connectionPollTimer)
+      _connectionPollTimer = null
     }
   }
 

@@ -33,11 +33,16 @@ _EMPTY_REQUERY_RETRIES = 2
 def _dedup_hash(tool_name: str, args: dict[str, Any]) -> str:
     """Return a compact hash for deduplication of identical tool calls.
 
-    Normalizes paths (forward-slash only) and produces a SHA-256 digest
-    instead of holding full JSON strings in memory.
+    Normalises Windows-style paths to forward slashes so the same call
+    with ``C:\\Users\\x`` and ``C:/Users/x`` is treated as a duplicate,
+    and produces a SHA-256 digest instead of holding full JSON strings
+    in memory.
     """
     canonical = json.dumps(args, sort_keys=True, default=str)
-    canonical = canonical.replace("\\\\", "/")
+    # JSON encoding of a single backslash produces ``\\`` in the output
+    # string — replace those with ``/`` so cross-platform paths collapse
+    # to a single canonical form.
+    canonical = canonical.replace("\\\\", "/").replace("\\", "/")
     raw = f"{tool_name}:{canonical}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -268,7 +273,12 @@ async def run_tool_loop(
                         "tool_call_id": tc_id,
                     })
                 continue
-            seen.add(dedup_key)
+            # NOTE: ``seen.add(dedup_key)`` is intentionally deferred until
+            # AFTER the FORBIDDEN / confirmation gate below.  Adding it
+            # eagerly would permanently block the LLM from re-attempting
+            # a tool the user merely *rejected once* — the user might
+            # legitimately approve the same call later in the conversation
+            # (e.g. after providing missing context).
 
             exec_id = str(uuid.uuid4())
 
@@ -374,6 +384,12 @@ async def run_tool_loop(
                 "tool_name": tool_name,
                 "execution_id": exec_id,
             })
+
+            # Mark the call as seen ONLY now that it has cleared every
+            # rejection gate and is about to actually execute.  This way
+            # a previously-rejected call can be retried in a later
+            # iteration if the user changes their mind.
+            seen.add(dedup_key)
 
             context = ExecutionContext(
                 session_id=client_ip,

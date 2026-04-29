@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { api } from '../../services/api'
+import { useChatStore } from '../../stores/chat'
 
 interface WeatherData {
   city: string
@@ -30,6 +31,7 @@ const error = ref(false)
 const expanded = ref(false)
 const lastUpdated = ref('')
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+const chatStore = useChatStore()
 
 /** Map condition text from Open-Meteo to an emoji icon key. */
 function conditionToIcon(condition: string): string {
@@ -71,7 +73,12 @@ async function fetchWeather(): Promise<void> {
 
 onMounted(() => {
   fetchWeather()
-  refreshTimer = setInterval(fetchWeather, REFRESH_MS)
+  // Skip the refresh while a chat is streaming (or during the
+  // post-stream grace period) to avoid contending with the backend
+  // for tool / network resources.  The next interval picks it up.
+  refreshTimer = setInterval(() => {
+    if (!chatStore.isPollingPaused()) fetchWeather()
+  }, REFRESH_MS)
 })
 
 onUnmounted(() => {

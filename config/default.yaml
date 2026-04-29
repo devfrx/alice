@@ -255,9 +255,9 @@ qdrant:
   path: "data/qdrant"              # [embedded] data directory
   host: "localhost"                # [server] Qdrant host
   port: 6333                       # [server] Qdrant gRPC port
-  embedding_model: "text-embedding-mxbai-embed-large-v1"
+  embedding_model: "text-embedding-qwen3-embedding-0.6b"
   embedding_dim: 1024
-  embedding_fallback: false        # mxbai-embed-large-v1 is 1024-dim; fastembed's default model is 384-dim — no compatible CPU fallback available
+  embedding_fallback: false        # qwen3-embedding-0.6b is 1024-dim; fastembed's default model is 384-dim — no compatible CPU fallback available
 
 
 # ──────────────────────────────────────────────────

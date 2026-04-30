@@ -19,6 +19,9 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
+from backend.services.knowledge import (
+    KnowledgeDocCreate,
+)
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -41,16 +44,16 @@ class MemoryPlugin(BasePlugin):
     # ------------------------------------------------------------------
 
     async def initialize(self, ctx: AppContext) -> None:
-        """Store the context and verify memory service availability.
+        """Store the context and verify the knowledge backend is wired.
 
         Args:
             ctx: The shared application context.
         """
         await super().initialize(ctx)
 
-        if ctx.memory_service is None:
+        if ctx.knowledge_backend is None or ctx.memory_service is None:
             self.logger.warning(
-                "MemoryService is not available "
+                "Knowledge backend (memory) is not available "
                 "— all memory tools will return errors"
             )
 
@@ -267,7 +270,11 @@ class MemoryPlugin(BasePlugin):
         Returns:
             A ``ToolResult`` with the payload or an error.
         """
-        if self._ctx is None or self._ctx.memory_service is None:
+        if (
+            self._ctx is None
+            or self._ctx.knowledge_backend is None
+            or self._ctx.memory_service is None
+        ):
             return ToolResult.error("Memory service not available")
 
         start = time.perf_counter()
@@ -293,19 +300,27 @@ class MemoryPlugin(BasePlugin):
         """Report missing dependencies.
 
         Returns:
-            A list with ``"memory_service"`` if unavailable, else empty.
+            A list with ``"knowledge_backend"`` if unavailable, else empty.
         """
-        if self._ctx is None or self._ctx.memory_service is None:
-            return ["memory_service"]
+        if (
+            self._ctx is None
+            or self._ctx.knowledge_backend is None
+            or self._ctx.memory_service is None
+        ):
+            return ["knowledge_backend"]
         return []
 
     async def get_connection_status(self) -> ConnectionStatus:
-        """Return CONNECTED if memory service is available.
+        """Return CONNECTED if the knowledge backend (memory) is available.
 
         Returns:
             Current connection status.
         """
-        if self._ctx and self._ctx.memory_service is not None:
+        if (
+            self._ctx
+            and self._ctx.knowledge_backend is not None
+            and self._ctx.memory_service is not None
+        ):
             return ConnectionStatus.CONNECTED
         return ConnectionStatus.ERROR
 
@@ -356,16 +371,21 @@ class MemoryPlugin(BasePlugin):
                 )
 
         try:
-            entry = await self._ctx.memory_service.add(
-                content=content,
-                scope=scope,
-                category=category,
-                source="llm",
-                conversation_id=context.conversation_id,
-                expires_at=expires_at,
+            doc = await self._ctx.knowledge_backend.create(
+                KnowledgeDocCreate(
+                    kind="memory",
+                    content=content,
+                    metadata={
+                        "scope": scope,
+                        "category": category,
+                        "source": "llm",
+                        "conversation_id": context.conversation_id,
+                        "expires_at": expires_at,
+                    },
+                ),
             )
             elapsed_ms = (time.perf_counter() - start) * 1000
-            entry_id = getattr(entry, "id", "unknown")
+            entry_id = doc.id or "unknown"
             return ToolResult.ok(
                 content=f"Memory saved (id={entry_id}, scope={scope})",
                 execution_time_ms=elapsed_ms,
@@ -401,26 +421,29 @@ class MemoryPlugin(BasePlugin):
             limit = 5
 
         category = args.get("category")
-        search_filter: dict[str, Any] | None = None
+        search_filters: dict[str, Any] | None = None
         if category:
-            search_filter = {"category": category}
+            search_filters = {"category": category}
 
         try:
-            results = await self._ctx.memory_service.search(
-                query=query,
+            hits = await self._ctx.knowledge_backend.search(
+                query,
+                kind="memory",
                 k=limit,
-                filter=search_filter,
+                filters=search_filters,
             )
             memories = [
                 {
-                    "id": str(getattr(m["entry"], "id", "")),
-                    "content": getattr(m["entry"], "content", ""),
-                    "category": getattr(m["entry"], "category", None),
-                    "scope": getattr(m["entry"], "scope", ""),
-                    "score": m.get("score"),
-                    "created_at": str(getattr(m["entry"], "created_at", "")),
+                    "id": h.doc.id,
+                    "content": h.doc.content,
+                    "category": (h.doc.metadata or {}).get("category"),
+                    "scope": (h.doc.metadata or {}).get("scope", ""),
+                    "score": h.score,
+                    "created_at": str(h.doc.created_at)
+                    if h.doc.created_at is not None
+                    else "",
                 }
-                for m in results
+                for h in hits
             ]
             elapsed_ms = (time.perf_counter() - start) * 1000
             return ToolResult.ok(
@@ -491,32 +514,32 @@ class MemoryPlugin(BasePlugin):
         Returns:
             ``ToolResult`` with JSON list or error.
         """
-        limit = args.get("limit", 20)
-        if not isinstance(limit, int) or not 1 <= limit <= 50:
-            limit = 20
-
-        list_filter: dict[str, Any] = {}
+        list_filters: dict[str, Any] = {}
         scope = args.get("scope")
         if scope:
-            list_filter["scope"] = scope
+            list_filters["scope"] = scope
         category = args.get("category")
         if category:
-            list_filter["category"] = category
+            list_filters["category"] = category
+        limit = int(args.get("limit", 50) or 50)
 
         try:
-            entries, total = await self._ctx.memory_service.list(
-                filter=list_filter if list_filter else None,
+            docs, total = await self._ctx.knowledge_backend.list(
+                kind="memory",
+                filters=list_filters if list_filters else None,
                 limit=limit,
             )
             memories = [
                 {
-                    "id": str(getattr(m, "id", "")),
-                    "content": getattr(m, "content", ""),
-                    "category": getattr(m, "category", None),
-                    "scope": getattr(m, "scope", ""),
-                    "created_at": str(getattr(m, "created_at", "")),
+                    "id": d.id,
+                    "content": d.content,
+                    "category": (d.metadata or {}).get("category"),
+                    "scope": (d.metadata or {}).get("scope", ""),
+                    "created_at": str(d.created_at)
+                    if d.created_at is not None
+                    else "",
                 }
-                for m in entries
+                for d in docs
             ]
             elapsed_ms = (time.perf_counter() - start) * 1000
             return ToolResult.ok(

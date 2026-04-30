@@ -69,6 +69,8 @@ class AliceEvent(StrEnum):
     # -- Email Assistant (Phase 15) --
     EMAIL_RECEIVED = "email.received"
     EMAIL_SENT = "email.sent"
+    # -- Service Orchestrator (Phase 1 finalisation) --
+    SERVICE_STATUS = "service.status"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

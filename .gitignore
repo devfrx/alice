@@ -22,6 +22,8 @@ out/
 dist-electron/
 frontend/out/
 frontend/dist/
+frontend/dist-installer/
+frontend/resources/backend/
 .npm
 *.tgz
 

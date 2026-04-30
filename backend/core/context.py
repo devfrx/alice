@@ -19,6 +19,7 @@ from backend.core.protocols import (
     ConversationFileManagerProtocol,
     EmbeddingClientProtocol,
     EmailServiceProtocol,
+    KnowledgeBackendProtocol,
     LLMServiceProtocol,
     LMStudioManagerProtocol,
     MemoryServiceProtocol,
@@ -68,6 +69,11 @@ class AppContext:
     note_service: NoteServiceProtocol | None = None
     """Obsidian-like note vault service."""
 
+    knowledge_backend: KnowledgeBackendProtocol | None = None
+    """Unified knowledge store (Phase 1).  Wraps memory + note services
+    behind a kind-dispatched protocol so Phase 3 can swap to Continuum
+    without touching plugin code."""
+
     email_service: EmailServiceProtocol | None = None
     """Async IMAP/SMTP email assistant service."""
 
@@ -86,6 +92,16 @@ class AppContext:
     plugin_state_repo: Any = None
     """Persistent plugin toggle-state repository."""
 
+    config_service: Any = None
+    """Layered configuration service (defaults/system/user/runtime).
+
+    When non-None it is the canonical owner of the resolved
+    :class:`AliceConfig`; ``ctx.config`` is updated by the service after
+    every successful mutation so existing callers (``ctx.config.foo``)
+    keep working unchanged.  See
+    :class:`backend.services.config_service.LayeredConfigService`.
+    """
+
     artifact_registry: Any = None
     """Unified registry for tool-generated artifacts (3D, images, audio, …)."""
 
@@ -99,6 +115,30 @@ class AppContext:
 
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
+
+    orchestrator: Any = None
+    """Centralized service lifecycle orchestrator (Phase 1 finalisation).
+
+    Typed as :class:`Any` to avoid an import cycle with
+    ``backend.core.service_orchestrator`` which itself imports from
+    :mod:`backend.core.event_bus`.  Always a
+    :class:`backend.core.service_orchestrator.ServiceOrchestrator` at
+    runtime once the lifespan has initialised it.
+    """
+
+    model_downloader: Any = None
+    """STT/TTS model downloader with progress events.
+
+    Always a :class:`backend.services.model_downloader.ModelDownloader`
+    at runtime; typed as :class:`Any` to avoid circular imports.
+    """
+
+    config_service: Any = None
+    """Layered configuration service (defaults < system < user < runtime).
+
+    Always a :class:`backend.services.config_service.LayeredConfigService`
+    at runtime; typed as :class:`Any` to avoid circular imports.
+    """
 
     # ------------------------------------------------------------------
     # Plugin state helpers

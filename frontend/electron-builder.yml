@@ -4,9 +4,12 @@
 # in "AL\CE" is the path separator and produces broken paths/shortcuts, so we
 # keep a filesystem-safe identifier here. The visual brand "AL\CE" is rendered
 # inside the running app (window title, splash, UI) — see frontend code.
-productName: ALICE
+productName: Alice
 directories:
   buildResources: build
+  # Stream D Phase 1: keep installer output isolated from the renderer
+  # bundle (frontend/out) so successive builds do not pollute each other.
+  output: dist-installer
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -14,15 +17,31 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # Never bundle the staged backend tree inside the asar — it ships as
+  # extraResources so the .exe stays directly executable from disk.
+  - '!resources/backend/**'
 asarUnpack:
   - resources/**
+# PyInstaller --onedir output is staged here by scripts/build-installer.ps1
+# and copied as-is into ``<install-dir>/resources/backend/`` at install time.
+extraResources:
+  - from: resources/backend
+    to: backend
+    filter:
+      - '**/*'
 win:
   executableName: alice
+  # icon: resources/icon.ico  # TODO Phase 1.5: ship .ico variant
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Alice-Setup-${version}.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  # installerIcon / uninstallerIcon: resources/icon.ico  # TODO Phase 1.5
+# TODO Phase 1.5: enable electron-updater (publish: github / generic feed).
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

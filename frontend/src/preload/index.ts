@@ -19,7 +19,10 @@ const windowControls = {
 
 const fileOps = {
   /** Open the system file explorer with the given file selected. */
-  showInFolder: (filePath: string): void => ipcRenderer.send('show-in-folder', filePath)
+  showInFolder: (filePath: string): void => ipcRenderer.send('show-in-folder', filePath),
+  /** Open a native directory picker.  Resolves to the chosen path or null. */
+  selectDirectory: (defaultPath?: string): Promise<string | null> =>
+    ipcRenderer.invoke('select-directory', defaultPath)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

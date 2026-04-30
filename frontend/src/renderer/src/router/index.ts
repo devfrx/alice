@@ -110,6 +110,12 @@ const router = createRouter({
       meta: { title: 'Bacheca', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
+      path: '/services',
+      name: 'services',
+      component: () => import('../views/ServicesView.vue'),
+      meta: { title: 'Servizi', transition: DEFAULT_PAGE_TRANSITION }
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/assistant'
     }

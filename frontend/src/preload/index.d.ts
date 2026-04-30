@@ -16,6 +16,8 @@ interface WindowControls {
 interface FileOps {
   /** Open the system file explorer with the given file selected. */
   showInFolder: (filePath: string) => void
+  /** Open a native directory picker and resolve to the selected path. */
+  selectDirectory: (defaultPath?: string) => Promise<string | null>
 }
 
 declare global {

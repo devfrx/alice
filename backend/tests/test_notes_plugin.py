@@ -56,11 +56,17 @@ def _make_note_entry(
 
 @pytest.fixture
 def mock_ctx():
-    """Build a mock AppContext with a mocked note_service."""
+    """Build a mock AppContext with a real ``QdrantBackend`` wrapping a mocked note service."""
     from backend.core.context import AppContext
+    from backend.services.knowledge import QdrantBackend
 
     ctx = MagicMock(spec=AppContext)
     ctx.note_service = AsyncMock()
+    ctx.memory_service = None
+    ctx.knowledge_backend = QdrantBackend(
+        memory_service=None,
+        note_service=ctx.note_service,
+    )
     ctx.event_bus = AsyncMock()
     ctx.config = MagicMock()
     ctx.config.notes.max_content_chars_llm = 50_000
@@ -85,10 +91,11 @@ def plugin(mock_ctx):
 
 @pytest.fixture
 def plugin_no_service(mock_ctx):
-    """NotesPlugin where note_service is None."""
+    """NotesPlugin where the knowledge backend (notes) is unavailable."""
     from backend.plugins.notes.plugin import NotesPlugin
 
     mock_ctx.note_service = None
+    mock_ctx.knowledge_backend = None
     p = NotesPlugin()
     p._ctx = mock_ctx
     p._initialized = True

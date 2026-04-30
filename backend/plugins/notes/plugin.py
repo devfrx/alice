@@ -2,13 +2,14 @@
 
 Exposes six tools — ``create_note``, ``read_note``, ``update_note``,
 ``delete_note``, ``search_notes``, ``list_notes`` — that delegate to
-the :class:`NoteServiceProtocol` on the application context.
+the :class:`KnowledgeBackend` on the application context.
 """
 
 from __future__ import annotations
 
 import time
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from backend.core.event_bus import AliceEvent
@@ -19,9 +20,43 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
+from backend.services.knowledge import (
+    KnowledgeDoc,
+    KnowledgeDocCreate,
+    KnowledgeDocPatch,
+)
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _isoformat_or_empty(value: datetime | str | None) -> str:
+    """Return an ISO-8601 string or ``""`` if value is missing."""
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+def _note_doc_to_payload(doc: KnowledgeDoc) -> dict[str, Any]:
+    """Serialise a note :class:`KnowledgeDoc` to the LLM-facing dict shape."""
+    meta = doc.metadata or {}
+    return {
+        "id": doc.id,
+        "title": doc.title or "",
+        "content": doc.content,
+        "folder_path": meta.get("folder_path", ""),
+        "tags": list(doc.tags),
+        "wikilinks": list(meta.get("wikilinks", []) or []),
+        "pinned": bool(meta.get("pinned", False)),
+        "created_at": _isoformat_or_empty(doc.created_at),
+        "updated_at": _isoformat_or_empty(doc.updated_at),
+    }
 
 
 class NotesPlugin(BasePlugin):
@@ -41,11 +76,11 @@ class NotesPlugin(BasePlugin):
     # ------------------------------------------------------------------ #
 
     async def initialize(self, ctx: AppContext) -> None:
-        """Store context and verify note service availability."""
+        """Store context and verify the knowledge backend (notes) is wired."""
         await super().initialize(ctx)
-        if ctx.note_service is None:
+        if ctx.knowledge_backend is None or ctx.note_service is None:
             self.logger.warning(
-                "NoteService is not available "
+                "Knowledge backend (notes) is not available "
                 "— all notes tools will return errors"
             )
 
@@ -268,7 +303,11 @@ class NotesPlugin(BasePlugin):
         context: ExecutionContext,
     ) -> ToolResult:
         """Dispatch to the requested notes tool."""
-        if self._ctx is None or self._ctx.note_service is None:
+        if (
+            self._ctx is None
+            or self._ctx.knowledge_backend is None
+            or self._ctx.note_service is None
+        ):
             return ToolResult.error("Note service not available")
 
         start = time.perf_counter()
@@ -294,13 +333,21 @@ class NotesPlugin(BasePlugin):
 
     def check_dependencies(self) -> list[str]:
         """Report missing dependencies."""
-        if self._ctx is None or self._ctx.note_service is None:
-            return ["note_service"]
+        if (
+            self._ctx is None
+            or self._ctx.knowledge_backend is None
+            or self._ctx.note_service is None
+        ):
+            return ["knowledge_backend"]
         return []
 
     async def get_connection_status(self) -> ConnectionStatus:
-        """Return CONNECTED if note service is available."""
-        if self._ctx and self._ctx.note_service is not None:
+        """Return CONNECTED if the knowledge backend (notes) is available."""
+        if (
+            self._ctx
+            and self._ctx.knowledge_backend is not None
+            and self._ctx.note_service is not None
+        ):
             return ConnectionStatus.CONNECTED
         return ConnectionStatus.ERROR
 
@@ -324,20 +371,23 @@ class NotesPlugin(BasePlugin):
         tags = args.get("tags")
 
         try:
-            entry = await self._ctx.note_service.create(
-                title=title,
-                content=content,
-                folder_path=folder_path,
-                tags=tags,
+            doc = await self._ctx.knowledge_backend.create(
+                KnowledgeDocCreate(
+                    kind="note",
+                    title=title,
+                    content=content,
+                    tags=list(tags) if tags else [],
+                    metadata={"folder_path": folder_path},
+                ),
             )
             elapsed = (time.perf_counter() - start) * 1000
             await self._ctx.event_bus.emit(
                 AliceEvent.NOTE_CREATED,
-                note_id=entry.id, title=title,
+                note_id=doc.id, title=title,
             )
             return ToolResult.ok(
                 content=(
-                    f"Note created (id={entry.id}, "
+                    f"Note created (id={doc.id}, "
                     f"title={title!r})"
                 ),
                 execution_time_ms=elapsed,
@@ -361,14 +411,16 @@ class NotesPlugin(BasePlugin):
             return ToolResult.error(f"Invalid note_id: {note_id!r}")
 
         try:
-            entry = await self._ctx.note_service.get(note_id)
+            doc = await self._ctx.knowledge_backend.get(
+                note_id, kind="note",
+            )
             elapsed = (time.perf_counter() - start) * 1000
-            if entry is None:
+            if doc is None:
                 return ToolResult.error(
                     f"Note {note_id} not found",
                     execution_time_ms=elapsed,
                 )
-            data = entry.to_dict()
+            data = _note_doc_to_payload(doc)
             max_chars = self._ctx.config.notes.max_content_chars_llm
             if len(data["content"]) > max_chars:
                 data["content"] = (
@@ -404,16 +456,26 @@ class NotesPlugin(BasePlugin):
             )
 
         try:
-            entry = await self._ctx.note_service.update(
+            patch_metadata: dict[str, Any] = {}
+            folder_path_arg = args.get("folder_path")
+            if folder_path_arg is not None:
+                patch_metadata["folder_path"] = folder_path_arg
+            pinned_arg = args.get("pinned")
+            if pinned_arg is not None:
+                patch_metadata["pinned"] = pinned_arg
+
+            doc = await self._ctx.knowledge_backend.update(
                 note_id,
-                title=args.get("title"),
-                content=args.get("content"),
-                folder_path=args.get("folder_path"),
-                tags=args.get("tags"),
-                pinned=args.get("pinned"),
+                KnowledgeDocPatch(
+                    title=args.get("title"),
+                    content=args.get("content"),
+                    tags=args.get("tags"),
+                    metadata=patch_metadata or None,
+                ),
+                kind="note",
             )
             elapsed = (time.perf_counter() - start) * 1000
-            if entry is None:
+            if doc is None:
                 return ToolResult.error(
                     f"Note {note_id} not found",
                     execution_time_ms=elapsed,
@@ -444,7 +506,9 @@ class NotesPlugin(BasePlugin):
             return ToolResult.error(f"Invalid note_id: {note_id!r}")
 
         try:
-            deleted = await self._ctx.note_service.delete(note_id)
+            deleted = await self._ctx.knowledge_backend.delete(
+                note_id, kind="note",
+            )
             elapsed = (time.perf_counter() - start) * 1000
             if deleted:
                 await self._ctx.event_bus.emit(
@@ -477,22 +541,30 @@ class NotesPlugin(BasePlugin):
             limit = 10
 
         try:
-            results = await self._ctx.note_service.search(
-                query=query,
-                folder=args.get("folder"),
-                tags=args.get("tags"),
-                limit=limit,
+            search_filters: dict[str, Any] = {}
+            if args.get("folder") is not None:
+                search_filters["folder"] = args.get("folder")
+            if args.get("tags") is not None:
+                search_filters["tags"] = args.get("tags")
+
+            hits = await self._ctx.knowledge_backend.search(
+                query,
+                kind="note",
+                k=limit,
+                filters=search_filters or None,
             )
             notes = [
                 {
-                    "id": str(r["entry"].id),
-                    "title": r["entry"].title,
-                    "folder_path": r["entry"].folder_path,
-                    "tags": r["entry"].tags,
-                    "score": r.get("score", 0.0),
-                    "updated_at": r["entry"].updated_at,
+                    "id": h.doc.id,
+                    "title": h.doc.title or "",
+                    "folder_path": (h.doc.metadata or {}).get(
+                        "folder_path", "",
+                    ),
+                    "tags": list(h.doc.tags),
+                    "score": h.score,
+                    "updated_at": _isoformat_or_empty(h.doc.updated_at),
                 }
-                for r in results
+                for h in hits
             ]
             elapsed = (time.perf_counter() - start) * 1000
             return ToolResult.ok(
@@ -519,22 +591,32 @@ class NotesPlugin(BasePlugin):
             limit = 20
 
         try:
-            entries, total = await self._ctx.note_service.list(
-                folder=args.get("folder"),
-                tags=args.get("tags"),
-                pinned_only=bool(args.get("pinned_only", False)),
+            list_filters: dict[str, Any] = {}
+            if args.get("folder") is not None:
+                list_filters["folder"] = args.get("folder")
+            if args.get("tags") is not None:
+                list_filters["tags"] = args.get("tags")
+            pinned_only = bool(args.get("pinned_only", False))
+            if pinned_only:
+                list_filters["pinned_only"] = True
+
+            docs, total = await self._ctx.knowledge_backend.list(
+                kind="note",
+                filters=list_filters or None,
                 limit=limit,
             )
             notes = [
                 {
-                    "id": str(e.id),
-                    "title": e.title,
-                    "folder_path": e.folder_path,
-                    "tags": e.tags,
-                    "pinned": e.pinned,
-                    "updated_at": e.updated_at,
+                    "id": d.id,
+                    "title": d.title or "",
+                    "folder_path": (d.metadata or {}).get(
+                        "folder_path", "",
+                    ),
+                    "tags": list(d.tags),
+                    "pinned": bool((d.metadata or {}).get("pinned", False)),
+                    "updated_at": _isoformat_or_empty(d.updated_at),
                 }
-                for e in entries
+                for d in docs
             ]
             elapsed = (time.perf_counter() - start) * 1000
             return ToolResult.ok(

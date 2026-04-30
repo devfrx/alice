@@ -52,11 +52,17 @@ def _make_memory_entry(
 
 @pytest.fixture
 def mock_ctx():
-    """Build a mock AppContext with a mocked memory_service."""
+    """Build a mock AppContext with a real ``QdrantBackend`` wrapping a mocked memory service."""
     from backend.core.context import AppContext
+    from backend.services.knowledge import QdrantBackend
 
     ctx = MagicMock(spec=AppContext)
     ctx.memory_service = AsyncMock()
+    ctx.note_service = None
+    ctx.knowledge_backend = QdrantBackend(
+        memory_service=ctx.memory_service,
+        note_service=None,
+    )
     ctx.config = MagicMock()
     ctx.config.memory.embedding_model = "test-model"
     ctx.config.memory.session_ttl_hours = 24
@@ -81,10 +87,11 @@ def plugin(mock_ctx):
 
 @pytest.fixture
 def plugin_no_service(mock_ctx):
-    """MemoryPlugin where memory_service is None."""
+    """MemoryPlugin where the knowledge backend (memory) is unavailable."""
     from backend.plugins.memory.plugin import MemoryPlugin
 
     mock_ctx.memory_service = None
+    mock_ctx.knowledge_backend = None
     p = MemoryPlugin()
     p._ctx = mock_ctx
     p._initialized = True

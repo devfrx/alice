@@ -65,8 +65,12 @@ import type {
   ArtifactListResponse,
 } from '../types/artifacts'
 
-/** Backend host (without /api), configurable via VITE_API_BASE_URL env var. */
-const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+/** Backend host (without /api), configurable via VITE_API_BASE_URL env var.
+ *  Default uses 127.0.0.1 (not `localhost`) because on Windows Electron's
+ *  fetch resolves `localhost` to ::1 first; the backend binds to 127.0.0.1
+ *  only, so IPv6 connections are refused and the startup health probe
+ *  would loop forever. */
+const BACKEND_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 /** Base URL for all REST calls. */
 const BASE_URL = `${BACKEND_BASE}/api`

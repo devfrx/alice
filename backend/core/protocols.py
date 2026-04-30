@@ -596,6 +596,19 @@ class NoteServiceProtocol(Protocol):
 
 
 # ---------------------------------------------------------------------------
+# Knowledge backend (Phase 1, Stream A)
+# ---------------------------------------------------------------------------
+
+# The full Protocol + data classes live next to the implementation in
+# ``backend/services/knowledge/`` to avoid a hard import cycle.  We expose
+# an alias here so ``AppContext`` can reference it consistently with the
+# rest of the protocol surface.
+from backend.services.knowledge.protocol import (  # noqa: E402
+    KnowledgeBackend as KnowledgeBackendProtocol,
+)
+
+
+# ---------------------------------------------------------------------------
 # Email service
 # ---------------------------------------------------------------------------
 

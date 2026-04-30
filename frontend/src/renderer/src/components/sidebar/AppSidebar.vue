@@ -180,6 +180,14 @@ async function onOpenFile(id: string): Promise<void> {
             <span class="sidebar__link-label">Email</span>
             <span v-if="unreadBadge" class="sidebar__badge">{{ unreadBadge }}</span>
           </router-link>
+
+          <router-link to="/services" class="sidebar__link" active-class="sidebar__link--active" title="Servizi"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <AppIcon name="server" :size="15" />
+            </span>
+            <span class="sidebar__link-label">Servizi</span>
+          </router-link>
         </nav>
 
         <!-- Calendar widget -->

@@ -713,6 +713,31 @@ class ToolRegistry:
             tool_def = self._tools.get(tool_name)
             plugin_name = self._tool_to_plugin.get(tool_name)
 
+            # Fallback: LLMs sometimes drop the "<plugin>_" prefix and
+            # emit the bare tool name (e.g. "remember" instead of
+            # "memory_remember").  Resolve by unique suffix match.
+            if tool_def is None:
+                suffix = f"_{tool_name}"
+                candidates = [
+                    ns for ns in self._tools
+                    if ns == tool_name or ns.endswith(suffix)
+                ]
+                if len(candidates) == 1:
+                    resolved = candidates[0]
+                    self._logger.info(
+                        "Tool '{}' resolved to namespaced '{}' "
+                        "(bare-name fallback)",
+                        tool_name, resolved,
+                    )
+                    tool_name = resolved
+                    tool_def = self._tools.get(resolved)
+                    plugin_name = self._tool_to_plugin.get(resolved)
+                elif len(candidates) > 1:
+                    return ToolResult.error(
+                        f"Tool '{tool_name}' is ambiguous: matches "
+                        f"{candidates!r} \u2014 use the full namespaced name"
+                    )
+
         if tool_def is None:
             return ToolResult.error(
                 f"Tool '{tool_name}' not available: "

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,6 +17,14 @@ from loguru import logger
 from backend.core.config import AliceConfig, PROJECT_ROOT, load_config
 from backend.core.context import AppContext, create_context
 from backend.core.event_bus import AliceEvent
+from backend.core.service_orchestrator import ServiceOrchestrator
+from backend.core.managed_services import (
+    LMStudioManagedService,
+    STTManagedService,
+    TTSManagedService,
+    TrellisManagedService,
+    VRAMManagedService,
+)
 from backend.db.database import create_engine_and_session, init_db
 from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.llm_service import LLMService
@@ -70,6 +79,56 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     ctx = create_context(config)
     ctx.db = session_factory  # type: ignore[assignment]
     ctx.engine = engine
+
+    # -- Service orchestrator ----------------------------------------------
+    # Created early so concrete service constructors below can attach
+    # themselves as they are instantiated.  Concrete services are still
+    # started inline (legacy path); the orchestrator only owns health
+    # polling, restarts, and the WS ``service.status`` event stream.
+    orchestrator = ServiceOrchestrator(ctx.event_bus)
+    ctx.orchestrator = orchestrator
+
+    # -- Layered configuration service (defaults/system/user/runtime) -------
+    # Built early so any subsequent service can read merged config through
+    # ``ctx.config`` exactly as before.  The service rebuilds ``ctx.config``
+    # whenever a layer mutation succeeds.
+    from backend.services.config_service import LayeredConfigService
+
+    config_service = LayeredConfigService(event_bus=ctx.event_bus)
+    ctx.config_service = config_service
+    ctx.config = config_service.get_resolved()
+    config = ctx.config  # keep local alias in sync for the rest of lifespan
+
+    async def _refresh_ctx_config(**_kwargs: object) -> None:
+        ctx.config = config_service.get_resolved()
+
+    ctx.event_bus.subscribe("config.changed", _refresh_ctx_config)
+
+    # -- Model downloader (STT/TTS) ----------------------------------------
+    # Provides idempotent + resumable downloads of Whisper / Piper models
+    # with progress events forwarded to the events WebSocket.
+    from backend.services.model_downloader import ModelDownloader, PROGRESS_EVENT
+
+    # In a PyInstaller --onedir bundle ``__file__`` lives inside ``_internal/``
+    # which is read-only on Windows by user expectation; we keep models next to
+    # ``backend.exe`` so the in-app downloader can write to them and bundled
+    # defaults staged by ``build-installer.ps1`` are picked up automatically.
+    if getattr(sys, "frozen", False):
+        models_root = Path(sys.executable).resolve().parent / "models"
+    else:
+        models_root = PROJECT_ROOT / "models"
+    models_root.mkdir(parents=True, exist_ok=True)
+    ctx.model_downloader = ModelDownloader(models_root, ctx.event_bus)
+
+    async def _forward_download_progress(**kwargs: object) -> None:
+        if ctx.ws_connection_manager is None:
+            return
+        await ctx.ws_connection_manager.broadcast({
+            "type": PROGRESS_EVENT,
+            **kwargs,
+        })
+
+    ctx.event_bus.subscribe(PROGRESS_EVENT, _forward_download_progress)
 
     # -- Load persisted user preferences ------------------------------------
     from backend.services.preferences_service import PreferencesService
@@ -131,6 +190,14 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         api_token=config.llm.api_token,
     )
     ctx.lmstudio_manager = lmstudio_manager
+
+    # Register LM Studio with the orchestrator (health-only, never auto-start).
+    try:
+        await orchestrator.attach_started(
+            LMStudioManagedService(lmstudio_manager),
+        )
+    except Exception as exc:
+        logger.warning("Orchestrator: failed to attach LM Studio: {}", exc)
 
     conversations_dir = PROJECT_ROOT / "data" / "conversations"
     ctx.conversation_file_manager = ConversationFileManager(conversations_dir)
@@ -213,6 +280,23 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("Note service failed to start: {}", exc)
             await note_service.close()
 
+    # -- Knowledge backend (Phase 1, Stream A) -----------------------------
+    # Thin :class:`KnowledgeBackend` adapter wrapping the existing memory
+    # and note services.  Plugins (notes, memory) consume this backend
+    # instead of the underlying services directly so Phase 3 can swap to
+    # Continuum without touching plugin code.
+    from backend.services.knowledge import QdrantBackend
+
+    ctx.knowledge_backend = QdrantBackend(
+        memory_service=ctx.memory_service,
+        note_service=ctx.note_service,
+    )
+    logger.info(
+        "Knowledge backend wired (memory={}, notes={})",
+        ctx.memory_service is not None,
+        ctx.note_service is not None,
+    )
+
     # -- Email service (Phase 15) ------------------------------------------
     if config.email.enabled:
         from backend.services.email_service import EmailService
@@ -241,6 +325,14 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception as exc:
             logger.warning("STT service failed to start: {}", exc)
 
+    if ctx.stt_service is not None:
+        try:
+            await orchestrator.attach_started(
+                STTManagedService(ctx.stt_service),
+            )
+        except Exception as exc:
+            logger.warning("Orchestrator: failed to attach STT: {}", exc)
+
     if config.tts.enabled:
         try:
             tts_service = TTSService(config.tts)
@@ -249,6 +341,14 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("TTS service started (engine={})", config.tts.engine)
         except Exception as exc:
             logger.warning("TTS service failed to start: {}", exc)
+
+    if ctx.tts_service is not None:
+        try:
+            await orchestrator.attach_started(
+                TTSManagedService(ctx.tts_service),
+            )
+        except Exception as exc:
+            logger.warning("Orchestrator: failed to attach TTS: {}", exc)
 
     if config.vram.monitoring_enabled:
         try:
@@ -263,6 +363,62 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("VRAM monitor started")
         except Exception as exc:
             logger.warning("VRAM monitor failed to start: {}", exc)
+
+    if ctx.vram_monitor is not None:
+        try:
+            await orchestrator.attach_started(
+                VRAMManagedService(ctx.vram_monitor),
+            )
+        except Exception as exc:
+            logger.warning("Orchestrator: failed to attach VRAM monitor: {}", exc)
+
+    # -- TRELLIS external process (health-only, user-managed) --------------
+    # Resolve the launcher script path from the install layout so the user
+    # can press "Start" in the UI without opening a terminal.  Both
+    # ``scripts/start-trellis.ps1`` and ``scripts/start-trellis2.ps1`` are
+    # shipped in the installer's ``resources/scripts/`` folder.
+    def _resolve_trellis_launcher(name: str) -> tuple[Path | None, Path | None]:
+        script_name = (
+            "start-trellis.ps1" if name == "trellis" else "start-trellis2.ps1"
+        )
+        # In a frozen build the launchers are bundled next to ``backend.exe``
+        # under ``scripts/`` (see ``build-installer.ps1``); in dev they live at
+        # the repo root.
+        if getattr(sys, "frozen", False):
+            base = Path(sys.executable).resolve().parent
+        else:
+            base = PROJECT_ROOT
+        candidate = base / "scripts" / script_name
+        if candidate.exists():
+            return candidate, base
+        return None, None
+
+    if getattr(config, "trellis", None) and config.trellis.enabled:
+        try:
+            launcher, cwd = _resolve_trellis_launcher("trellis")
+            await orchestrator.attach_started(
+                TrellisManagedService(
+                    name="trellis",
+                    service_url=config.trellis.service_url,
+                    launcher=launcher,
+                    cwd=cwd,
+                ),
+            )
+        except Exception as exc:
+            logger.warning("Orchestrator: failed to attach TRELLIS: {}", exc)
+    if getattr(config, "trellis2", None) and config.trellis2.enabled:
+        try:
+            launcher, cwd = _resolve_trellis_launcher("trellis2")
+            await orchestrator.attach_started(
+                TrellisManagedService(
+                    name="trellis2",
+                    service_url=config.trellis2.service_url,
+                    launcher=launcher,
+                    cwd=cwd,
+                ),
+            )
+        except Exception as exc:
+            logger.warning("Orchestrator: failed to attach TRELLIS.2: {}", exc)
 
     # -- VRAM event handlers ------------------------------------------------
     # These handlers ONLY log VRAM pressure.  Mutating ``stt_cfg`` /
@@ -400,6 +556,21 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         AliceEvent.NOTE_DELETED, _forward_note_deleted,
     )
 
+    # -- Bridge orchestrator service.status events to the events WS ------
+    async def _forward_service_status(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "service.status",
+                "service": kwargs.get("service"),
+                "status": kwargs.get("status"),
+                "detail": kwargs.get("detail"),
+                "timestamp": kwargs.get("timestamp"),
+            })
+
+    ctx.event_bus.subscribe(
+        AliceEvent.SERVICE_STATUS, _forward_service_status,
+    )
+
     # -- Artifact registry (unified tool-output store) ------------------
     from backend.services.artifacts import ArtifactRegistry
 
@@ -448,6 +619,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         # -- Shutdown -----------------------------------------------------------
+        # Stop orchestrator polling first so health probes don't race with
+        # the legacy per-service shutdown calls below.
+        if ctx is not None and ctx.orchestrator is not None:
+            try:
+                await ctx.orchestrator.shutdown_polling()
+            except Exception as exc:
+                logger.error("Orchestrator shutdown error: {}", exc)
         if plugin_manager is not None:
             try:
                 await plugin_manager.shutdown()

@@ -7,11 +7,13 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
+from pydantic import ValidationError
 
 from backend.api.routes.models import serialise_model
 from backend.api.routes.voice import push_voice_ready
 from backend.core.config import KNOWN_MODELS
 from backend.core.context import AppContext
+from backend.services.config_service import ConfigLayer
 from backend.services.stt_service import STTService
 from backend.services.tts_service import TTSService
 
@@ -20,6 +22,151 @@ router = APIRouter(tags=["config"])
 
 def _ctx(request: Request) -> AppContext:
     return request.app.state.context
+
+
+# ---------------------------------------------------------------------------
+# Layered configuration endpoints (Phase 1 — Stream C)
+# ---------------------------------------------------------------------------
+
+
+_REDACT_KEYS: frozenset[str] = frozenset({
+    "api_token", "token", "password", "secret",
+})
+
+
+def _redact(node: Any) -> Any:
+    """Return a deep copy of ``node`` with sensitive scalar values masked."""
+    if isinstance(node, dict):
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            lowered = key.lower() if isinstance(key, str) else key
+            if (
+                isinstance(lowered, str)
+                and lowered in _REDACT_KEYS
+                and isinstance(value, str)
+                and value
+            ):
+                out[key] = "***"
+            else:
+                out[key] = _redact(value)
+        return out
+    if isinstance(node, list):
+        return [_redact(item) for item in node]
+    return node
+
+
+def _resolved_dict(ctx: AppContext) -> dict[str, Any]:
+    """Return the resolved config as a plain dict (with secrets redacted)."""
+    cfg = ctx.config
+    return _redact(cfg.model_dump(mode="json"))
+
+
+@router.get("/config/resolved")
+async def get_resolved_config(request: Request) -> dict[str, Any]:
+    """Return the full merged-and-validated configuration (secrets redacted)."""
+    return _resolved_dict(_ctx(request))
+
+
+@router.get("/config/layers")
+async def get_config_layers(request: Request) -> dict[str, Any]:
+    """Return the raw per-layer dicts (defaults/system/user/runtime).
+
+    Useful for diagnostics: shows exactly which layer contributes each
+    value before the merge step.
+    """
+    ctx = _ctx(request)
+    if ctx.config_service is None:
+        raise HTTPException(503, "Config service unavailable")
+    layers = ctx.config_service.get_all_layers()
+    return {name: _redact(data) for name, data in layers.items()}
+
+
+@router.patch("/config")
+async def patch_config(request: Request) -> dict[str, Any]:
+    """Set a single dotted-path value in the chosen layer.
+
+    Body schema::
+
+        {
+            "path":  "llm.temperature",   # dotted path, required
+            "value": 0.9,                  # any JSON value
+            "layer": "user"                # optional, default "user"
+        }
+
+    Allowed layers: ``user`` (default, persisted to user.yaml),
+    ``system`` (persisted to system.yaml — admin use), ``runtime``
+    (in-memory, lost on restart).  ``defaults`` is read-only.
+    """
+    ctx = _ctx(request)
+    if ctx.config_service is None:
+        raise HTTPException(503, "Config service unavailable")
+
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "Invalid JSON body") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Request body must be a JSON object")
+
+    path = body.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise HTTPException(400, "'path' must be a non-empty dotted string")
+    if "value" not in body:
+        raise HTTPException(400, "'value' is required")
+    value = body["value"]
+
+    raw_layer = body.get("layer", ConfigLayer.USER.value)
+    if not isinstance(raw_layer, str):
+        raise HTTPException(400, "'layer' must be a string")
+    try:
+        layer = ConfigLayer(raw_layer.lower())
+    except ValueError as exc:
+        raise HTTPException(
+            400,
+            f"'layer' must be one of: user, system, runtime (got '{raw_layer}')",
+        ) from exc
+    if layer is ConfigLayer.DEFAULTS:
+        raise HTTPException(400, "'defaults' layer is read-only")
+
+    try:
+        await ctx.config_service.set(path, value, layer=layer)
+    except ValidationError as exc:
+        raise HTTPException(422, exc.errors()) from exc
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    if ctx.ws_connection_manager is not None:
+        try:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "config.changed",
+                "path": path,
+                "value": value if not _is_sensitive_path(path) else "***",
+                "layer": layer.value,
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("config.changed broadcast failed: {}", exc)
+
+    return _resolved_dict(ctx)
+
+
+@router.post("/config/reload")
+async def reload_config(request: Request) -> dict[str, Any]:
+    """Re-read disk layers (defaults/system/user) and revalidate."""
+    ctx = _ctx(request)
+    if ctx.config_service is None:
+        raise HTTPException(503, "Config service unavailable")
+    try:
+        ctx.config_service.reload()
+        ctx.config = ctx.config_service.get_resolved()
+    except ValidationError as exc:
+        raise HTTPException(422, exc.errors()) from exc
+    return _resolved_dict(ctx)
+
+
+def _is_sensitive_path(path: str) -> bool:
+    """Heuristically detect dotted paths that point at a secret."""
+    last = path.rsplit(".", 1)[-1].lower()
+    return last in _REDACT_KEYS
 
 
 @router.get("/config/models")

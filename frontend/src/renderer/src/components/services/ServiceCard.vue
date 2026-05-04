@@ -216,30 +216,35 @@ function fmtMb(mb: number): string {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  background: var(--surface-1);
+  gap: var(--space-2-5);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--surface-1) 86%, var(--surface-0));
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  border-radius: 8px;
+  box-shadow: var(--shadow-xs);
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 .service-card:hover {
-  background: var(--surface-2);
+  background: var(--surface-1);
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
 }
 .service-card::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: var(--radius-lg);
+  left: 0;
+  top: var(--space-3);
+  bottom: var(--space-3);
   pointer-events: none;
-  border-left: 2px solid transparent;
-  transition: border-color 140ms ease;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  transition: background 140ms ease;
 }
-.service-card.is-up::before { border-left-color: var(--success); }
-.service-card.is-degraded::before { border-left-color: var(--warning); }
-.service-card.is-down::before { border-left-color: var(--danger); }
-.service-card.is-starting::before { border-left-color: var(--accent); }
+.service-card.is-up::before { background: var(--success); }
+.service-card.is-degraded::before { background: var(--warning); }
+.service-card.is-down::before { background: var(--danger); }
+.service-card.is-starting::before { background: var(--accent); }
 
 /* ── Header ──────────────────────────────────────────────────── */
 .service-card__head {
@@ -249,15 +254,15 @@ function fmtMb(mb: number): string {
 }
 .service-card__icon-wrap {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
-  color: var(--accent);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
 }
 .service-card__title-block {
   flex: 1 1 auto;
@@ -271,7 +276,7 @@ function fmtMb(mb: number): string {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: 0;
   line-height: var(--leading-tight);
 }
 .service-card__tagline {
@@ -286,7 +291,7 @@ function fmtMb(mb: number): string {
   align-items: center;
   gap: var(--space-1-5);
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
@@ -326,9 +331,10 @@ function fmtMb(mb: number): string {
 /* ── Body ────────────────────────────────────────────────────── */
 .service-card__detail {
   margin: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface-inset);
-  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-2-5);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   font-size: var(--text-xs);
   color: var(--text-secondary);
   line-height: var(--leading-snug);
@@ -374,7 +380,7 @@ function fmtMb(mb: number): string {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: auto;
-  padding-top: var(--space-2);
+  padding-top: var(--space-1);
 }
 .btn {
   display: inline-flex;
@@ -383,7 +389,7 @@ function fmtMb(mb: number): string {
   padding: var(--space-1-5) var(--space-3);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
@@ -393,7 +399,7 @@ function fmtMb(mb: number): string {
   cursor: not-allowed;
 }
 .btn--ghost {
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text-secondary);
   border-color: var(--border);
 }
@@ -422,7 +428,7 @@ function fmtMb(mb: number): string {
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   background: var(--surface-1);
-  border-radius: var(--radius-pill);
+  border-radius: 6px;
 }
 
 /* ── Models panel ────────────────────────────────────────────── */
@@ -447,9 +453,9 @@ function fmtMb(mb: number): string {
 }
 .model-row {
   padding: var(--space-2-5) var(--space-3);
-  background: var(--surface-2);
+  background: var(--surface-0);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   transition: background 120ms ease, border-color 120ms ease;
 }
 .model-row:hover { border-color: var(--border-hover); }
@@ -481,7 +487,7 @@ function fmtMb(mb: number): string {
   align-items: center;
   gap: var(--space-1);
   padding: 2px var(--space-1-5);
-  border-radius: var(--radius-pill);
+  border-radius: 6px;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   text-transform: uppercase;

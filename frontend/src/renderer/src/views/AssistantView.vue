@@ -13,7 +13,6 @@ import { computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref
 import { useRouter } from 'vue-router'
 import AliceOrb from '../components/assistant/AliceOrb.vue'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
-import StatusBubbles from '../components/assistant/StatusBubbles.vue'
 import AssistantFab from '../components/assistant/AssistantFab.vue'
 import AssistantResponse from '../components/assistant/AssistantResponse.vue'
 import AssistantTranscript from '../components/assistant/AssistantTranscript.vue'
@@ -78,9 +77,6 @@ const {
     transcript, speak, cancelSpeak,
     audioDevices, selectedDeviceId, refreshDevices,
 } = useVoice()
-
-/** Template ref for the floating input bar. */
-const floatingBarRef = ref<InstanceType<typeof FloatingInputBar> | null>(null)
 
 /** Whether the conversation history drawer is visible. */
 const historyDrawerOpen = ref(false)
@@ -424,11 +420,6 @@ const showLastResponse = computed(() =>
     orbState.value === 'idle' || orbState.value === 'speaking'
 )
 
-/** Whether the orb tap should act as a "stop" action. */
-const isInterruptible = computed(() =>
-    orbState.value === 'thinking' || orbState.value === 'speaking'
-)
-
 /** Send a text message with optional file attachments. */
 async function handleSend(content: string, attachments: File[]): Promise<void> {
     await send(content, undefined, attachments)
@@ -605,7 +596,7 @@ onMounted(() => {
                 </button>
             </Transition>
 
-            <FloatingInputBar ref="floatingBarRef" :disabled="chatStore.isStreamingCurrentConversation"
+            <FloatingInputBar :disabled="chatStore.isStreamingCurrentConversation"
                 :is-connected="isConnected" :is-streaming="chatStore.isStreamingCurrentConversation"
                 :audio-devices="audioDevices" :selected-device-id="selectedDeviceId" :orb-state="orbState"
                 @send="handleSend" @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"

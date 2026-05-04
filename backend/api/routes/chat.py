@@ -47,6 +47,7 @@ from backend.services.turn import (
     WebSocketEventSink,
     WSEventSink,
     create_turn_executor,
+    is_websocket_closed_runtime_error,
 )
 
 router = APIRouter(tags=["chat"])
@@ -110,6 +111,16 @@ def _utcnow() -> datetime:
 def _ctx(ws_or_request: Any) -> AppContext:
     """Extract the ``AppContext`` from the ASGI app state."""
     return ws_or_request.app.state.context
+
+
+async def _receive_ws_text(websocket: WebSocket) -> str:
+    """Receive text while normalising closed-socket runtime errors."""
+    try:
+        return await websocket.receive_text()
+    except RuntimeError as exc:
+        if is_websocket_closed_runtime_error(exc):
+            raise WebSocketDisconnect() from exc
+        raise
 
 
 def _attachment_url(file_path: str) -> str:
@@ -1165,7 +1176,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                 raw = message_buffer.pop(0)
                 await asyncio.sleep(0)  # yield to event loop
             else:
-                raw = await websocket.receive_text()
+                raw = await _receive_ws_text(websocket)
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
@@ -1351,6 +1362,10 @@ async def ws_chat(websocket: WebSocket) -> None:
                 # other sessions (REST endpoints) immediately.  The session
                 # uses expire_on_commit=False so `conv` stays usable.
                 await session.commit()
+                if ctx.conversation_file_manager:
+                    await _sync_conversation_to_file(
+                        session, conv_id, ctx.conversation_file_manager,
+                    )
 
                 # --- fetch history for context ----------------------------
                 stmt = (

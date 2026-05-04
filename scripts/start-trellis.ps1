@@ -14,7 +14,9 @@
 param(
     [switch]$Install,
     [string]$Model = "",
-    [int]$Port = 8090
+    [int]$Port = 8090,
+    [string]$TrellisDir = "",
+    [switch]$NoPrompt
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +25,8 @@ $ErrorActionPreference = "Stop"
 $ScriptDir     = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AliceRoot     = Split-Path -Parent $ScriptDir
 $WorkspaceRoot = Split-Path -Parent $AliceRoot
-$TrellisDir    = Join-Path $WorkspaceRoot "TRELLIS-for-windows"
+if (-not $TrellisDir) { $TrellisDir = Join-Path $WorkspaceRoot "TRELLIS-for-windows" }
+$TrellisDir    = [IO.Path]::GetFullPath($TrellisDir)
 $ServerPy      = Join-Path $AliceRoot "trellis_server\server.py"
 
 Write-Host ""
@@ -112,6 +115,7 @@ if ($portInUse) {
     Write-Host "  [!] Port $Port already in use - TRELLIS might be running" -ForegroundColor Yellow
     Write-Host "      PID: $procId  ($($proc.ProcessName))" -ForegroundColor DarkGray
     Write-Host ""
+    if ($NoPrompt) { exit 0 }
     $answer = Read-Host "  Continue anyway? (y/N)"
     if ($answer -ne "y" -and $answer -ne "Y") { exit 0 }
 }

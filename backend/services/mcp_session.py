@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import sys
 import traceback
 from typing import Any
 
@@ -12,6 +13,62 @@ from loguru import logger
 
 from backend.core.config import McpServerConfig
 from backend.core.plugin_models import ConnectionStatus, ToolDefinition
+
+
+# ---------------------------------------------------------------------------
+# Command resolution
+# ---------------------------------------------------------------------------
+#
+# Hardcoding interpreter paths like ``backend/.venv/Scripts/python.exe`` in
+# ``mcp.servers[*].command`` breaks for the packaged installer (no venv) and
+# for users running from a different cwd.  We support a small set of
+# placeholders that are expanded at session start so the same configuration
+# works in dev and frozen modes:
+#
+#   ``{python}``               -> ``sys.executable`` (works anywhere a real
+#                                 Python interpreter is available; in a
+#                                 PyInstaller build this is ``backend.exe``).
+#   ``{builtin:fetch_primp}``  -> the full command needed to launch the
+#                                 bundled ``mcp_fetch_primp`` MCP server.
+#
+# Builtin tokens MUST appear as the only entry in ``command``; the resolver
+# replaces the whole list with the runtime-appropriate one.
+
+_BUILTIN_FETCH_PRIMP = "{builtin:fetch_primp}"
+
+
+def _resolve_command(command: list[str]) -> list[str]:
+    """Expand placeholder tokens in an MCP stdio command list.
+
+    Args:
+        command: Raw command from configuration.
+
+    Returns:
+        New list with every supported placeholder replaced by its concrete
+        runtime value.  Tokens not recognised are left untouched so plain
+        commands (``npx``, ``uvx``, absolute paths, ...) still work.
+    """
+    if not command:
+        return list(command)
+
+    # Builtin commands replace the entire list.
+    head = command[0]
+    if head == _BUILTIN_FETCH_PRIMP:
+        if getattr(sys, "frozen", False):
+            # In the packaged backend.exe, dispatch to the bundled MCP
+            # server via the dedicated CLI flag wired in backend/__main__.py.
+            return [sys.executable, "--mcp-fetch-primp"]
+        # In dev mode invoke the same flag through ``python -m backend``.
+        return [sys.executable, "-m", "backend", "--mcp-fetch-primp"]
+
+    # Per-token substitution for everything else.
+    resolved: list[str] = []
+    for token in command:
+        if token == "{python}":
+            resolved.append(sys.executable)
+        else:
+            resolved.append(token)
+    return resolved
 
 
 class McpSession:
@@ -235,7 +292,8 @@ class McpSession:
                             "stdio transport requires 'command'"
                         )
                     import shutil
-                    exe = self._config.command[0]
+                    resolved_command = _resolve_command(list(self._config.command))
+                    exe = resolved_command[0]
                     # Accept both PATH-resolvable commands (e.g. "uvx", "npx")
                     # and direct file paths (absolute or relative with a separator).
                     has_separator = (os.sep in exe) or ("/" in exe)
@@ -251,8 +309,8 @@ class McpSession:
                             f"executable '{exe}' not found in PATH"
                         )
                     server_params = mcp.StdioServerParameters(
-                        command=self._config.command[0],
-                        args=self._config.command[1:],
+                        command=resolved_command[0],
+                        args=resolved_command[1:],
                         env={**os.environ, **self._config.env},
                     )
                     read, write = await stack.enter_async_context(

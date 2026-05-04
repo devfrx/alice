@@ -25,6 +25,27 @@ if TYPE_CHECKING:  # pragma: no cover — typing only
     from fastapi import WebSocket
 
 
+_CLOSED_WEBSOCKET_RUNTIME_MARKERS = (
+    "WebSocket is not connected",
+    "Cannot call \"send\" once a close message has been sent",
+    "Cannot call \"receive\" once a disconnect message has been received",
+    "Unexpected ASGI message \"websocket.send\"",
+)
+
+
+def is_websocket_closed_runtime_error(exc: RuntimeError) -> bool:
+    """Return whether *exc* is Starlette reporting a closed WebSocket.
+
+    Starlette sometimes surfaces normal close races as ``RuntimeError``
+    instead of :class:`fastapi.WebSocketDisconnect`; the message can even
+    say that ``accept()`` was not called although the socket had already
+    been accepted and then closed.  Treat only these known transport-state
+    messages as disconnects so unrelated runtime errors still surface.
+    """
+    message = str(exc)
+    return any(marker in message for marker in _CLOSED_WEBSOCKET_RUNTIME_MARKERS)
+
+
 @runtime_checkable
 class WSEventSink(Protocol):
     """Structural type for outbound event sinks used by turn executors.
@@ -57,6 +78,7 @@ class WebSocketEventSink:
 
     def __init__(self, ws: "WebSocket") -> None:
         self._ws = ws
+        self._closed = False
 
     async def send(self, event: dict[str, Any]) -> None:
         """Send ``event`` as JSON; swallow disconnect / runtime errors.
@@ -71,16 +93,23 @@ class WebSocketEventSink:
         try:
             await self._ws.send_json(event)
         except WebSocketDisconnect:
+            self._closed = True
             logger.debug("WebSocketEventSink: client disconnected on send")
         except RuntimeError as exc:
             # Typical when the socket has already been closed.
+            if is_websocket_closed_runtime_error(exc):
+                self._closed = True
             logger.debug("WebSocketEventSink: send failed ({})", exc)
 
     @property
     def is_connected(self) -> bool:
         """Return ``True`` while the WebSocket is in CONNECTED state."""
         try:
-            return self._ws.client_state == WebSocketState.CONNECTED
+            return (
+                not self._closed
+                and self._ws.client_state == WebSocketState.CONNECTED
+                and self._ws.application_state == WebSocketState.CONNECTED
+            )
         except Exception:  # pragma: no cover — defensive
             return False
 
@@ -123,4 +152,5 @@ __all__ = [
     "RecordingEventSink",
     "WSEventSink",
     "WebSocketEventSink",
+    "is_websocket_closed_runtime_error",
 ]

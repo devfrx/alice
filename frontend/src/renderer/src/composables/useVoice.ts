@@ -644,8 +644,6 @@ export function useVoice(): UseVoiceReturn {
 
   function connect(): void {
     voiceWs.connect()
-    // Enumerate devices on connect (may need mic permission first for labels)
-    void refreshDevices()
   }
   function disconnect(): void {
     clearSttTimeout()

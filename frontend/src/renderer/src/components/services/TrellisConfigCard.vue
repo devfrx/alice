@@ -30,6 +30,8 @@ const store = useServicesStore()
 const dirPath = ref('')
 const enabled = ref(false)
 const saving = ref(false)
+const restarting = ref(false)
+const stopping = ref(false)
 const loading = ref(true)
 const saveError = ref<string | null>(null)
 const saveOk = ref(false)
@@ -58,6 +60,7 @@ const statusLabel = computed(
   () => STATUS_LABELS[props.service.status] ?? props.service.status,
 )
 const isStarting = computed(() => props.service.status === 'starting')
+const isStopped = computed(() => props.service.status === 'down')
 
 onMounted(async () => {
   loading.value = true
@@ -81,7 +84,7 @@ async function pickDir(): Promise<void> {
   if (picked) dirPath.value = picked
 }
 
-async function save(): Promise<void> {
+async function save(): Promise<boolean> {
   saving.value = true
   saveError.value = null
   saveOk.value = false
@@ -93,10 +96,46 @@ async function save(): Promise<void> {
       payload,
     )
     saveOk.value = true
+    return true
+  } catch (e) {
+    saveError.value = (e as Error).message
+    return false
+  } finally {
+    saving.value = false
+  }
+}
+
+async function startOrRestart(): Promise<void> {
+  if (isStarting.value) {
+    await store.refresh()
+    return
+  }
+  restarting.value = true
+  saveError.value = null
+  try {
+    enabled.value = true
+    const saved = await save()
+    if (!saved) return
+    await store.restart(props.service.name)
+    await store.refresh()
   } catch (e) {
     saveError.value = (e as Error).message
   } finally {
-    saving.value = false
+    restarting.value = false
+  }
+}
+
+async function stopService(): Promise<void> {
+  stopping.value = true
+  saveError.value = null
+  saveOk.value = false
+  try {
+    await store.stop(props.service.name)
+    await store.refresh()
+  } catch (e) {
+    saveError.value = (e as Error).message
+  } finally {
+    stopping.value = false
   }
 }
 </script>
@@ -179,15 +218,29 @@ async function save(): Promise<void> {
       <button
         class="btn btn--accent"
         type="button"
-        :disabled="saving || loading"
+        :disabled="saving || restarting || stopping || loading"
         @click="save"
       >
         <AppIcon name="check" :size="13" />
         <span>{{ saving ? 'Salvo…' : 'Salva' }}</span>
       </button>
-      <button class="btn btn--ghost" type="button" @click="emit('restart')">
+      <button
+        class="btn btn--ghost"
+        type="button"
+        :disabled="saving || restarting || stopping || loading || isStarting"
+        @click="startOrRestart"
+      >
         <AppIcon name="refresh-ccw" :size="13" />
-        <span>Avvia / Riavvia</span>
+        <span>{{ restarting || isStarting ? 'Avvio…' : 'Avvia / Riavvia' }}</span>
+      </button>
+      <button
+        class="btn btn--ghost"
+        type="button"
+        :disabled="saving || restarting || stopping || loading || isStopped"
+        @click="stopService"
+      >
+        <AppIcon name="stop" :size="13" />
+        <span>{{ stopping ? 'Spengo…' : 'Spegni' }}</span>
       </button>
       <button
         v-if="isV2"
@@ -208,30 +261,35 @@ async function save(): Promise<void> {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background: var(--surface-1);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--surface-1) 86%, var(--surface-0));
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  transition: background 140ms ease, border-color 140ms ease;
+  border-radius: 8px;
+  box-shadow: var(--shadow-xs);
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 .trellis-card:hover {
-  background: var(--surface-2);
+  background: var(--surface-1);
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
 }
 .trellis-card::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: var(--radius-lg);
+  left: 0;
+  top: var(--space-3);
+  bottom: var(--space-3);
   pointer-events: none;
-  border-left: 2px solid transparent;
-  transition: border-color 140ms ease;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  transition: background 140ms ease;
 }
-.trellis-card.is-up::before { border-left-color: var(--success); }
-.trellis-card.is-degraded::before { border-left-color: var(--warning); }
-.trellis-card.is-down::before { border-left-color: var(--danger); }
-.trellis-card.is-starting::before { border-left-color: var(--accent); }
+.trellis-card.is-up::before { background: var(--success); }
+.trellis-card.is-degraded::before { background: var(--warning); }
+.trellis-card.is-down::before { background: var(--danger); }
+.trellis-card.is-starting::before { background: var(--accent); }
 
 /* ── Header ──────────────────────────────────────────────────── */
 .trellis-card__head {
@@ -241,15 +299,15 @@ async function save(): Promise<void> {
 }
 .trellis-card__icon-wrap {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
-  color: var(--accent);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
 }
 .trellis-card__title-block {
   flex: 1 1 auto;
@@ -263,7 +321,7 @@ async function save(): Promise<void> {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: 0;
   line-height: var(--leading-tight);
 }
 .trellis-card__tagline {
@@ -278,7 +336,7 @@ async function save(): Promise<void> {
   align-items: center;
   gap: var(--space-1-5);
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
@@ -306,9 +364,10 @@ async function save(): Promise<void> {
 /* ── Detail line ─────────────────────────────────────────────── */
 .trellis-card__detail {
   margin: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface-inset);
-  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-2-5);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   font-size: var(--text-xs);
   color: var(--text-secondary);
   line-height: var(--leading-snug);
@@ -319,7 +378,7 @@ async function save(): Promise<void> {
 .trellis-card__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2-5);
 }
 .trellis-card__field {
   display: flex;
@@ -347,7 +406,7 @@ async function save(): Promise<void> {
   padding: var(--space-2) var(--space-3);
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   color: var(--text-primary);
   font-size: var(--text-xs);
   font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
@@ -366,10 +425,10 @@ async function save(): Promise<void> {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--surface-inset);
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--surface-0);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   cursor: pointer;
   transition: border-color 120ms ease;
 }
@@ -431,7 +490,7 @@ async function save(): Promise<void> {
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-size: var(--text-xs);
   line-height: var(--leading-snug);
 }
@@ -459,14 +518,14 @@ async function save(): Promise<void> {
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn--ghost {
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text-secondary);
   border-color: var(--border);
 }

@@ -7,7 +7,7 @@ through a uniform Protocol without coupling to their internals.
 
 from backend.core.managed_services.lmstudio import LMStudioManagedService
 from backend.core.managed_services.stt import STTManagedService
-from backend.core.managed_services.trellis import TrellisManagedService
+from backend.core.managed_services.trellis import TrellisManagedService, resolve_trellis_launcher
 from backend.core.managed_services.tts import TTSManagedService
 from backend.core.managed_services.vram import VRAMManagedService
 
@@ -17,4 +17,5 @@ __all__ = [
     "TTSManagedService",
     "TrellisManagedService",
     "VRAMManagedService",
+    "resolve_trellis_launcher",
 ]

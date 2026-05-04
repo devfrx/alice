@@ -65,6 +65,8 @@ _ANNOTATED_TYPES: frozenset[str] = frozenset(
     }
 )
 
+_TOOL_TIMEOUT_BUFFER_S: float = 30.0
+
 
 class AnnotatingSink:
     """Forward events to ``inner`` adding ``agent_step_index`` to token/tool events.
@@ -882,12 +884,64 @@ class AgentTurnExecutor:
         cancel_event: asyncio.Event,
         session: Any,
     ) -> TurnResult:
-        """Run one step under ``cfg.step_timeout_seconds``."""
-        timeout = self._cfg.step_timeout_seconds
+        """Run one step under the effective agent/tool timeout."""
+        timeout = self._effective_step_timeout_seconds(sub_turn)
         coro = self._direct.execute(sub_turn, annotated, cancel_event, session)
         if timeout and timeout > 0:
             return await asyncio.wait_for(coro, timeout=timeout)
         return await coro
+
+    def _effective_step_timeout_seconds(self, sub_turn: TurnInput) -> float:
+        """Return a step timeout that never undercuts included tools."""
+        configured = self._configured_step_timeout_seconds()
+        tool_timeout = self._max_included_tool_timeout_seconds(sub_turn)
+        if tool_timeout is None:
+            return configured
+        return max(configured, tool_timeout + _TOOL_TIMEOUT_BUFFER_S)
+
+    def _configured_step_timeout_seconds(self) -> float:
+        """Return the numeric configured step timeout, or ``0`` if disabled."""
+        value = getattr(self._cfg, "step_timeout_seconds", 0) or 0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _max_included_tool_timeout_seconds(
+        self, sub_turn: TurnInput,
+    ) -> float | None:
+        """Return the largest timeout for tools exposed to this sub-turn."""
+        if not sub_turn.tools:
+            return None
+
+        ctx = getattr(self._direct, "ctx", None)
+        registry = getattr(ctx, "tool_registry", None)
+        timeouts: list[float] = []
+
+        if registry is not None:
+            for tool in sub_turn.tools:
+                if not isinstance(tool, dict):
+                    continue
+                function = tool.get("function")
+                if not isinstance(function, dict):
+                    continue
+                tool_name = function.get("name")
+                if not isinstance(tool_name, str) or not tool_name:
+                    continue
+                tool_def = registry.get_tool_definition(tool_name)
+                if tool_def is not None and tool_def.timeout_ms > 0:
+                    timeouts.append(tool_def.timeout_ms / 1000.0)
+
+        if timeouts:
+            return max(timeouts)
+
+        llm_cfg = getattr(getattr(ctx, "config", None), "llm", None)
+        fallback = getattr(llm_cfg, "tool_execution_timeout", None)
+        try:
+            fallback_timeout = float(fallback or 0)
+        except (TypeError, ValueError):
+            fallback_timeout = 0.0
+        return fallback_timeout if fallback_timeout > 0 else None
 
     def _compute_deadline(self) -> float | None:
         """Return the monotonic deadline for the run, or ``None`` if disabled."""

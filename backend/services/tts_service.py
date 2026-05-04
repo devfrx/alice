@@ -14,11 +14,27 @@ import asyncio
 import io
 import os
 import re
+import sys
 import tempfile
 import wave
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+
+def _resolve_resource_root() -> Path:
+    """Return the directory that holds bundled ``models/`` and other data.
+
+    In a PyInstaller --onedir build ``__file__`` lives inside ``_internal/``
+    and walking three parents up lands in ``_internal/`` itself, **not** in
+    the directory next to ``backend.exe`` where ``build-installer.ps1``
+    actually stages ``models/``.  Use ``sys.executable`` in frozen mode so
+    paths line up with the installer layout; in dev mode keep the original
+    ``services/`` ↑ ``backend/`` ↑ ``alice/`` resolution.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent.parent
 
 from loguru import logger
 
@@ -231,8 +247,9 @@ class _PiperEngine:
             length_scale=1.0 / speed if speed > 0 else 1.0,
         )
 
-        # Resolve relative to project root (3 levels up from services/)
-        project_root = Path(__file__).resolve().parent.parent.parent
+        # Resolve relative to the runtime resource root (handles both dev
+        # and PyInstaller --onedir layouts).
+        project_root = _resolve_resource_root()
         model_path = voice if voice.endswith(".onnx") else f"{voice}.onnx"
         model_path_obj = Path(model_path)
         if not model_path_obj.is_absolute():
@@ -316,8 +333,9 @@ class _KokoroEngine:
     ) -> None:
         import kokoro_onnx  # lazy
 
-        # Resolve relative paths to project root
-        project_root = Path(__file__).resolve().parent.parent.parent
+        # Resolve relative paths against the runtime resource root
+        # (PyInstaller-aware via _resolve_resource_root).
+        project_root = _resolve_resource_root()
         model_resolved = Path(model_path)
         voices_resolved = Path(voices_path)
         if not model_resolved.is_absolute():

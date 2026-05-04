@@ -4,6 +4,7 @@ Endpoints:
 
 * ``GET    /api/services``                       — list all services.
 * ``GET    /api/services/{name}/health``         — single-service snapshot.
+* ``POST   /api/services/{name}/stop``           — stop a service.
 * ``POST   /api/services/{name}/restart``        — schedule a restart.
 * ``GET    /api/services/{name}/models``         — downloadable model catalog.
 * ``GET    /api/services/{name}/models/installed`` — installed models on disk.
@@ -23,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from backend.core.managed_services import TrellisManagedService, resolve_trellis_launcher
 from backend.core.context import AppContext
 from backend.services.model_downloader import CATALOG, list_catalog
 
@@ -71,6 +73,35 @@ def _config_service(request: Request):
     return svc
 
 
+async def _sync_trellis_service(request: Request, name: str) -> None:
+    """Apply the latest Trellis config to the orchestrator service."""
+    ctx = _ctx(request)
+    cfg_svc = _config_service(request)
+    ctx.config = cfg_svc.get_resolved()
+    section = getattr(ctx.config, name, None)
+    if section is None:
+        return
+
+    launcher, cwd = resolve_trellis_launcher(name)
+    model_key = "trellis_model" if name == "trellis" else "trellis2_model"
+    dir_key = "trellis_dir" if name == "trellis" else "trellis2_dir"
+    kwargs = {
+        "service_url": section.service_url,
+        "launcher": launcher,
+        "cwd": cwd,
+        "model": getattr(section, model_key),
+        "trellis_dir": getattr(section, dir_key),
+    }
+
+    orch = _orchestrator(request)
+    service = orch.get(name)
+    if isinstance(service, TrellisManagedService):
+        service.configure(**kwargs)
+        return
+    if section.enabled:
+        await orch.attach_started(TrellisManagedService(name=name, **kwargs))
+
+
 # ---------------------------------------------------------------------------
 # Health / lifecycle
 # ---------------------------------------------------------------------------
@@ -96,11 +127,36 @@ async def get_service_health(
     return {"name": name, **health.to_dict()}
 
 
+@router.post("/services/{name}/stop")
+async def stop_service(
+    request: Request, name: str,
+) -> JSONResponse:
+    """Stop *name* and return ``202 Accepted``."""
+    if name in _TRELLIS_CONFIG_KEYS:
+        await _sync_trellis_service(request, name)
+
+    orch = _orchestrator(request)
+    try:
+        await orch.stop(name)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Unknown service '{name}'",
+        )
+    logger.info("Service stop requested: {}", name)
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={"name": name, "status": "stop_scheduled"},
+    )
+
+
 @router.post("/services/{name}/restart")
 async def restart_service(
     request: Request, name: str,
 ) -> JSONResponse:
     """Schedule a restart for *name* and return ``202 Accepted``."""
+    if name in _TRELLIS_CONFIG_KEYS:
+        await _sync_trellis_service(request, name)
+
     orch = _orchestrator(request)
     try:
         await orch.restart(name)
@@ -406,4 +462,5 @@ async def configure_trellis(
             )
 
     logger.info("'{}' configuration updated: {}", name, list(updated))
+    await _sync_trellis_service(request, name)
     return {"service": name, "updated": updated}

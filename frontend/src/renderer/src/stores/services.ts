@@ -100,7 +100,27 @@ export const useServicesStore = defineStore('services', () => {
     const r = await fetch(`${API}/services/${encodeURIComponent(name)}/restart`, {
       method: 'POST',
     })
-    if (!r.ok) throw new Error(`Restart failed: HTTP ${r.status}`)
+    if (!r.ok) {
+      const detail = await r
+        .json()
+        .then((body: { detail?: string }) => body.detail)
+        .catch(() => `HTTP ${r.status}`)
+      throw new Error(detail || `Restart failed: HTTP ${r.status}`)
+    }
+    await refresh()
+  }
+
+  async function stop(name: string): Promise<void> {
+    const r = await fetch(`${API}/services/${encodeURIComponent(name)}/stop`, {
+      method: 'POST',
+    })
+    if (!r.ok) {
+      const detail = await r
+        .json()
+        .then((body: { detail?: string }) => body.detail)
+        .catch(() => `HTTP ${r.status}`)
+      throw new Error(detail || `Stop failed: HTTP ${r.status}`)
+    }
     await refresh()
   }
 
@@ -232,6 +252,7 @@ export const useServicesStore = defineStore('services', () => {
     hasDegraded,
     // actions
     refresh,
+    stop,
     restart,
     loadCatalog,
     downloadModel,

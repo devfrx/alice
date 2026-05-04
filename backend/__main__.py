@@ -38,9 +38,38 @@ class _SuppressLifespanCancelledError(logging.Filter):
         return True
 
 
+def _run_mcp_fetch_primp() -> None:
+    """Dispatch to the bundled mcp-fetch-primp stdio server.
+
+    The MCP client launches this entry point as a subprocess (configured via
+    the ``{builtin:fetch_primp}`` placeholder in ``default.yaml``).  In a
+    PyInstaller --onedir build ``sys.executable`` is ``backend.exe`` and the
+    standalone ``backend/tools/mcp_fetch_primp.py`` script can no longer be
+    invoked directly, so we re-export the same server through this CLI flag.
+    """
+    if sys.platform == "win32":
+        # Match the standalone script's UTF-8 stdio setup so the MCP
+        # framing protocol is not corrupted by Windows code-page encoders.
+        import io
+
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+
+    from backend.tools.mcp_fetch_primp import _main as _fetch_primp_main
+
+    asyncio.run(_fetch_primp_main())
+
+
 def main() -> None:
     """Launch uvicorn with graceful signal handling for Windows."""
     import argparse
+
+    # Builtin MCP server dispatch — must be checked before argparse so the
+    # flag works even when invoked as ``backend.exe --mcp-fetch-primp`` with
+    # no other arguments (argparse would otherwise treat it as unknown).
+    if "--mcp-fetch-primp" in sys.argv[1:]:
+        _run_mcp_fetch_primp()
+        return
 
     parser = argparse.ArgumentParser(description="AL\\CE backend server")
     parser.add_argument("--host", default="127.0.0.1")

@@ -20,6 +20,7 @@ from backend.services.turn.sink import (
     RecordingEventSink,
     WebSocketEventSink,
     WSEventSink,
+    is_websocket_closed_runtime_error,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "WSEventSink",
     "WebSocketEventSink",
     "create_turn_executor",
+    "is_websocket_closed_runtime_error",
 ]

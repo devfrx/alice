@@ -143,7 +143,6 @@ async function refreshAll(): Promise<void> {
           v-for="svc in trellisServices"
           :key="svc.name"
           :service="svc"
-          @restart="store.restart(svc.name)"
           @open-guide="showGuide = true"
         />
       </div>
@@ -161,24 +160,38 @@ async function refreshAll(): Promise<void> {
 <style scoped>
 /* ── Page shell ───────────────────────────────────────────────── */
 .services-view {
-  padding: var(--space-8);
-  max-width: 1180px;
-  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6) clamp(var(--space-4), 3vw, var(--space-8)) var(--space-8);
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-6);
+  background:
+    linear-gradient(180deg, var(--surface-0) 0%, var(--bg-primary) 34%, var(--surface-0) 100%);
 }
 
 /* ── Header ───────────────────────────────────────────────────── */
 .services-view__head {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-4);
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-sm);
 }
 .services-view__head-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
 }
@@ -189,10 +202,10 @@ async function refreshAll(): Promise<void> {
 }
 .services-view__title {
   margin: 0;
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: 0;
 }
 .services-view__subtitle {
   margin: 0;
@@ -202,13 +215,15 @@ async function refreshAll(): Promise<void> {
   max-width: 64ch;
 }
 .services-view__refresh {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface-2);
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -241,13 +256,14 @@ async function refreshAll(): Promise<void> {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1-5) var(--space-3);
-  background: var(--surface-2);
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: var(--text-xs);
   color: var(--text-secondary);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: 0;
 }
 .stat-pill__dot {
   width: 6px;
@@ -297,13 +313,13 @@ async function refreshAll(): Promise<void> {
 .services-view__section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 .services-view__section-head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding-bottom: var(--space-3);
+  padding: 0 var(--space-1) var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 .services-view__section-title {
@@ -311,7 +327,7 @@ async function refreshAll(): Promise<void> {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: 0;
 }
 .services-view__section-count {
   display: inline-flex;
@@ -320,9 +336,9 @@ async function refreshAll(): Promise<void> {
   min-width: 22px;
   height: 20px;
   padding: 0 var(--space-2);
-  background: var(--surface-2);
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   color: var(--text-muted);
@@ -330,11 +346,11 @@ async function refreshAll(): Promise<void> {
 }
 .services-view__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-3);
 }
 .services-view__grid--wide {
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
 }
 
 /* ── Empty state ─────────────────────────────────────────────── */
@@ -346,10 +362,31 @@ async function refreshAll(): Promise<void> {
   padding: var(--space-8);
   background: var(--surface-1);
   border: 1px dashed var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   color: var(--text-muted);
   gap: var(--space-3);
   font-size: var(--text-sm);
 }
 .services-view__empty p { margin: 0; }
+
+@media (max-width: 760px) {
+  .services-view {
+    padding: var(--space-4) var(--space-3) var(--space-6);
+    gap: var(--space-5);
+  }
+
+  .services-view__head {
+    position: static;
+    margin: 0;
+  }
+
+  .services-view__head-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .services-view__refresh {
+    justify-content: center;
+  }
+}
 </style>

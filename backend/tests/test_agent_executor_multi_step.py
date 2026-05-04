@@ -14,6 +14,7 @@ Asserts:
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -107,3 +108,31 @@ async def test_multi_step_runs_each_step_with_critic() -> None:
     assert result.finish_reason == "stop"
     assert result.had_tool_calls is True
     assert result.agent_run_id is None
+
+
+def test_step_timeout_extends_to_included_tool_timeout() -> None:
+    """Agent step timeout must not undercut long-running tools."""
+
+    class _Registry:
+        def get_tool_definition(self, tool_name: str):
+            if tool_name == "cad_generator_cad_generate_from_image":
+                return SimpleNamespace(timeout_ms=120_000)
+            return None
+
+    direct = MockDirect()
+    direct.ctx = SimpleNamespace(tool_registry=_Registry(), config=None)  # type: ignore[attr-defined]
+    executor = build_executor(
+        direct=direct,
+        complexity=TaskComplexity.MULTI_STEP,
+        cfg=make_agent_cfg(step_timeout_seconds=60),
+    )
+    turn = make_agent_turn(
+        tools=[
+            {
+                "type": "function",
+                "function": {"name": "cad_generator_cad_generate_from_image"},
+            },
+        ],
+    )
+
+    assert executor._effective_step_timeout_seconds(turn) == 150

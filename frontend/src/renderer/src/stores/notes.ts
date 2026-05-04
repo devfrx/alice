@@ -7,7 +7,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../services/api'
-import type { Note, NoteFolder, NoteSearchResult } from '../types/notes'
+import type { Note, NoteFolder } from '../types/notes'
 
 export const useNotesStore = defineStore('notes', () => {
   // -----------------------------------------------------------------------

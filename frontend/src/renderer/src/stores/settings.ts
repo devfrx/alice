@@ -51,7 +51,7 @@ export const useSettingsStore = defineStore('settings', () => {
       model: 'large-v3'
     },
     tts: {
-      voice: 'models/tts/it_IT-paola-medium',
+      voice: 'models/tts/piper/it_IT-paola-medium',
       engine: 'piper'
     },
     ui: {

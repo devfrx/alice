@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -502,7 +503,10 @@ class TestCadGenerateFromImage:
     async def test_tool_hidden_when_trellis2_disabled(self, tmp_path: Path) -> None:
         """trellis2.enabled=False → cad_generate_from_image not exposed."""
         plugin = CadGeneratorPlugin()
-        ctx = _make_app_context(tmp_path)  # trellis2 default = disabled
+        ctx = _make_app_context(
+            tmp_path,
+            trellis2_overrides={"enabled": False},
+        )
 
         with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
             MockClient.return_value = _mock_client()
@@ -568,6 +572,50 @@ class TestCadGenerateFromImage:
             output_file = Path(payload["file_path"])
             assert output_file.exists()
             mock2.generate_from_image.assert_awaited_once()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_generate_from_image_recovers_local_glb_after_error(
+        self, tmp_path: Path,
+    ) -> None:
+        """If TRELLIS.2 wrote the GLB before failing HTTP, recover it."""
+        abs_path, rel_path = _stage_uploaded_image("recover.png")
+        output_dir = tmp_path / "3d_models_v2"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        recovered_file = output_dir / "recovered_model.glb"
+        recovered_file.write_bytes(b"glTF" + b"recovered")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": False},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                mock2.generate_from_image = AsyncMock(
+                    side_effect=Exception("endpoint cancelled"),
+                )
+                mock2.download_model = AsyncMock(
+                    side_effect=Exception("service already stopped"),
+                )
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                result = await plugin.execute_tool(
+                    "cad_generate_from_image",
+                    {"image_path": rel_path, "model_name": "recovered_model"},
+                    _make_exec_ctx(),
+                )
+
+            assert result.success is True
+            payload = result.content
+            assert payload["model_name"] == "recovered_model"
+            assert payload["size_bytes"] == recovered_file.stat().st_size
+            assert Path(payload["file_path"]) == recovered_file
             await plugin.cleanup()
         finally:
             abs_path.unlink(missing_ok=True)
@@ -716,6 +764,41 @@ class TestCadGenerateFromImage:
                 )
 
             assert result.success is False
+            lmstudio = ctx.lmstudio_manager
+            lmstudio.unload_model.assert_awaited()
+            lmstudio.load_model.assert_awaited()
+            await plugin.cleanup()
+        finally:
+            abs_path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_vram_swap_reload_after_cancellation(self, tmp_path: Path) -> None:
+        """Cancelled image generation must still reload LM Studio models."""
+        abs_path, rel_path = _stage_uploaded_image("cancelled.png")
+        try:
+            plugin = CadGeneratorPlugin()
+            ctx = _make_app_context(
+                tmp_path, trellis2_overrides={"auto_vram_swap": True},
+            )
+
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2, \
+                 patch("backend.plugins.cad_generator.plugin.asyncio.sleep", new=AsyncMock()):
+                MockClient.return_value = _mock_client()
+                mock2 = _mock_client_v2()
+                mock2.generate_from_image = AsyncMock(
+                    side_effect=asyncio.CancelledError(),
+                )
+                MockClient2.return_value = mock2
+                await plugin.initialize(ctx)
+
+                with pytest.raises(asyncio.CancelledError):
+                    await plugin.execute_tool(
+                        "cad_generate_from_image",
+                        {"image_path": rel_path},
+                        _make_exec_ctx(),
+                    )
+
             lmstudio = ctx.lmstudio_manager
             lmstudio.unload_model.assert_awaited()
             lmstudio.load_model.assert_awaited()

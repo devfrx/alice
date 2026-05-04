@@ -171,17 +171,31 @@ Push-Location $Backend
 try {
     Remove-IfExists $BackendDist
     Remove-IfExists $BackendBuild
+    $py = Join-Path $Backend ".venv\Scripts\python.exe"
     if (-not $SkipBackendInstall) {
         Write-Host "  → uv sync --extra dev --extra voice" -ForegroundColor Yellow
-        uv sync --extra dev --extra voice
-        if ($LASTEXITCODE -ne 0) { throw "uv sync failed (exit $LASTEXITCODE)" }
-        Write-Host "  → uv pip install pyinstaller" -ForegroundColor Yellow
-        uv pip install pyinstaller
-        if ($LASTEXITCODE -ne 0) { throw "pyinstaller install failed (exit $LASTEXITCODE)" }
+        # An outer activation can leave VIRTUAL_ENV pointing at a sibling
+        # venv (e.g. alice\.venv), which makes ``uv pip install`` target
+        # the wrong interpreter.  Scope both commands to the backend's
+        # own project environment to keep PyInstaller installed where
+        # we will invoke it from below.
+        $prevVenv = $env:VIRTUAL_ENV
+        $env:VIRTUAL_ENV = $null
+        try {
+            uv sync --extra dev --extra voice
+            if ($LASTEXITCODE -ne 0) { throw "uv sync failed (exit $LASTEXITCODE)" }
+            if (-not (Test-Path $py)) {
+                throw "Python interpreter not found at $py after uv sync."
+            }
+            Write-Host "  → uv pip install --python `"$py`" pyinstaller" -ForegroundColor Yellow
+            uv pip install --python "$py" pyinstaller
+            if ($LASTEXITCODE -ne 0) { throw "pyinstaller install failed (exit $LASTEXITCODE)" }
+        } finally {
+            $env:VIRTUAL_ENV = $prevVenv
+        }
     } else {
         Write-Host "  → skipping uv sync / pyinstaller install (-SkipBackendInstall)" -ForegroundColor DarkYellow
     }
-    $py = Join-Path $Backend ".venv\Scripts\python.exe"
     if (-not (Test-Path $py)) {
         throw "Python interpreter not found at $py — run setup.ps1 first."
     }
@@ -212,6 +226,13 @@ foreach ($launcher in @('start-trellis2.ps1', 'start-trellis.ps1')) {
     if (Test-Path $src) {
         Copy-Item -Path $src -Destination $ScriptsStage -Force
         Write-Host "  → bundled $launcher" -ForegroundColor DarkGray
+    }
+}
+foreach ($serverDir in @('trellis_server', 'trellis2_server')) {
+    $src = Join-Path $Root $serverDir
+    if (Test-Path $src) {
+        Copy-Item -Path $src -Destination (Join-Path $Stage $serverDir) -Recurse -Force
+        Write-Host "  → bundled $serverDir" -ForegroundColor DarkGray
     }
 }
 Write-Host "  → staged $((Get-ChildItem $Stage -Recurse | Measure-Object).Count) files" -ForegroundColor Green
@@ -350,6 +371,47 @@ Write-Host "  → models bundle: $([math]::Round($totalSize / 1MB, 1)) MB" -Fore
 
 # ─── 5. electron-builder ────────────────────────────────────────
 Write-Step 5 6 "electron-builder — Windows NSIS installer"
+
+# Pre-populate the winCodeSign cache.  electron-builder ships a 7z
+# archive that contains symlinks for darwin .dylib files; on Windows
+# without Developer Mode (or admin) 7za fails with
+# "Il privilegio richiesto non appartiene al client", which makes
+# electron-builder loop forever re-downloading.  Extracting the
+# archive ourselves while excluding the darwin symlink targets
+# leaves a populated cache so electron-builder skips its own
+# extraction.
+function Initialize-WinCodeSignCache {
+    $cacheRoot = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\winCodeSign'
+    $extracted = Join-Path $cacheRoot 'winCodeSign-2.6.0'
+    if (Test-Path (Join-Path $extracted 'windows-10\x64\signtool.exe')) {
+        Write-Host "  → winCodeSign cache already populated" -ForegroundColor DarkGray
+        return
+    }
+    New-Item -ItemType Directory -Force -Path $cacheRoot | Out-Null
+    $sevenZip = Join-Path $Frontend 'node_modules\7zip-bin\win\x64\7za.exe'
+    if (-not (Test-Path $sevenZip)) {
+        Write-Host "  ! 7za.exe not found at $sevenZip — skipping cache priming" -ForegroundColor DarkYellow
+        return
+    }
+    $archive = Join-Path $cacheRoot 'winCodeSign-2.6.0.7z'
+    $url     = 'https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z'
+    Write-Host "  → priming winCodeSign cache (download + safe extract)" -ForegroundColor Yellow
+    $prev = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
+    } finally {
+        $ProgressPreference = $prev
+    }
+    # Exclude the darwin symlink files that trip Windows ACLs.
+    & $sevenZip x $archive "-o$extracted" '-aoa' '-bso0' '-bsp0' '-x!darwin' | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "winCodeSign pre-extraction failed (exit $LASTEXITCODE)"
+    }
+    Remove-Item $archive -Force -ErrorAction SilentlyContinue
+}
+Initialize-WinCodeSignCache
+
 Push-Location $Frontend
 try {
     Remove-IfExists $Installer

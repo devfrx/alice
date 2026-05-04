@@ -55,7 +55,7 @@ stt:
 
 tts:
   engine: "piper"
-  voice: "models/tts/it_IT-paola-medium"
+  voice: "models/tts/piper/it_IT-paola-medium"
   sample_rate: 22050
   enabled: true
   speed: 1.0
@@ -338,10 +338,12 @@ mcp:
   #about:blank#blocked
   # PRIMP FETCH — fetch con TLS fingerprint Chrome reale (primp). Bypassa Cloudflare,
   # Radware, anti-bot. Usa per e-commerce, comparatori, qualsiasi sito che ritorna 403.
-  # Richiede: backend/.venv (primp + mcp già installati)
+  # Comando "{builtin:fetch_primp}" — gestito da McpSession in modo portabile:
+  #   • dev:    python -m backend --mcp-fetch-primp
+  #   • frozen: backend.exe --mcp-fetch-primp
     - name: primp
       transport: stdio
-      command: ["backend/.venv/Scripts/python.exe", "backend/tools/mcp_fetch_primp.py"]
+      command: ["{builtin:fetch_primp}"]
       enabled: true
   #
   # FETCH — fallback leggero per API REST, siti statici senza anti-bot.

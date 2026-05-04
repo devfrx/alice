@@ -20,6 +20,7 @@ from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext, ToolResult
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
+from backend.services.turn import is_websocket_closed_runtime_error
 
 # Type alias for the sync callback.
 SyncFn = Callable[..., Coroutine[Any, Any, None]]
@@ -379,7 +380,7 @@ async def run_tool_loop(
                     })
                     continue
 
-            await websocket.send_json({
+            await _send_json(websocket, {
                 "type": "tool_execution_start",
                 "tool_name": tool_name,
                 "execution_id": exec_id,
@@ -401,6 +402,8 @@ async def run_tool_loop(
         # Release the SQLite write lock held by pending flush()es so that
         # plugin tools can write to the DB on their own connections.
         await session.commit()
+        if ctx.conversation_file_manager and sync_fn:
+            await sync_fn(session, conv_id, ctx.conversation_file_manager)
 
         # 3. Execute all tools in parallel (with timeout).
         coros = [
@@ -598,7 +601,12 @@ async def run_tool_loop(
             if artifact_id:
                 ws_payload["artifact_id"] = artifact_id
 
-            await websocket.send_json(ws_payload)
+            try:
+                await _send_json(websocket, ws_payload)
+            except WebSocketDisconnect:
+                if ctx.conversation_file_manager and sync_fn:
+                    await sync_fn(session, conv_id, ctx.conversation_file_manager)
+                raise
 
         await session.commit()
 
@@ -927,6 +935,18 @@ async def run_tool_loop(
 # ---------------------------------------------------------------------------
 
 
+async def _send_json(websocket: WebSocket, payload: dict[str, Any]) -> None:
+    """Send a JSON frame, normalising Starlette closed-socket races."""
+    try:
+        await websocket.send_json(payload)
+    except WebSocketDisconnect:
+        raise
+    except RuntimeError as exc:
+        if is_websocket_closed_runtime_error(exc):
+            raise WebSocketDisconnect(code=1006) from exc
+        raise
+
+
 async def _exec_one(
     ctx: AppContext,
     tc_id: str,
@@ -1098,6 +1118,18 @@ async def _request_confirmation(
             tool_name, execution_id,
         )
         return False
+    except RuntimeError as exc:
+        if is_websocket_closed_runtime_error(exc):
+            logger.warning(
+                "WebSocket disconnected during confirmation for tool '{}' (exec_id={})",
+                tool_name, execution_id,
+            )
+            return False
+        logger.warning(
+            "Error receiving confirmation for tool '{}' (exec_id={})",
+            tool_name, execution_id,
+        )
+        return False
     except Exception:
         logger.warning(
             "Error receiving confirmation for tool '{}' (exec_id={})",
@@ -1130,5 +1162,9 @@ async def _ws_cancel_reader(
                 return
     except (WebSocketDisconnect, asyncio.CancelledError):
         return
+    except RuntimeError as exc:
+        if is_websocket_closed_runtime_error(exc):
+            return
+        logger.debug("WS cancel reader stopped unexpectedly")
     except Exception:
         logger.debug("WS cancel reader stopped unexpectedly")

@@ -24,6 +24,7 @@ from backend.core.managed_services import (
     TTSManagedService,
     TrellisManagedService,
     VRAMManagedService,
+    resolve_trellis_launcher,
 )
 from backend.db.database import create_engine_and_session, init_db
 from backend.services.conversation_file_manager import ConversationFileManager
@@ -373,48 +374,32 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("Orchestrator: failed to attach VRAM monitor: {}", exc)
 
     # -- TRELLIS external process (health-only, user-managed) --------------
-    # Resolve the launcher script path from the install layout so the user
-    # can press "Start" in the UI without opening a terminal.  Both
-    # ``scripts/start-trellis.ps1`` and ``scripts/start-trellis2.ps1`` are
-    # shipped in the installer's ``resources/scripts/`` folder.
-    def _resolve_trellis_launcher(name: str) -> tuple[Path | None, Path | None]:
-        script_name = (
-            "start-trellis.ps1" if name == "trellis" else "start-trellis2.ps1"
-        )
-        # In a frozen build the launchers are bundled next to ``backend.exe``
-        # under ``scripts/`` (see ``build-installer.ps1``); in dev they live at
-        # the repo root.
-        if getattr(sys, "frozen", False):
-            base = Path(sys.executable).resolve().parent
-        else:
-            base = PROJECT_ROOT
-        candidate = base / "scripts" / script_name
-        if candidate.exists():
-            return candidate, base
-        return None, None
-
     if getattr(config, "trellis", None) and config.trellis.enabled:
         try:
-            launcher, cwd = _resolve_trellis_launcher("trellis")
+            launcher, cwd = resolve_trellis_launcher("trellis")
             await orchestrator.attach_started(
                 TrellisManagedService(
                     name="trellis",
                     service_url=config.trellis.service_url,
                     launcher=launcher,
                     cwd=cwd,
+                    model=config.trellis.trellis_model,
+                    trellis_dir=config.trellis.trellis_dir,
                 ),
             )
         except Exception as exc:
             logger.warning("Orchestrator: failed to attach TRELLIS: {}", exc)
     if getattr(config, "trellis2", None) and config.trellis2.enabled:
         try:
-            launcher, cwd = _resolve_trellis_launcher("trellis2")
+            launcher, cwd = resolve_trellis_launcher("trellis2")
             await orchestrator.attach_started(
                 TrellisManagedService(
                     name="trellis2",
                     service_url=config.trellis2.service_url,
                     launcher=launcher,
                     cwd=cwd,
+                    model=config.trellis2.trellis2_model,
+                    trellis_dir=config.trellis2.trellis2_dir,
                 ),
             )
         except Exception as exc:

@@ -314,10 +314,38 @@ class ServiceOrchestrator:
                 "Orchestrator: restart for '{}' already in progress", name,
             )
             return
+        if entry.started and entry.last_health.status == "starting":
+            logger.info(
+                "Orchestrator: '{}' restart ignored because it is already starting",
+                name,
+            )
+            return
         entry.restart_task = asyncio.create_task(
             self._restart_with_backoff(name),
             name=f"orch-restart-{name}",
         )
+
+    async def stop(self, name: str) -> None:
+        """Stop the named service immediately.
+
+        Args:
+            name: Registered service name.
+
+        Raises:
+            KeyError: If *name* is not registered.
+        """
+        if name not in self._entries:
+            raise KeyError(name)
+        entry = self._entries[name]
+        if entry.restart_task is not None and not entry.restart_task.done():
+            entry.restart_task.cancel()
+            try:
+                await entry.restart_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            entry.restart_task = None
+        entry.backoff_attempts = 0
+        await self._stop_one(name)
 
     # ------------------------------------------------------------------
     # Health & status

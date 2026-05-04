@@ -18,7 +18,10 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from backend.services.turn.direct_executor import DirectTurnExecutor
-from backend.services.turn.sink import RecordingEventSink
+from backend.services.turn.sink import (
+    RecordingEventSink,
+    is_websocket_closed_runtime_error,
+)
 
 from ._turn_helpers import StreamingMockLLM, make_ctx, make_turn
 
@@ -48,6 +51,47 @@ async def test_disconnect_during_stream_returns_disconnected() -> None:
     # caller's responsibility (handled in ws_chat).
     assert result.content == ""
     assert result.had_tool_calls is False
+
+
+def test_closed_websocket_runtime_error_is_detected() -> None:
+    """Starlette close-state RuntimeErrors are treated as disconnects."""
+    exc = RuntimeError(
+        'WebSocket is not connected. Need to call "accept" first.',
+    )
+
+    assert is_websocket_closed_runtime_error(exc) is True
+    assert is_websocket_closed_runtime_error(RuntimeError("boom")) is False
+
+
+@pytest.mark.asyncio
+async def test_sink_disconnect_mid_stream_returns_disconnected() -> None:
+    """A closed outbound sink stops streaming without an error result."""
+
+    class _ClosingSink(RecordingEventSink):
+        async def send(self, event):
+            await super().send(event)
+            self.is_connected = False
+
+    llm = StreamingMockLLM(
+        events=[
+            {"type": "token", "content": "partial"},
+            {"type": "token", "content": " ignored"},
+            {"type": "done"},
+        ],
+    )
+    sink = _ClosingSink()
+    executor = DirectTurnExecutor(make_ctx(), llm)
+
+    result = await executor.execute(
+        turn=make_turn(),
+        sink=sink,
+        cancel_event=asyncio.Event(),
+        session=None,
+    )
+
+    assert result.finish_reason == "disconnected"
+    assert result.content == "partial"
+    assert sink.events == [{"type": "token", "content": "partial"}]
 
 
 @pytest.mark.asyncio

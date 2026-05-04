@@ -1,11 +1,59 @@
-﻿import { app, shell, BrowserWindow, ipcMain, Menu, MenuItem, dialog } from 'electron'
-import { spawn, ChildProcess } from 'child_process'
-import { existsSync } from 'fs'
+﻿import { app, shell, BrowserWindow, ipcMain, Menu, MenuItem, dialog, session, type WebContents } from 'electron'
+import { spawn, spawnSync, ChildProcess } from 'child_process'
+import { existsSync, mkdirSync, appendFileSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 let mainWindow: BrowserWindow | null = null
+
+// Keep Electron runtime paths aligned with electron-builder's productName.
+// Without this, app.getPath('userData') follows package.json's technical
+// name (alice-frontend), which hides production logs in an unexpected folder.
+app.setName('Alice')
+
+// ─── Diagnostic logging ────────────────────────────────────────────────
+// When Alice.exe is launched from Explorer it has no console attached, so
+// any crash in the main process or any renderer/GPU subprocess vanishes
+// silently — making "the app closed itself" reports impossible to debug.
+// We mirror everything to a rolling log under userData so post-mortem
+// inspection is always possible without re-launching from a terminal.
+const LOG_DIR = join(app.getPath('userData'), 'logs')
+const LOG_FILE = join(LOG_DIR, 'main.log')
+try {
+  mkdirSync(LOG_DIR, { recursive: true })
+} catch {
+  // best-effort: logging must never crash the app
+}
+
+function logToFile(level: string, args: unknown[]): void {
+  try {
+    const line = `${new Date().toISOString()} [${level}] ${args
+      .map((a) => (a instanceof Error ? `${a.message}\n${a.stack ?? ''}` : typeof a === 'string' ? a : JSON.stringify(a)))
+      .join(' ')}\n`
+    appendFileSync(LOG_FILE, line)
+  } catch {
+    // swallow — never let logging cause a crash
+  }
+}
+
+// Tee console.* through the file logger so messages survive even when no
+// console is attached (typical for double-click launches from Explorer).
+const _origLog = console.log.bind(console)
+const _origWarn = console.warn.bind(console)
+const _origError = console.error.bind(console)
+console.log = (...args: unknown[]) => { logToFile('log', args); try { _origLog(...args) } catch { /* no console */ } }
+console.warn = (...args: unknown[]) => { logToFile('warn', args); try { _origWarn(...args) } catch { /* no console */ } }
+console.error = (...args: unknown[]) => { logToFile('error', args); try { _origError(...args) } catch { /* no console */ } }
+
+// Catch-all: surface uncaught failures in the main process so the user
+// can attach the log file to a bug report instead of seeing a silent exit.
+process.on('uncaughtException', (err) => {
+  console.error('[main] uncaughtException:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] unhandledRejection:', reason)
+})
 
 // ─── Packaged backend lifecycle ────────────────────────────────────────
 // In dev mode the backend is started by scripts/start-dev.ps1.  When the
@@ -17,7 +65,47 @@ let backendShuttingDown = false
 const BACKEND_PORT = Number(process.env.BACKEND_PORT) || 8000
 const BACKEND_HOST = '127.0.0.1'
 const BACKEND_HEALTH_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`
-const BACKEND_STARTUP_TIMEOUT_MS = 30_000
+const BACKEND_STARTUP_TIMEOUT_MS = 120_000
+const EXISTING_BACKEND_STARTUP_TIMEOUT_MS = 90_000
+
+function isTrustedRendererOrigin(origin: string): boolean {
+  if (origin === 'file://') return true
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    try {
+      return origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
+function isMainWindowContents(contents: WebContents): boolean {
+  return mainWindow !== null && contents.id === mainWindow.webContents.id
+}
+
+/**
+ * Allow microphone capture only for Alice's own renderer.
+ *
+ * Electron's default media permission prompt is fragile in packaged Windows
+ * builds launched from file://. Handling it explicitly keeps voice startup
+ * deterministic and avoids native permission callbacks being invoked outside
+ * our control.
+ */
+function configureMediaPermissions(): void {
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    if (permission !== 'media') {
+      callback(false)
+      return
+    }
+    callback(isMainWindowContents(contents) && isTrustedRendererOrigin(details.requestingUrl))
+  })
+
+  session.defaultSession.setPermissionCheckHandler((contents, permission, requestingOrigin) => {
+    if (permission !== 'media') return false
+    return contents !== null && isMainWindowContents(contents) && isTrustedRendererOrigin(requestingOrigin)
+  })
+}
 
 /**
  * Resolve the absolute path to the bundled backend executable.
@@ -28,6 +116,65 @@ function resolveBackendExe(): string | null {
   if (!app.isPackaged) return null
   const exe = join(process.resourcesPath, 'backend', 'backend.exe')
   return existsSync(exe) ? exe : null
+}
+
+/**
+ * Probe ``/api/health`` once with a short timeout.  Used to detect whether
+ * an instance of the backend is already serving on ``BACKEND_PORT`` so we
+ * can either reuse it (avoids the "address already in use" crash that
+ * happens when a previous run leaked a backend.exe) or fail fast with a
+ * clear message.
+ */
+async function probeBackendHealth(timeoutMs = 1500): Promise<boolean> {
+  try {
+    const res = await fetch(BACKEND_HEALTH_URL, { signal: AbortSignal.timeout(timeoutMs) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Return the PID that owns ``BACKEND_PORT`` on loopback, if any.
+ */
+function getBackendPortOwnerPid(): number | null {
+  if (process.platform !== 'win32') return null
+  // ``netstat -ano -p tcp`` is available on every supported Windows SKU
+  // and does not require admin.  Parsing its output is more reliable than
+  // attempting to bind a probe socket from Node, which would race with
+  // the actual spawn.
+  const r = spawnSync('netstat', ['-ano', '-p', 'tcp'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  if (r.status !== 0 || !r.stdout) return null
+  const needle = `:${BACKEND_PORT}`
+  for (const line of r.stdout.split(/\r?\n/)) {
+    if (!line.includes('LISTENING') || !line.includes(needle)) continue
+    const parts = line.trim().split(/\s+/)
+    const localAddress = parts[1] ?? ''
+    const pid = Number(parts[4])
+    if (localAddress.endsWith(needle) && Number.isInteger(pid) && pid > 0) {
+      return pid
+    }
+  }
+  return null
+}
+
+/**
+ * Best-effort termination of a stale process tree that owns BACKEND_PORT.
+ */
+function killProcessTree(pid: number): void {
+  if (process.platform !== 'win32') return
+  spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true })
+}
+
+function logBackendChunk(stream: 'stdout' | 'stderr', chunk: Buffer): void {
+  const text = chunk.toString('utf8').replace(/\r?\n$/, '')
+  if (!text) return
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim()) console.log(`[backend:${stream}] ${line}`)
+  }
 }
 
 /**
@@ -59,21 +206,45 @@ async function waitForBackendHealth(timeoutMs = BACKEND_STARTUP_TIMEOUT_MS): Pro
 async function startPackagedBackend(): Promise<void> {
   const exe = resolveBackendExe()
   if (!exe) return  // dev mode or missing binary — nothing to spawn
+
+  // Pre-flight: if a previous run left a healthy backend on the port we
+  // simply reuse it instead of spawning a duplicate that would crash on
+  // bind() with WinError 10048 and take the whole app down with it.
+  if (await probeBackendHealth()) {
+    console.log(`[backend] reusing existing instance on ${BACKEND_HOST}:${BACKEND_PORT}`)
+    return
+  }
+  // Port bound but not healthy often means the user started backend.exe a
+  // few seconds before Alice.  The packaged backend can take ~20-60s to
+  // initialise STT/TTS/plugins, so wait before treating the owner as stale.
+  const portOwnerPid = getBackendPortOwnerPid()
+  if (portOwnerPid !== null) {
+    console.warn(
+      `[backend] port ${BACKEND_PORT} owned by pid ${portOwnerPid}; waiting for health`,
+    )
+    if (await waitForBackendHealth(EXISTING_BACKEND_STARTUP_TIMEOUT_MS)) {
+      console.log(`[backend] reusing existing instance on ${BACKEND_HOST}:${BACKEND_PORT}`)
+      return
+    }
+    console.warn(`[backend] killing stale backend port owner pid=${portOwnerPid}`)
+    killProcessTree(portOwnerPid)
+    await new Promise((r) => setTimeout(r, 750))
+  }
+
   console.log('[backend] spawning', exe, 'on', BACKEND_HOST + ':' + BACKEND_PORT)
+  backendShuttingDown = false
   backendProcess = spawn(exe, ['--host', BACKEND_HOST, '--port', String(BACKEND_PORT)], {
     cwd: join(process.resourcesPath, 'backend'),
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   })
-  backendProcess.stdout?.on('data', (chunk) => process.stdout.write(`[backend] ${chunk}`))
-  backendProcess.stderr?.on('data', (chunk) => process.stderr.write(`[backend] ${chunk}`))
+  backendProcess.stdout?.on('data', (chunk: Buffer) => logBackendChunk('stdout', chunk))
+  backendProcess.stderr?.on('data', (chunk: Buffer) => logBackendChunk('stderr', chunk))
   backendProcess.on('exit', (code, signal) => {
     console.log(`[backend] exited code=${code} signal=${signal}`)
     backendProcess = null
     if (!backendShuttingDown) {
-      // Backend died unexpectedly — tear the UI down so the user sees the
-      // problem instead of a silently-broken window.
-      app.quit()
+      mainWindow?.webContents.send('backend-process-exited', { code, signal })
     }
   })
   const healthy = await waitForBackendHealth()
@@ -87,8 +258,13 @@ async function startPackagedBackend(): Promise<void> {
 function stopPackagedBackend(): void {
   if (!backendProcess) return
   backendShuttingDown = true
+  const pid = backendProcess.pid
   try {
-    backendProcess.kill()
+    if (process.platform === 'win32' && pid !== undefined) {
+      killProcessTree(pid)
+    } else {
+      backendProcess.kill()
+    }
   } catch (err) {
     console.warn('[backend] kill() failed', err)
   }
@@ -166,6 +342,19 @@ function createWindow(): void {
     mainWindow = null
   })
 
+  // Capture renderer / helper-process crashes that would otherwise close the
+  // window without any visible error.  These are the usual suspects behind
+  // "the app silently disappeared after a few seconds" reports.
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[renderer] render-process-gone', details)
+  })
+  mainWindow.webContents.on('unresponsive', () => {
+    console.error('[renderer] unresponsive')
+  })
+  mainWindow.webContents.on('responsive', () => {
+    console.warn('[renderer] responsive again')
+  })
+
   // Forward maximize/unmaximize state to renderer for accurate title bar UI.
   mainWindow.on('maximize', () => {
     mainWindow?.webContents.send('window-maximized-change', true)
@@ -226,6 +415,17 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.alice.app')
+
+  // App-level crash hooks for GPU / utility / pepper-plugin sub-processes.
+  // Without these, a GPU process death is invisible and the user just sees
+  // the window vanish.
+  app.on('child-process-gone', (_e, details) => {
+    console.error('[app] child-process-gone', details)
+  })
+  app.on('render-process-gone', (_e, _wc, details) => {
+    console.error('[app] render-process-gone', details)
+  })
+  configureMediaPermissions()
 
   // Packaged builds: start the bundled backend before creating any window
   // so the renderer never races the API.  In dev mode this is a no-op and

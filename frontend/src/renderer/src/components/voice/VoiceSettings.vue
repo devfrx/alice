@@ -306,7 +306,7 @@ async function save(): Promise<void> {
             <label v-if="ttsEngine !== 'kokoro'" class="settings-field">
               <span class="settings-field__label">Voce</span>
               <input v-model="ttsVoice" type="text" class="settings-field__input"
-                placeholder="models/tts/it_IT-paola-medium" aria-label="Percorso voce TTS" @change="save" />
+                placeholder="models/tts/piper/it_IT-paola-medium" aria-label="Percorso voce TTS" @change="save" />
             </label>
             <template v-if="ttsEngine === 'kokoro'">
               <label class="settings-field">

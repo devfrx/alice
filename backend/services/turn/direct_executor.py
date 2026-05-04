@@ -34,7 +34,10 @@ from loguru import logger
 from backend.core.context import AppContext
 from backend.services.llm_service import LLMService
 from backend.services.turn.models import TurnInput, TurnResult
-from backend.services.turn.sink import WSEventSink
+from backend.services.turn.sink import (
+    WSEventSink,
+    is_websocket_closed_runtime_error,
+)
 
 # Type alias for the "sync conversation to file" callback used by
 # run_tool_loop.  Provided by the caller to avoid a circular import
@@ -115,6 +118,17 @@ class DirectTurnExecutor:
 
         # v3-2 (also valid post-stream): cancel takes precedence over
         # any other finish reason emitted by the LLM.
+        if finish_reason == "disconnected":
+            return TurnResult(
+                content=full_content,
+                thinking=thinking,
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                finish_reason="disconnected",
+                final_assistant_message_id=None,
+                had_tool_calls=False,
+            )
+
         if cancel_event.is_set():
             return TurnResult(
                 content=full_content,
@@ -307,6 +321,10 @@ class DirectTurnExecutor:
         # v3-1: cancel reader scoped to the streaming phase only.
         reader_task = self._spawn_cancel_reader(sink, cancel_event)
 
+        async def _send(event: dict[str, Any]) -> bool:
+            await sink.send(event)
+            return sink.is_connected
+
         try:
             async for event in self.llm.chat(
                 turn.messages,
@@ -321,13 +339,19 @@ class DirectTurnExecutor:
                 etype = event.get("type")
                 if etype == "token":
                     full_content += event.get("content", "")
-                    await sink.send(event)
+                    if not await _send(event):
+                        finish_reason = "disconnected"
+                        break
                 elif etype == "thinking":
                     thinking += event.get("content", "")
-                    await sink.send(event)
+                    if not await _send(event):
+                        finish_reason = "disconnected"
+                        break
                 elif etype == "tool_call":
                     tool_calls_collected.append(event)
-                    await sink.send(event)
+                    if not await _send(event):
+                        finish_reason = "disconnected"
+                        break
                 elif etype == "usage":
                     in_tok = int(event.get("input_tokens", 0) or 0)
                     out_tok = int(event.get("output_tokens", 0) or 0)
@@ -338,7 +362,9 @@ class DirectTurnExecutor:
                         "LLM error during initial stream: {}",
                         event.get("content", "unknown"),
                     )
-                    await sink.send(event)
+                    if not await _send(event):
+                        finish_reason = "disconnected"
+                        break
                     finish_reason = "error"
                 elif etype == "done":
                     finish_reason = event.get("finish_reason", "stop")
@@ -350,6 +376,19 @@ class DirectTurnExecutor:
             cancel_event.set()
             raise
         except Exception as exc:
+            if (
+                isinstance(exc, RuntimeError)
+                and is_websocket_closed_runtime_error(exc)
+            ):
+                finish_reason = "disconnected"
+                return (
+                    full_content,
+                    thinking,
+                    tool_calls_collected,
+                    finish_reason,
+                    in_tok,
+                    out_tok,
+                )
             # v3-5: any LLM streaming error becomes a graceful "error"
             # finish, with detail forwarded through the sink.  The
             # caller persists nothing and emits the WS done(error)
@@ -410,6 +449,14 @@ class DirectTurnExecutor:
                     return
                 except asyncio.CancelledError:
                     raise
+                except RuntimeError as exc:
+                    if is_websocket_closed_runtime_error(exc):
+                        cancel_event.set()
+                        return
+                    logger.warning(
+                        "Non-fatal error in cancel reader, ignoring",
+                    )
+                    continue
                 except Exception:
                     logger.warning(
                         "Non-fatal error in cancel reader, ignoring",

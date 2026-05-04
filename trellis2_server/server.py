@@ -38,6 +38,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import gc
 import io
 import logging
@@ -45,6 +46,7 @@ import os
 import re
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -82,6 +84,12 @@ logger = logging.getLogger("trellis2")
 _pipeline = None
 _model_name: str = "microsoft/TRELLIS.2-4B"
 _output_dir: Path = Path(tempfile.gettempdir()) / "trellis2_output"
+_generation_lock = asyncio.Lock()
+_state_lock = threading.Lock()
+_generation_busy = False
+_generation_started_at: float | None = None
+_generation_name: str | None = None
+_generation_pipeline_type: str | None = None
 
 # Short-name → full HuggingFace repo ID mapping.
 _MODEL_ALIASES: dict[str, str] = {
@@ -131,6 +139,109 @@ def _unload_pipeline():
         torch.cuda.empty_cache()
 
 
+def _set_generation_state(
+    *,
+    busy: bool,
+    name: str | None = None,
+    pipeline_type: str | None = None,
+) -> None:
+    """Update the generation state exposed by ``/health``."""
+    global _generation_busy, _generation_started_at
+    global _generation_name, _generation_pipeline_type
+    with _state_lock:
+        _generation_busy = busy
+        _generation_started_at = time.monotonic() if busy else None
+        _generation_name = name if busy else None
+        _generation_pipeline_type = pipeline_type if busy else None
+
+
+def _generation_state() -> dict[str, object]:
+    """Return a thread-safe snapshot of the current generation state."""
+    with _state_lock:
+        started = _generation_started_at
+        return {
+            "busy": _generation_busy,
+            "current_job_name": _generation_name,
+            "current_pipeline_type": _generation_pipeline_type,
+            "current_job_elapsed_s": (
+                round(time.monotonic() - started, 3)
+                if started is not None else 0
+            ),
+        }
+
+
+def _generate_glb_sync(
+    *,
+    image_bytes: bytes,
+    seed: int,
+    output_name: str,
+    pipeline_type: str,
+    decimation_target: int,
+    texture_size: int,
+) -> dict[str, object]:
+    """Run the blocking TRELLIS.2 pipeline in a worker thread."""
+    import o_voxel  # local import — pulls torch + CUDA
+
+    pipeline = _load_pipeline()
+    actual_seed = seed if seed >= 0 else int(time.time()) % (2**32)
+    name = output_name or f"model_{uuid.uuid4().hex[:8]}"
+    _output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = _output_dir / f"{name}.glb"
+
+    pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+
+    meshes = pipeline.run(
+        pil_image,
+        seed=actual_seed,
+        pipeline_type=pipeline_type,
+    )
+    mesh = meshes[0]
+
+    # CuMesh post-processing (simplify + UV unwrap + texture bake)
+    # allocates several GB of CUDA scratch buffers.  On consumer GPUs
+    # (16 GB) the only way to make it fit is to evict the diffusion
+    # weights from VRAM first.  In ``low_vram`` mode the per-step
+    # modules are already swapped back to CPU at the end of
+    # ``pipeline.run()``, but the allocator keeps fragmented blocks
+    # around that CuMesh's raw cudaMalloc cannot reuse.
+    # IMPORTANT: do not call ``pipeline.to('cpu')`` here — in low-VRAM
+    # mode that rewrites ``self._device`` and breaks the next call by
+    # sending per-step submodules to CPU.
+    import torch  # local — already imported by pipeline.run
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+
+    # nvdiffrast hard limit on total vertex count.
+    mesh.simplify(16_777_216)
+
+    glb = o_voxel.postprocess.to_glb(
+        vertices=mesh.vertices,
+        faces=mesh.faces,
+        attr_volume=mesh.attrs,
+        coords=mesh.coords,
+        attr_layout=mesh.layout,
+        voxel_size=mesh.voxel_size,
+        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+        decimation_target=decimation_target,
+        texture_size=texture_size,
+        remesh=True,
+        remesh_band=1,
+        remesh_project=0,
+        verbose=False,
+    )
+    glb.export(str(out_path), extension_webp=True)
+
+    return {
+        "model_name": name,
+        "file_path": str(out_path),
+        "format": "glb",
+        "size_bytes": out_path.stat().st_size,
+        "pipeline_type": pipeline_type,
+        "seed": actual_seed,
+    }
+
+
 # ── Endpoints ─────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -143,8 +254,9 @@ async def health():
     """
     vram_free_mb = 0
     gpu_available = False
+    state = _generation_state()
 
-    if _pipeline is not None:
+    if _pipeline is not None and not state["busy"]:
         import torch
         gpu_available = torch.cuda.is_available()
         if gpu_available:
@@ -157,6 +269,7 @@ async def health():
         "vram_free_mb": vram_free_mb,
         "model_loaded": _pipeline is not None,
         "model_name": _model_name,
+        **state,
     }
 
 
@@ -180,8 +293,6 @@ async def generate(
         decimation_target: Target triangle count for the exported GLB.
         texture_size: Square PBR texture resolution.
     """
-    import o_voxel  # local import — pulls torch + CUDA
-
     if pipeline_type not in _ALLOWED_PIPELINE_TYPES:
         raise HTTPException(
             400,
@@ -189,83 +300,52 @@ async def generate(
             f"Allowed: {', '.join(sorted(_ALLOWED_PIPELINE_TYPES))}",
         )
 
-    pipeline = _load_pipeline()
-    actual_seed = seed if seed >= 0 else int(time.time()) % (2**32)
     name = output_name or f"model_{uuid.uuid4().hex[:8]}"
     if not re.fullmatch(r"[a-zA-Z0-9_]{1,64}", name):
         raise HTTPException(
             400, "output_name must be alphanumeric/underscore, max 64 chars.",
         )
-    _output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = _output_dir / f"{name}.glb"
+
+    if _generation_lock.locked():
+        raise HTTPException(
+            409,
+            "TRELLIS.2 generation already in progress. Wait for it to finish.",
+        )
 
     try:
-        img_bytes = await image.read()
-        pil_image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-
-        meshes = pipeline.run(
-            pil_image,
-            seed=actual_seed,
-            pipeline_type=pipeline_type,
-        )
-        mesh = meshes[0]
-
-        # CuMesh post-processing (simplify + UV unwrap + texture bake)
-        # allocates several GB of CUDA scratch buffers.  On consumer
-        # GPUs (16 GB) the only way to make it fit is to evict the
-        # diffusion weights from VRAM first.  In ``low_vram`` mode the
-        # per-step modules are already swapped back to CPU at the end
-        # of ``pipeline.run()``, but the allocator keeps fragmented
-        # blocks around that CuMesh's raw cudaMalloc cannot reuse.
-        # An aggressive cache flush + IPC collect releases them.
-        # IMPORTANT: do **not** call ``pipeline.to('cpu')`` here — in
-        # low-VRAM mode that just rewrites ``self._device`` and would
-        # break the next call by sending per-step submodules to CPU.
-        import torch  # local — already imported by pipeline.run
-        gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-
-        # nvdiffrast hard limit on total vertex count.
-        mesh.simplify(16_777_216)
-
-        glb = o_voxel.postprocess.to_glb(
-            vertices=mesh.vertices,
-            faces=mesh.faces,
-            attr_volume=mesh.attrs,
-            coords=mesh.coords,
-            attr_layout=mesh.layout,
-            voxel_size=mesh.voxel_size,
-            aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-            decimation_target=decimation_target,
-            texture_size=texture_size,
-            remesh=True,
-            remesh_band=1,
-            remesh_project=0,
-            verbose=False,
-        )
-        glb.export(str(out_path), extension_webp=True)
+        async with _generation_lock:
+            img_bytes = await image.read()
+            _set_generation_state(
+                busy=True,
+                name=name,
+                pipeline_type=pipeline_type,
+            )
+            try:
+                payload = await asyncio.to_thread(
+                    _generate_glb_sync,
+                    image_bytes=img_bytes,
+                    seed=seed,
+                    output_name=name,
+                    pipeline_type=pipeline_type,
+                    decimation_target=decimation_target,
+                    texture_size=texture_size,
+                )
+            finally:
+                _set_generation_state(busy=False)
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("TRELLIS.2 generation failed")
         raise HTTPException(500, f"Generation failed: {exc}")
 
-    return JSONResponse(
-        {
-            "model_name": name,
-            "file_path": str(out_path),
-            "format": "glb",
-            "size_bytes": out_path.stat().st_size,
-            "pipeline_type": pipeline_type,
-            "seed": actual_seed,
-        }
-    )
+    return JSONResponse(payload)
 
 
 @app.post("/unload")
 async def unload():
     """Unload the TRELLIS.2 model from VRAM to free memory for the LLM."""
+    if _generation_lock.locked():
+        raise HTTPException(409, "Cannot unload while generation is running.")
     _unload_pipeline()
     return {"status": "unloaded"}
 
@@ -274,6 +354,8 @@ async def unload():
 async def load_model(model: str = Form(...)):
     """Switch to a different TRELLIS.2 model at runtime."""
     global _model_name
+    if _generation_lock.locked():
+        raise HTTPException(409, "Cannot switch models while generation is running.")
     allowed = set(_MODEL_ALIASES.keys()) | set(_MODEL_ALIASES.values())
     if model not in allowed:
         raise HTTPException(

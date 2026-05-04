@@ -12,7 +12,18 @@ import { computed, type ComputedRef } from 'vue'
 import { useChatStore } from '../stores/chat'
 
 /** Tool names that produce 3D models and benefit from a generation overlay. */
-const CAD_TOOL_NAMES = new Set(['cad_generate', 'cad_generate_from_image'])
+const CAD_TOOL_NAMES = new Set([
+  'cad_generate',
+  'cad_generate_from_image',
+  'cad_generator_cad_generate',
+  'cad_generator_cad_generate_from_image',
+])
+
+function normalizeCadToolName(toolName: string): CadGenerationInfo['toolName'] | null {
+  if (toolName.endsWith('cad_generate_from_image')) return 'cad_generate_from_image'
+  if (toolName.endsWith('cad_generate')) return 'cad_generate'
+  return null
+}
 
 export interface CadGenerationInfo {
   toolName: 'cad_generate' | 'cad_generate_from_image'
@@ -37,8 +48,10 @@ export function useGenerationState(): UseGenerationState {
       (e) => CAD_TOOL_NAMES.has(e.toolName) && e.status === 'running',
     )
     if (!exec) return null
+    const toolName = normalizeCadToolName(exec.toolName)
+    if (!toolName) return null
     return {
-      toolName: exec.toolName as CadGenerationInfo['toolName'],
+      toolName,
       executionId: exec.executionId,
     }
   })

@@ -241,7 +241,7 @@ class TTSConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_TTS__")
 
     engine: Literal["piper", "xtts", "kokoro"] = "piper"
-    voice: str = "models/tts/it_IT-paola-medium"
+    voice: str = "models/tts/piper/it_IT-paola-medium"
     sample_rate: int = 22050
     enabled: bool = False
     """Whether TTS is enabled."""

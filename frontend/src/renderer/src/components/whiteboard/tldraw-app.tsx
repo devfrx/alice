@@ -16,6 +16,14 @@ export interface TldrawAppProps {
   onDocumentChange?: (snapshot: TLStoreSnapshot) => void
 }
 
+type LegacyShapeProps = Record<string, unknown> & {
+  align?: string
+  fontSizeAdjustment?: number
+  labelColor?: string
+  scale?: number
+  textAlign?: string
+}
+
 /**
  * Debounce helper — fires callback after `delay` ms of inactivity.
  */
@@ -83,15 +91,16 @@ export default function TldrawApp({
     if (store) {
       for (const record of Object.values(store)) {
         if (record.typeName === 'shape' && record.props) {
-          if (record.props.scale == null) record.props.scale = 1
+          const props = record.props as LegacyShapeProps
+          if (props.scale == null) props.scale = 1
           // text shapes: 'align' was renamed to 'textAlign'
-          if (record.type === 'text' && record.props.textAlign == null) {
-            record.props.textAlign = record.props.align ?? 'start'
+          if (record.type === 'text' && props.textAlign == null) {
+            props.textAlign = props.align ?? 'start'
           }
           // note shapes: fontSizeAdjustment + labelColor required since tldraw v3.9
           if (record.type === 'note') {
-            if (record.props.fontSizeAdjustment == null) record.props.fontSizeAdjustment = 0
-            if (record.props.labelColor == null) record.props.labelColor = 'black'
+            if (props.fontSizeAdjustment == null) props.fontSizeAdjustment = 0
+            if (props.labelColor == null) props.labelColor = 'black'
           }
         }
       }

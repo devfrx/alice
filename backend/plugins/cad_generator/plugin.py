@@ -585,16 +585,16 @@ class CadGeneratorPlugin(BasePlugin):
         except Exception as exc:
             gen_error = f"TRELLIS generation failed: {exc}"
             logger.error(gen_error)
+        finally:
+            # Step 3: unload TRELLIS model (best-effort)
+            try:
+                await self._client.unload_model()
+            except Exception:
+                pass
 
-        # Step 3: unload TRELLIS model (best-effort)
-        try:
-            await self._client.unload_model()
-        except Exception:
-            pass
-
-        # Step 4: reload everything we unloaded
-        if cfg.auto_vram_swap and unloaded_models:
-            await self._reload_llm_after_swap(unloaded_models)
+            # Step 4: reload everything we unloaded, including cancellation paths
+            if cfg.auto_vram_swap and unloaded_models:
+                await self._reload_llm_after_swap(unloaded_models)
 
         return gen_result, gen_error
 
@@ -723,50 +723,75 @@ class CadGeneratorPlugin(BasePlugin):
         except Exception as exc:
             gen_error = f"TRELLIS.2 generation failed: {exc}"
             logger.error(gen_error)
+        finally:
+            # Best-effort unload of the TRELLIS.2 weights so the LLM can
+            # reclaim VRAM cleanly even on failure or cancellation.
+            try:
+                await self._client_v2.unload_model()
+            except Exception:
+                pass
 
-        # Best-effort unload of the TRELLIS.2 weights so the LLM can
-        # reclaim VRAM cleanly even on failure.
-        try:
-            await self._client_v2.unload_model()
-        except Exception:
-            pass
+            if cfg2.auto_vram_swap and unloaded_models:
+                await self._reload_llm_after_swap(unloaded_models)
 
-        if cfg2.auto_vram_swap and unloaded_models:
-            await self._reload_llm_after_swap(unloaded_models)
-
-        if gen_error:
-            return ToolResult.error(gen_error)
         if gen_result is None:
-            return ToolResult.error("TRELLIS.2 generation returned no result")
-
-        # --- download generated GLB ------------------------------------
-        try:
-            glb_bytes = await self._client_v2.download_model(
-                gen_result.base.model_name
-            )
-        except Exception as exc:
-            return ToolResult.error(f"Failed to download model: {exc}")
+            result_model_name = model_name
+            result_format = "glb"
+            result_pipeline_type = pipeline_type
+            result_seed = cfg2.seed
+        else:
+            result_model_name = gen_result.base.model_name
+            result_format = gen_result.base.format
+            result_pipeline_type = gen_result.pipeline_type
+            result_seed = gen_result.seed
 
         output_dir = PROJECT_ROOT / cfg2.model_output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{gen_result.base.model_name}.glb"
-        await asyncio.to_thread(output_path.write_bytes, glb_bytes)
+        output_path = output_dir / f"{result_model_name}.glb"
+
+        if gen_error and not output_path.is_file():
+            return ToolResult.error(gen_error)
+        if gen_result is None and not output_path.is_file():
+            return ToolResult.error("TRELLIS.2 generation returned no result")
+
+        # --- download generated GLB ------------------------------------
+        glb_bytes: bytes | None = None
+        try:
+            glb_bytes = await self._client_v2.download_model(result_model_name)
+        except Exception as exc:
+            if not output_path.is_file():
+                return ToolResult.error(f"Failed to download model: {exc}")
+            glb_bytes = await asyncio.to_thread(output_path.read_bytes)
+            logger.warning(
+                "Recovered TRELLIS.2 model '{}' from local output after download error: {}",
+                result_model_name, exc,
+            )
+        else:
+            await asyncio.to_thread(output_path.write_bytes, glb_bytes)
+
+        if gen_error:
+            logger.warning(
+                "Recovered TRELLIS.2 model '{}' from local output after generation error: {}",
+                result_model_name, gen_error,
+            )
+        if glb_bytes is None:
+            return ToolResult.error("TRELLIS.2 generation produced no model bytes")
 
         elapsed = (time.perf_counter() - start) * 1000
         payload = {
-            "model_name": gen_result.base.model_name,
-            "format": gen_result.base.format,
+            "model_name": result_model_name,
+            "format": result_format,
             "size_bytes": len(glb_bytes),
             "file_path": str(output_path),
-            "export_url": f"/api/cad/models/{gen_result.base.model_name}",
+            "export_url": f"/api/cad/models/{result_model_name}",
             "source_image": image_path_arg,
-            "pipeline_type": gen_result.pipeline_type,
-            "seed": gen_result.seed,
+            "pipeline_type": result_pipeline_type,
+            "seed": result_seed,
         }
         logger.info(
             "3D model '{}' generated from image ({} bytes, {:.0f}ms, pipeline={})",
-            gen_result.base.model_name, len(glb_bytes), elapsed,
-            gen_result.pipeline_type,
+            result_model_name, len(glb_bytes), elapsed,
+            result_pipeline_type,
         )
         return ToolResult.ok(
             payload,

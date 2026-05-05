@@ -1,16 +1,11 @@
 ﻿import { app, shell, BrowserWindow, ipcMain, Menu, MenuItem, dialog, session, type WebContents } from 'electron'
 import { spawn, spawnSync, ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, appendFileSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 let mainWindow: BrowserWindow | null = null
-
-// Keep Electron runtime paths aligned with electron-builder's productName.
-// Without this, app.getPath('userData') follows package.json's technical
-// name (alice-frontend), which hides production logs in an unexpected folder.
-app.setName('Alice')
 
 // ─── Diagnostic logging ────────────────────────────────────────────────
 // When Alice.exe is launched from Explorer it has no console attached, so
@@ -65,26 +60,13 @@ let backendShuttingDown = false
 const BACKEND_PORT = Number(process.env.BACKEND_PORT) || 8000
 const BACKEND_HOST = '127.0.0.1'
 const BACKEND_HEALTH_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`
-const BACKEND_STARTUP_TIMEOUT_MS = 120_000
-const EXISTING_BACKEND_STARTUP_TIMEOUT_MS = 90_000
+const BACKEND_STARTUP_TIMEOUT_MS = 30_000
 
-function isTrustedRendererOrigin(requestingUrlOrOrigin: string): boolean {
-  if (!requestingUrlOrOrigin) return false
-  try {
-    const parsed = new URL(requestingUrlOrOrigin)
-    if (parsed.protocol === 'file:') return true
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      return parsed.origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
-    }
-    return false
-  } catch {
-    if (requestingUrlOrOrigin === 'file://' || requestingUrlOrOrigin === 'null') {
-      return true
-    }
-  }
+function isTrustedRendererOrigin(origin: string): boolean {
+  if (origin === 'file://') return true
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     try {
-      return requestingUrlOrOrigin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
+      return origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
     } catch {
       return false
     }
@@ -147,10 +129,12 @@ async function probeBackendHealth(timeoutMs = 1500): Promise<boolean> {
 }
 
 /**
- * Return the PID that owns ``BACKEND_PORT`` on loopback, if any.
+ * Return true if any TCP socket is currently bound to ``BACKEND_PORT`` on
+ * the loopback interface.  We treat this as evidence that another process
+ * (typically a stray backend.exe from a previous crash) owns the port.
  */
-function getBackendPortOwnerPid(): number | null {
-  if (process.platform !== 'win32') return null
+function isBackendPortBound(): boolean {
+  if (process.platform !== 'win32') return false
   // ``netstat -ano -p tcp`` is available on every supported Windows SKU
   // and does not require admin.  Parsing its output is more reliable than
   // attempting to bind a probe socket from Node, which would race with
@@ -159,34 +143,24 @@ function getBackendPortOwnerPid(): number | null {
     encoding: 'utf8',
     windowsHide: true,
   })
-  if (r.status !== 0 || !r.stdout) return null
+  if (r.status !== 0 || !r.stdout) return false
   const needle = `:${BACKEND_PORT}`
-  for (const line of r.stdout.split(/\r?\n/)) {
-    if (!line.includes('LISTENING') || !line.includes(needle)) continue
-    const parts = line.trim().split(/\s+/)
-    const localAddress = parts[1] ?? ''
-    const pid = Number(parts[4])
-    if (localAddress.endsWith(needle) && Number.isInteger(pid) && pid > 0) {
-      return pid
-    }
-  }
-  return null
+  return r.stdout
+    .split(/\r?\n/)
+    .some((line) => line.includes('LISTENING') && line.includes(needle))
 }
 
 /**
- * Best-effort termination of a stale process tree that owns BACKEND_PORT.
+ * Best-effort termination of any leftover ``backend.exe`` process that may
+ * be holding ``BACKEND_PORT`` from a previous (crashed) Alice session.
+ * Only kills processes whose image name matches the executable we are
+ * about to spawn so we never touch unrelated user processes.
  */
-function killProcessTree(pid: number): void {
+function killStaleBackend(exe: string): void {
   if (process.platform !== 'win32') return
-  spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true })
-}
-
-function logBackendChunk(stream: 'stdout' | 'stderr', chunk: Buffer): void {
-  const text = chunk.toString('utf8').replace(/\r?\n$/, '')
-  if (!text) return
-  for (const line of text.split(/\r?\n/)) {
-    if (line.trim()) console.log(`[backend:${stream}] ${line}`)
-  }
+  const imageName = basename(exe) // backend.exe
+  console.warn(`[backend] port ${BACKEND_PORT} busy — killing stale ${imageName}`)
+  spawnSync('taskkill', ['/F', '/T', '/IM', imageName], { windowsHide: true })
 }
 
 /**
@@ -226,37 +200,29 @@ async function startPackagedBackend(): Promise<void> {
     console.log(`[backend] reusing existing instance on ${BACKEND_HOST}:${BACKEND_PORT}`)
     return
   }
-  // Port bound but not healthy often means the user started backend.exe a
-  // few seconds before Alice.  The packaged backend can take ~20-60s to
-  // initialise STT/TTS/plugins, so wait before treating the owner as stale.
-  const portOwnerPid = getBackendPortOwnerPid()
-  if (portOwnerPid !== null) {
-    console.warn(
-      `[backend] port ${BACKEND_PORT} owned by pid ${portOwnerPid}; waiting for health`,
-    )
-    if (await waitForBackendHealth(EXISTING_BACKEND_STARTUP_TIMEOUT_MS)) {
-      console.log(`[backend] reusing existing instance on ${BACKEND_HOST}:${BACKEND_PORT}`)
-      return
-    }
-    console.warn(`[backend] killing stale backend port owner pid=${portOwnerPid}`)
-    killProcessTree(portOwnerPid)
+  // Port bound but not answering /api/health → stale process from a
+  // crashed session.  Kill it so the new backend can bind cleanly.
+  if (isBackendPortBound()) {
+    killStaleBackend(exe)
+    // Give the OS a moment to release the socket before we spawn.
     await new Promise((r) => setTimeout(r, 750))
   }
 
   console.log('[backend] spawning', exe, 'on', BACKEND_HOST + ':' + BACKEND_PORT)
-  backendShuttingDown = false
   backendProcess = spawn(exe, ['--host', BACKEND_HOST, '--port', String(BACKEND_PORT)], {
     cwd: join(process.resourcesPath, 'backend'),
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   })
-  backendProcess.stdout?.on('data', (chunk: Buffer) => logBackendChunk('stdout', chunk))
-  backendProcess.stderr?.on('data', (chunk: Buffer) => logBackendChunk('stderr', chunk))
+  backendProcess.stdout?.on('data', (chunk) => process.stdout.write(`[backend] ${chunk}`))
+  backendProcess.stderr?.on('data', (chunk) => process.stderr.write(`[backend] ${chunk}`))
   backendProcess.on('exit', (code, signal) => {
     console.log(`[backend] exited code=${code} signal=${signal}`)
     backendProcess = null
     if (!backendShuttingDown) {
-      mainWindow?.webContents.send('backend-process-exited', { code, signal })
+      // Backend died unexpectedly — tear the UI down so the user sees the
+      // problem instead of a silently-broken window.
+      app.quit()
     }
   })
   const healthy = await waitForBackendHealth()
@@ -270,13 +236,8 @@ async function startPackagedBackend(): Promise<void> {
 function stopPackagedBackend(): void {
   if (!backendProcess) return
   backendShuttingDown = true
-  const pid = backendProcess.pid
   try {
-    if (process.platform === 'win32' && pid !== undefined) {
-      killProcessTree(pid)
-    } else {
-      backendProcess.kill()
-    }
+    backendProcess.kill()
   } catch (err) {
     console.warn('[backend] kill() failed', err)
   }

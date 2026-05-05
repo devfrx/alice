@@ -252,7 +252,7 @@ class TrellisManagedService(ManagedService):
         try:
             async with httpx.AsyncClient(timeout=timeout_s) as client:
                 resp = await client.get(f"{self._service_url}/health")
-            return resp.status_code < 500
+            return resp.status_code == 200
         except httpx.HTTPError:
             return False
 
@@ -423,7 +423,7 @@ class TrellisManagedService(ManagedService):
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{self._service_url}/health")
-            if resp.status_code < 500:
+            if resp.status_code == 200:
                 detail = f"reachable ({resp.status_code})"
                 with contextlib.suppress(Exception):
                     data = resp.json()
@@ -434,6 +434,12 @@ class TrellisManagedService(ManagedService):
                 return ServiceHealth(
                     status="up",
                     detail=detail,
+                    last_check=now,
+                )
+            if resp.status_code < 500:
+                return ServiceHealth(
+                    status="degraded",
+                    detail=f"unexpected health HTTP {resp.status_code}",
                     last_check=now,
                 )
             return ServiceHealth(

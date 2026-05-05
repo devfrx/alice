@@ -68,11 +68,23 @@ const BACKEND_HEALTH_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`
 const BACKEND_STARTUP_TIMEOUT_MS = 120_000
 const EXISTING_BACKEND_STARTUP_TIMEOUT_MS = 90_000
 
-function isTrustedRendererOrigin(origin: string): boolean {
-  if (origin === 'file://') return true
+function isTrustedRendererOrigin(requestingUrlOrOrigin: string): boolean {
+  if (!requestingUrlOrOrigin) return false
+  try {
+    const parsed = new URL(requestingUrlOrOrigin)
+    if (parsed.protocol === 'file:') return true
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      return parsed.origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
+    }
+    return false
+  } catch {
+    if (requestingUrlOrOrigin === 'file://' || requestingUrlOrOrigin === 'null') {
+      return true
+    }
+  }
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     try {
-      return origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
+      return requestingUrlOrOrigin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
     } catch {
       return false
     }

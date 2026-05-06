@@ -105,6 +105,11 @@
         <PluginManagement />
       </section>
 
+      <!-- Email -->
+      <section :ref="(el) => setSectionRef('email', el)" id="section-email" class="sv__section">
+        <EmailSettings />
+      </section>
+
       <!-- MCP Servers -->
       <section :ref="(el) => setSectionRef('mcp', el)" id="section-mcp" class="sv__section">
         <McpManager />
@@ -148,7 +153,8 @@
           <Transition name="sv-warn">
             <div v-if="settingsStore.settings.agent.enabled" class="sv__warn">
               <AppIcon name="alert-triangle" :size="14" :stroke-width="2" />
-              <span>Le richieste con strumenti potrebbero richiedere più chiamate al modello e impiegare più tempo.</span>
+              <span>Le richieste con strumenti potrebbero richiedere più chiamate al modello e impiegare più
+                tempo.</span>
             </div>
           </Transition>
 
@@ -157,7 +163,8 @@
           <div class="sv__row">
             <div class="sv__row-text">
               <span class="sv__row-label">Mostra Plan Card sotto i messaggi</span>
-              <span class="sv__row-hint">Aggiunge una checklist collassabile con il piano dell'agente sotto ogni risposta.</span>
+              <span class="sv__row-hint">Aggiunge una checklist collassabile con il piano dell'agente sotto ogni
+                risposta.</span>
             </div>
             <button class="sv__toggle" :class="{ 'sv__toggle--on': uiStore.agentPlanCardEnabled }" role="switch"
               :aria-checked="uiStore.agentPlanCardEnabled"
@@ -257,6 +264,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import ModelManager from '../components/settings/ModelManager.vue'
+import EmailSettings from '../components/settings/EmailSettings.vue'
 import VoiceSettings from '../components/voice/VoiceSettings.vue'
 import PluginManagement from '../components/settings/PluginManagement.vue'
 import McpManager from '../components/settings/McpManager.vue'
@@ -272,13 +280,14 @@ const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
 
 /* ── Navigation ─────────────────────────────────────────────── */
-type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
+type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
 
 const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'model', label: 'Modello', iconName: 'package' },
   { id: 'llm', label: 'Parametri LLM', iconName: 'sliders' },
   { id: 'voice', label: 'Voce', iconName: 'mic' },
   { id: 'plugins', label: 'Plugin', iconName: 'cpu' },
+  { id: 'email', label: 'Email', iconName: 'mail' },
   { id: 'mcp', label: 'Server MCP', iconName: 'server' },
   { id: 'knowledge', label: 'Knowledge Graph', iconName: 'share-graph' },
   { id: 'memory', label: 'Memoria', iconName: 'book' },
@@ -291,7 +300,7 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
 const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
-  model: null, llm: null, voice: null, plugins: null, mcp: null, knowledge: null, memory: null, vectorstore: null, agent: null, security: null, ui: null,
+  model: null, llm: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, agent: null, security: null, ui: null,
 })
 
 function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null) {
@@ -610,6 +619,7 @@ onUnmounted(() => {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
 .sv__readonly-pill--on {
   background: rgba(110, 200, 140, 0.14);
   color: rgb(150, 220, 175);

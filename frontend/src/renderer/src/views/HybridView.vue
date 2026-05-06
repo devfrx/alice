@@ -205,7 +205,9 @@ const whiteboardPayloads = computed((): WhiteboardPayload[] => {
 const hasCadModels = computed(() => cadModels.value.length > 0)
 const hasCharts = computed(() => chartPayloads.value.length > 0)
 const hasWhiteboards = computed(() => whiteboardPayloads.value.length > 0)
+const hasCadWorkspace = computed(() => hasCadModels.value || cadGenerationInProgress.value !== null)
 const hasAnyOutput = computed(() => hasCadModels.value || hasCharts.value || hasWhiteboards.value)
+const hasAnyWorkspaceContent = computed(() => hasAnyOutput.value || cadGenerationInProgress.value !== null)
 
 const cadActiveIndex = ref(0)
 const chartActiveIndex = ref(0)
@@ -246,7 +248,13 @@ watch(whiteboardPayloads, (w) => { if (whiteboardActiveIndex.value >= w.length) 
 /* Auto-focus the 3D tab the moment a CAD generation starts so the user
    sees the placeholder + final model in the workspace. */
 watch(cadGenerationInProgress, (info) => {
-    if (info) workspaceTab.value = '3d'
+    if (info) {
+        workspaceTab.value = '3d'
+        return
+    }
+    if (workspaceTab.value === '3d' && !hasCadModels.value) {
+        dismissWorkspaceTab()
+    }
 })
 
 /* Keep the artifacts store warm for the active conversation so pin state
@@ -336,7 +344,10 @@ watch(() => chatStore.isStreamingCurrentConversation, (streaming) => {
         wasStreamingHere = false
         if (!voiceStore.autoTtsResponse || !voiceStore.ttsAvailable || !voiceStore.connected) return
         const msgs = chatStore.messages
-        const lastUserIdx = msgs.findLastIndex(m => m.role === 'user')
+        let lastUserIdx = -1
+        for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === 'user') { lastUserIdx = i; break }
+        }
         const allContent = msgs
             .slice(lastUserIdx + 1)
             .filter(m => m.role === 'assistant' && m.content?.trim())
@@ -451,8 +462,8 @@ onBeforeUnmount(() => {
                 </div>
 
                 <!-- Workspace tab bar (artifacts only) -->
-                <div v-if="hasAnyOutput" class="workspace-tabs">
-                    <button v-if="hasCadModels" class="workspace-tab"
+                <div v-if="hasAnyWorkspaceContent" class="workspace-tabs">
+                    <button v-if="hasCadWorkspace" class="workspace-tab"
                         :class="{ 'workspace-tab--active': workspaceTab === '3d' }" @click="workspaceTab = '3d'">
                         <AppIcon name="box-3d" :size="13" />
                         <span>3D</span>
@@ -463,7 +474,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="bar-chart" :size="13" />
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="workspace-tab__badge">{{ chartPayloads.length
-                        }}</span>
+                            }}</span>
                     </button>
                     <button v-if="hasWhiteboards" class="workspace-tab"
                         :class="{ 'workspace-tab--active': workspaceTab === 'whiteboard' }"
@@ -483,12 +494,14 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- ── Empty state (no artifacts yet) ── -->
-            <div v-if="!hasAnyOutput" class="hybrid-view__workspace-body">
-                <!-- CAD generation in progress with no prior model -->
-                <div v-if="cadGenerationInProgress" class="workspace-viewer workspace-viewer--placeholder">
-                    <CADGenerationPlaceholder :generation="cadGenerationInProgress" />
-                </div>
-                <div v-else class="workspace-empty">
+            <div v-if="cadGenerationInProgress && workspaceTab === '3d' && !hasCadModels"
+                class="workspace-viewer workspace-viewer--placeholder">
+                <CADGenerationPlaceholder :generation="cadGenerationInProgress" />
+            </div>
+
+            <!-- ── Empty state (no artifacts yet) ── -->
+            <div v-else-if="!hasAnyOutput" class="hybrid-view__workspace-body">
+                <div class="workspace-empty">
                     <div class="workspace-empty__orb">
                         <AppIcon name="orb" :size="40" />
                     </div>
@@ -513,7 +526,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="chevron-left" :size="14" />
                     </button>
                     <span class="workspace-viewer__counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                    }}</span>
+                        }}</span>
                     <button class="workspace-viewer__nav-btn" :disabled="chartActiveIndex >= chartPayloads.length - 1"
                         @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
                         <AppIcon name="chevron-right" :size="14" />

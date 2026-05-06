@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from backend.api.routes.models import serialise_model
 from backend.api.routes.voice import push_voice_ready
@@ -256,6 +257,7 @@ async def get_config(request: Request) -> dict[str, Any]:
     """Return the current server configuration as JSON."""
     ctx = _ctx(request)
     cfg = ctx.config
+    email_password_configured = await _email_password_configured(cfg.email)
     return {
         "llm": {
             "provider": cfg.llm.provider,
@@ -308,6 +310,23 @@ async def get_config(request: Request) -> dict[str, Any]:
         "agent": {
             "enabled": cfg.agent.enabled,
         },
+        "email": {
+            "enabled": cfg.email.enabled,
+            "imap_host": cfg.email.imap_host,
+            "imap_port": cfg.email.imap_port,
+            "imap_ssl": cfg.email.imap_ssl,
+            "smtp_host": cfg.email.smtp_host,
+            "smtp_port": cfg.email.smtp_port,
+            "smtp_ssl": cfg.email.smtp_ssl,
+            "username": cfg.email.username,
+            "use_keyring": cfg.email.use_keyring,
+            "fetch_last_n": cfg.email.fetch_last_n,
+            "max_fetch": cfg.email.max_fetch,
+            "imap_idle_enabled": cfg.email.imap_idle_enabled,
+            "archive_folder": cfg.email.archive_folder,
+            "password_configured": email_password_configured,
+            "service_running": ctx.email_service is not None,
+        },
     }
 
 
@@ -347,6 +366,22 @@ async def update_config(request: Request) -> dict[str, Any]:
         "kokoro_voice": cfg.tts.kokoro_voice,
         "kokoro_language": cfg.tts.kokoro_language,
     } if "tts" in body else None
+    old_email = {
+        "enabled": cfg.email.enabled,
+        "imap_host": cfg.email.imap_host,
+        "imap_port": cfg.email.imap_port,
+        "imap_ssl": cfg.email.imap_ssl,
+        "smtp_host": cfg.email.smtp_host,
+        "smtp_port": cfg.email.smtp_port,
+        "smtp_ssl": cfg.email.smtp_ssl,
+        "username": cfg.email.username,
+        "use_keyring": cfg.email.use_keyring,
+        "fetch_last_n": cfg.email.fetch_last_n,
+        "max_fetch": cfg.email.max_fetch,
+        "imap_idle_enabled": cfg.email.imap_idle_enabled,
+        "archive_folder": cfg.email.archive_folder,
+    } if "email" in body else None
+    email_password_changed = False
 
     # Apply supported runtime overrides.
     if "llm" in body:
@@ -609,6 +644,54 @@ async def update_config(request: Request) -> dict[str, Any]:
                 raise HTTPException(400, "agent.enabled must be a boolean")
             object.__setattr__(cfg.agent, "enabled", agent_updates["enabled"])
 
+    if "email" in body:
+        email_updates = body["email"]
+        if not isinstance(email_updates, dict):
+            raise HTTPException(400, "email must be a JSON object")
+
+        if "enabled" in email_updates:
+            if not isinstance(email_updates["enabled"], bool):
+                raise HTTPException(400, "email.enabled must be a boolean")
+            object.__setattr__(cfg.email, "enabled", email_updates["enabled"])
+        for key in ("imap_ssl", "smtp_ssl", "use_keyring", "imap_idle_enabled"):
+            if key in email_updates:
+                if not isinstance(email_updates[key], bool):
+                    raise HTTPException(400, f"email.{key} must be a boolean")
+                object.__setattr__(cfg.email, key, email_updates[key])
+        for key in ("imap_host", "smtp_host", "username", "archive_folder"):
+            if key in email_updates:
+                value = str(email_updates[key]).strip()
+                if len(value) > 255:
+                    raise HTTPException(400, f"email.{key} must be max 255 chars")
+                object.__setattr__(cfg.email, key, value)
+        for key in ("imap_port", "smtp_port"):
+            if key in email_updates:
+                try:
+                    port = int(email_updates[key])
+                except (TypeError, ValueError):
+                    raise HTTPException(400, f"email.{key} must be an integer")
+                if not (1 <= port <= 65535):
+                    raise HTTPException(400, f"email.{key} must be between 1 and 65535")
+                object.__setattr__(cfg.email, key, port)
+        for key in ("fetch_last_n", "max_fetch"):
+            if key in email_updates:
+                try:
+                    value = int(email_updates[key])
+                except (TypeError, ValueError):
+                    raise HTTPException(400, f"email.{key} must be an integer")
+                if not (1 <= value <= 500):
+                    raise HTTPException(400, f"email.{key} must be between 1 and 500")
+                object.__setattr__(cfg.email, key, value)
+
+        raw_password = email_updates.get("password")
+        if isinstance(raw_password, str) and raw_password:
+            if cfg.email.use_keyring:
+                await _store_email_password(cfg.email.username, raw_password)
+                object.__setattr__(cfg.email, "password", SecretStr(""))
+            else:
+                object.__setattr__(cfg.email, "password", SecretStr(raw_password))
+            email_password_changed = True
+
     # -- Persist independent preferences to database -------------------------
     if ctx.preferences_service is not None:
         try:
@@ -642,6 +725,14 @@ async def update_config(request: Request) -> dict[str, Any]:
         if tts_changed:
             await _apply_tts_changes(ctx, body["tts"])
             await push_voice_ready(ctx)
+
+    if old_email is not None:
+        email_changed = email_password_changed or any(
+            getattr(cfg.email, key) != value
+            for key, value in old_email.items()
+        )
+        if email_changed:
+            await _apply_email_changes(ctx)
 
     # Return the full config after applying changes.
     return await get_config(request)
@@ -745,6 +836,67 @@ async def _apply_tts_changes(ctx: AppContext, tts_updates: dict) -> None:
         )
     except Exception as exc:
         logger.warning("TTS service failed to restart: {}", exc)
+
+
+async def _store_email_password(username: str, password: str) -> None:
+    """Persist an email password in the OS keyring.
+
+    Args:
+        username: Account username used as the keyring account name.
+        password: Secret value to store.
+    """
+    username = username.strip()
+    if not username:
+        raise HTTPException(400, "email.username is required before saving password")
+    try:
+        import keyring
+    except ImportError as exc:  # pragma: no cover — dependency is declared
+        raise HTTPException(500, "Python keyring package is not installed") from exc
+    try:
+        await asyncio.to_thread(keyring.set_password, "alice", username, password)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"Failed to save email password in keyring: {exc}") from exc
+
+
+async def _email_password_configured(email_cfg: Any) -> bool:
+    """Return whether an email password is available without exposing it."""
+    if email_cfg.password.get_secret_value():
+        return True
+    if not email_cfg.use_keyring or not email_cfg.username:
+        return False
+    try:
+        import keyring
+        pwd = await asyncio.to_thread(
+            keyring.get_password, "alice", email_cfg.username,
+        )
+        return bool(pwd)
+    except Exception:
+        return False
+
+
+async def _apply_email_changes(ctx: AppContext) -> None:
+    """Restart or stop the email service after runtime config changes."""
+    if ctx.email_service is not None:
+        try:
+            await ctx.email_service.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to stop EmailService for restart: {}", exc)
+        ctx.email_service = None
+
+    if not ctx.config.email.enabled:
+        logger.info("Email service stopped (disabled via config)")
+        return
+
+    from backend.services.email_service import EmailService
+
+    email_service = EmailService(ctx.config.email, ctx.event_bus)
+    try:
+        await email_service.initialize()
+        ctx.email_service = email_service
+        logger.info("Email service restarted ({})", ctx.config.email.username)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Email service failed to restart: {}", exc)
+        await email_service.close()
 
 
 @router.post("/config/sync-model")

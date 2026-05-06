@@ -341,6 +341,37 @@ export interface ToolExecution {
   success?: boolean
   /** MIME type of the result content (e.g. "image/png"). */
   contentType?: string
+  /** Latest progress snapshot, when the tool reports incremental updates. */
+  progress?: ToolProgressSnapshot
+}
+
+/** Latest progress frame received from a long-running tool. */
+export interface ToolProgressSnapshot {
+  /** Implementation-specific high-level phase (e.g. "sampling"). */
+  phase?: string
+  /** Optional human-readable stage label (e.g. "Shape latent"). */
+  label?: string | null
+  /** Current step within ``total`` (monotonic). */
+  step?: number
+  /** Total steps. */
+  total?: number
+  /** Pre-computed integer percentage (0-100). */
+  percent?: number
+  /** Wall-clock elapsed since the tool started, in seconds. */
+  elapsedS?: number
+}
+
+/** Server pushes incremental progress for a long-running tool. */
+export interface WsToolProgressMessage {
+  type: 'tool_progress'
+  tool_name: string
+  execution_id: string
+  phase?: string
+  label?: string | null
+  step?: number
+  total?: number
+  percent?: number
+  elapsed_s?: number
 }
 
 /** A pending tool confirmation awaiting user approval. */

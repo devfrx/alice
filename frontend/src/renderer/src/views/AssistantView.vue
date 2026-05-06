@@ -221,6 +221,7 @@ const cadModels = computed((): CadModelPayload[] => {
 
 /** Whether any CAD models exist in the conversation. */
 const hasCadModels = computed(() => cadModels.value.length > 0)
+const hasCadPanel = computed(() => hasCadModels.value || cadGenerationInProgress.value !== null)
 
 /** Auto-open the side panel when a new model appears, jump to it. */
 watch(() => cadModels.value.length, (newLen, oldLen) => {
@@ -244,6 +245,17 @@ watch(cadGenerationInProgress, (info) => {
     if (info) {
         sidePanelOpen.value = true
         sidePanelTab.value = '3d'
+        return
+    }
+    if (sidePanelTab.value !== '3d' || hasCadModels.value) {
+        return
+    }
+    if (hasCharts.value) {
+        sidePanelTab.value = 'chart'
+    } else if (hasWhiteboards.value) {
+        sidePanelTab.value = 'whiteboard'
+    } else {
+        sidePanelOpen.value = false
     }
 })
 
@@ -503,7 +515,7 @@ onMounted(() => {
 
 <template>
     <div class="assistant-view" aria-label="Assistente" :class="{
-        'assistant-view--panel-open': sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards),
+        'assistant-view--panel-open': sidePanelOpen && (hasCadPanel || hasCharts || hasWhiteboards),
         'assistant-view--dragging': isDraggingPanel
     }" :style="{ '--panel-width': `${sidePanelWidth}px` }">
         <AmbientBackground :state="orbState" :audio-level="audioLevel" />
@@ -558,7 +570,7 @@ onMounted(() => {
 
             <!-- Toggle 3D panel button (visible when models exist and panel is closed) -->
             <Transition name="toggle-fade">
-                <button v-if="hasCadModels && (!sidePanelOpen || sidePanelTab !== '3d')"
+                <button v-if="hasCadPanel && (!sidePanelOpen || sidePanelTab !== '3d')"
                     class="assistant-view__3d-toggle" title="Apri pannello 3D"
                     @click="() => { sidePanelOpen = true; sidePanelTab = '3d' }">
                     <AppIcon name="box-3d" :size="16" :stroke-width="1.5" />
@@ -573,7 +585,7 @@ onMounted(() => {
                     @click="() => { sidePanelOpen = true; sidePanelTab = 'chart' }">
                     <AppIcon name="bar-chart" :size="16" :stroke-width="1.5" />
                     <span v-if="chartPayloads.length > 1" class="assistant-view__chart-badge">{{ chartPayloads.length
-                    }}</span>
+                        }}</span>
                 </button>
             </Transition>
 
@@ -596,18 +608,18 @@ onMounted(() => {
                 </button>
             </Transition>
 
-            <FloatingInputBar :disabled="chatStore.isStreamingCurrentConversation"
-                :is-connected="isConnected" :is-streaming="chatStore.isStreamingCurrentConversation"
-                :audio-devices="audioDevices" :selected-device-id="selectedDeviceId" :orb-state="orbState"
-                @send="handleSend" @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"
+            <FloatingInputBar :disabled="chatStore.isStreamingCurrentConversation" :is-connected="isConnected"
+                :is-streaming="chatStore.isStreamingCurrentConversation" :audio-devices="audioDevices"
+                :selected-device-id="selectedDeviceId" :orb-state="orbState" @send="handleSend"
+                @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"
                 @voice-stop="stopListening" @voice-cancel-processing="cancelProcessing"
                 @refresh-devices="refreshDevices" @select-device="(id) => { selectedDeviceId = id }" />
         </div>
 
         <!-- Right Side Panel (3D models or charts) -->
         <Transition name="side-panel-slide">
-            <div v-if="sidePanelOpen && (hasCadModels || hasCharts || hasWhiteboards)"
-                class="assistant-view__side-panel" :style="{ width: `${sidePanelWidth}px` }">
+            <div v-if="sidePanelOpen && (hasCadPanel || hasCharts || hasWhiteboards)" class="assistant-view__side-panel"
+                :style="{ width: `${sidePanelWidth}px` }">
                 <!-- Resize drag handle -->
                 <div class="side-panel__resize-handle" @mousedown="onResizeStart">
                     <div class="side-panel__resize-grip">
@@ -615,9 +627,9 @@ onMounted(() => {
                     </div>
                 </div>
                 <!-- Tab switcher (when multiple content types exist) -->
-                <div v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length > 1"
+                <div v-if="[hasCadPanel, hasCharts, hasWhiteboards].filter(Boolean).length > 1"
                     class="side-panel__tabs">
-                    <button v-if="hasCadModels" class="side-panel__tab"
+                    <button v-if="hasCadPanel" class="side-panel__tab"
                         :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }" @click="sidePanelTab = '3d'">
                         <AppIcon name="box-3d" :size="14" :stroke-width="1.5" />
                         <span>3D</span>
@@ -629,7 +641,7 @@ onMounted(() => {
                         <AppIcon name="bar-chart" :size="14" :stroke-width="1.5" />
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
-                        }}</span>
+                            }}</span>
                     </button>
                     <button v-if="hasWhiteboards" class="side-panel__tab"
                         :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
@@ -659,7 +671,7 @@ onMounted(() => {
                 <div v-if="hasCharts && (sidePanelTab === 'chart' || (!hasCadModels && !hasWhiteboards))"
                     class="side-panel__chart-container">
                     <!-- Close button (only when no tab bar is shown) -->
-                    <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
+                    <button v-if="[hasCadPanel, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
                         class="side-panel__chart-close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <AppIcon name="x" :size="14" />
                     </button>
@@ -671,7 +683,7 @@ onMounted(() => {
                             <AppIcon name="chevron-left" :size="14" />
                         </button>
                         <span class="side-panel__chart-counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                        }}</span>
+                            }}</span>
                         <button class="side-panel__chart-nav-btn"
                             :disabled="chartActiveIndex >= chartPayloads.length - 1"
                             @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">
@@ -686,7 +698,7 @@ onMounted(() => {
                 <div v-if="hasWhiteboards && (sidePanelTab === 'whiteboard' || (!hasCadModels && !hasCharts))"
                     class="side-panel__wb-container">
                     <!-- Close button (only when sole content) -->
-                    <button v-if="[hasCadModels, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
+                    <button v-if="[hasCadPanel, hasCharts, hasWhiteboards].filter(Boolean).length <= 1"
                         class="side-panel__wb-close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <AppIcon name="x" :size="14" />
                     </button>

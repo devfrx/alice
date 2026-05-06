@@ -18,6 +18,7 @@ from loguru import logger
 
 from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext, ToolResult
+from backend.core.tool_progress import current_progress_emitter
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
 from backend.services.turn import is_websocket_closed_runtime_error
@@ -407,7 +408,7 @@ async def run_tool_loop(
 
         # 3. Execute all tools in parallel (with timeout).
         coros = [
-            asyncio.ensure_future(_exec_one(ctx, tc_id, name, a, c))
+            asyncio.ensure_future(_exec_one(ctx, tc_id, name, a, c, websocket))
             for tc_id, name, a, c in tasks
         ]
         if coros:
@@ -953,9 +954,37 @@ async def _exec_one(
     name: str,
     args: dict[str, Any],
     context: ExecutionContext,
+    websocket: WebSocket | None = None,
 ) -> tuple[str, str, ToolResult, str]:
-    """Execute a single tool and return its result alongside metadata."""
-    result = await ctx.tool_registry.execute_tool(name, args, context)
+    """Execute a single tool and return its result alongside metadata.
+
+    While the tool runs, a progress emitter is bound to the
+    ``current_progress_emitter`` contextvar so long-running tools can
+    push ``tool_progress`` frames to the active WebSocket via
+    :func:`backend.core.tool_progress.emit_tool_progress`.
+    """
+    if websocket is not None:
+        async def _emit(progress: dict[str, Any]) -> None:
+            try:
+                await _send_json(websocket, {
+                    "type": "tool_progress",
+                    "tool_name": name,
+                    "execution_id": context.execution_id,
+                    **progress,
+                })
+            except WebSocketDisconnect:
+                # Client gone — swallow so the tool keeps running
+                # locally to completion (cancellation is handled
+                # elsewhere).
+                pass
+
+        token = current_progress_emitter.set(_emit)
+        try:
+            result = await ctx.tool_registry.execute_tool(name, args, context)
+        finally:
+            current_progress_emitter.reset(token)
+    else:
+        result = await ctx.tool_registry.execute_tool(name, args, context)
     return tc_id, name, result, context.execution_id
 
 

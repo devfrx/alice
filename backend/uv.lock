@@ -193,6 +193,7 @@ dependencies = [
     { name = "feedparser" },
     { name = "httpx" },
     { name = "jsonschema" },
+    { name = "keyring" },
     { name = "loguru" },
     { name = "mcp" },
     { name = "paho-mqtt" },
@@ -229,9 +230,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
-]
-email = [
-    { name = "keyring" },
 ]
 file-reader = [
     { name = "pdfplumber" },
@@ -298,7 +296,7 @@ requires-dist = [
     { name = "feedparser", specifier = ">=6.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.0" },
-    { name = "keyring", marker = "extra == 'email'", specifier = ">=24.0" },
+    { name = "keyring", specifier = ">=24.0" },
     { name = "kokoro-onnx", marker = "extra == 'tts-kokoro'", specifier = ">=0.4" },
     { name = "kokoro-onnx", marker = "extra == 'voice'", specifier = ">=0.4" },
     { name = "kokoro-onnx", marker = "extra == 'voice-gpu'", specifier = ">=0.4" },
@@ -353,7 +351,7 @@ requires-dist = [
     { name = "websockets", specifier = ">=13.0" },
     { name = "winotify", specifier = ">=1.1" },
 ]
-provides-extras = ["dev", "stt", "stt-gpu", "tts-piper", "tts-xtts", "tts-kokoro", "email", "vram", "voice", "voice-gpu", "file-reader", "memory"]
+provides-extras = ["dev", "stt", "stt-gpu", "tts-piper", "tts-xtts", "tts-kokoro", "vram", "voice", "voice-gpu", "file-reader", "memory"]
 
 [[package]]
 name = "annotated-doc"

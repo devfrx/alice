@@ -91,6 +91,189 @@ _generation_started_at: float | None = None
 _generation_name: str | None = None
 _generation_pipeline_type: str | None = None
 
+# ── Progress tracking (populated by tqdm monkey-patch) ────────────
+# Sampling stages (in execution order) emitted by the TRELLIS.2 pipeline.
+# Each entry: tqdm description prefix → (human label, expected steps).
+# The expected steps are used as the "total" weight for the global
+# progress bar even before the first tqdm update arrives.
+_PROGRESS_STAGES: list[tuple[str, str, int]] = [
+    ("sampling sparse structure", "Sparse structure", 12),
+    ("sampling shape slat",        "Shape latent",      12),
+    ("sampling texture slat",      "Texture latent",    12),
+]
+_PROGRESS_TOTAL_STEPS: int = sum(s[2] for s in _PROGRESS_STAGES)
+
+_progress_lock = threading.Lock()
+_progress_state: dict[str, object] = {
+    "stage_index": -1,        # 0-based index into _PROGRESS_STAGES (-1 = not yet sampling)
+    "stage_label": None,      # human-readable phase name
+    "stage_step": 0,          # current step within the active stage
+    "stage_total": 0,         # total steps of the active stage
+    "global_step": 0,         # cumulative step across all stages
+    "global_total": _PROGRESS_TOTAL_STEPS,
+    "phase": "init",          # "init" | "sampling" | "postprocess" | "done"
+}
+
+
+def _reset_progress(phase: str = "init") -> None:
+    """Reset progress tracking to its starting state."""
+    with _progress_lock:
+        _progress_state.update({
+            "stage_index": -1,
+            "stage_label": None,
+            "stage_step": 0,
+            "stage_total": 0,
+            "global_step": 0,
+            "global_total": _PROGRESS_TOTAL_STEPS,
+            "phase": phase,
+        })
+
+
+def _set_progress_phase(phase: str) -> None:
+    """Update the high-level phase tag (``init``/``sampling``/``postprocess``/``done``)."""
+    with _progress_lock:
+        _progress_state["phase"] = phase
+        if phase == "postprocess":
+            # Force the bar to 100% of sampling so the UI shows we are
+            # finalizing rather than still mid-stage.
+            _progress_state["global_step"] = _PROGRESS_TOTAL_STEPS
+
+
+def _update_sampling_progress(desc: str, n: int, total: int) -> None:
+    """Update sampling progress from a tqdm callback.
+
+    Args:
+        desc: The raw tqdm bar description (e.g. ``"Sampling shape SLat"``).
+        n: Current iteration count of that bar.
+        total: Total iterations of that bar (may be 0 / unknown).
+    """
+    if not desc:
+        return
+    desc_l = desc.lower()
+    stage_idx = -1
+    label = None
+    expected_total = 0
+    for i, (prefix, lbl, weight) in enumerate(_PROGRESS_STAGES):
+        if desc_l.startswith(prefix):
+            stage_idx = i
+            label = lbl
+            expected_total = weight
+            break
+    if stage_idx < 0:
+        return  # not a sampling bar we care about
+
+    actual_total = total if total and total > 0 else expected_total
+    cumulative_prior = sum(s[2] for s in _PROGRESS_STAGES[:stage_idx])
+    # Clamp stage step to actual_total to keep the global counter monotonic.
+    safe_n = min(max(n, 0), actual_total)
+    with _progress_lock:
+        _progress_state.update({
+            "stage_index": stage_idx,
+            "stage_label": label,
+            "stage_step": safe_n,
+            "stage_total": actual_total,
+            "global_step": cumulative_prior + safe_n,
+            "global_total": _PROGRESS_TOTAL_STEPS,
+            "phase": "sampling",
+        })
+
+
+def _install_tqdm_progress_hook() -> None:
+    """Monkey-patch tqdm to forward sampling progress to ``_progress_state``.
+
+    Idempotent — calling twice is a no-op.  Hooks both ``__init__`` and
+    ``update`` so we capture the very first frame (n=0) as well as
+    every subsequent step the diffusion loop emits.
+    """
+    try:
+        from tqdm import std as tqdm_std
+    except Exception:  # pragma: no cover — tqdm always installed via trellis2 deps
+        return
+
+    if getattr(tqdm_std.tqdm, "_alice_patch_version", 0) >= 3:
+        return
+
+    _orig_init = tqdm_std.tqdm.__init__
+    _orig_update = tqdm_std.tqdm.update
+    _orig_iter = tqdm_std.tqdm.__iter__
+    _orig_display = tqdm_std.tqdm.display
+
+    def _safe_desc(instance) -> str:
+        return str(getattr(instance, "desc", None) or "")
+
+    def _safe_int_attr(instance, attr: str) -> int:
+        try:
+            return int(getattr(instance, attr, 0) or 0)
+        except Exception:
+            return 0
+
+    def _patched_init(self, *a, **kw):
+        _orig_init(self, *a, **kw)
+        try:
+            _update_sampling_progress(
+                _safe_desc(self), _safe_int_attr(self, "n"),
+                _safe_int_attr(self, "total"),
+            )
+        except Exception:
+            pass
+
+    def _patched_update(self, n=1):
+        result = _orig_update(self, n)
+        try:
+            _update_sampling_progress(
+                _safe_desc(self), _safe_int_attr(self, "n"),
+                _safe_int_attr(self, "total"),
+            )
+        except Exception:
+            pass
+        return result
+
+    def _patched_iter(self):
+        desc = _safe_desc(self)
+        track = False
+        manual_n = _safe_int_attr(self, "n")
+        total = _safe_int_attr(self, "total")
+        try:
+            track = any(
+                desc.lower().startswith(prefix)
+                for prefix, _, _ in _PROGRESS_STAGES
+            )
+            if track:
+                _update_sampling_progress(desc, manual_n, total)
+        except Exception:
+            track = False
+        try:
+            for obj in _orig_iter(self):
+                yield obj
+                if track:
+                    try:
+                        manual_n += 1
+                        _update_sampling_progress(desc, manual_n, total)
+                    except Exception:
+                        track = False
+        finally:
+            if track and total > 0:
+                try:
+                    _update_sampling_progress(desc, min(manual_n, total), total)
+                except Exception:
+                    pass
+
+    def _patched_display(self, *a, **kw):
+        try:
+            _update_sampling_progress(
+                _safe_desc(self), _safe_int_attr(self, "n"),
+                _safe_int_attr(self, "total"),
+            )
+        except Exception:
+            pass
+        return _orig_display(self, *a, **kw)
+
+    tqdm_std.tqdm.__init__ = _patched_init
+    tqdm_std.tqdm.update = _patched_update
+    tqdm_std.tqdm.__iter__ = _patched_iter
+    tqdm_std.tqdm.display = _patched_display
+    tqdm_std.tqdm._alice_patch_version = 3
+
 # Short-name → full HuggingFace repo ID mapping.
 _MODEL_ALIASES: dict[str, str] = {
     "TRELLIS.2-4B": "microsoft/TRELLIS.2-4B",
@@ -114,6 +297,12 @@ def _load_pipeline():
     global _pipeline
     if _pipeline is not None:
         return _pipeline
+
+    # Hook tqdm before any trellis2 import so the very first sampling
+    # bar is captured (the import itself triggers a couple of
+    # "Loading weights" bars that we intentionally ignore via the
+    # description filter).
+    _install_tqdm_progress_hook()
 
     from trellis2.pipelines import Trellis2ImageTo3DPipeline
 
@@ -182,6 +371,7 @@ def _generate_glb_sync(
     """Run the blocking TRELLIS.2 pipeline in a worker thread."""
     import o_voxel  # local import — pulls torch + CUDA
 
+    _reset_progress(phase="init")
     pipeline = _load_pipeline()
     actual_seed = seed if seed >= 0 else int(time.time()) % (2**32)
     name = output_name or f"model_{uuid.uuid4().hex[:8]}"
@@ -196,6 +386,11 @@ def _generate_glb_sync(
         pipeline_type=pipeline_type,
     )
     mesh = meshes[0]
+
+    # Sampling is finished — from here on the work is CPU/GPU mesh
+    # post-processing (decimation, UV unwrap, texture bake) which the
+    # tqdm hook does not cover.
+    _set_progress_phase("postprocess")
 
     # CuMesh post-processing (simplify + UV unwrap + texture bake)
     # allocates several GB of CUDA scratch buffers.  On consumer GPUs
@@ -232,6 +427,8 @@ def _generate_glb_sync(
     )
     glb.export(str(out_path), extension_webp=True)
 
+    _set_progress_phase("done")
+
     return {
         "model_name": name,
         "file_path": str(out_path),
@@ -262,6 +459,9 @@ async def health():
         if gpu_available:
             vram_free_mb = torch.cuda.mem_get_info()[0] // (1024 * 1024)
 
+    with _progress_lock:
+        progress_snapshot = dict(_progress_state)
+
     return {
         "status": "ok",
         "service": "trellis2",
@@ -269,6 +469,7 @@ async def health():
         "vram_free_mb": vram_free_mb,
         "model_loaded": _pipeline is not None,
         "model_name": _model_name,
+        "progress": progress_snapshot,
         **state,
     }
 

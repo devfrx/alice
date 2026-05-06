@@ -8,6 +8,7 @@ for GPUs with limited memory.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 import time
 from pathlib import Path
@@ -28,6 +29,7 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
+from backend.core.tool_progress import emit_tool_progress
 from backend.plugins.cad_generator.client import TrellisClient
 from backend.plugins.cad_generator.client_v2 import (
     Trellis2Client,
@@ -602,6 +604,77 @@ class CadGeneratorPlugin(BasePlugin):
     # Image-to-3D (TRELLIS.2) flow
     # ------------------------------------------------------------------
 
+    async def _poll_trellis2_progress(self, started_at: float) -> None:
+        """Poll TRELLIS.2 ``/health`` and emit ``tool_progress`` frames.
+
+        Runs until cancelled by the caller (typically when the
+        ``/generate`` request completes).  Each poll fetches the
+        ``progress`` block populated by the tqdm hook in
+        ``trellis2_server/server.py`` and forwards a normalized payload
+        to the active WebSocket via :func:`emit_tool_progress`.
+
+        Failures (server slow to wake up, transient HTTP errors) are
+        swallowed: a missing progress update must never break the
+        generation itself.
+
+        Args:
+            started_at: ``time.perf_counter()`` snapshot taken when the
+                tool started, used to compute ``elapsed_s``.
+        """
+        if self._client_v2 is None:
+            return
+
+        # First poll only after a short delay so the server has a chance
+        # to load weights and report a meaningful sampling step.
+        last_emitted_step = -1
+        last_phase = ""
+        try:
+            while True:
+                await asyncio.sleep(0.5)
+                status = await self._client_v2.get_status()
+                if not status:
+                    continue
+                progress = status.get("progress") or {}
+                phase = str(progress.get("phase") or "init")
+                global_step = int(progress.get("global_step") or 0)
+                global_total = int(
+                    progress.get("global_total") or 0
+                ) or 1
+                # Avoid spamming identical frames.
+                if (
+                    phase == last_phase
+                    and global_step == last_emitted_step
+                ):
+                    continue
+                last_phase = phase
+                last_emitted_step = global_step
+
+                percent = (
+                    100 if phase == "done"
+                    else max(0, min(100, int(global_step * 100 / global_total)))
+                )
+                # Reserve the last 5% for the post-processing phase so
+                # the bar visibly advances during the ~10 s mesh bake.
+                if phase == "sampling":
+                    percent = min(percent, 95)
+                elif phase == "postprocess":
+                    percent = max(percent, 96)
+
+                await emit_tool_progress({
+                    "phase": phase,
+                    "label": progress.get("stage_label"),
+                    "step": global_step,
+                    "total": global_total,
+                    "percent": percent,
+                    "elapsed_s": round(
+                        time.perf_counter() - started_at, 2,
+                    ),
+                })
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # pragma: no cover \u2014 defensive
+            logger.debug("TRELLIS.2 progress polling stopped: {}", exc)
+
     def _resolve_uploaded_image(self, image_path: str) -> tuple[Path, str] | str:
         """Validate *image_path* and return ``(absolute_path, mime_type)``.
 
@@ -710,6 +783,9 @@ class CadGeneratorPlugin(BasePlugin):
 
         gen_error: str | None = None
         gen_result = None
+        progress_task = asyncio.create_task(
+            self._poll_trellis2_progress(start)
+        )
         try:
             gen_result = await self._client_v2.generate_from_image(
                 image_bytes,
@@ -724,6 +800,9 @@ class CadGeneratorPlugin(BasePlugin):
             gen_error = f"TRELLIS.2 generation failed: {exc}"
             logger.error(gen_error)
         finally:
+            progress_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await progress_task
             # Best-effort unload of the TRELLIS.2 weights so the LLM can
             # reclaim VRAM cleanly even on failure or cancellation.
             try:

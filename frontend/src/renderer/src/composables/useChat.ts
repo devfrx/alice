@@ -41,6 +41,7 @@ import type {
   WsToolConfirmationResponsePayload,
   WsToolExecutionDoneMessage,
   WsToolExecutionStartMessage,
+  WsToolProgressMessage,
   WsWarningMessage
 } from '../types/chat'
 
@@ -169,6 +170,19 @@ export function useChat(): UseChatReturn {
     store.completeToolExecution(msg.execution_id, msg.result, msg.success, msg.content_type)
   }
 
+  const onToolProgress = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsToolProgressMessage
+    store.updateToolExecutionProgress(msg.execution_id, {
+      phase: msg.phase,
+      label: msg.label ?? null,
+      step: msg.step,
+      total: msg.total,
+      percent: msg.percent,
+      elapsedS: msg.elapsed_s,
+    })
+  }
+
   const onToolConfirmationRequired = (data: unknown): void => {
     if (store.streamGeneration !== activeGeneration) return
     const msg = data as WsToolConfirmationRequiredMessage
@@ -290,6 +304,7 @@ export function useChat(): UseChatReturn {
   wsManager.on('tool_call', onToolCall)
   wsManager.on('tool_execution_start', onToolExecutionStart)
   wsManager.on('tool_execution_done', onToolExecutionDone)
+  wsManager.on('tool_progress', onToolProgress)
   wsManager.on('tool_confirmation_required', onToolConfirmationRequired)
   wsManager.on('llm_requery', onLlmRequery)
   wsManager.on('warning', onWarning)
@@ -331,6 +346,7 @@ export function useChat(): UseChatReturn {
     wsManager.off('tool_call', onToolCall)
     wsManager.off('tool_execution_start', onToolExecutionStart)
     wsManager.off('tool_execution_done', onToolExecutionDone)
+    wsManager.off('tool_progress', onToolProgress)
     wsManager.off('tool_confirmation_required', onToolConfirmationRequired)
     wsManager.off('llm_requery', onLlmRequery)
     wsManager.off('warning', onWarning)

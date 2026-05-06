@@ -10,14 +10,7 @@
 import { computed, type ComputedRef } from 'vue'
 
 import { useChatStore } from '../stores/chat'
-
-/** Tool names that produce 3D models and benefit from a generation overlay. */
-const CAD_TOOL_NAMES = new Set([
-  'cad_generate',
-  'cad_generate_from_image',
-  'cad_generator_cad_generate',
-  'cad_generator_cad_generate_from_image',
-])
+import type { ToolProgressSnapshot } from '../types/chat'
 
 function normalizeCadToolName(toolName: string): CadGenerationInfo['toolName'] | null {
   if (toolName.endsWith('cad_generate_from_image')) return 'cad_generate_from_image'
@@ -28,6 +21,8 @@ function normalizeCadToolName(toolName: string): CadGenerationInfo['toolName'] |
 export interface CadGenerationInfo {
   toolName: 'cad_generate' | 'cad_generate_from_image'
   executionId: string
+  /** Latest progress snapshot, when the backend reports incremental updates. */
+  progress?: ToolProgressSnapshot
 }
 
 export interface UseGenerationState {
@@ -44,15 +39,16 @@ export function useGenerationState(): UseGenerationState {
   const chatStore = useChatStore()
 
   const cadGenerationInProgress = computed<CadGenerationInfo | null>(() => {
-    const exec = chatStore.activeToolExecutions.find(
-      (e) => CAD_TOOL_NAMES.has(e.toolName) && e.status === 'running',
-    )
+    const exec = chatStore.activeToolExecutions.find((e) => (
+      e.status === 'running' && normalizeCadToolName(e.toolName) !== null
+    ))
     if (!exec) return null
     const toolName = normalizeCadToolName(exec.toolName)
     if (!toolName) return null
     return {
       toolName,
       executionId: exec.executionId,
+      progress: exec.progress,
     }
   })
 

@@ -67,6 +67,7 @@ dependencies = [
     # Email Assistant (Phase 15)
     "aioimaplib>=1.0.1",
     "aiosmtplib>=3.0",
+    "keyring>=24.0",
 
     # Utils
     "loguru>=0.7",
@@ -103,9 +104,6 @@ tts-xtts = [
 tts-kokoro = [
     "kokoro-onnx>=0.4",
     "soundfile>=0.12",
-]
-email = [
-    "keyring>=24.0",
 ]
 # VRAM monitoring
 vram = [

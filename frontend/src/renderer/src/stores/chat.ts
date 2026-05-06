@@ -614,6 +614,16 @@ export const useChatStore = defineStore('chat', () => {
     delete pendingConfirmations.value[executionId]
   }
 
+  /** Merge an incremental progress update into a running tool execution. */
+  function updateToolExecutionProgress(
+    executionId: string,
+    progress: ToolExecution['progress']
+  ): void {
+    const exec = activeToolExecutions.value.find((e) => e.executionId === executionId)
+    if (!exec || exec.status !== 'running') return
+    exec.progress = { ...exec.progress, ...progress }
+  }
+
   /** Add a pending confirmation request. */
   function addPendingConfirmation(req: ConfirmationRequest): void {
     pendingConfirmations.value[req.executionId] = req
@@ -811,6 +821,7 @@ export const useChatStore = defineStore('chat', () => {
     // tool execution actions
     addToolExecution,
     completeToolExecution,
+    updateToolExecutionProgress,
     addPendingConfirmation,
     removePendingConfirmation,
     updateContextInfo,

@@ -31,6 +31,24 @@ export interface AliceSettings {
   agent: {
     enabled: boolean
   }
+  email: {
+    enabled: boolean
+    imapHost: string
+    imapPort: number
+    imapSsl: boolean
+    smtpHost: string
+    smtpPort: number
+    smtpSsl: boolean
+    username: string
+    password: string
+    useKeyring: boolean
+    fetchLastN: number
+    maxFetch: number
+    imapIdleEnabled: boolean
+    archiveFolder: string
+    passwordConfigured: boolean
+    serviceRunning: boolean
+  }
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -60,6 +78,24 @@ export const useSettingsStore = defineStore('settings', () => {
     },
     agent: {
       enabled: false
+    },
+    email: {
+      enabled: false,
+      imapHost: '',
+      imapPort: 993,
+      imapSsl: true,
+      smtpHost: '',
+      smtpPort: 587,
+      smtpSsl: false,
+      username: '',
+      password: '',
+      useKeyring: true,
+      fetchLastN: 20,
+      maxFetch: 50,
+      imapIdleEnabled: true,
+      archiveFolder: 'Archive',
+      passwordConfigured: false,
+      serviceRunning: false
     }
   })
 
@@ -157,6 +193,25 @@ export const useSettingsStore = defineStore('settings', () => {
         const agent = config.agent as Record<string, unknown>
         settings.value.agent.enabled = (agent.enabled as boolean) ?? settings.value.agent.enabled
       }
+      if (config.email) {
+        const email = config.email as Record<string, unknown>
+        settings.value.email.enabled = (email.enabled as boolean) ?? settings.value.email.enabled
+        settings.value.email.imapHost = (email.imap_host as string) ?? settings.value.email.imapHost
+        settings.value.email.imapPort = (email.imap_port as number) ?? settings.value.email.imapPort
+        settings.value.email.imapSsl = (email.imap_ssl as boolean) ?? settings.value.email.imapSsl
+        settings.value.email.smtpHost = (email.smtp_host as string) ?? settings.value.email.smtpHost
+        settings.value.email.smtpPort = (email.smtp_port as number) ?? settings.value.email.smtpPort
+        settings.value.email.smtpSsl = (email.smtp_ssl as boolean) ?? settings.value.email.smtpSsl
+        settings.value.email.username = (email.username as string) ?? settings.value.email.username
+        settings.value.email.useKeyring = (email.use_keyring as boolean) ?? settings.value.email.useKeyring
+        settings.value.email.fetchLastN = (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
+        settings.value.email.maxFetch = (email.max_fetch as number) ?? settings.value.email.maxFetch
+        settings.value.email.imapIdleEnabled = (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
+        settings.value.email.archiveFolder = (email.archive_folder as string) ?? settings.value.email.archiveFolder
+        settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? false
+        settings.value.email.serviceRunning = (email.service_running as boolean) ?? false
+        settings.value.email.password = ''
+      }
     } catch (err) {
       console.warn('[settings store] loadSettings failed:', err)
     } finally {
@@ -170,8 +225,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Save current settings to the backend. */
   async function saveSettings(): Promise<void> {
+    const emailPassword = settings.value.email.password.trim()
     try {
-      await api.updateConfig({
+      const updated = await api.updateConfig({
         llm: {
           temperature: settings.value.llm.temperature,
           max_tokens: settings.value.llm.maxTokens,
@@ -196,8 +252,35 @@ export const useSettingsStore = defineStore('settings', () => {
         },
         agent: {
           enabled: settings.value.agent.enabled
+        },
+        email: {
+          enabled: settings.value.email.enabled,
+          imap_host: settings.value.email.imapHost,
+          imap_port: settings.value.email.imapPort,
+          imap_ssl: settings.value.email.imapSsl,
+          smtp_host: settings.value.email.smtpHost,
+          smtp_port: settings.value.email.smtpPort,
+          smtp_ssl: settings.value.email.smtpSsl,
+          username: settings.value.email.username,
+          use_keyring: settings.value.email.useKeyring,
+          fetch_last_n: settings.value.email.fetchLastN,
+          max_fetch: settings.value.email.maxFetch,
+          imap_idle_enabled: settings.value.email.imapIdleEnabled,
+          archive_folder: settings.value.email.archiveFolder,
+          ...(emailPassword ? { password: emailPassword } : {})
         }
       })
+      const email = updated.email as Record<string, unknown> | undefined
+      if (email) {
+        settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? settings.value.email.passwordConfigured
+        settings.value.email.serviceRunning = (email.service_running as boolean) ?? settings.value.email.serviceRunning
+      }
+      if (emailPassword) {
+        _loadingSettings = true
+        settings.value.email.password = ''
+        await nextTick()
+        _loadingSettings = false
+      }
     } catch (err) {
       console.warn('[settings store] saveSettings failed:', err)
     }

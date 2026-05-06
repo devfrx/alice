@@ -10,6 +10,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { resolveBackendUrl } from '../../services/api'
 import { useArtifactsStore } from '../../stores/artifacts'
 import AppIcon from '../ui/AppIcon.vue'
@@ -86,6 +87,19 @@ function initScene(container: HTMLDivElement): void {
     /* Scene */
     scene = new THREE.Scene()
     scene.fog = new THREE.Fog(BG_COLOR, 8, 28)
+
+    /* PBR image-based lighting — required for TRELLIS GLB models that
+       ship metallic/roughness PBR materials.  Without an environment
+       map, metallic surfaces sample a black environment and the model
+       renders almost completely dark even with directional lights. */
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    pmrem.compileEquirectangularShader()
+    const envScene = new RoomEnvironment()
+    scene.environment = pmrem.fromScene(envScene, 0.04).texture
+    envScene.traverse((c) => {
+        if (c instanceof THREE.Mesh) c.geometry?.dispose()
+    })
+    pmrem.dispose()
 
     /* Camera */
     camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 1000)
@@ -280,6 +294,7 @@ onUnmounted(() => {
 
     controls?.dispose()
     renderer?.dispose()
+    scene?.environment?.dispose()
     renderer = null
     scene = null
     camera = null

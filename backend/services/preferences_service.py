@@ -19,7 +19,12 @@ PERSISTABLE_SECTIONS: frozenset[str] = frozenset({
     "tts", "stt", "voice", "ui", "plugins",
     "pc_automation", "web_search", "calendar", "weather",
     "clipboard", "notifications", "media_control", "file_search", "news",
-    "agent",
+    "agent", "email",
+})
+
+# Sensitive keys that must never be persisted to the preferences table.
+SENSITIVE_PREFERENCE_KEYS: frozenset[str] = frozenset({
+    "password",
 })
 
 # Within the 'llm' section, only these keys are user preferences.
@@ -101,7 +106,13 @@ class PreferencesService:
                 continue
 
             if section in PERSISTABLE_SECTIONS:
-                await self.save_section(section, updates)
+                safe_updates = {
+                    key: value
+                    for key, value in updates.items()
+                    if key not in SENSITIVE_PREFERENCE_KEYS
+                }
+                if safe_updates:
+                    await self.save_section(section, safe_updates)
             elif section == "llm":
                 for key, value in updates.items():
                     if key in PERSISTABLE_LLM_KEYS:

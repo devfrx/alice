@@ -370,6 +370,7 @@ const orbState = computed<'idle' | 'listening' | 'thinking' | 'speaking' | 'proc
     if (voiceStore.isSpeaking) return 'speaking'
     if (voiceStore.isListening) return 'listening'
     if (voiceStore.isProcessing) return 'processing'
+    if (cadGenerationInProgress.value !== null) return 'processing'
     if (chatStore.isStreamingCurrentConversation) return 'thinking'
     return 'idle'
 })
@@ -426,6 +427,42 @@ const streamContent = computed(() => chatStore.currentStreamContent)
 
 /** Thinking/reasoning content for display. */
 const thinkingContent = computed(() => chatStore.currentThinkingContent)
+
+/* ── Veil reactive triggers ───────────────────────────────────
+ * The orb (Veil) exposes triggerToken / triggerToolCall via defineExpose.
+ * We pulse these from streaming, tool-call and artifact signals so the visual
+ * mechanic reacts in real time without adding noisy extra state names.
+ */
+const orbRef = ref<{
+    triggerToken?: () => void
+    triggerToolCall?: () => void
+    triggerDone?: () => void
+} | null>(null)
+
+watch(streamContent, (curr, prev) => {
+    if (!curr) return
+    const prevLen = prev?.length ?? 0
+    const delta = curr.length - prevLen
+    if (delta <= 0) return
+    /* Throttle: one mote per ~12 new chars to stay tasteful. */
+    const pulses = Math.min(4, Math.max(1, Math.floor(delta / 12)))
+    for (let i = 0; i < pulses; i++) orbRef.value?.triggerToken?.()
+})
+
+watch(
+    () => lastToolCalls.value.length,
+    (curr, prev) => {
+        if (curr > (prev ?? 0)) orbRef.value?.triggerToolCall?.()
+    },
+)
+
+watch(cadGenerationInProgress, (curr, prev) => {
+    if (curr && !prev) {
+        orbRef.value?.triggerToolCall?.()
+    } else if (!curr && prev) {
+        orbRef.value?.triggerDone?.()
+    }
+})
 
 /** Show the last response when idle or while TTS is speaking (not during new input). */
 const showLastResponse = computed(() =>
@@ -486,6 +523,7 @@ watch(
             wasStreamingHere = true
         } else if (wasStreamingHere) {
             wasStreamingHere = false
+            orbRef.value?.triggerDone?.()
             if (!voiceStore.autoTtsResponse || !voiceStore.ttsAvailable || !voiceStore.connected) return
             const msgs = chatStore.messages
             // Collect ALL assistant content from the current exchange
@@ -507,9 +545,7 @@ watch(
 
 onMounted(() => {
     connectVoice()
-    if (!chatStore.currentConversation) {
-        chatStore.createConversation().catch(console.error)
-    }
+    chatStore.restoreConversation().catch(console.error)
 })
 </script>
 
@@ -524,7 +560,7 @@ onMounted(() => {
         <div class="assistant-view__main">
             <div class="assistant-view__center">
                 <div class="assistant-view__orb-wrapper">
-                    <AliceOrb :state="orbState" :audio-level="audioLevel" @click="handleOrbClick" />
+                    <AliceOrb ref="orbRef" :state="orbState" :audio-level="audioLevel" @click="handleOrbClick" />
                     <!-- <Transition name="stop-hint-fade">
                         <button v-if="isInterruptible" class="assistant-view__stop-hint" @click.stop="handleOrbClick"
                             aria-label="Interrompi">
@@ -585,7 +621,7 @@ onMounted(() => {
                     @click="() => { sidePanelOpen = true; sidePanelTab = 'chart' }">
                     <AppIcon name="bar-chart" :size="16" :stroke-width="1.5" />
                     <span v-if="chartPayloads.length > 1" class="assistant-view__chart-badge">{{ chartPayloads.length
-                        }}</span>
+                    }}</span>
                 </button>
             </Transition>
 
@@ -641,7 +677,7 @@ onMounted(() => {
                         <AppIcon name="bar-chart" :size="14" :stroke-width="1.5" />
                         <span>Grafici</span>
                         <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                     </button>
                     <button v-if="hasWhiteboards" class="side-panel__tab"
                         :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
@@ -683,7 +719,7 @@ onMounted(() => {
                             <AppIcon name="chevron-left" :size="14" />
                         </button>
                         <span class="side-panel__chart-counter">{{ chartActiveIndex + 1 }} / {{ chartPayloads.length
-                            }}</span>
+                        }}</span>
                         <button class="side-panel__chart-nav-btn"
                             :disabled="chartActiveIndex >= chartPayloads.length - 1"
                             @click="chartActiveIndex = Math.min(chartPayloads.length - 1, chartActiveIndex + 1)">

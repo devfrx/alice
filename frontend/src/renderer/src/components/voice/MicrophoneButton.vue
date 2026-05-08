@@ -40,7 +40,19 @@ const emit = defineEmits<{
 
 const isActive = computed(() => store.isListening)
 const isProcessing = computed(() => store.isProcessing)
+const permissionDenied = computed(() => store.micPermission === 'denied')
 const level = computed(() => store.audioLevel)
+
+const buttonTitle = computed(() => {
+  if (!props.available) return 'Speech-to-Text non disponibile'
+  if (!props.connected) return 'Connessione vocale non pronta'
+  if (permissionDenied.value) return 'Permesso microfono negato: abilitalo nelle impostazioni'
+  if (isActive.value) return 'Clicca per fermare'
+  if (isProcessing.value) return 'Clicca per annullare'
+  return 'Clicca per parlare (tasto destro: microfono)'
+})
+
+const showPermissionNotice = computed(() => permissionDenied.value && !isActive.value && !isProcessing.value)
 
 /** Whether the device dropdown is visible. */
 const showDeviceMenu = ref(false)
@@ -123,11 +135,12 @@ const ringOuterStyle = computed(() => ({
       'mic-btn--active': isActive,
       'mic-btn--processing': isProcessing,
       'mic-btn--disabled': !available || !connected,
+      'mic-btn--permission-denied': permissionDenied,
       'mic-btn--click': clicking,
     }" :disabled="!available || !connected"
+      :aria-describedby="showPermissionNotice ? 'mic-permission-notice' : undefined"
       :aria-label="isActive ? 'Clicca per inviare' : isProcessing ? 'Clicca per annullare' : 'Clicca per parlare'"
-      :title="!available ? 'Servizio vocale non disponibile' : !connected ? 'Non connesso' : isActive ? 'Clicca per fermare' : isProcessing ? 'Clicca per annullare' : 'Clicca per parlare (tasto destro: microfono)'"
-      @click.prevent="onClick" @contextmenu="onContextMenu">
+      :title="buttonTitle" @click.prevent="onClick" @contextmenu="onContextMenu">
       <!-- Multi-ring audio visualization (recording) -->
       <span v-if="isActive" class="mic-ring mic-ring--inner" :style="ringInnerStyle" />
       <span v-if="isActive && level > 0.15" class="mic-ring mic-ring--mid" :style="ringMidStyle" />
@@ -145,6 +158,12 @@ const ringOuterStyle = computed(() => ({
         </span>
       </Transition>
     </button>
+
+    <Transition name="mic-notice">
+      <span v-if="showPermissionNotice" id="mic-permission-notice" class="mic-permission-notice" role="status">
+        Microfono bloccato
+      </span>
+    </Transition>
 
     <!-- Device selection dropdown (right-click) -->
     <Transition name="menu-fade">
@@ -226,6 +245,42 @@ const ringOuterStyle = computed(() => ({
 .mic-btn--disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+
+.mic-btn--permission-denied:not(:disabled) {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}
+
+.mic-permission-notice {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: calc(var(--z-dropdown) + 1);
+  width: max-content;
+  max-width: 180px;
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--warning);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.mic-notice-enter-active,
+.mic-notice-leave-active {
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.mic-notice-enter-from,
+.mic-notice-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 
 /* Click ripple */

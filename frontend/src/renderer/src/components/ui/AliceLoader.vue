@@ -1,4 +1,6 @@
 ﻿<script setup lang="ts">
+import BrandWordmark from '../branding/BrandWordmark.vue'
+
 /**
  * AliceLoader.vue — Full-screen animated splash loader.
  *
@@ -72,6 +74,12 @@ withDefaults(
                     <circle cx="60" cy="60" r="22" stroke="var(--accent)" stroke-width="12" opacity="0.06" />
                     <circle cx="60" cy="60" r="5" fill="var(--accent)" opacity="0.10" />
                 </svg>
+            </div>
+
+            <div class="alice-splash__brand" aria-hidden="true">
+                <span class="alice-splash__wordmark">
+                    <BrandWordmark brand="alce" />
+                </span>
             </div>
 
             <!-- Message ─────────────────────────────────────────── -->
@@ -190,6 +198,21 @@ withDefaults(
 .alice-splash__core {
     transform-origin: 60px 60px;
     animation: aliceCorePulse 2.4s ease-in-out infinite;
+}
+
+/* ── Brand ───────────────────────────────────────────────────── */
+
+.alice-splash__brand {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1;
+    opacity: var(--opacity-visible);
+}
+
+.alice-splash__wordmark {
+    display: inline-flex;
 }
 
 /* ── Message ─────────────────────────────────────────────────── */

@@ -14,10 +14,12 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
-import { useUIStore } from '../../stores/ui'
+import { useUIStore, type UIMode } from '../../stores/ui'
 import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
 import { api } from '../../services/api'
+import BrandThemeToggle from '../branding/BrandThemeToggle.vue'
+import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
@@ -36,6 +38,11 @@ const isOpen = computed(() => uiStore.sidebarOpen)
 /** Toggle collapsed state via central UI store. */
 function toggle(): void {
   uiStore.toggleSidebar()
+}
+
+function onModeTabClick(mode: UIMode): void {
+  uiStore.setMode(mode)
+  toggle()
 }
 
 // Conversations are loaded by useChat's onConnected handler after the
@@ -127,7 +134,9 @@ async function onOpenFile(id: string): Promise<void> {
       <aside v-if="isOpen" class="sidebar">
         <!-- Header with close button -->
         <div class="sidebar__header">
-          <span class="sidebar__brand">AL\CE</span>
+          <span class="sidebar__brand">
+            <BrandWordmark brand="alce" />
+          </span>
           <button class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
@@ -136,11 +145,12 @@ async function onOpenFile(id: string): Promise<void> {
         <!-- Mode switcher tabs: Assistente / Ibrido -->
         <div class="sidebar__mode-tabs">
           <router-link to="/assistant" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
-            @click="toggle">
+            :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'assistant' }" @click="onModeTabClick('assistant')">
             <AppIcon name="orb" :size="14" />
             <span>Assistente</span>
           </router-link>
-          <router-link to="/hybrid" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active" @click="toggle">
+          <router-link to="/hybrid" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
+            :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'hybrid' }" @click="onModeTabClick('hybrid')">
             <AppIcon name="hybrid-sidebar" :size="14" />
             <span>Ibrido</span>
           </router-link>
@@ -203,6 +213,11 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Footer: settings -->
         <div class="sidebar__footer">
+          <div class="sidebar__theme-row">
+            <span class="sidebar__theme-label">Tema</span>
+            <BrandThemeToggle />
+          </div>
+
           <router-link to="/settings" class="sidebar__link sidebar__link--footer" active-class="sidebar__link--active"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">
@@ -285,10 +300,12 @@ async function onOpenFile(id: string): Promise<void> {
 }
 
 .sidebar__brand {
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  letter-spacing: 3px;
-  color: var(--text-muted);
+  letter-spacing: 0;
+  color: var(--text-primary);
   text-transform: uppercase;
 }
 
@@ -340,35 +357,69 @@ async function onOpenFile(id: string): Promise<void> {
   align-items: center;
   justify-content: center;
   gap: var(--space-1-5);
-  padding: 6px var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
   border-radius: calc(var(--radius-md) - 3px);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-decoration: none;
   transition:
     background var(--transition-fast),
+    border-color var(--transition-fast),
     color var(--transition-fast),
     box-shadow var(--transition-fast);
   white-space: nowrap;
 }
 
 .sidebar__mode-tab:hover {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   background: var(--surface-hover);
 }
 
 .sidebar__mode-tab--active {
-  background: var(--surface-4);
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-xs);
+}
+
+.sidebar__mode-tab--active svg {
+  color: var(--accent);
 }
 
 /* ── Footer (impostazioni) ─────────────────────────────────── */
 .sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3) var(--space-3);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.sidebar__theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--input-height-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.sidebar__theme-label {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+}
+
+.sidebar__theme-row :deep(.brand-theme-toggle) {
+  flex: 0 0 auto;
 }
 
 .sidebar__link--footer {

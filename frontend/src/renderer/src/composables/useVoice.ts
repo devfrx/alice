@@ -15,6 +15,7 @@ import { BACKEND_HOST } from '../services/api'
 import { WebSocketManager } from '../services/ws'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
+import { useToast } from './useToast'
 import type { VoiceReadyMessage } from '../types/voice'
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,7 @@ function loadSelectedDeviceId(): string {
 export function useVoice(): UseVoiceReturn {
   const store = useVoiceStore()
   const chatStore = useChatStore()
+  const toast = useToast()
 
   // -- Local state --
   const isConnected = ref(false)
@@ -135,6 +137,14 @@ export function useVoice(): UseVoiceReturn {
   let workletNode: AudioWorkletNode | null = null
   let levelTimer: ReturnType<typeof setInterval> | null = null
   let workletBlobUrl: string | null = null
+  let lastVoiceNoticeAt = 0
+
+  function showVoiceNotice(message: string, type: 'warning' | 'error' = 'warning'): void {
+    const now = Date.now()
+    if (now - lastVoiceNoticeAt < 6000) return
+    lastVoiceNoticeAt = now
+    toast[type](message)
+  }
 
   // -- Silence-based auto-stop (continuous modes) --
   const SILENCE_THRESHOLD = 0.04        // normalised level below which we consider silence
@@ -447,8 +457,17 @@ export function useVoice(): UseVoiceReturn {
 
   async function startListening(): Promise<void> {
     if (store.isListening) return
+    if (!store.sttAvailable) {
+      showVoiceNotice('Speech-to-Text non disponibile: controlla lo stato dei servizi.')
+      return
+    }
     if (!voiceWs.isConnected) {
       console.warn('[ALICE Voice] Voice WS not connected, cannot start listening')
+      showVoiceNotice('Connessione vocale non ancora pronta. Riprova tra un momento.')
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showVoiceNotice('Microfono non disponibile in questo ambiente.', 'error')
       return
     }
 
@@ -474,8 +493,18 @@ export function useVoice(): UseVoiceReturn {
       store.micPermission = 'granted'
     } catch (err) {
       console.error('[ALICE Voice] Mic permission denied or error:', err)
-      micPermission.value = 'denied'
-      store.micPermission = 'denied'
+      const name = err instanceof DOMException ? err.name : ''
+      micPermission.value = name === 'NotFoundError' ? 'prompt' : 'denied'
+      store.micPermission = micPermission.value
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        showVoiceNotice('Permesso microfono negato. Abilitalo nelle impostazioni dell\'app o del browser.', 'error')
+      } else if (name === 'NotFoundError') {
+        showVoiceNotice('Nessun microfono trovato. Collega o seleziona un dispositivo audio.', 'error')
+      } else if (name === 'NotReadableError') {
+        showVoiceNotice('Il microfono risulta occupato da un altro programma.', 'error')
+      } else {
+        showVoiceNotice('Non riesco ad avviare il microfono. Controlla dispositivo e permessi.', 'error')
+      }
       return
     }
 
@@ -529,6 +558,7 @@ export function useVoice(): UseVoiceReturn {
       await audioContext.audioWorklet.addModule(workletBlobUrl)
     } catch (err) {
       console.error('[ALICE Voice] AudioWorklet addModule failed:', err)
+      showVoiceNotice('Acquisizione audio non avviata: AudioWorklet non disponibile.', 'error')
       // Cleanup on failure
       if (levelTimer) { clearInterval(levelTimer); levelTimer = null }
       analyserNode?.disconnect(); analyserNode = null

@@ -252,6 +252,16 @@
   --sidebar-collapsed: 42px;
 }
 
+/* ── Branding Assets ───────────────────────────────────────── */
+:root {
+  --brand-alce-logo: url('../logos/brand/alice_logo_light.webp');
+  --brand-alce-text-logo: url('../logos/brand/alice_text_logo_light.webp');
+  --brand-continuum-logo: url('../logos/brand/continuum_logo_light.webp');
+  --brand-continuum-text-logo: url('../logos/brand/continuum_text_logo_light.webp');
+  --brand-alce-desktop-logo: url('../logos/brand/desktop_app_alice_logo_light.webp');
+  --brand-continuum-desktop-logo: url('../logos/brand/desktop_app_continuum_logo_light.webp');
+}
+
 /* ── Legacy compat (consumed by electron-vite boilerplate) ── */
 :root {
   --color-background-mute: #232323;
@@ -572,6 +582,14 @@ textarea:focus:not(:focus-visible) {
 
   /* ── Legacy compat ───────────────────────────────────────── */
   --color-background-mute: #EAE4DB;
+
+  /* ── Branding Assets ─────────────────────────────────────── */
+  --brand-alce-logo: url('../logos/brand/alice_logo_dark.webp');
+  --brand-alce-text-logo: url('../logos/brand/alice_text_logo_dark.webp');
+  --brand-continuum-logo: url('../logos/brand/continuum_logo_dark.webp');
+  --brand-continuum-text-logo: url('../logos/brand/continuum_text_logo_dark.webp');
+  --brand-alce-desktop-logo: url('../logos/brand/desktop_app_alice_logo_dark.webp');
+  --brand-continuum-desktop-logo: url('../logos/brand/desktop_app_continuum_logo_dark.webp');
 }
 
 /* ── Light theme: selection highlight ───────────────────────── */

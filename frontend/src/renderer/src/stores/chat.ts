@@ -25,6 +25,25 @@ import type {
   ToolExecution,
 } from '../types/chat'
 
+const ACTIVE_CONVERSATION_STORAGE_KEY = 'alice_active_conversation_id'
+
+function loadStoredConversationId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function storeActiveConversationId(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, id)
+    else localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY)
+  } catch {
+    /* localStorage may be unavailable */
+  }
+}
+
 export const useChatStore = defineStore('chat', () => {
   // -----------------------------------------------------------------------
   // State
@@ -35,6 +54,11 @@ export const useChatStore = defineStore('chat', () => {
 
   /** The currently open conversation (includes messages). */
   const currentConversation = ref<ConversationDetail | null>(null)
+
+  watch(
+    () => currentConversation.value?.id ?? null,
+    (id) => storeActiveConversationId(id),
+  )
 
   /** Whether the LLM is currently streaming a response. */
   const isStreaming = ref(false)
@@ -70,6 +94,33 @@ export const useChatStore = defineStore('chat', () => {
       lastStreamEndedAt.value = Date.now()
     }
   })
+
+  function collapseRedundantDrafts(items: ConversationSummary[]): ConversationSummary[] {
+    const storedId = loadStoredConversationId()
+    const preferredDraftId =
+      currentConversation.value?.messages.length === 0 ? currentConversation.value.id : storedId
+    let keptUntitledDraft = false
+
+    return items.filter((conversation) => {
+      const hasMessages = conversation.message_count > 0
+      const hasTitle = !!conversation.title?.trim()
+      const isActive = conversation.id === currentConversation.value?.id
+      const isStreaming = conversation.id === streamingConversationId.value
+      const isStored = conversation.id === storedId
+      const isPreferredDraft = preferredDraftId ? conversation.id === preferredDraftId : false
+
+      if (hasMessages || hasTitle || isActive || isStreaming) return true
+      if (isPreferredDraft) {
+        keptUntitledDraft = true
+        return true
+      }
+      if (!keptUntitledDraft && !preferredDraftId && !isStored) {
+        keptUntitledDraft = true
+        return true
+      }
+      return false
+    })
+  }
 
   /** The conversation ID for which streaming is currently active. */
   const streamingConversationId = ref<string | null>(null)
@@ -208,7 +259,7 @@ export const useChatStore = defineStore('chat', () => {
         })
     }
 
-    conversations.value = [...localOnly, ...remote]
+    conversations.value = collapseRedundantDrafts([...localOnly, ...remote])
   }
 
   /** Load a full conversation (with messages) and set it as active. */
@@ -288,11 +339,57 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function reusableEmptyConversation(): ConversationSummary | null {
+    if (
+      currentConversation.value &&
+      currentConversation.value.messages.length === 0 &&
+      currentConversation.value.id !== streamingConversationId.value
+    ) {
+      return conversations.value.find((c) => c.id === currentConversation.value?.id) ?? {
+        id: currentConversation.value.id,
+        title: currentConversation.value.title,
+        created_at: currentConversation.value.created_at,
+        updated_at: currentConversation.value.updated_at,
+        message_count: 0,
+      }
+    }
+    return conversations.value.find((c) => c.message_count === 0 && c.id !== streamingConversationId.value) ?? null
+  }
+
+  /** Restore the best existing conversation without creating a new empty one. */
+  async function restoreConversation(): Promise<void> {
+    if (currentConversation.value) return
+    if (conversations.value.length === 0) {
+      await loadConversations()
+    }
+
+    const storedId = loadStoredConversationId()
+    if (storedId && conversations.value.some((c) => c.id === storedId)) {
+      await loadConversation(storedId)
+      return
+    }
+
+    const empty = reusableEmptyConversation()
+    if (empty) {
+      await loadConversation(empty.id)
+      return
+    }
+
+    const latest = conversations.value[0]
+    if (latest) await loadConversation(latest.id)
+  }
+
   /**
    * Start a fresh conversation and persist it to the backend immediately.
    * Falls back to local-only if the backend is unreachable.
    */
-  async function createConversation(): Promise<void> {
+  async function createConversation(): Promise<string> {
+    const reusable = reusableEmptyConversation()
+    if (reusable) {
+      await loadConversation(reusable.id)
+      return reusable.id
+    }
+
     const now = new Date().toISOString()
     let newId = crypto.randomUUID()
 
@@ -350,6 +447,8 @@ export const useChatStore = defineStore('chat', () => {
         console.warn('[chat store] createConversation: backend unreachable, keeping local-only')
       }
     }
+
+    return newId
   }
 
   /** Delete a conversation on the backend and remove it from local state. */
@@ -371,6 +470,7 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value = conversations.value.filter((c) => c.id !== id)
     if (currentConversation.value?.id === id) {
       currentConversation.value = null
+      storeActiveConversationId(null)
     }
   }
 
@@ -385,6 +485,7 @@ export const useChatStore = defineStore('chat', () => {
 
     conversations.value = []
     currentConversation.value = null
+    storeActiveConversationId(null)
   }
 
   /** Rename a conversation on the backend and update local state. */
@@ -798,6 +899,7 @@ export const useChatStore = defineStore('chat', () => {
     // REST actions
     loadConversations,
     loadConversation,
+    restoreConversation,
     createConversation,
     deleteConversation,
     deleteAllConversations,

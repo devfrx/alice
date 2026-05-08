@@ -392,7 +392,13 @@ export function useChat(): UseChatReturn {
       store.cancelStream()
     }
 
-    // Auto-create a conversation if none exists yet.
+    // Reopen an existing conversation before creating a new one. This prevents
+    // reloads from producing a trail of empty chats.
+    if (!conversationId && !store.currentConversation) {
+      await store.restoreConversation()
+    }
+
+    // Auto-create only when the user actually sends and no existing target exists.
     if (!conversationId && !store.currentConversation) {
       await store.createConversation()
     }

@@ -46,6 +46,7 @@ const SERVICE_META: Record<string, { label: string; icon: AppIconName }> = {
     vram: { label: 'VRAM Monitor', icon: 'cpu' },
     trellis: { label: 'TRELLIS', icon: 'box-3d' },
     trellis2: { label: 'TRELLIS 2', icon: 'box-3d' },
+    trellis2multiview: { label: 'TRELLIS 2 MV', icon: 'box-3d' },
 }
 
 const windowControls = window.electron?.windowControls

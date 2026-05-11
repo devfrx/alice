@@ -12,6 +12,7 @@ Endpoints:
 * ``GET    /api/services/{name}/config``         — current trellis* config.
 * ``POST   /api/services/{name}/configure``      — update trellis* config.
 * ``GET    /api/services/trellis2/setup-guide``  — markdown setup walkthrough.
+* ``GET    /api/services/trellis2multiview/setup-guide`` — multi-view variant.
 """
 
 from __future__ import annotations
@@ -73,6 +74,18 @@ def _config_service(request: Request):
     return svc
 
 
+# Per-variant model / directory attribute names on the Trellis* config
+# sections.  Centralised here so the route helpers stay declarative.
+_TRELLIS_VARIANT_KEYS: dict[str, tuple[str, str]] = {
+    "trellis": ("trellis_model", "trellis_dir"),
+    "trellis2": ("trellis2_model", "trellis2_dir"),
+    "trellis2multiview": (
+        "trellis2multiview_model",
+        "trellis2multiview_dir",
+    ),
+}
+
+
 async def _sync_trellis_service(request: Request, name: str) -> None:
     """Apply the latest Trellis config to the orchestrator service."""
     ctx = _ctx(request)
@@ -83,8 +96,9 @@ async def _sync_trellis_service(request: Request, name: str) -> None:
         return
 
     launcher, cwd = resolve_trellis_launcher(name)
-    model_key = "trellis_model" if name == "trellis" else "trellis2_model"
-    dir_key = "trellis_dir" if name == "trellis" else "trellis2_dir"
+    model_key, dir_key = _TRELLIS_VARIANT_KEYS.get(
+        name, ("trellis_model", "trellis_dir"),
+    )
     kwargs = {
         "service_url": section.service_url,
         "launcher": launcher,
@@ -290,6 +304,12 @@ _TRELLIS_CONFIG_KEYS: dict[str, dict[str, str]] = {
         "trellis2_dir": "trellis2.trellis2_dir",
         "trellis2_model": "trellis2.trellis2_model",
     },
+    "trellis2multiview": {
+        "enabled": "trellis2multiview.enabled",
+        "service_url": "trellis2multiview.service_url",
+        "trellis2multiview_dir": "trellis2multiview.trellis2multiview_dir",
+        "trellis2multiview_model": "trellis2multiview.trellis2multiview_model",
+    },
 }
 
 
@@ -374,6 +394,78 @@ async def trellis_setup_guide() -> dict[str, str]:
     }
 
 
+_TRELLIS2_MULTIVIEW_GUIDE_MD = """\
+# TRELLIS.2 Multi-view — Guida setup
+
+TRELLIS.2 multi-view è una variante di TRELLIS.2 che accetta **più foto
+dello stesso oggetto da angolazioni diverse** (1-6 immagini) per
+ricostruzioni 3D più accurate.  Gira come microservizio separato sulla
+porta **8092** e può coesistere con TRELLIS.2 single-image (8091).
+
+## 1. Prerequisiti
+
+Identici a TRELLIS.2: GPU NVIDIA ≥ 16 GB VRAM, CUDA Toolkit 12.x
+(*non* 13.x), Visual Studio Build Tools 2022 con workload C++,
+[uv](https://github.com/astral-sh/uv) e Git.
+
+## 2. Clonare il repository multi-view
+
+```powershell
+git clone https://huggingface.co/spaces/cpuai/Trellis.2.multiview "C:\\Users\\<tu>\\Source\\TRELLIS.2.multiview"
+```
+
+(Si tratta di uno HuggingFace Space, non di un repo GitHub: usa `git clone`
+direttamente sull'URL `huggingface.co/spaces/...`).
+
+## 3. Configurare AL\\CE
+
+In questa pagina:
+
+1. Incolla il percorso nel campo **TRELLIS.2 Multi-view directory**.
+2. Premi **Salva** e abilita il servizio.
+
+Oppure modifica `%APPDATA%\\alice\\user.yaml`:
+
+```yaml
+trellis2multiview:
+  enabled: true
+  trellis2multiview_dir: "C:/Users/<tu>/Source/TRELLIS.2.multiview"
+```
+
+## 4. Installazione one-shot
+
+Al primo Start AL\\CE lancia automaticamente
+`scripts/start-trellis2multiview.ps1 -Install` che:
+
+- crea un venv Python 3.10 dedicato dentro `TRELLIS.2.multiview\\.venv`;
+- installa torch 2.7.0 + cu128, flash-attn (wheel prebuilt),
+  nvdiffrast, nvdiffrec, CuMesh, FlexGEMM e o-voxel (con le stesse
+  patch Windows usate per TRELLIS.2 single-image);
+- al primo run scarica i pesi `microsoft/TRELLIS.2-4B` (~8 GB).
+
+Tempo stimato: **30-60 min** la prima volta.
+
+## 5. Uso
+
+Una volta `up`, l'LLM espone lo strumento `cad_generate_from_multiview`
+che accetta una lista di **1-6 percorsi immagine** caricati prima dalla
+chat.  Più angolazioni distinte = ricostruzione più accurata; oltre 6
+viste i miglioramenti sono marginali e crescono i tempi.
+
+I file GLB generati finiscono in `data/3d_models/` come per TRELLIS.2.
+"""
+
+
+@router.get("/services/trellis2multiview/setup-guide")
+async def trellis2_multiview_setup_guide() -> dict[str, str]:
+    """Return the in-app setup walkthrough for TRELLIS.2 multi-view."""
+    return {
+        "service": "trellis2multiview",
+        "format": "markdown",
+        "content": _TRELLIS2_MULTIVIEW_GUIDE_MD,
+    }
+
+
 @router.get("/services/{name}/config")
 async def get_trellis_config(
     request: Request, name: str,
@@ -438,7 +530,7 @@ async def configure_trellis(
 
     cfg_svc = _config_service(request)
     updated: dict[str, Any] = {}
-    dir_key = "trellis_dir" if name == "trellis" else "trellis2_dir"
+    _, dir_key = _TRELLIS_VARIANT_KEYS.get(name, ("trellis_model", "trellis_dir"))
 
     for key, value in body.items():
         path = allowed.get(key)

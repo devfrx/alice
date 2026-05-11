@@ -170,7 +170,7 @@ export const useServicesStore = defineStore('services', () => {
   }
 
   async function configureTrellis(
-    serviceName: 'trellis' | 'trellis2',
+    serviceName: 'trellis' | 'trellis2' | 'trellis2multiview',
     payload: Record<string, unknown>,
   ): Promise<void> {
     const r = await fetch(
@@ -192,7 +192,7 @@ export const useServicesStore = defineStore('services', () => {
   }
 
   async function loadTrellisConfig(
-    serviceName: 'trellis' | 'trellis2',
+    serviceName: 'trellis' | 'trellis2' | 'trellis2multiview',
   ): Promise<Record<string, unknown>> {
     const r = await fetch(
       `${API}/services/${encodeURIComponent(serviceName)}/config`,
@@ -202,8 +202,12 @@ export const useServicesStore = defineStore('services', () => {
     return body.config
   }
 
-  async function loadTrellisGuide(): Promise<string> {
-    const r = await fetch(`${API}/services/trellis2/setup-guide`)
+  async function loadTrellisGuide(
+    serviceName: 'trellis2' | 'trellis2multiview' = 'trellis2',
+  ): Promise<string> {
+    const r = await fetch(
+      `${API}/services/${encodeURIComponent(serviceName)}/setup-guide`,
+    )
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const body = (await r.json()) as { content: string }
     return body.content

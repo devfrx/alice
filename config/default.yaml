@@ -504,3 +504,46 @@ trellis2:
   decimation_target: 500000
   texture_size: 4096
   seed: -1
+  # TRELLIS.2 esporta sempre metallicFactor=1.0 + roughnessFactor=1.0 e
+  # delega tutto a una metallicRoughnessTexture predetta. Su personaggi
+  # stilizzati / anime il canale "metallic" e' inaffidabile e satura,
+  # quindi senza HDRI il modello viene renderizzato quasi nero.
+  # force_diffuse_materials=true patcha il GLB scaricato impostando
+  # metallicFactor=0 (e roughnessFactor=diffuse_roughness_factor),
+  # restituendo il vero baseColorTexture come albedo diffusa.
+  # Disabilita solo se vuoi il look "raw" di TRELLIS.2.
+  force_diffuse_materials: true
+  diffuse_roughness_factor: 0.85
+
+# ----------------------------------------------------------------------
+# TRELLIS.2 Multi-view configuration
+# ----------------------------------------------------------------------
+# Variante multi-view del fork "cpuai/Trellis.2.multiview": accetta da
+# 1 a 6 foto dello stesso oggetto da angolazioni diverse e produce una
+# ricostruzione 3D piu' accurata rispetto al single-image.  Gira come
+# microservizio separato sulla porta 8092 con un proprio venv (puo'
+# coesistere con TRELLIS.2 single-image).
+trellis2multiview:
+  enabled: true
+  trellis2multiview_dir: ""  # vuoto = auto-detect (../TRELLIS.2.multiview)
+  service_url: "http://localhost:8092"
+  # 1800s (30 min) — il multi-view fa piu' lavoro di sampling rispetto
+  # al single-image; il primo run scarica ~8GB di pesi.
+  request_timeout_s: 1800
+  max_model_size_mb: 10000
+  model_output_dir: "data/3d_models"
+  auto_vram_swap: true
+  trellis2multiview_model: "microsoft/TRELLIS.2-4B"
+  pipeline_type: "1024"
+  allowed_pipeline_types:
+    - "512"
+    - "1024"
+  decimation_target: 500000
+  texture_size: 4096
+  seed: -1
+  # Cap lato config: il server impone comunque un suo limite hardcoded
+  # (_MAX_INPUT_IMAGES) per evitare che client malevoli esauriscano la
+  # VRAM.  Oltre 6 viste i miglioramenti diventano marginali.
+  max_input_images: 6
+  force_diffuse_materials: true
+  diffuse_roughness_factor: 0.85

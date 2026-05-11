@@ -404,6 +404,26 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         except Exception as exc:
             logger.warning("Orchestrator: failed to attach TRELLIS.2: {}", exc)
+    if (
+        getattr(config, "trellis2multiview", None)
+        and config.trellis2multiview.enabled
+    ):
+        try:
+            launcher, cwd = resolve_trellis_launcher("trellis2multiview")
+            await orchestrator.attach_started(
+                TrellisManagedService(
+                    name="trellis2multiview",
+                    service_url=config.trellis2multiview.service_url,
+                    launcher=launcher,
+                    cwd=cwd,
+                    model=config.trellis2multiview.trellis2multiview_model,
+                    trellis_dir=config.trellis2multiview.trellis2multiview_dir,
+                ),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Orchestrator: failed to attach TRELLIS.2 multi-view: {}", exc,
+            )
 
     # -- VRAM event handlers ------------------------------------------------
     # These handlers ONLY log VRAM pressure.  Mutating ``stt_cfg`` /

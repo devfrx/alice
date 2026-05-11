@@ -13,6 +13,8 @@
 import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
+import HybridStateWaveform from '../components/assistant/HybridStateWaveform.vue'
+import StatePreviewControls from '../components/assistant/StatePreviewControls.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
@@ -32,6 +34,7 @@ import { useVoiceStore } from '../stores/voice'
 import type { CadModelPayload, ChartPayload, WhiteboardPayload } from '../types/chat'
 import { isWhiteboardPayload } from '../types/chat'
 import { api } from '../services/api'
+import type { OrbState } from '../components/assistant/veil-orb/types'
 
 const ImmersiveCADCanvas = defineAsyncComponent(
     () => import('../components/assistant/ImmersiveCADCanvas.vue')
@@ -47,6 +50,7 @@ const chatStore = useChatStore()
 const chatApi = inject(ChatApiKey, null)
 const _router = useRouter()
 const _route = useRoute()
+const isDev = import.meta.env.DEV
 if (!chatApi) {
     console.error('[HybridView] ChatApiKey injection failed — redirecting to home')
     _router.replace({ name: 'home' })
@@ -100,13 +104,37 @@ async function handleBranch(messageId: string): Promise<void> {
     await chatStore.branchConversation(messageId)
 }
 
+const hasAgentProcessing = computed<boolean>(() => {
+    if (chatStore.activeToolExecutions.length > 0) return true
+    for (const run of chatStore.agentRuns.values()) {
+        if (run.mode === 'agent' && run.state === 'running') return true
+    }
+    return false
+})
+
 const orbState = computed<'idle' | 'listening' | 'thinking' | 'speaking' | 'processing'>(() => {
     if (voiceStore.isSpeaking) return 'speaking'
     if (voiceStore.isListening) return 'listening'
     if (voiceStore.isProcessing) return 'processing'
+    if (cadGenerationInProgress.value !== null) return 'processing'
+    if (hasAgentProcessing.value) return 'processing'
     if (chatStore.isStreamingCurrentConversation) return 'thinking'
     return 'idle'
 })
+
+const previewState = ref<OrbState | null>(null)
+const activeAnimationState = computed<OrbState>(() => previewState.value ?? orbState.value)
+const activeAnimationAudioLevel = computed(() => previewState.value === 'listening'
+    ? Math.max(voiceStore.audioLevel, 0.58)
+    : voiceStore.audioLevel)
+
+function startAnimationPreview(state: OrbState): void {
+    previewState.value = state
+}
+
+function stopAnimationPreview(): void {
+    previewState.value = null
+}
 
 const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
 
@@ -402,16 +430,17 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="hybrid-view" aria-label="Ibrido" :class="{ 'hybrid-view--dragging': isDraggingDivider }">
-        <AmbientBackground :state="orbState" :audio-level="voiceStore.audioLevel" :subtle="true" />
+        <AmbientBackground :state="activeAnimationState" :audio-level="activeAnimationAudioLevel" :subtle="true" />
 
         <!-- ── Left: compact conversation pane ── -->
         <aside class="hybrid-view__left" :style="{ width: leftPaneWidth + 'px' }">
             <div class="hybrid-view__pane-header">
                 <span class="hybrid-view__pane-title">Conversazione</span>
-                <span class="hybrid-view__state-pill" :class="`state-pill--${orbState}`">
-                    <AliceSpinner v-if="orbState !== 'idle'" size="xs" />
-                    <span>{{ orbState === 'idle' ? 'Pronto' : orbState === 'thinking' ? 'Elabora…' : orbState ===
-                        'listening' ? 'Ascolto' : orbState === 'speaking' ? 'Parla' : 'Processa' }}</span>
+                <span class="hybrid-view__state-pill" :class="`state-pill--${activeAnimationState}`">
+                    <AliceSpinner v-if="activeAnimationState !== 'idle'" size="xs" />
+                    <span>{{ activeAnimationState === 'idle' ? 'Pronto' : activeAnimationState === 'thinking' ?
+                        'Elabora…' : activeAnimationState === 'listening' ? 'Ascolto' : activeAnimationState ===
+                            'speaking' ? 'Parla' : 'Processa' }}</span>
                 </span>
             </div>
 
@@ -436,6 +465,11 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="hybrid-view__input-zone">
+                <HybridStateWaveform class="hybrid-view__wave-field" :state="activeAnimationState"
+                    :audio-level="activeAnimationAudioLevel" compact />
+                <StatePreviewControls v-if="isDev" class="hybrid-view__preview-controls" :active-state="previewState"
+                    compact orientation="horizontal" @preview-start="startAnimationPreview"
+                    @preview-end="stopAnimationPreview" />
                 <TranscriptOverlay :text="transcript" :is-processing="voiceStore.isProcessing"
                     :is-recording="voiceStore.isListening" :audio-level="voiceStore.audioLevel"
                     :duration="voiceStore.formattedDuration" :auto-send="!voiceStore.confirmTranscript"
@@ -709,13 +743,43 @@ onBeforeUnmount(() => {
 .hybrid-view__input-zone {
     position: relative;
     flex-shrink: 0;
+    isolation: isolate;
+    padding-top: 72px;
+    background: linear-gradient(to top,
+            color-mix(in srgb, var(--surface-0) 92%, transparent) 0%,
+            color-mix(in srgb, var(--surface-0) 72%, transparent) 68%,
+            transparent 100%);
+    overflow: visible;
+}
+
+.hybrid-view__wave-field {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+    z-index: 0;
+    height: 160px;
+    opacity: 0.98;
+}
+
+.hybrid-view__preview-controls {
+    position: absolute;
+    top: 18px;
+    right: 14px;
+    z-index: 2;
 }
 
 /* Override ChatInput to sit flush inside the pane */
 .hybrid-view__input-zone :deep(.ci) {
+    position: relative;
+    z-index: 1;
     border-left: none;
     border-right: none;
+    border-top: none;
     border-bottom: none;
+    background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 /* ── Divider ────────────────────────────────────────────────── */

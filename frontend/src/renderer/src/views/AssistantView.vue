@@ -33,6 +33,7 @@ import { isWhiteboardPayload } from '../types/chat'
 import { api } from '../services/api'
 import AppIcon from '../components/ui/AppIcon.vue'
 import CADGenerationPlaceholder from '../components/chat/CADGenerationPlaceholder.vue'
+import type { OrbState } from '../components/assistant/veil-orb/types'
 
 const ImmersiveCADCanvas = defineAsyncComponent(
     () => import('../components/assistant/ImmersiveCADCanvas.vue')
@@ -95,6 +96,14 @@ const latestAgentRunId = computed<string | null>(() => {
         }
     }
     return latestId
+})
+
+const hasAgentProcessing = computed<boolean>(() => {
+    if (chatStore.activeToolExecutions.length > 0) return true
+    for (const run of chatStore.agentRuns.values()) {
+        if (run.mode === 'agent' && run.state === 'running') return true
+    }
+    return false
 })
 
 /** True when an activity feed exists and the sidebar is currently hidden. */
@@ -371,11 +380,21 @@ const orbState = computed<'idle' | 'listening' | 'thinking' | 'speaking' | 'proc
     if (voiceStore.isListening) return 'listening'
     if (voiceStore.isProcessing) return 'processing'
     if (cadGenerationInProgress.value !== null) return 'processing'
+    if (hasAgentProcessing.value) return 'processing'
     if (chatStore.isStreamingCurrentConversation) return 'thinking'
     return 'idle'
 })
 
 const audioLevel = computed(() => voiceStore.audioLevel)
+const previewOrbState = ref<OrbState | null>(null)
+const visualState = computed<OrbState>(() => previewOrbState.value ?? orbState.value)
+const visualAudioLevel = computed(() => previewOrbState.value === 'listening'
+    ? Math.max(audioLevel.value, 0.58)
+    : audioLevel.value)
+
+function handleOrbPreviewState(state: OrbState | null): void {
+    previewOrbState.value = state
+}
 
 /** Last assistant response for display. */
 const lastResponse = computed(() => {
@@ -554,13 +573,14 @@ onMounted(() => {
         'assistant-view--panel-open': sidePanelOpen && (hasCadPanel || hasCharts || hasWhiteboards),
         'assistant-view--dragging': isDraggingPanel
     }" :style="{ '--panel-width': `${sidePanelWidth}px` }">
-        <AmbientBackground :state="orbState" :audio-level="audioLevel" />
+        <AmbientBackground :state="visualState" :audio-level="visualAudioLevel" />
 
         <!-- Main area (orb + content) -->
         <div class="assistant-view__main">
             <div class="assistant-view__center">
                 <div class="assistant-view__orb-wrapper">
-                    <AliceOrb ref="orbRef" :state="orbState" :audio-level="audioLevel" @click="handleOrbClick" />
+                    <AliceOrb ref="orbRef" :state="orbState" :audio-level="audioLevel" @click="handleOrbClick"
+                        @preview-state-change="handleOrbPreviewState" />
                     <!-- <Transition name="stop-hint-fade">
                         <button v-if="isInterruptible" class="assistant-view__stop-hint" @click.stop="handleOrbClick"
                             aria-label="Interrompi">
@@ -775,7 +795,7 @@ onMounted(() => {
             :key="pendingConfirmationsList[0].executionId" :confirmation="pendingConfirmationsList[0]"
             @respond="respondToConfirmation" />
 
-        <AgentActivitySidebar @reply="onAgentReply" />
+        <AgentActivitySidebar side="left" @reply="onAgentReply" />
     </div>
 </template>
 
@@ -1081,7 +1101,7 @@ onMounted(() => {
 /* ── Agent activity sidebar toggle ── */
 .assistant-view__agent-toggle {
     position: absolute;
-    right: 16px;
+    left: 16px;
     top: 16px;
     z-index: var(--z-sticky);
     display: flex;

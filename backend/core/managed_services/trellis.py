@@ -34,12 +34,17 @@ def resolve_trellis_launcher(name: str) -> tuple[Path | None, Path | None]:
     """Return the bundled launcher script and working directory for *name*.
 
     Args:
-        name: ``"trellis"`` or ``"trellis2"``.
+        name: ``"trellis"``, ``"trellis2"`` or ``"trellis2multiview"``.
 
     Returns:
         ``(launcher, cwd)`` when the script exists, otherwise ``(None, None)``.
     """
-    script_name = "start-trellis.ps1" if name == "trellis" else "start-trellis2.ps1"
+    script_map = {
+        "trellis": "start-trellis.ps1",
+        "trellis2": "start-trellis2.ps1",
+        "trellis2multiview": "start-trellis2multiview.ps1",
+    }
+    script_name = script_map.get(name, f"start-{name}.ps1")
     if getattr(sys, "frozen", False):
         base = Path(sys.executable).resolve().parent
     else:
@@ -195,7 +200,14 @@ class TrellisManagedService(ManagedService):
         if self._port is not None:
             argv.extend(["-Port", str(self._port)])
         if self._trellis_dir:
-            dir_flag = "-TrellisDir" if self.name == "trellis" else "-Trellis2Dir"
+            # Each launcher exposes its directory under a different
+            # PowerShell parameter name; keep them in sync here.
+            dir_flag_map = {
+                "trellis": "-TrellisDir",
+                "trellis2": "-Trellis2Dir",
+                "trellis2multiview": "-Trellis2MultiviewDir",
+            }
+            dir_flag = dir_flag_map.get(self.name, "-TrellisDir")
             argv.extend([dir_flag, self._trellis_dir])
         if os.name == "nt" and launcher_str.lower().endswith(".ps1"):
             argv.append("-NoPrompt")

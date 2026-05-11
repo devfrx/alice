@@ -26,6 +26,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
     click: []
+    'preview-state-change': [state: OrbState | null]
 }>()
 
 const isDev = import.meta.env.DEV
@@ -87,6 +88,7 @@ watch(() => props.audioLevel, (l) => {
 function startDevPreview(state: OrbState): void {
     if (!isDev) return
     previewState.value = state
+    emit('preview-state-change', state)
     engine?.setState(state)
     engine?.setAudioLevel(state === 'listening' ? Math.max(props.audioLevel, 0.58) : props.audioLevel)
 }
@@ -94,6 +96,7 @@ function startDevPreview(state: OrbState): void {
 function stopDevPreview(): void {
     if (!previewState.value) return
     previewState.value = null
+    emit('preview-state-change', null)
     engine?.setState(props.state)
     engine?.setAudioLevel(props.audioLevel)
 }

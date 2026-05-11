@@ -21,6 +21,7 @@
 import { computed, ref, toRef, watch } from 'vue'
 
 import AppIcon from '../ui/AppIcon.vue'
+import AgentRunSummary from './AgentRunSummary.vue'
 import { useAgentActivity } from '../../composables/useAgentActivity'
 import type { AgentRun, AgentRunState } from '../../types/agent'
 
@@ -38,7 +39,6 @@ const feed = useAgentActivity(runRef)
 
 const toolActivity = computed(() => feed.value?.toolActivity ?? [])
 const planSteps = computed(() => feed.value?.planSteps ?? [])
-const stats = computed(() => feed.value?.stats ?? null)
 const showPlanSection = computed(() => planSteps.value.length > 1)
 
 // ---------------------------------------------------------------------------
@@ -108,27 +108,19 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
 <template>
   <section class="agent-plan" :class="stateClass" aria-label="Attività dell'agente">
     <button class="agent-plan__head" type="button" :aria-expanded="!collapsed" @click="toggle">
-      <span class="agent-plan__badge">Agente</span>
-      <span class="agent-plan__title">{{ headerLabel }}</span>
-
-      <span v-if="stats && stats.toolCallsTotal > 0" class="agent-plan__chip"
-        :title="`${stats.toolCallsTotal} chiamata${stats.toolCallsTotal === 1 ? '' : 'e'} a strumenti`">
-        <AppIcon name="bar-chart" :size="10" :stroke-width="1.75" />
-        {{ stats.toolCallsTotal }}
+      <span class="agent-plan__mark" aria-hidden="true">
+        <AppIcon name="cpu" :size="14" />
       </span>
-      <span v-if="run.replans > 0" class="agent-plan__chip" :title="`Ripianificazioni: ${run.replans}`">
-        <AppIcon name="refresh-cw" :size="10" :stroke-width="1.75" />
-        {{ run.replans }}
-      </span>
-      <span v-if="run.retries_total > 0" class="agent-plan__chip agent-plan__chip--warn"
-        :title="`Retry totali: ${run.retries_total}`">
-        <AppIcon name="refresh-cw" :size="10" :stroke-width="1.75" />
-        {{ run.retries_total }}
+      <span class="agent-plan__title-group">
+        <span class="agent-plan__eyebrow">Attività agente</span>
+        <span class="agent-plan__title">{{ headerLabel }}</span>
       </span>
 
       <AppIcon name="chevron-down" :size="12" :stroke-width="1.75" class="agent-plan__chevron"
         :class="{ 'agent-plan__chevron--open': !collapsed }" />
     </button>
+
+    <AgentRunSummary class="agent-plan__summary" :run="run" :feed="feed" compact />
 
     <div class="agent-plan__body" :class="{ 'agent-plan__body--collapsed': collapsed }">
       <div class="agent-plan__body-inner">
@@ -153,6 +145,7 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
                 :class="{ 'agent-plan__activity-result--err': item.resultIsError }">
                 {{ item.resultPreview }}
               </span>
+              <span class="agent-plan__activity-name">{{ item.toolName }}</span>
             </div>
           </li>
         </ol>
@@ -172,6 +165,7 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
               :class="`agent-plan__plan-item--${step.status}`">
               <span class="agent-plan__plan-num">{{ step.index + 1 }}</span>
               <span class="agent-plan__plan-desc">{{ step.description }}</span>
+              <span v-if="step.expectedOutcome" class="agent-plan__plan-outcome">{{ step.expectedOutcome }}</span>
               <span v-if="step.verdict" class="agent-plan__plan-verdict">
                 {{ step.verdict.reason }}
               </span>
@@ -195,7 +189,7 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
   margin: var(--space-2) 0 var(--space-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-1);
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
   color: var(--text-primary);
   font-size: var(--text-sm);
   overflow: hidden;
@@ -215,7 +209,7 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
   top: 0;
   bottom: 0;
   left: 0;
-  width: 3px;
+  width: 2px;
   background: var(--surface-3);
   transition: background var(--transition-normal);
 }
@@ -241,7 +235,7 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + 3px);
+  padding: var(--space-2-5) var(--space-3) var(--space-2-5) calc(var(--space-3) + 3px);
   background: transparent;
   border: 0;
   color: inherit;
@@ -255,21 +249,36 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
   background: var(--surface-hover);
 }
 
-.agent-plan__badge {
+.agent-plan__mark {
   display: inline-flex;
   align-items: center;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-pill);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
   background: var(--accent-medium);
   color: var(--accent);
+  flex-shrink: 0;
+}
+
+.agent-plan__title-group {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.agent-plan__eyebrow {
+  color: var(--text-muted);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  line-height: var(--leading-tight);
   text-transform: uppercase;
 }
 
 .agent-plan__title {
-  flex: 1;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--text-primary);
@@ -279,30 +288,14 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
   white-space: nowrap;
 }
 
-.agent-plan__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px var(--space-1-5);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: var(--text-2xs);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-
-.agent-plan__chip--warn {
-  color: var(--warning);
-  border-color: var(--warning-border);
-  background: var(--warning-bg);
-}
-
 .agent-plan__chevron {
   color: var(--text-muted);
   transition: transform var(--transition-fast);
   flex-shrink: 0;
+}
+
+.agent-plan__summary {
+  border-top: 1px solid var(--border);
 }
 
 .agent-plan__chevron--open {
@@ -345,15 +338,27 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
 
 .agent-plan__activity-item {
   display: grid;
-  grid-template-columns: 16px 1fr;
+  grid-template-columns: 18px 1fr;
   gap: var(--space-2);
   align-items: start;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
   color: var(--text-primary);
-  transition: opacity var(--transition-fast);
+  transition: opacity var(--transition-fast), border-color var(--transition-fast);
 }
 
 .agent-plan__activity-item--pending {
   opacity: 0.55;
+}
+
+.agent-plan__activity-item--running {
+  border-color: var(--accent-border);
+}
+
+.agent-plan__activity-item--failed {
+  border-color: var(--danger-border);
 }
 
 .agent-plan__dot {
@@ -439,6 +444,16 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
 }
 
 .agent-plan__activity-result {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  line-height: var(--leading-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-plan__activity-name {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--text-2xs);
   color: var(--text-muted);
   line-height: var(--leading-snug);
@@ -534,6 +549,14 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
   margin-top: 2px;
   color: var(--text-muted);
   font-style: italic;
+  font-size: var(--text-2xs);
+}
+
+.agent-plan__plan-outcome {
+  grid-column: 2;
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
   font-size: var(--text-2xs);
 }
 

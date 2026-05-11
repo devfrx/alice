@@ -35,6 +35,11 @@ from backend.plugins.cad_generator.client_v2 import (
     Trellis2Client,
     _ALLOWED_PIPELINE_TYPES as _TRELLIS2_PIPELINES,
 )
+from backend.plugins.cad_generator.client_multiview import (
+    Trellis2MultiviewClient,
+    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_MULTIVIEW_PIPELINES,
+)
+from backend.plugins.cad_generator.glb_postprocess import patch_glb_materials
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -73,6 +78,11 @@ class CadGeneratorPlugin(BasePlugin):
         # ``None`` and the ``cad_generate_from_image`` tool is hidden
         # from the LLM by ``get_tools``.
         self._client_v2: Trellis2Client | None = None
+        # TRELLIS.2 multi-view client.  Same lazy-creation rule as
+        # ``_client_v2``: only instantiated when
+        # ``ctx.config.trellis2multiview.enabled`` is True so that idle
+        # installations don't poll a port nobody is listening on.
+        self._client_multiview: Trellis2MultiviewClient | None = None
         self._request_timeout_s: int = 1200
         # Cached connection status + timestamp for TTL-based refresh.
         self._cached_status: ConnectionStatus = ConnectionStatus.UNKNOWN
@@ -91,6 +101,11 @@ class CadGeneratorPlugin(BasePlugin):
     def client_v2(self) -> Trellis2Client | None:
         """Expose the TRELLIS.2 client for route-level access (may be ``None``)."""
         return self._client_v2
+
+    @property
+    def client_multiview(self) -> Trellis2MultiviewClient | None:
+        """Expose the TRELLIS.2 multi-view client (may be ``None``)."""
+        return self._client_multiview
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -150,14 +165,42 @@ class CadGeneratorPlugin(BasePlugin):
                     cfg2.service_url,
                 )
 
+        # Optional sibling: TRELLIS.2 multi-view (image-list-to-3D).
+        # Independent of TRELLIS.2 single-image: each variant has its
+        # own venv, port and config block so the user can enable any
+        # combination of the three.
+        cfg_mv = getattr(ctx.config, "trellis2multiview", None)
+        if cfg_mv is not None and cfg_mv.enabled:
+            self._client_multiview = Trellis2MultiviewClient(
+                base_url=cfg_mv.service_url,
+                timeout_s=cfg_mv.request_timeout_s,
+                max_model_size_mb=cfg_mv.max_model_size_mb,
+            )
+            output_dir_mv = PROJECT_ROOT / cfg_mv.model_output_dir
+            output_dir_mv.mkdir(parents=True, exist_ok=True)
+            if await self._client_multiview.health_check():
+                logger.info(
+                    "TRELLIS.2 multi-view microservice reachable at {}",
+                    cfg_mv.service_url,
+                )
+            else:
+                logger.warning(
+                    "TRELLIS.2 multi-view microservice not reachable at {} — "
+                    "multi-image-to-3D will fail until start-trellis2multiview.ps1 runs",
+                    cfg_mv.service_url,
+                )
+
     async def cleanup(self) -> None:
-        """Close the TRELLIS and TRELLIS.2 HTTP clients."""
+        """Close the TRELLIS, TRELLIS.2 and TRELLIS.2 multi-view HTTP clients."""
         if self._client is not None:
             await self._client.close()
             self._client = None
         if self._client_v2 is not None:
             await self._client_v2.close()
             self._client_v2 = None
+        if self._client_multiview is not None:
+            await self._client_multiview.close()
+            self._client_multiview = None
         await super().cleanup()
 
     async def get_connection_status(self) -> ConnectionStatus:
@@ -337,6 +380,72 @@ class CadGeneratorPlugin(BasePlugin):
                 )
             )
 
+        if self._client_multiview is not None:
+            cfg_mv = self.ctx.config.trellis2multiview
+            _allowed_pipeline_types_mv = (
+                set(cfg_mv.allowed_pipeline_types) & _TRELLIS2_MULTIVIEW_PIPELINES
+                or {cfg_mv.pipeline_type}
+            )
+            tools.append(
+                ToolDefinition(
+                    name="cad_generate_from_multiview",
+                    description=(
+                        "Generate a HIGH-FIDELITY 3D model (GLB) from MULTIPLE USER-PROVIDED IMAGES "
+                        "of the same object taken from DIFFERENT ANGLES, using the local "
+                        "TRELLIS.2 multi-view neural network. "
+                        "Use this when the user attaches 2 or more photos / renders / sketches of the SAME object "
+                        "and wants a more accurate 3D reconstruction than single-image would yield. "
+                        "REQUIRES at least 1 image (typically 2-6 distinct angles): every entry of "
+                        "'image_paths' must point to an existing file under 'data/uploads/...'. "
+                        "If only one image is available, use 'cad_generate_from_image' instead. "
+                        "Generation takes ~30-120 seconds depending on pipeline_type and image count."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "image_paths": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": cfg_mv.max_input_images,
+                                "items": {
+                                    "type": "string",
+                                    "description": (
+                                        "Path to one input image, relative to the project root "
+                                        "(e.g. 'data/uploads/<conv_id>/<file_id>.png'). "
+                                        "Must be an existing PNG/JPEG/WebP/GIF inside data/uploads/."
+                                    ),
+                                },
+                                "description": (
+                                    f"List of {1}-{cfg_mv.max_input_images} input image paths "
+                                    "showing the SAME object from DIFFERENT angles."
+                                ),
+                            },
+                            "model_name": {
+                                "type": "string",
+                                "description": (
+                                    "Output filename stem (alphanumeric + underscore, "
+                                    "max 64 chars). Defaults to auto-generated."
+                                ),
+                            },
+                            "pipeline_type": {
+                                "type": "string",
+                                "enum": sorted(_allowed_pipeline_types_mv),
+                                "description": (
+                                    "Resolution / quality preset.  "
+                                    f"Defaults to '{cfg_mv.pipeline_type}' from config. "
+                                    "Only the values in the enum are allowed on this hardware."
+                                ),
+                            },
+                        },
+                        "required": ["image_paths"],
+                    },
+                    result_type="json",
+                    timeout_ms=(cfg_mv.request_timeout_s + 30) * 1000,
+                    requires_confirmation=True,
+                    risk_level="safe",
+                )
+            )
+
         return tools
 
     # ------------------------------------------------------------------
@@ -363,6 +472,8 @@ class CadGeneratorPlugin(BasePlugin):
             return await self._execute_cad_generate(args, context)
         if tool_name == "cad_generate_from_image":
             return await self._execute_cad_generate_from_image(args, context)
+        if tool_name == "cad_generate_from_multiview":
+            return await self._execute_cad_generate_from_multiview(args, context)
         return ToolResult.error(f"Unknown tool: {tool_name}")
 
     async def _execute_cad_generate(
@@ -856,6 +967,25 @@ class CadGeneratorPlugin(BasePlugin):
         if glb_bytes is None:
             return ToolResult.error("TRELLIS.2 generation produced no model bytes")
 
+        # --- post-process: neutralise unreliable metallic channel ------
+        # See ``glb_postprocess.patch_glb_materials`` for rationale.
+        if cfg2.force_diffuse_materials:
+            patched = await asyncio.to_thread(
+                patch_glb_materials,
+                glb_bytes,
+                metallic_factor=0.0,
+                roughness_factor=cfg2.diffuse_roughness_factor,
+            )
+            if patched is not glb_bytes:
+                await asyncio.to_thread(output_path.write_bytes, patched)
+                logger.debug(
+                    "Patched TRELLIS.2 GLB materials for '{}' "
+                    "(metallicFactor=0, roughnessFactor={})",
+                    result_model_name,
+                    cfg2.diffuse_roughness_factor,
+                )
+                glb_bytes = patched
+
         elapsed = (time.perf_counter() - start) * 1000
         payload = {
             "model_name": result_model_name,
@@ -870,6 +1000,286 @@ class CadGeneratorPlugin(BasePlugin):
         logger.info(
             "3D model '{}' generated from image ({} bytes, {:.0f}ms, pipeline={})",
             result_model_name, len(glb_bytes), elapsed,
+            result_pipeline_type,
+        )
+        return ToolResult.ok(
+            payload,
+            content_type="application/json",
+            execution_time_ms=elapsed,
+        )
+
+    # ------------------------------------------------------------------
+    # Multi-image-to-3D (TRELLIS.2 multi-view) flow
+    # ------------------------------------------------------------------
+
+    async def _poll_trellis2_multiview_progress(self, started_at: float) -> None:
+        """Poll the multi-view ``/health`` endpoint and emit progress frames.
+
+        Sibling of :meth:`_poll_trellis2_progress` targeted at the
+        multi-view client.  Kept as a separate method (rather than
+        parameterising the original) because it lets the call sites
+        stay readable and the two clients carry independent caches.
+        """
+        if self._client_multiview is None:
+            return
+
+        last_emitted_step = -1
+        last_phase = ""
+        try:
+            while True:
+                await asyncio.sleep(0.5)
+                status = await self._client_multiview.get_status()
+                if not status:
+                    continue
+                progress = status.get("progress") or {}
+                phase = str(progress.get("phase") or "init")
+                global_step = int(progress.get("global_step") or 0)
+                global_total = int(progress.get("global_total") or 0) or 1
+                if (
+                    phase == last_phase
+                    and global_step == last_emitted_step
+                ):
+                    continue
+                last_phase = phase
+                last_emitted_step = global_step
+
+                percent = (
+                    100 if phase == "done"
+                    else max(0, min(100, int(global_step * 100 / global_total)))
+                )
+                if phase == "sampling":
+                    percent = min(percent, 95)
+                elif phase == "postprocess":
+                    percent = max(percent, 96)
+
+                await emit_tool_progress({
+                    "phase": phase,
+                    "label": progress.get("stage_label"),
+                    "step": global_step,
+                    "total": global_total,
+                    "percent": percent,
+                    "elapsed_s": round(time.perf_counter() - started_at, 2),
+                })
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.debug("TRELLIS.2 multi-view progress polling stopped: {}", exc)
+
+    async def _execute_cad_generate_from_multiview(
+        self,
+        args: dict[str, Any],
+        context: ExecutionContext,
+    ) -> ToolResult:
+        """Run the multi-image-to-3D pipeline via the TRELLIS.2 multi-view service.
+
+        Steps mirror :meth:`_execute_cad_generate_from_image`, with two
+        differences:
+
+        - ``image_paths`` is a list of 1..N paths (validated one by one
+          via :meth:`_resolve_uploaded_image`); all images must share a
+          single MIME type so the multipart upload is consistent.
+        - The client invocation uses ``generate_from_images`` (plural).
+        """
+        start = time.perf_counter()
+
+        if self._client_multiview is None:
+            return ToolResult.error(
+                "TRELLIS.2 multi-view microservice is disabled — set "
+                "trellis2multiview.enabled in config/default.yaml and start "
+                "scripts/start-trellis2multiview.ps1"
+            )
+
+        cfg_mv = self.ctx.config.trellis2multiview
+
+        # --- argument validation: image_paths --------------------------
+        image_paths = args.get("image_paths")
+        if not isinstance(image_paths, list) or not image_paths:
+            return ToolResult.error(
+                "'image_paths' must be a non-empty list of image paths"
+            )
+        if len(image_paths) > cfg_mv.max_input_images:
+            return ToolResult.error(
+                f"Too many input images ({len(image_paths)} > "
+                f"{cfg_mv.max_input_images}). Provide fewer views."
+            )
+
+        resolved_paths: list[Path] = []
+        mime_types: set[str] = set()
+        for raw in image_paths:
+            if not isinstance(raw, str):
+                return ToolResult.error(
+                    "Each entry in 'image_paths' must be a string path"
+                )
+            resolved = self._resolve_uploaded_image(raw.strip())
+            if isinstance(resolved, str):
+                return ToolResult.error(resolved)
+            abs_path, mime = resolved
+            resolved_paths.append(abs_path)
+            mime_types.add(mime)
+
+        # All views must share the same MIME so the server can decode
+        # them uniformly.  In practice users upload PNG-on-PNG; if they
+        # mix formats we standardise on the first one's MIME and let
+        # PIL handle the per-image decoding (the bytes carry their own
+        # signature).
+        chosen_mime = next(iter(mime_types)) if len(mime_types) == 1 else "image/png"
+
+        # --- argument validation: pipeline_type / model_name -----------
+        pipeline_type = (args.get("pipeline_type") or cfg_mv.pipeline_type).strip()
+        allowed = set(cfg_mv.allowed_pipeline_types) & _TRELLIS2_MULTIVIEW_PIPELINES
+        if not allowed:
+            allowed = {cfg_mv.pipeline_type}
+        if pipeline_type not in allowed:
+            return ToolResult.error(
+                f"Invalid pipeline_type '{pipeline_type}'. "
+                f"Allowed on this hardware: {', '.join(sorted(allowed))}"
+            )
+
+        model_name = args.get("model_name", "").strip()
+        if model_name:
+            model_name = re.sub(r"[^a-zA-Z0-9_]", "_", model_name).strip("_")
+        if not model_name:
+            model_name = re.sub(
+                r"[^a-zA-Z0-9_]", "_", resolved_paths[0].stem[:40],
+            ).strip("_")
+        if not model_name or not _MODEL_NAME_RE.match(model_name):
+            return ToolResult.error(
+                "model_name must be alphanumeric/underscore, max 64 chars"
+            )
+
+        # --- service availability --------------------------------------
+        if not await self._client_multiview.health_check():
+            return ToolResult.error(
+                "TRELLIS.2 multi-view microservice is not reachable — "
+                "please start scripts/start-trellis2multiview.ps1 before generating"
+            )
+
+        # --- read all images off the loop, in parallel ----------------
+        try:
+            images_bytes = await asyncio.gather(
+                *(asyncio.to_thread(p.read_bytes) for p in resolved_paths)
+            )
+        except OSError as exc:
+            return ToolResult.error(f"Failed to read input image: {exc}")
+
+        # --- VRAM swap + generate --------------------------------------
+        unloaded_models: list[str] = []
+        if cfg_mv.auto_vram_swap:
+            unloaded_models = await self._unload_llm_for_swap()
+
+        gen_error: str | None = None
+        gen_result = None
+        progress_task = asyncio.create_task(
+            self._poll_trellis2_multiview_progress(start)
+        )
+        try:
+            gen_result = await self._client_multiview.generate_from_images(
+                list(images_bytes),
+                model_name,
+                pipeline_type=pipeline_type,
+                seed=cfg_mv.seed,
+                decimation_target=cfg_mv.decimation_target,
+                texture_size=cfg_mv.texture_size,
+                image_mime=chosen_mime,
+            )
+        except Exception as exc:
+            gen_error = f"TRELLIS.2 multi-view generation failed: {exc}"
+            logger.error(gen_error)
+        finally:
+            progress_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await progress_task
+            try:
+                await self._client_multiview.unload_model()
+            except Exception:
+                pass
+            if cfg_mv.auto_vram_swap and unloaded_models:
+                await self._reload_llm_after_swap(unloaded_models)
+
+        if gen_result is None:
+            result_model_name = model_name
+            result_format = "glb"
+            result_pipeline_type = pipeline_type
+            result_seed = cfg_mv.seed
+            result_image_count = len(resolved_paths)
+        else:
+            result_model_name = gen_result.base.model_name
+            result_format = gen_result.base.format
+            result_pipeline_type = gen_result.pipeline_type
+            result_seed = gen_result.seed
+            result_image_count = gen_result.image_count
+
+        output_dir = PROJECT_ROOT / cfg_mv.model_output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{result_model_name}.glb"
+
+        if gen_error and not output_path.is_file():
+            return ToolResult.error(gen_error)
+        if gen_result is None and not output_path.is_file():
+            return ToolResult.error(
+                "TRELLIS.2 multi-view generation returned no result"
+            )
+
+        # --- download generated GLB ------------------------------------
+        glb_bytes: bytes | None = None
+        try:
+            glb_bytes = await self._client_multiview.download_model(
+                result_model_name,
+            )
+        except Exception as exc:
+            if not output_path.is_file():
+                return ToolResult.error(f"Failed to download model: {exc}")
+            glb_bytes = await asyncio.to_thread(output_path.read_bytes)
+            logger.warning(
+                "Recovered TRELLIS.2 multi-view model '{}' from local "
+                "output after download error: {}",
+                result_model_name, exc,
+            )
+        else:
+            await asyncio.to_thread(output_path.write_bytes, glb_bytes)
+
+        if gen_error:
+            logger.warning(
+                "Recovered TRELLIS.2 multi-view model '{}' from local "
+                "output after generation error: {}",
+                result_model_name, gen_error,
+            )
+        if glb_bytes is None:
+            return ToolResult.error(
+                "TRELLIS.2 multi-view generation produced no model bytes"
+            )
+
+        # --- post-process: neutralise unreliable metallic channel ------
+        if cfg_mv.force_diffuse_materials:
+            patched = await asyncio.to_thread(
+                patch_glb_materials,
+                glb_bytes,
+                metallic_factor=0.0,
+                roughness_factor=cfg_mv.diffuse_roughness_factor,
+            )
+            if patched is not glb_bytes:
+                await asyncio.to_thread(output_path.write_bytes, patched)
+                logger.debug(
+                    "Patched TRELLIS.2 multi-view GLB materials for '{}'",
+                    result_model_name,
+                )
+                glb_bytes = patched
+
+        elapsed = (time.perf_counter() - start) * 1000
+        payload = {
+            "model_name": result_model_name,
+            "format": result_format,
+            "size_bytes": len(glb_bytes),
+            "file_path": str(output_path),
+            "export_url": f"/api/cad/models/{result_model_name}",
+            "source_images": [str(p) for p in image_paths],
+            "image_count": result_image_count,
+            "pipeline_type": result_pipeline_type,
+            "seed": result_seed,
+        }
+        logger.info(
+            "3D model '{}' generated from {} views ({} bytes, {:.0f}ms, pipeline={})",
+            result_model_name, result_image_count, len(glb_bytes), elapsed,
             result_pipeline_type,
         )
         return ToolResult.ok(

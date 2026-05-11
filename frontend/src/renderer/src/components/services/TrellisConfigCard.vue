@@ -8,8 +8,9 @@
  *  - Configuration writes go through `cfg_svc.set("<name>.X", value)` via
  *    the parametric ``POST /api/services/<name>/configure`` endpoint.
  *
- * The same component handles both ``trellis`` (text-to-3D, port 8090) and
- * ``trellis2`` (image-to-3D, port 8091); the dir-key and labels switch on
+ * The same component handles ``trellis`` (text-to-3D, port 8090),
+ * ``trellis2`` (image-to-3D, port 8091) and ``trellis2multiview``
+ * (multi-image-to-3D, port 8092); the dir-key and labels switch on
  * ``props.service.name``.
  */
 import { computed, onMounted, ref } from 'vue'
@@ -43,17 +44,36 @@ const STATUS_LABELS: Record<string, string> = {
   starting: 'Avvio…',
 }
 
-const isV2 = computed(() => props.service.name === 'trellis2')
-const dirKey = computed(() => (isV2.value ? 'trellis2_dir' : 'trellis_dir'))
-const variantLabel = computed(() => (isV2.value ? 'TRELLIS.2' : 'TRELLIS'))
-const tagline = computed(() =>
-  isV2.value
-    ? 'Image-to-3D · porta 8091 · richiede setup compilazione'
-    : 'Text-to-3D · porta 8090',
+type TrellisVariant = 'trellis' | 'trellis2' | 'trellis2multiview'
+const variant = computed<TrellisVariant>(
+  () => props.service.name as TrellisVariant,
 )
-const placeholder = computed(() =>
-  isV2.value ? 'C:\\path\\to\\TRELLIS.2' : 'C:\\path\\to\\TRELLIS-for-windows',
-)
+const isV2 = computed(() => variant.value === 'trellis2')
+const isMV = computed(() => variant.value === 'trellis2multiview')
+const hasGuide = computed(() => isV2.value || isMV.value)
+
+const dirKey = computed(() => {
+  if (isMV.value) return 'trellis2multiview_dir'
+  if (isV2.value) return 'trellis2_dir'
+  return 'trellis_dir'
+})
+const variantLabel = computed(() => {
+  if (isMV.value) return 'TRELLIS.2 Multi-view'
+  if (isV2.value) return 'TRELLIS.2'
+  return 'TRELLIS'
+})
+const tagline = computed(() => {
+  if (isMV.value)
+    return 'Multi-image-to-3D · porta 8092 · richiede setup compilazione'
+  if (isV2.value)
+    return 'Image-to-3D · porta 8091 · richiede setup compilazione'
+  return 'Text-to-3D · porta 8090'
+})
+const placeholder = computed(() => {
+  if (isMV.value) return 'C:\\path\\to\\TRELLIS.2.multiview'
+  if (isV2.value) return 'C:\\path\\to\\TRELLIS.2'
+  return 'C:\\path\\to\\TRELLIS-for-windows'
+})
 
 const statusClass = computed(() => `is-${props.service.status}`)
 const statusLabel = computed(
@@ -65,9 +85,7 @@ const isStopped = computed(() => props.service.status === 'down')
 onMounted(async () => {
   loading.value = true
   try {
-    const cfg = await store.loadTrellisConfig(
-      props.service.name as 'trellis' | 'trellis2',
-    )
+    const cfg = await store.loadTrellisConfig(variant.value)
     enabled.value = Boolean(cfg.enabled ?? false)
     dirPath.value = (cfg[dirKey.value] as string) ?? ''
   } catch (e) {
@@ -91,10 +109,7 @@ async function save(): Promise<boolean> {
   try {
     const payload: Record<string, unknown> = { enabled: enabled.value }
     payload[dirKey.value] = dirPath.value.trim() || undefined
-    await store.configureTrellis(
-      props.service.name as 'trellis' | 'trellis2',
-      payload,
-    )
+    await store.configureTrellis(variant.value, payload)
     saveOk.value = true
     return true
   } catch (e) {
@@ -243,7 +258,7 @@ async function stopService(): Promise<void> {
         <span>{{ stopping ? 'Spengo…' : 'Spegni' }}</span>
       </button>
       <button
-        v-if="isV2"
+        v-if="hasGuide"
         class="btn btn--ghost btn--right"
         type="button"
         @click="emit('open-guide')"

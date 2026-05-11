@@ -110,6 +110,11 @@ function gaussian(x: number, center: number, width: number): number {
     return Math.exp(-d * d)
 }
 
+function circularGaussian(position: number, center: number, width: number): number {
+    const d = Math.abs(((position - center + 1.5) % 1) - 0.5)
+    return Math.exp(-(d / width) * (d / width))
+}
+
 /** Maps hue t ∈ [0,1) to a full-spectrum RGB tuple. */
 function hueRGB(t: number): RGB {
     const h6 = ((t % 1 + 1) % 1) * 6
@@ -605,6 +610,7 @@ export class VeilEngine {
         const ctx = this.ctx
         const lightMode = this.isLightTheme()
         const { rx, ry } = this.lensBounds()
+        const lensPath = this.createLensPath(1.012)
         const w = rx * cfg.shaftWidth * (1 + this.hoverT * 0.08)
         const h = ry * 2.55
         const cx = this.cx + Math.sin(this.time * 0.18) * w * 0.05
@@ -613,13 +619,14 @@ export class VeilEngine {
         const grad = ctx.createLinearGradient(cx, top, cx, top + h)
         const a = cfg.shaftIntensity
         const shaftColor: RGB = lightMode ? [132, 92, 66] : cfg.warmLight
-        grad.addColorStop(0, rgba(shaftColor, a * (lightMode ? 0.13 : 0.62)))
-        grad.addColorStop(0.44, rgba(shaftColor, a * (lightMode ? 0.07 : 0.38)))
+        grad.addColorStop(0, rgba(shaftColor, a * (lightMode ? 0.10 : 0.24)))
+        grad.addColorStop(0.44, rgba(shaftColor, a * (lightMode ? 0.05 : 0.13)))
         grad.addColorStop(1, rgba(shaftColor, 0))
 
         ctx.save()
+        ctx.clip(lensPath)
         ctx.globalCompositeOperation = lightMode ? 'source-over' : 'screen'
-        ctx.filter = 'blur(10px)'
+        ctx.filter = 'blur(8px)'
         ctx.fillStyle = grad
         ctx.beginPath()
         ctx.ellipse(cx, top + h * 0.45, w * 0.8, h * 0.50, 0, 0, TAU)
@@ -1155,7 +1162,9 @@ export class VeilEngine {
         const lensPath = this.createLensPath()
         const white: RGB = lightMode ? [252, 248, 238] : [255, 252, 242]
         const cyan: RGB = lightMode ? [112, 180, 196] : [182, 244, 255]
-        const seamPhase = this.time * 0.68
+        const seamPhase = this.time * 0.92
+        const scanPhase = ((this.time * 0.30 + entry * 0.07) % 1 + 1) % 1
+        const counterScanPhase = ((1 - this.time * 0.22 + entry * 0.05) % 1 + 1) % 1
 
         ctx.save()
         ctx.clip(lensPath)
@@ -1216,13 +1225,16 @@ export class VeilEngine {
                     const ny = (centY - this.cy) / ry
                     const angle = Math.atan2(ny, nx)
                     const seed = Math.sin(ringIndex * 11.13 + segmentIndex * 17.71 + facetIndex * 5.31)
+                    const sweepA = circularGaussian((nx * 0.58 + ny * 0.42) * 0.5 + 0.5, scanPhase, 0.095)
+                    const sweepB = circularGaussian((nx * -0.36 + ny * 0.64) * 0.5 + 0.5, counterScanPhase, 0.13)
+                    const sweep = Math.max(sweepA, sweepB * 0.68)
                     const processingWave = 0.50 + 0.50 * Math.sin(
-                        this.time * 1.75 + nx * 6.4 - ny * 4.8 + seed * TAU,
+                        this.time * 2.25 + nx * 6.4 - ny * 4.8 + seed * TAU,
                     )
                     const chromaWave = 0.50 + 0.50 * Math.sin(
-                        this.time * 1.05 - nx * 3.3 + ny * 7.1 + ringIndex * 0.9,
+                        this.time * 1.32 - nx * 3.3 + ny * 7.1 + ringIndex * 0.9,
                     )
-                    const hue = ((angle / TAU + 0.55 + this.time * 0.22 + chromaWave * 0.12 + seed * 0.05) % 1 + 1) % 1
+                    const hue = ((angle / TAU + 0.55 + this.time * 0.28 + chromaWave * 0.12 + sweep * 0.04 + seed * 0.05) % 1 + 1) % 1
                     const prismColor = hueRGB(hue)
                     const prismColorNext = hueRGB(hue + 0.11 + processingWave * 0.035)
                     const prismColorPrev = hueRGB(hue - 0.075 - chromaWave * 0.025)
@@ -1250,8 +1262,8 @@ export class VeilEngine {
                     const angledLight = 0.30 + 0.70 * Math.abs(
                         Math.sin(angle * 1.35 + seed * 2.7 + this.time * 0.42),
                     )
-                    const faceAlpha = (lightMode ? 0.022 : 0.030) * a * angledLight * radiusFalloff
-                    const prismAlpha = (lightMode ? 0.135 : 0.245) * a * (0.24 + processingWave * 0.76) * radiusFalloff
+                    const faceAlpha = (lightMode ? 0.022 : 0.030) * a * angledLight * radiusFalloff * (0.70 + sweep * 1.40)
+                    const prismAlpha = (lightMode ? 0.135 : 0.245) * a * (0.24 + processingWave * 0.62 + sweep * 0.42) * radiusFalloff
 
                     const faceGrad = ctx.createLinearGradient(tri[0][0], tri[0][1], tri[2][0], tri[2][1])
                     faceGrad.addColorStop(0, rgba(white, faceAlpha * 0.20))
@@ -1315,6 +1327,40 @@ export class VeilEngine {
         ctx.fillRect(this.cx - rx * 1.05, this.cy - ry * 1.06, rx * 2.10, ry * 2.12)
 
         ctx.globalCompositeOperation = lightMode ? 'source-over' : 'screen'
+
+        const ribbons: Array<{ offset: number; colorA: RGB; colorB: RGB; alpha: number; width: number }> = [
+            { offset: 0.00, colorA: cyan, colorB: white, alpha: 0.052, width: 0.92 },
+            { offset: 0.43, colorA: hueRGB(this.time * 0.055 + 0.18), colorB: cyan, alpha: 0.038, width: 0.72 },
+        ]
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        for (let ri = 0; ri < ribbons.length; ri++) {
+            const ribbon = ribbons[ri]
+            const p = ((this.time * (0.18 + ri * 0.05) + ribbon.offset) % 1 + 1) % 1
+            const yn = -0.72 + p * 1.44
+            const wobble = Math.sin(this.time * 0.85 + ri * 1.7) * 0.05
+            const y = this.cy + (yn + wobble) * ry
+            const grad = ctx.createLinearGradient(this.cx - rx * 0.88, y - ry * 0.20, this.cx + rx * 0.88, y + ry * 0.22)
+            const alpha = ribbon.alpha * a * (lightMode ? 0.68 : 1)
+            grad.addColorStop(0, rgba(ribbon.colorA, 0))
+            grad.addColorStop(0.38, rgba(ribbon.colorA, alpha))
+            grad.addColorStop(0.52, rgba(white, alpha * 0.70))
+            grad.addColorStop(0.68, rgba(ribbon.colorB, alpha * 0.86))
+            grad.addColorStop(1, rgba(ribbon.colorB, 0))
+            ctx.strokeStyle = grad
+            ctx.lineWidth = ribbon.width
+            ctx.beginPath()
+            ctx.moveTo(this.cx - rx * 0.82, y - ry * 0.18)
+            ctx.bezierCurveTo(
+                this.cx - rx * 0.36,
+                y + ry * (0.16 + ri * 0.04),
+                this.cx + rx * 0.18,
+                y - ry * (0.18 - ri * 0.02),
+                this.cx + rx * 0.82,
+                y + ry * 0.16,
+            )
+            ctx.stroke()
+        }
 
         // Structural refractive seams, kept subtle so they read as texture.
         ctx.lineCap = 'round'

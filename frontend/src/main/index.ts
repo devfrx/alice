@@ -62,7 +62,18 @@ const BACKEND_HOST = '127.0.0.1'
 const BACKEND_HEALTH_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`
 const BACKEND_STARTUP_TIMEOUT_MS = 30_000
 
-function isTrustedRendererOrigin(origin: string): boolean {
+function normalizeRendererOrigin(urlOrOrigin: string): string | null {
+  if (urlOrOrigin === 'file://') return 'file://'
+  try {
+    const parsed = new URL(urlOrOrigin)
+    return parsed.protocol === 'file:' ? 'file://' : parsed.origin
+  } catch {
+    return null
+  }
+}
+
+function isTrustedRendererOrigin(urlOrOrigin: string): boolean {
+  const origin = normalizeRendererOrigin(urlOrOrigin)
   if (origin === 'file://') return true
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     try {
@@ -72,6 +83,17 @@ function isTrustedRendererOrigin(origin: string): boolean {
     }
   }
   return false
+}
+
+function isTrustedRendererRequest(contents: WebContents, urlOrOrigin?: string): boolean {
+  if (!isMainWindowContents(contents)) return false
+  if (urlOrOrigin && isTrustedRendererOrigin(urlOrOrigin)) return true
+  return isTrustedRendererOrigin(contents.getURL())
+}
+
+function isAudioMediaRequest(mediaTypes?: string[]): boolean {
+  if (!mediaTypes || mediaTypes.length === 0) return true
+  return mediaTypes.includes('audio') && !mediaTypes.includes('video')
 }
 
 function isMainWindowContents(contents: WebContents): boolean {
@@ -92,12 +114,13 @@ function configureMediaPermissions(): void {
       callback(false)
       return
     }
-    callback(isMainWindowContents(contents) && isTrustedRendererOrigin(details.requestingUrl))
+    const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined
+    callback(isTrustedRendererRequest(contents, details.requestingUrl) && isAudioMediaRequest(mediaTypes))
   })
 
   session.defaultSession.setPermissionCheckHandler((contents, permission, requestingOrigin) => {
     if (permission !== 'media') return false
-    return contents !== null && isMainWindowContents(contents) && isTrustedRendererOrigin(requestingOrigin)
+    return contents !== null && isTrustedRendererRequest(contents, requestingOrigin)
   })
 }
 

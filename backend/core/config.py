@@ -752,6 +752,93 @@ class Trellis2ServiceConfig(BaseSettings):
     seed: int = -1
     """Seed for generation. -1 = random."""
 
+    force_diffuse_materials: bool = True
+    """If True, post-process the generated GLB to neutralise the
+    unreliable ``metallic`` channel emitted by the TRELLIS.2 texturing
+    pipeline.  Stylised / anime characters are wrongly predicted as
+    near-pure metal, which under a small ``RoomEnvironment`` renders
+    them almost completely black.  Setting ``metallicFactor=0`` makes
+    the material fully diffuse and restores the real ``baseColorTexture``
+    look.  Disable to keep the raw TRELLIS.2 export unchanged."""
+
+    diffuse_roughness_factor: float = 0.85
+    """``roughnessFactor`` applied alongside ``force_diffuse_materials``.
+    ``0.85`` keeps the look matte without going fully Lambertian.
+    Ignored when ``force_diffuse_materials`` is False."""
+
+
+class Trellis2MultiviewServiceConfig(BaseSettings):
+    """TRELLIS.2 multi-view microservice configuration.
+
+    Sibling of :class:`Trellis2ServiceConfig` for the multi-image
+    fork (cpuai/Trellis.2.multiview).  The two services use
+    independent venvs and ports so they can coexist or be enabled
+    one at a time.  Multi-view conditioning typically yields a
+    visibly more accurate reconstruction when 2-6 photos of the
+    same object are provided.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_TRELLIS2_MULTIVIEW__")
+
+    enabled: bool = False
+    """Enable the TRELLIS.2 multi-view microservice integration."""
+
+    service_url: str = "http://localhost:8092"
+    """Base URL of the TRELLIS.2 multi-view microservice."""
+
+    request_timeout_s: int = 1800
+    """Timeout for multi-view 3D generation in seconds (default 30 min).
+    Multi-view runs do more sampling work than single-image and the
+    first call also downloads ~8GB of weights."""
+
+    max_model_size_mb: int = 100
+    """Maximum accepted size for generated GLB files."""
+
+    model_output_dir: str = "data/3d_models"
+    """Local directory for generated GLB files (relative to PROJECT_ROOT)."""
+
+    auto_vram_swap: bool = True
+    """If True, automatically unload the LLM from VRAM before generation
+    and reload it after.  Required on GPUs with < 24GB VRAM."""
+
+    trellis2multiview_model: str = "microsoft/TRELLIS.2-4B"
+    """TRELLIS.2 checkpoint to load (HuggingFace repo ID).  Currently
+    only the 4B image-to-3D weights support multi-view conditioning."""
+
+    trellis2multiview_dir: str = ""
+    """Path to the TRELLIS.2.multiview installation directory.  Used by
+    start-trellis2multiview.ps1.  Empty = auto-detect (../TRELLIS.2.multiview)."""
+
+    pipeline_type: str = "1024"
+    """Default generation resolution: 512 / 1024 / 1024_cascade /
+    1536_cascade.  See trellis2 for trade-offs."""
+
+    allowed_pipeline_types: list[str] = ["512", "1024"]
+    """Whitelist of pipeline_type values the LLM is allowed to pick.
+    Same hardware-budget reasoning as :class:`Trellis2ServiceConfig`."""
+
+    decimation_target: int = 500_000
+    """Target triangle count for the exported GLB."""
+
+    texture_size: int = 4096
+    """Square PBR texture resolution for the exported GLB."""
+
+    seed: int = -1
+    """Seed for generation. -1 = random."""
+
+    max_input_images: int = 6
+    """Maximum number of views the LLM tool will accept.  Capped here
+    AND server-side (``trellis2multiview_server._MAX_INPUT_IMAGES``).
+    Most reconstructions plateau between 4 and 6 views."""
+
+    force_diffuse_materials: bool = True
+    """Same metallicFactor neutralisation as :class:`Trellis2ServiceConfig`.
+    The multi-view fork shares the same texturing pipeline and exhibits
+    the same near-pure-metal artefact on stylised inputs."""
+
+    diffuse_roughness_factor: float = 0.85
+    """``roughnessFactor`` applied alongside ``force_diffuse_materials``."""
+
 
 class NetworkProbeConfig(BaseSettings):
     """Network probe plugin configuration."""
@@ -975,6 +1062,13 @@ class AliceConfig(BaseSettings):
     mcp: McpConfig = Field(default_factory=McpConfig)
     trellis: TrellisServiceConfig = Field(default_factory=TrellisServiceConfig)
     trellis2: Trellis2ServiceConfig = Field(default_factory=Trellis2ServiceConfig)
+    # Field name kept lower-camel-ish (no underscore between "2" and
+    # "multiview") so it matches the managed-service name used in URL
+    # routes (``/api/services/trellis2multiview/...``) and lets the
+    # generic config endpoint resolve the section via ``getattr``.
+    trellis2multiview: Trellis2MultiviewServiceConfig = Field(
+        default_factory=Trellis2MultiviewServiceConfig
+    )
     chart: ChartConfig = Field(default_factory=ChartConfig)
     whiteboard: WhiteboardConfig = Field(default_factory=WhiteboardConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)

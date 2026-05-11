@@ -3,14 +3,20 @@
  * TrellisSetupGuideModal — Inline guide for the Trellis2 build process.
  *
  * Fetches the markdown walkthrough from
- * `GET /api/services/trellis2/setup-guide` (proxied by the
+ * `GET /api/services/{service}/setup-guide` (proxied by the
  * `loadTrellisGuide` action) and renders it inside a centred modal.
+ * The ``service`` prop selects between ``trellis2`` (single-image,
+ * default) and ``trellis2multiview`` (multi-image fork).
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useServicesStore } from '../../stores/services'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import AppIcon from '../ui/AppIcon.vue'
 
+const props = withDefaults(
+  defineProps<{ service?: 'trellis2' | 'trellis2multiview' }>(),
+  { service: 'trellis2' },
+)
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const store = useServicesStore()
@@ -18,11 +24,17 @@ const html = ref('')
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+const variantTitle = computed(() =>
+  props.service === 'trellis2multiview'
+    ? 'Setup TRELLIS.2 Multi-view'
+    : 'Setup TRELLIS.2',
+)
+
 async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const md = await store.loadTrellisGuide()
+    const md = await store.loadTrellisGuide(props.service)
     html.value = renderMarkdown(md)
   } catch (e) {
     error.value = (e as Error).message
@@ -58,7 +70,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </span>
           <div class="guide-modal__title-block">
             <h2 id="trellis-guide-title" class="guide-modal__title">
-              Setup TRELLIS.2
+              {{ variantTitle }}
             </h2>
             <span class="guide-modal__subtitle">
               Guida passo-passo alla compilazione locale

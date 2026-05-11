@@ -19,6 +19,21 @@ import TrellisSetupGuideModal from '../components/services/TrellisSetupGuideModa
 
 const store = useServicesStore()
 const showGuide = ref(false)
+const guideService = ref<TrellisGuideService>('trellis2')
+
+function openGuide(svc: TrellisGuideService): void {
+  guideService.value = svc
+  showGuide.value = true
+}
+
+function openGuideForService(name: string): void {
+  // Narrowing helper for the template: only the two known multi-step
+  // services have a markdown guide; classic ``trellis`` (text-to-3D)
+  // doesn't surface this button.
+  if (name === 'trellis2' || name === 'trellis2multiview') {
+    openGuide(name)
+  }
+}
 const refreshing = ref(false)
 
 onMounted(() => {
@@ -27,11 +42,21 @@ onMounted(() => {
   void store.loadCatalog('tts')
 })
 
+// Names of the Trellis-family services that get the dedicated
+// configuration card (instead of the generic ServiceCard).  Kept as a
+// const so adding a new variant only requires updating this list.
+const TRELLIS_NAMES = ['trellis', 'trellis2', 'trellis2multiview'] as const
+type TrellisGuideService = 'trellis2' | 'trellis2multiview'
+
 const stdServices = computed(() =>
-  store.services.filter((s) => s.name !== 'trellis' && s.name !== 'trellis2'),
+  store.services.filter(
+    (s) => !TRELLIS_NAMES.includes(s.name as (typeof TRELLIS_NAMES)[number]),
+  ),
 )
 const trellisServices = computed(() =>
-  store.services.filter((s) => s.name === 'trellis' || s.name === 'trellis2'),
+  store.services.filter((s) =>
+    TRELLIS_NAMES.includes(s.name as (typeof TRELLIS_NAMES)[number]),
+  ),
 )
 
 const summary = computed(() => {
@@ -143,7 +168,7 @@ async function refreshAll(): Promise<void> {
           v-for="svc in trellisServices"
           :key="svc.name"
           :service="svc"
-          @open-guide="showGuide = true"
+          @open-guide="openGuideForService(svc.name)"
         />
       </div>
     </section>
@@ -153,7 +178,11 @@ async function refreshAll(): Promise<void> {
       <p>Nessun servizio registrato.</p>
     </div>
 
-    <TrellisSetupGuideModal v-if="showGuide" @close="showGuide = false" />
+    <TrellisSetupGuideModal
+      v-if="showGuide"
+      :service="guideService"
+      @close="showGuide = false"
+    />
   </main>
 </template>
 

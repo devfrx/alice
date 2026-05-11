@@ -16,11 +16,18 @@
 import { computed, ref, watch } from 'vue'
 
 import AppIcon from '../ui/AppIcon.vue'
+import AgentRunSummary from './AgentRunSummary.vue'
 import { useUIStore } from '../../stores/ui'
 import { useChatStore } from '../../stores/chat'
 import { useAgentActivity } from '../../composables/useAgentActivity'
 import { humanizeRunSubtitle } from '../../utils/agentLabels'
 import type { AgentRun, Verdict } from '../../types/agent'
+
+const props = withDefaults(defineProps<{
+    side?: 'left' | 'right'
+}>(), {
+    side: 'right',
+})
 
 const uiStore = useUIStore()
 const chatStore = useChatStore()
@@ -47,6 +54,16 @@ const visible = computed<boolean>(
 )
 
 const isBypass = computed<boolean>(() => focusedRun.value?.mode === 'bypass')
+const sideClass = computed<string>(() => `agent-sidebar--${props.side}`)
+
+function activityStatusLabel(status: string): string {
+    switch (status) {
+        case 'done': return 'ok'
+        case 'failed': return 'errore'
+        case 'running': return 'live'
+        default: return 'in coda'
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Activity feed (real tool calls + plan steps)
@@ -114,10 +131,11 @@ function close(): void {
 
 <template>
     <Transition name="agent-sidebar">
-        <aside v-if="visible && focusedRun" class="agent-sidebar" role="complementary" aria-label="Cosa sto facendo">
+        <aside v-if="visible && focusedRun" class="agent-sidebar" :class="sideClass" role="complementary"
+            aria-label="Attività agente">
             <header class="agent-sidebar__head">
                 <div class="agent-sidebar__head-text">
-                    <span class="agent-sidebar__title">Cosa sto facendo</span>
+                    <span class="agent-sidebar__title">Attività agente</span>
                     <span class="agent-sidebar__subtitle">{{ subtitle }}</span>
                 </div>
                 <button type="button" class="agent-sidebar__close" aria-label="Chiudi" @click="close">
@@ -125,8 +143,13 @@ function close(): void {
                 </button>
             </header>
 
+            <AgentRunSummary :run="focusedRun" :feed="feed" />
+
             <div class="agent-sidebar__scroll">
-                <p v-if="focusedRun.plan?.goal" class="agent-sidebar__goal">{{ focusedRun.plan.goal }}</p>
+                <div v-if="focusedRun.plan?.goal" class="agent-sidebar__goal">
+                    <span>Obiettivo</span>
+                    <p>{{ focusedRun.plan.goal }}</p>
+                </div>
 
                 <!-- Bypass: no plan, single verdict summary -->
                 <div v-if="isBypass" class="agent-sidebar__bypass">
@@ -149,26 +172,33 @@ function close(): void {
                 </div>
 
                 <!-- Agent: real tool-call timeline -->
-                <ul v-else-if="toolActivity.length" class="activity-list">
-                    <li v-for="item in toolActivity" :key="item.callId" class="activity-item"
-                        :class="`activity-item--${item.status}`">
-                        <span class="activity-item__dot" aria-hidden="true">
-                            <AppIcon v-if="item.status === 'done'" name="check" :size="10" :stroke-width="2.5" />
-                            <AppIcon v-else-if="item.status === 'failed'" name="x" :size="10" :stroke-width="2.5" />
-                            <span v-else class="activity-item__pulse" />
-                        </span>
-                        <div class="activity-item__main">
-                            <div class="activity-item__row">
-                                <span class="activity-item__label">{{ item.toolLabel }}</span>
+                <section v-else-if="toolActivity.length" class="agent-sidebar__section">
+                    <div class="agent-sidebar__section-head">
+                        <span>Strumenti eseguiti</span>
+                        <strong>{{ toolActivity.length }}</strong>
+                    </div>
+                    <ul class="activity-list">
+                        <li v-for="item in toolActivity" :key="item.callId" class="activity-item"
+                            :class="`activity-item--${item.status}`">
+                            <span class="activity-item__dot" aria-hidden="true">
+                                <AppIcon v-if="item.status === 'done'" name="check" :size="10" :stroke-width="2.5" />
+                                <AppIcon v-else-if="item.status === 'failed'" name="x" :size="10" :stroke-width="2.5" />
+                                <span v-else class="activity-item__pulse" />
+                            </span>
+                            <div class="activity-item__main">
+                                <div class="activity-item__row">
+                                    <span class="activity-item__label">{{ item.toolLabel }}</span>
+                                    <span class="activity-item__status">{{ activityStatusLabel(item.status) }}</span>
+                                </div>
+                                <p v-if="item.argsSummary" class="activity-item__args">{{ item.argsSummary }}</p>
+                                <p v-if="item.resultPreview" class="activity-item__preview"
+                                    :class="{ 'activity-item__preview--error': item.resultIsError }">{{ item.resultPreview
+                                    }}</p>
                                 <span class="activity-item__name">{{ item.toolName }}</span>
                             </div>
-                            <p v-if="item.argsSummary" class="activity-item__args">{{ item.argsSummary }}</p>
-                            <p v-if="item.resultPreview" class="activity-item__preview"
-                                :class="{ 'activity-item__preview--error': item.resultIsError }">{{ item.resultPreview
-                                }}</p>
-                        </div>
-                    </li>
-                </ul>
+                        </li>
+                    </ul>
+                </section>
                 <p v-else class="agent-sidebar__empty">In attesa del piano…</p>
 
                 <!-- Plan checklist (collapsible, hidden for 1-step plans) -->
@@ -177,13 +207,17 @@ function close(): void {
                         @click="togglePlanSection">
                         <AppIcon name="chevron-down" :size="11" :stroke-width="1.5" class="agent-sidebar__plan-chevron"
                             :class="{ 'agent-sidebar__plan-chevron--open': planSectionOpen }" />
-                        Piano ({{ planSteps.length }} passi)
+                        Piano operativo ({{ planSteps.length }} passi)
                     </button>
                     <ol v-if="planSectionOpen" class="agent-sidebar__plan-list">
                         <li v-for="step in planSteps" :key="step.index" class="plan-row"
                             :class="`plan-row--${step.status}`">
                             <span class="plan-row__num">{{ step.index + 1 }}.</span>
-                            <span class="plan-row__desc">{{ step.description }}</span>
+                            <span class="plan-row__desc">
+                                {{ step.description }}
+                                <small v-if="step.expectedOutcome">{{ step.expectedOutcome }}</small>
+                                <em v-if="step.verdict">{{ step.verdict.reason }}</em>
+                            </span>
                         </li>
                     </ol>
                 </div>
@@ -207,6 +241,10 @@ function close(): void {
                     Piano rivisto {{ focusedRun.replans }}
                     {{ focusedRun.replans === 1 ? 'volta' : 'volte' }}
                 </div>
+
+                <p v-for="(w, i) in !isBypass ? focusedRun.warnings : []" :key="i" class="agent-sidebar__warning">
+                    {{ w.message }}
+                </p>
             </footer>
         </aside>
     </Transition>
@@ -217,19 +255,29 @@ function close(): void {
 .agent-sidebar {
     position: absolute;
     top: var(--space-3);
-    right: var(--space-3);
     bottom: var(--space-3);
     z-index: var(--z-sticky);
     width: 380px;
+    max-width: calc(100% - var(--space-6));
     display: flex;
     flex-direction: column;
-    background: var(--surface-1);
+    background: color-mix(in srgb, var(--surface-1) 92%, transparent);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-sidebar), var(--shadow-lg);
     color: var(--text-primary);
     font-size: var(--text-base);
     overflow: hidden;
+    backdrop-filter: blur(var(--glass-blur-heavy));
+    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+}
+
+.agent-sidebar--right {
+    right: var(--space-3);
+}
+
+.agent-sidebar--left {
+    left: var(--space-3);
 }
 
 /* ── Slide-in transition ─────────────────────────────────── */
@@ -239,9 +287,15 @@ function close(): void {
         opacity var(--transition-normal) var(--ease-decel);
 }
 
-.agent-sidebar-enter-from,
-.agent-sidebar-leave-to {
+.agent-sidebar--right.agent-sidebar-enter-from,
+.agent-sidebar--right.agent-sidebar-leave-to {
     transform: translateX(calc(100% + var(--space-3)));
+    opacity: 0;
+}
+
+.agent-sidebar--left.agent-sidebar-enter-from,
+.agent-sidebar--left.agent-sidebar-leave-to {
+    transform: translateX(calc(-100% - var(--space-3)));
     opacity: 0;
 }
 
@@ -256,7 +310,7 @@ function close(): void {
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--border);
-    background: var(--surface-1);
+    background: color-mix(in srgb, var(--surface-1) 84%, transparent);
 }
 
 .agent-sidebar__head-text {
@@ -267,14 +321,14 @@ function close(): void {
 }
 
 .agent-sidebar__title {
-    font-size: var(--text-md);
+    font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     color: var(--text-primary);
     line-height: var(--leading-tight);
 }
 
 .agent-sidebar__subtitle {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     color: var(--text-secondary);
     line-height: var(--leading-snug);
     white-space: nowrap;
@@ -311,49 +365,89 @@ function close(): void {
     flex-direction: column;
 }
 
+.agent-sidebar__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+}
+
+.agent-sidebar__section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.agent-sidebar__section-head strong {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
 /* ── Goal ──────────────────────────────────────────────── */
 .agent-sidebar__goal {
     margin: 0;
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--text-sm);
-    font-style: italic;
-    line-height: var(--leading-snug);
-    color: var(--text-secondary);
+    padding: var(--space-3) var(--space-4) var(--space-2);
     border-bottom: 1px solid var(--border);
+}
+
+.agent-sidebar__goal span {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.agent-sidebar__goal p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
 }
 
 /* ── Activity timeline ──────────────────────────────────── */
 .activity-list {
     list-style: none;
     margin: 0;
-    padding: var(--space-3) var(--space-4);
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2-5);
+    gap: var(--space-2);
     min-width: 0;
 }
 
 .activity-item {
     position: relative;
     display: flex;
-    gap: var(--space-2-5);
+    gap: var(--space-2);
     align-items: flex-start;
-    padding: var(--space-1) 0 var(--space-1) var(--space-2);
-    border-left: 2px solid transparent;
-    transition: border-color var(--transition-normal);
+    padding: var(--space-2-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--surface-2) 62%, transparent);
+    transition: border-color var(--transition-normal), background var(--transition-normal);
     min-width: 0;
 }
 
 .activity-item--running {
-    border-left-color: var(--accent);
+    border-color: var(--accent-border);
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
 }
 
 .activity-item--done {
-    border-left-color: var(--success-border);
+    border-color: color-mix(in srgb, var(--success-border) 72%, var(--border));
 }
 
 .activity-item--failed {
-    border-left-color: var(--danger-border);
+    border-color: var(--danger-border);
 }
 
 .activity-item__dot {
@@ -431,14 +525,27 @@ function close(): void {
 }
 
 .activity-item__name {
+    align-self: flex-start;
     font-family: ui-monospace, SFMono-Regular, monospace;
     font-size: var(--text-2xs);
-    padding: 1px var(--space-1);
+    padding: 1px 0 0;
     border-radius: var(--radius-xs);
-    background: var(--surface-3);
     color: var(--text-muted);
     white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.activity-item__status {
     flex-shrink: 0;
+    padding: 1px var(--space-1-5);
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
 }
 
 .activity-item__args {
@@ -593,8 +700,9 @@ function close(): void {
 }
 
 .plan-row {
-    display: flex;
-    align-items: baseline;
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    align-items: start;
     gap: var(--space-1-5);
     font-size: var(--text-xs);
     color: var(--text-secondary);
@@ -608,9 +716,24 @@ function close(): void {
 }
 
 .plan-row__desc {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     flex: 1;
     min-width: 0;
     color: var(--text-primary);
+}
+
+.plan-row__desc small,
+.plan-row__desc em {
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    font-style: normal;
+    line-height: var(--leading-snug);
+}
+
+.plan-row__desc em {
+    color: var(--text-secondary);
 }
 
 .plan-row--failed {

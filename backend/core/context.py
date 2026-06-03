@@ -23,7 +23,6 @@ from backend.core.protocols import (
     LLMServiceProtocol,
     LMStudioManagerProtocol,
     MemoryServiceProtocol,
-    NoteServiceProtocol,
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     QdrantServiceProtocol,
@@ -66,13 +65,17 @@ class AppContext:
     memory_service: MemoryServiceProtocol | None = None
     """Persistent semantic memory service."""
 
-    note_service: NoteServiceProtocol | None = None
-    """Obsidian-like note vault service."""
-
     knowledge_backend: KnowledgeBackendProtocol | None = None
-    """Unified knowledge store (Phase 1).  Wraps memory + note services
-    behind a kind-dispatched protocol so Phase 3 can swap to Continuum
-    without touching plugin code."""
+    """Unified knowledge store (Phase 1).  Wraps the memory service behind
+    a kind-dispatched protocol; ``note`` knowledge is delegated to
+    Continuum via :class:`CompositeKnowledgeBackend` when enabled."""
+
+    continuum_client: Any = None
+    """Shared Continuum REST client (Phase 3).  Set when Continuum is the
+    note backend so the notes backend and the ``continuum`` plugin drive
+    one client instance — keeping a single, coherent folder path↔id cache
+    (e.g. a folder created via the plugin is immediately resolvable when
+    placing a note). ``None`` when Continuum is disabled."""
 
     email_service: EmailServiceProtocol | None = None
     """Async IMAP/SMTP email assistant service."""

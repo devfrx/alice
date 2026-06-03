@@ -149,6 +149,6 @@ const emit = defineEmits<{
 }
 
 .ui-badge__remove:focus-visible {
-    box-shadow: var(--shadow-focus);
+    outline: none;
 }
 </style>

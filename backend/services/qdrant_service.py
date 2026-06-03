@@ -23,9 +23,6 @@ from backend.core.config import QdrantConfig
 COLLECTION_MEMORY = "alice_memory"
 """Memory entries (Phase 9)."""
 
-COLLECTION_NOTES = "alice_notes"
-"""Note embeddings (Phase 13)."""
-
 COLLECTION_TOOLS = "alice_tools"
 """Tool definition embeddings (Tool RAG)."""
 

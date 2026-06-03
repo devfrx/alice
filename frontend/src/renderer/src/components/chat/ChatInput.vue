@@ -14,6 +14,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { AudioDevice } from '../../composables/useVoice'
 import ModelSelector from '../settings/ModelSelector.vue'
+import ChatToolControls from './ChatToolControls.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import ContextBar from './ContextBar.vue'
 import { useChatStore } from '../../stores/chat'
@@ -313,6 +314,9 @@ defineExpose({
 
       <!-- Divider -->
       <div class="ci__divider" />
+
+      <!-- Agent mode + tool selector -->
+      <ChatToolControls />
 
       <!-- Model selectors -->
       <div class="ci__selectors">

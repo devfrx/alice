@@ -122,3 +122,33 @@ export interface VectorStoreStats {
   connected: boolean
   collections: VectorStoreCollectionInfo[]
 }
+
+/** A single tool in the chat tool-picker catalog. */
+export interface ToolCatalogTool {
+  /** Namespaced tool name (persisted in disabled_tools). */
+  name: string
+  /** Bare tool name for display. */
+  label: string
+  /** Human-readable tool description. */
+  description: string
+  /** Whether this tool is currently offered to the LLM. */
+  enabled: boolean
+}
+
+/** Tools grouped under their owning plugin. */
+export interface ToolCatalogPlugin {
+  plugin: string
+  tools: ToolCatalogTool[]
+}
+
+/** Response of GET /settings/tool-catalog and PUT /settings/active-tools. */
+export interface ToolCatalogResponse {
+  /** Whether tool definitions are sent to the LLM at all. */
+  tools_enabled: boolean
+  /** Whether Tool RAG auto-selects tools (disables manual selection). */
+  tool_rag_enabled: boolean
+  /** Namespaced names of tools the user turned off. */
+  disabled_tools: string[]
+  /** Available tools grouped by plugin. */
+  plugins: ToolCatalogPlugin[]
+}

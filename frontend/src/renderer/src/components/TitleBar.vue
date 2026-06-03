@@ -827,7 +827,6 @@ onUnmounted(() => {
 .titlebar__service-trigger:focus-visible,
 .titlebar__refresh-btn:focus-visible {
     outline: none;
-    box-shadow: var(--shadow-focus);
 }
 
 .is-spinning {

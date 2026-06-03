@@ -106,7 +106,7 @@ defineEmits<{
 }
 
 .ui-btn:focus-visible {
-    box-shadow: var(--shadow-focus);
+    outline: none;
 }
 
 /* ── Sizes ─────────────────────────── */

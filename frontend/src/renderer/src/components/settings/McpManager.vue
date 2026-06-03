@@ -388,7 +388,6 @@ onMounted(() => {
 
 .mcp-btn:focus-visible {
     outline: none;
-    box-shadow: var(--focus-ring-shadow);
 }
 
 .mcp-btn:disabled {

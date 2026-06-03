@@ -15,7 +15,6 @@
  *                           Defaults to `DEFAULT_PAGE_TRANSITION` if missing.
  *
  * Deep-link routes:
- *   - `/notes/:id?` — optional note id, consumed by NotesPageView.
  *   - `/email/:id?` — optional email uid, consumed by EmailPageView.
  *   - `/calendar`   — optional `?date=YYYY-MM-DD` query (delegated to the
  *                     CalendarView component).
@@ -82,13 +81,6 @@ const router = createRouter({
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
       meta: { title: 'Impostazioni', transition: DEFAULT_PAGE_TRANSITION }
-    },
-    {
-      path: '/notes/:id?',
-      name: 'notes',
-      component: () => import('../views/NotesPageView.vue'),
-      props: true,
-      meta: { title: 'Note', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
       path: '/email/:id?',

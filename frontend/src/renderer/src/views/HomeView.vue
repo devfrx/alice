@@ -325,7 +325,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 .home-view__mode-btn:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-focus);
 }
 
 .home-view__mode-icon {

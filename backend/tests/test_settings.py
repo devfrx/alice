@@ -40,3 +40,73 @@ class TestToolConfirmations:
     async def test_put_missing_field_returns_422(self, client):
         resp = await client.put(_URL, json={})
         assert resp.status_code == 422
+
+
+_CATALOG_URL = "/api/settings/tool-catalog"
+_ACTIVE_URL = "/api/settings/active-tools"
+
+
+@pytest.mark.asyncio
+class TestToolCatalog:
+    """Tests for GET /api/settings/tool-catalog and PUT /active-tools."""
+
+    async def test_catalog_shape(self, client):
+        resp = await client.get(_CATALOG_URL)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert set(body) >= {
+            "tools_enabled",
+            "tool_rag_enabled",
+            "disabled_tools",
+            "plugins",
+        }
+        assert isinstance(body["plugins"], list)
+        assert body["disabled_tools"] == []
+
+    async def test_set_active_tools_round_trips(self, client):
+        resp = await client.put(
+            _ACTIVE_URL, json={"disabled_tools": ["plugin_b", "plugin_a"]},
+        )
+        assert resp.status_code == 200
+        # Stored sorted + deduplicated.
+        assert resp.json()["disabled_tools"] == ["plugin_a", "plugin_b"]
+
+        get_resp = await client.get(_CATALOG_URL)
+        assert get_resp.json()["disabled_tools"] == ["plugin_a", "plugin_b"]
+
+    async def test_set_active_tools_dedupes_and_drops_empty(self, client):
+        resp = await client.put(
+            _ACTIVE_URL, json={"disabled_tools": ["x", "x", "", "y"]},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["disabled_tools"] == ["x", "y"]
+
+    async def test_clear_active_tools(self, client):
+        await client.put(_ACTIVE_URL, json={"disabled_tools": ["x"]})
+        resp = await client.put(_ACTIVE_URL, json={"disabled_tools": []})
+        assert resp.status_code == 200
+        assert resp.json()["disabled_tools"] == []
+
+    async def test_disabled_tool_marked_in_catalog(self, client):
+        """A tool present in the catalog is reported enabled=False once disabled."""
+        catalog = (await client.get(_CATALOG_URL)).json()
+        names = [
+            t["name"]
+            for plugin in catalog["plugins"]
+            for t in plugin["tools"]
+        ]
+        if not names:
+            pytest.skip("No plugins/tools loaded in the test app")
+        target = names[0]
+        await client.put(_ACTIVE_URL, json={"disabled_tools": [target]})
+        updated = (await client.get(_CATALOG_URL)).json()
+        flat = {
+            t["name"]: t["enabled"]
+            for plugin in updated["plugins"]
+            for t in plugin["tools"]
+        }
+        assert flat[target] is False
+
+    async def test_set_active_tools_invalid_body_returns_422(self, client):
+        resp = await client.put(_ACTIVE_URL, json={"disabled_tools": "nope"})
+        assert resp.status_code == 422

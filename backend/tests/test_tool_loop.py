@@ -431,6 +431,138 @@ class TestConfirmation:
 
 
 # ---------------------------------------------------------------------------
+# Tests — client-executed tools
+# ---------------------------------------------------------------------------
+
+
+class _ClientToolWebSocket(MockWebSocket):
+    """WebSocket stub that answers ``client_tool_call`` frames.
+
+    Echoes back a ``client_tool_result`` for the most recent
+    ``client_tool_call`` it observed, simulating the Continuum web client
+    executing a block tool against the open editor.
+    """
+
+    def __init__(self, *, success: bool = True, result: Any = None,
+                 error: str | None = None) -> None:
+        super().__init__()
+        self._reply_success = success
+        self._reply_result = result
+        self._reply_error = error
+
+    async def receive_text(self) -> str:
+        """Return a client_tool_result matching the latest client_tool_call."""
+        for msg in reversed(self.sent):
+            if msg.get("type") == "client_tool_call":
+                payload: dict[str, Any] = {
+                    "type": "client_tool_result",
+                    "execution_id": msg["execution_id"],
+                    "success": self._reply_success,
+                }
+                if self._reply_success:
+                    payload["result"] = self._reply_result
+                else:
+                    payload["error"] = self._reply_error
+                return json.dumps(payload)
+        raise asyncio.TimeoutError
+
+
+class TestClientExecutedTools:
+    """Tools flagged ``client_execution`` are delegated to the client."""
+
+    @pytest.mark.asyncio
+    async def test_client_tool_round_trip(self) -> None:
+        """A client tool gets a client_tool_call and persists the result."""
+        client_def = ToolDefinition(
+            name="continuum_list_blocks",
+            description="List blocks",
+            client_execution=True,
+        )
+        reg = MockToolRegistry(definitions={"continuum_list_blocks": client_def})
+        ws = _ClientToolWebSocket(result={"count": 2, "blocks": []})
+        llm_resp = [[
+            {"type": "token", "content": "Listed"},
+            {"type": "done"},
+        ]]
+        ws, session, reg = await _run(
+            [_tc("continuum_list_blocks")],
+            registry=reg,
+            ws=ws,
+            llm_responses=llm_resp,
+        )
+        # The server must NOT run the tool locally.
+        assert reg.execute_calls == []
+        # A client_tool_call frame was emitted.
+        calls = [m for m in ws.sent if m.get("type") == "client_tool_call"]
+        assert len(calls) == 1
+        assert calls[0]["tool_name"] == "continuum_list_blocks"
+        # The result is reported as a successful tool_execution_done.
+        done = [
+            m for m in ws.sent
+            if m.get("type") == "tool_execution_done"
+            and m.get("tool_name") == "continuum_list_blocks"
+        ]
+        assert len(done) == 1
+        assert done[0]["success"] is True
+        # A role="tool" message was persisted for the LLM loop.
+        tool_msgs = [
+            o for o in session.added
+            if isinstance(o, Message) and o.role == "tool"
+        ]
+        assert len(tool_msgs) == 1
+
+    @pytest.mark.asyncio
+    async def test_client_tool_failure_reported(self) -> None:
+        """A client-reported failure becomes a failed tool_execution_done."""
+        client_def = ToolDefinition(
+            name="continuum_update_block",
+            description="Update block",
+            client_execution=True,
+        )
+        reg = MockToolRegistry(definitions={"continuum_update_block": client_def})
+        ws = _ClientToolWebSocket(success=False, error="Block index out of range.")
+        llm_resp = [[
+            {"type": "token", "content": "Handled"},
+            {"type": "done"},
+        ]]
+        ws, session, reg = await _run(
+            [_tc("continuum_update_block", '{"index": 99}')],
+            registry=reg,
+            ws=ws,
+            llm_responses=llm_resp,
+        )
+        assert reg.execute_calls == []
+        failures = [
+            m for m in ws.sent
+            if m.get("type") == "tool_execution_done" and m.get("success") is False
+        ]
+        assert len(failures) == 1
+
+    @pytest.mark.asyncio
+    async def test_client_tool_not_deduplicated(self) -> None:
+        """Identical client tool calls are NOT collapsed (live state changes)."""
+        client_def = ToolDefinition(
+            name="continuum_list_blocks",
+            description="List blocks",
+            client_execution=True,
+        )
+        reg = MockToolRegistry(definitions={"continuum_list_blocks": client_def})
+        ws = _ClientToolWebSocket(result={"count": 0, "blocks": []})
+        llm_resp = [[
+            {"type": "token", "content": "Listed twice"},
+            {"type": "done"},
+        ]]
+        ws, _, _ = await _run(
+            [_tc("continuum_list_blocks"), _tc("continuum_list_blocks")],
+            registry=reg,
+            ws=ws,
+            llm_responses=llm_resp,
+        )
+        calls = [m for m in ws.sent if m.get("type") == "client_tool_call"]
+        assert len(calls) == 2
+
+
+# ---------------------------------------------------------------------------
 # Tests — empty response retry
 # ---------------------------------------------------------------------------
 

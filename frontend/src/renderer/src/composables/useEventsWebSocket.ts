@@ -10,7 +10,6 @@ import { onScopeDispose, ref } from 'vue'
 import { useCalendarStore } from '../stores/calendar'
 import { useEmailStore } from '../stores/email'
 import { useMcpStore } from '../stores/mcp'
-import { useNotesStore } from '../stores/notes'
 import { useArtifactsStore } from '../stores/artifacts'
 import { useServicesStore } from '../stores/services'
 import { BACKEND_HOST } from '../services/api'
@@ -22,7 +21,6 @@ export function useEventsWebSocket() {
   const calendarStore = useCalendarStore()
   const emailStore = useEmailStore()
   const mcpStore = useMcpStore()
-  const notesStore = useNotesStore()
   const artifactsStore = useArtifactsStore()
   const servicesStore = useServicesStore()
 
@@ -80,16 +78,6 @@ export function useEventsWebSocket() {
         // Handle email events (Phase 15)
         if (data.type === 'email.received' && typeof data.folder === 'string') {
           emailStore.handleEmailReceived(data.folder as string)
-        }
-
-        // Handle note events (Phase 13)
-        if (
-          data.type === 'note.created' ||
-          data.type === 'note.updated' ||
-          data.type === 'note.deleted'
-        ) {
-          void notesStore.loadNotes()
-          void notesStore.loadFolders()
         }
 
         // Handle artifact events: lazy-fetch the new artifact and add to store.

@@ -162,6 +162,16 @@ class LLMConfig(BaseSettings):
         default_factory=lambda: ["memory", "system_info", "web_search"],
     )
     """Plugins whose tools are always included regardless of tool_rag results."""
+    disabled_tools: list[str] = Field(default_factory=list)
+    """Namespaced tool names the user has turned off for chat (opt-out filter).
+
+    Empty (the default) means every available tool is offered to the LLM.
+    When non-empty, matching tools are removed from the toolset assembled
+    in the non-RAG / non-scoped branch of the chat handler. The selection
+    is persisted as a user preference and survives restarts.
+
+    Has no effect when ``tool_rag_enabled`` is True (Tool RAG auto-selects
+    the relevant tools) or when ``tools_enabled`` is False (no tools sent)."""
     # -- Ollama-specific options (ignored by other providers) --
     num_ctx: int = 8192
     """Context window size. Ollama defaults to 2048; 8192 is better for 9B+ models."""
@@ -521,28 +531,53 @@ class QdrantConfig(BaseSettings):
     """If True, fall back to fastembed (CPU) when LLM embedding API is unavailable."""
 
 
-class NotesConfig(BaseSettings):
-    """Note system (Obsidian-like vault) configuration."""
+class ContinuumConfig(BaseSettings):
+    """Continuum knowledge-base integration.
 
-    model_config = SettingsConfigDict(env_prefix="ALICE_NOTES__")
+    When enabled, ``note``-kind knowledge is delegated to a running
+    Continuum server (see :class:`~backend.services.knowledge.\
+continuum_backend.ContinuumBackend`) instead of Alice's local note
+    store, while ``memory``/``fact`` kinds keep using Qdrant. The two are
+    composed by :class:`~backend.services.knowledge.composite_backend.\
+CompositeKnowledgeBackend`.
 
-    enabled: bool = False
-    """Enable the Note System. False by default (opt-in)."""
+    Continuum is a *separate* local application; Alice talks to it over
+    its REST API. The optional bearer token must match the server's
+    ``CONTINUUM_API_TOKEN`` when that server enforces authentication.
+    """
 
-    db_path: str = "data/notes.db"
-    """Path to the dedicated notes SQLite file (separate from alice.db)."""
+    model_config = SettingsConfigDict(env_prefix="ALICE_CONTINUUM__")
 
-    embedding_enabled: bool = True
-    """Enable semantic search via Qdrant vector embeddings."""
+    enabled: bool = True
+    """Route ``note`` knowledge to Continuum instead of the local vault."""
 
-    max_content_chars_llm: int = 8000
-    """Max note content chars included in LLM tool responses."""
+    base_url: str = "http://localhost:3001"
+    """Base URL of the Continuum server (no trailing ``/api``)."""
 
-    semantic_threshold: float = 0.70
-    """Minimum cosine similarity for semantic search results."""
+    api_token: str | None = None
+    """Bearer token sent on every request; ``None`` for token-less servers."""
 
-    max_search_results: int = 20
-    """Maximum results returned from search."""
+    timeout_s: float = 15.0
+    """Per-request HTTP timeout in seconds."""
+
+    folder_cache_ttl_s: float = 30.0
+    """How long the folder-path ↔ id resolution cache stays valid."""
+
+    note_max_content_chars_llm: int = 8000
+    """Max note content chars included in LLM ``read_note`` responses."""
+
+    agent_prompt_file: str = "config/continuum_agent_prompt.md"
+    """System prompt used for the *Continuum-scoped* Alice agent — i.e.
+    chats opened from inside Continuum (``?scope=continuum``). Gives the
+    agent a clean, Continuum-only persona instead of Alice's general
+    desktop prompt. Resolved to an absolute path at load time."""
+
+    agent_tool_plugins: list[str] = Field(
+        default_factory=lambda: ["continuum"]
+    )
+    """Plugins whose tools are ALWAYS injected for the Continuum-scoped
+    agent, bypassing tool RAG so the agent reliably knows how to act on
+    Continuum itself."""
 
 
 _MCP_SERVER_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,29}$")
@@ -1058,7 +1093,7 @@ class AliceConfig(BaseSettings):
     news: NewsConfig = Field(default_factory=NewsConfig)
     qdrant: QdrantConfig = Field(default_factory=QdrantConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
-    notes: NotesConfig = Field(default_factory=NotesConfig)
+    continuum: ContinuumConfig = Field(default_factory=ContinuumConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)
     trellis: TrellisServiceConfig = Field(default_factory=TrellisServiceConfig)
     trellis2: Trellis2ServiceConfig = Field(default_factory=Trellis2ServiceConfig)
@@ -1106,12 +1141,16 @@ class AliceConfig(BaseSettings):
                     abs_path = PROJECT_ROOT / db_path
                     db_data["url"] = f"{prefix}:///{abs_path}"
 
-        # -- notes db_path (resolve relative to PROJECT_ROOT) --
-        notes_data = data.get("notes")
-        if isinstance(notes_data, dict):
-            raw_db = notes_data.get("db_path", "")
-            if raw_db and not Path(raw_db).is_absolute():
-                notes_data["db_path"] = str(PROJECT_ROOT / raw_db)
+        # -- continuum agent prompt file (resolve relative to PROJECT_ROOT) --
+        continuum_data = data.get("continuum")
+        if isinstance(continuum_data, dict):
+            raw_prompt = continuum_data.get(
+                "agent_prompt_file", "config/continuum_agent_prompt.md"
+            )
+            if raw_prompt and not Path(raw_prompt).is_absolute():
+                continuum_data["agent_prompt_file"] = str(
+                    PROJECT_ROOT / raw_prompt
+                )
 
         # -- qdrant path (resolve relative to PROJECT_ROOT) --
         qdrant_data = data.get("qdrant")

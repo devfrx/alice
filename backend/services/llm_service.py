@@ -140,6 +140,10 @@ class LLMService:
         )
         self._is_ollama = config.provider == "ollama"
         self._system_prompt: str | None = None
+        # Cache of alternate, task-scoped base prompts keyed by file path
+        # (e.g. the Continuum-scoped agent persona). Kept separate from
+        # ``_system_prompt`` so scopes never clobber the default prompt.
+        self._scoped_prompts: dict[str, str] = {}
         self._response_ids: OrderedDict[str, str] = OrderedDict()
         self._response_ids_max = 500
         # Cache for "auto" model resolution: (resolved_id, resolved_at_monotonic)
@@ -174,6 +178,64 @@ class LLMService:
             if val and "embed" in val.lower():
                 return True
         return False
+
+    @staticmethod
+    def _model_id(item: dict[str, Any]) -> str | None:
+        """Return the canonical identifier for a model entry."""
+        return item.get("path") or item.get("id") or item.get("name")
+
+    @staticmethod
+    def _is_loaded(item: dict[str, Any]) -> bool:
+        """Check if a model entry is currently loaded into memory.
+
+        The LM Studio v1 API marks a loaded model with a non-empty
+        ``loaded_instances`` list.  The ``state`` field is unreliable —
+        recent builds leave it blank for every model — so it is only
+        consulted as a secondary signal.  OAI-compatible responses carry
+        no load information at all, in which case this returns ``False``.
+        """
+        if item.get("loaded_instances"):
+            return True
+        return item.get("state") in ("loaded", "loading")
+
+    def _pick_chat_model_id(
+        self, items: list[dict[str, Any]],
+    ) -> str | None:
+        """Choose the best chat model id from non-embedding candidates.
+
+        Preference order:
+
+        1. The configured model (when not ``"auto"``) if it is present in
+           the candidate list — honours an explicit user choice.
+        2. A model trained for tool use.  AL\\CE is fundamentally a
+           tool-using agent, and this also skips single-purpose models
+           such as OCR/vision-only checkpoints that would otherwise be
+           picked just because they sort first.
+        3. The first candidate, as a last resort.
+
+        Args:
+            items: Non-embedding model entries from the models API.
+
+        Returns:
+            The chosen model identifier, or ``None`` if *items* is empty.
+        """
+        if not items:
+            return None
+
+        configured = self._config.model
+        if configured and configured != "auto":
+            for item in items:
+                if self._model_id(item) == configured:
+                    return configured
+
+        for item in items:
+            caps = item.get("capabilities") or {}
+            if caps.get("trained_for_tool_use"):
+                model_id = self._model_id(item)
+                if model_id:
+                    return model_id
+
+        return self._model_id(items[0])
 
     # ------------------------------------------------------------------
     # Per-model capability helpers
@@ -267,25 +329,38 @@ class LLMService:
                     await self._model_registry.refresh_from_api(items)
 
                 if items:
-                    # Prefer a loaded LLM (skip embedding models — LM Studio v1
-                    # API returns "type": "llm" | "embedding" for each entry,
-                    # and sending chat/completions to an embedding model will
-                    # fail).
-                    for item in items:
-                        if self._is_embedding_model(item):
-                            continue
-                        state = item.get("state", "")
-                        if state in ("loaded", "loading", ""):
-                            resolved = item.get("path") or item.get("id") or item.get("name")
-                            if resolved:
-                                break
-                    if not resolved:
-                        # Fall back to first non-embedding model regardless of state
-                        for item in items:
-                            if not self._is_embedding_model(item):
-                                resolved = item.get("path") or item.get("id") or item.get("name")
-                                break
-                    if not resolved:
+                    # Only consider chat-capable (non-embedding) models;
+                    # sending chat/completions to an embedding model fails.
+                    non_embedding = [
+                        it for it in items
+                        if not self._is_embedding_model(it)
+                    ]
+                    # Strongly prefer a model that is ALREADY loaded.
+                    # Resolving to an unloaded model makes LM Studio
+                    # JIT-load it on the next chat request, which evicts
+                    # the embedding model (and any current chat model)
+                    # from VRAM — the cause of the "loads an OCR model,
+                    # drops embeddings, then reloads them" churn.  The
+                    # ``state`` field is blank on recent LM Studio builds,
+                    # so loadedness is detected via ``loaded_instances``.
+                    loaded_llms = [
+                        it for it in non_embedding if self._is_loaded(it)
+                    ]
+                    if loaded_llms:
+                        resolved = self._pick_chat_model_id(loaded_llms)
+                    elif non_embedding:
+                        # No chat model is loaded — fall back to the best
+                        # available so the user can still chat, accepting a
+                        # one-time JIT load.  ``_pick_chat_model_id`` avoids
+                        # single-purpose models (e.g. OCR) where possible.
+                        resolved = self._pick_chat_model_id(non_embedding)
+                        if resolved:
+                            logger.info(
+                                "No chat model loaded in LM Studio; "
+                                "auto-selecting '{}' (will be JIT-loaded)",
+                                resolved,
+                            )
+                    else:
                         logger.debug(
                             "LM Studio v1 API returned {} model(s), all "
                             "embedding — falling back to OAI-compat",
@@ -306,12 +381,14 @@ class LLMService:
                     )
                     resp.raise_for_status()
                     items = resp.json().get("data", [])
-                    # Skip embedding models in OAI-compat responses too
-                    for item in items:
-                        if not self._is_embedding_model(item):
-                            resolved = item.get("id")
-                            if resolved:
-                                break
+                    # Skip embedding models in OAI-compat responses too.
+                    # This endpoint exposes no load state, so we cannot
+                    # prefer a loaded model here; pick the best chat model.
+                    non_embedding = [
+                        it for it in items
+                        if not self._is_embedding_model(it)
+                    ]
+                    resolved = self._pick_chat_model_id(non_embedding)
                     if not resolved and items:
                         logger.warning(
                             "All {} model(s) from OAI-compat API are embedding "
@@ -391,17 +468,13 @@ class LLMService:
     def invalidate_system_prompt_cache(self) -> None:
         """Clear the cached system prompt so it is reloaded on next access."""
         self._system_prompt = None
+        self._scoped_prompts.clear()
 
-    def _get_dynamic_system_prompt(self) -> str:
-        """Return system prompt with current date/time appended.
+    def _temporal_block(self) -> str:
+        """Build the 'current date/time' block prepended to system prompts.
 
-        The base prompt is cached; only the temporal context is
-        regenerated on each call so the LLM always knows "today's" date.
+        Regenerated on every call so the LLM always knows "today's" date.
         """
-        base = self._load_system_prompt()
-        if not base:
-            return ""
-
         now = datetime.now()
         # Italian locale-aware day/month names
         days_it = [
@@ -416,19 +489,28 @@ class LLMService:
         day_name = days_it[now.weekday()]
         month_name = months_it[now.month]
         date_str = f"{day_name} {now.day} {month_name} {now.year}"
-
-        time_block = (
+        return (
             f"## Data e ora corrente\n\n"
             f"- **Data odierna**: {date_str}\n"
             f"- **Data ISO**: {now.strftime('%Y-%m-%d')}\n"
             f"- **Ora**: {now.strftime('%H:%M')}\n"
-
         )
+
+    def _get_dynamic_system_prompt(self) -> str:
+        """Return system prompt with current date/time appended.
+
+        The base prompt is cached; only the temporal context is
+        regenerated on each call so the LLM always knows "today's" date.
+        """
+        base = self._load_system_prompt()
+        if not base:
+            return ""
+
         # Prepend temporal context so it sits at the TOP of the system prompt
         # (beginning of context window = maximum model attention).
         # Appending it at the end risks "lost in the middle" suppression,
         # causing the model to revert to its training-time date assumption.
-        return time_block + base
+        return self._temporal_block() + base
 
     def get_system_prompt(
         self, memory_context: str | None = None,
@@ -452,6 +534,66 @@ class LLMService:
         if memory_context:
             return memory_context
         return base
+
+    def _load_scoped_prompt(self, path_str: str) -> str:
+        """Read and cache an alternate, task-scoped base prompt file.
+
+        Unlike :meth:`_load_system_prompt`, the OS-environment block is
+        intentionally omitted so the scoped persona stays clean. A missing
+        file is treated as a soft failure (logged, empty string returned)
+        so callers can transparently fall back to the default prompt.
+
+        Args:
+            path_str: Absolute path to the scoped prompt markdown file.
+
+        Returns:
+            The scoped prompt text, or ``""`` if the file is missing.
+        """
+        cached = self._scoped_prompts.get(path_str)
+        if cached is not None:
+            return cached
+
+        path = Path(path_str)
+        if not path.exists():
+            logger.warning("Scoped system prompt file not found: {}", path)
+            return ""
+
+        base = path.read_text(encoding="utf-8").strip()
+        self._scoped_prompts[path_str] = base
+        logger.debug("Loaded scoped system prompt from {}", path)
+        return base
+
+    def get_scoped_system_prompt(
+        self,
+        base_prompt_path: str,
+        memory_context: str | None = None,
+    ) -> str:
+        """Build a task-scoped system prompt from an ALTERNATE base file.
+
+        Used by callers that need a focused agent persona (e.g. the
+        Continuum-scoped agent) instead of Alice's general-purpose
+        prompt. The temporal context block is reused, but the local-OS
+        environment block is omitted to keep the scope clean. If the
+        scoped file is missing, this transparently falls back to the
+        default system prompt so chats never break.
+
+        Args:
+            base_prompt_path: Absolute path to the scoped prompt file.
+            memory_context: Optional block of relevant memories/context
+                to append.
+
+        Returns:
+            The complete scoped system prompt string.
+        """
+        base = self._load_scoped_prompt(base_prompt_path)
+        if not base:
+            # Soft fallback: behave exactly like the default prompt.
+            return self.get_system_prompt(memory_context=memory_context)
+
+        prompt = self._temporal_block() + base
+        if memory_context:
+            return f"{prompt}\n\n{memory_context}"
+        return prompt
 
     # ------------------------------------------------------------------
     # Message building

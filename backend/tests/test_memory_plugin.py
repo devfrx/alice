@@ -58,10 +58,8 @@ def mock_ctx():
 
     ctx = MagicMock(spec=AppContext)
     ctx.memory_service = AsyncMock()
-    ctx.note_service = None
     ctx.knowledge_backend = QdrantBackend(
         memory_service=ctx.memory_service,
-        note_service=None,
     )
     ctx.config = MagicMock()
     ctx.config.memory.embedding_model = "test-model"

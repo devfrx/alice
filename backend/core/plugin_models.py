@@ -56,6 +56,12 @@ class ToolDefinition:
         max_result_chars: Maximum characters in the tool result before truncation.
             Defaults to ``MAX_TOOL_RESULT_LENGTH``. Override for tools that
             return large payloads (e.g. web scraping).
+        client_execution: When ``True`` the tool is *not* executed on the
+            server. Instead the chat WebSocket delegates execution to the
+            connected client (which runs it against live UI state, e.g. the
+            open Continuum editor) and feeds the client-supplied result back
+            into the LLM loop. The owning plugin's :meth:`execute_tool` is a
+            defensive no-op for these tools — they only ever run client-side.
     """
 
     name: str
@@ -70,6 +76,7 @@ class ToolDefinition:
     risk_level: Literal["safe", "medium", "dangerous", "forbidden"] = "safe"
     sanitise_output: bool = True
     max_result_chars: int = MAX_TOOL_RESULT_LENGTH
+    client_execution: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.parameters, dict):

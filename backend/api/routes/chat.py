@@ -1168,6 +1168,12 @@ async def ws_chat(websocket: WebSocket) -> None:
                 _ws_connections.pop(client_ip, None)
         return
 
+    # Agent scope (constant for the connection lifetime). A chat opened
+    # *from* Continuum passes ``?scope=continuum`` so Alice uses a clean,
+    # Continuum-only persona and always-injected Continuum tools.
+    agent_scope = (websocket.query_params.get("scope") or "").strip().lower()
+    continuum_scope = agent_scope == "continuum"
+
     try:
         message_buffer: list[str] = []
 
@@ -1183,6 +1189,18 @@ async def ws_chat(websocket: WebSocket) -> None:
                 await websocket.send_json(
                     {"type": "error", "content": "Invalid JSON"}
                 )
+                continue
+
+            message_type = data.get("type")
+            if message_type in {
+                "tool_confirmation_response",
+                "client_tool_result",
+                "cancel",
+            }:
+                # Control frames are consumed by the active generation/tool
+                # waiters. If a stale one arrives while the main chat loop is
+                # listening for a new user turn, ignore it instead of treating
+                # the missing `content` field as an empty message.
                 continue
 
             user_content: str = data.get("content", "").strip()
@@ -1401,7 +1419,14 @@ async def ws_chat(websocket: WebSocket) -> None:
                 # --- fetch available tools for LLM ------------------------
                 tools: list[dict[str, Any]] | None = None
                 if ctx.tool_registry and ctx.config.llm.tools_enabled:
-                    if (
+                    if continuum_scope:
+                        # Continuum-scoped agent: always inject the full
+                        # Continuum toolset (bypass tool RAG) so the agent
+                        # reliably knows how to act on Continuum.
+                        tools = await ctx.tool_registry.get_tools_for_plugins(
+                            set(ctx.config.continuum.agent_tool_plugins),
+                        )
+                    elif (
                         ctx.config.llm.tool_rag_enabled
                         and ctx.qdrant_service is not None
                     ):
@@ -1414,6 +1439,14 @@ async def ws_chat(websocket: WebSocket) -> None:
                         )
                     else:
                         tools = await ctx.tool_registry.get_available_tools()
+                        if tools and ctx.config.llm.disabled_tools:
+                            # Apply the user's per-chat tool selection
+                            # (opt-out). Skipped under tool RAG / continuum
+                            # scope, which pick their own toolset above.
+                            tools = ctx.tool_registry.exclude_disabled(
+                                tools,
+                                set(ctx.config.llm.disabled_tools),
+                            )
                         if tools and ctx.config.llm.max_tools > 0:
                             tools = ctx.tool_registry.limit_tools(
                                 tools,
@@ -1473,9 +1506,15 @@ async def ws_chat(websocket: WebSocket) -> None:
                 # Build system prompt once for the entire request — reused
                 # in build_messages, build_continuation_messages, and the
                 # native API path.
-                cached_sys_prompt = llm.get_system_prompt(
-                    memory_context=memory_context,
-                )
+                if continuum_scope:
+                    cached_sys_prompt = llm.get_scoped_system_prompt(
+                        ctx.config.continuum.agent_prompt_file,
+                        memory_context=memory_context,
+                    )
+                else:
+                    cached_sys_prompt = llm.get_system_prompt(
+                        memory_context=memory_context,
+                    )
 
                 messages = llm.build_messages(
                     user_content,
@@ -1971,6 +2010,13 @@ async def get_conversation(
                                 await ctx.tool_registry
                                 .get_available_tools()
                             )
+                            if avail_tools and ctx.config.llm.disabled_tools:
+                                avail_tools = (
+                                    ctx.tool_registry.exclude_disabled(
+                                        avail_tools,
+                                        set(ctx.config.llm.disabled_tools),
+                                    )
+                                )
                             if avail_tools:
                                 if ctx.config.llm.max_tools > 0:
                                     avail_tools = (

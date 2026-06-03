@@ -145,7 +145,7 @@ onUnmounted(() => {
 }
 
 .ctx-menu:focus-visible {
-    box-shadow: var(--shadow-focus);
+    outline: none;
 }
 
 .ctx-menu__title {

@@ -327,6 +327,74 @@ class TestLookup:
 
 
 # ---------------------------------------------------------------------------
+# Tool catalog & per-chat selection (disabled_tools)
+# ---------------------------------------------------------------------------
+
+
+class TestToolCatalogAndExclusion:
+
+    @pytest.mark.asyncio
+    async def test_catalog_lists_namespaced_and_bare_names(self, make_registry):
+        """Catalog exposes the plugin, namespaced name and bare label."""
+        plugin = MockPlugin(
+            tools=[_make_tool("get_info", description="Gets info")],
+            name="system_info",
+        )
+        registry = make_registry({"system_info": plugin})
+        await registry.refresh()
+
+        catalog = registry.get_tool_catalog()
+        assert len(catalog) == 1
+        entry = catalog[0]
+        assert entry["plugin"] == "system_info"
+        assert entry["name"] == "system_info_get_info"
+        assert entry["label"] == "get_info"
+        assert entry["description"] == "Gets info"
+
+    @pytest.mark.asyncio
+    async def test_catalog_empty_when_no_tools(self, make_registry):
+        """No registered tools → empty catalog."""
+        registry = make_registry({})
+        await registry.refresh()
+        assert registry.get_tool_catalog() == []
+
+    @pytest.mark.asyncio
+    async def test_exclude_disabled_removes_matching_tools(self, make_registry):
+        """Namespaced names in the disabled set are dropped from the toolset."""
+        p1 = MockPlugin(tools=[_make_tool("tool_a")], name="plugin_a")
+        p2 = MockPlugin(tools=[_make_tool("tool_b")], name="plugin_b")
+        registry = make_registry({"plugin_a": p1, "plugin_b": p2})
+        await registry.refresh()
+
+        all_tools = registry.get_all_tools()
+        filtered = registry.exclude_disabled(all_tools, {"plugin_a_tool_a"})
+        names = {t["function"]["name"] for t in filtered}
+        assert names == {"plugin_b_tool_b"}
+
+    @pytest.mark.asyncio
+    async def test_exclude_disabled_empty_set_is_noop(self, make_registry):
+        """An empty disabled set returns the original list unchanged."""
+        plugin = MockPlugin(tools=[_make_tool("tool_a")], name="plugin_a")
+        registry = make_registry({"plugin_a": plugin})
+        await registry.refresh()
+
+        all_tools = registry.get_all_tools()
+        assert registry.exclude_disabled(all_tools, set()) is all_tools
+
+    @pytest.mark.asyncio
+    async def test_exclude_disabled_does_not_mutate_input(self, make_registry):
+        """Filtering must not mutate the caller's list."""
+        plugin = MockPlugin(tools=[_make_tool("tool_a")], name="plugin_a")
+        registry = make_registry({"plugin_a": plugin})
+        await registry.refresh()
+
+        all_tools = registry.get_all_tools()
+        original_len = len(all_tools)
+        registry.exclude_disabled(all_tools, {"plugin_a_tool_a"})
+        assert len(all_tools) == original_len
+
+
+# ---------------------------------------------------------------------------
 # Dynamic Availability
 # ---------------------------------------------------------------------------
 

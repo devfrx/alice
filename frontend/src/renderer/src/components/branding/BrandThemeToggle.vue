@@ -40,7 +40,6 @@ function toggleTheme(): void {
 
 .sv__toggle:focus-visible {
     outline: none;
-    box-shadow: var(--shadow-focus);
 }
 
 .sv__toggle-thumb {

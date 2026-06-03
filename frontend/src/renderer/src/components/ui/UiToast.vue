@@ -146,7 +146,7 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
 }
 
 .ui-toast__close:focus-visible {
-  box-shadow: var(--shadow-focus);
+  outline: none;
 }
 
 /* ── Transition: slide in/out from right ────────────────────── */

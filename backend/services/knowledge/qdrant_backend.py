@@ -2,8 +2,9 @@
 
 Phase 1 implementation of :class:`KnowledgeBackend` that **wraps**
 the existing :class:`~backend.services.memory_service.MemoryService`
-and :class:`~backend.services.note_service.NoteService` without
-duplicating any storage logic.
+without duplicating any storage logic. ``note`` knowledge is served by
+Continuum (see :class:`~backend.services.knowledge.continuum_backend.\
+ContinuumBackend`), so this adapter only handles ``memory``/``fact``.
 
 Routing rule (see ``docs/architecture/phase1-alice-finalization.md``
 section 6):
@@ -11,19 +12,17 @@ section 6):
 ============== =========================== ========================
 ``kind``       Underlying service           Qdrant collection
 ============== =========================== ========================
-``note``       ``NoteService``              ``COLLECTION_NOTES``
 ``memory``     ``MemoryService`` (long_term/session) ``COLLECTION_MEMORY``
 ``fact``       ``MemoryService`` (user_fact)         ``COLLECTION_MEMORY``
 ============== =========================== ========================
 
 The adapter is intentionally thin: no business logic, no extra
 caching, no retries.  Its only job is to translate between the
-unified :class:`KnowledgeDoc` shape and the existing service APIs.
+unified :class:`KnowledgeDoc` shape and the existing service API.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -38,12 +37,8 @@ from backend.services.knowledge.protocol import (
 )
 
 if TYPE_CHECKING:
-    from backend.core.protocols import (
-        MemoryServiceProtocol,
-        NoteServiceProtocol,
-    )
+    from backend.core.protocols import MemoryServiceProtocol
     from backend.services.memory_service import MemoryEntry
-    from backend.services.note_service import NoteEntry
 
 
 # ---------------------------------------------------------------------------
@@ -56,32 +51,18 @@ _FACT_SCOPE: str = "user_fact"
 _DEFAULT_MEMORY_SCOPE: str = "long_term"
 
 
-def _coerce_iso(value: Any) -> datetime | None:
-    """Best-effort ISO-8601 → ``datetime`` conversion (returns ``None`` on failure)."""
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, str) and value:
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            return None
-    return None
-
-
 # ---------------------------------------------------------------------------
 # QdrantBackend
 # ---------------------------------------------------------------------------
 
 class QdrantBackend:
-    """Thin :class:`KnowledgeBackend` wrapper over Memory + Note services.
+    """Thin :class:`KnowledgeBackend` wrapper over the Memory service.
 
     Args:
         memory_service: Existing :class:`MemoryService` instance, or
             ``None`` if memory is disabled in the current configuration.
-        note_service: Existing :class:`NoteService` instance, or
-            ``None`` if notes are disabled in the current configuration.
 
-    Both services may legitimately be absent (the corresponding plugin
+    The service may legitimately be absent (the corresponding plugin
     will then surface a "service not available" error to callers).  The
     backend itself never raises on construction.
     """
@@ -92,10 +73,8 @@ class QdrantBackend:
         self,
         *,
         memory_service: MemoryServiceProtocol | None,
-        note_service: NoteServiceProtocol | None,
     ) -> None:
         self._memory = memory_service
-        self._notes = note_service
         self._log = logger.bind(component="QdrantBackend")
 
     # ------------------------------------------------------------------
@@ -106,11 +85,6 @@ class QdrantBackend:
         if self._memory is None:
             raise RuntimeError("memory_service is not available")
         return self._memory
-
-    def _require_notes(self) -> NoteServiceProtocol:
-        if self._notes is None:
-            raise RuntimeError("note_service is not available")
-        return self._notes
 
     @staticmethod
     def _is_memory_kind(kind: str) -> bool:
@@ -128,7 +102,7 @@ class QdrantBackend:
         k: int = 5,
         filters: dict[str, Any] | None = None,
     ) -> list[KnowledgeHit]:
-        """Dispatch to ``MemoryService.search`` or ``NoteService.search``."""
+        """Dispatch a semantic search to ``MemoryService.search``."""
         if self._is_memory_kind(kind):
             mem = self._require_memory()
             mem_filter = self._build_memory_filter(kind, filters)
@@ -136,24 +110,6 @@ class QdrantBackend:
             return [
                 KnowledgeHit(
                     doc=_memory_entry_to_doc(r["entry"]),
-                    score=float(r.get("score", 0.0)),
-                )
-                for r in results
-            ]
-
-        if kind == "note":
-            notes = self._require_notes()
-            folder = (filters or {}).get("folder")
-            tags = (filters or {}).get("tags")
-            results = await notes.search(
-                query,
-                folder=folder,
-                tags=tags,
-                limit=k,
-            )
-            return [
-                KnowledgeHit(
-                    doc=_note_entry_to_doc(r["entry"]),
                     score=float(r.get("score", 0.0)),
                 )
                 for r in results
@@ -174,11 +130,6 @@ class QdrantBackend:
         so for memory kinds this returns ``None``.  Callers that need
         memory lookup should use :meth:`search` or :meth:`list`.
         """
-        if kind == "note":
-            notes = self._require_notes()
-            entry = await notes.get(doc_id)
-            return _note_entry_to_doc(entry) if entry is not None else None
-
         if self._is_memory_kind(kind):
             # MemoryService has no get-by-id; documented limitation.
             return None
@@ -209,16 +160,6 @@ class QdrantBackend:
             )
             return _memory_entry_to_doc(entry)
 
-        if kind == "note":
-            notes = self._require_notes()
-            entry = await notes.create(
-                title=doc.title or "",
-                content=doc.content,
-                folder_path=meta.get("folder_path", ""),
-                tags=list(doc.tags) if doc.tags else None,
-            )
-            return _note_entry_to_doc(entry)
-
         raise ValueError(f"Unsupported knowledge kind: {kind!r}")
 
     # ------------------------------------------------------------------
@@ -233,19 +174,6 @@ class QdrantBackend:
         kind: KnowledgeKind,
     ) -> KnowledgeDoc | None:
         """Apply a partial update.  Memory-kind updates are unsupported."""
-        if kind == "note":
-            notes = self._require_notes()
-            meta = patch.metadata or {}
-            entry = await notes.update(
-                doc_id,
-                title=patch.title,
-                content=patch.content,
-                folder_path=meta.get("folder_path"),
-                tags=patch.tags,
-                pinned=meta.get("pinned"),
-            )
-            return _note_entry_to_doc(entry) if entry is not None else None
-
         if self._is_memory_kind(kind):
             # MemoryService is append-only by design.
             self._log.debug(
@@ -267,10 +195,6 @@ class QdrantBackend:
         if self._is_memory_kind(kind):
             mem = self._require_memory()
             return bool(await mem.delete(doc_id))
-
-        if kind == "note":
-            notes = self._require_notes()
-            return bool(await notes.delete(doc_id))
 
         raise ValueError(f"Unsupported knowledge kind: {kind!r}")
 
@@ -299,17 +223,6 @@ class QdrantBackend:
             )
             return [_memory_entry_to_doc(e) for e in entries], total
 
-        if kind == "note":
-            notes = self._require_notes()
-            entries, total = await notes.list(
-                folder=filters.get("folder"),
-                tags=filters.get("tags"),
-                pinned_only=bool(filters.get("pinned_only", False)),
-                limit=limit,
-                offset=offset,
-            )
-            return [_note_entry_to_doc(e) for e in entries], total
-
         raise ValueError(f"Unsupported knowledge kind: {kind!r}")
 
     # ------------------------------------------------------------------
@@ -332,7 +245,6 @@ class QdrantBackend:
                 )
             return int(await mem.delete_by_scope(scope))
 
-        # Notes do not currently support bulk filter delete via this API.
         raise ValueError(
             f"delete_by_filter not supported for kind {kind!r}",
         )
@@ -342,17 +254,11 @@ class QdrantBackend:
     # ------------------------------------------------------------------
 
     async def health(self) -> BackendHealth:
-        """Return ``up`` if at least one underlying service is wired."""
-        if self._memory is None and self._notes is None:
+        """Return ``up`` if the memory service is wired."""
+        if self._memory is None:
             return BackendHealth(
                 status="down",
-                detail="memory_service and note_service both unavailable",
-            )
-        if self._memory is None or self._notes is None:
-            missing = "memory_service" if self._memory is None else "note_service"
-            return BackendHealth(
-                status="degraded",
-                detail=f"{missing} unavailable",
+                detail="memory_service unavailable",
             )
         return BackendHealth(status="up", detail=None)
 
@@ -409,22 +315,4 @@ def _memory_entry_to_doc(entry: MemoryEntry) -> KnowledgeDoc:
         },
         created_at=getattr(entry, "created_at", None),
         updated_at=None,
-    )
-
-
-def _note_entry_to_doc(entry: NoteEntry) -> KnowledgeDoc:
-    """Adapt a :class:`NoteEntry` to a :class:`KnowledgeDoc`."""
-    return KnowledgeDoc(
-        id=str(getattr(entry, "id", "")),
-        kind="note",
-        title=getattr(entry, "title", ""),
-        content=getattr(entry, "content", ""),
-        tags=list(getattr(entry, "tags", []) or []),
-        metadata={
-            "folder_path": getattr(entry, "folder_path", "") or "",
-            "pinned": bool(getattr(entry, "pinned", False)),
-            "wikilinks": list(getattr(entry, "wikilinks", []) or []),
-        },
-        created_at=_coerce_iso(getattr(entry, "created_at", None)),
-        updated_at=_coerce_iso(getattr(entry, "updated_at", None)),
     )

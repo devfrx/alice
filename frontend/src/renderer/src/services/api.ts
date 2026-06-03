@@ -26,6 +26,7 @@ import type {
   ModelOperationResponse,
   ModelUnloadResponse,
   ModelsStatusResponse,
+  ToolCatalogResponse,
   VectorStoreStats
 } from '../types/settings'
 import type { CalendarEvent, TodaySummary } from '../types/calendar'
@@ -45,14 +46,6 @@ import type {
   DeleteRelationsPayload,
   KGGraph
 } from '../types/mcpMemory'
-import type {
-  Note,
-  NoteListResponse,
-  NoteSearchResponse,
-  NoteFolder,
-  CreateNoteRequest,
-  UpdateNoteRequest
-} from '../types/notes'
 import type { EmailHeader, EmailDetail, EmailSearchRequest } from '../types/email'
 import type {
   WhiteboardSpec,
@@ -458,6 +451,17 @@ export const api = {
   getTools: (): Promise<{ tools_enabled: boolean }> =>
     request<{ tools_enabled: boolean }>('/settings/tools'),
 
+  /** Read the chat tool catalog grouped by plugin (with gating flags). */
+  getToolCatalog: (): Promise<ToolCatalogResponse> =>
+    request<ToolCatalogResponse>('/settings/tool-catalog'),
+
+  /** Persist the per-chat tool selection (opt-out list of namespaced names). */
+  setActiveTools: (disabledTools: string[]): Promise<ToolCatalogResponse> =>
+    request<ToolCatalogResponse>('/settings/active-tools', {
+      method: 'PUT',
+      body: JSON.stringify({ disabled_tools: disabledTools })
+    }),
+
   /** Get all persisted user preferences. */
   getPreferences: (): Promise<Record<string, unknown>> =>
     request<Record<string, unknown>>('/settings/preferences'),
@@ -671,80 +675,6 @@ export const api = {
     request<unknown>('/mcp/memory/observations', {
       method: 'DELETE',
       body: JSON.stringify(payload),
-    }),
-
-  // -- Notes ----------------------------------------------------------------
-
-  /** Fetch notes with optional filters. */
-  getNotes: (params?: {
-    folder?: string
-    tags?: string
-    pinned?: boolean
-    q?: string
-    limit?: number
-    offset?: number
-  }): Promise<NoteListResponse> => {
-    const qs = new URLSearchParams()
-    if (params?.folder) qs.set('folder', params.folder)
-    if (params?.tags) qs.set('tags', params.tags)
-    if (params?.pinned !== undefined) qs.set('pinned', String(params.pinned))
-    if (params?.q) qs.set('q', params.q)
-    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
-    if (params?.offset !== undefined) qs.set('offset', String(params.offset))
-    const q = qs.toString()
-    return request<NoteListResponse>(`/notes${q ? `?${q}` : ''}`)
-  },
-
-  /** Fetch a single note by ID. */
-  getNote: (id: string): Promise<Note> =>
-    request<Note>(`/notes/${encodeURIComponent(id)}`),
-
-  /** Create a new note. */
-  createNote: (data: CreateNoteRequest): Promise<Note> =>
-    request<Note>('/notes', { method: 'POST', body: JSON.stringify(data) }),
-
-  /** Update an existing note. */
-  updateNote: (id: string, data: UpdateNoteRequest): Promise<Note> =>
-    request<Note>(`/notes/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-
-  /** Delete a note by ID. */
-  deleteNote: (id: string): Promise<{ deleted: boolean }> =>
-    request<{ deleted: boolean }>(`/notes/${encodeURIComponent(id)}`, {
-      method: 'DELETE'
-    }),
-
-  /** Full-text search over notes. */
-  searchNotes: (
-    query: string,
-    folder?: string,
-    tags?: string[],
-    limit?: number
-  ): Promise<NoteSearchResponse> =>
-    request<NoteSearchResponse>('/notes/search', {
-      method: 'POST',
-      body: JSON.stringify({
-        query,
-        ...(folder ? { folder } : {}),
-        ...(tags ? { tags } : {}),
-        ...(limit ? { limit } : {})
-      })
-    }),
-
-  /** Get all note folders with counts. */
-  getNoteFolders: (): Promise<NoteFolder[]> =>
-    request<NoteFolder[]>('/notes/folders'),
-
-  /** Delete a folder. mode = 'move' (notes → root) or 'delete'. */
-  deleteFolder: (
-    folderPath: string,
-    mode: 'move' | 'delete' = 'move'
-  ): Promise<{ affected: number; mode: string }> =>
-    request<{ affected: number; mode: string }>('/notes/folders/delete', {
-      method: 'POST',
-      body: JSON.stringify({ folder_path: folderPath, mode })
     }),
 
   // -- Email Assistant (Phase 15) -----------------------------------------

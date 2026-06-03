@@ -100,7 +100,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .ui-card--interactive:focus-visible {
-    box-shadow: var(--shadow-focus);
+    outline: none;
 }
 
 /* ── No padding ── */

@@ -115,6 +115,5 @@ function endPreview(): void {
 
 .state-preview-controls__btn:focus-visible {
     outline: none;
-    box-shadow: var(--shadow-focus);
 }
 </style>

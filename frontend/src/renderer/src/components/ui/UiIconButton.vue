@@ -97,7 +97,7 @@ const nativeTitle = (): string | undefined => {
 }
 
 .ui-icon-btn:focus-visible {
-    box-shadow: var(--shadow-focus);
+    outline: none;
 }
 
 .ui-icon-btn__content {

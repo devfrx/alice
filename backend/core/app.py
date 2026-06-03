@@ -266,37 +266,54 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("Memory service failed to start: {}", exc)
             await memory_service.close()
 
-    # -- Note service (Phase 13) -------------------------------------------
-    if config.notes.enabled and qdrant_service:
-        from backend.services.note_service import NoteService
-
-        note_service = NoteService(
-            config.notes, qdrant_service, embedding_client,
-        )
-        try:
-            await note_service.initialize()
-            ctx.note_service = note_service
-            logger.info("Note service started")
-        except Exception as exc:
-            logger.warning("Note service failed to start: {}", exc)
-            await note_service.close()
-
     # -- Knowledge backend (Phase 1, Stream A) -----------------------------
     # Thin :class:`KnowledgeBackend` adapter wrapping the existing memory
-    # and note services.  Plugins (notes, memory) consume this backend
-    # instead of the underlying services directly so Phase 3 can swap to
-    # Continuum without touching plugin code.
+    # service.  Plugins (memory) consume this backend instead of the
+    # underlying service directly. ``note`` knowledge is served by
+    # Continuum (below); Qdrant only handles ``memory``/``fact``.
     from backend.services.knowledge import QdrantBackend
 
-    ctx.knowledge_backend = QdrantBackend(
+    qdrant_backend = QdrantBackend(
         memory_service=ctx.memory_service,
-        note_service=ctx.note_service,
     )
-    logger.info(
-        "Knowledge backend wired (memory={}, notes={})",
-        ctx.memory_service is not None,
-        ctx.note_service is not None,
-    )
+
+    # -- Continuum knowledge backend (Phase 3) -----------------------------
+    # When Continuum is enabled, ``note`` knowledge is delegated to the
+    # external Continuum server while ``memory``/``fact`` stay on Qdrant.
+    # The two are composed behind the single KnowledgeBackend interface so
+    # plugin code is unaffected.
+    if config.continuum.enabled:
+        from backend.services.knowledge import (
+            CompositeKnowledgeBackend,
+            ContinuumBackend,
+            ContinuumClient,
+        )
+
+        continuum_client = ContinuumClient(
+            base_url=config.continuum.base_url,
+            api_token=config.continuum.api_token,
+            timeout_s=config.continuum.timeout_s,
+            folder_cache_ttl_s=config.continuum.folder_cache_ttl_s,
+        )
+        ctx.knowledge_backend = CompositeKnowledgeBackend(
+            note_backend=ContinuumBackend(client=continuum_client),
+            memory_backend=qdrant_backend,
+        )
+        # Expose the same client so the ``continuum`` plugin reuses it
+        # instead of building a second one — a single instance keeps the
+        # folder path↔id cache coherent across note placement and plugin
+        # folder mutations.
+        ctx.continuum_client = continuum_client
+        logger.info(
+            "Knowledge backend wired (notes=continuum @ {}, memory=qdrant)",
+            config.continuum.base_url,
+        )
+    else:
+        ctx.knowledge_backend = qdrant_backend
+        logger.info(
+            "Knowledge backend wired (memory={}, notes=disabled)",
+            ctx.memory_service is not None,
+        )
 
     # -- Email service (Phase 15) ------------------------------------------
     if config.email.enabled:
@@ -666,11 +683,6 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await ctx.memory_service.close()
             except Exception as exc:
                 logger.error("Memory service shutdown error: {}", exc)
-        if ctx is not None and ctx.note_service:
-            try:
-                await ctx.note_service.close()
-            except Exception as exc:
-                logger.error("Note service shutdown error: {}", exc)
         if ctx is not None and ctx.email_service:
             try:
                 await ctx.email_service.close()

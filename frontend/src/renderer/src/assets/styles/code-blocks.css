@@ -4,7 +4,7 @@
  *
  *  Styles for code blocks rendered by `useMarkdown` inside v-html.
  *  Imported globally so MessageBubble, StreamingIndicator,
- *  AssistantResponse, NoteEditor (and any future component)
+ *  AssistantResponse (and any future component)
  *  share one source.  Clean Supabase-dashboard inspired display.
  *
  *  Parent selector shorthand ─ every markdown-rendering context:

@@ -1,11 +1,14 @@
 """AL\\CE — :class:`KnowledgeBackend` Protocol and document data models.
 
 This module defines the structural interface every persistent
-knowledge backend must satisfy.  In Phase 1 the only implementation is
-:class:`~backend.services.knowledge.qdrant_backend.QdrantBackend`,
-which wraps the existing ``MemoryService`` + ``NoteService``.  In
-Phase 3 a Continuum-backed implementation will be swapped in
-configuration without touching plugin code.
+knowledge backend must satisfy.
+:class:`~backend.services.knowledge.qdrant_backend.QdrantBackend` wraps
+the existing ``MemoryService`` (``memory``/``fact`` kinds), while
+:class:`~backend.services.knowledge.continuum_backend.ContinuumBackend`
+serves ``note`` knowledge from the Continuum server; the two are
+composed by
+:class:`~backend.services.knowledge.composite_backend.\
+CompositeKnowledgeBackend`.
 
 The contract is intentionally **kind-dispatched**: each operation
 takes a ``kind`` argument so the backend can route to the correct

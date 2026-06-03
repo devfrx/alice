@@ -141,10 +141,6 @@ function onInput(e: Event): void {
     border-color: var(--border-hover);
 }
 
-.ui-input__wrapper:focus-within {
-    box-shadow: var(--shadow-focus);
-}
-
 .ui-input:not(.ui-input--error) .ui-input__wrapper:focus-within {
     border-color: var(--accent-border);
 }

@@ -58,7 +58,7 @@ const emit = defineEmits<{ click: [] }>()
 }
 
 .ctx-item:focus-visible {
-    box-shadow: var(--shadow-focus);
+    outline: none;
 }
 
 .ctx-item:active:not(:disabled) {

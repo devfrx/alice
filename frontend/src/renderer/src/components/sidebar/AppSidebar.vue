@@ -158,14 +158,6 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
-          <router-link to="/notes" class="sidebar__link" active-class="sidebar__link--active" title="Note"
-            @click="toggle">
-            <span class="sidebar__link-icon" aria-hidden="true">
-              <AppIcon name="file-text" :size="15" />
-            </span>
-            <span class="sidebar__link-label">Note</span>
-          </router-link>
-
           <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">
@@ -466,7 +458,7 @@ async function onOpenFile(id: string): Promise<void> {
 }
 
 .sidebar__link:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
+  outline: none;
 }
 
 /* Icon */

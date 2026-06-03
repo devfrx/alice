@@ -83,13 +83,13 @@ plugins:
     - file_search
     - news
     - memory
-    - notes
     - mcp_client
     - cad_generator
     - chart_generator
     - email_assistant
     - whiteboard
     - network_probe
+    - continuum  # exposes Continuum knowledge-base tools (requires continuum.enabled)
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -234,17 +234,23 @@ memory:
 
 
 # ──────────────────────────────────────────────────
-# Phase 13 — Note System
+# Continuum knowledge-base integration
 # ──────────────────────────────────────────────────
-
-notes:
+# When enabled, `note` knowledge is delegated to a running Continuum
+# server while `memory`/`fact` stay on Qdrant. Also enable the
+# `continuum` plugin above to expose folder/kind/database/graph tools.
+continuum:
   enabled: true
-  # db_path: "data/notes.db"
-  embedding_enabled: true
-  max_content_chars_llm: 8000
-  semantic_threshold: 0.70
-  max_search_results: 20
-
+  base_url: "http://localhost:3001"
+  # api_token: ""            # must match the server's CONTINUUM_API_TOKEN when set
+  timeout_s: 15.0
+  folder_cache_ttl_s: 30.0
+  note_max_content_chars_llm: 8000
+  # Continuum-scoped agent: chats opened from inside Continuum
+  # (ws ?scope=continuum) use this clean, Continuum-only persona and
+  # always get the tools below injected (bypassing tool RAG).
+  agent_prompt_file: "config/continuum_agent_prompt.md"
+  agent_tool_plugins: ["continuum"]
 
 # ──────────────────────────────────────────────────
 # Qdrant Vector Store

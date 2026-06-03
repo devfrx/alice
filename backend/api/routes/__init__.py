@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from backend.api.routes import artifacts, audit, cad, calendar, charts, chat, config, email, events, mcp, mcp_memory, memory, models, notes, plugins, services, settings, vector_store, voice, whiteboards
+from backend.api.routes import artifacts, audit, cad, calendar, charts, chat, config, email, events, mcp, mcp_memory, memory, models, plugins, services, settings, vector_store, voice, whiteboards
 
 router = APIRouter(prefix="/api")
 
@@ -14,7 +14,6 @@ router.include_router(chat.router)
 router.include_router(config.router)
 router.include_router(memory.router)
 router.include_router(models.router)
-router.include_router(notes.router)
 router.include_router(plugins.router)
 router.include_router(services.router)
 router.include_router(settings.router)

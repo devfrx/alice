@@ -56,6 +56,20 @@ def _patch_llm(app: FastAPI) -> None:
     llm.build_messages = _mock_build_messages
 
 
+def _receive_stream_frame(ws: Any) -> dict[str, Any]:
+    """Receive the next assistant stream frame, skipping context metadata."""
+    while True:
+        frame = ws.receive_json()
+        frame_type = str(frame.get("type", ""))
+        if frame_type.startswith("agent.") or frame_type in {
+            "context_info",
+            "context_compression_done",
+            "context_compression_failed",
+        }:
+            continue
+        return frame
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -84,15 +98,15 @@ class TestWebSocketBasicFlow:
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "Hi there"})
 
-            token1 = ws.receive_json()
+            token1 = _receive_stream_frame(ws)
             assert token1["type"] == "token"
             assert token1["content"] == "Hello"
 
-            token2 = ws.receive_json()
+            token2 = _receive_stream_frame(ws)
             assert token2["type"] == "token"
             assert token2["content"] == " world"
 
-            done = ws.receive_json()
+            done = _receive_stream_frame(ws)
             assert done["type"] == "done"
             assert "conversation_id" in done
             assert "message_id" in done
@@ -105,10 +119,10 @@ class TestWebSocketBasicFlow:
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "test"})
             # Drain tokens.
-            ws.receive_json()
-            ws.receive_json()
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
 
-            done = ws.receive_json()
+            done = _receive_stream_frame(ws)
             uuid.UUID(done["conversation_id"])
             uuid.UUID(done["message_id"])
 
@@ -165,6 +179,23 @@ class TestWebSocketErrors:
             assert resp["type"] == "error"
             assert "Empty message" in resp["content"]
 
+    def test_ws_stale_control_frame_does_not_become_empty_message(
+        self, ws_app: FastAPI,
+    ) -> None:
+        """Late confirmation/client frames should not poison the next turn."""
+        client = TestClient(ws_app)
+        with client.websocket_connect("/api/ws/chat") as ws:
+            ws.send_json({
+                "type": "tool_confirmation_response",
+                "execution_id": "stale",
+                "approved": True,
+            })
+            ws.send_json({"content": "Hi there"})
+
+            token = _receive_stream_frame(ws)
+            assert token["type"] == "token"
+            assert token["content"] == "Hello"
+
 
 # ---------------------------------------------------------------------------
 # Tests — conversation management
@@ -181,9 +212,9 @@ class TestWebSocketConversations:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "hello"})
-            ws.receive_json()  # token
-            ws.receive_json()  # token
-            done = ws.receive_json()
+            _receive_stream_frame(ws)  # token
+            _receive_stream_frame(ws)  # token
+            done = _receive_stream_frame(ws)
             assert done["type"] == "done"
             conv_id = done["conversation_id"]
             # Must be a valid UUID.
@@ -197,15 +228,15 @@ class TestWebSocketConversations:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "first", "conversation_id": cid})
-            ws.receive_json()
-            ws.receive_json()
-            done1 = ws.receive_json()
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
+            done1 = _receive_stream_frame(ws)
             assert done1["conversation_id"] == cid
 
             ws.send_json({"content": "second", "conversation_id": cid})
-            ws.receive_json()
-            ws.receive_json()
-            done2 = ws.receive_json()
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
+            done2 = _receive_stream_frame(ws)
             assert done2["conversation_id"] == cid
 
     def test_ws_different_messages_can_use_different_conversations(
@@ -215,14 +246,14 @@ class TestWebSocketConversations:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "msg1"})
-            ws.receive_json()
-            ws.receive_json()
-            done1 = ws.receive_json()
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
+            done1 = _receive_stream_frame(ws)
 
             ws.send_json({"content": "msg2"})
-            ws.receive_json()
-            ws.receive_json()
-            done2 = ws.receive_json()
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
+            done2 = _receive_stream_frame(ws)
 
             assert done1["conversation_id"] != done2["conversation_id"]
 
@@ -240,9 +271,9 @@ class TestWebSocketDisconnect:
         client = TestClient(ws_app)
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "bye"})
-            ws.receive_json()
-            ws.receive_json()
-            ws.receive_json()  # done
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)  # done
         # Exiting the context manager closes the WS; no exception expected.
 
     def test_ws_reconnect_after_disconnect(self, ws_app: FastAPI) -> None:
@@ -252,17 +283,17 @@ class TestWebSocketDisconnect:
         # First connection.
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "first"})
-            ws.receive_json()
-            ws.receive_json()
-            ws.receive_json()
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
+            _receive_stream_frame(ws)
 
         # Second connection.
         with client.websocket_connect("/api/ws/chat") as ws:
             ws.send_json({"content": "second"})
-            token1 = ws.receive_json()
+            token1 = _receive_stream_frame(ws)
             assert token1["type"] == "token"
-            ws.receive_json()
-            done = ws.receive_json()
+            _receive_stream_frame(ws)
+            done = _receive_stream_frame(ws)
             assert done["type"] == "done"
 
     def test_ws_multiple_messages_in_single_connection(
@@ -273,7 +304,7 @@ class TestWebSocketDisconnect:
         with client.websocket_connect("/api/ws/chat") as ws:
             for i in range(3):
                 ws.send_json({"content": f"msg {i}"})
-                ws.receive_json()  # token
-                ws.receive_json()  # token
-                done = ws.receive_json()
+                _receive_stream_frame(ws)  # token
+                _receive_stream_frame(ws)  # token
+                done = _receive_stream_frame(ws)
                 assert done["type"] == "done"

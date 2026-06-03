@@ -254,7 +254,20 @@ async def run_tool_loop(
                 continue
 
             dedup_key = _dedup_hash(tool_name, args)
-            if dedup_key in seen:
+
+            # Resolve the tool definition early so we can branch on its
+            # execution location (client vs server) and skip dedup for
+            # client-executed tools, whose effect is stateful: re-listing
+            # or re-reading live UI state after a mutation is legitimate
+            # and must not be collapsed into a "duplicate" response.
+            tool_def = (
+                ctx.tool_registry.get_tool_definition(tool_name)
+                if ctx.tool_registry
+                else None
+            )
+            is_client_tool = bool(tool_def and tool_def.client_execution)
+
+            if dedup_key in seen and not is_client_tool:
                 logger.warning(
                     "Dedup: skipping duplicate tool call {}(…)", tool_name,
                 )
@@ -283,13 +296,6 @@ async def run_tool_loop(
             # (e.g. after providing missing context).
 
             exec_id = str(uuid.uuid4())
-
-            # Check if tool requires user confirmation.
-            tool_def = (
-                ctx.tool_registry.get_tool_definition(tool_name)
-                if ctx.tool_registry
-                else None
-            )
 
             # FORBIDDEN enforcement — block tools with risk_level "forbidden"
             if tool_def and tool_def.risk_level == "forbidden":
@@ -392,6 +398,33 @@ async def run_tool_loop(
             # a previously-rejected call can be retried in a later
             # iteration if the user changes their mind.
             seen.add(dedup_key)
+
+            # Client-executed tools (e.g. Continuum live-editor block
+            # operations) are not run on the server: the owning plugin
+            # cannot reach the user's open document. Delegate execution to
+            # the connected client over the same WebSocket, mirroring the
+            # request/response shape of the tool-confirmation handshake,
+            # then persist the client-supplied result like any other tool
+            # message so the LLM loop continues seamlessly.
+            if is_client_tool:
+                client_result = await _execute_client_tool(
+                    websocket, tool_name, args, exec_id,
+                    tool_exec_timeout, cancel_event,
+                )
+                await _persist_client_tool_result(
+                    websocket=websocket,
+                    session=session,
+                    conv_id=conv_id,
+                    tc_id=tc_id,
+                    tool_name=tool_name,
+                    exec_id=exec_id,
+                    result=client_result,
+                    mem_history=mem_history,
+                    ver=_ver,
+                    sync_fn=sync_fn,
+                    ctx=ctx,
+                )
+                continue
 
             context = ExecutionContext(
                 session_id=client_ip,
@@ -1065,6 +1098,155 @@ def _save_rejected_tool_msg(
         version_index=version_index,
     )
     session.add(msg)
+
+
+async def _execute_client_tool(
+    websocket: WebSocket,
+    tool_name: str,
+    args: dict[str, Any],
+    execution_id: str,
+    timeout_s: float,
+    cancel_event: asyncio.Event | None = None,
+) -> ToolResult:
+    """Delegate a tool's execution to the connected client and await its result.
+
+    Sends a ``client_tool_call`` frame and blocks until a matching
+    ``client_tool_result`` arrives, mirroring the proven request/response
+    shape of :func:`_request_confirmation`. Used for tools flagged with
+    ``ToolDefinition.client_execution`` — operations that must run against
+    live client UI state (e.g. the open Continuum editor) rather than on
+    the server.
+
+    Args:
+        websocket: Active WebSocket connection.
+        tool_name: Namespaced tool name being delegated.
+        args: Parsed arguments to forward to the client.
+        execution_id: Unique execution ID used to correlate the response.
+        timeout_s: Maximum seconds to wait for the client to respond.
+        cancel_event: Optional event set when a ``cancel`` message arrives.
+
+    Returns:
+        A :class:`ToolResult` carrying the client-supplied payload, or an
+        error result on timeout / disconnect / cancellation.
+    """
+    await websocket.send_json({
+        "type": "client_tool_call",
+        "tool_name": tool_name,
+        "args": args,
+        "execution_id": execution_id,
+    })
+
+    deadline = asyncio.get_running_loop().time() + timeout_s
+    try:
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise asyncio.TimeoutError
+            raw = await asyncio.wait_for(
+                websocket.receive_text(), timeout=remaining,
+            )
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.debug(
+                    "Ignoring non-JSON message during client tool wait",
+                )
+                continue
+            if msg.get("type") == "cancel":
+                if cancel_event:
+                    cancel_event.set()
+                return ToolResult.error("Client tool cancelled by user.")
+            if (
+                msg.get("type") == "client_tool_result"
+                and msg.get("execution_id") == execution_id
+            ):
+                if msg.get("success", False):
+                    payload = msg.get("result")
+                    content = (
+                        payload
+                        if isinstance(payload, (str, dict, list))
+                        else str(payload)
+                    )
+                    return ToolResult.ok(
+                        content if content is not None else "OK",
+                        content_type="application/json"
+                        if isinstance(payload, (dict, list))
+                        else "text/plain",
+                    )
+                return ToolResult.error(
+                    str(msg.get("error") or "Client tool reported a failure."),
+                )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Client tool '{}' timed out after {}s (exec_id={})",
+            tool_name, timeout_s, execution_id,
+        )
+        return ToolResult.error(
+            f"Client tool '{tool_name}' timed out — is a Continuum note open?",
+        )
+    except WebSocketDisconnect:
+        logger.warning(
+            "WebSocket disconnected during client tool '{}' (exec_id={})",
+            tool_name, execution_id,
+        )
+        raise
+    except RuntimeError as exc:
+        if is_websocket_closed_runtime_error(exc):
+            raise WebSocketDisconnect(code=1006) from exc
+        logger.warning("Error receiving client tool result: {}", exc)
+        return ToolResult.error("Failed to receive client tool result.")
+
+
+async def _persist_client_tool_result(
+    *,
+    websocket: WebSocket,
+    session: Any,
+    conv_id: uuid.UUID,
+    tc_id: str,
+    tool_name: str,
+    exec_id: str,
+    result: ToolResult,
+    mem_history: list[dict[str, Any]] | None,
+    ver: dict[str, Any],
+    sync_fn: SyncFn | None,
+    ctx: AppContext,
+) -> None:
+    """Persist a client-executed tool result and notify the WebSocket.
+
+    Mirrors the persistence performed for server-side tool results in the
+    main loop (DB ``role="tool"`` message + in-memory history append +
+    ``tool_execution_done`` frame), minus the image/artifact handling that
+    only applies to server-produced binary payloads.
+    """
+    content = _result_to_str(result)
+    tool_msg = Message(
+        conversation_id=conv_id,
+        role="tool",
+        content=content,
+        tool_call_id=tc_id,
+        **ver,
+    )
+    session.add(tool_msg)
+    await session.flush()
+    await session.commit()
+
+    if mem_history is not None:
+        mem_history.append({
+            "role": "tool",
+            "content": content,
+            "tool_call_id": tc_id,
+        })
+
+    if ctx.conversation_file_manager and sync_fn:
+        await sync_fn(session, conv_id, ctx.conversation_file_manager)
+
+    await _send_json(websocket, {
+        "type": "tool_execution_done",
+        "tool_name": tool_name,
+        "result": content,
+        "execution_id": exec_id,
+        "success": result.success,
+    })
 
 
 async def _request_confirmation(

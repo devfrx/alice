@@ -14,6 +14,7 @@ import AppIcon from '../ui/AppIcon.vue'
 import ModelSelector from '../settings/ModelSelector.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import ContextBar from '../chat/ContextBar.vue'
+import ChatToolControls from '../chat/ChatToolControls.vue'
 import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
 import { useUIStore } from '../../stores/ui'
@@ -363,6 +364,9 @@ defineExpose({
 
                     <!-- Divider -->
                     <div v-if="isExpanded" class="fib__divider" />
+
+                    <!-- Agent mode + tool selector (only when expanded) -->
+                    <ChatToolControls v-if="isExpanded" />
 
                     <!-- Model selectors (only when expanded) -->
                     <div v-if="isExpanded" class="fib__selectors">

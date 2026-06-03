@@ -366,6 +366,35 @@ class ToolRegistry:
                 available.append(entry)
         return available
 
+    async def get_tools_for_plugins(
+        self, plugin_names: set[str],
+    ) -> list[dict[str, Any]]:
+        """Return all available tools owned by the given plugins.
+
+        Unlike tool RAG, this returns the *complete* tool set for the
+        requested plugins with no relevance filtering, so callers that
+        need a fixed, always-injected toolset (e.g. a scoped agent) get
+        reliable, deterministic results. Connection-status filtering from
+        :meth:`get_available_tools` still applies.
+
+        Args:
+            plugin_names: Plugin names whose tools should be returned.
+
+        Returns:
+            Filtered list of OpenAI-format tool dicts.
+        """
+        if not plugin_names:
+            return []
+        async with self._lock:
+            plugin_map_snapshot = dict(self._tool_to_plugin)
+        available = await self.get_available_tools()
+        return [
+            entry
+            for entry in available
+            if plugin_map_snapshot.get(entry["function"]["name"])
+            in plugin_names
+        ]
+
     def limit_tools(
         self,
         tools: list[dict[str, Any]],
@@ -435,6 +464,61 @@ class ToolRegistry:
             The tool definition or ``None`` if not registered.
         """
         return self._tools.get(tool_name)
+
+    def get_tool_catalog(self) -> list[dict[str, Any]]:
+        """Return every registered tool grouped-ready for the chat UI.
+
+        Produces a flat list of lightweight descriptors so the frontend
+        can render a plugin → tools picker without pulling the full
+        OpenAI schemas. Each entry contains:
+
+        * ``plugin``: owning plugin name.
+        * ``name``: namespaced tool name (the value stored in
+          :attr:`LLMConfig.disabled_tools`).
+        * ``label``: bare tool name for display.
+        * ``description``: human-readable tool description.
+
+        Returns:
+            One descriptor dict per registered tool.
+        """
+        catalog: list[dict[str, Any]] = []
+        for ns_name, tool_def in self._tools.items():
+            catalog.append(
+                {
+                    "plugin": self._tool_to_plugin.get(ns_name, ""),
+                    "name": ns_name,
+                    "label": tool_def.name,
+                    "description": tool_def.description,
+                }
+            )
+        return catalog
+
+    def exclude_disabled(
+        self,
+        tools: list[dict[str, Any]],
+        disabled_names: set[str],
+    ) -> list[dict[str, Any]]:
+        """Drop tools whose namespaced name is in *disabled_names*.
+
+        Used to apply the user's per-chat tool selection (opt-out) on
+        top of the available toolset. A no-op when *disabled_names* is
+        empty so default behaviour is preserved.
+
+        Args:
+            tools: OpenAI-format tool dicts (e.g. from
+                :meth:`get_available_tools`).
+            disabled_names: Namespaced tool names to remove.
+
+        Returns:
+            The filtered list (a new list; the input is not mutated).
+        """
+        if not disabled_names:
+            return tools
+        return [
+            entry
+            for entry in tools
+            if entry["function"]["name"] not in disabled_names
+        ]
 
     # ------------------------------------------------------------------
     # Tool RAG — embed & retrieve

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '../services/api'
-import type { DownloadStatusResponse, LMStudioModel, ModelOperationResponse } from '../types/settings'
+import type { DownloadStatusResponse, LMStudioModel, ModelOperationResponse, ToolCatalogPlugin } from '../types/settings'
 import { useChatStore } from './chat'
 
 export interface AliceSettings {
@@ -152,7 +152,85 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // NOTE: loadToggles() is deferred — called by initialize() after backend is ready.
 
-  /** Load settings from the backend. */
+  /* ── Per-chat tool selection ──────────────────────────────────── */
+
+  /** Available tools grouped by plugin (for the chat tool picker). */
+  const toolCatalog = ref<ToolCatalogPlugin[]>([])
+
+  /** Namespaced names of tools the user has turned off. */
+  const disabledTools = ref<Set<string>>(new Set())
+
+  /**
+   * Whether manual tool selection has any effect right now.
+   *
+   * It is meaningless when tools are globally off (nothing is sent) or
+   * when Tool RAG is on (tools are auto-selected per message).
+   */
+  const toolSelectionAvailable = computed(
+    () => toolsEnabled.value && !settings.value.llm.toolRagEnabled,
+  )
+
+  /** Number of tools currently turned off (for badge display). */
+  const disabledToolCount = computed(() => disabledTools.value.size)
+
+  /** Whether a specific namespaced tool is currently enabled. */
+  function isToolEnabled(name: string): boolean {
+    return !disabledTools.value.has(name)
+  }
+
+  /** Load the tool catalog and the persisted selection from the backend. */
+  async function loadToolCatalog(): Promise<void> {
+    try {
+      const catalog = await api.getToolCatalog()
+      toolCatalog.value = catalog.plugins
+      disabledTools.value = new Set(catalog.disabled_tools)
+    } catch (err) {
+      console.warn('[settings store] loadToolCatalog failed:', err)
+    }
+  }
+
+  /** Persist the current disabled-tools set to the backend. */
+  async function _persistDisabledTools(): Promise<void> {
+    try {
+      const result = await api.setActiveTools([...disabledTools.value])
+      toolCatalog.value = result.plugins
+      disabledTools.value = new Set(result.disabled_tools)
+    } catch (err) {
+      console.warn('[settings store] setActiveTools failed:', err)
+    }
+  }
+
+  /** Enable or disable a single namespaced tool, then persist. */
+  async function setToolEnabled(name: string, enabled: boolean): Promise<void> {
+    const next = new Set(disabledTools.value)
+    if (enabled) next.delete(name)
+    else next.add(name)
+    disabledTools.value = next
+    await _persistDisabledTools()
+  }
+
+  /** Enable or disable every tool of a plugin at once, then persist. */
+  async function setPluginEnabled(
+    plugin: string, enabled: boolean,
+  ): Promise<void> {
+    const group = toolCatalog.value.find((p) => p.plugin === plugin)
+    if (!group) return
+    const next = new Set(disabledTools.value)
+    for (const tool of group.tools) {
+      if (enabled) next.delete(tool.name)
+      else next.add(tool.name)
+    }
+    disabledTools.value = next
+    await _persistDisabledTools()
+  }
+
+  /** Clear the selection so every tool is offered again, then persist. */
+  async function resetToolSelection(): Promise<void> {
+    disabledTools.value = new Set()
+    await _persistDisabledTools()
+  }
+
+  /** Load settings from the backend into the reactive store. */
   async function loadSettings(): Promise<void> {
     _loadingSettings = true
     try {
@@ -649,7 +727,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * Loads persisted toggles, settings, and starts connection polling.
    */
   async function initialize(): Promise<void> {
-    await Promise.all([loadToggles(), loadSettings()])
+    await Promise.all([loadToggles(), loadSettings(), loadToolCatalog()])
     startConnectionPolling()
   }
 
@@ -668,6 +746,15 @@ export const useSettingsStore = defineStore('settings', () => {
     toolConfirmations,
     systemPromptEnabled,
     toolsEnabled,
+    toolCatalog,
+    disabledTools,
+    toolSelectionAvailable,
+    disabledToolCount,
+    isToolEnabled,
+    loadToolCatalog,
+    setToolEnabled,
+    setPluginEnabled,
+    resetToolSelection,
     models,
     isLoadingModels,
     isLoadingModel,

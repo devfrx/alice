@@ -31,11 +31,10 @@ async def get_stats(request: Request) -> dict[str, Any]:
     collections_info: list[dict[str, Any]] = []
     from backend.services.qdrant_service import (
         COLLECTION_MEMORY,
-        COLLECTION_NOTES,
         COLLECTION_TOOLS,
     )
 
-    for coll_name in (COLLECTION_MEMORY, COLLECTION_NOTES, COLLECTION_TOOLS):
+    for coll_name in (COLLECTION_MEMORY, COLLECTION_TOOLS):
         try:
             count = await ctx.qdrant_service.count(coll_name)
             dim = await ctx.qdrant_service.get_collection_dim(coll_name)

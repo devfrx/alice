@@ -11,7 +11,6 @@ from backend.core.config import QdrantConfig
 from backend.services.qdrant_service import (
     QdrantService,
     COLLECTION_MEMORY,
-    COLLECTION_NOTES,
     COLLECTION_TOOLS,
     PROJECT_NS,
 )
@@ -168,7 +167,6 @@ class TestCRUD:
 class TestConstants:
     def test_collection_names(self):
         assert COLLECTION_MEMORY == "alice_memory"
-        assert COLLECTION_NOTES == "alice_notes"
         assert COLLECTION_TOOLS == "alice_tools"
 
     def test_project_ns(self):

@@ -159,8 +159,7 @@ function onHoverLeave(): void {
 }
 
 .alice-orb:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 8px;
+    outline: none;
     border-radius: var(--radius-md);
 }
 
@@ -218,6 +217,5 @@ function onHoverLeave(): void {
 
 .alice-orb-dev__btn:focus-visible {
     outline: none;
-    box-shadow: var(--shadow-focus);
 }
 </style>

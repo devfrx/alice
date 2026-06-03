@@ -329,7 +329,6 @@ function timeAgo(iso: string): string {
 }
 
 .conv-list__header-btn:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
   outline: none;
 }
 
@@ -361,7 +360,6 @@ function timeAgo(iso: string): string {
 }
 
 .conv-list__scroller:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
   border-radius: var(--radius-sm);
 }
 
@@ -407,7 +405,7 @@ function timeAgo(iso: string): string {
 
 /* Keyboard-focused item */
 .conv-item--focused {
-  box-shadow: var(--focus-ring-shadow);
+  outline: none;
 }
 
 /* ─── Title ─────────────────────────────────────────────────── */
@@ -538,7 +536,6 @@ function timeAgo(iso: string): string {
 }
 
 .conv-item__action:focus-visible {
-  box-shadow: var(--focus-ring-shadow);
   outline: none;
 }
 

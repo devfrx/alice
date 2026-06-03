@@ -199,8 +199,7 @@ onBeforeUnmount(() => {
 }
 
 .error-boundary__btn:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: var(--space-0-5);
+    outline: none;
 }
 
 .error-boundary__btn--ghost {

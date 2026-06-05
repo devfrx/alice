@@ -136,7 +136,7 @@ function _loadSidebarWidth(): number {
     const raw = localStorage.getItem(`${SIDEBAR_KEY}_width`)
     if (raw !== null) {
       const n = parseInt(raw, 10)
-      if (!isNaN(n)) return Math.min(420, Math.max(180, n))
+      if (!isNaN(n)) return Math.min(420, Math.max(200, n))
     }
   } catch {
     /* localStorage may be unavailable */
@@ -283,7 +283,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   function setSidebarWidth(n: number): void {
-    sidebarWidth.value = Math.min(420, Math.max(180, n))
+    sidebarWidth.value = Math.min(420, Math.max(200, n))
     _saveStr(`${SIDEBAR_KEY}_width`, String(sidebarWidth.value))
   }
 

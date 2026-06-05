@@ -126,6 +126,7 @@ onUnmounted(() => {
 }
 
 .app-body {
+  position: relative;
   flex: 1;
   display: flex;
   overflow: hidden;

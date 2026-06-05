@@ -244,7 +244,7 @@ function toExpanded(): void {
 .docked-sidebar__controls {
   position: absolute;
   top: var(--space-2, 8px);
-  right: var(--space-3, 12px);
+  right: calc(var(--space-3, 12px) + 6px);
   z-index: 2;
   display: flex;
   gap: var(--space-0-5, 2px);

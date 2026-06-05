@@ -137,10 +137,10 @@ describe('closeLeaf', () => {
 // ---------------------------------------------------------------------------
 
 describe('setSidebarWidth clamping', () => {
-  it('clamps values below minimum to 180', () => {
+  it('clamps values below minimum to 200', () => {
     const ws = useWorkspaceStore()
     ws.setSidebarWidth(50)
-    expect(ws.sidebarWidth).toBe(180)
+    expect(ws.sidebarWidth).toBe(200)
   })
 
   it('clamps values above maximum to 420', () => {

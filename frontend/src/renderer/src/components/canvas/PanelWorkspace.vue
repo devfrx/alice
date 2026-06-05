@@ -13,7 +13,7 @@
  * The ModuleLauncher floats top-right in both modes. The empty state shows
  * only in the degenerate tiled case (no modules at all).
  */
-import { computed } from 'vue'
+import { computed, toRef, onMounted, onUnmounted } from 'vue'
 import SplitContainer from './SplitContainer.vue'
 import PanelLeaf from './PanelLeaf.vue'
 import ChatPanel from './ChatPanel.vue'
@@ -21,6 +21,8 @@ import UiEmptyState from '../ui/UiEmptyState.vue'
 import ModuleLauncher from './ModuleLauncher.vue'
 import { useResizablePane } from '../../composables/useResizablePane'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { onOpenModule } from '../../composables/workspace/moduleIntents'
+import { useArtifactAutoOpen } from '../../composables/workspace/useArtifactAutoOpen'
 
 const props = defineProps<{
   conversationId?: string | null
@@ -40,6 +42,29 @@ const {
 
 // DEV-only: keep a single reset affordance for layout testing.
 const isDev = import.meta.env.DEV
+
+// ── Intent bus: CONSUMER ──────────────────────────────────────────────────
+// Subscribe here (not in the store) so the handler is scoped to this
+// component's lifetime and automatically unregistered on unmount — no
+// risk of handler accumulation across test-pinia re-instantiations.
+let _unsubscribeIntentBus: (() => void) | null = null
+
+onMounted(() => {
+  _unsubscribeIntentBus = onOpenModule(({ moduleId, params }) => {
+    if (!workspaceStore.autoOpenEnabled) return
+    workspaceStore.openModule(moduleId, params)
+  })
+})
+
+onUnmounted(() => {
+  _unsubscribeIntentBus?.()
+  _unsubscribeIntentBus = null
+})
+
+// ── Intent bus: PRODUCER ──────────────────────────────────────────────────
+// Watch for new content and emit open-module intents. Accepts the reactive
+// conversation id so the CAD watcher can scope to the active conversation.
+useArtifactAutoOpen(toRef(props, 'conversationId'))
 </script>
 
 <template>

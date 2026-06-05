@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
-import AppSidebar from './components/sidebar/AppSidebar.vue'
+import DockedSidebar from './components/canvas/DockedSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
 // ModeSwitcher is managed inside AssistantFab for assistant mode
 import { UiToast, AliceLoader } from './components/ui'
@@ -100,14 +100,14 @@ onUnmounted(() => {
       <span class="global-operation-bar__text">{{ settingsStore.operationDescription }}</span>
     </div>
     <div class="app-body">
+      <!-- Docked, resizable, collapsible sidebar (hosts AppSidebar inline) -->
+      <DockedSidebar />
       <main class="app-content">
         <ErrorBoundary>
           <router-view />
         </ErrorBoundary>
       </main>
     </div>
-    <!-- Floating sidebar (renders its own backdrop) -->
-    <AppSidebar />
     <!-- <ModeSwitcher v-if="uiStore.mode !== 'assistant'" /> NON ATTIVARE! -->
     <ModalContainer />
     <UiToast />

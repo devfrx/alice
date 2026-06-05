@@ -34,8 +34,12 @@ function _saveBool(key: string, value: boolean): void {
 export const useUIStore = defineStore('ui', () => {
   const mode = ref<UIMode>(loadMode())
 
-  /** Sidebar open state — floating sidebar starts closed. */
-  const sidebarOpen = ref(false)
+  /**
+   * Sidebar open state — source of truth for the docked sidebar's
+   * visible(expanded/rail) ↔ closed state. Starts open since the docked
+   * sidebar is now a primary surface of the shell.
+   */
+  const sidebarOpen = ref(true)
 
   // ---------------------------------------------------------------------
   // Agent UX preferences

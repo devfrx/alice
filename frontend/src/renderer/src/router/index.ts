@@ -54,9 +54,19 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      redirect: '/workspace'
+    },
+    {
+      path: '/home',
       name: 'home',
       component: () => import('../views/HomeView.vue'),
       meta: { title: 'Home', transition: DEFAULT_PAGE_TRANSITION }
+    },
+    {
+      path: '/workspace',
+      name: 'workspace',
+      component: () => import('../views/WorkspaceView.vue'),
+      meta: { title: 'Workspace', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
       path: '/assistant',

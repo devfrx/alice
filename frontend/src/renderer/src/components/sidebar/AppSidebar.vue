@@ -24,6 +24,15 @@ import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
 
+/**
+ * When `docked` is true the sidebar renders inline inside its parent frame
+ * (see {@link DockedSidebar}) instead of as a floating overlay: no backdrop,
+ * no fixed positioning, no slide animation, and the close button is hidden
+ * (collapsing is handled by the docked frame). All content and conversation
+ * actions are identical between modes.
+ */
+const props = withDefaults(defineProps<{ docked?: boolean }>(), { docked: false })
+
 const chatStore = useChatStore()
 const uiStore = useUIStore()
 const emailStore = useEmailStore()
@@ -32,11 +41,20 @@ const { confirm } = useModal()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
 
-/** Whether the sidebar is expanded (wired to central UI store). */
-const isOpen = computed(() => uiStore.sidebarOpen)
+/**
+ * Whether the sidebar body is shown.
+ * - Docked: always rendered; the parent frame controls visibility/width.
+ * - Floating overlay: driven by the central UI store open state.
+ */
+const isOpen = computed(() => props.docked || uiStore.sidebarOpen)
 
-/** Toggle collapsed state via central UI store. */
+/**
+ * Close affordance. In floating mode this toggles the overlay; in docked mode
+ * nav links call this on click but we must NOT close the docked sidebar, so it
+ * is a no-op there (collapse is handled by the frame / TitleBar toggle).
+ */
 function toggle(): void {
+  if (props.docked) return
   uiStore.toggleSidebar()
 }
 
@@ -123,21 +141,21 @@ async function onOpenFile(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="sidebar__root">
-    <!-- Backdrop overlay — click to close -->
-    <Transition name="sidebar-backdrop">
+  <div class="sidebar__root" :class="{ 'sidebar__root--docked': props.docked }">
+    <!-- Backdrop overlay — click to close (floating overlay mode only) -->
+    <Transition v-if="!props.docked" name="sidebar-backdrop">
       <div v-if="isOpen" class="sidebar__backdrop" @click="toggle" />
     </Transition>
 
-    <!-- Floating sidebar panel -->
-    <Transition name="sidebar-slide">
-      <aside v-if="isOpen" class="sidebar">
-        <!-- Header with close button -->
+    <!-- Sidebar panel: floating (overlay) or docked (inline frame) -->
+    <Transition :name="props.docked ? '' : 'sidebar-slide'">
+      <aside v-if="isOpen" class="sidebar" :class="{ 'sidebar--docked': props.docked }">
+        <!-- Header with close button (close hidden when docked) -->
         <div class="sidebar__header">
           <span class="sidebar__brand">
             <BrandWordmark brand="alce" />
           </span>
-          <button class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
+          <button v-if="!props.docked" class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
         </div>
@@ -158,6 +176,14 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
+          <router-link to="/workspace" class="sidebar__link" active-class="sidebar__link--active" title="Workspace"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <AppIcon name="hybrid-panel" :size="15" />
+            </span>
+            <span class="sidebar__link-label">Workspace</span>
+          </router-link>
+
           <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">
@@ -266,6 +292,27 @@ async function onOpenFile(id: string): Promise<void> {
   box-shadow: var(--shadow-floating);
   z-index: calc(var(--z-overlay) - 1);
   overflow: hidden;
+}
+
+/* ── Docked mode: fill the parent frame, no overlay chrome ───────── */
+.sidebar__root--docked {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar--docked {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--surface-1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  z-index: auto;
 }
 
 /* Slide animation */

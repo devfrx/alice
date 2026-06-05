@@ -10,15 +10,15 @@
  * - 'tiled': chat is a leaf inside the tiling tree — only the tree renders
  *   (the chat appears as a normal tile via ChatModule → ChatPanel).
  *
- * The ModuleLauncher floats top-right in both modes. The empty state shows
- * only in the degenerate tiled case (no modules at all).
+ * The module launcher lives in the ChatPanel header (not as a floating overlay
+ * on the workspace). The empty state shows only in the degenerate tiled case
+ * (no modules at all).
  */
 import { computed, toRef, onMounted, onUnmounted } from 'vue'
 import SplitContainer from './SplitContainer.vue'
 import PanelLeaf from './PanelLeaf.vue'
 import ChatPanel from './ChatPanel.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
-import ModuleLauncher from './ModuleLauncher.vue'
 import { useResizablePane } from '../../composables/useResizablePane'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { onOpenModule } from '../../composables/workspace/moduleIntents'
@@ -107,20 +107,20 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
       />
     </template>
 
-    <!-- Module launcher — always visible, floats top-right above panel content. -->
-    <div class="panel-workspace__toolbar">
-      <ModuleLauncher :conversation-id="props.conversationId ?? null" />
-      <!-- DEV-only: reset layout button. -->
-      <button
-        v-if="isDev"
-        type="button"
-        class="panel-workspace__dev-reset"
-        title="Reset layout (DEV)"
-        @click="workspaceStore.resetLayout()"
-      >
-        ↺
-      </button>
-    </div>
+    <!--
+      The module launcher now lives in the ChatPanel header (top-right); no
+      floating overlay sits on the workspace content anymore.
+      DEV-only: a minimal reset-layout affordance remains, bottom-right.
+    -->
+    <button
+      v-if="isDev"
+      type="button"
+      class="panel-workspace__dev-reset"
+      title="Reset layout (DEV)"
+      @click="workspaceStore.resetLayout()"
+    >
+      ↺
+    </button>
   </div>
 </template>
 
@@ -131,7 +131,9 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
   flex-direction: row;
   width: 100%;
   height: 100%;
-  padding: var(--gutter, 6px);
+  /* Matching gutter so the floating sidebar and the workspace surfaces read as
+     detached "tabs" with consistent breathing room on every edge. */
+  padding: var(--gutter-lg, 10px);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -178,27 +180,21 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
   background: var(--accent-border);
 }
 
-/* Launcher toolbar — floats top-right above all panel content. */
-.panel-workspace__toolbar {
+/* DEV-only reset button — minimal, unobtrusive, bottom-right. */
+.panel-workspace__dev-reset {
   position: absolute;
-  top: var(--space-2, 8px);
+  bottom: var(--space-2, 8px);
   right: var(--space-2, 8px);
   z-index: var(--z-overlay, 50);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1, 4px);
-}
-
-/* DEV-only reset button — minimal, unobtrusive. */
-.panel-workspace__dev-reset {
   font-size: var(--text-xs, 11px);
   padding: 2px 6px;
   color: var(--text-muted);
-  background: transparent;
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   cursor: pointer;
   line-height: 1;
+  opacity: 0.6;
 }
 
 .panel-workspace__dev-reset:hover {

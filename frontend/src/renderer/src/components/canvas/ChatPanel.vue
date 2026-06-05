@@ -20,12 +20,13 @@ import ToolConfirmationDialog from '../chat/ToolConfirmationDialog.vue'
 import MessageEditDialog from '../chat/MessageEditDialog.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
+import ModuleLauncher from './ModuleLauncher.vue'
 import { ChatApiKey } from '../../composables/useChat'
 import { useVoice } from '../../composables/useVoice'
 import { useChatStore } from '../../stores/chat'
 import { useWorkspaceStore } from '../../stores/workspace'
 
-defineProps<{
+const props = defineProps<{
   /** Optional conversation hint — reserved for future per-tile conversations. */
   conversationId?: string | null
   /**
@@ -113,6 +114,17 @@ watch(
   () => scrollConversation()
 )
 
+// ── Header: active conversation title ────────────────────────────────────────
+/**
+ * Title shown on the left of the blended header. Reads the active
+ * conversation's `title` from the chat store; falls back to a sensible
+ * default when the conversation is untitled (new/empty draft).
+ */
+const conversationTitle = computed<string>(() => {
+  const title = chatStore.currentConversation?.title?.trim()
+  return title || 'Nuova chat'
+})
+
 // ── Anchor / tile toggle ─────────────────────────────────────────────────────
 const isAnchored = computed<boolean>(() => workspaceStore.chatMode === 'anchored')
 
@@ -125,9 +137,9 @@ function toggleAnchor(): void {
 <template>
   <div class="chat-panel">
     <header v-if="!embedded" class="chat-panel__header">
-      <AppIcon name="message" :size="14" class="chat-panel__icon" />
-      <span class="chat-panel__title">Chat</span>
+      <span class="chat-panel__title" :title="conversationTitle">{{ conversationTitle }}</span>
       <div class="chat-panel__actions">
+        <ModuleLauncher :conversation-id="props.conversationId ?? null" />
         <UiIconButton
           :label="isAnchored ? 'Apri come pannello' : 'Ancora chat'"
           size="xs"
@@ -209,37 +221,41 @@ function toggleAnchor(): void {
 </template>
 
 <style scoped>
+/*
+ * Anchored chat blends directly with the workspace background: no card border,
+ * radius, shadow or distinct surface. Module tiles stay cards; the chat melts
+ * into the surface. When embedded inside a ModulePanel the panel supplies the
+ * card chrome, so the same transparent root is correct there too.
+ */
 .chat-panel {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   min-height: 0;
-  border-radius: var(--panel-radius, var(--radius-md));
-  box-shadow: var(--panel-shadow, var(--shadow-floating));
-  background: var(--surface-1);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
 }
 
+/* Slim blended header — no card chrome, just a hairline under it. */
 .chat-panel__header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--panel-header-height, 30px);
+  height: var(--panel-header-height, 36px);
   flex-shrink: 0;
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-3);
   border-bottom: 1px solid var(--border);
-  background: var(--surface-2, var(--surface-1));
-}
-
-.chat-panel__icon {
-  color: var(--text-secondary);
-  flex-shrink: 0;
+  background: transparent;
 }
 
 .chat-panel__title {
-  font-size: var(--text-xs);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   white-space: nowrap;
@@ -251,7 +267,7 @@ function toggleAnchor(): void {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .chat-panel__messages {

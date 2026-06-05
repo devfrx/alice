@@ -300,6 +300,12 @@ async function onOpenFile(id: string): Promise<void> {
   height: 100%;
 }
 
+/*
+ * Docked mode: fill the parent DockedSidebar frame, which now provides the
+ * floating card chrome (surface, border, radius, shadow). The sidebar itself
+ * is transparent and inherits the frame's rounded clip; its inner sections
+ * (nav / conversations / footer) scroll within the card.
+ */
 .sidebar--docked {
   position: relative;
   top: auto;
@@ -307,9 +313,9 @@ async function onOpenFile(id: string): Promise<void> {
   width: 100%;
   height: 100%;
   border: none;
-  border-radius: 0;
+  border-radius: inherit;
   box-shadow: none;
-  background: var(--surface-1);
+  background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   z-index: auto;

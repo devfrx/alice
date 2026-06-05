@@ -181,17 +181,25 @@ function toExpanded(): void {
 .docked-sidebar {
   position: relative;
   flex-shrink: 0;
-  height: 100%;
+  height: calc(100% - 2 * var(--gutter-lg, 10px));
+  margin: var(--gutter-lg, 10px) 0 var(--gutter-lg, 10px) var(--gutter-lg, 10px);
   overflow: hidden;
   background: var(--surface-1);
-  border-right: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius, var(--radius-lg));
+  box-shadow: var(--panel-shadow, var(--shadow-floating));
   transition: width var(--transition-fast, 160ms) var(--ease-out, ease);
   /* Sits in normal flow — modals/toasts (teleported) render above. */
   z-index: auto;
 }
 
+/* Collapsed: no card chrome and no gutter so the workspace reclaims the space. */
 .docked-sidebar--collapsed {
-  border-right: none;
+  margin: 0;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .docked-sidebar--dragging {

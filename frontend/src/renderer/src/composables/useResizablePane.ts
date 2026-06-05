@@ -1,14 +1,14 @@
 /**
  * useResizablePane — drag-to-resize composable for AL\CE panels.
  *
- * Encapsulates the pointer-down / mousemove / mouseup listener lifecycle that
+ * Encapsulates the mousedown / mousemove / mouseup listener lifecycle that
  * was previously duplicated in HybridView (left pane, normal delta) and
  * AssistantView (side panel, inverted delta).  The composable is intentionally
  * px-based and DOM-element-agnostic; callers convert px ↔ ratios if needed.
  *
  * @example
  * ```ts
- * const { size, isDragging, onPointerDown } = useResizablePane({
+ * const { size, isDragging, onMouseDown } = useResizablePane({
  *   axis: 'x',
  *   min: 220,
  *   max: 900,
@@ -46,15 +46,19 @@ export interface ResizablePaneController {
   /** `true` while a drag gesture is in progress. */
   isDragging: Ref<boolean>
   /**
-   * Attach to the divider element's `@mousedown` (or `@pointerdown`) handler.
+   * Attach to the divider element's `@mousedown` handler.
    * Registers `document` mousemove/mouseup listeners for the duration of the
    * drag and cleans up automatically on mouseup.
    */
-  onPointerDown: (e: MouseEvent | PointerEvent) => void
+  onMouseDown: (e: MouseEvent) => void
   /**
    * Removes any in-flight document listeners immediately.
    * Called automatically by `onScopeDispose`; expose for callers that need
    * manual teardown (e.g. legacy `onBeforeUnmount` hooks).
+   *
+   * **Note:** this removes document listeners but does NOT reset `isDragging`.
+   * Callers invoking `cleanup` mid-drag are responsible for resetting
+   * `isDragging` themselves (e.g. `isDragging.value = false`).
    */
   cleanup: () => void
   /**
@@ -72,10 +76,16 @@ export interface ResizablePaneController {
  *
  * @param options - Configuration for axis, bounds, initial size and direction.
  * @returns A {@link ResizablePaneController} with reactive `size`/`isDragging`
- *   refs and an `onPointerDown` handler to wire to the divider element.
+ *   refs and an `onMouseDown` handler to wire to the divider element.
  */
 export function useResizablePane(options: ResizablePaneOptions): ResizablePaneController {
   const { axis, min, max, invert = false } = options
+
+  if (import.meta.env.DEV && options.min > options.max) {
+    console.warn(
+      `[useResizablePane] min (${options.min}) > max (${options.max}); clamping will always yield max.`
+    )
+  }
 
   const clamp = (v: number): number => Math.min(max, Math.max(min, v))
 
@@ -97,7 +107,7 @@ export function useResizablePane(options: ResizablePaneOptions): ResizablePaneCo
     }
   }
 
-  function onPointerDown(e: MouseEvent | PointerEvent): void {
+  function onMouseDown(e: MouseEvent): void {
     e.preventDefault()
 
     isDragging.value = true
@@ -134,5 +144,5 @@ export function useResizablePane(options: ResizablePaneOptions): ResizablePaneCo
     cleanup()
   })
 
-  return { size, isDragging, onPointerDown, cleanup, setSize }
+  return { size, isDragging, onMouseDown, cleanup, setSize }
 }

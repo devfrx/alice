@@ -23,6 +23,18 @@ import type { WorkspaceLayout, LeafNode, TileNode } from '../composables/workspa
 export const LAYOUT_KEY = 'alice_workspace_layout_v1'
 const SIDEBAR_KEY = 'alice_workspace_sidebar'
 const AUTOOPEN_KEY = 'alice_workspace_autoopen'
+const CHATMODE_KEY = 'alice_workspace_chatmode'
+
+// ---------------------------------------------------------------------------
+// Chat mode type
+// ---------------------------------------------------------------------------
+
+/**
+ * How the chat surface is presented:
+ * - 'anchored' — chat lives in a dedicated left column beside the tiling area.
+ * - 'tiled'    — chat is a leaf inside the tiling tree (a normal module tile).
+ */
+export type ChatMode = 'anchored' | 'tiled'
 
 // ---------------------------------------------------------------------------
 // Sidebar mode type
@@ -142,6 +154,16 @@ function _loadAutoOpen(): boolean {
   }
 }
 
+function _loadChatMode(): ChatMode {
+  try {
+    const raw = localStorage.getItem(CHATMODE_KEY)
+    if (raw === 'anchored' || raw === 'tiled') return raw
+  } catch {
+    /* localStorage may be unavailable */
+  }
+  return 'anchored'
+}
+
 // ---------------------------------------------------------------------------
 // Persistence write helpers
 // ---------------------------------------------------------------------------
@@ -163,6 +185,22 @@ function _saveBool(key: string, value: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
+// Tree traversal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Walk the layout tree and return the id of the first leaf whose moduleId
+ * matches `moduleId`, or null if none exists.
+ */
+function findLeafIdByModule(node: TileNode | null, moduleId: string): string | null {
+  if (node === null) return null
+  if (node.kind === 'leaf') return node.moduleId === moduleId ? node.id : null
+  return (
+    findLeafIdByModule(node.children[0], moduleId) ?? findLeafIdByModule(node.children[1], moduleId)
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Store definition
 // ---------------------------------------------------------------------------
 
@@ -175,6 +213,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const sidebarMode = ref<SidebarMode>(_loadSidebarMode())
   const sidebarWidth = ref<number>(_loadSidebarWidth())
   const autoOpenEnabled = ref<boolean>(_loadAutoOpen())
+  const chatMode = ref<ChatMode>(_loadChatMode())
 
   /** Transient — NOT persisted. True while a panel divider drag is in progress. */
   const isResizing = ref<boolean>(false)
@@ -192,6 +231,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     if (root === null || activeLeafId === null) return null
     return findLeaf(root, activeLeafId)
   })
+
+  /** Id of the leaf rendering the chat module in the current layout, or null. */
+  const chatLeafId = computed<string | null>(() => findLeafIdByModule(layout.value.root, 'chat'))
 
   // -------------------------------------------------------------------------
   // Layout actions (wrap pure tree fns; persist inside each action)
@@ -254,6 +296,35 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   // -------------------------------------------------------------------------
+  // Chat-mode actions
+  // -------------------------------------------------------------------------
+
+  /**
+   * Convert the chat into a tile. If no chat leaf exists yet, open one so the
+   * tiling tree actually contains the chat module.
+   */
+  function tileChat(): void {
+    chatMode.value = 'tiled'
+    _saveStr(CHATMODE_KEY, chatMode.value)
+    if (chatLeafId.value === null) {
+      openModule('chat')
+    }
+  }
+
+  /**
+   * Anchor the chat back into the left column. If a chat leaf exists in the
+   * tiling tree, remove it (the anchored column renders chat instead).
+   */
+  function anchorChat(): void {
+    chatMode.value = 'anchored'
+    _saveStr(CHATMODE_KEY, chatMode.value)
+    const id = chatLeafId.value
+    if (id !== null) {
+      closeLeaf(id)
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Transient actions
   // -------------------------------------------------------------------------
 
@@ -277,10 +348,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     sidebarMode,
     sidebarWidth,
     autoOpenEnabled,
+    chatMode,
     isResizing,
     // Computed
     hasModules,
     activeLeaf,
+    chatLeafId,
     // Layout actions
     openModule,
     closeLeaf,
@@ -292,6 +365,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // Auto-open actions
     toggleAutoOpen,
     setAutoOpen,
+    // Chat-mode actions
+    tileChat,
+    anchorChat,
     // Transient actions
     setResizing
   }

@@ -1,20 +1,22 @@
 <script setup lang="ts">
 /**
- * ChatModule — Stub adapter for the Chat workspace tile.
+ * ChatModule — Tiling-leaf adapter for the Chat surface.
  *
- * Replaced with real chat content in T8/T9. Accepts `params` already so the
- * tile leaf renderer can forward them without a future prop-contract change.
+ * When the chat is converted into a tile, the leaf renders the real chat via
+ * `ChatPanel`, which reuses the existing message thread + composer.
  */
-import UiEmptyState from '../../ui/UiEmptyState.vue'
+import ChatPanel from '../ChatPanel.vue'
 
-defineProps<{
+const props = defineProps<{
   params?: Record<string, unknown>
 }>()
+
+const conversationId = (props.params?.conversationId as string | undefined) ?? null
 </script>
 
 <template>
   <div class="module-root">
-    <UiEmptyState icon="message" title="Chat" subtitle="In arrivo" />
+    <ChatPanel :conversation-id="conversationId" />
   </div>
 </template>
 
@@ -22,8 +24,5 @@ defineProps<{
 .module-root {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>

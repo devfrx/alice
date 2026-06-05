@@ -292,6 +292,94 @@ describe('migrateLayout', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 7b. Chat mode: tileChat / anchorChat / chatLeafId / persistence
+// ---------------------------------------------------------------------------
+
+describe('chat mode', () => {
+  it('defaults to anchored with no chat leaf', () => {
+    const ws = useWorkspaceStore()
+    expect(ws.chatMode).toBe('anchored')
+    expect(ws.chatLeafId).toBeNull()
+  })
+
+  it('tileChat sets tiled mode, persists, and opens a chat leaf when none exists', () => {
+    const ws = useWorkspaceStore()
+    ws.tileChat()
+
+    expect(ws.chatMode).toBe('tiled')
+    expect(localStorage.getItem('alice_workspace_chatmode')).toBe('tiled')
+    expect(ws.chatLeafId).not.toBeNull()
+    expect(ws.hasModules).toBe(true)
+    expect((ws.layout.root as LeafNode).moduleId).toBe('chat')
+  })
+
+  it('tileChat does not open a second chat leaf when one already exists', () => {
+    const ws = useWorkspaceStore()
+    ws.openModule('chat')
+    const firstLeafId = ws.chatLeafId
+    expect(firstLeafId).not.toBeNull()
+
+    ws.tileChat()
+    expect(ws.chatMode).toBe('tiled')
+    // Same single chat leaf — no duplicate, root is still a leaf.
+    expect(ws.layout.root?.kind).toBe('leaf')
+    expect(ws.chatLeafId).toBe(firstLeafId)
+  })
+
+  it('chatLeafId detects the chat leaf inside a split tree', () => {
+    const ws = useWorkspaceStore()
+    ws.openModule('chart')
+    ws.openModule('chat')
+
+    expect(ws.layout.root?.kind).toBe('split')
+    const leafId = ws.chatLeafId
+    expect(leafId).not.toBeNull()
+    // It should point at the actual chat leaf, not the chart one.
+    const root = ws.layout.root as SplitNode
+    const chatChild = root.children.find(
+      (c) => c.kind === 'leaf' && (c as LeafNode).moduleId === 'chat'
+    ) as LeafNode
+    expect(leafId).toBe(chatChild.id)
+  })
+
+  it('anchorChat sets anchored mode, persists, and removes the chat leaf', () => {
+    const ws = useWorkspaceStore()
+    ws.openModule('chart')
+    ws.openModule('chat')
+    expect(ws.chatLeafId).not.toBeNull()
+
+    ws.anchorChat()
+
+    expect(ws.chatMode).toBe('anchored')
+    expect(localStorage.getItem('alice_workspace_chatmode')).toBe('anchored')
+    expect(ws.chatLeafId).toBeNull()
+    // The chart module remains; only the chat leaf was removed.
+    expect(ws.hasModules).toBe(true)
+    expect((ws.layout.root as LeafNode).moduleId).toBe('chart')
+  })
+
+  it('anchorChat is a no-op on the tree when there is no chat leaf', () => {
+    const ws = useWorkspaceStore()
+    ws.openModule('chart')
+    ws.anchorChat()
+
+    expect(ws.chatMode).toBe('anchored')
+    expect(ws.hasModules).toBe(true)
+    expect((ws.layout.root as LeafNode).moduleId).toBe('chart')
+  })
+
+  it('chatMode persists across a fresh store instance', () => {
+    const ws1 = useWorkspaceStore()
+    ws1.tileChat()
+    expect(localStorage.getItem('alice_workspace_chatmode')).toBe('tiled')
+
+    setActivePinia(createPinia())
+    const ws2 = useWorkspaceStore()
+    expect(ws2.chatMode).toBe('tiled')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 7. setResizing (transient, not persisted)
 // ---------------------------------------------------------------------------
 

@@ -90,6 +90,7 @@ plugins:
     - whiteboard
     - network_probe
     - continuum  # exposes Continuum knowledge-base tools (requires continuum.enabled)
+    - agent      # update_plan (todo-list) + spawn_subagent (isolated sub-task) meta-tools
     # - home_automation  # not implemented yet
 
 home_assistant:
@@ -147,6 +148,14 @@ agent:
 
   persistence:
     save_runs: true
+
+agent_tools:
+  plan_enabled: true              # expose update_plan (visible mutable todo-list)
+  subagent_enabled: true          # expose spawn_subagent (isolated-context delegation)
+  subagent_max_steps: 6           # tool-call iterations cap inside one sub-agent run
+  subagent_max_output_tokens: 1024
+  subagent_timeout_seconds: 180.0 # wall-clock budget for an entire sub-agent run
+  subagent_max_tools: 16          # max tools exposed to a sub-agent (after filtering)
 
 vram:
   monitoring_enabled: true

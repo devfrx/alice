@@ -993,6 +993,39 @@ class AgentPersistenceConfig(BaseSettings):
     """If True, every agent run is recorded in the ``agent_runs`` table."""
 
 
+class AgentToolsConfig(BaseSettings):
+    """Configuration for the ``agent`` plugin's meta-tools.
+
+    These tools (``update_plan`` and ``spawn_subagent``) give the LLM
+    Claude/GPT-style agentic capabilities *on top of* the existing tool
+    loop: a visible, mutable todo-list and the ability to delegate a
+    self-contained sub-task to an isolated-context sub-agent.
+
+    The sub-agent runs **serially** (blocking) — a single local GPU
+    serialises inference, so there is no benefit to parallel sub-agents.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT_TOOLS__")
+
+    plan_enabled: bool = True
+    """Expose the ``update_plan`` todo-list tool."""
+
+    subagent_enabled: bool = True
+    """Expose the ``spawn_subagent`` delegation tool."""
+
+    subagent_max_steps: int = 6
+    """Hard cap on tool-call iterations inside a single sub-agent run."""
+
+    subagent_max_output_tokens: int = 1024
+    """Cap on the LLM output per sub-agent step."""
+
+    subagent_timeout_seconds: float = 180.0
+    """Wall-clock budget for an entire sub-agent run."""
+
+    subagent_max_tools: int = 16
+    """Maximum number of tools exposed to a sub-agent (after filtering)."""
+
+
 class AgentConfig(BaseSettings):
     """Configuration for the Agent Loop v2 execution strategy.
 
@@ -1077,6 +1110,7 @@ class AliceConfig(BaseSettings):
         default_factory=PcAutomationConfig
     )
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    agent_tools: AgentToolsConfig = Field(default_factory=AgentToolsConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
     web_search: WebSearchConfig = Field(default_factory=WebSearchConfig)

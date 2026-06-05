@@ -127,7 +127,7 @@ export function useArtifactAutoOpen(conversationIdRef?: Ref<string | null | unde
         emitOpenModule('cad3d', { artifactId: artifact.id })
       }
     },
-    { deep: false }
+    { deep: true }
   )
 
   // ── Watcher: new chart payloads in messages ──────────────────────────────
@@ -140,15 +140,7 @@ export function useArtifactAutoOpen(conversationIdRef?: Ref<string | null | unde
       for (const [chartId, payload] of currentCharts) {
         if (seenChartIds.has(chartId)) continue
         seenChartIds.add(chartId)
-        emitOpenModule('chart', {
-          chartPayload: {
-            chart_id: payload.chart_id,
-            chart_url: payload.chart_url,
-            title: payload.title,
-            chart_type: payload.chart_type,
-            created_at: payload.created_at
-          }
-        })
+        emitOpenModule('chart', { chartPayload: payload })
       }
     },
     { deep: false }

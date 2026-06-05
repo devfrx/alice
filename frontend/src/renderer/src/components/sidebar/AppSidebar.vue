@@ -11,7 +11,7 @@
  * and delegates mutations back through events / store actions.
  */
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
 import { useUIStore, type UIMode } from '../../stores/ui'
@@ -37,6 +37,7 @@ const chatStore = useChatStore()
 const uiStore = useUIStore()
 const emailStore = useEmailStore()
 const router = useRouter()
+const route = useRoute()
 const { confirm } = useModal()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
@@ -63,6 +64,12 @@ function onModeTabClick(mode: UIMode): void {
   toggle()
 }
 
+/** Navigate to Workspace (not a UIMode — handled separately). */
+async function onWorkspaceTabClick(): Promise<void> {
+  toggle()
+  await router.push('/workspace')
+}
+
 // Conversations are loaded by useChat's onConnected handler after the
 // WebSocket connects; no need to fire a potentially premature REST call here.
 
@@ -79,9 +86,12 @@ async function onSelect(id: string): Promise<void> {
     return
   }
   const current = router.currentRoute.value.name as string
-  if (current !== 'assistant' && current !== 'hybrid') {
+  // 'workspace' and 'assistant' are the active chat surfaces; navigate there if not already on one.
+  if (current !== 'assistant' && current !== 'workspace') {
     try {
-      await router.push({ name: uiStore.mode })
+      // If mode is still stored as 'hybrid' (legacy), fall back to workspace.
+      const target = uiStore.mode === 'hybrid' ? 'workspace' : uiStore.mode
+      await router.push({ name: target })
     } catch (err) {
       console.error('[AppSidebar] Navigation failed, falling back to home:', err)
       await router.replace({ name: 'home' }).catch(() => { })
@@ -93,8 +103,9 @@ async function onSelect(id: string): Promise<void> {
 async function onCreate(): Promise<void> {
   await chatStore.createConversation()
   const current = router.currentRoute.value.name as string
-  if (current !== 'assistant' && current !== 'hybrid') {
-    await router.push({ name: uiStore.mode })
+  if (current !== 'assistant' && current !== 'workspace') {
+    const target = uiStore.mode === 'hybrid' ? 'workspace' : uiStore.mode
+    await router.push({ name: target })
   }
 }
 
@@ -160,30 +171,23 @@ async function onOpenFile(id: string): Promise<void> {
           </button>
         </div>
 
-        <!-- Mode switcher tabs: Assistente / Ibrido -->
+        <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
         <div class="sidebar__mode-tabs">
           <router-link to="/assistant" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
             :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'assistant' }" @click="onModeTabClick('assistant')">
             <AppIcon name="orb" :size="14" />
             <span>Assistente</span>
           </router-link>
-          <router-link to="/hybrid" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
-            :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'hybrid' }" @click="onModeTabClick('hybrid')">
-            <AppIcon name="hybrid-sidebar" :size="14" />
-            <span>Ibrido</span>
-          </router-link>
+          <button class="sidebar__mode-tab"
+            :class="{ 'sidebar__mode-tab--active': route.path.startsWith('/workspace') }"
+            @click="onWorkspaceTabClick">
+            <AppIcon name="hybrid-panel" :size="14" />
+            <span>Workspace</span>
+          </button>
         </div>
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
-          <router-link to="/workspace" class="sidebar__link" active-class="sidebar__link--active" title="Workspace"
-            @click="toggle">
-            <span class="sidebar__link-icon" aria-hidden="true">
-              <AppIcon name="hybrid-panel" :size="15" />
-            </span>
-            <span class="sidebar__link-label">Workspace</span>
-          </router-link>
-
           <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">
@@ -410,6 +414,8 @@ async function onOpenFile(id: string): Promise<void> {
   font-weight: var(--weight-medium);
   color: var(--text-secondary);
   text-decoration: none;
+  background: transparent;
+  cursor: pointer;
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),

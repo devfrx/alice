@@ -24,7 +24,7 @@ import type { RouteLocationNormalized, RouterScrollBehavior } from 'vue-router'
 import { useUIStore, type UIMode } from '../stores/ui'
 
 /** Route names that correspond to a UI mode. */
-const MODE_ROUTES = new Set<string>(['assistant', 'hybrid'])
+const MODE_ROUTES = new Set<string>(['assistant'])
 
 /** Window-title suffix shared by every page. */
 const TITLE_SUFFIX = 'AL\\CE'
@@ -75,10 +75,9 @@ const router = createRouter({
       meta: { title: 'Assistente', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
+      // HybridView retired — redirect to Workspace (the new primary surface).
       path: '/hybrid',
-      name: 'hybrid',
-      component: () => import('../views/HybridView.vue'),
-      meta: { title: 'Ibrido', transition: DEFAULT_PAGE_TRANSITION }
+      redirect: '/workspace'
     },
     {
       path: '/calendar',
@@ -119,7 +118,7 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/assistant'
+      redirect: '/workspace'
     }
   ]
 })

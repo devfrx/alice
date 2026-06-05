@@ -17,14 +17,12 @@ import ContextBar from '../chat/ContextBar.vue'
 import ChatToolControls from '../chat/ChatToolControls.vue'
 import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
-import { useUIStore } from '../../stores/ui'
 import { useVoiceStore } from '../../stores/voice'
 import { useToast } from '../../composables/useToast'
 
 const router = useRouter()
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
-const uiStore = useUIStore()
 const voiceStore = useVoiceStore()
 const toast = useToast()
 
@@ -32,11 +30,9 @@ const supportsVision = computed(() => settingsStore.activeModel?.capabilities.vi
 const supportsToolUse = computed(() => settingsStore.activeModel?.capabilities.trained_for_tool_use ?? false)
 const supportsThinking = computed(() => settingsStore.activeModel?.capabilities.thinking ?? false)
 
-/** Toggle between assistant and hybrid mode. */
+/** Navigate to Workspace (the primary chat surface; hybrid mode retired R3). */
 function toggleMode(): void {
-    const next = uiStore.mode === 'assistant' ? 'hybrid' : 'assistant'
-    uiStore.setMode(next)
-    router.push({ name: next })
+    router.push({ name: 'workspace' })
 }
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'processing'
@@ -350,16 +346,10 @@ defineExpose({
 
                     <div class="fib__gap" />
 
-                    <!-- Mode toggle chip -->
+                    <!-- Workspace shortcut chip (hybrid mode retired R3) -->
                     <button class="fib__mode-toggle" @click="toggleMode">
-                        <template v-if="uiStore.mode === 'assistant'">
-                            <AppIcon name="message" :size="11" />
-                            <span>Ibrida</span>
-                        </template>
-                        <template v-else>
-                            <AppIcon name="orb" :size="11" />
-                            <span>Assistente</span>
-                        </template>
+                        <AppIcon name="hybrid-panel" :size="11" />
+                        <span>Workspace</span>
                     </button>
 
                     <!-- Divider -->

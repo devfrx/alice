@@ -67,7 +67,8 @@ const formattedSize = computed(() => {
 const downloadHref = computed(() => resolveBackendUrl(props.artifact.download_url))
 
 function openConversation(): void {
-    router.push({ path: '/hybrid', query: { conv: props.artifact.conversation_id } })
+    // /hybrid retired (R3) → open conversation in Workspace (primary surface).
+    router.push({ path: '/workspace', query: { conv: props.artifact.conversation_id } })
 }
 </script>
 

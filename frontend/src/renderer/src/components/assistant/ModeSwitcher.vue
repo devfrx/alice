@@ -18,9 +18,9 @@ interface ModeEntry {
     label: string
 }
 
+// 'hybrid' retired (R3) — removed from picker; /hybrid redirects to /workspace.
 const modes: ModeEntry[] = [
     { id: 'assistant', label: 'Assistente' },
-    { id: 'hybrid', label: 'Ibrido' },
 ]
 
 /** Active mode index for the sliding highlight. */

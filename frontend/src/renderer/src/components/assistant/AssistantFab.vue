@@ -10,7 +10,6 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatStore } from '../../stores/chat'
-import { useUIStore } from '../../stores/ui'
 import AppIcon from '../ui/AppIcon.vue'
 
 const props = defineProps<{
@@ -24,7 +23,6 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const chatStore = useChatStore()
-const uiStore = useUIStore()
 
 const expanded = ref(false)
 const fabRef = ref<HTMLElement | null>(null)
@@ -49,8 +47,8 @@ function handleAction(id: string): void {
             emit('toggle-history')
             break
         case 'mode':
-            uiStore.setMode('hybrid')
-            router.push({ name: 'hybrid' })
+            // 'hybrid' mode retired (R3) — Workspace is now the primary surface.
+            router.push({ name: 'workspace' })
             break
         case 'new-conv':
             chatStore.createConversation().catch(console.error)

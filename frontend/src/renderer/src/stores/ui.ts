@@ -1,9 +1,11 @@
 ﻿/**
  * Pinia store managing UI mode state for AL\CE.
  *
- * Supports two modes:
+ * Active modes:
  * - 'assistant' — Living AI orb, voice-first interaction
- * - 'hybrid'    — Chat with ambient orb overlay
+ *
+ * Retired (kept in type for back-compat; no UI path sets it anymore):
+ * - 'hybrid'    — Dual-pane chat+workspace (retired R3; /hybrid → /workspace redirect)
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
@@ -115,6 +117,8 @@ export const useUIStore = defineStore('ui', () => {
   function loadMode(): UIMode {
     try {
       const stored = localStorage.getItem('alice_ui_mode')
+      // 'hybrid' accepted from storage for back-compat (users with old persisted value).
+      // The router redirect (/hybrid → /workspace) handles the UX gracefully.
       if (stored === 'assistant' || stored === 'hybrid') return stored
     } catch {
       /* localStorage may be unavailable */

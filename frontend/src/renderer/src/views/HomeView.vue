@@ -29,9 +29,9 @@
 
         <div class="home-view__actions" aria-label="Avvio">
           <div class="home-view__mode-toggle" role="radiogroup" aria-label="Modalita">
-            <button v-for="option in modeOptions" :key="option.mode" class="home-view__mode-btn"
-              :class="{ 'home-view__mode-btn--active': uiStore.mode === option.mode }" type="button" role="radio"
-              :aria-checked="uiStore.mode === option.mode" @click="selectMode(option.mode)">
+            <button v-for="option in launchOptions" :key="option.route" class="home-view__mode-btn"
+              :class="{ 'home-view__mode-btn--active': option.isActive() }" type="button" role="radio"
+              :aria-checked="option.isActive()" @click="selectOption(option)">
               <span class="home-view__mode-icon">
                 <AppIcon :name="option.icon" :size="15" />
               </span>
@@ -70,27 +70,27 @@ import { useRouter } from 'vue-router'
 import BrandWordmark from '../components/branding/BrandWordmark.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 import type { AppIconName } from '../assets/icons'
-import { useUIStore, type UIMode } from '../stores/ui'
+import { useUIStore } from '../stores/ui'
 
 const uiStore = useUIStore()
 const router = useRouter()
 const aliceImageUrl = new URL('../assets/logos/brand/alice_header.png', import.meta.url).href
 
-interface ModeOption {
-  mode: UIMode
+/** A launch option that maps to a named route (not necessarily a UIMode). */
+interface LaunchOption {
+  route: string
   label: string
   icon: AppIconName
+  /** True when the option should be highlighted as selected. */
+  isActive: () => boolean
+  /** Side effect before navigation (e.g. setMode for voice mode). */
+  select: () => void
 }
 
 interface Capability {
   label: string
   detail: string
 }
-
-const modeOptions: ModeOption[] = [
-  { mode: 'assistant', label: 'Assistente', icon: 'orb' },
-  { mode: 'hybrid', label: 'Ibrido', icon: 'hybrid-panel' },
-]
 
 const capabilities: Capability[] = [
   { label: 'Modello locale', detail: 'LM Studio / streaming' },
@@ -100,16 +100,37 @@ const capabilities: Capability[] = [
   { label: 'Output', detail: 'CAD / grafici / lavagna' },
 ]
 
-const startLabel = computed(() =>
-  uiStore.mode === 'assistant' ? 'Apri Assistente' : 'Apri Ibrido',
+// 'hybrid' retired (R3) — replaced by 'workspace' as the second launch option.
+const launchOptions: LaunchOption[] = [
+  {
+    route: 'assistant',
+    label: 'Assistente',
+    icon: 'orb',
+    isActive: () => uiStore.mode === 'assistant',
+    select: () => uiStore.setMode('assistant'),
+  },
+  {
+    route: 'workspace',
+    label: 'Workspace',
+    icon: 'hybrid-panel',
+    isActive: () => false, // workspace is not tracked by UIMode
+    select: () => { /* no UIMode to set */ },
+  },
+]
+
+/** Currently selected launch option (first with isActive, or first). */
+const selectedOption = computed(
+  () => launchOptions.find((o) => o.isActive()) ?? launchOptions[0],
 )
 
-function selectMode(mode: UIMode): void {
-  uiStore.setMode(mode)
+const startLabel = computed(() => `Apri ${selectedOption.value.label}`)
+
+function selectOption(option: LaunchOption): void {
+  option.select()
 }
 
 function start(): void {
-  router.push({ name: uiStore.mode })
+  router.push({ name: selectedOption.value.route })
 }
 
 function onKeydown(e: KeyboardEvent): void {

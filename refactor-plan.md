@@ -201,3 +201,48 @@ Le fasi 1–2 sono indipendenti dalla strategia agentica: posso iniziarle subito
 2. Vuoi che **inizi subito le Fasi 1–2** (split + TurnAssembler, zero rischio) in attesa di chiudere la decisione sulla Fase 3?
 
 Appena i test finiscono ti riporto il numero esatto della baseline.
+
+---
+
+# CONCLUSIONE (refactor completato)
+
+Branch: `refactor/agentic-chat-model-driven`. Strategia scelta: **chat agentica
+model-driven come default**, pipeline strutturata `classifier→planner→critic`
+conservata come **opt-in** (`agent.structured_mode`, off di default).
+
+## Fasi eseguite
+
+- **F1 — Checkpoint** ✅ — split `chat.py`→package + plugin `agent` committati
+  come baseline; 27 violazioni ruff del codice nuovo risolte (B904/N806/SIM,
+  + `flake8-bugbear.extend-immutable-calls` per i marker FastAPI).
+- **F2 — Config unificata** ✅ — `agent_tools.*` assorbito in `agent.*`
+  (`planning`, `delegation`, `subagent.*`); aggiunti `agent.structured_mode` e
+  `agent.reflection`. classifier/planner/critic restano sotto `agent` (solo
+  structured mode).
+- **F3 — Default model-driven** ✅ — factory riscritta: `DirectTurnExecutor`
+  (lite/model-driven/voice) + i meta-tool `update_plan`/`spawn_subagent` come
+  motore agentico; nuovo `ReflectiveTurnExecutor` (self-check opzionale, off di
+  default, riusa `CriticService`); `AgentTurnExecutor` ora solo per
+  `structured_mode`. Niente più doppia orchestrazione.
+- **F4 — Eventi + frontend** ✅ — cablati gli handler WS mancanti
+  (`agent.warning`, `agent.critic_invoked`); il piano model-driven
+  (`agent_update_plan`) è reso come checklist live in `ToolExecutionIndicator`.
+- **F5 — Docs + verifica** ✅ — `CLAUDE.md` aggiornato; questa conclusione;
+  pass finale di test/ruff/typecheck.
+
+## Verifica
+
+- Backend: suite agent/turn/executor/factory/config **verde** (subset critico
+  ~172 test); ruff pulito su `services/turn`, `plugins/agent`,
+  `api/routes/chat`, `core/config.py`.
+- Frontend: `npm run typecheck` verde; file modificati lint-clean.
+- Le failure del run completo (plugin Windows / voice / rete) sono **ambientali**
+  e preesistenti, non regressioni del refactor.
+
+## Note / possibili estensioni future
+
+- Reflection è OFF di default e, quando attiva, emette `agent.warning` con
+  `run_id=None` nel path model-driven: il surfacing UI di questi warning
+  "run-less" (toast/banner) è un'estensione futura.
+- Detection "high-risk" precisa per la reflection richiederebbe di strumentare
+  `run_tool_loop` per riportare i tool eseguiti; oggi si usa `tool_turns_only`.

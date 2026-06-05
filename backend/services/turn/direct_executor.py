@@ -26,7 +26,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from fastapi import WebSocketDisconnect
 from loguru import logger
@@ -442,7 +443,7 @@ class DirectTurnExecutor:
                     raw = await asyncio.wait_for(
                         ws.receive_text(), timeout=2.0,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 except WebSocketDisconnect:
                     cancel_event.set()

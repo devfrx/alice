@@ -995,19 +995,21 @@ class AgentPersistenceConfig(BaseSettings):
 class AgentReflectionConfig(BaseSettings):
     """Optional self-check (reflection) for the model-driven loop.
 
-    Reflection is the lightweight, model-driven replacement for the
-    standalone critic of structured mode: instead of grading every step,
-    a single verification pass runs on the final answer — by default only
-    when the turn touched a high-risk tool.
+    Reflection is the lightweight, opt-in replacement for structured mode's
+    per-step critic: instead of grading every step, a single verification
+    pass runs on the final answer and surfaces a non-blocking warning when
+    the output looks degenerate. It costs one extra LLM call on the turns
+    it covers, so it is OFF by default.
     """
 
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__REFLECTION__")
 
-    enabled: bool = True
-    """Run a reflection pass on the final answer."""
+    enabled: bool = False
+    """Run a reflection (self-check) pass on the final answer (opt-in)."""
 
-    high_risk_only: bool = True
-    """Only reflect when the turn used a dangerous / confirmation-gated tool."""
+    tool_turns_only: bool = True
+    """When True, only verify turns that actually used tools (where a mistake
+    is most likely); when False, verify every turn."""
 
 
 class AgentSubagentConfig(BaseSettings):

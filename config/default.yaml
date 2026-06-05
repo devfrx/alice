@@ -127,8 +127,8 @@ agent:
   planning: true                  # expose update_plan (visible mutable todo-list)
   delegation: true                # expose spawn_subagent (isolated-context delegation)
   reflection:
-    enabled: true                 # final-answer self-check (model-driven critic)
-    high_risk_only: true          # only after a dangerous/confirmation-gated tool
+    enabled: false                # opt-in final-answer self-check (adds 1 LLM call)
+    tool_turns_only: true         # only verify turns that actually used tools
   subagent:
     max_steps: 6                  # tool-call iterations cap inside one sub-agent run
     max_output_tokens: 1024

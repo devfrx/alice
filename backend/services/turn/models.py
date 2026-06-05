@@ -11,7 +11,7 @@ nothing about WebSocket frames, DB sessions, or post-turn persistence.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 

@@ -10,7 +10,7 @@
  * AssistantView is orb-centric / voice-first.
  * HybridView is workspace-centric / text-first.
  */
-import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
 import HybridStateWaveform from '../components/assistant/HybridStateWaveform.vue'
@@ -26,6 +26,7 @@ import AliceSpinner from '../components/ui/AliceSpinner.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 import CADGenerationPlaceholder from '../components/chat/CADGenerationPlaceholder.vue'
 import { ChatApiKey } from '../composables/useChat'
+import { useResizablePane } from '../composables/useResizablePane'
 import { useVoice } from '../composables/useVoice'
 import { useGenerationState } from '../composables/useGenerationState'
 import { useArtifactsStore } from '../stores/artifacts'
@@ -139,40 +140,8 @@ function stopAnimationPreview(): void {
 const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
 
 // ── Resizable left pane ────────────────────────────────────────────────────
-const PANE_MIN = 220
-const PANE_MAX = 900
-const PANE_DEFAULT = 840
-const leftPaneWidth = ref(PANE_DEFAULT)
-const isDraggingDivider = ref(false)
-/** Cleanup callback for the in-flight drag, used to release document
- *  listeners if the component unmounts mid-drag. */
-let resizeCleanup: (() => void) | null = null
-
-function onResizeStart(e: MouseEvent): void {
-    e.preventDefault()
-    isDraggingDivider.value = true
-    const startX = e.clientX
-    const startW = leftPaneWidth.value
-
-    function onMove(ev: MouseEvent): void {
-        leftPaneWidth.value = Math.min(PANE_MAX, Math.max(PANE_MIN, startW + ev.clientX - startX))
-    }
-
-    function onUp(): void {
-        isDraggingDivider.value = false
-        document.removeEventListener('mousemove', onMove)
-        document.removeEventListener('mouseup', onUp)
-        resizeCleanup = null
-    }
-
-    resizeCleanup = (): void => {
-        document.removeEventListener('mousemove', onMove)
-        document.removeEventListener('mouseup', onUp)
-    }
-
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-}
+const { size: leftPaneWidth, isDragging: isDraggingDivider, onMouseDown: onResizeStart } =
+    useResizablePane({ axis: 'x', min: 220, max: 900, initial: 840 })
 
 // ── Workspace tabs: 3D / chart / whiteboard ─────────────────────────────────
 type WorkspaceTab = '3d' | 'chart' | 'whiteboard'
@@ -419,12 +388,6 @@ watch(
 onMounted(() => {
     connectVoice()
     applyRouteConversation().catch(console.error)
-})
-
-onBeforeUnmount(() => {
-    isDraggingDivider.value = false
-    resizeCleanup?.()
-    resizeCleanup = null
 })
 </script>
 

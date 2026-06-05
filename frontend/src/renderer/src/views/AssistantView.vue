@@ -9,7 +9,7 @@
  * When CAD models exist in the conversation, a side panel slides in
  * from the right with an interactive 3D viewer + prev/next navigation.
  */
-import { computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AliceOrb from '../components/assistant/AliceOrb.vue'
 import AmbientBackground from '../components/assistant/AmbientBackground.vue'
@@ -22,6 +22,7 @@ import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vu
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import AgentActivitySidebar from '../components/chat/AgentActivitySidebar.vue'
 import { ChatApiKey } from '../composables/useChat'
+import { useResizablePane } from '../composables/useResizablePane'
 import { useVoice } from '../composables/useVoice'
 import { useGenerationState } from '../composables/useGenerationState'
 import { useArtifactsStore } from '../stores/artifacts'
@@ -167,50 +168,8 @@ const whiteboardActiveIndex = ref(0)
 const sidePanelTab = ref<'3d' | 'chart' | 'whiteboard'>('3d')
 
 /* ── Resizable side panel ── */
-const SIDE_PANEL_MIN = 280
-const SIDE_PANEL_MAX = 800
-const SIDE_PANEL_DEFAULT = 400
-const sidePanelWidth = ref(SIDE_PANEL_DEFAULT)
-const isDraggingPanel = ref(false)
-/** Cleanup callback for the in-flight drag, used to release document
- *  listeners if the component unmounts mid-drag. */
-let resizeCleanup: (() => void) | null = null
-
-function onResizeStart(e: MouseEvent): void {
-    e.preventDefault()
-    isDraggingPanel.value = true
-    const startX = e.clientX
-    const startW = sidePanelWidth.value
-
-    function onMove(ev: MouseEvent): void {
-        const delta = startX - ev.clientX
-        sidePanelWidth.value = Math.min(
-            SIDE_PANEL_MAX,
-            Math.max(SIDE_PANEL_MIN, startW + delta)
-        )
-    }
-
-    function onUp(): void {
-        isDraggingPanel.value = false
-        document.removeEventListener('mousemove', onMove)
-        document.removeEventListener('mouseup', onUp)
-        resizeCleanup = null
-    }
-
-    resizeCleanup = (): void => {
-        document.removeEventListener('mousemove', onMove)
-        document.removeEventListener('mouseup', onUp)
-    }
-
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-}
-
-onBeforeUnmount(() => {
-    isDraggingPanel.value = false
-    resizeCleanup?.()
-    resizeCleanup = null
-})
+const { size: sidePanelWidth, isDragging: isDraggingPanel, onMouseDown: onResizeStart } =
+    useResizablePane({ axis: 'x', min: 280, max: 800, initial: 400, invert: true })
 
 /**
  * Collects ALL CAD model payloads from the conversation messages.

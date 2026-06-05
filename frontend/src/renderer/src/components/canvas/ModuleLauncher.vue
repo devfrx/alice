@@ -10,7 +10,7 @@
  * Filtering: chat is excluded (singleton, conversion handled elsewhere);
  * any module whose available() guard returns false is also excluded.
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import UiIconButton from '../ui/UiIconButton.vue'
 import UiContextMenu from '../ui/UiContextMenu.vue'
 import UiContextMenuItem from '../ui/UiContextMenuItem.vue'
@@ -46,20 +46,21 @@ const triggerRef = ref<InstanceType<typeof UiIconButton> | null>(null)
 // Computed module list
 // ---------------------------------------------------------------------------
 
-function visibleModules(): ModuleDef[] {
-  return listModules().filter(
+const visibleModules = computed<ModuleDef[]>(() =>
+  listModules().filter(
     (m) =>
       m.id !== 'chat' && (m.available?.({ conversationId: props.conversationId ?? null }) ?? true)
   )
-}
+)
 
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
-function openMenu(event: MouseEvent): void {
-  const btn = event.currentTarget as HTMLElement
-  const rect = btn.getBoundingClientRect()
+function openMenu(): void {
+  const el = (triggerRef.value as unknown as { $el?: HTMLElement } | null)?.$el
+  if (!el) return
+  const rect = el.getBoundingClientRect()
   // Anchor the menu below and left-aligned with the button
   menuX.value = rect.left
   menuY.value = rect.bottom + 4
@@ -100,7 +101,7 @@ function selectModule(moduleId: string): void {
       @close="closeMenu"
     >
       <UiContextMenuItem
-        v-for="mod in visibleModules()"
+        v-for="mod in visibleModules"
         :key="mod.id"
         :label="mod.label"
         @click="selectModule(mod.id)"

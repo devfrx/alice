@@ -30,8 +30,8 @@
         <div class="home-view__actions" aria-label="Avvio">
           <div class="home-view__mode-toggle" role="radiogroup" aria-label="Modalita">
             <button v-for="option in launchOptions" :key="option.route" class="home-view__mode-btn"
-              :class="{ 'home-view__mode-btn--active': option.isActive() }" type="button" role="radio"
-              :aria-checked="option.isActive()" @click="selectOption(option)">
+              :class="{ 'home-view__mode-btn--active': selectedOption.route === option.route }" type="button"
+              role="radio" :aria-checked="selectedOption.route === option.route" @click="selectOption(option)">
               <span class="home-view__mode-icon">
                 <AppIcon :name="option.icon" :size="15" />
               </span>
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandWordmark from '../components/branding/BrandWordmark.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
@@ -118,15 +118,19 @@ const launchOptions: LaunchOption[] = [
   },
 ]
 
-/** Currently selected launch option (first with isActive, or first). */
+/** Explicitly clicked option; takes priority over isActive() checks. */
+const chosenOption = ref<LaunchOption>(launchOptions[0])
+
+/** Currently selected launch option: explicit click > first isActive match > first option. */
 const selectedOption = computed(
-  () => launchOptions.find((o) => o.isActive()) ?? launchOptions[0],
+  () => chosenOption.value ?? launchOptions.find((o) => o.isActive()) ?? launchOptions[0],
 )
 
 const startLabel = computed(() => `Apri ${selectedOption.value.label}`)
 
 function selectOption(option: LaunchOption): void {
   option.select()
+  chosenOption.value = option
 }
 
 function start(): void {

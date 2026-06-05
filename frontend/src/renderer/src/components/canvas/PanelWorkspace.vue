@@ -10,9 +10,10 @@ import { computed } from 'vue'
 import SplitContainer from './SplitContainer.vue'
 import PanelLeaf from './PanelLeaf.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
+import ModuleLauncher from './ModuleLauncher.vue'
 import { useWorkspaceStore } from '../../stores/workspace'
 
-defineProps<{
+const props = defineProps<{
   conversationId?: string | null
 }>()
 
@@ -20,9 +21,7 @@ const workspaceStore = useWorkspaceStore()
 
 const root = computed(() => workspaceStore.layout.root)
 
-// TEMP / DEV-ONLY: manual-testing scaffolding. Replaced by the real
-// ModuleLauncher in T7. Gated behind import.meta.env.DEV so it never ships in
-// production builds.
+// DEV-only: keep a single reset affordance for layout testing.
 const isDev = import.meta.env.DEV
 </script>
 
@@ -40,12 +39,19 @@ const isDev = import.meta.env.DEV
       subtitle="Apri un modulo dal pulsante in alto a destra"
     />
 
-    <!-- TEMP / DEV-ONLY debug bar — remove once ModuleLauncher (T7) lands. -->
-    <div v-if="isDev" class="panel-workspace__debug">
-      <button type="button" @click="workspaceStore.openModule('chart')">+ chart</button>
-      <button type="button" @click="workspaceStore.openModule('whiteboard')">+ whiteboard</button>
-      <button type="button" @click="workspaceStore.openModule('cad3d')">+ 3d</button>
-      <button type="button" @click="workspaceStore.resetLayout()">reset</button>
+    <!-- Module launcher — always visible, floats top-right above panel content. -->
+    <div class="panel-workspace__toolbar">
+      <ModuleLauncher :conversation-id="props.conversationId ?? null" />
+      <!-- DEV-only: reset layout button. -->
+      <button
+        v-if="isDev"
+        type="button"
+        class="panel-workspace__dev-reset"
+        title="Reset layout (DEV)"
+        @click="workspaceStore.resetLayout()"
+      >
+        ↺
+      </button>
     </div>
   </div>
 </template>
@@ -60,32 +66,31 @@ const isDev = import.meta.env.DEV
   overflow: hidden;
 }
 
-/* TEMP / DEV-ONLY debug bar styling. */
-.panel-workspace__debug {
+/* Launcher toolbar — floats top-right above all panel content. */
+.panel-workspace__toolbar {
   position: absolute;
   top: var(--space-2, 8px);
   right: var(--space-2, 8px);
   z-index: var(--z-overlay, 50);
   display: flex;
+  align-items: center;
   gap: var(--space-1, 4px);
-  padding: var(--space-1, 4px);
-  background: var(--surface-2, rgba(0, 0, 0, 0.4));
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
 }
 
-.panel-workspace__debug button {
+/* DEV-only reset button — minimal, unobtrusive. */
+.panel-workspace__dev-reset {
   font-size: var(--text-xs, 11px);
   padding: 2px 6px;
-  color: var(--text-secondary);
-  background: var(--surface-1);
+  color: var(--text-muted);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   cursor: pointer;
+  line-height: 1;
 }
 
-.panel-workspace__debug button:hover {
-  color: var(--text-primary);
+.panel-workspace__dev-reset:hover {
+  color: var(--text-secondary);
   background: var(--surface-hover);
 }
 </style>

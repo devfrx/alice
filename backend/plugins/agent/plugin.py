@@ -12,7 +12,8 @@ existing tool loop, giving the model first-class planning and delegation:
   single concise summary.  Execution is serial / blocking (single local GPU
   serialises inference), which is exactly the context-isolation pattern.
 
-Both tools are opt-in via :class:`~backend.core.config.AgentToolsConfig`.
+Both tools are opt-in via the ``agent.planning`` / ``agent.delegation``
+flags in :class:`~backend.core.config.AgentConfig`.
 """
 
 from __future__ import annotations
@@ -64,16 +65,17 @@ class AgentPlugin(BasePlugin):
     def get_tools(self) -> list[ToolDefinition]:
         """Return the agent meta-tool definitions.
 
-        Tools are gated by the ``agent_tools`` config flags so a deployment
+        Tools are gated by the ``agent.planning`` / ``agent.delegation``
+        config flags so a deployment
         can expose planning without delegation (or neither).
 
         Returns:
             Zero, one, or two ``ToolDefinition`` objects.
         """
-        cfg = self._ctx.config.agent_tools if self._ctx else None
+        cfg = self._ctx.config.agent if self._ctx else None
         tools: list[ToolDefinition] = []
 
-        if cfg is None or cfg.plan_enabled:
+        if cfg is None or cfg.planning:
             tools.append(
                 ToolDefinition(
                     name="update_plan",
@@ -121,7 +123,7 @@ class AgentPlugin(BasePlugin):
                 ),
             )
 
-        if cfg is None or cfg.subagent_enabled:
+        if cfg is None or cfg.delegation:
             tools.append(
                 ToolDefinition(
                     name="spawn_subagent",
@@ -234,7 +236,7 @@ class AgentPlugin(BasePlugin):
         """Run an isolated sub-agent and return its summary."""
         if self._ctx is None:
             return ToolResult.error("Plugin not initialised")
-        cfg = self._ctx.config.agent_tools
+        cfg = self._ctx.config.agent.subagent
 
         task = str(args.get("task", "")).strip()
         if not task:
@@ -256,10 +258,10 @@ class AgentPlugin(BasePlugin):
             task=task,
             context=extra_context,
             allowed_tools=allowed_tools,
-            max_steps=cfg.subagent_max_steps,
-            max_output_tokens=cfg.subagent_max_output_tokens,
-            timeout_seconds=cfg.subagent_timeout_seconds,
-            max_tools=cfg.subagent_max_tools,
+            max_steps=cfg.max_steps,
+            max_output_tokens=cfg.max_output_tokens,
+            timeout_seconds=cfg.timeout_seconds,
+            max_tools=cfg.max_tools,
             conversation_id=context.conversation_id,
             session_id=context.session_id,
         )

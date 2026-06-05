@@ -8,10 +8,9 @@ Settings v2 for validation and env parsing.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, Literal
-
-import re
 
 import yaml
 from loguru import logger
@@ -993,54 +992,85 @@ class AgentPersistenceConfig(BaseSettings):
     """If True, every agent run is recorded in the ``agent_runs`` table."""
 
 
-class AgentToolsConfig(BaseSettings):
-    """Configuration for the ``agent`` plugin's meta-tools.
+class AgentReflectionConfig(BaseSettings):
+    """Optional self-check (reflection) for the model-driven loop.
 
-    These tools (``update_plan`` and ``spawn_subagent``) give the LLM
-    Claude/GPT-style agentic capabilities *on top of* the existing tool
-    loop: a visible, mutable todo-list and the ability to delegate a
-    self-contained sub-task to an isolated-context sub-agent.
+    Reflection is the lightweight, model-driven replacement for the
+    standalone critic of structured mode: instead of grading every step,
+    a single verification pass runs on the final answer — by default only
+    when the turn touched a high-risk tool.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__REFLECTION__")
+
+    enabled: bool = True
+    """Run a reflection pass on the final answer."""
+
+    high_risk_only: bool = True
+    """Only reflect when the turn used a dangerous / confirmation-gated tool."""
+
+
+class AgentSubagentConfig(BaseSettings):
+    """Runtime limits for the ``spawn_subagent`` delegation tool.
 
     The sub-agent runs **serially** (blocking) — a single local GPU
     serialises inference, so there is no benefit to parallel sub-agents.
     """
 
-    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT_TOOLS__")
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__SUBAGENT__")
 
-    plan_enabled: bool = True
-    """Expose the ``update_plan`` todo-list tool."""
-
-    subagent_enabled: bool = True
-    """Expose the ``spawn_subagent`` delegation tool."""
-
-    subagent_max_steps: int = 6
+    max_steps: int = 6
     """Hard cap on tool-call iterations inside a single sub-agent run."""
 
-    subagent_max_output_tokens: int = 1024
+    max_output_tokens: int = 1024
     """Cap on the LLM output per sub-agent step."""
 
-    subagent_timeout_seconds: float = 180.0
+    timeout_seconds: float = 180.0
     """Wall-clock budget for an entire sub-agent run."""
 
-    subagent_max_tools: int = 16
+    max_tools: int = 16
     """Maximum number of tools exposed to a sub-agent (after filtering)."""
 
 
 class AgentConfig(BaseSettings):
-    """Configuration for the Agent Loop v2 execution strategy.
+    """Configuration for agentic chat execution.
 
-    The agent loop is OFF by default (``enabled: False``).  When disabled
-    the chat path uses :class:`DirectTurnExecutor` and behavior is
-    bit-equivalent to the pre-v2 implementation.
+    Default = a single **model-driven** loop: the model itself decides
+    step-by-step what to do, with the ``update_plan`` and ``spawn_subagent``
+    meta-tools for structure and an optional reflection pass. The legacy
+    ``classifier -> planner -> critic`` pipeline is preserved but gated
+    behind :attr:`structured_mode` (opt-in, off by default). When
+    :attr:`enabled` is False the chat path uses the lite
+    :class:`DirectTurnExecutor` with no agentic affordances.
     """
 
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
 
     enabled: bool = False
-    """Master switch for the agent loop. False = legacy direct execution."""
+    """Master switch for agentic chat. False = lite direct execution."""
+
+    structured_mode: bool = False
+    """Opt-in legacy plan->act->critic pipeline (classifier/planner/critic).
+    When False (default) chat uses the model-driven loop below."""
 
     voice_mode_bypass: bool = True
     """In voice mode always fall back to :class:`DirectTurnExecutor`."""
+
+    planning: bool = True
+    """Expose the ``update_plan`` todo-list tool in the model-driven loop."""
+
+    delegation: bool = True
+    """Expose the ``spawn_subagent`` delegation tool in the model-driven loop."""
+
+    reflection: AgentReflectionConfig = Field(
+        default_factory=AgentReflectionConfig
+    )
+    """Optional final-answer self-check (model-driven critic replacement)."""
+
+    subagent: AgentSubagentConfig = Field(default_factory=AgentSubagentConfig)
+    """Runtime limits for ``spawn_subagent``."""
+
+    # --- structured_mode knobs (used only when structured_mode is True) ---
 
     max_steps: int = 8
     """Hard cap on the number of plan steps executed in a single run."""
@@ -1110,7 +1140,6 @@ class AliceConfig(BaseSettings):
         default_factory=PcAutomationConfig
     )
     agent: AgentConfig = Field(default_factory=AgentConfig)
-    agent_tools: AgentToolsConfig = Field(default_factory=AgentToolsConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
     web_search: WebSearchConfig = Field(default_factory=WebSearchConfig)

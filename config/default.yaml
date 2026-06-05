@@ -119,43 +119,46 @@ pc_automation:
   confirmation_timeout_s: 60
 
 agent:
-  enabled: true                   # Agent loop ON by default (plan + critic)
-  voice_mode_bypass: true         # voice mode always uses DirectTurnExecutor
+  enabled: true                   # agentic chat (model-driven) ON by default
+  structured_mode: false          # opt-in legacy plan→act→critic pipeline (off)
+  voice_mode_bypass: true         # voice mode always uses the lite DirectTurnExecutor
+
+  # --- model-driven loop (the default) ---
+  planning: true                  # expose update_plan (visible mutable todo-list)
+  delegation: true                # expose spawn_subagent (isolated-context delegation)
+  reflection:
+    enabled: true                 # final-answer self-check (model-driven critic)
+    high_risk_only: true          # only after a dangerous/confirmation-gated tool
+  subagent:
+    max_steps: 6                  # tool-call iterations cap inside one sub-agent run
+    max_output_tokens: 1024
+    timeout_seconds: 180.0        # wall-clock budget for an entire sub-agent run
+    max_tools: 16                 # max tools exposed to a sub-agent (after filtering)
+
+  # --- structured_mode knobs (used ONLY when structured_mode: true) ---
   max_steps: 8
   max_retries_per_step: 2
   max_replans: 2
   step_timeout_seconds: 60        # max wall-clock for ONE step (excl. user wait)
   total_timeout_seconds: 240      # max wall-clock for entire run (excl. user wait)
   pause_timeout_during_confirmation: true   # clock paused during tool confirmation
-
   classifier:
     enabled: true                 # if false → always full agent loop
     cache_ttl_seconds: 300
     max_output_tokens: 20
     temperature: 0.0
-
   planner:
     max_output_tokens: 600
     temperature: 0.2
     require_json_object: true     # response_format={"type":"json_object"}
-
   critic:
     max_output_tokens: 80
     temperature: 0.0
     fail_open: true               # parse error → verdict OK (don't block user)
     always_run: true              # critic runs after every turn (also TRIVIAL/SINGLE_TOOL)
     degeneration_detector_enabled: true   # local pre-LLM detector for repetition / fake tool_code
-
   persistence:
     save_runs: true
-
-agent_tools:
-  plan_enabled: true              # expose update_plan (visible mutable todo-list)
-  subagent_enabled: true          # expose spawn_subagent (isolated-context delegation)
-  subagent_max_steps: 6           # tool-call iterations cap inside one sub-agent run
-  subagent_max_output_tokens: 1024
-  subagent_timeout_seconds: 180.0 # wall-clock budget for an entire sub-agent run
-  subagent_max_tools: 16          # max tools exposed to a sub-agent (after filtering)
 
 vram:
   monitoring_enabled: true

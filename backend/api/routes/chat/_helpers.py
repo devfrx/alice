@@ -233,22 +233,22 @@ def _filter_history_for_llm(
     # Tool/function messages from web scrapes or searches can be
     # thousands of tokens.  Keep full content only for the last
     # few tool results; truncate older ones to save context.
-    _TOOL_TRUNC_CHARS = 1500
-    _TOOL_RECENT_KEEP = 4  # keep last N tool messages untruncated
+    tool_trunc_chars = 1500
+    tool_recent_keep = 4  # keep last N tool messages untruncated
     tool_indices = [
         i for i, m in enumerate(result)
         if m.get("role") == "tool"
     ]
-    old_tool_indices = set(tool_indices[:-_TOOL_RECENT_KEEP]) if (
-        len(tool_indices) > _TOOL_RECENT_KEEP
+    old_tool_indices = set(tool_indices[:-tool_recent_keep]) if (
+        len(tool_indices) > tool_recent_keep
     ) else set()
     for idx in old_tool_indices:
         content = result[idx].get("content") or ""
-        if len(content) > _TOOL_TRUNC_CHARS:
+        if len(content) > tool_trunc_chars:
             result[idx] = {
                 **result[idx],
                 "content": (
-                    content[:_TOOL_TRUNC_CHARS]
+                    content[:tool_trunc_chars]
                     + "\n... [truncated for context]"
                 ),
             }
@@ -258,8 +258,8 @@ def _filter_history_for_llm(
     # messages stay in history and cause the model to mimic the
     # pattern.  Replace them with a neutral marker so the LLM does
     # not learn to reproduce truncated answers.
-    _TRUNC_MAX_CHARS = 80
-    _SENTENCE_ENDERS = frozenset(".!?。…»\"')`")
+    trunc_max_chars = 80
+    sentence_enders = frozenset(".!?。…»\"')`")
     cleaned: list[dict[str, Any]] = []
     for m in result:
         if (
@@ -271,8 +271,8 @@ def _filter_history_for_llm(
             if not content:
                 continue  # drop empty assistant messages
             if (
-                len(content) < _TRUNC_MAX_CHARS
-                and content[-1] not in _SENTENCE_ENDERS
+                len(content) < trunc_max_chars
+                and content[-1] not in sentence_enders
             ):
                 cleaned.append({**m, "content": "[Incomplete response]"})
                 continue
@@ -360,7 +360,10 @@ def _build_mcp_context(ctx: AppContext) -> str | None:
             # Extract path args (anything starting with a drive letter or /)
             roots = [
                 arg for arg in srv.command[1:]
-                if arg and ((arg[0].isalpha() and len(arg) > 1 and arg[1] == ":") or arg.startswith("/"))
+                if arg and (
+                    (arg[0].isalpha() and len(arg) > 1 and arg[1] == ":")
+                    or arg.startswith("/")
+                )
             ]
             root_info = f"  root permessa: {', '.join(roots)}" if roots else ""
             lines.append(f"- {srv.name} (stdio){root_info}")
@@ -475,7 +478,7 @@ def _compute_context_breakdown(
     files = 0
     tool_results = 0
     other = 0
-    _OVERHEAD = 4  # role/metadata overhead per message
+    overhead = 4  # role/metadata overhead per message
 
     for msg in messages:
         role = msg.get("role", "")
@@ -483,14 +486,14 @@ def _compute_context_breakdown(
 
         if role == "system":
             text = content if isinstance(content, str) else ""
-            system += _OVERHEAD + ctx_manager.estimate_tokens(text)
+            system += overhead + ctx_manager.estimate_tokens(text)
 
         elif role == "tool":
             text = content if isinstance(content, str) else ""
-            tool_results += _OVERHEAD + ctx_manager.estimate_tokens(text)
+            tool_results += overhead + ctx_manager.estimate_tokens(text)
 
         elif role in ("user", "assistant"):
-            tok = _OVERHEAD
+            tok = overhead
             if isinstance(content, list):
                 for part in content:
                     if part.get("type") == "text":
@@ -516,7 +519,7 @@ def _compute_context_breakdown(
 
         else:
             text = content if isinstance(content, str) else ""
-            other += _OVERHEAD + ctx_manager.estimate_tokens(text)
+            other += overhead + ctx_manager.estimate_tokens(text)
 
     return {
         "system": system,

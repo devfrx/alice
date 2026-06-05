@@ -8,6 +8,7 @@ switching, branching, and idempotent creation.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import shutil
 import uuid
@@ -155,12 +156,10 @@ async def get_conversation(
             # --- current context window ---
             cw = 0
             if ctx.llm_service and ctx.lmstudio_manager:
-                try:
+                with contextlib.suppress(Exception):
                     cw = await ctx.llm_service.get_active_context_window(
                         ctx.lmstudio_manager,
                     )
-                except Exception:
-                    pass
             if cw <= 0:
                 cw = 32768
 
@@ -269,20 +268,19 @@ async def get_conversation(
                                         set(ctx.config.llm.disabled_tools),
                                     )
                                 )
-                            if avail_tools:
-                                if ctx.config.llm.max_tools > 0:
-                                    avail_tools = (
-                                        ctx.tool_registry.limit_tools(
-                                            avail_tools,
-                                            max_tools=(
-                                                ctx.config.llm.max_tools
-                                            ),
-                                            priority_plugins=(
-                                                ctx.config.llm
-                                                .priority_plugins
-                                            ),
-                                        )
+                            if avail_tools and ctx.config.llm.max_tools > 0:
+                                avail_tools = (
+                                    ctx.tool_registry.limit_tools(
+                                        avail_tools,
+                                        max_tools=(
+                                            ctx.config.llm.max_tools
+                                        ),
+                                        priority_plugins=(
+                                            ctx.config.llm
+                                            .priority_plugins
+                                        ),
                                     )
+                                )
                             tool_tokens = (
                                 ctx.context_manager.estimate_tokens(
                                     json.dumps(
@@ -558,7 +556,9 @@ async def update_conversation_title(
     try:
         body = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(
+            status_code=400, detail="Invalid JSON body",
+        ) from None
 
     raw_title = body.get("title")
     if raw_title is None:
@@ -611,7 +611,9 @@ async def switch_version(
     try:
         body = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(
+            status_code=400, detail="Invalid JSON body",
+        ) from None
 
     vg_id_raw: str | None = body.get("version_group_id")
     version_idx: int | None = body.get("version_index")
@@ -627,7 +629,7 @@ async def switch_version(
     except ValueError:
         raise HTTPException(
             status_code=400, detail="Invalid version_group_id",
-        )
+        ) from None
 
     if isinstance(version_idx, bool) or not isinstance(version_idx, int) or version_idx < 0:
         raise HTTPException(
@@ -707,12 +709,16 @@ async def branch_conversation(
     try:
         src_conv_id = uuid.UUID(conversation_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid conversation_id")
+        raise HTTPException(
+            status_code=400, detail="Invalid conversation_id",
+        ) from None
 
     try:
         from_msg_id = uuid.UUID(body.from_message_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid from_message_id")
+        raise HTTPException(
+            status_code=400, detail="Invalid from_message_id",
+        ) from None
 
     ctx = _ctx(request)
     async with ctx.db() as session:
@@ -867,16 +873,17 @@ async def create_conversation(request: Request) -> dict[str, Any]:
     ctx = _ctx(request)
 
     body: dict[str, Any] = {}
-    try:
+    # An empty / absent body is fine — fall back to server-side defaults.
+    with contextlib.suppress(Exception):
         body = await request.json()
-    except Exception:
-        pass  # empty body is fine
 
     if body.get("id"):
         try:
             conv_id = uuid.UUID(body["id"])
         except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="Invalid conversation id")
+            raise HTTPException(
+                status_code=400, detail="Invalid conversation id",
+            ) from None
     else:
         conv_id = uuid.uuid4()
     title: str | None = body.get("title")
@@ -919,7 +926,7 @@ async def create_conversation(request: Request) -> dict[str, Any]:
                 raise HTTPException(
                     status_code=409,
                     detail="Conversation id conflict",
-                )
+                ) from None
             message_count: int = await session.scalar(
                 sa.select(sa.func.count(Message.id)).where(
                     Message.conversation_id == existing.id

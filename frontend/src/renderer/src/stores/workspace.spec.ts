@@ -377,6 +377,37 @@ describe('chat mode', () => {
     const ws2 = useWorkspaceStore()
     expect(ws2.chatMode).toBe('tiled')
   })
+
+  it('closeLeaf on the chat tile re-anchors chatMode and removes the chat leaf', () => {
+    const ws = useWorkspaceStore()
+    ws.tileChat()
+    expect(ws.chatMode).toBe('tiled')
+    const id = ws.chatLeafId
+    expect(id).not.toBeNull()
+
+    ws.closeLeaf(id as string)
+
+    expect(ws.chatMode).toBe('anchored')
+    expect(localStorage.getItem('alice_workspace_chatmode')).toBe('anchored')
+    expect(ws.chatLeafId).toBeNull()
+  })
+
+  it('closeLeaf on a NON-chat tile while tiled does NOT change chatMode', () => {
+    const ws = useWorkspaceStore()
+    ws.tileChat()
+    ws.openModule('chart')
+    expect(ws.chatMode).toBe('tiled')
+
+    // Identify the chart leaf (it will be the active leaf after the second openModule)
+    const chartLeafId = (ws.activeLeaf as LeafNode).id
+    expect(chartLeafId).not.toBeNull()
+
+    ws.closeLeaf(chartLeafId)
+
+    // chatMode must still be tiled — the chat leaf survived
+    expect(ws.chatMode).toBe('tiled')
+    expect(ws.chatLeafId).not.toBeNull()
+  })
 })
 
 // ---------------------------------------------------------------------------

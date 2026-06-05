@@ -16,7 +16,7 @@ const conversationId = (props.params?.conversationId as string | undefined) ?? n
 
 <template>
   <div class="module-root">
-    <ChatPanel :conversation-id="conversationId" />
+    <ChatPanel :conversation-id="conversationId" :embedded="true" />
   </div>
 </template>
 

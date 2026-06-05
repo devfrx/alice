@@ -255,6 +255,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   function closeLeaf(leafId: string): void {
     layout.value = treeCloseLeaf(layout.value, leafId)
     _persistLayout()
+    // If the closed leaf was the chat tile and no chat leaf remains in the new
+    // layout, fall back to anchored mode so the chat surface is not lost.
+    if (chatMode.value === 'tiled' && findLeafIdByModule(layout.value.root, 'chat') === null) {
+      chatMode.value = 'anchored'
+      _saveStr(CHATMODE_KEY, chatMode.value)
+    }
   }
 
   function setRatio(splitId: string, ratio: number): void {

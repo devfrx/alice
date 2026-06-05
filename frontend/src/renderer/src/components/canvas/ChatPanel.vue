@@ -28,6 +28,12 @@ import { useWorkspaceStore } from '../../stores/workspace'
 defineProps<{
   /** Optional conversation hint — reserved for future per-tile conversations. */
   conversationId?: string | null
+  /**
+   * When true the panel is hosted inside a ModulePanel (tiled mode) which
+   * already supplies a header with a title and close button. Suppressing the
+   * built-in header avoids a double-header layout.
+   */
+  embedded?: boolean
 }>()
 
 const chatStore = useChatStore()
@@ -118,7 +124,7 @@ function toggleAnchor(): void {
 
 <template>
   <div class="chat-panel">
-    <header class="chat-panel__header">
+    <header v-if="!embedded" class="chat-panel__header">
       <AppIcon name="message" :size="14" class="chat-panel__icon" />
       <span class="chat-panel__title">Chat</span>
       <div class="chat-panel__actions">

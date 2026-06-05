@@ -2,27 +2,27 @@
  * ═══════════════════════════════════════════════════════════════
  *  AL\CE — Centralized Design Tokens & Theme
  *  Ultra-clean AI agent interface
- *  Dark (base): warm charcoal / cream — Claude Desktop palette
+ *  Dark (base): neutral warm-gray / cream — Claude Desktop palette
  *  Light (override): ivory paper / Taupe Mocha accent
  * ═══════════════════════════════════════════════════════════════
  */
 
 /* ── Backgrounds ───────────────────────────────────────────── */
 :root {
-  --bg-primary: #262624;                       /* Warm charcoal base */
-  --bg-secondary: #2D2C29;                     /* Panel / sidebar */
-  --bg-tertiary: #34322D;                      /* Elevated surfaces (cards, tooltips) */
+  --bg-primary: #1A1A19;                       /* Neutral dark base */
+  --bg-secondary: #222221;                     /* Panel / sidebar */
+  --bg-tertiary: #2A2A28;                      /* Elevated surfaces (cards, tooltips) */
   --bg-input: rgba(232, 220, 200, 0.04);       /* Input fields */
-  --bg-tool: rgba(38, 38, 36, 0.8);           /* Tool/code bubble background */
+  --bg-tool: rgba(26, 26, 25, 0.8);           /* Tool/code bubble background */
 }
 
 /* ── Surface Elevation System ──────────────────────────────── */
 :root {
-  --surface-0: #262624;                        /* Base layer — page background */
-  --surface-1: #2D2C29;                        /* Sidebar, panels */
-  --surface-2: #34322D;                        /* Cards, dropdowns */
-  --surface-3: #3C3A35;                        /* Elevated cards, popovers */
-  --surface-4: #45423C;                        /* Maximum elevation */
+  --surface-0: #1A1A19;                        /* Base layer — page background */
+  --surface-1: #222221;                        /* Sidebar, panels */
+  --surface-2: #2A2A28;                        /* Cards, dropdowns */
+  --surface-3: #333331;                        /* Elevated cards, popovers */
+  --surface-4: #3D3D3A;                        /* Maximum elevation */
   --surface-hover: rgba(232, 220, 200, 0.04);  /* Interactive surface hover */
   --surface-active: rgba(232, 220, 200, 0.06); /* Interactive surface active/pressed */
   --surface-selected: rgba(232, 220, 200, 0.08);/* Selected item background */
@@ -31,9 +31,9 @@
 
 /* ── Typography ────────────────────────────────────────────── */
 :root {
-  --text-primary: #ECEAE3;                     /* Warm cream off-white */
-  --text-secondary: #B4AFA4;                   /* Muted warm gray */
-  --text-muted: #7C766B;                       /* Very subtle */
+  --text-primary: #ECEAE5;                     /* Near-white, minimal warmth */
+  --text-secondary: #ADABA4;                   /* Muted neutral gray */
+  --text-muted: #74726B;                       /* Very subtle */
 }
 
 /* ── Accent — Warm Cream "Panna" ───────────────────────────── */
@@ -265,13 +265,13 @@
 
 /* ── Legacy compat (consumed by electron-vite boilerplate) ── */
 :root {
-  --color-background-mute: #34322D;
+  --color-background-mute: #2A2A28;
 }
 
 /* ── Glass Effects ───────────────────────────────────────────── */
 :root {
-  --glass-bg: rgba(38, 38, 36, 0.8);
-  --glass-bg-light: rgba(38, 38, 36, 0.5);
+  --glass-bg: rgba(26, 26, 25, 0.80);
+  --glass-bg-light: rgba(26, 26, 25, 0.50);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-border-hover: rgba(255, 255, 255, 0.10);
   --glass-blur: 12px;
@@ -621,9 +621,9 @@ textarea:focus:not(:focus-visible) {
 :root {
   /* --text-primary / --text-secondary / --text-muted already defined above */
   --text-tertiary: var(--text-muted);           /* Alias: least prominent readable text */
-  --text-disabled: rgba(236, 234, 227, 0.28);   /* Disabled form labels/buttons */
-  --text-inverse: #262624;                      /* For text on accent-filled surfaces */
-  --text-on-accent: #262624;                    /* Text rendered on accent bg */
+  --text-disabled: rgba(236, 234, 229, 0.28);   /* Disabled form labels/buttons */
+  --text-inverse: #1A1A19;                      /* For text on accent-filled surfaces */
+  --text-on-accent: #1A1A19;                    /* Text rendered on accent bg (cream is light) */
   --text-link: var(--accent);
   --text-link-hover: var(--accent-hover);
   --selection-bg: rgba(232, 220, 200, 0.20);    /* Drives ::selection — cream-on-dark */

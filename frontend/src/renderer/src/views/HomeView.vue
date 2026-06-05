@@ -276,7 +276,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   display: grid;
   margin: 0;
   color: var(--text-primary);
-  font-family: var(--font-display);
+  font-family: var(--font-brand);
   font-size: clamp(5.8rem, 15vw, 12rem);
   font-weight: var(--weight-semibold);
   letter-spacing: 0;

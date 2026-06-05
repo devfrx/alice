@@ -381,7 +381,7 @@ onUnmounted(() => {
 }
 
 .titlebar__title {
-    font-family: var(--font-display);
+    font-family: var(--font-brand);
     font-size: 10px;
     font-weight: var(--weight-semibold);
     letter-spacing: 0;

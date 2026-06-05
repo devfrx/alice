@@ -75,6 +75,40 @@ function parseWhiteboardPayload(result: string): { board_id: string; title: stri
     } catch { return null }
 }
 
+/** A single model-driven plan step from the `agent_update_plan` tool. */
+interface PlanStepView {
+    step: string
+    status: string
+}
+
+/** Parse the `update_plan` tool result into its ordered step list. */
+function parsePlanPayload(result: string): PlanStepView[] | null {
+    try {
+        const p = JSON.parse(result)
+        if (!Array.isArray(p?.plan)) return null
+        return (p.plan as unknown[])
+            .filter(
+                (s): s is PlanStepView =>
+                    !!s && typeof (s as PlanStepView).step === 'string',
+            )
+            .map((s) => ({ step: s.step, status: s.status ?? 'pending' }))
+    } catch {
+        return null
+    }
+}
+
+/** True when this execution is a model-driven plan (todo-list) update. */
+function isPlanResult(exec: ToolExecution): boolean {
+    if (!exec.result) return false
+    if (!exec.toolName.endsWith('update_plan')) return false
+    return parsePlanPayload(exec.result) !== null
+}
+
+/** Non-null plan accessor used inside guarded template blocks. */
+function planOf(result: string): PlanStepView[] {
+    return parsePlanPayload(result) as PlanStepView[]
+}
+
 /** Check if result is a plain text result (not special payload). */
 function isPlainResult(exec: ToolExecution): boolean {
     if (!exec.result) return false
@@ -82,6 +116,7 @@ function isPlainResult(exec: ToolExecution): boolean {
     if (exec.contentType === 'application/vnd.alice.cad-model+json') return false
     if (exec.contentType === 'application/vnd.alice.chart+json' && parseChartPayload(exec.result)) return false
     if (exec.contentType === 'application/vnd.alice.whiteboard+json') return false
+    if (isPlanResult(exec)) return false
     return true
 }
 </script>
@@ -131,6 +166,21 @@ function isPlainResult(exec: ToolExecution): boolean {
                             <span class="tool-exec__wb-title">{{ parseWhiteboardPayload(exec.result)?.title }}</span>
                             <span class="tool-exec__wb-badge">aperta nel pannello</span>
                         </div>
+                    </template>
+                    <!-- Model-driven plan checklist (update_plan tool) -->
+                    <template v-else-if="isPlanResult(exec)">
+                        <ul class="tool-exec__plan">
+                            <li v-for="(s, i) in planOf(exec.result)" :key="i" class="tool-exec__plan-item"
+                                :class="`tool-exec__plan-item--${s.status}`">
+                                <span class="tool-exec__plan-mark">
+                                    <AppIcon v-if="s.status === 'completed'" name="check" :size="11"
+                                        :stroke-width="2.5" />
+                                    <span v-else class="tool-exec__plan-dot"
+                                        :class="{ 'tool-exec__plan-dot--active': s.status === 'in_progress' }" />
+                                </span>
+                                <span class="tool-exec__plan-text">{{ s.step }}</span>
+                            </li>
+                        </ul>
                     </template>
                     <!-- Plain text result (collapsible) -->
                     <template v-else-if="isPlainResult(exec)">
@@ -370,6 +420,60 @@ function isPlainResult(exec: ToolExecution): boolean {
 .tool-exec__result-full::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: var(--radius-xs);
+}
+
+/* Model-driven plan checklist */
+.tool-exec__plan {
+    list-style: none;
+    margin: var(--space-1) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.tool-exec__plan-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-1-5);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.tool-exec__plan-mark {
+    width: 12px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--success);
+}
+
+.tool-exec__plan-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid var(--text-muted);
+    box-sizing: border-box;
+}
+
+.tool-exec__plan-dot--active {
+    border-color: var(--accent);
+    background: var(--accent);
+    animation: dotPulse 1.4s ease-in-out infinite;
+}
+
+.tool-exec__plan-item--completed .tool-exec__plan-text {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.tool-exec__plan-item--in_progress .tool-exec__plan-text {
+    color: var(--text-primary);
+    font-weight: var(--weight-medium);
 }
 
 /* Special result types */

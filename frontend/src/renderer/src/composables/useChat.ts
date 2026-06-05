@@ -318,6 +318,8 @@ export function useChat(): UseChatReturn {
   wsManager.on('agent.step_started', onAgentEvent)
   wsManager.on('agent.step_completed', onAgentEvent)
   wsManager.on('agent.replanned', onAgentEvent)
+  wsManager.on('agent.critic_invoked', onAgentEvent)
+  wsManager.on('agent.warning', onAgentEvent)
   wsManager.on('agent.ask_user', onAgentEvent)
   wsManager.on('agent.run_finished', onAgentEvent)
 

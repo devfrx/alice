@@ -436,23 +436,26 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* MessageBubble — Supabase-clean */
+/* MessageBubble — Claude Desktop style */
 
 /* Row layout */
 .bubble-row {
   display: flex;
-  align-items: flex-end;
-  margin-bottom: var(--space-4);
+  /* Generous vertical breathing room between messages — Claude Desktop feel */
+  margin-bottom: var(--space-6);
   position: relative;
 }
 
 .row--user {
+  align-items: flex-end;
   justify-content: flex-end;
   gap: var(--space-2);
 }
 
+/* Assistant rows: top-align so the branch button sits at message top */
 .row--assistant,
 .row--tool {
+  align-items: flex-start;
   justify-content: flex-start;
 }
 
@@ -470,9 +473,12 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* Branch button — to the right of assistant bubbles, visible on row hover */
+/* Branch button — to the right of assistant bubbles, visible on row hover.
+   flex-shrink: 0 prevents the action bar from squishing the full-width bubble. */
 .bubble-side-actions--right {
   order: 1;
+  flex-shrink: 0;
+  margin-top: var(--space-1);
 }
 
 .row--assistant:hover .bubble-side-actions--right,
@@ -532,30 +538,33 @@ onUnmounted(() => {
 /* Bubble base */
 .bubble {
   position: relative;
-  font-size: var(--text-sm);
+  font-size: var(--chat-reading-size, 0.92rem);
   font-family: var(--font-sans);
   word-break: break-word;
 }
 
-/* User bubble */
+/* User bubble — discrete, right-aligned, subtle rounded card */
 .bubble--user {
-  max-width: 65%;
-  background: var(--surface-2);
+  max-width: 75%;
+  background: var(--surface-selected);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  /* Slightly asymmetric — Claude Desktop user bubble shape */
+  border-radius: 16px 16px 4px 16px;
   color: var(--text-primary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
   animation: slideInRight 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Assistant bubble */
+/* Assistant — flowing text directly on the chat background. No bubble chrome:
+   no background, no border, no rounded box. Content fills the reading column. */
 .bubble--assistant {
-  max-width: 82%;
+  width: 100%;
+  max-width: 100%;
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: 0;
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
   animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -758,6 +767,11 @@ onUnmounted(() => {
   cursor: text;
 }
 
+/* Slightly more generous paragraph spacing for assistant flowing text */
+.bubble--assistant .bubble__content :deep(p) {
+  margin: 0 0 0.65em;
+}
+
 .bubble__content :deep(p) {
   margin: 0 0 0.5em;
 }
@@ -791,11 +805,8 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-/* Timestamp — hover to reveal, positioned to the side */
+/* Timestamp — hover to reveal */
 .bubble__time {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
   font-size: var(--text-2xs);
   color: var(--text-muted);
   opacity: 0;
@@ -804,14 +815,24 @@ onUnmounted(() => {
   transition: opacity var(--transition-fast);
 }
 
-.bubble:hover .bubble__time {
-  opacity: 1;
+/* User timestamp: absolutely positioned to the left of the bubble (inside
+   the side-actions bar — the existing .bubble-side-actions rule handles this) */
+.bubble--user .bubble__time {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.row--assistant .bubble__time,
-.row--tool .bubble__time {
-  left: calc(100% + var(--space-3));
-  right: auto;
+/* Assistant / tool timestamp: inline block at the bottom of the content,
+   so it doesn't overflow the now-full-width bubble */
+.bubble--assistant .bubble__time,
+.bubble--tool .bubble__time {
+  display: block;
+  margin-top: var(--space-1-5);
+}
+
+.bubble:hover .bubble__time {
+  opacity: 1;
 }
 
 /* Image overlay */

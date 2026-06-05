@@ -160,26 +160,28 @@ function toggleAnchor(): void {
         <span>Inizia a scrivere</span>
       </div>
 
-      <MessageBubble
-        v-for="msg in chatStore.messages"
-        :key="msg.id"
-        :message="msg"
-        :version-count="msg.version_group_id ? chatStore.getVersionCount(msg.version_group_id) : 1"
-        :active-version-index="
-          msg.version_group_id ? chatStore.getActiveVersionIndex(msg.version_group_id) : 0
-        "
-        :edit-disabled="chatStore.isStreamingCurrentConversation"
-        :branch-disabled="chatStore.isStreamingCurrentConversation"
-        @edit="startEdit"
-        @switch-version="handleVersionSwitch"
-        @branch="handleBranch"
-      />
-
-      <div v-if="chatStore.isStreamingCurrentConversation" class="chat-panel__streaming">
-        <StreamingIndicator
-          :content="chatStore.currentStreamContent"
-          :thinking-content="chatStore.currentThinkingContent"
+      <div class="chat-panel__thread">
+        <MessageBubble
+          v-for="msg in chatStore.messages"
+          :key="msg.id"
+          :message="msg"
+          :version-count="msg.version_group_id ? chatStore.getVersionCount(msg.version_group_id) : 1"
+          :active-version-index="
+            msg.version_group_id ? chatStore.getActiveVersionIndex(msg.version_group_id) : 0
+          "
+          :edit-disabled="chatStore.isStreamingCurrentConversation"
+          :branch-disabled="chatStore.isStreamingCurrentConversation"
+          @edit="startEdit"
+          @switch-version="handleVersionSwitch"
+          @branch="handleBranch"
         />
+
+        <div v-if="chatStore.isStreamingCurrentConversation" class="chat-panel__streaming">
+          <StreamingIndicator
+            :content="chatStore.currentStreamContent"
+            :thinking-content="chatStore.currentThinkingContent"
+          />
+        </div>
       </div>
     </div>
 
@@ -274,8 +276,17 @@ function toggleAnchor(): void {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-2);
+  padding: var(--space-4) var(--space-2);
   scroll-behavior: smooth;
+}
+
+/* Reading-width column — centers the message thread and constrains long
+   assistant text to a comfortable reading measure. User bubbles stay
+   right-aligned within this column via MessageBubble's row--user rule. */
+.chat-panel__thread {
+  max-width: var(--content-width-reading, 65ch);
+  width: 100%;
+  margin: 0 auto;
 }
 
 .chat-panel__messages::-webkit-scrollbar {
@@ -304,7 +315,7 @@ function toggleAnchor(): void {
 }
 
 .chat-panel__streaming {
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0;
 }
 
 .chat-panel__streaming :deep(.bubble-row) {

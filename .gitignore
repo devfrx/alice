@@ -84,3 +84,6 @@ trellis_server/
 !trellis_server/server.py
 data/3d_models/
 landing-assets/
+
+# Superpowers brainstorming companion
+.superpowers/

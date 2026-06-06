@@ -159,57 +159,75 @@ onBeforeUnmount(() => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
+/* ── Chip: shared spec for agent + tools buttons ── */
 .ctc__chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 9px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
-  border-radius: 999px;
-  background: var(--surface-2, rgba(255, 255, 255, 0.04));
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
-  font-size: 11px;
-  font-weight: 500;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
 }
 
 .ctc__chip:hover:not(:disabled) {
-  background: var(--surface-3, rgba(255, 255, 255, 0.08));
-  color: var(--text-primary, #fff);
+  background: var(--surface-3);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
+/* Active agent state — accent tint */
 .ctc__chip--on {
-  background: var(--accent-soft, rgba(99, 102, 241, 0.18));
-  border-color: var(--accent, #6366f1);
-  color: var(--accent, #818cf8);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
+.ctc__chip--on:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Tools popover open */
 .ctc__chip--open {
-  border-color: var(--accent, #6366f1);
-  color: var(--text-primary, #fff);
+  border-color: var(--accent-border);
+  background: var(--surface-3);
+  color: var(--text-primary);
 }
 
 .ctc__chip--muted,
 .ctc__chip:disabled {
-  opacity: 0.45;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
+/* Disabled count badge */
 .ctc__badge {
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--accent, #6366f1);
-  color: #fff;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--text-on-accent);
   font-size: 9px;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   line-height: 14px;
 }
 
+/* ── Popover ── */
 .ctc__pop {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -217,33 +235,34 @@ onBeforeUnmount(() => {
   width: 320px;
   max-height: 360px;
   overflow-y: auto;
-  padding: 8px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
-  border-radius: 12px;
-  background: var(--surface-1, #1a1a1f);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  z-index: 50;
+  padding: var(--space-2);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-floating);
+  z-index: var(--z-dropdown);
 }
 
 .ctc__pop-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 4px 8px;
+  padding: var(--space-1) var(--space-1) var(--space-2);
 }
 
 .ctc__pop-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary, #fff);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
 }
 
 .ctc__reset {
   border: none;
   background: none;
-  color: var(--accent, #818cf8);
-  font-size: 11px;
+  color: var(--accent);
+  font-size: var(--text-xs);
   cursor: pointer;
+  padding: 0;
 }
 
 .ctc__reset:hover {
@@ -251,9 +270,9 @@ onBeforeUnmount(() => {
 }
 
 .ctc__empty {
-  padding: 12px 4px;
-  font-size: 12px;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  padding: var(--space-3) var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -265,7 +284,7 @@ onBeforeUnmount(() => {
 }
 
 .ctc__group {
-  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-top: 1px solid var(--border);
 }
 
 .ctc__group:first-child {
@@ -275,40 +294,40 @@ onBeforeUnmount(() => {
 .ctc__group-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 4px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-1);
 }
 
 .ctc__expand {
   display: inline-flex;
   border: none;
   background: none;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
 }
 
 .ctc__plugin-name {
   flex: 1;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary, #fff);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
 }
 
 .ctc__plugin-count {
-  font-size: 10px;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.4));
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
 }
 
 .ctc__tools {
-  padding: 0 4px 6px 26px;
+  padding: 0 var(--space-1) var(--space-1-5) 26px;
 }
 
 .ctc__tool {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 0;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
 }
 
 .ctc__tool-text {
@@ -318,33 +337,34 @@ onBeforeUnmount(() => {
 
 .ctc__tool-name {
   display: block;
-  font-size: 11px;
-  color: var(--text-primary, #fff);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
 }
 
 .ctc__tool-desc {
   display: block;
-  font-size: 10px;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.45));
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* ── Toggle switch ── */
 .ctc__sw {
   position: relative;
   flex-shrink: 0;
   width: 30px;
   height: 16px;
   border: none;
-  border-radius: 999px;
-  background: var(--surface-3, rgba(255, 255, 255, 0.14));
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) ease;
 }
 
 .ctc__sw--on {
-  background: var(--accent, #6366f1);
+  background: var(--accent);
 }
 
 .ctc__sw-thumb {
@@ -354,17 +374,18 @@ onBeforeUnmount(() => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #fff;
-  transition: transform 0.15s;
+  background: var(--text-on-accent);
+  transition: transform var(--duration-fast) ease;
 }
 
 .ctc__sw--on .ctc__sw-thumb {
   transform: translateX(14px);
 }
 
+/* ── Popover transition ── */
 .ctc-pop-enter-active,
 .ctc-pop-leave-active {
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .ctc-pop-enter-from,

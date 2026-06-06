@@ -160,11 +160,17 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
 .ctx {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    height: 22px;
+    gap: 4px;
+    height: 26px;
     flex-shrink: 0;
     cursor: default;
     position: relative;
+    opacity: 0.85;
+    transition: opacity var(--duration-fast) ease;
+}
+
+.ctx:hover {
+    opacity: 1;
 }
 
 /* ── Ring SVG ── */

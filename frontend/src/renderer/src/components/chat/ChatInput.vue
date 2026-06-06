@@ -33,8 +33,6 @@ function toggleMode(): void {
 }
 
 const supportsVision = computed(() => settingsStore.activeModel?.capabilities.vision ?? false)
-const supportsToolUse = computed(() => settingsStore.activeModel?.capabilities.trained_for_tool_use ?? false)
-const supportsThinking = computed(() => settingsStore.activeModel?.capabilities.thinking ?? false)
 
 const props = defineProps<{
   /** Disable the input (e.g. while streaming). */
@@ -281,27 +279,17 @@ defineExpose({
       :disabled="disabled" aria-label="Scrivi un messaggio" @keydown="handleKeydown" @input="autoResize"
       @paste="handlePaste" />
 
-    <!-- Bottom control row: left cluster + right cluster -->
+    <!-- Bottom control row: left config group / right actions group -->
     <div class="ci__controls">
 
-      <!-- Left cluster: status dot + context ring, attach, model chips, agent/tools -->
+      <!-- Left cluster: attach, then config chips (model, embedding, tools, workspace) -->
       <div class="ci__controls-left">
-        <!-- Connection dot -->
-        <div class="ci__dot" :class="isConnected ? 'dot--ok' : 'dot--err'"
-          :title="isConnected ? 'Connesso' : 'Non connesso'" />
-
-        <!-- Context ring -->
-        <ContextBar :context-info="chatStore.contextInfo" :is-compressing="chatStore.isCompressingContext" />
-
-        <!-- Divider -->
-        <div class="ci__divider" />
-
         <!-- Attach button -->
         <button class="ci__attach" :disabled="disabled || !supportsVision"
           :aria-label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
           :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
           @click="openFilePicker">
-          <AppIcon name="paperclip" :size="15" />
+          <AppIcon name="paperclip" :size="14" />
         </button>
 
         <!-- Divider -->
@@ -323,20 +311,14 @@ defineExpose({
         </button>
       </div>
 
-      <!-- Right cluster: mic + send/stop -->
+      <!-- Right cluster: context, connection dot, mic, send/stop -->
       <div class="ci__controls-right">
-        <!-- Capability badges (compact, only on wide layouts) -->
-        <div v-if="settingsStore.activeModel" class="ci__badges">
-          <span class="ci__badge" :class="{ 'ci__badge--on': supportsVision }" title="Vision">
-            <AppIcon name="eye" :size="12" />
-          </span>
-          <span class="ci__badge" :class="{ 'ci__badge--on': supportsThinking }" title="Thinking">
-            <AppIcon name="lightbulb-simple" :size="12" />
-          </span>
-          <span class="ci__badge" :class="{ 'ci__badge--on': supportsToolUse }" title="Tool Use">
-            <AppIcon name="tool" :size="12" />
-          </span>
-        </div>
+        <!-- Context ring (subtle status) -->
+        <ContextBar :context-info="chatStore.contextInfo" :is-compressing="chatStore.isCompressingContext" />
+
+        <!-- Connection status dot -->
+        <div class="ci__dot" :class="isConnected ? 'dot--ok' : 'dot--err'"
+          :title="isConnected ? 'Connesso' : 'Non connesso'" />
 
         <!-- Microphone button -->
         <MicrophoneButton v-if="voiceStore.isReady" :available="voiceStore.sttAvailable"
@@ -345,7 +327,7 @@ defineExpose({
           @stop-recording="$emit('voice-stop')" @cancel-processing="$emit('voice-cancel-processing')"
           @refresh-devices="$emit('refresh-devices')" @select-device="(id) => $emit('select-device', id)" />
 
-        <!-- Send / Stop toggle -->
+        <!-- Send / Stop toggle — sole accent CTA -->
         <Transition name="btn-swap" mode="out-in">
           <button v-if="isStreaming" key="stop" class="ci__stop" aria-label="Interrompi generazione"
             @click="emit('stop')">
@@ -512,7 +494,7 @@ defineExpose({
   min-height: 28px;
 }
 
-/* Left cluster: dot + context + attach + models + tools + workspace */
+/* Left cluster: attach + divider + config chips */
 .ci__controls-left {
   display: flex;
   align-items: center;
@@ -522,11 +504,11 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Right cluster: badges + mic + send/stop */
+/* Right cluster: context + dot + mic + send/stop */
 .ci__controls-right {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1-5);
   flex-shrink: 0;
 }
 
@@ -613,21 +595,21 @@ defineExpose({
 }
 
 /* ============================================================
-   Workspace shortcut chip
+   Workspace shortcut chip — unified chip spec
    ============================================================ */
 .ci__mode-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 22px;
-  padding: 0 7px;
+  height: 26px;
+  padding: 0 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  letter-spacing: 0.03em;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -638,43 +620,9 @@ defineExpose({
 }
 
 .ci__mode-toggle:hover {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   border-color: var(--border-hover);
   background: var(--surface-3);
-}
-
-/* ============================================================
-   Capability badges (right cluster, compact)
-   ============================================================ */
-.ci__badges {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.ci__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  opacity: 0.3;
-  transition:
-    color var(--duration-fast) ease,
-    border-color var(--duration-fast) ease,
-    background var(--duration-fast) ease,
-    opacity var(--duration-fast) ease;
-}
-
-.ci__badge--on {
-  color: var(--text-secondary);
-  border-color: var(--border);
-  background: var(--surface-2);
-  opacity: 1;
 }
 
 /* ============================================================
@@ -791,10 +739,6 @@ defineExpose({
   }
 
   .ci__mode-toggle {
-    display: none;
-  }
-
-  .ci__badges {
     display: none;
   }
 

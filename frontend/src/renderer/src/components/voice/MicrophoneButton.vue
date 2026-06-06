@@ -151,7 +151,7 @@ const ringOuterStyle = computed(() => ({
 
       <!-- Icon: mic or processing dots -->
       <Transition name="icon-morph" mode="out-in">
-        <AppIcon v-if="!isProcessing" key="mic" name="mic" :size="20" class="mic-btn__icon"
+        <AppIcon v-if="!isProcessing" key="mic" name="mic" :size="15" class="mic-btn__icon"
           :class="{ 'mic-btn__icon--rec': isActive }" />
         <span v-else key="dots" class="mic-btn__dots">
           <span /><span /><span />
@@ -201,16 +201,16 @@ const ringOuterStyle = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-hover);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color var(--transition-fast),
-    background var(--transition-fast),
-    border-color var(--transition-fast);
+  transition: color var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
   outline: none;
   -webkit-app-region: no-drag;
 }

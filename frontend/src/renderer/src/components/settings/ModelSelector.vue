@@ -335,40 +335,42 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  background: var(--white-subtle);
+  padding: 0 8px;
+  height: 26px;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   cursor: pointer;
   white-space: nowrap;
-  height: 24px;
   transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 .ms__trigger:hover {
-  background: var(--white-light);
+  background: var(--surface-3);
   border-color: var(--border-hover);
   color: var(--text-primary);
 }
 
 .ms__trigger--open {
-  background: var(--white-medium);
+  background: var(--surface-3);
   border-color: var(--accent-border);
   color: var(--text-primary);
 }
 
+/* Embedding selector: same style, no special background needed */
 .ms__trigger--embedding {
-  background: var(--white-faint);
+  background: var(--surface-2);
 }
 
 .ms__trigger--embedding:hover {
-  background: var(--white-light);
+  background: var(--surface-3);
 }
 
 .ms__warn-icon {

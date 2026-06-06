@@ -427,45 +427,35 @@ defineExpose({
     max-width: 600px;
     width: auto;
 
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur-heavy));
-    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
-    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-3) var(--space-2);
 
-    box-shadow:
-        var(--shadow-floating),
-        inset 0 1px 0 var(--white-subtle);
+    box-shadow: var(--shadow-elevated);
     transition:
         left 350ms var(--ease-out-expo),
-        border-color 300ms var(--ease-smooth),
-        box-shadow 300ms var(--ease-smooth),
+        border-color var(--duration-normal) var(--ease-out-expo),
+        box-shadow var(--duration-normal) var(--ease-out-expo),
         padding 250ms var(--ease-out-expo),
         min-width 250ms var(--ease-out-expo),
         max-width 250ms var(--ease-out-expo),
-        background 300ms var(--ease-smooth);
+        background var(--duration-normal) var(--ease-out-expo);
 
     display: grid;
 }
 
 .fib:focus-within {
-    border-color: var(--glass-border-hover);
-    box-shadow:
-        var(--shadow-floating),
-        0 0 24px var(--accent-glow),
-        inset 0 1px 0 var(--white-subtle);
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-elevated), 0 0 0 1px var(--accent-border);
 }
 
 /* Expanded input */
 .fib--expanded {
     min-width: 420px;
     max-width: min(900px, calc(100vw - 48px));
-    background: var(--glass-bg);
-    box-shadow:
-        var(--shadow-floating),
-        var(--shadow-lg),
-        inset 0 1px 0 var(--white-subtle);
+    background: var(--surface-1);
+    box-shadow: var(--shadow-elevated);
 }
 
 /* Active states pill */
@@ -479,36 +469,30 @@ defineExpose({
 .fib--listening {
     border-color: var(--listening-border);
     box-shadow:
-        var(--shadow-floating),
-        0 0 20px var(--listening-dim),
-        inset 0 1px 0 var(--listening-border);
+        var(--shadow-elevated),
+        0 0 20px var(--listening-dim);
 }
 
 /* Thinking — cream glow */
 .fib--thinking {
     border-color: var(--thinking-border);
     box-shadow:
-        var(--shadow-floating),
-        0 0 20px var(--thinking-dim),
-        inset 0 1px 0 var(--accent-faint);
+        var(--shadow-elevated),
+        0 0 20px var(--thinking-dim);
 }
 
 /* Speaking — green glow */
 .fib--speaking {
     border-color: var(--speaking-border);
     box-shadow:
-        var(--shadow-floating),
-        0 0 20px var(--speaking-dim),
-        inset 0 1px 0 var(--speaking-border);
+        var(--shadow-elevated),
+        0 0 20px var(--speaking-dim);
 }
 
-/* Drag over — accent highlight */
+/* Drag over — accent highlight (mirrors ChatInput .ci--drag) */
 .fib--drag {
-    border-color: var(--accent-border);
-    box-shadow:
-        var(--shadow-floating),
-        0 0 28px var(--accent-glow),
-        inset 0 0 12px var(--accent-faint);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 /* ── Active state overlay ── */
@@ -874,35 +858,33 @@ defineExpose({
     opacity: 1;
 }
 
-/* Mode toggle — labeled chip */
+/* Mode toggle — labeled chip (mirrors ChatInput .ci__mode-toggle) */
 .fib__mode-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    height: 24px;
+    gap: 4px;
+    height: 26px;
     padding: 0 8px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--surface-2);
     color: var(--text-secondary);
-    font-size: 10px;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
     font-weight: var(--weight-medium);
-    letter-spacing: 0.03em;
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
     transition:
-        color 150ms ease,
-        border-color 150ms ease,
-        background 150ms ease,
-        box-shadow 150ms ease;
+        color var(--duration-fast) ease,
+        border-color var(--duration-fast) ease,
+        background var(--duration-fast) ease;
 }
 
 .fib__mode-toggle:hover {
     color: var(--text-primary);
     border-color: var(--border-hover);
     background: var(--surface-3);
-    box-shadow: 0 0 0 1px var(--white-subtle);
 }
 
 /* Divider */
@@ -933,33 +915,27 @@ defineExpose({
     gap: var(--space-1);
 }
 
-/* Attach button */
+/* Attach button (mirrors ChatInput .ci__attach) */
 .fib__attach {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-md);
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
     border: none;
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
     transition:
-        color 200ms var(--ease-smooth),
-        background 200ms var(--ease-smooth),
-        transform 200ms var(--ease-out-back);
+        color var(--duration-fast) ease,
+        background var(--duration-fast) ease;
 }
 
 .fib__attach:hover:not(:disabled) {
     background: var(--surface-hover);
-    color: var(--accent);
-    transform: scale(1.08) rotate(-8deg);
-}
-
-.fib__attach:active:not(:disabled) {
-    transform: scale(0.92);
+    color: var(--text-primary);
 }
 
 .fib__attach:disabled {
@@ -982,8 +958,8 @@ defineExpose({
     border: none;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: var(--text-sm);
-    line-height: var(--leading-normal);
+    font-size: var(--text-base);
+    line-height: var(--leading-relaxed);
     resize: none;
     outline: none !important;
     box-shadow: none !important;
@@ -992,7 +968,7 @@ defineExpose({
 
 .fib__textarea::placeholder {
     color: var(--text-muted);
-    letter-spacing: 0.02em;
+    opacity: 0.75;
 }
 
 .fib__textarea:disabled {
@@ -1007,72 +983,67 @@ defineExpose({
     gap: var(--space-2);
 }
 
+/* Send button — accent-filled (mirrors ChatInput .ci__send) */
 .fib__send {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--border);
+    border: none;
     background: var(--accent);
-    color: var(--surface-0);
+    color: var(--text-on-accent);
     cursor: pointer;
     transition:
-        background 200ms var(--ease-smooth),
-        color 200ms var(--ease-smooth),
-        opacity 200ms var(--ease-smooth),
-        box-shadow 200ms var(--ease-smooth),
-        transform 200ms var(--ease-out-back),
-        border-color 200ms var(--ease-smooth);
+        background var(--duration-fast) ease,
+        opacity var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease,
+        transform var(--duration-fast) ease;
 }
 
 .fib__send:hover:not(:disabled) {
     background: var(--accent-hover);
-    border-color: var(--accent);
-    transform: scale(1.06);
-    box-shadow: 0 0 16px var(--accent-glow);
+    box-shadow: 0 2px 8px var(--accent-glow);
+    transform: translateY(-1px);
 }
 
 .fib__send:active:not(:disabled) {
-    transform: scale(0.92);
+    transform: translateY(0);
 }
 
 .fib__send:disabled {
     opacity: var(--opacity-disabled);
     cursor: not-allowed;
-    background: var(--surface-3);
-    color: var(--text-muted);
-    border-color: var(--border);
 }
 
+/* Stop button — danger ring pulse (mirrors ChatInput .ci__stop) */
 .fib__stop {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--danger-border);
-    background: var(--surface-1);
+    border: 1px solid var(--danger-strong);
+    background: var(--surface-2);
     color: var(--danger);
     cursor: pointer;
-    transition:
-        background 200ms var(--ease-smooth),
-        transform 200ms var(--ease-out-back),
-        box-shadow 200ms var(--ease-smooth);
+    animation: stop-ring 1.5s ease-out infinite;
+    transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .fib__stop:hover {
-    background: var(--surface-hover);
-    transform: scale(1.06);
-    box-shadow: 0 0 12px var(--danger-glow);
+    background: var(--danger-light);
+    color: var(--danger);
 }
 
-.fib__stop:active {
-    transform: scale(0.92);
+@keyframes stop-ring {
+    0%   { box-shadow: 0 0 0 0 var(--danger-glow); }
+    70%  { box-shadow: 0 0 0 5px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 /* ── Thumbnails ── */
@@ -1227,6 +1198,10 @@ defineExpose({
 
     .fib--listening,
     .fib--thinking {
+        animation: none;
+    }
+
+    .fib__stop {
         animation: none;
     }
 

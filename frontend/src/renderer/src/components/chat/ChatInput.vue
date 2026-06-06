@@ -261,6 +261,7 @@ defineExpose({
 <template>
   <div class="ci" :class="{ 'ci--drag': isDragOver }" @dragenter="handleDragEnter" @dragover="handleDragOver"
     @dragleave="handleDragLeave" @drop="handleDrop">
+
     <!-- Thumbnail strip (only when files are pending) -->
     <div v-if="pendingFiles.length > 0" class="ci__thumbs">
       <div v-for="file in pendingFiles" :key="file.name + file.size + file.lastModified" class="ci__thumb">
@@ -271,123 +272,137 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Layer 1: Toolbar row -->
-    <div class="ci__toolbar">
-      <!-- Status cluster: connection dot + capability badges -->
-      <div class="ci__status">
-        <div class="ci__dot" :class="isConnected ? 'dot--ok' : 'dot--err'" />
+    <!-- Textarea: top of the field card, transparent & borderless -->
+    <!-- Hidden file input (no layout impact) -->
+    <input ref="fileInputRef" type="file" accept="image/*" multiple class="ci__file-input"
+      @change="handleFileSelect" />
+
+    <textarea ref="textareaRef" v-model="text" class="ci__textarea" placeholder="Scrivi un messaggio..." rows="1"
+      :disabled="disabled" aria-label="Scrivi un messaggio" @keydown="handleKeydown" @input="autoResize"
+      @paste="handlePaste" />
+
+    <!-- Bottom control row: left cluster + right cluster -->
+    <div class="ci__controls">
+
+      <!-- Left cluster: status dot + context ring, attach, model chips, agent/tools -->
+      <div class="ci__controls-left">
+        <!-- Connection dot -->
+        <div class="ci__dot" :class="isConnected ? 'dot--ok' : 'dot--err'"
+          :title="isConnected ? 'Connesso' : 'Non connesso'" />
+
+        <!-- Context ring -->
+        <ContextBar :context-info="chatStore.contextInfo" :is-compressing="chatStore.isCompressingContext" />
+
+        <!-- Divider -->
+        <div class="ci__divider" />
+
+        <!-- Attach button -->
+        <button class="ci__attach" :disabled="disabled || !supportsVision"
+          :aria-label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
+          :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
+          @click="openFilePicker">
+          <AppIcon name="paperclip" :size="15" />
+        </button>
+
+        <!-- Divider -->
+        <div class="ci__divider" />
+
+        <!-- Model selector chips -->
+        <div class="ci__selectors">
+          <ModelSelector model-type="embedding" />
+          <ModelSelector model-type="llm" />
+        </div>
+
+        <!-- Agent mode + tool selector pills -->
+        <ChatToolControls />
+
+        <!-- Workspace shortcut chip -->
+        <button class="ci__mode-toggle" @click="toggleMode">
+          <AppIcon name="hybrid-panel" :size="11" />
+          <span>Workspace</span>
+        </button>
+      </div>
+
+      <!-- Right cluster: mic + send/stop -->
+      <div class="ci__controls-right">
+        <!-- Capability badges (compact, only on wide layouts) -->
         <div v-if="settingsStore.activeModel" class="ci__badges">
           <span class="ci__badge" :class="{ 'ci__badge--on': supportsVision }" title="Vision">
-            <AppIcon name="eye" :size="16" />
+            <AppIcon name="eye" :size="12" />
           </span>
           <span class="ci__badge" :class="{ 'ci__badge--on': supportsThinking }" title="Thinking">
-            <AppIcon name="lightbulb-simple" :size="16" />
+            <AppIcon name="lightbulb-simple" :size="12" />
           </span>
           <span class="ci__badge" :class="{ 'ci__badge--on': supportsToolUse }" title="Tool Use">
-            <AppIcon name="tool" :size="16" />
+            <AppIcon name="tool" :size="12" />
           </span>
         </div>
-      </div>
 
-      <!-- Context usage bar (grows to fill available space) -->
-      <ContextBar :context-info="chatStore.contextInfo" :is-compressing="chatStore.isCompressingContext" />
-
-      <div class="ci__gap" />
-
-      <!-- Workspace shortcut chip (hybrid mode retired R3) -->
-      <button class="ci__mode-toggle" @click="toggleMode">
-        <AppIcon name="hybrid-panel" :size="11" />
-        <span>Workspace</span>
-      </button>
-
-      <!-- Divider -->
-      <div class="ci__divider" />
-
-      <!-- Agent mode + tool selector -->
-      <ChatToolControls />
-
-      <!-- Model selectors -->
-      <div class="ci__selectors">
-        <ModelSelector model-type="embedding" />
-        <ModelSelector model-type="llm" />
-      </div>
-    </div>
-
-    <!-- Layer 2: Input row (grows with textarea, border lights up on focus) -->
-    <div class="ci__body">
-      <!-- Attach (paperclip) button -->
-      <button class="ci__attach" :disabled="disabled || !supportsVision"
-        :aria-label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
-        :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'" @click="openFilePicker">
-        <AppIcon name="paperclip" :size="17" />
-      </button>
-
-      <!-- Hidden file input -->
-      <input ref="fileInputRef" type="file" accept="image/*" multiple class="ci__file-input"
-        @change="handleFileSelect" />
-
-      <!-- Auto-growing textarea -->
-      <textarea ref="textareaRef" v-model="text" class="ci__textarea" placeholder="Scrivi un messaggio..." rows="1"
-        :disabled="disabled" aria-label="Scrivi un messaggio" @keydown="handleKeydown" @input="autoResize"
-        @paste="handlePaste" />
-
-      <!-- Microphone button (toggle to talk) -->
-      <div class="ci__actions">
+        <!-- Microphone button -->
         <MicrophoneButton v-if="voiceStore.isReady" :available="voiceStore.sttAvailable"
           :connected="voiceStore.connected" :audio-devices="audioDevices ?? []"
           :selected-device-id="selectedDeviceId ?? ''" @start-recording="$emit('voice-start')"
           @stop-recording="$emit('voice-stop')" @cancel-processing="$emit('voice-cancel-processing')"
           @refresh-devices="$emit('refresh-devices')" @select-device="(id) => $emit('select-device', id)" />
 
-        <!-- Send / Stop toggle with transition -->
+        <!-- Send / Stop toggle -->
         <Transition name="btn-swap" mode="out-in">
           <button v-if="isStreaming" key="stop" class="ci__stop" aria-label="Interrompi generazione"
             @click="emit('stop')">
-            <AppIcon name="stop" :size="16" />
+            <AppIcon name="stop" :size="14" />
           </button>
-          <button v-else key="send" class="ci__send" :disabled="(!text.trim() && pendingFiles.length === 0) || disabled"
-            aria-label="Invia messaggio" @click="submit">
-            <AppIcon name="send" :size="16" />
+          <button v-else key="send" class="ci__send"
+            :disabled="(!text.trim() && pendingFiles.length === 0) || disabled" aria-label="Invia messaggio"
+            @click="submit">
+            <AppIcon name="send" :size="14" />
           </button>
         </Transition>
       </div>
+
     </div>
   </div>
 </template>
 
 <style scoped>
 /* ============================================================
-   Root container — Glass-morphism floating input
+   Root container — Claude-style single rounded field card
+   Blends onto the chat background; border lights on focus-within.
    ============================================================ */
 .ci {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  padding: var(--space-3) var(--space-4) var(--space-3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-3) var(--space-2);
   margin-inline: var(--space-4);
   box-shadow: var(--shadow-elevated);
   container-type: inline-size;
   container-name: chat-input;
-  transition: box-shadow var(--duration-normal) var(--ease-out-expo),
+  transition:
+    box-shadow var(--duration-normal) var(--ease-out-expo),
     border-color var(--duration-normal) var(--ease-out-expo);
 }
 
 .ci:focus-within {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-elevated), 0 0 0 1px var(--white-subtle);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-elevated), 0 0 0 1px var(--accent-border);
+}
+
+/* Drag-over: accent glow on the entire field */
+.ci--drag {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 /* ============================================================
-   Thumbnail strip — Polished thumbnails
+   Thumbnail strip
    ============================================================ */
 .ci__thumbs {
   display: flex;
   gap: var(--space-2);
   overflow-x: auto;
-  padding-bottom: var(--space-1);
+  padding-bottom: var(--space-2);
   scrollbar-width: none;
 }
 
@@ -398,8 +413,8 @@ defineExpose({
 .ci__thumb {
   position: relative;
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border-hover);
@@ -448,27 +463,79 @@ defineExpose({
 }
 
 /* ============================================================
-   Toolbar row
+   Hidden file input
    ============================================================ */
-.ci__toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: 32px;
+.ci__file-input {
+  display: none;
 }
 
-/* Status cluster (dot + badges) */
-.ci__status {
+/* ============================================================
+   Textarea — transparent & borderless, grows with content
+   ============================================================ */
+.ci__textarea {
+  width: 100%;
+  min-height: 28px;
+  max-height: 120px;
+  padding: 0 var(--space-1);
+  margin-bottom: var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  resize: none;
+  outline: none !important;
+  box-shadow: none !important;
+  letter-spacing: 0.01em;
+  display: block;
+}
+
+.ci__textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+.ci__textarea:disabled {
+  opacity: var(--opacity-muted);
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Bottom control row
+   ============================================================ */
+.ci__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 28px;
+}
+
+/* Left cluster: dot + context + attach + models + tools + workspace */
+.ci__controls-left {
   display: flex;
   align-items: center;
   gap: var(--space-1-5);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Right cluster: badges + mic + send/stop */
+.ci__controls-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 
-/* Connection status dot */
+/* ============================================================
+   Connection status dot
+   ============================================================ */
 .ci__dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--radius-full);
   flex-shrink: 0;
   transition: background var(--transition-normal);
@@ -476,68 +543,131 @@ defineExpose({
 
 .dot--ok {
   background: var(--success);
-  box-shadow: 0 0 6px var(--success-glow);
+  box-shadow: 0 0 5px var(--success-glow);
   animation: dot-pulse 3s ease-in-out infinite;
 }
 
 @keyframes dot-pulse {
-
-  0%,
-  100% {
-    box-shadow: 0 0 6px var(--success-glow);
-  }
-
-  50% {
-    box-shadow: 0 0 12px var(--success-glow), 0 0 4px var(--success);
-  }
+  0%, 100% { box-shadow: 0 0 5px var(--success-glow); }
+  50% { box-shadow: 0 0 10px var(--success-glow), 0 0 3px var(--success); }
 }
 
 .dot--err {
   background: var(--danger);
-  box-shadow: 0 0 6px var(--danger-glow);
+  box-shadow: 0 0 5px var(--danger-glow);
   animation: dot-blink 2s ease-in-out infinite;
 }
 
 @keyframes dot-blink {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.35;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
-/* Capability badges */
+/* ============================================================
+   Vertical divider
+   ============================================================ */
+.ci__divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* ============================================================
+   Attach button
+   ============================================================ */
+.ci__attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.ci__attach:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.ci__attach:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Model selector chips wrapper
+   ============================================================ */
+.ci__selectors {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Workspace shortcut chip
+   ============================================================ */
+.ci__mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+}
+
+.ci__mode-toggle:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-hover);
+  background: var(--surface-3);
+}
+
+/* ============================================================
+   Capability badges (right cluster, compact)
+   ============================================================ */
 .ci__badges {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 }
 
 .ci__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: var(--radius-sm);
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-muted);
-  opacity: 0.35;
+  opacity: 0.3;
   transition:
     color var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
     background var(--duration-fast) ease,
     opacity var(--duration-fast) ease;
-}
-
-.ci__badge svg {
-  width: 11px;
-  height: 11px;
 }
 
 .ci__badge--on {
@@ -547,235 +677,71 @@ defineExpose({
   opacity: 1;
 }
 
-/* Mode toggle — labeled chip */
-.ci__mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition:
-    color 150ms ease,
-    border-color 150ms ease,
-    background 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.ci__mode-toggle:hover {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-  background: var(--surface-3);
-  box-shadow: 0 0 0 1px var(--white-subtle);
-}
-
-/* Divider */
-.ci__divider {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  flex-shrink: 0;
-  opacity: 0.6;
-}
-
-/* Flex spacer */
-.ci__gap {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Selectors wrapper */
-.ci__selectors {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1-5);
-}
-
 /* ============================================================
-   Input body (Layer 2 — border container, grows with textarea)
+   Send button — accent-filled circle/rounded-square
    ============================================================ */
-.ci__body {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-inset);
-  padding: 4px var(--space-1-5);
-  transition:
-    border-color var(--duration-normal) var(--ease-out-expo),
-    box-shadow var(--duration-normal) var(--ease-out-expo),
-    background var(--duration-normal) var(--ease-out-expo);
-}
-
-.ci__body:focus-within {
-  border-color: var(--border);
-  background: var(--surface-0);
-  box-shadow: 0 0 0 1px var(--white-subtle);
-}
-
-/* Drag-over: subtle glow on the input border */
-.ci--drag .ci__body {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-
-/* Hidden file input */
-.ci__file-input {
-  display: none;
-}
-
-/* Attach button */
-.ci__attach {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
-}
-
-.ci__attach:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--accent);
-}
-
-.ci__attach:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
-}
-
-/* Textarea — Warmer, inviting feel */
-.ci__textarea {
-  flex: 1;
-  min-width: 0;
-  min-height: 36px;
-  max-height: 120px;
-  padding: 8px 6px;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-  resize: none;
-  outline: none !important;
-  box-shadow: none !important;
-  letter-spacing: 0.01em;
-}
-
-.ci__textarea::placeholder {
-  color: var(--text-muted);
-  opacity: 0.7;
-  letter-spacing: 0.02em;
-}
-
-.ci__textarea:disabled {
-  opacity: var(--opacity-muted);
-  cursor: not-allowed;
-}
-
-.ci__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-/* Send button — Neutral accent on hover */
 .ci__send {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: none;
   background: var(--accent);
-  color: var(--text-muted);
+  color: var(--text-on-accent);
   cursor: pointer;
   transition:
-    background 120ms ease,
-    color 120ms ease,
-    opacity 120ms ease,
-    box-shadow 120ms ease;
+    background var(--duration-fast) ease,
+    opacity var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 
 .ci__send:hover:not(:disabled) {
-  background: var(--surface-2);
-  color: var(--text-primary);
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px var(--accent-glow);
+  transform: translateY(-1px);
 }
 
-.ci__send:not(:disabled) {
-  animation: none;
+.ci__send:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .ci__send:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
-  animation: none;
 }
 
-@keyframes sendReady {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-
-  50% {
-    box-shadow: 0 0 8px var(--white-light);
-  }
-}
-
-/* Stop button (pulsing danger ring) */
+/* ============================================================
+   Stop button — danger ring pulse
+   ============================================================ */
 .ci__stop {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-md);
   border: 1px solid var(--danger-strong);
-  background: var(--accent);
+  background: var(--surface-2);
   color: var(--danger);
   cursor: pointer;
   animation: stop-ring 1.5s ease-out infinite;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .ci__stop:hover {
-  background: var(--surface-2);
+  background: var(--danger-light);
+  color: var(--danger);
 }
 
 @keyframes stop-ring {
-  0% {
-    box-shadow: 0 0 0 0 var(--danger-glow);
-  }
-
-  70% {
-    box-shadow: 0 0 0 6px transparent;
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
+  0%   { box-shadow: 0 0 0 0 var(--danger-glow); }
+  70%  { box-shadow: 0 0 0 5px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 /* ============================================================
@@ -783,76 +749,63 @@ defineExpose({
    ============================================================ */
 .btn-swap-enter-active,
 .btn-swap-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.12s ease, transform 0.12s ease;
 }
 
 .btn-swap-enter-from {
   opacity: 0;
-  transform: scale(0.8);
+  transform: scale(0.75);
 }
 
 .btn-swap-leave-to {
   opacity: 0;
-  transform: scale(0.8);
+  transform: scale(0.75);
 }
 
 /* ============================================================
    Reduced motion
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .ci {
-    transition: none;
-  }
-
-  .ci__send:not(:disabled) {
-    animation: none;
-  }
-
+  .ci,
+  .ci__send,
   .ci__thumb {
     transition: none;
+  }
+
+  .ci__stop {
+    animation: none;
   }
 }
 
 /* ============================================================
-   Responsive: compact layout for narrow containers (Hybrid left pane)
+   Responsive: narrow containers
    ============================================================ */
-@container chat-input (max-width: 380px) {
+@container chat-input (max-width: 420px) {
   .ci {
     padding: var(--space-2) var(--space-2) var(--space-2);
     margin-inline: var(--space-2);
-  }
-
-  .ci__toolbar {
-    gap: var(--space-1);
-  }
-
-  .ci__badges {
-    display: none;
   }
 
   .ci__selectors {
     display: none;
   }
 
+  .ci__mode-toggle {
+    display: none;
+  }
+
+  .ci__badges {
+    display: none;
+  }
+
   .ci__divider {
     display: none;
   }
-
-  .ci__mode-toggle span {
-    display: none;
-  }
-
-  .ci__mode-toggle {
-    padding: 0 6px;
-    width: 24px;
-    height: 24px;
-    justify-content: center;
-  }
 }
 
-@container chat-input (max-width: 280px) {
-  .ci__mode-toggle {
-    display: none;
+@container chat-input (max-width: 300px) {
+  .ci__controls-left {
+    gap: var(--space-1);
   }
 }
 </style>

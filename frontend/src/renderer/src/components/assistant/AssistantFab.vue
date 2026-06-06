@@ -128,10 +128,8 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
     width: 42px;
     height: 42px;
     border-radius: var(--radius-full);
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border);
+    background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;
     display: flex;
@@ -207,11 +205,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-1-5) var(--space-3) var(--space-1-5) var(--space-2-5);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--border);
     border-radius: var(--radius-pill);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur-heavy));
-    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+    background: var(--surface-2);
     color: var(--text-secondary);
     font-size: var(--text-xs);
     white-space: nowrap;
@@ -228,7 +224,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
     background: var(--surface-3);
     border-color: var(--accent-border);
     color: var(--text-primary);
-    box-shadow: 0 0 16px var(--accent-glow);
+    box-shadow: var(--shadow-md);
 }
 
 .fab__action-icon {

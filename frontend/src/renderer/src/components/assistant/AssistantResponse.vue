@@ -215,7 +215,7 @@ onMounted(() => {
     height: 28px;
     background: linear-gradient(to bottom,
             transparent,
-            var(--accent-glow, var(--accent)));
+            var(--accent-glow));
     opacity: 0.25;
     transition:
         height 500ms var(--ease-smooth),
@@ -254,7 +254,7 @@ onMounted(() => {
     border-radius: var(--radius-full);
     background: var(--accent);
     opacity: 0.6;
-    box-shadow: 0 0 10px var(--accent-glow, var(--accent));
+    box-shadow: 0 0 10px var(--accent-glow);
     transition:
         opacity 300ms var(--ease-smooth),
         box-shadow 300ms var(--ease-smooth),
@@ -267,8 +267,8 @@ onMounted(() => {
     width: 8px;
     height: 8px;
     opacity: 1;
-    box-shadow: 0 0 20px var(--accent-glow, var(--accent)),
-        0 0 40px rgba(140, 180, 160, 0.15);
+    box-shadow: 0 0 20px var(--accent-glow),
+        0 0 40px var(--accent-glow);
     animation: dot-pulse 2s ease-in-out infinite;
 }
 
@@ -278,7 +278,7 @@ onMounted(() => {
     opacity: 0.9;
     background: var(--thinking);
     box-shadow: 0 0 16px var(--thinking),
-        0 0 32px rgba(155, 140, 210, 0.15);
+        0 0 32px var(--thinking-dim);
     animation: dot-pulse 1.5s ease-in-out infinite;
 }
 
@@ -286,7 +286,7 @@ onMounted(() => {
     width: 7px;
     height: 7px;
     opacity: 0.9;
-    box-shadow: 0 0 18px var(--accent-glow, var(--accent));
+    box-shadow: 0 0 18px var(--accent-glow);
     animation: dot-pulse 2.2s ease-in-out infinite;
 }
 
@@ -440,20 +440,20 @@ onMounted(() => {
 .alice-voice--generating .response-body {
     opacity: 0.92;
     background: radial-gradient(ellipse at center top,
-            rgba(140, 180, 160, 0.04) 0%,
+            color-mix(in srgb, var(--accent) 4%, transparent) 0%,
             transparent 70%);
 }
 
 .alice-voice--thinking .response-body {
     background: radial-gradient(ellipse at center top,
-            rgba(155, 140, 210, 0.04) 0%,
+            color-mix(in srgb, var(--thinking) 4%, transparent) 0%,
             transparent 70%);
 }
 
 .alice-voice--speaking .response-body {
     opacity: 1;
     background: radial-gradient(ellipse at center top,
-            rgba(92, 170, 120, 0.03) 0%,
+            color-mix(in srgb, var(--speaking) 3%, transparent) 0%,
             transparent 70%);
 }
 
@@ -578,7 +578,7 @@ onMounted(() => {
 .tool-activity {
     margin-top: var(--space-3);
     padding-top: var(--space-3);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--border);
     text-align: left;
 }
 

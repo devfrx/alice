@@ -142,8 +142,6 @@ function truncateContent(content: string, maxLen = 200): string {
     bottom: 0;
     z-index: 900;
     background: var(--black-medium);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
 }
 
 .drawer-backdrop-enter-active {
@@ -171,8 +169,8 @@ function truncateContent(content: string, maxLen = 200): string {
     flex-direction: column;
     overflow: hidden;
     background: var(--surface-1);
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-floating);
 }
 
@@ -281,7 +279,7 @@ function truncateContent(content: string, maxLen = 200): string {
 }
 
 .drawer__msg--assistant {
-    border-left: 2px solid var(--speaking, #2dd4bf);
+    border-left: 2px solid var(--speaking);
 }
 
 .drawer__msg--tool {
@@ -290,7 +288,7 @@ function truncateContent(content: string, maxLen = 200): string {
 }
 
 .drawer__msg--system {
-    border-left: 2px solid var(--thinking, #60a5fa);
+    border-left: 2px solid var(--info);
     opacity: 0.6;
 }
 

@@ -59,10 +59,8 @@ function endPreview(): void {
     padding: 4px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+    background: var(--surface-2);
     box-shadow: var(--shadow-xs);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .state-preview-controls--horizontal {

@@ -72,17 +72,15 @@ const showStatus = computed(() => props.state !== 'idle')
     pointer-events: none;
 }
 
-/* ── Primary status capsule — glass ── */
+/* ── Primary status capsule ── */
 .status-capsule {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1-5);
     padding: 6px var(--space-3) 6px var(--space-2-5);
-    background: var(--glass-bg-light);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
     font-size: var(--text-2xs);
     font-weight: var(--weight-medium);
     color: var(--text-secondary);
@@ -138,7 +136,7 @@ const showStatus = computed(() => props.state !== 'idle')
     letter-spacing: 0.03em;
 }
 
-/* ── Tool execution capsules — glass ── */
+/* ── Tool execution capsules ── */
 .status-tools {
     display: flex;
     flex-direction: column;
@@ -151,11 +149,9 @@ const showStatus = computed(() => props.state !== 'idle')
     align-items: center;
     gap: var(--space-1-5);
     padding: 4px var(--space-2-5) 4px var(--space-2);
-    background: var(--glass-bg-light);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
     font-size: var(--text-2xs);
     color: var(--accent);
     pointer-events: auto;
@@ -166,7 +162,7 @@ const showStatus = computed(() => props.state !== 'idle')
 }
 
 .tool-capsule:hover {
-    border-color: var(--glass-border-hover);
+    border-color: var(--border-hover);
 }
 
 .tool-capsule__icon {

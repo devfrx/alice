@@ -802,15 +802,13 @@ onMounted(() => {
     height: calc(100% - 24px);
     margin: 12px 12px 12px 0;
     z-index: var(--z-raised);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur-heavy));
-    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow: var(--shadow-floating);
 }
 
 /* Prevent text selection while dragging the panel edge */
@@ -1097,7 +1095,7 @@ onMounted(() => {
     align-items: center;
     gap: 2px;
     padding: 6px 8px;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--border);
     background: transparent;
     border-radius: 16px 16px 0 0;
 }
@@ -1159,7 +1157,7 @@ onMounted(() => {
 
 .side-panel__close:hover {
     background: var(--danger);
-    color: white;
+    color: var(--text-primary);
 }
 
 /* ── Side panel CAD loading overlay ── */
@@ -1208,7 +1206,7 @@ onMounted(() => {
 
 .side-panel__chart-close:hover {
     background: var(--danger);
-    color: white;
+    color: var(--text-primary);
 }
 
 .side-panel__chart-nav {
@@ -1217,7 +1215,7 @@ onMounted(() => {
     justify-content: center;
     gap: 8px;
     padding: 6px 8px;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--border);
     background: transparent;
 }
 
@@ -1282,7 +1280,7 @@ onMounted(() => {
 
 .side-panel__wb-close:hover {
     background: var(--danger);
-    color: white;
+    color: var(--text-primary);
 }
 
 .side-panel__wb-nav {
@@ -1291,7 +1289,7 @@ onMounted(() => {
     justify-content: center;
     gap: 8px;
     padding: 6px 8px;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--border);
     background: transparent;
 }
 
@@ -1339,7 +1337,7 @@ onMounted(() => {
     flex-shrink: 0;
 }
 
-/* Stop / interrupt pill below the orb — glass */
+/* Stop / interrupt pill below the orb */
 .assistant-view__stop-hint {
     position: absolute;
     bottom: -40px;
@@ -1350,10 +1348,8 @@ onMounted(() => {
     gap: 6px;
     padding: 6px 16px;
     border: 1px solid var(--danger-border);
-    border-radius: 20px;
-    background: var(--glass-bg-light);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
     color: var(--danger);
     font-size: var(--text-2xs);
     font-weight: 500;

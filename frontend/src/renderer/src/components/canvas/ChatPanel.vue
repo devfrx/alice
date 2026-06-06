@@ -9,8 +9,9 @@
  * data flows through the store/injection, this panel is fully functional
  * anywhere it is mounted under App (anchored column OR a tiling leaf).
  *
- * A compact header exposes a single toggle that anchors the chat or converts
- * it into a tile via the workspace store.
+ * A compact header exposes the conversation title and the ModuleLauncher
+ * (layout/module shortcut). The header is width-constrained to the same
+ * reading column as the thread so title and launcher are flush with messages.
  */
 import { computed, inject, nextTick, ref, watch } from 'vue'
 import MessageBubble from '../chat/MessageBubble.vue'
@@ -19,12 +20,10 @@ import ChatInput from '../chat/ChatInput.vue'
 import ToolConfirmationDialog from '../chat/ToolConfirmationDialog.vue'
 import MessageEditDialog from '../chat/MessageEditDialog.vue'
 import AppIcon from '../ui/AppIcon.vue'
-import UiIconButton from '../ui/UiIconButton.vue'
 import ModuleLauncher from './ModuleLauncher.vue'
 import { ChatApiKey } from '../../composables/useChat'
 import { useVoice } from '../../composables/useVoice'
 import { useChatStore } from '../../stores/chat'
-import { useWorkspaceStore } from '../../stores/workspace'
 
 const props = defineProps<{
   /** Optional conversation hint — reserved for future per-tile conversations. */
@@ -38,7 +37,6 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
-const workspaceStore = useWorkspaceStore()
 const chatApi = inject(ChatApiKey, null)
 
 // Graceful no-ops if the injection is unavailable (keeps the panel renderable
@@ -124,30 +122,16 @@ const conversationTitle = computed<string>(() => {
   const title = chatStore.currentConversation?.title?.trim()
   return title || 'Nuova chat'
 })
-
-// ── Anchor / tile toggle ─────────────────────────────────────────────────────
-const isAnchored = computed<boolean>(() => workspaceStore.chatMode === 'anchored')
-
-function toggleAnchor(): void {
-  if (isAnchored.value) workspaceStore.tileChat()
-  else workspaceStore.anchorChat()
-}
 </script>
 
 <template>
   <div class="chat-panel">
     <header v-if="!embedded" class="chat-panel__header">
-      <span class="chat-panel__title" :title="conversationTitle">{{ conversationTitle }}</span>
-      <div class="chat-panel__actions">
-        <ModuleLauncher :conversation-id="props.conversationId ?? null" />
-        <UiIconButton
-          :label="isAnchored ? 'Apri come pannello' : 'Ancora chat'"
-          size="xs"
-          variant="ghost"
-          @click="toggleAnchor"
-        >
-          <AppIcon :name="isAnchored ? 'external-link' : 'pin'" :size="13" />
-        </UiIconButton>
+      <div class="chat-panel__header-inner">
+        <span class="chat-panel__title" :title="conversationTitle">{{ conversationTitle }}</span>
+        <div class="chat-panel__actions">
+          <ModuleLauncher :conversation-id="props.conversationId ?? null" />
+        </div>
       </div>
     </header>
 
@@ -242,16 +226,24 @@ function toggleAnchor(): void {
   overflow: hidden;
 }
 
-/* Slim blended header — no card chrome, just a hairline under it. */
+/* Slim blended header — full-width hairline, inner content column-centered. */
 .chat-panel__header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+
+/* Inner row is constrained to the same column width as the thread so the
+   title sits flush with the left edge of messages. */
+.chat-panel__header-inner {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   height: var(--panel-header-height, 36px);
-  flex-shrink: 0;
+  max-width: min(100%, 820px);
+  width: 100%;
+  margin: 0 auto;
   padding: 0 var(--space-2) 0 var(--space-3);
-  border-bottom: 1px solid var(--border);
-  background: transparent;
 }
 
 .chat-panel__title {
@@ -284,7 +276,7 @@ function toggleAnchor(): void {
    assistant text to a comfortable reading measure. User bubbles stay
    right-aligned within this column via MessageBubble's row--user rule. */
 .chat-panel__thread {
-  max-width: var(--content-width-reading, 65ch);
+  max-width: min(100%, 820px);
   width: 100%;
   margin: 0 auto;
 }

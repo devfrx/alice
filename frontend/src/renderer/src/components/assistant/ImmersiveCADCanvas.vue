@@ -459,13 +459,13 @@ onUnmounted(() => {
 }
 
 .side-cad__retry-btn {
-  margin-top: 8px;
-  padding: 4px 14px;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-4);
   font-size: var(--text-xs);
   color: var(--text-primary);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -479,7 +479,7 @@ onUnmounted(() => {
   height: 24px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: side-cad-spin 0.8s linear infinite;
 }
 

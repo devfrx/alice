@@ -14,43 +14,18 @@
  *     disabled or when Tool RAG is active (auto-selection), since
  *     manual choice would have no effect in those cases.
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import AppIcon from '../ui/AppIcon.vue'
+import UiPopover from '../ui/UiPopover.vue'
 
 const settingsStore = useSettingsStore()
 
 const isOpen = ref(false)
-const rootRef = ref<HTMLElement | null>(null)
 /** Trigger chip ("Strumenti") — anchor for the teleported popover. */
 const triggerRef = ref<HTMLElement | null>(null)
-/** The teleported popover element (for outside-click detection). */
-const popRef = ref<HTMLElement | null>(null)
-/** Inline fixed-position style for the teleported popover. */
-const popStyle = ref<Record<string, string>>({})
 /** Plugin names whose tool list is expanded in the popover. */
 const expanded = ref<Set<string>>(new Set())
-
-/** Fixed width of the popover (keep in sync with CSS). */
-const POP_WIDTH = 320
-
-/** Recompute the popover's fixed position anchored above the trigger chip. */
-function updatePopPosition(): void {
-  const trigger = triggerRef.value
-  if (!trigger) return
-  const rect = trigger.getBoundingClientRect()
-  let left = rect.left
-  // Clamp so the popover never overflows the viewport right edge.
-  if (left + POP_WIDTH > window.innerWidth - 8) {
-    left = window.innerWidth - 8 - POP_WIDTH
-  }
-  if (left < 8) left = 8
-  popStyle.value = {
-    position: 'fixed',
-    left: `${left}px`,
-    bottom: `${window.innerHeight - rect.top + 8}px`,
-  }
-}
 
 /** Whether the agent loop is currently active (global config). */
 const agentEnabled = computed(() => settingsStore.settings.agent.enabled)
@@ -78,20 +53,6 @@ function toggleOpen(): void {
   isOpen.value = !isOpen.value
 }
 
-// Manage reposition listeners from the open-state itself so EVERY close path
-// (toggle, Escape, outside-click) tears them down symmetrically — not just the
-// toggle button.
-watch(isOpen, (open) => {
-  if (open) {
-    nextTick(updatePopPosition)
-    window.addEventListener('scroll', updatePopPosition, true)
-    window.addEventListener('resize', updatePopPosition)
-  } else {
-    window.removeEventListener('scroll', updatePopPosition, true)
-    window.removeEventListener('resize', updatePopPosition)
-  }
-})
-
 function toggleExpand(plugin: string): void {
   const next = new Set(expanded.value)
   if (next.has(plugin)) next.delete(plugin)
@@ -105,38 +66,10 @@ function isPluginEnabled(plugin: string): boolean {
   if (!group) return true
   return group.tools.every((t) => settingsStore.isToolEnabled(t.name))
 }
-
-function handleClickOutside(event: MouseEvent): void {
-  if (!isOpen.value) return
-  const target = event.target as Node
-  // The popover is teleported outside rootRef, so treat clicks inside it
-  // (or inside the trigger root) as "inside".
-  const insideRoot = rootRef.value?.contains(target) ?? false
-  const insidePop = popRef.value?.contains(target) ?? false
-  if (!insideRoot && !insidePop) {
-    isOpen.value = false
-  }
-}
-
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') isOpen.value = false
-}
-
-onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside)
-  document.addEventListener('keydown', handleKeydown)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-  document.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('scroll', updatePopPosition, true)
-  window.removeEventListener('resize', updatePopPosition)
-})
 </script>
 
 <template>
-  <div ref="rootRef" class="ctc">
+  <div class="ctc">
     <!-- Agent loop chip (drives global config) -->
     <button class="ctc__chip" :class="{ 'ctc__chip--on': agentEnabled }" role="switch"
       :aria-checked="agentEnabled" title="Attiva/disattiva la modalità agente (loop)" @click="toggleAgent">
@@ -154,11 +87,10 @@ onBeforeUnmount(() => {
       <span v-if="available && disabledCount > 0" class="ctc__badge">-{{ disabledCount }}</span>
     </button>
 
-    <!-- Popover — teleported to body to escape the input bar's overflow:hidden -->
-    <Teleport to="body">
-      <Transition name="ctc-pop">
-        <div v-if="isOpen" ref="popRef" class="ctc__pop" :style="popStyle">
-        <div class="ctc__pop-head">
+    <!-- Popover — opens upward from the input bar, chrome from UiPopover -->
+    <UiPopover :open="isOpen" :anchor-el="triggerRef" placement="top" align="start" width="320px"
+      aria-label="Strumenti attivi" panel-class="ctc__pop" @update:open="isOpen = $event">
+      <div class="ctc__pop-head">
           <span class="ctc__pop-title">Strumenti attivi</span>
           <button v-if="disabledCount > 0" class="ctc__reset" @click="settingsStore.resetToolSelection()">
             Ripristina tutti
@@ -200,9 +132,7 @@ onBeforeUnmount(() => {
             </ul>
           </li>
         </ul>
-        </div>
-      </Transition>
-    </Teleport>
+    </UiPopover>
   </div>
 </template>
 
@@ -244,13 +174,13 @@ onBeforeUnmount(() => {
 
 /* Active agent state — accent tint */
 .ctc__chip--on {
-  background: var(--accent-soft);
+  background: var(--accent-dim);
   border-color: var(--accent-border);
   color: var(--accent);
 }
 
 .ctc__chip--on:hover:not(:disabled) {
-  background: var(--accent-soft);
+  background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -281,20 +211,13 @@ onBeforeUnmount(() => {
 
 </style>
 
-<!-- Popover styles are NOT scoped (teleported outside component DOM) -->
+<!-- Popover content styles are NOT scoped (slot is teleported with UiPopover) -->
 <style>
-/* ── Popover ── */
+/* ── Popover content ── chrome (surface/border/radius/shadow/width) comes
+   from UiPopover; only scroll constraints are owned here. */
 .ctc__pop {
-  /* position is set inline (fixed) via popStyle */
-  width: 320px;
   max-height: 360px;
   overflow-y: auto;
-  padding: var(--space-2);
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  box-shadow: var(--shadow-floating);
-  z-index: var(--z-dropdown, 1000);
 }
 
 .ctc__pop-head {
@@ -435,17 +358,5 @@ onBeforeUnmount(() => {
 
 .ctc__pop .ctc__sw--on .ctc__sw-thumb {
   transform: translateX(14px);
-}
-
-/* ── Popover transition ── */
-.ctc-pop-enter-active,
-.ctc-pop-leave-active {
-  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
-}
-
-.ctc-pop-enter-from,
-.ctc-pop-leave-to {
-  opacity: 0;
-  transform: translateY(6px);
 }
 </style>

@@ -200,7 +200,6 @@
   --z-dropdown: 100;                           /* Dropdown menus */
   --z-overlay: 1000;                           /* Dialog overlays */
   --z-modal: 9999;                             /* Modal / confirm overlays */
-  --z-popover: 10001;                          /* Transient popovers/menus/selects — above modals */
 }
 
 /* ── Opacity Levels ────────────────────────────────────────── */
@@ -704,7 +703,7 @@ h1, h2, h3, h4, h5, h6, .u-display {
 :root {
   /* Canonical layer stack. Order matters; higher = closer to viewer. */
   --z-below: -1;                                /* Behind normal flow */
-  --z-popover: 200;                             /* Context menus, select popovers */
+  --z-popover: 10001;                           /* Transient popovers/menus/selects — above modals (a select can open inside a dialog) */
   --z-tooltip: 1100;                            /* Above overlays, below modals */
   --z-toast: 10000;                             /* Above modals, notifications */
   --z-max: 2147483647;                          /* Absolute top — OS-level overlays */

@@ -7,11 +7,12 @@
  * bar area. On click, opens a dropdown listing models with size, capability
  * badges, load status, and metadata.
  */
-import { computed, onBeforeUnmount, onMounted, ref, nextTick, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiPopover from '../ui/UiPopover.vue'
 
 const props = withDefaults(defineProps<{
   /** Which model type to show: 'llm' (default) or 'embedding'. */
@@ -22,15 +23,8 @@ const settingsStore = useSettingsStore()
 
 const isOpen = ref(false)
 const errorMessage = ref<string | null>(null)
-const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLElement | null>(null)
-const dropdownRef = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
-/** Inline fixed-position style for the teleported dropdown. */
-const dropdownStyle = ref<Record<string, string>>({})
-
-/** Minimum dropdown width (keep in sync with CSS). */
-const DROPDOWN_MIN_WIDTH = 340
 
 /** All models for this selector's type. */
 const typeModels = computed(() =>
@@ -68,45 +62,6 @@ const triggerLabel = computed(() => {
   if (props.modelType === 'embedding') return 'Nessun embedding'
   return settingsStore.settings.llm.model
 })
-
-function adjustDropdownPosition(): void {
-  nextTick(() => {
-    const trigger = triggerRef.value
-    if (!trigger) return
-    const rect = trigger.getBoundingClientRect()
-    // Effective width: prefer the rendered dropdown width, else the minimum.
-    const maxWidth = Math.min(440, window.innerWidth - 32)
-    const width = Math.max(
-      DROPDOWN_MIN_WIDTH,
-      Math.min(maxWidth, dropdownRef.value?.getBoundingClientRect().width || DROPDOWN_MIN_WIDTH)
-    )
-    let left = rect.left
-    // Clamp so the dropdown never overflows the viewport right edge.
-    if (left + width > window.innerWidth - 8) {
-      left = window.innerWidth - 8 - width
-    }
-    if (left < 8) left = 8
-    dropdownStyle.value = {
-      position: 'fixed',
-      left: `${left}px`,
-      bottom: `${window.innerHeight - rect.top + 8}px`,
-    }
-  })
-}
-
-function handleScroll(): void {
-  if (isOpen.value) adjustDropdownPosition()
-}
-
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    isOpen.value = false
-  }
-}
-
-function handleResize(): void {
-  if (isOpen.value) adjustDropdownPosition()
-}
 
 function formatSize(bytes: number): string {
   const gb = bytes / 1_073_741_824
@@ -153,50 +108,18 @@ function isModelBusy(model: LMStudioModel): boolean {
   return false
 }
 
-function handleClickOutside(event: MouseEvent): void {
-  if (!isOpen.value) return
-  const target = event.target as Node
-  // The dropdown is teleported outside rootRef, so treat clicks inside it
-  // (or inside the trigger root) as "inside".
-  const insideRoot = rootRef.value?.contains(target) ?? false
-  const insideDropdown = dropdownRef.value?.contains(target) ?? false
-  if (!insideRoot && !insideDropdown) {
-    isOpen.value = false
-  }
-}
-
-watch(isOpen, (val) => {
-  if (val) {
-    adjustDropdownPosition()
-    document.addEventListener('keydown', handleKeydown)
-    window.addEventListener('scroll', handleScroll, true)
-  } else {
-    document.removeEventListener('keydown', handleKeydown)
-    window.removeEventListener('scroll', handleScroll, true)
-  }
-})
-
 onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside)
-  window.addEventListener('resize', handleResize)
   settingsStore.loadModels()
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-  window.removeEventListener('resize', handleResize)
-  window.removeEventListener('scroll', handleScroll, true)
-  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
 <template>
-  <div ref="rootRef" class="ms">
+  <div class="ms">
     <!-- Trigger button -->
     <button ref="triggerRef" class="ms__trigger" :class="{
       'ms__trigger--embedding': props.modelType === 'embedding',
       'ms__trigger--open': isOpen
-    }" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle" @keydown="handleKeydown">
+    }" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle">
       <!-- Type icon -->
       <AppIcon v-if="props.modelType === 'embedding'" class="ms__type-icon" name="embedding" :size="11"
         title="Embedding model" />
@@ -209,10 +132,16 @@ onBeforeUnmount(() => {
         :stroke-width="2.5" />
     </button>
 
-    <!-- Dropdown — teleported to body to escape the input bar's overflow:hidden -->
-    <Teleport to="body">
-      <Transition name="ms-drop">
-        <div v-if="isOpen" ref="dropdownRef" class="ms__dropdown" role="group" :style="dropdownStyle">
+    <!-- Dropdown — UiPopover owns teleport/positioning/outside-click/Escape.
+         Opens upward (placement="top") since the selector lives in the bottom bar. -->
+    <UiPopover
+      :open="isOpen"
+      :anchor-el="triggerRef"
+      placement="top"
+      aria-label="Selettore modello"
+      @update:open="isOpen = $event"
+    >
+      <div class="ms__dropdown" role="group">
         <!-- Search (only when many models) -->
         <div v-if="showSearch" class="ms__search">
           <AppIcon class="ms__search-icon" name="search" :size="12" />
@@ -346,9 +275,8 @@ onBeforeUnmount(() => {
             </template>
           </template>
         </div>
-        </div>
-      </Transition>
-    </Teleport>
+      </div>
+    </UiPopover>
   </div>
 </template>
 
@@ -447,21 +375,16 @@ onBeforeUnmount(() => {
 }
 </style>
 
-<!-- Dropdown styles are NOT scoped (teleported outside component DOM) -->
+<!-- Dropdown content lives inside UiPopover's teleported slot, so these
+     rules are NOT scoped. Panel chrome (surface/border/radius/shadow/position/
+     z-index/transition) is owned by UiPopover — only content layout lives here. -->
 <style>
-/* ── Dropdown ─────────────────────────────────────────────────── */
+/* ── Dropdown content (chrome comes from UiPopover) ───────────── */
 .ms__dropdown {
-  /* position is set inline (fixed) via dropdownStyle */
   min-width: 340px;
   max-width: min(440px, calc(100vw - 32px));
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-floating);
-  z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* ── Search ───────────────────────────────────────────────────── */
@@ -515,20 +438,6 @@ onBeforeUnmount(() => {
 
 .ms__list::-webkit-scrollbar-thumb:hover {
   background: var(--accent-medium);
-}
-
-/* ── Dropdown transition ──────────────────────────────────────── */
-.ms-drop-enter-active,
-.ms-drop-leave-active {
-  transition:
-    opacity 200ms var(--ease-smooth),
-    transform 200ms var(--ease-smooth);
-}
-
-.ms-drop-enter-from,
-.ms-drop-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.97);
 }
 
 /* ── Error ────────────────────────────────────────────────────── */
@@ -642,7 +551,7 @@ onBeforeUnmount(() => {
 }
 
 .ms__item:hover {
-  background: var(--white-subtle);
+  background: var(--surface-hover);
 }
 
 .ms__item--loaded {

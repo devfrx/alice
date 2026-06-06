@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * UiContextMenu — Floating glassmorphism context menu.
+ * UiContextMenu — Floating context menu (unified solid-surface recipe).
  *
  * Features:
  *  - Auto-reposition so the menu never overflows the viewport.
@@ -134,14 +134,13 @@ onUnmounted(() => {
     z-index: var(--z-dropdown);
     min-width: 180px;
     padding: var(--space-1) 0;
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-dropdown);
     user-select: none;
     outline: none;
+    /* NO glass / NO backdrop-filter — solid surface only (unified recipe). */
 }
 
 .ctx-menu:focus-visible {

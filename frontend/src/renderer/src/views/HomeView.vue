@@ -449,8 +449,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   filter: grayscale(42%) contrast(1.05) brightness(0.88);
   mix-blend-mode: luminosity;
   opacity: 0.86;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 80%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 18%, black 80%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, black 18%, black 80%, transparent 100%);
 }
 
 .home-view__ledger {

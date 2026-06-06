@@ -763,7 +763,6 @@ function fmtMs(v: number | null): string {
     align-items: center;
     justify-content: space-between;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--border);
 }
 
 .net-probe__title {
@@ -961,8 +960,7 @@ function fmtMs(v: number | null): string {
 .net-probe__card {
     padding: 10px;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
+    background: var(--surface-2);
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -972,7 +970,7 @@ function fmtMs(v: number | null): string {
     margin-top: 4px;
     padding: 8px;
     border-radius: 4px;
-    background: var(--surface-2);
+    background: var(--surface-3);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1000,7 +998,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__mono {
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
 }
 
@@ -1043,7 +1041,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__port-num {
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
     min-width: 44px;
 }
@@ -1062,10 +1060,10 @@ function fmtMs(v: number | null): string {
 
 .net-probe__closed-port {
     font-size: 11px;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     color: var(--text-muted);
     padding: 1px 5px;
-    background: var(--surface-2);
+    background: var(--surface-3);
     border-radius: 3px;
 }
 
@@ -1074,14 +1072,14 @@ function fmtMs(v: number | null): string {
 .net-probe__conn-proto {
     font-size: 11px;
     font-weight: 600;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
 }
 
 .net-probe__conn-status {
     font-size: 10px;
     color: var(--text-secondary);
     padding: 1px 6px;
-    background: var(--surface-2);
+    background: var(--surface-3);
     border-radius: 3px;
     margin-left: auto;
 }

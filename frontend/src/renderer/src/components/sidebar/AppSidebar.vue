@@ -97,9 +97,7 @@ async function onSelect(id: string): Promise<void> {
   // 'workspace' and 'assistant' are the active chat surfaces; navigate there if not already on one.
   if (current !== 'assistant' && current !== 'workspace') {
     try {
-      // If mode is still stored as 'hybrid' (legacy), fall back to workspace.
-      const target = uiStore.mode === 'hybrid' ? 'workspace' : uiStore.mode
-      await router.push({ name: target })
+      await router.push({ name: uiStore.mode })
     } catch (err) {
       console.error('[AppSidebar] Navigation failed, falling back to home:', err)
       await router.replace({ name: 'home' }).catch(() => { })
@@ -112,8 +110,7 @@ async function onCreate(): Promise<void> {
   await chatStore.createConversation()
   const current = router.currentRoute.value.name as string
   if (current !== 'assistant' && current !== 'workspace') {
-    const target = uiStore.mode === 'hybrid' ? 'workspace' : uiStore.mode
-    await router.push({ name: target })
+    await router.push({ name: uiStore.mode })
   }
 }
 

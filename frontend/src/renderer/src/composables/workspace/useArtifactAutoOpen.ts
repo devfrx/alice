@@ -15,7 +15,7 @@
  *
  * @param conversationIdRef - Reactive ref/getter for the active conversation id.
  *   Used to scope chart/whiteboard detection to the current conversation's
- *   messages (same scoping as HybridView).
+ *   messages.
  */
 
 import { watch, type Ref } from 'vue'
@@ -47,7 +47,7 @@ export function diffNewIds(seen: Set<string>, current: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Payload extraction helpers (mirror HybridView logic exactly)
+// Payload extraction helpers
 // ---------------------------------------------------------------------------
 
 function extractChartIds(messages: ChatMessage[]): Map<string, ChartPayload> {

@@ -1,7 +1,7 @@
 /**
  * Composable that wires the WebSocket connection to the Pinia chat store.
  *
- * Usage (typically in a top-level layout or HybridView):
+ * Usage (typically in a top-level layout or a chat view):
  *
  * ```vue
  * <script setup lang="ts">

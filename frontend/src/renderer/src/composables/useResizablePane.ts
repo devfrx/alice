@@ -2,8 +2,8 @@
  * useResizablePane — drag-to-resize composable for AL\CE panels.
  *
  * Encapsulates the mousedown / mousemove / mouseup listener lifecycle that
- * was previously duplicated in HybridView (left pane, normal delta) and
- * AssistantView (side panel, inverted delta).  The composable is intentionally
+ * was previously duplicated across resizable panes (e.g. AssistantView's side
+ * panel, inverted delta).  The composable is intentionally
  * px-based and DOM-element-agnostic; callers convert px ↔ ratios if needed.
  *
  * @example

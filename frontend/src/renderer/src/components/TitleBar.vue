@@ -333,7 +333,6 @@ onUnmounted(() => {
     height: var(--titlebar-height, 38px);
     min-height: var(--titlebar-height, 38px);
     background: transparent;
-    border-bottom: 1px solid var(--border);
     backdrop-filter: blur(var(--glass-blur));
     z-index: var(--z-sticky);
     user-select: none;

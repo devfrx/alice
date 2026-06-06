@@ -200,6 +200,7 @@
   --z-dropdown: 100;                           /* Dropdown menus */
   --z-overlay: 1000;                           /* Dialog overlays */
   --z-modal: 9999;                             /* Modal / confirm overlays */
+  --z-popover: 10001;                          /* Transient popovers/menus/selects — above modals */
 }
 
 /* ── Opacity Levels ────────────────────────────────────────── */

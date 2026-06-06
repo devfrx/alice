@@ -90,7 +90,7 @@ function selectModule(moduleId: string): void {
       :active="menuVisible"
       @click="openMenu"
     >
-      <AppIcon name="plus" :size="16" />
+      <AppIcon name="modules" :size="16" />
     </UiIconButton>
 
     <UiContextMenu

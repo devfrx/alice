@@ -188,7 +188,6 @@ function formatFullDate(dateStr: string): string {
 /* ── Header ──────────────────────────── */
 .viewer__header {
   padding: var(--space-5) var(--space-5) var(--space-4);
-  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 

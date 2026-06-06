@@ -174,6 +174,9 @@ const _ICONS = {
   /** Home / full-screen layout */
   'hybrid-home': { icon: 'solar:home-2-bold' },
 
+  /** Modules / panels grid (workspace module launcher) */
+  'modules': { icon: 'solar:widget-2-bold' },
+
   // ── Info / feedback ───────────────────────────────────────────────────────
 
   /** Eye / visibility */

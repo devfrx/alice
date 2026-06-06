@@ -243,12 +243,11 @@
     'Segoe UI', Roboto, Oxygen, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
-  /* Editorial serif for headings/display — the Claude editorial feel.
-   * Georgia is always present on Windows, so the serif look works out of
-   * the box. Bundling Newsreader or Source Serif 4 as self-hosted woff2
-   * is an optional future enhancement that will be picked up automatically
-   * when the @font-face declarations are added. */
-  --font-display: 'Newsreader', 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  /* Display/heading font. Serif was retired by user request — headings now
+   * use AL\CE's default sans so the whole UI shares one typeface. Kept as a
+   * token so a serif (or any other display face) can be reintroduced in one
+   * place if ever desired. */
+  --font-display: var(--font-sans);
   /* Kaluar brand wordmark — used only by logo/wordmark components. */
   --font-brand: 'Kaluar', var(--font-sans);
 }

@@ -396,11 +396,8 @@ async function onOpenFile(id: string): Promise<void> {
 .sidebar__mode-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  gap: var(--space-1);
   margin: 0 var(--space-3) var(--space-3);
-  padding: 3px;
-  background: var(--surface-2);
-  border-radius: var(--radius-md);
   flex-shrink: 0;
 }
 
@@ -412,7 +409,7 @@ async function onOpenFile(id: string): Promise<void> {
   min-height: 34px;
   padding: 0 var(--space-2);
   border: 1px solid transparent;
-  border-radius: calc(var(--radius-md) - 3px);
+  border-radius: var(--radius-sm);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   color: var(--text-secondary);
@@ -434,7 +431,6 @@ async function onOpenFile(id: string): Promise<void> {
 
 .sidebar__mode-tab--active {
   background: var(--accent-dim);
-  border-color: var(--accent-border);
   color: var(--text-primary);
   box-shadow: var(--shadow-xs);
 }
@@ -459,9 +455,6 @@ async function onOpenFile(id: string): Promise<void> {
   gap: var(--space-3);
   min-height: var(--input-height-md);
   padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
 }
 
 .sidebar__theme-label {

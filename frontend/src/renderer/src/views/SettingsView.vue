@@ -380,12 +380,10 @@ onUnmounted(() => {
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-5) var(--space-3);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur-heavy));
-  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-floating);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow-y: auto;
 }
 
@@ -610,19 +608,19 @@ onUnmounted(() => {
 /* ── Read-only pill (Modalità agente status) ─────────────── */
 .sv__readonly-pill {
   flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: var(--space-0-5) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--white-subtle);
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-normal);
   text-transform: uppercase;
 }
 
 .sv__readonly-pill--on {
-  background: rgba(110, 200, 140, 0.14);
-  color: rgb(150, 220, 175);
+  background: var(--success-medium);
+  color: var(--success);
 }
 
 /* Warning transition */

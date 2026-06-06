@@ -10,6 +10,7 @@ import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -194,9 +195,8 @@ onBeforeUnmount(() => {
 
         <!-- ── Models list ── -->
         <div v-else class="mm-list">
-            <div v-if="settingsStore.models.length === 0" class="mm-empty">
-                Nessun modello disponibile. Verifica la connessione a LM Studio.
-            </div>
+            <UiEmptyState v-if="settingsStore.models.length === 0" icon="package"
+                title="Nessun modello disponibile" subtitle="Verifica la connessione a LM Studio." compact />
 
             <div v-for="model in settingsStore.models" :key="model.name" class="mm-model" :class="{
                 'mm-model--loaded': model.loaded,
@@ -483,13 +483,6 @@ onBeforeUnmount(() => {
     padding: var(--space-8);
 }
 
-.mm-empty {
-    padding: var(--space-5);
-    text-align: center;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-}
-
 /* ── Model list ── */
 .mm-list {
     display: flex;
@@ -504,14 +497,13 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: var(--space-1-5);
     padding: var(--space-3) var(--space-4);
-    background: var(--surface-0);
-    border: 1px solid var(--border);
+    background: var(--surface-1);
     border-radius: var(--radius-md);
-    transition: border-color var(--transition-fast), opacity var(--transition-fast);
+    transition: background var(--transition-fast), opacity var(--transition-fast);
 }
 
 .mm-model:hover {
-    border-color: var(--border-hover);
+    background: var(--surface-2);
 }
 
 .mm-model--busy {
@@ -566,7 +558,6 @@ onBeforeUnmount(() => {
     width: 20px;
     height: 20px;
     background: var(--white-subtle);
-    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text-muted);
     cursor: default;
@@ -703,15 +694,15 @@ onBeforeUnmount(() => {
 
 /* ── Download section ── */
 .mm-download {
-    background: var(--surface-0);
-    border: 1px solid var(--border);
+    background: var(--surface-1);
     border-radius: var(--radius-md);
     padding: var(--space-4);
 }
 
 .mm-download__title {
     margin: 0 0 var(--space-3) 0;
-    font-size: var(--text-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-md);
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
 }
@@ -770,8 +761,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: var(--space-1);
     padding: var(--space-2) var(--space-3);
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    background: var(--surface-2);
     border-radius: var(--radius-sm);
 }
 
@@ -857,8 +847,7 @@ onBeforeUnmount(() => {
 }
 
 .mm-dialog {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    background: var(--surface-2);
     border-radius: var(--radius-lg);
     padding: var(--space-6);
     width: 420px;
@@ -868,6 +857,7 @@ onBeforeUnmount(() => {
 
 .mm-dialog__title {
     margin: 0 0 var(--space-1) 0;
+    font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-semibold);
     color: var(--text-primary);

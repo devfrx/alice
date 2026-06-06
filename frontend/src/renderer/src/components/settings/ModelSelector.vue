@@ -354,7 +354,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════════
-   ModelSelector — Glassmorphism dropdown coherent with FloatingInputBar
+   ModelSelector — solid dropdown coherent with FloatingInputBar
    ═══════════════════════════════════════════════════════════════ */
 
 .ms {
@@ -455,11 +455,9 @@ onBeforeUnmount(() => {
   min-width: 340px;
   max-width: min(440px, calc(100vw - 32px));
   background: var(--surface-2);
-  backdrop-filter: blur(var(--glass-blur-heavy));
-  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-  border: 1px solid var(--border-hover);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-floating), inset 0 1px 0 var(--white-subtle);
+  box-shadow: var(--shadow-floating);
   z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
@@ -793,7 +791,6 @@ onBeforeUnmount(() => {
   width: 18px;
   height: 18px;
   background: var(--white-faint);
-  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   transition: all var(--transition-fast);
@@ -801,7 +798,6 @@ onBeforeUnmount(() => {
 
 .ms__item:hover .ms__cap {
   color: var(--text-secondary);
-  border-color: var(--border-hover);
 }
 
 /* ── Loading progress ─────────────────────────────────────────── */

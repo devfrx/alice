@@ -9,6 +9,7 @@
 import { computed, ref } from 'vue'
 import { useServicesStore, type ServiceSnapshot } from '../../stores/services'
 import AppIcon from '../ui/AppIcon.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 import type { AppIconName } from '../../assets/icons'
 
 const props = defineProps<{ service: ServiceSnapshot }>()
@@ -144,9 +145,7 @@ function fmtMb(mb: number): string {
     </div>
 
     <section v-if="expanded && isModelService" class="service-card__models">
-      <div v-if="!catalog.length" class="service-card__empty">
-        Nessun modello disponibile in catalogo.
-      </div>
+      <UiEmptyState v-if="!catalog.length" compact title="Nessun modello in catalogo" />
       <ul v-else class="model-list">
         <li
           v-for="m in catalog"
@@ -218,14 +217,14 @@ function fmtMb(mb: number): string {
   flex-direction: column;
   gap: var(--space-2-5);
   padding: var(--space-4);
-  background: color-mix(in srgb, var(--surface-1) 86%, var(--surface-0));
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 .service-card:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
   border-color: var(--border-hover);
   box-shadow: var(--shadow-sm);
 }
@@ -260,7 +259,6 @@ function fmtMb(mb: number): string {
   align-items: center;
   justify-content: center;
   background: var(--surface-2);
-  border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-secondary);
 }
@@ -333,7 +331,6 @@ function fmtMb(mb: number): string {
   margin: 0;
   padding: var(--space-2) var(--space-2-5);
   background: var(--surface-0);
-  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: var(--text-xs);
   color: var(--text-secondary);
@@ -435,13 +432,6 @@ function fmtMb(mb: number): string {
 .service-card__models {
   margin-top: var(--space-2);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-.service-card__empty {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  text-align: center;
-  padding: var(--space-3);
 }
 .model-list {
   list-style: none;

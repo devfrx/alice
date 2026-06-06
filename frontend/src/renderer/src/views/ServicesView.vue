@@ -13,6 +13,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useServicesStore } from '../stores/services'
 import AppIcon from '../components/ui/AppIcon.vue'
+import UiEmptyState from '../components/ui/UiEmptyState.vue'
 import ServiceCard from '../components/services/ServiceCard.vue'
 import TrellisConfigCard from '../components/services/TrellisConfigCard.vue'
 import TrellisSetupGuideModal from '../components/services/TrellisSetupGuideModal.vue'
@@ -173,10 +174,11 @@ async function refreshAll(): Promise<void> {
       </div>
     </section>
 
-    <div v-if="!store.services.length && !store.error" class="services-view__empty">
-      <AppIcon name="server" :size="32" />
-      <p>Nessun servizio registrato.</p>
-    </div>
+    <UiEmptyState
+      v-if="!store.services.length && !store.error"
+      icon="server"
+      title="Nessun servizio registrato"
+    />
 
     <TrellisSetupGuideModal
       v-if="showGuide"
@@ -198,8 +200,7 @@ async function refreshAll(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  background:
-    linear-gradient(180deg, var(--surface-0) 0%, var(--bg-primary) 34%, var(--surface-0) 100%);
+  background: var(--surface-0);
 }
 
 /* ── Header ───────────────────────────────────────────────────── */
@@ -212,10 +213,9 @@ async function refreshAll(): Promise<void> {
   gap: var(--space-4);
   padding: var(--space-4);
   margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
-  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 8px;
-  backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--shadow-sm);
 }
 .services-view__head-row {
@@ -381,22 +381,6 @@ async function refreshAll(): Promise<void> {
 .services-view__grid--wide {
   grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
 }
-
-/* ── Empty state ─────────────────────────────────────────────── */
-.services-view__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-8);
-  background: var(--surface-1);
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  color: var(--text-muted);
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-}
-.services-view__empty p { margin: 0; }
 
 @media (max-width: 760px) {
   .services-view {

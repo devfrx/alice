@@ -496,7 +496,7 @@ textarea:focus:not(:focus-visible) {
 
 /* ── Heading base — serif display ──────────────────────────── */
 /* Component scoped styles that set font-family explicitly will still win. */
-h1, h2, h3, .u-display {
+h1, h2, h3, h4, h5, h6, .u-display {
   font-family: var(--font-display);
   letter-spacing: var(--tracking-tight);
 }

@@ -305,6 +305,7 @@ onBeforeUnmount(() => {
 }
 
 .ctc__pop-title {
+  font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);

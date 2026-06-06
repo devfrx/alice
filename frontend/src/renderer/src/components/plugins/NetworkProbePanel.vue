@@ -766,6 +766,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__title {
+    font-family: var(--font-display);
     font-weight: 600;
     font-size: 14px;
     display: flex;
@@ -1093,6 +1094,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__sub-title {
+    font-family: var(--font-display);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);

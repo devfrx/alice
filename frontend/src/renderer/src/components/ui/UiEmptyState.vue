@@ -65,6 +65,7 @@ withDefaults(
 
 .ui-empty__title {
     margin: 0;
+    font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     color: var(--text-secondary);

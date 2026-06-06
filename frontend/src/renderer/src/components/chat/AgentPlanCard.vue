@@ -279,6 +279,7 @@ const stateClass = computed<string>(() => `agent-plan--${props.run.state}`)
 }
 
 .agent-plan__title {
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--text-primary);

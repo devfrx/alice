@@ -103,6 +103,7 @@ watch(() => props.id, (id) => { void syncDeepLink(id) })
 }
 
 .email-page__empty-title {
+  font-family: var(--font-display);
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
   color: var(--text-secondary);

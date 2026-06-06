@@ -600,6 +600,7 @@ watch(memoryConnected, (connected) => {
 }
 
 .kg-section__title {
+    font-family: var(--font-display);
     font-size: var(--text-sm);
     color: var(--text-secondary);
     font-weight: var(--weight-semibold);

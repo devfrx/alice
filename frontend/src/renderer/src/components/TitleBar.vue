@@ -512,6 +512,7 @@ onUnmounted(() => {
 }
 
 .titlebar__service-title {
+    font-family: var(--font-display);
     color: var(--text-primary);
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);

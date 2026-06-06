@@ -169,6 +169,7 @@ function openUrl(url: string): void {
 }
 
 .search-panel__title {
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 14px;
 }

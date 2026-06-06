@@ -7,6 +7,7 @@
  */
 import { computed } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 import type { ArtifactKind } from '../../types/artifacts'
 import type { ConversationSummary } from '../../types/chat'
 
@@ -34,11 +35,17 @@ const KIND_OPTIONS: KindOption[] = [
     { value: 'cad_3d_image', label: '3D da immagine' },
 ]
 
-/** Bound select value (must be a writable computed for v-model). */
-const conversationModel = computed({
+/** Bound select value (writable computed; widened to accept UiSelect's `string | number`). */
+const conversationModel = computed<string | number>({
     get: () => props.conversationFilter,
-    set: (v) => emit('update:conversationFilter', v),
+    set: (v) => emit('update:conversationFilter', String(v)),
 })
+
+/** Options for the conversation filter, with the leading "Tutte" entry. */
+const conversationOptions = computed<UiSelectOption[]>(() => [
+    { value: 'all', label: 'Tutte' },
+    ...props.conversations.map((c) => ({ value: c.id, label: c.title || 'Senza titolo' })),
+])
 </script>
 
 <template>
@@ -60,12 +67,8 @@ const conversationModel = computed({
 
         <label class="artifact-filters__conv">
             <span class="artifact-filters__conv-label">Conversazione</span>
-            <select v-model="conversationModel" class="artifact-filters__select">
-                <option value="all">Tutte</option>
-                <option v-for="c in conversations" :key="c.id" :value="c.id">
-                    {{ c.title || 'Senza titolo' }}
-                </option>
-            </select>
+            <UiSelect v-model="conversationModel" :options="conversationOptions" size="sm"
+                aria-label="Conversazione" class="artifact-filters__select" />
         </label>
     </div>
 </template>
@@ -167,29 +170,7 @@ const conversationModel = computed({
 }
 
 .artifact-filters__select {
-    height: var(--input-height-sm);
-    background: var(--surface-2);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0 var(--space-2);
-    font-size: var(--text-xs);
-    font-family: inherit;
     min-width: 200px;
-    cursor: pointer;
-    transition:
-        border-color var(--transition-fast),
-        background var(--transition-fast);
-}
-
-.artifact-filters__select:hover {
-    border-color: var(--border-hover);
-}
-
-.artifact-filters__select:focus {
-    outline: none;
-    border-color: var(--accent-border);
-    box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 @media (max-width: 720px) {

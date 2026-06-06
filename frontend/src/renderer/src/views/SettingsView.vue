@@ -239,10 +239,9 @@
           <label class="sv__field">
             <span class="sv__field-label">Tema</span>
             <div class="sv__input-wrap">
-              <select v-model="settingsStore.settings.ui.theme" class="sv__input">
-                <option value="dark">Scuro</option>
-                <option value="light">Chiaro</option>
-              </select>
+              <UiSelect class="sv__select" :model-value="settingsStore.settings.ui.theme" :options="themeOptions"
+                size="md" aria-label="Tema"
+                @update:model-value="(v) => (settingsStore.settings.ui.theme = v === 'light' ? 'light' : 'dark')" />
             </div>
           </label>
           <label class="sv__field">
@@ -272,12 +271,19 @@ import KnowledgeGraphManager from '../components/settings/KnowledgeGraphManager.
 import MemoryManager from '../components/settings/MemoryManager.vue'
 import VectorStoreManager from '../components/settings/VectorStoreManager.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../components/ui/UiSelect.vue'
 import type { AppIconName } from '../assets/icons'
 import { useSettingsStore } from '../stores/settings'
 import { useUIStore } from '../stores/ui'
 
 const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
+
+/* ── UI theme select ────────────────────────────────────────── */
+const themeOptions: UiSelectOption[] = [
+  { value: 'dark', label: 'Scuro' },
+  { value: 'light', label: 'Chiaro' },
+]
 
 /* ── Navigation ─────────────────────────────────────────────── */
 type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
@@ -693,12 +699,8 @@ onUnmounted(() => {
 }
 
 /* Select dropdown */
-select.sv__input {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 32px;
+.sv__select {
+  width: 100%;
 }
 
 /* ── Bottom spacer ────────────────────────────────────────── */

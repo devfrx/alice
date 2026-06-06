@@ -5,10 +5,11 @@
  * Single source of truth for all voice-related settings. Loads config
  * from backend on mount and persists changes via PUT /config.
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../../services/api'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 const settingsStore = useSettingsStore()
 const voiceStore = useVoiceStore()
@@ -141,6 +142,26 @@ const voiceLangMap = Object.fromEntries(
   kokoroVoices.flatMap(g => g.voices.map(v => [v.value, g.lang]))
 )
 
+/** Flattened Kokoro voice options, with non-selectable group headers. */
+const kokoroVoiceOptions = computed<UiSelectOption[]>(() =>
+  kokoroVoices.flatMap((g) => [
+    { value: `__group__${g.lang}`, label: g.group, disabled: true },
+    ...g.voices,
+  ]),
+)
+
+/** Kokoro output-language options. */
+const kokoroLanguages: UiSelectOption[] = [
+  { value: 'it', label: 'Italiano' },
+  { value: 'en-us', label: 'English (US)' },
+  { value: 'en-gb', label: 'English (UK)' },
+  { value: 'fr-fr', label: 'Français' },
+  { value: 'es', label: 'Español' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'ja', label: '日本語' },
+  { value: 'zh', label: '中文' },
+]
+
 function onKokoroVoiceChange(): void {
   const lang = voiceLangMap[kokoroVoice.value]
   if (lang) kokoroLanguage.value = lang
@@ -267,9 +288,8 @@ async function save(): Promise<void> {
           <template v-if="sttEnabled && sttLibAvailable">
             <label class="settings-field">
               <span class="settings-field__label">Modello</span>
-              <select v-model="sttModel" class="settings-field__input" aria-label="Modello STT" @change="save">
-                <option v-for="m in sttModels" :key="m.value" :value="m.value">{{ m.label }}</option>
-              </select>
+              <UiSelect :model-value="sttModel" :options="sttModels" size="md" aria-label="Modello STT"
+                @update:model-value="(v) => { sttModel = String(v); save() }" />
             </label>
             <label class="settings-field">
               <span class="settings-field__label">Lingua</span>
@@ -299,9 +319,8 @@ async function save(): Promise<void> {
           <template v-if="ttsEnabled && ttsEngines.length > 0">
             <label class="settings-field">
               <span class="settings-field__label">Motore</span>
-              <select v-model="ttsEngine" class="settings-field__input" aria-label="Motore TTS" @change="save">
-                <option v-for="e in ttsEngines" :key="e.value" :value="e.value">{{ e.label }}</option>
-              </select>
+              <UiSelect :model-value="ttsEngine" :options="ttsEngines" size="md" aria-label="Motore TTS"
+                @update:model-value="(v) => { ttsEngine = String(v); save() }" />
             </label>
             <label v-if="ttsEngine !== 'kokoro'" class="settings-field">
               <span class="settings-field__label">Voce</span>
@@ -311,26 +330,13 @@ async function save(): Promise<void> {
             <template v-if="ttsEngine === 'kokoro'">
               <label class="settings-field">
                 <span class="settings-field__label">Voce Kokoro</span>
-                <select v-model="kokoroVoice" class="settings-field__input" aria-label="Voce Kokoro"
-                  @change="onKokoroVoiceChange">
-                  <optgroup v-for="group in kokoroVoices" :key="group.group" :label="group.group">
-                    <option v-for="v in group.voices" :key="v.value" :value="v.value">{{ v.label }}</option>
-                  </optgroup>
-                </select>
+                <UiSelect :model-value="kokoroVoice" :options="kokoroVoiceOptions" size="md" aria-label="Voce Kokoro"
+                  @update:model-value="(v) => { kokoroVoice = String(v); onKokoroVoiceChange() }" />
               </label>
               <label class="settings-field">
                 <span class="settings-field__label">Lingua Kokoro</span>
-                <select v-model="kokoroLanguage" class="settings-field__input" aria-label="Lingua Kokoro"
-                  @change="save">
-                  <option value="it">Italiano</option>
-                  <option value="en-us">English (US)</option>
-                  <option value="en-gb">English (UK)</option>
-                  <option value="fr-fr">Français</option>
-                  <option value="es">Español</option>
-                  <option value="de">Deutsch</option>
-                  <option value="ja">日本語</option>
-                  <option value="zh">中文</option>
-                </select>
+                <UiSelect :model-value="kokoroLanguage" :options="kokoroLanguages" size="md" aria-label="Lingua Kokoro"
+                  @update:model-value="(v) => { kokoroLanguage = String(v); save() }" />
               </label>
             </template>
             <label class="settings-field settings-field--wide">

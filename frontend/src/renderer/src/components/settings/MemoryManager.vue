@@ -17,16 +17,11 @@
 
         <!-- Filters row -->
         <div class="mem-filters">
-            <select v-model="scopeFilter" class="mem-select" aria-label="Filtra per ambito">
-                <option value="">Tutti gli ambiti</option>
-                <option value="long_term">Lungo termine</option>
-                <option value="session">Sessione</option>
-            </select>
+            <UiSelect :model-value="scopeFilter" :options="scopeOptions" size="sm"
+                aria-label="Filtra per ambito" @update:model-value="(v) => (scopeFilter = String(v))" />
 
-            <select v-model="categoryFilter" class="mem-select" aria-label="Filtra per categoria">
-                <option value="">Tutte le categorie</option>
-                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
+            <UiSelect :model-value="categoryFilter" :options="categoryOptions" size="sm"
+                aria-label="Filtra per categoria" @update:model-value="(v) => (categoryFilter = String(v))" />
 
             <div class="mem-search">
                 <input v-model="searchQuery" type="text" class="mem-search__input" placeholder="Ricerca semantica…"
@@ -125,6 +120,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useMemoryStore } from '../../stores/memory'
 import type { MemoryEntry } from '../../types/memory'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 const store = useMemoryStore()
 
@@ -139,6 +135,19 @@ const categories = computed<string[]>(() => {
     if (!store.stats) return []
     return Object.keys(store.stats.by_category).sort()
 })
+
+/** Static scope filter options (leading "all" entry uses the empty value). */
+const scopeOptions: UiSelectOption[] = [
+    { value: '', label: 'Tutti gli ambiti' },
+    { value: 'long_term', label: 'Lungo termine' },
+    { value: 'session', label: 'Sessione' },
+]
+
+/** Category filter options, derived from stats with a leading "all" entry. */
+const categoryOptions = computed<UiSelectOption[]>(() => [
+    { value: '', label: 'Tutte le categorie' },
+    ...categories.value.map((cat) => ({ value: cat, label: cat })),
+])
 
 // ── Confirmation dialog ───────────────────────────────────────────────────
 const confirmAction = ref<(() => Promise<void>) | null>(null)
@@ -273,28 +282,6 @@ onMounted(() => {
     gap: var(--space-2);
     margin-bottom: var(--space-3);
     align-items: center;
-}
-
-.mem-select {
-    padding: var(--space-1) var(--space-2);
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    font-family: inherit;
-    outline: none;
-    cursor: pointer;
-    transition: border-color var(--transition-fast);
-}
-
-.mem-select:focus {
-    border-color: var(--accent-border);
-}
-
-.mem-select option {
-    background: var(--surface-2);
-    color: var(--text-primary);
 }
 
 .mem-search {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { api } from '../../services/api'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 /* ── Type definitions ───────────────────────────────────────────────── */
 
@@ -151,6 +152,16 @@ const scanResult = ref<ScanResult | null>(null)
 const scanLoading = ref(false)
 const scanError = ref('')
 const showClosedPorts = ref(false)
+
+/* Protocol options shared by the service-check and connection-list selects. */
+const svcProtocolOptions: UiSelectOption[] = [
+    { value: 'tcp', label: 'TCP' },
+    { value: 'udp', label: 'UDP' },
+]
+const connProtocolOptions: UiSelectOption[] = [
+    ...svcProtocolOptions,
+    { value: 'all', label: 'All' },
+]
 
 /* Service check (quick-check section) */
 const svcHost = ref('')
@@ -471,10 +482,9 @@ function fmtMs(v: number | null): string {
                             @keydown.enter="checkService" />
                         <input v-model.number="svcPort" class="net-probe__input net-probe__input--sm" type="number"
                             min="1" max="65535" placeholder="Port" />
-                        <select v-model="svcProtocol" class="net-probe__select">
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                        </select>
+                        <UiSelect :model-value="svcProtocol" :options="svcProtocolOptions" size="sm"
+                            aria-label="Protocollo" class="net-probe__select"
+                            @update:model-value="(v) => (svcProtocol = v === 'udp' ? 'udp' : 'tcp')" />
                     </div>
                     <button class="net-probe__btn net-probe__btn--sm" :disabled="svcLoading" @click="checkService">
                         <span v-if="svcLoading" class="net-probe__spinner" />
@@ -696,11 +706,9 @@ function fmtMs(v: number | null): string {
                 <!-- ─── Connections ──────────────────────────────────── -->
                 <div v-if="activeTab === 'connections'" class="net-probe__section">
                     <div class="net-probe__field-row">
-                        <select v-model="connProtocol" class="net-probe__select">
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                            <option value="all">All</option>
-                        </select>
+                        <UiSelect :model-value="connProtocol" :options="connProtocolOptions" size="sm"
+                            aria-label="Protocollo" class="net-probe__select"
+                            @update:model-value="(v) => (connProtocol = v === 'udp' ? 'udp' : v === 'all' ? 'all' : 'tcp')" />
                         <button class="net-probe__btn" :disabled="connLoading" @click="getConnections">
                             <span v-if="connLoading" class="net-probe__spinner" />
                             {{ connLoading ? 'Loading…' : '🔗 List Connections' }}
@@ -891,20 +899,8 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__select {
-    padding: 7px 8px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text-primary);
-    font-size: 12px;
-    font-family: inherit;
-    outline: none;
-    cursor: pointer;
     flex-shrink: 0;
-}
-
-.net-probe__select:focus {
-    border-color: var(--accent);
+    min-width: 84px;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */

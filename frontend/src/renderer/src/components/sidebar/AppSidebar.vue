@@ -404,7 +404,6 @@ async function onOpenFile(id: string): Promise<void> {
   padding: 3px;
   background: var(--surface-2);
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -453,7 +452,6 @@ async function onOpenFile(id: string): Promise<void> {
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3) var(--space-3);
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 

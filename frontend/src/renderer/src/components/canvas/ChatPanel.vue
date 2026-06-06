@@ -226,10 +226,9 @@ const conversationTitle = computed<string>(() => {
   overflow: hidden;
 }
 
-/* Slim blended header — full-width hairline, inner content column-centered. */
+/* Slim blended header — no separator, inner content column-centered. */
 .chat-panel__header {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
   background: transparent;
 }
 

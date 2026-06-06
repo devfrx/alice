@@ -289,7 +289,6 @@ function timeAgo(iso: string): string {
   align-items: center;
   padding: var(--space-2) var(--space-2) var(--space-1-5);
   margin-top: var(--space-1);
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -406,22 +405,19 @@ function timeAgo(iso: string): string {
 }
 
 /*
- * Active: --surface-selected background + subtle left accent bar (inset box-shadow).
- * The 2px inset bar on left reads as a clear selection cue without being heavy.
+ * Active: --surface-selected background is the sole selection cue (no accent bar).
  */
 .conv-item--active {
   background: var(--surface-selected);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .conv-item--active:hover {
   background: var(--surface-selected);
 }
 
-/* Streaming — same base as active */
+/* Streaming — same base as active; the pulsing dot indicates progress */
 .conv-item--streaming {
   background: var(--surface-selected);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 /* Keyboard-focused item */

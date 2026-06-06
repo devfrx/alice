@@ -61,7 +61,7 @@ const emit = defineEmits<{
   width: 100%;
   height: 100%;
   border-radius: var(--panel-radius, var(--radius-md));
-  box-shadow: var(--panel-shadow, var(--shadow-md));
+  box-shadow: var(--panel-shadow, var(--shadow-sm));
   /* Fully opaque solid surface — no glass / semi-transparency. */
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -79,8 +79,7 @@ const emit = defineEmits<{
   height: var(--panel-header-height, 28px);
   flex-shrink: 0;
   padding: 0 var(--space-2);
-  /* Minimal chrome: same surface as the body, single hairline separator. */
-  border-bottom: 1px solid var(--border);
+  /* Minimal chrome: header is flush with the body — same surface, no separator. */
   background: var(--surface-1);
 }
 

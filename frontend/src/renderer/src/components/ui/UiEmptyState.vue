@@ -3,10 +3,10 @@
  * UiEmptyState — Generic empty / zero-state component.
  *
  * Used wherever a list, board, or panel has nothing to show. Composes a
- * centred icon orb, a title and an optional subtitle, with a slot for
+ * plain muted icon, a title and an optional subtitle, with a slot for
  * primary actions (typically a UiButton).
  *
- * Visuals follow the cream-on-charcoal theme — no hardcoded colors.
+ * Restrained Claude-style aesthetic — no orb / glow, all tokenized.
  */
 import AppIcon from './AppIcon.vue'
 import type { AppIconName } from '../../assets/icons'
@@ -30,9 +30,7 @@ withDefaults(
 
 <template>
     <div class="ui-empty" :class="{ 'ui-empty--compact': compact }" role="status">
-        <div v-if="icon" class="ui-empty__orb" aria-hidden="true">
-            <AppIcon :name="icon" :size="iconSize" />
-        </div>
+        <AppIcon v-if="icon" :name="icon" :size="iconSize" class="ui-empty__icon" aria-hidden="true" />
         <p class="ui-empty__title">{{ title }}</p>
         <p v-if="subtitle" class="ui-empty__subtitle">{{ subtitle }}</p>
         <div v-if="$slots.actions" class="ui-empty__actions">
@@ -48,42 +46,28 @@ withDefaults(
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: var(--space-3);
-    padding: var(--space-8) var(--space-4);
-    color: var(--text-secondary);
+    gap: var(--space-2);
+    padding: var(--space-6) var(--space-4);
+    color: var(--text-muted);
     width: 100%;
     height: 100%;
 }
 
 .ui-empty--compact {
-    gap: var(--space-2);
-    padding: var(--space-4);
+    gap: var(--space-1-5);
+    padding: var(--space-3);
 }
 
-.ui-empty__orb {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: var(--accent-dim);
-    border: 1px solid var(--accent-border);
-    color: var(--accent);
-    box-shadow: inset 0 0 24px var(--accent-glow);
-}
-
-.ui-empty--compact .ui-empty__orb {
-    width: 44px;
-    height: 44px;
+.ui-empty__icon {
+    color: var(--text-muted);
+    opacity: 0.4;
 }
 
 .ui-empty__title {
     margin: 0;
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
-    letter-spacing: 0.01em;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
 }
 
 .ui-empty__subtitle {

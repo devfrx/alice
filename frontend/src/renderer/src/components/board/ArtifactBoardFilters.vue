@@ -76,9 +76,8 @@ const conversationModel = computed({
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-1);
+    padding: var(--space-2) var(--space-6) var(--space-4);
+    background: transparent;
 }
 
 /* ── Kind chips ── */
@@ -168,20 +167,42 @@ const conversationModel = computed({
 }
 
 .artifact-filters__select {
+    height: var(--input-height-sm);
     background: var(--surface-2);
     color: var(--text-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 6px var(--space-2);
+    padding: 0 var(--space-2);
     font-size: var(--text-xs);
     font-family: inherit;
     min-width: 200px;
     cursor: pointer;
+    transition:
+        border-color var(--transition-fast),
+        background var(--transition-fast);
+}
+
+.artifact-filters__select:hover {
+    border-color: var(--border-hover);
 }
 
 .artifact-filters__select:focus {
     outline: none;
     border-color: var(--accent-border);
     box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+@media (max-width: 720px) {
+    .artifact-filters {
+        padding: var(--space-2) var(--space-4) var(--space-3);
+    }
+
+    .artifact-filters__conv {
+        margin-left: 0;
+    }
+
+    .artifact-filters__select {
+        min-width: 160px;
+    }
 }
 </style>

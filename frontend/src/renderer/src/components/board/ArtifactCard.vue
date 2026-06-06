@@ -73,7 +73,7 @@ function openConversation(): void {
 </script>
 
 <template>
-    <UiCard variant="default" no-padding class="artifact-card">
+    <UiCard variant="subtle" no-padding class="artifact-card">
         <div class="artifact-card__preview">
             <ArtifactPreview3D :artifact="artifact" />
             <button class="artifact-card__pin" :class="{ 'artifact-card__pin--active': artifact.pinned }"
@@ -122,14 +122,15 @@ function openConversation(): void {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: var(--shadow-sm);
     transition:
-        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
         transform var(--transition-fast);
 }
 
 .artifact-card:hover {
-    border-color: var(--border-hover);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
 /* ── Preview ── */
@@ -137,7 +138,6 @@ function openConversation(): void {
     position: relative;
     aspect-ratio: 4 / 3;
     background: var(--surface-0);
-    border-bottom: 1px solid var(--border);
 }
 
 .artifact-card__pin {
@@ -150,25 +150,24 @@ function openConversation(): void {
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
+    border: none;
     background: var(--surface-2);
     color: var(--text-muted);
+    box-shadow: var(--shadow-sm);
     cursor: pointer;
     transition:
         color var(--transition-fast),
-        background var(--transition-fast),
-        border-color var(--transition-fast);
+        background var(--transition-fast);
 }
 
 .artifact-card__pin:hover {
     color: var(--text-primary);
-    border-color: var(--accent-border);
+    background: var(--surface-3);
 }
 
 .artifact-card__pin--active {
     color: var(--accent);
     background: var(--accent-dim);
-    border-color: var(--accent-border);
 }
 
 /* ── Body ── */
@@ -244,8 +243,7 @@ function openConversation(): void {
     justify-content: flex-end;
     gap: var(--space-1);
     padding: var(--space-2) var(--space-3);
-    border-top: 1px solid var(--border);
-    background: var(--surface-1);
+    border-top: 1px solid var(--border-subtle);
 }
 
 .artifact-card__action {

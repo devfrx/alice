@@ -6,7 +6,9 @@ import {
   deepestLastLeaf,
   openModule,
   closeLeaf,
-  setRatio
+  setRatio,
+  countColumns,
+  columnOf
 } from './tilingTree'
 import type { LeafNode, SplitNode, WorkspaceLayout } from './tilingTypes'
 
@@ -93,65 +95,60 @@ describe('4-step A/B/C/D sequence', () => {
     expect(l.activeLeafId).toBe(leafB.id)
   })
 
-  it('after C: root = split(vertical, [leafA, split(horizontal, [leafB, leafC])]); active = leafC', () => {
+  it('after C: root = split(horizontal, [vSplit[A,B], leafC]); ratio 0.5; active = leafC', () => {
     let l = openModule(createEmptyLayout(), 'moduleA', undefined, idGen)
     l = openModule(l, 'moduleB', undefined, idGen)
     l = openModule(l, 'moduleC', undefined, idGen)
 
-    // root: vertical split
+    // root: horizontal spine split joining two columns
     const rootSplit = l.root as SplitNode
     expect(rootSplit.kind).toBe('split')
-    expect(rootSplit.orientation).toBe('vertical')
+    expect(rootSplit.orientation).toBe('horizontal')
+    expect(rootSplit.ratio).toBe(0.5)
 
-    // children[0] = leaf A (unchanged)
-    const leafA = rootSplit.children[0] as LeafNode
-    expect(leafA.kind).toBe('leaf')
+    // children[0] = vertical split [A, B] (first column, full)
+    const firstColumn = rootSplit.children[0] as SplitNode
+    expect(firstColumn.kind).toBe('split')
+    expect(firstColumn.orientation).toBe('vertical')
+    const leafA = firstColumn.children[0] as LeafNode
+    const leafB = firstColumn.children[1] as LeafNode
     expect(leafA.moduleId).toBe('moduleA')
-
-    // children[1] = horizontal split containing B and C
-    const innerSplit = rootSplit.children[1] as SplitNode
-    expect(innerSplit.kind).toBe('split')
-    expect(innerSplit.orientation).toBe('horizontal')
-
-    const leafB = innerSplit.children[0] as LeafNode
-    const leafC = innerSplit.children[1] as LeafNode
-    expect(leafB.kind).toBe('leaf')
     expect(leafB.moduleId).toBe('moduleB')
+
+    // children[1] = leaf C (second column, single panel)
+    const leafC = rootSplit.children[1] as LeafNode
     expect(leafC.kind).toBe('leaf')
     expect(leafC.moduleId).toBe('moduleC')
 
     expect(l.activeLeafId).toBe(leafC.id)
   })
 
-  it('after D: C replaced by split(vertical, [leafC, leafD]); active = leafD', () => {
+  it('after D: root = split(horizontal, [vSplit[A,B], vSplit[C,D]]); active = leafD', () => {
     let l = openModule(createEmptyLayout(), 'moduleA', undefined, idGen)
     l = openModule(l, 'moduleB', undefined, idGen)
     l = openModule(l, 'moduleC', undefined, idGen)
     l = openModule(l, 'moduleD', undefined, idGen)
 
-    // root → vertical split
+    // root → horizontal spine split joining two full columns
     const rootSplit = l.root as SplitNode
     expect(rootSplit.kind).toBe('split')
-    expect(rootSplit.orientation).toBe('vertical')
+    expect(rootSplit.orientation).toBe('horizontal')
 
-    // children[0] = leaf A
-    const leafA = rootSplit.children[0] as LeafNode
+    // children[0] = vertical split [A, B]
+    const firstColumn = rootSplit.children[0] as SplitNode
+    expect(firstColumn.kind).toBe('split')
+    expect(firstColumn.orientation).toBe('vertical')
+    const leafA = firstColumn.children[0] as LeafNode
+    const leafB = firstColumn.children[1] as LeafNode
     expect(leafA.moduleId).toBe('moduleA')
-
-    // children[1] = horizontal split [B, split(vertical, [C, D])]
-    const mid = rootSplit.children[1] as SplitNode
-    expect(mid.kind).toBe('split')
-    expect(mid.orientation).toBe('horizontal')
-
-    const leafB = mid.children[0] as LeafNode
     expect(leafB.moduleId).toBe('moduleB')
 
-    const rightSplit = mid.children[1] as SplitNode
-    expect(rightSplit.kind).toBe('split')
-    expect(rightSplit.orientation).toBe('vertical')
-
-    const leafC = rightSplit.children[0] as LeafNode
-    const leafD = rightSplit.children[1] as LeafNode
+    // children[1] = vertical split [C, D] (second column, now full)
+    const secondColumn = rootSplit.children[1] as SplitNode
+    expect(secondColumn.kind).toBe('split')
+    expect(secondColumn.orientation).toBe('vertical')
+    const leafC = secondColumn.children[0] as LeafNode
+    const leafD = secondColumn.children[1] as LeafNode
     expect(leafC.moduleId).toBe('moduleC')
     expect(leafD.moduleId).toBe('moduleD')
 
@@ -202,18 +199,25 @@ describe('closeLeaf', () => {
 
   it('closing a leaf whose sibling is a subtree promotes the sibling subtree', () => {
     const idGen = makeIdGen()
-    // Build A/B/C so root = split(vertical, [A, split(horizontal, [B, C])])
+    // Build A/B/C so root = hSplit[ vSplit[A,B], leafC ]
     let l = openModule(createEmptyLayout(), 'moduleA', undefined, idGen)
     l = openModule(l, 'moduleB', undefined, idGen)
     l = openModule(l, 'moduleC', undefined, idGen)
 
+    // First column is vSplit[A,B]; second column is leaf C.
     const rootSplit = l.root as SplitNode
-    const leafA = rootSplit.children[0] as LeafNode
-    const innerSplit = rootSplit.children[1] as SplitNode
+    const firstColumn = rootSplit.children[0] as SplitNode
+    const leafA = firstColumn.children[0] as LeafNode
+    const leafB = firstColumn.children[1] as LeafNode
+    const leafC = rootSplit.children[1] as LeafNode
 
-    // Close leaf A → root should be the inner horizontal split
+    // Close leaf A → A removed from its vertical column, B promoted in its place,
+    // so root = hSplit[ leafB, leafC ].
     const l2 = closeLeaf(l, leafA.id)
-    expect(l2.root).toEqual(innerSplit)
+    expect(l2.root).toEqual({
+      ...rootSplit,
+      children: [leafB, leafC]
+    })
   })
 
   it('activeLeafId updates to deepestLastLeaf(sibling) when active leaf is closed', () => {
@@ -222,11 +226,12 @@ describe('closeLeaf', () => {
     l = openModule(l, 'moduleB', undefined, idGen)
     l = openModule(l, 'moduleC', undefined, idGen)
 
-    // active = C; close C → sibling is B; activeLeafId should be B
+    // After A/B/C: root = hSplit[ vSplit[A,B], leafC ]; active = C.
+    // Closing C → sibling is vSplit[A,B], deepestLastLeaf = B; activeLeafId = B.
     const rootSplit = l.root as SplitNode
-    const innerSplit = rootSplit.children[1] as SplitNode
-    const leafB = innerSplit.children[0] as LeafNode
-    const leafC = innerSplit.children[1] as LeafNode
+    const firstColumn = rootSplit.children[0] as SplitNode
+    const leafB = firstColumn.children[1] as LeafNode
+    const leafC = rootSplit.children[1] as LeafNode
 
     expect(l.activeLeafId).toBe(leafC.id)
     const l2 = closeLeaf(l, leafC.id)
@@ -315,10 +320,12 @@ describe('findLeaf', () => {
     let l = openModule(createEmptyLayout(), 'A', undefined, idGen)
     l = openModule(l, 'B', undefined, idGen)
     l = openModule(l, 'C', undefined, idGen)
+    // After A/B/C: root = hSplit[ vSplit[A,B], leafC ].
     const root = l.root as SplitNode
-    const innerSplit = root.children[1] as SplitNode
-    const leafC = innerSplit.children[1] as LeafNode
+    const leafA = (root.children[0] as SplitNode).children[0] as LeafNode
+    const leafC = root.children[1] as LeafNode
     expect(findLeaf(l.root, leafC.id)).toBe(leafC)
+    expect(findLeaf(l.root, leafA.id)).toBe(leafA)
   })
 })
 
@@ -353,10 +360,88 @@ describe('deepestLastLeaf', () => {
     let l = openModule(createEmptyLayout(), 'A', undefined, idGen)
     l = openModule(l, 'B', undefined, idGen)
     l = openModule(l, 'C', undefined, idGen)
-    // deepest last leaf from root: root.children[1] is split, its children[1] = leafC
+    // After A/B/C: root = hSplit[ vSplit[A,B], leafC ]; root.children[1] = leafC.
     const rootSplit = l.root as SplitNode
-    const innerSplit = rootSplit.children[1] as SplitNode
-    const leafC = innerSplit.children[1] as LeafNode
+    const leafC = rootSplit.children[1] as LeafNode
     expect(deepestLastLeaf(l.root!)).toBe(leafC)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Column model (Task A)
+// ---------------------------------------------------------------------------
+describe('column model', () => {
+  function build(count: number): WorkspaceLayout {
+    const idGen = makeIdGen()
+    let l = createEmptyLayout()
+    for (let i = 0; i < count; i++) {
+      l = openModule(l, `module${String.fromCharCode(65 + i)}`, undefined, idGen)
+    }
+    return l
+  }
+
+  it('3rd panel creates a 2nd column (root horizontal, children[1] a leaf, ratio 0.5)', () => {
+    const l = build(3)
+    const root = l.root as SplitNode
+    expect(root.kind).toBe('split')
+    expect(root.orientation).toBe('horizontal')
+    expect(root.ratio).toBe(0.5)
+    // children[0] is the first (full) column, children[1] is a fresh single-leaf column
+    expect((root.children[0] as SplitNode).orientation).toBe('vertical')
+    expect(root.children[1].kind).toBe('leaf')
+  })
+
+  it('4th panel fills the 2nd column top/bottom; root stays a single horizontal split', () => {
+    const l = build(4)
+    const root = l.root as SplitNode
+    expect(root.kind).toBe('split')
+    expect(root.orientation).toBe('horizontal')
+    // NOT nested: both children are vertical-split columns, no further horizontal spine
+    const left = root.children[0] as SplitNode
+    const right = root.children[1] as SplitNode
+    expect(left.orientation).toBe('vertical')
+    expect(right.orientation).toBe('vertical')
+    expect((right.children[0] as LeafNode).moduleId).toBe('moduleC')
+    expect((right.children[1] as LeafNode).moduleId).toBe('moduleD')
+  })
+
+  it('5th panel creates a 3rd column with ratio 2/3 and a nested horizontal spine on the left', () => {
+    const l = build(5)
+    const root = l.root as SplitNode
+    expect(root.kind).toBe('split')
+    expect(root.orientation).toBe('horizontal')
+    expect(root.ratio).toBe(2 / 3)
+    // children[0] is the horizontal spine of the first two columns
+    const spine = root.children[0] as SplitNode
+    expect(spine.kind).toBe('split')
+    expect(spine.orientation).toBe('horizontal')
+    // children[1] is the fresh 3rd column (single leaf)
+    expect(root.children[1].kind).toBe('leaf')
+    expect((root.children[1] as LeafNode).moduleId).toBe('moduleE')
+  })
+
+  it('countColumns returns 1/1/2/2/3 after A/B/C/D/E', () => {
+    expect(countColumns(build(1).root!)).toBe(1)
+    expect(countColumns(build(2).root!)).toBe(1)
+    expect(countColumns(build(3).root!)).toBe(2)
+    expect(countColumns(build(4).root!)).toBe(2)
+    expect(countColumns(build(5).root!)).toBe(3)
+  })
+
+  it('columnOf returns the column node containing a given active leaf', () => {
+    // After A/B/C/D/E: root = hSplit[ hSplit[vSplit[A,B], vSplit[C,D]], leafE ].
+    const l = build(5)
+    const root = l.root as SplitNode
+    const spine = root.children[0] as SplitNode
+    const colAB = spine.children[0] as SplitNode // vSplit[A,B]
+    const colCD = spine.children[1] as SplitNode // vSplit[C,D]
+    const leafE = root.children[1] as LeafNode
+
+    const leafA = colAB.children[0] as LeafNode
+    const leafD = colCD.children[1] as LeafNode
+
+    expect(columnOf(root, leafA.id)).toBe(colAB)
+    expect(columnOf(root, leafD.id)).toBe(colCD)
+    expect(columnOf(root, leafE.id)).toBe(leafE)
   })
 })

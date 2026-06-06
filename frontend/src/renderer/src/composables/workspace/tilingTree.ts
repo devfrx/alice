@@ -83,7 +83,32 @@ export function deepestLastLeaf(node: TileNode): LeafNode {
   return deepestLastLeaf(node.children[1])
 }
 
-/** Open a new module, splitting the active (or deepest-last) leaf.
+/** Count the columns in a subtree.
+ *  A `horizontal` split is part of the top-level spine → sum of its children's
+ *  column counts. Any other node (a `leaf` or a `vertical` split) IS a single
+ *  column. */
+export function countColumns(node: TileNode): number {
+  if (node.kind === 'split' && node.orientation === 'horizontal') {
+    return countColumns(node.children[0]) + countColumns(node.children[1])
+  }
+  return 1
+}
+
+/** Walk down the top-level `horizontal` spine toward the leaf, returning the
+ *  first node that is the column containing it (a `leaf` or a `vertical` split).
+ *  Assumes leafId exists within `root`. */
+export function columnOf(root: TileNode, leafId: string): TileNode {
+  let node = root
+  while (node.kind === 'split' && node.orientation === 'horizontal') {
+    node = findLeaf(node.children[0], leafId) !== null ? node.children[0] : node.children[1]
+  }
+  return node
+}
+
+/** Open a new module under the strict column model.
+ *  A column holds at most 2 panels (a single leaf, or a `vertical` split of two
+ *  leaves stacked top/bottom). The top-level spine is `horizontal` splits joining
+ *  columns left-to-right.
  *  Returns a new WorkspaceLayout; inputs are never mutated. */
 export function openModule(
   layout: WorkspaceLayout,
@@ -101,14 +126,21 @@ export function openModule(
     (layout.activeLeafId !== null ? findLeaf(layout.root, layout.activeLeafId) : null) ??
     deepestLastLeaf(layout.root)
 
-  const parentOrient = orientationOfParent(layout.root, target.id)
-  const newOrient: SplitOrientation =
-    parentOrient === null ? 'vertical' : parentOrient === 'vertical' ? 'horizontal' : 'vertical'
+  const column = columnOf(layout.root, target.id)
 
+  if (column.kind === 'leaf') {
+    // Column has room (1 panel) → stack the new leaf below it (top/bottom).
+    const splitId = idGen()
+    const newColumn = makeSplit('vertical', 0.5, [column, newLeaf], splitId)
+    const newRoot = _replaceNode(layout.root, column.id, newColumn)
+    return { ...layout, root: newRoot, activeLeafId: newLeaf.id }
+  }
+
+  // Column is full (a vertical split of 2 panels) → append a fresh column on the
+  // far right by replacing the entire root with a horizontal spine split.
+  const n = countColumns(layout.root)
   const splitId = idGen()
-  const newSplit = makeSplit(newOrient, 0.5, [target, newLeaf], splitId)
-
-  const newRoot = _replaceNode(layout.root, target.id, newSplit)
+  const newRoot = makeSplit('horizontal', n / (n + 1), [layout.root, newLeaf], splitId)
   return { ...layout, root: newRoot, activeLeafId: newLeaf.id }
 }
 

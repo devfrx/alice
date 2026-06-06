@@ -60,8 +60,8 @@ function onSnapshotChange(snapshot: Record<string, unknown>): void {
   width: 100%;
   display: flex;
   flex-direction: row;
-  padding: 10px;
-  gap: 10px;
+  padding: var(--space-2-5);
+  gap: var(--space-2-5);
   overflow: hidden;
   background: var(--surface-0);
   color: var(--text-primary);
@@ -72,7 +72,7 @@ function onSnapshotChange(snapshot: Record<string, unknown>): void {
   flex: 1;
   min-width: 0;
   display: flex;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -84,9 +84,9 @@ function onSnapshotChange(snapshot: Record<string, unknown>): void {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: var(--space-3);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .whiteboard-page__empty p {

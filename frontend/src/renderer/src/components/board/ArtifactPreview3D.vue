@@ -195,13 +195,13 @@ onUnmounted(() => {
 }
 
 .artifact-preview-3d__overlay--error {
-    color: var(--danger, #d4624a);
+    color: var(--danger);
 }
 
 .artifact-preview-3d__spinner {
     width: 26px;
     height: 26px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     border: 2px solid var(--accent-border);
     border-top-color: var(--accent);
     animation: artifact-preview-spin 0.9s linear infinite;

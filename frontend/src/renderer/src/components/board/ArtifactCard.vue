@@ -151,9 +151,8 @@ function openConversation(): void {
     justify-content: center;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: color-mix(in srgb, var(--surface-0) 70%, transparent);
+    background: var(--surface-2);
     color: var(--text-muted);
-    backdrop-filter: blur(6px);
     cursor: pointer;
     transition:
         color var(--transition-fast),

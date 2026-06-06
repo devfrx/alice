@@ -642,8 +642,6 @@ watch(memoryConnected, (connected) => {
     align-items: center;
     justify-content: center;
     background: var(--black-heavy);
-    backdrop-filter: blur(var(--blur-sm));
-    -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .kg-dialog {

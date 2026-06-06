@@ -139,111 +139,111 @@ onMounted(() => {
 .vs-status {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3, 12px);
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: var(--bg-secondary, #1C1C1C);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-3);
     align-items: center;
 }
 
 .vs-status__item {
     display: flex;
     align-items: center;
-    gap: var(--space-1, 4px);
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #A09B90);
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
 }
 
 .vs-status__item strong {
-    color: var(--accent, #E8DCC8);
-    font-weight: 600;
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
 }
 
 .vs-status__dot {
     width: 8px;
     height: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     flex-shrink: 0;
 }
 
 .vs-status__dot--ok {
-    background: var(--success, #5C9A6E);
-    box-shadow: 0 0 6px var(--success-glow, rgba(92, 154, 110, 0.4));
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success-glow);
 }
 
 .vs-status__dot--off {
-    background: var(--danger, #B85C5C);
-    box-shadow: 0 0 6px var(--danger-glow, rgba(184, 92, 92, 0.4));
+    background: var(--danger);
+    box-shadow: 0 0 6px var(--danger-glow);
 }
 
 .vs-status__label {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #A09B90);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
 }
 
 /* ── Collections ───────────────────────────────────────────── */
 .vs-collections {
-    margin-bottom: var(--space-3, 12px);
+    margin-bottom: var(--space-3);
 }
 
 .vs-collections__header {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-secondary, #A09B90);
-    font-weight: 600;
-    margin-bottom: var(--space-2, 8px);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-weight: var(--weight-semibold);
+    margin-bottom: var(--space-2);
 }
 
 .vs-collections__list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 
 .vs-coll {
     display: flex;
     align-items: center;
-    gap: var(--space-3, 12px);
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: var(--bg-secondary, #1C1C1C);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    transition: border-color 0.2s;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast);
 }
 
 .vs-coll:hover {
-    border-color: var(--accent-border, rgba(232, 220, 200, 0.20));
+    border-color: var(--accent-border);
 }
 
 .vs-coll__name {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--accent, #E8DCC8);
-    font-weight: 500;
-    font-family: monospace;
+    font-size: var(--text-sm);
+    color: var(--accent);
+    font-weight: var(--weight-medium);
+    font-family: var(--font-mono);
     min-width: 120px;
 }
 
 .vs-coll__stat {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #A09B90);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
 }
 
 .vs-coll__stat strong {
-    color: var(--text-primary, #EDEDE9);
-    font-weight: 600;
+    color: var(--text-primary);
+    font-weight: var(--weight-semibold);
 }
 
 /* ── Section ───────────────────────────────────────────────── */
 .vs-section {
-    margin-bottom: var(--space-3, 12px);
+    margin-bottom: var(--space-3);
 }
 
 .vs-section__header {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-secondary, #A09B90);
-    font-weight: 600;
-    margin-bottom: var(--space-2, 8px);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-weight: var(--weight-semibold);
+    margin-bottom: var(--space-2);
 }
 
 /* ── Row (toggle / input) ──────────────────────────────────── */
@@ -251,8 +251,8 @@ onMounted(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-2, 8px) 0;
-    gap: var(--space-3, 12px);
+    padding: var(--space-2) 0;
+    gap: var(--space-3);
 }
 
 .vs-row__text {
@@ -262,14 +262,14 @@ onMounted(() => {
 }
 
 .vs-row__label {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-primary, #EDEDE9);
-    font-weight: 500;
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    font-weight: var(--weight-medium);
 }
 
 .vs-row__hint {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-muted, #5F5B53);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
 }
 
 .vs-input-wrap {
@@ -278,58 +278,58 @@ onMounted(() => {
 
 .vs-input {
     width: 80px;
-    padding: var(--space-1, 4px) var(--space-2, 8px);
-    background: var(--bg-input, rgba(237, 227, 213, 0.04));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #EDEDE9);
-    font-size: var(--text-sm, 0.8125rem);
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color var(--transition-fast);
 }
 
 .vs-input:focus {
-    border-color: var(--accent-border, rgba(232, 220, 200, 0.20));
+    border-color: var(--accent-border);
 }
 
 /* ── Actions ───────────────────────────────────────────────── */
 .vs-actions {
     display: flex;
-    gap: var(--space-2, 8px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
 }
 
 .vs-btn {
-    padding: var(--space-1, 4px) var(--space-3, 12px);
-    border-radius: var(--radius-sm, 4px);
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 500;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     cursor: pointer;
     border: 1px solid transparent;
-    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .vs-btn--secondary {
-    background: var(--bg-tertiary, #232323);
-    border-color: var(--border, rgba(255, 255, 255, 0.08));
-    color: var(--text-secondary, #A09B90);
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-secondary);
 }
 
 .vs-btn--secondary:hover:not(:disabled) {
-    background: var(--white-light, rgba(255, 255, 255, 0.06));
-    color: var(--text-primary, #EDEDE9);
+    background: var(--white-light);
+    color: var(--text-primary);
 }
 
 .vs-btn--accent {
-    background: var(--accent-dim, rgba(232, 220, 200, 0.10));
-    border-color: var(--accent-border, rgba(232, 220, 200, 0.20));
-    color: var(--accent, #E8DCC8);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
 }
 
 .vs-btn--accent:hover:not(:disabled) {
-    background: var(--accent-light, rgba(232, 220, 200, 0.08));
-    border-color: var(--accent, #E8DCC8);
+    background: var(--accent-light);
+    border-color: var(--accent);
 }
 
 .vs-btn:disabled {
@@ -339,25 +339,25 @@ onMounted(() => {
 
 /* ── Empty / Loading / Error ───────────────────────────────── */
 .vs-empty {
-    color: var(--text-muted, #5F5B53);
-    padding: var(--space-4, 16px);
+    color: var(--text-muted);
+    padding: var(--space-4);
     text-align: center;
-    font-size: var(--text-sm, 0.8125rem);
+    font-size: var(--text-sm);
 }
 
 .vs-loading {
-    color: var(--text-muted, #5F5B53);
-    padding: var(--space-2, 8px);
-    font-size: var(--text-sm, 0.8125rem);
+    color: var(--text-muted);
+    padding: var(--space-2);
+    font-size: var(--text-sm);
 }
 
 .vs-error {
-    color: rgba(220, 80, 80, 0.9);
-    padding: var(--space-2, 8px);
-    font-size: var(--text-sm, 0.8125rem);
-    background: rgba(220, 80, 80, 0.06);
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-2, 8px);
+    color: var(--danger);
+    padding: var(--space-2);
+    font-size: var(--text-sm);
+    background: var(--danger-faint);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-2);
 }
 
 /* ── Reuse SettingsView toggle styles ──────────────────────── */
@@ -365,17 +365,17 @@ onMounted(() => {
     position: relative;
     width: 36px;
     height: 20px;
-    border-radius: 10px;
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    background: var(--surface-3, #2A2A2A);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--surface-3);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
     flex-shrink: 0;
 }
 
 .sv__toggle--on {
-    background: var(--accent-dim, rgba(232, 220, 200, 0.10));
-    border-color: var(--accent-border, rgba(232, 220, 200, 0.20));
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
 }
 
 .sv__toggle-thumb {
@@ -384,13 +384,13 @@ onMounted(() => {
     left: 2px;
     width: 14px;
     height: 14px;
-    border-radius: 50%;
-    background: var(--text-muted, #5F5B53);
-    transition: transform 0.2s, background 0.2s;
+    border-radius: var(--radius-full);
+    background: var(--text-muted);
+    transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .sv__toggle--on .sv__toggle-thumb {
     transform: translateX(16px);
-    background: var(--accent, #E8DCC8);
+    background: var(--accent);
 }
 </style>

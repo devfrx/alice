@@ -189,7 +189,7 @@ onUnmounted(() => {
 .cal-widget__header-right {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
     flex-shrink: 0;
 }
 
@@ -301,12 +301,12 @@ onUnmounted(() => {
 .cal-widget__list {
     max-height: 140px;
     overflow-y: auto;
-    padding: 0 0 6px;
+    padding: 0 0 var(--space-1-5);
     border-top: 1px solid var(--border);
 }
 
 .cal-widget__list::-webkit-scrollbar {
-    width: 2px;
+    width: var(--space-0-5);
 }
 
 .cal-widget__list::-webkit-scrollbar-track {
@@ -441,7 +441,7 @@ onUnmounted(() => {
     padding: 0 3px;
     border-radius: var(--radius-full);
     background: var(--accent);
-    color: var(--bg-primary);
+    color: var(--text-on-accent);
     font-size: var(--text-2xs);
     font-weight: var(--weight-bold);
     line-height: 1;

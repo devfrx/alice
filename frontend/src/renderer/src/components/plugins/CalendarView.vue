@@ -353,10 +353,11 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   cursor: pointer;
   z-index: var(--z-raised);
   color: var(--text-on-accent);
+  transition: box-shadow var(--transition-fast);
 }
 
 .calendar__event:hover {
-  filter: brightness(1.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .calendar__event-time {
@@ -372,21 +373,24 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 .calendar__event-add {
   display: none;
   position: absolute;
-  top: 1px;
-  right: 1px;
-  width: 18px;
-  height: 18px;
+  top: var(--space-0-5);
+  right: var(--space-0-5);
+  width: 16px;
+  height: 16px;
   border-radius: var(--radius-full);
-  background: var(--black-medium);
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  font-size: var(--text-xs);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: none;
+  font-size: var(--text-sm);
   line-height: 1;
   cursor: pointer;
-  z-index: var(--z-sticky);
   padding: 0;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .calendar__event:hover .calendar__event-add {
@@ -444,6 +448,10 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   background: var(--accent-faint);
 }
 
+.calendar__month-cell--today:hover {
+  background: var(--accent-dim);
+}
+
 .calendar__month-cell--today .calendar__month-date {
   color: var(--accent);
 }
@@ -460,14 +468,19 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 
 .calendar__month-event {
   font-size: var(--text-2xs);
-  padding: 1px var(--space-1);
-  border-radius: var(--radius-xs);
-  margin-top: 2px;
+  padding: var(--space-0-5) var(--space-1);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-0-5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
   color: var(--text-on-accent);
+  transition: box-shadow var(--transition-fast);
+}
+
+.calendar__month-event:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 .calendar__month-more {

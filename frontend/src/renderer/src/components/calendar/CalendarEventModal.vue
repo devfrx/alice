@@ -10,6 +10,17 @@ import { api } from '../../services/api'
 import { useCalendarStore } from '../../stores/calendar'
 import { useModal } from '../../composables/useModal'
 import type { CalendarEvent, EventFormData } from '../../composables/useCalendar'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+
+/** Recurrence presets (RRULE strings); empty value means no recurrence. */
+const recurrenceOptions: UiSelectOption[] = [
+  { value: '', label: 'Nessuna' },
+  { value: 'FREQ=DAILY', label: 'Ogni giorno' },
+  { value: 'FREQ=WEEKLY', label: 'Ogni settimana' },
+  { value: 'FREQ=WEEKLY;BYDAY=MO,WE,FR', label: 'Lun/Mer/Ven' },
+  { value: 'FREQ=MONTHLY', label: 'Ogni mese' },
+  { value: 'FREQ=YEARLY', label: 'Ogni anno' },
+]
 
 interface CalendarEventModalProps {
   /** The existing event being edited, or null for create mode. */
@@ -130,14 +141,13 @@ async function handleDelete(): Promise<void> {
       </div>
       <div class="event-form__field">
         <label>Ricorrenza (RRULE)</label>
-        <select v-model="form.recurrence_rule">
-          <option value="">Nessuna</option>
-          <option value="FREQ=DAILY">Ogni giorno</option>
-          <option value="FREQ=WEEKLY">Ogni settimana</option>
-          <option value="FREQ=WEEKLY;BYDAY=MO,WE,FR">Lun/Mer/Ven</option>
-          <option value="FREQ=MONTHLY">Ogni mese</option>
-          <option value="FREQ=YEARLY">Ogni anno</option>
-        </select>
+        <UiSelect
+          :model-value="form.recurrence_rule"
+          :options="recurrenceOptions"
+          size="md"
+          aria-label="Ricorrenza"
+          @update:model-value="form.recurrence_rule = String($event)"
+        />
       </div>
     </div>
 
@@ -185,28 +195,31 @@ async function handleDelete(): Promise<void> {
 
 .event-form__field label {
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-normal);
 }
 
 .event-form__field input,
-.event-form__field textarea,
-.event-form__field select {
+.event-form__field textarea {
   background: var(--surface-inset);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-2);
   color: var(--text-primary);
   font-size: var(--text-sm);
+  font-family: var(--font-sans);
   outline: none;
   transition: border-color var(--transition-fast);
 }
 
+.event-form__field textarea {
+  resize: vertical;
+}
+
 .event-form__field input:focus,
-.event-form__field textarea:focus,
-.event-form__field select:focus {
+.event-form__field textarea:focus {
   border-color: var(--accent-border);
 }
 
@@ -241,7 +254,7 @@ async function handleDelete(): Promise<void> {
 
 .event-form__btn--primary {
   background: var(--accent);
-  color: var(--surface-0);
+  color: var(--text-on-accent);
   border-color: var(--accent);
 }
 

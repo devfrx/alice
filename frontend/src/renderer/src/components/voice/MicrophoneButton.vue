@@ -418,13 +418,11 @@ const ringOuterStyle = computed(() => ({
   right: 0;
   min-width: 240px;
   max-width: 340px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-1) 0;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-dropdown);
   z-index: var(--z-dropdown);
 }
 
@@ -441,7 +439,6 @@ const ringOuterStyle = computed(() => ({
   padding: var(--space-2-5) var(--space-3);
   font-size: var(--text-sm);
   color: var(--text-muted);
-  font-style: italic;
 }
 
 .mic-menu__item {

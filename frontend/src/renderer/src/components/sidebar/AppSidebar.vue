@@ -43,6 +43,14 @@ const { confirm } = useModal()
 const unreadBadge = computed(() => emailStore.unreadCount)
 
 /**
+ * Mode-tab active state is derived from the ROUTE (not `uiStore.mode`, which
+ * defaults to 'assistant' and would falsely mark Assistente active while on
+ * /workspace). Each tab is active only for its own surface, mutually exclusive.
+ */
+const isAssistantActive = computed(() => route.name === 'assistant')
+const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
+
+/**
  * Whether the sidebar body is shown.
  * - Docked: always rendered; the parent frame controls visibility/width.
  * - Floating overlay: driven by the central UI store open state.
@@ -173,13 +181,13 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
         <div class="sidebar__mode-tabs">
-          <router-link to="/assistant" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
-            :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'assistant' }" @click="onModeTabClick('assistant')">
+          <router-link to="/assistant" class="sidebar__mode-tab"
+            :class="{ 'sidebar__mode-tab--active': isAssistantActive }" @click="onModeTabClick('assistant')">
             <AppIcon name="orb" :size="14" />
             <span>Assistente</span>
           </router-link>
           <button class="sidebar__mode-tab"
-            :class="{ 'sidebar__mode-tab--active': route.path.startsWith('/workspace') }"
+            :class="{ 'sidebar__mode-tab--active': isWorkspaceActive }"
             @click="onWorkspaceTabClick">
             <AppIcon name="hybrid-panel" :size="14" />
             <span>Workspace</span>
@@ -288,12 +296,11 @@ async function onOpenFile(id: string): Promise<void> {
   height: calc(100vh - var(--titlebar-height, 38px) - 16px);
   display: flex;
   flex-direction: column;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur-heavy));
-  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-  border: 1px solid var(--glass-border);
+  /* Solid, fully-opaque surface — no glass / semi-transparency. */
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 20px;
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--panel-shadow, var(--shadow-md));
   z-index: calc(var(--z-overlay) - 1);
   overflow: hidden;
 }
@@ -397,7 +404,7 @@ async function onOpenFile(id: string): Promise<void> {
   padding: 3px;
   background: var(--surface-2);
   border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--border);
   flex-shrink: 0;
 }
 

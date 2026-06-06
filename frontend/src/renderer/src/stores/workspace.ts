@@ -40,7 +40,7 @@ export type ChatMode = 'anchored' | 'tiled'
 // Sidebar mode type
 // ---------------------------------------------------------------------------
 
-export type SidebarMode = 'expanded' | 'rail' | 'closed'
+export type SidebarMode = 'expanded' | 'closed'
 
 // ---------------------------------------------------------------------------
 // Migration helpers
@@ -124,7 +124,9 @@ function loadLayout(): WorkspaceLayout {
 function _loadSidebarMode(): SidebarMode {
   try {
     const raw = localStorage.getItem(SIDEBAR_KEY)
-    if (raw === 'expanded' || raw === 'rail' || raw === 'closed') return raw
+    if (raw === 'expanded' || raw === 'closed') return raw
+    // Legacy 'rail' value (intermediate reduce-only mode, since removed) → expanded.
+    if (raw === 'rail') return 'expanded'
   } catch {
     /* localStorage may be unavailable */
   }

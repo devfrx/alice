@@ -159,9 +159,9 @@ describe('setSidebarWidth clamping', () => {
 describe('setSidebarMode', () => {
   it('updates sidebarMode and persists to localStorage', () => {
     const ws = useWorkspaceStore()
-    ws.setSidebarMode('rail')
-    expect(ws.sidebarMode).toBe('rail')
-    expect(localStorage.getItem('alice_workspace_sidebar')).toBe('rail')
+    ws.setSidebarMode('expanded')
+    expect(ws.sidebarMode).toBe('expanded')
+    expect(localStorage.getItem('alice_workspace_sidebar')).toBe('expanded')
   })
 
   it('can set to closed', () => {
@@ -169,6 +169,13 @@ describe('setSidebarMode', () => {
     ws.setSidebarMode('closed')
     expect(ws.sidebarMode).toBe('closed')
     expect(localStorage.getItem('alice_workspace_sidebar')).toBe('closed')
+  })
+
+  it('migrates a legacy persisted "rail" value to expanded on load', () => {
+    localStorage.setItem('alice_workspace_sidebar', 'rail')
+    setActivePinia(createPinia())
+    const ws = useWorkspaceStore()
+    expect(ws.sidebarMode).toBe('expanded')
   })
 })
 

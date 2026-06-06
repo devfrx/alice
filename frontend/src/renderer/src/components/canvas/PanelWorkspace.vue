@@ -40,9 +40,6 @@ const {
   onMouseDown: onChatResizeStart
 } = useResizablePane({ axis: 'x', min: 320, max: 900, initial: 520 })
 
-// DEV-only: keep a single reset affordance for layout testing.
-const isDev = import.meta.env.DEV
-
 // ── Intent bus: CONSUMER ──────────────────────────────────────────────────
 // Subscribe here (not in the store) so the handler is scoped to this
 // component's lifetime and automatically unregistered on unmount — no
@@ -110,17 +107,7 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
     <!--
       The module launcher now lives in the ChatPanel header (top-right); no
       floating overlay sits on the workspace content anymore.
-      DEV-only: a minimal reset-layout affordance remains, bottom-right.
     -->
-    <button
-      v-if="isDev"
-      type="button"
-      class="panel-workspace__dev-reset"
-      title="Reset layout (DEV)"
-      @click="workspaceStore.resetLayout()"
-    >
-      ↺
-    </button>
   </div>
 </template>
 
@@ -178,27 +165,5 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
 .panel-workspace__divider:hover,
 .panel-workspace__divider--active {
   background: var(--accent-border);
-}
-
-/* DEV-only reset button — minimal, unobtrusive, bottom-right. */
-.panel-workspace__dev-reset {
-  position: absolute;
-  bottom: var(--space-2, 8px);
-  right: var(--space-2, 8px);
-  z-index: var(--z-overlay, 50);
-  font-size: var(--text-xs, 11px);
-  padding: 2px 6px;
-  color: var(--text-muted);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
-  cursor: pointer;
-  line-height: 1;
-  opacity: 0.6;
-}
-
-.panel-workspace__dev-reset:hover {
-  color: var(--text-secondary);
-  background: var(--surface-hover);
 }
 </style>

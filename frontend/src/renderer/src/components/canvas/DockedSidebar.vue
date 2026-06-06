@@ -3,25 +3,15 @@
  * DockedSidebar — inline, resizable, collapsible frame on the left of the
  * shell that hosts {@link AppSidebar} in its docked variant.
  *
- * ── Toggle mapping (single source of truth, no double-toggle) ──────────────
- * Two independent concerns drive this frame:
+ * ── Visibility (single source of truth) ───────────────────────────────────
+ * `uiStore.sidebarOpen` (boolean) is the ONLY driver of OPEN ↔ CLOSED. It is
+ * wired to the EXISTING TitleBar toggle button. When false the frame collapses
+ * to zero width; reopening is done exclusively via the TitleBar toggle (there
+ * is no in-frame floating reopen affordance). Closing is done via the X button
+ * in the sidebar header (which flips this same flag).
  *
- *   1. `uiStore.sidebarOpen` (boolean) — VISIBLE ↔ CLOSED. This is the source
- *      of truth wired to the EXISTING TitleBar toggle button. When false the
- *      frame collapses to zero width and only a small floating reopen
- *      affordance remains. The TitleBar button (and the in-frame collapse
- *      button) flip exactly this flag — nothing else.
- *
- *   2. `workspaceStore.sidebarMode` ('expanded' | 'rail' | 'closed') +
- *      `sidebarWidth` — control HOW the frame looks WHEN visible. We only ever
- *      toggle between 'expanded' (full sidebar) and 'rail' (narrow strip with
- *      an expand button) here; the 'closed' value is treated as collapsed too
- *      but is never written by this component (we use `sidebarOpen` for that).
- *
- * Because visibility lives solely in `sidebarOpen` and width/rail lives solely
- * in `sidebarMode`, the two never fight: the TitleBar toggle shows/hides, the
- * in-frame rail button changes width presentation, and there is exactly one
- * writer per piece of state.
+ * `sidebarWidth` controls how wide the frame is WHEN visible. There is no
+ * intermediate "rail"/reduce mode — the sidebar is either expanded or closed.
  *
  * The frame sits in normal document flow (z-index: auto) so teleported
  * modals/toasts (z-modal / z-toast) always render above it.
@@ -32,8 +22,6 @@ import AppIcon from '../ui/AppIcon.vue'
 import { useResizablePane } from '../../composables/useResizablePane'
 import { useUIStore } from '../../stores/ui'
 import { useWorkspaceStore } from '../../stores/workspace'
-
-const RAIL_WIDTH = 48
 
 const uiStore = useUIStore()
 const workspaceStore = useWorkspaceStore()
@@ -61,87 +49,31 @@ watch(
   }
 )
 
-/** Visible when the UI store says open AND not explicitly railed/closed mode. */
+/** Visible when the UI store says open. */
 const isVisible = computed(() => uiStore.sidebarOpen)
 
-/** Rail (narrow) presentation when visible but mode === 'rail'. */
-const isRail = computed(() => isVisible.value && workspaceStore.sidebarMode === 'rail')
+/** Effective frame width in px (0 when collapsed). */
+const frameWidth = computed<number>(() => (isVisible.value ? size.value : 0))
 
-/** Full sidebar shown only when visible and not in rail mode. */
-const showFull = computed(() => isVisible.value && !isRail.value)
-
-/** Effective frame width in px. */
-const frameWidth = computed<number>(() => {
-  if (!isVisible.value) return 0
-  if (isRail.value) return RAIL_WIDTH
-  return size.value
-})
-
-/** Collapse the whole frame (TitleBar toggle mirrors this). */
+/** Collapse the whole frame (TitleBar toggle reopens). */
 function collapse(): void {
   uiStore.sidebarOpen = false
-}
-
-/** Reopen the frame to its last expanded/rail state. */
-function reopen(): void {
-  uiStore.sidebarOpen = true
-}
-
-/** Switch between full (expanded) and rail presentations while visible. */
-function toRail(): void {
-  workspaceStore.setSidebarMode('rail')
-}
-
-function toExpanded(): void {
-  workspaceStore.setSidebarMode('expanded')
 }
 </script>
 
 <template>
-  <!-- Frame in normal flow; width animates between 0 / rail / expanded. -->
+  <!-- Frame in normal flow; width animates between 0 (closed) and expanded. -->
   <div
     class="docked-sidebar"
     :class="{
       'docked-sidebar--collapsed': !isVisible,
-      'docked-sidebar--rail': isRail,
       'docked-sidebar--dragging': isDragging
     }"
     :style="{ width: frameWidth + 'px' }"
   >
-    <!-- Rail: narrow strip with an expand affordance. -->
-    <div v-if="isRail" class="docked-sidebar__rail">
-      <button
-        type="button"
-        class="docked-sidebar__rail-btn"
-        aria-label="Espandi sidebar"
-        title="Espandi"
-        @click="toExpanded"
-      >
-        <AppIcon name="hybrid-sidebar" :size="16" />
-      </button>
-      <button
-        type="button"
-        class="docked-sidebar__rail-btn"
-        aria-label="Chiudi sidebar"
-        title="Chiudi"
-        @click="collapse"
-      >
-        <AppIcon name="x" :size="14" :stroke-width="2.5" />
-      </button>
-    </div>
-
-    <!-- Full sidebar body. -->
-    <div v-else-if="showFull" class="docked-sidebar__body">
+    <!-- Full sidebar body. Closing is via the X in the sidebar header. -->
+    <div v-if="isVisible" class="docked-sidebar__body">
       <div class="docked-sidebar__controls">
-        <button
-          type="button"
-          class="docked-sidebar__ctrl-btn"
-          aria-label="Comprimi in barra"
-          title="Comprimi"
-          @click="toRail"
-        >
-          <AppIcon name="hybrid-sidebar" :size="14" />
-        </button>
         <button
           type="button"
           class="docked-sidebar__ctrl-btn"
@@ -163,18 +95,6 @@ function toExpanded(): void {
       />
     </div>
   </div>
-
-  <!-- Floating reopen affordance when fully collapsed. -->
-  <button
-    v-if="!isVisible"
-    type="button"
-    class="docked-sidebar__reopen"
-    aria-label="Apri sidebar"
-    title="Apri sidebar"
-    @click="reopen"
-  >
-    <AppIcon name="hybrid-sidebar" :size="16" />
-  </button>
 </template>
 
 <style scoped>
@@ -184,10 +104,12 @@ function toExpanded(): void {
   height: calc(100% - 2 * var(--gutter-lg, 10px));
   margin: var(--gutter-lg, 10px) 0 var(--gutter-lg, 10px) var(--gutter-lg, 10px);
   overflow: hidden;
+  /* Solid, fully-opaque surface — no glass / semi-transparency. */
   background: var(--surface-1);
+  /* Subtle hairline + soft shadow for light separation (not a heavy frame). */
   border: 1px solid var(--border);
   border-radius: var(--panel-radius, var(--radius-lg));
-  box-shadow: var(--panel-shadow, var(--shadow-floating));
+  box-shadow: var(--panel-shadow, var(--shadow-md));
   transition: width var(--transition-fast, 160ms) var(--ease-out, ease);
   /* Sits in normal flow — modals/toasts (teleported) render above. */
   z-index: auto;
@@ -207,17 +129,7 @@ function toExpanded(): void {
   user-select: none;
 }
 
-/* ── Rail ──────────────────────────────────────────────────────────── */
-.docked-sidebar__rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1, 4px);
-  padding: var(--space-2, 8px) 0;
-  height: 100%;
-}
-
-.docked-sidebar__rail-btn,
+/* ── Controls (close button) ───────────────────────────────────────── */
 .docked-sidebar__ctrl-btn {
   display: inline-flex;
   align-items: center;
@@ -235,7 +147,6 @@ function toExpanded(): void {
     border-color var(--transition-fast);
 }
 
-.docked-sidebar__rail-btn:hover,
 .docked-sidebar__ctrl-btn:hover {
   color: var(--text-primary);
   background: var(--surface-hover);
@@ -274,35 +185,6 @@ function toExpanded(): void {
 .docked-sidebar__divider:hover,
 .docked-sidebar__divider--active {
   background: var(--accent-border);
-}
-
-/* ── Floating reopen affordance ────────────────────────────────────── */
-.docked-sidebar__reopen {
-  position: absolute;
-  top: calc(var(--titlebar-height, 38px) + var(--space-2, 8px));
-  left: var(--space-2, 8px);
-  z-index: var(--z-sticky, 100);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-secondary);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.docked-sidebar__reopen:hover {
-  color: var(--text-primary);
-  background: var(--surface-3);
-  border-color: var(--border-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -378,8 +378,8 @@
   --gutter: 6px;
   --gutter-lg: 10px;
   --panel-radius: var(--radius-md);
-  --panel-shadow: var(--shadow-floating);
-  --panel-header-height: 30px;
+  --panel-shadow: var(--shadow-md);
+  --panel-header-height: 28px;
 }
 
 /*

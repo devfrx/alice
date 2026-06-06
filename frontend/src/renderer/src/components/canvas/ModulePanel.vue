@@ -61,7 +61,8 @@ const emit = defineEmits<{
   width: 100%;
   height: 100%;
   border-radius: var(--panel-radius, var(--radius-md));
-  box-shadow: var(--panel-shadow, var(--shadow-floating));
+  box-shadow: var(--panel-shadow, var(--shadow-md));
+  /* Fully opaque solid surface — no glass / semi-transparency. */
   background: var(--surface-1);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -74,23 +75,24 @@ const emit = defineEmits<{
 .module-panel__header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  height: var(--panel-header-height, 30px);
+  gap: var(--space-1-5);
+  height: var(--panel-header-height, 28px);
   flex-shrink: 0;
   padding: 0 var(--space-2);
+  /* Minimal chrome: same surface as the body, single hairline separator. */
   border-bottom: 1px solid var(--border);
-  background: var(--surface-2, var(--surface-1));
+  background: var(--surface-1);
 }
 
 .module-panel__icon {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .module-panel__title {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

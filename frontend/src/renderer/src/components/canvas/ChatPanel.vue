@@ -248,6 +248,7 @@ const conversationTitle = computed<string>(() => {
 .chat-panel__title {
   flex: 1;
   min-width: 0;
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);

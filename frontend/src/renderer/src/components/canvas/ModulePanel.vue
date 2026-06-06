@@ -61,15 +61,19 @@ const emit = defineEmits<{
   width: 100%;
   height: 100%;
   border-radius: var(--panel-radius, var(--radius-md));
+  /* Borderless card — separation comes from the surface contrast against the
+     workspace background plus a soft shadow, not a drawn border. */
   box-shadow: var(--panel-shadow, var(--shadow-sm));
   /* Fully opaque solid surface — no glass / semi-transparency. */
   background: var(--surface-1);
-  border: 1px solid var(--border);
+  border: none;
   overflow: hidden;
 }
 
+/* Active leaf: lift it with a stronger shadow + faint accent glow ring
+   (no hard/marked border). */
 .module-panel--active {
-  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-border);
 }
 
 .module-panel__header {
@@ -89,6 +93,7 @@ const emit = defineEmits<{
 }
 
 .module-panel__title {
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--text-secondary);

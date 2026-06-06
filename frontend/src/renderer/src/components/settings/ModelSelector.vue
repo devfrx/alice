@@ -282,7 +282,7 @@ onMounted(() => {
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════════
-   ModelSelector — solid dropdown coherent with FloatingInputBar
+   ModelSelector — solid dropdown coherent with the chat input bar
    ═══════════════════════════════════════════════════════════════ */
 
 .ms {

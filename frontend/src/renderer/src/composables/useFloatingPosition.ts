@@ -25,7 +25,7 @@ import {
 export type FloatingPlacement = 'top' | 'bottom'
 
 /** Horizontal alignment of the floating element relative to the anchor. */
-export type FloatingAlign = 'start' | 'end'
+export type FloatingAlign = 'start' | 'center' | 'end'
 
 export interface UseFloatingPositionOptions {
   /** Preferred side; default `'bottom'`. */
@@ -73,7 +73,15 @@ export function useFloatingPosition(
     flip = true,
   } = options
 
-  const floatingStyle = ref<Record<string, string>>({})
+  // Start hidden + fixed (never `static`) so the panel can't flash at the
+  // document-flow top-left before the first measurement lands.
+  const HIDDEN_STYLE: Record<string, string> = {
+    position: 'fixed',
+    top: '-9999px',
+    left: '-9999px',
+    visibility: 'hidden',
+  }
+  const floatingStyle = ref<Record<string, string>>({ ...HIDDEN_STYLE })
 
   /** Recompute the fixed-position style from the anchor's current rect. */
   function update(): void {
@@ -125,12 +133,19 @@ export function useFloatingPosition(
     }
 
     // ── Horizontal alignment + viewport clamp ──
-    let left = align === 'end' ? rect.right - floatWidth : rect.left
+    let left: number
+    if (align === 'center') left = rect.left + rect.width / 2 - floatWidth / 2
+    else if (align === 'end') left = rect.right - floatWidth
+    else left = rect.left
     if (left + floatWidth > vw - VIEWPORT_MARGIN) {
       left = vw - VIEWPORT_MARGIN - floatWidth
     }
     if (left < VIEWPORT_MARGIN) left = VIEWPORT_MARGIN
     style['left'] = `${left}px`
+
+    // Reveal only once the panel has a real measured size, so we never paint
+    // it at a stale/zero-size position. Until then it stays hidden (off-screen).
+    style['visibility'] = floatRect && floatRect.width > 0 ? 'visible' : 'hidden'
 
     floatingStyle.value = style
   }
@@ -143,25 +158,52 @@ export function useFloatingPosition(
     if (isOpen.value) update()
   }
 
+  /**
+   * Observes both anchor and floating element so the panel repositions when
+   * either changes size — crucially, when the floating element gains its real
+   * size after first paint (the source of the "wrong position on first open"
+   * bug, where the panel measured 0×0 before content laid out).
+   */
+  let resizeObserver: ResizeObserver | null = null
+
   function addListeners(): void {
     // Capture phase so scrolling inside nested containers also repositions.
     window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', onResize)
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (isOpen.value) update()
+      })
+      // The floating element only exists after the next DOM flush; observe both
+      // once it is mounted.
+      nextTick(() => {
+        if (!resizeObserver) return
+        if (floatingEl.value) resizeObserver.observe(floatingEl.value)
+        if (anchorEl.value) resizeObserver.observe(anchorEl.value)
+      })
+    }
   }
 
   function removeListeners(): void {
     window.removeEventListener('scroll', onScroll, true)
     window.removeEventListener('resize', onResize)
+    resizeObserver?.disconnect()
+    resizeObserver = null
   }
 
   watch(
     isOpen,
     (open) => {
       if (open) {
-        // Compute after the floating element is in the DOM so size-aware
-        // flipping/clamping has real dimensions to work with.
-        nextTick(update)
+        // Hide first so the panel never flashes at a stale/zero position, then
+        // measure on the next DOM flush and again after paint settles (covers
+        // layout that shifts post-navigation or while sidebar/panels animate).
+        floatingStyle.value = { ...HIDDEN_STYLE }
         addListeners()
+        nextTick(update)
+        requestAnimationFrame(() => {
+          if (isOpen.value) update()
+        })
       } else {
         removeListeners()
       }

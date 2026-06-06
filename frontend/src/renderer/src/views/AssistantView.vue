@@ -17,7 +17,7 @@ import AssistantFab from '../components/assistant/AssistantFab.vue'
 import AssistantResponse from '../components/assistant/AssistantResponse.vue'
 import AssistantTranscript from '../components/assistant/AssistantTranscript.vue'
 import ConversationDrawer from '../components/assistant/ConversationDrawer.vue'
-import FloatingInputBar from '../components/input/FloatingInputBar.vue'
+import ChatInput from '../components/chat/ChatInput.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import AgentActivitySidebar from '../components/chat/AgentActivitySidebar.vue'
@@ -623,12 +623,16 @@ onMounted(() => {
                 </button>
             </Transition>
 
-            <FloatingInputBar :disabled="chatStore.isStreamingCurrentConversation" :is-connected="isConnected"
-                :is-streaming="chatStore.isStreamingCurrentConversation" :audio-devices="audioDevices"
-                :selected-device-id="selectedDeviceId" :orb-state="orbState" @send="handleSend"
-                @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"
-                @voice-stop="stopListening" @voice-cancel-processing="cancelProcessing"
-                @refresh-devices="refreshDevices" @select-device="(id) => { selectedDeviceId = id }" />
+            <!-- Unified input bar: the same ChatInput used in the Workspace,
+                 floated at the bottom-center of the assistant column. -->
+            <div class="assistant-view__input">
+                <ChatInput :disabled="chatStore.isStreamingCurrentConversation" :is-connected="isConnected"
+                    :is-streaming="chatStore.isStreamingCurrentConversation" :audio-devices="audioDevices"
+                    :selected-device-id="selectedDeviceId" @send="handleSend"
+                    @stop="() => { stopGeneration(); cancelSpeak() }" @voice-start="startListening"
+                    @voice-stop="stopListening" @voice-cancel-processing="cancelProcessing"
+                    @refresh-devices="refreshDevices" @select-device="(id) => { selectedDeviceId = id }" />
+            </div>
         </div>
 
         <!-- Right Side Panel (3D models or charts) -->
@@ -792,6 +796,25 @@ onMounted(() => {
     max-width: 900px;
     padding: var(--space-8) var(--space-4) 100px;
     gap: 0;
+}
+
+/* ── Unified floating input bar (reuses Workspace ChatInput) ── */
+.assistant-view__input {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-dropdown);
+    width: min(720px, calc(100% - 32px));
+    display: flex;
+    justify-content: stretch;
+}
+
+/* Let the field fill the floating wrapper (its own margin-inline keeps the
+   inset); cancel it here since the wrapper already provides side spacing. */
+.assistant-view__input :deep(.ci) {
+    flex: 1;
+    margin-inline: 0;
 }
 
 /* ── 3D / Chart Side Panel ── */

@@ -56,9 +56,13 @@ async function adjustPosition(): Promise<void> {
     const rect = el.getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
+    const MARGIN = 8
 
-    adjustedX.value = props.x + rect.width > vw ? vw - rect.width - 4 : props.x
-    adjustedY.value = props.y + rect.height > vh ? vh - rect.height - 4 : props.y
+    // Clamp on every side so the menu never leaves the app viewport: prefer the
+    // requested position, pull it in if it would overflow right/bottom, and
+    // never let it cross the top/left margins.
+    adjustedX.value = Math.max(MARGIN, Math.min(props.x, vw - rect.width - MARGIN))
+    adjustedY.value = Math.max(MARGIN, Math.min(props.y, vh - rect.height - MARGIN))
 
     // Move initial focus to the first enabled item so arrow keys work
     // immediately. Falls back to the menu container itself.

@@ -206,7 +206,7 @@ onUnmounted(() => {
                         :class="{ 'is-open': serviceAccordionOpen }" />
                 </button>
 
-                <UiPopover :open="serviceAccordionOpen" :anchor-el="serviceTriggerRef" placement="bottom" align="start"
+                <UiPopover :open="serviceAccordionOpen" :anchor-el="serviceTriggerRef" placement="bottom" align="center"
                     aria-label="Stato servizi" @update:open="serviceAccordionOpen = $event">
                     <section id="titlebar-services-panel" class="titlebar__service-panel">
                         <header class="titlebar__service-panel-head">

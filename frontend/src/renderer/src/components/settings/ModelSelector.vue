@@ -23,8 +23,14 @@ const settingsStore = useSettingsStore()
 const isOpen = ref(false)
 const errorMessage = ref<string | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
+/** Inline fixed-position style for the teleported dropdown. */
+const dropdownStyle = ref<Record<string, string>>({})
+
+/** Minimum dropdown width (keep in sync with CSS). */
+const DROPDOWN_MIN_WIDTH = 340
 
 /** All models for this selector's type. */
 const typeModels = computed(() =>
@@ -65,16 +71,31 @@ const triggerLabel = computed(() => {
 
 function adjustDropdownPosition(): void {
   nextTick(() => {
-    const dropdown = dropdownRef.value
-    if (!dropdown) return
-    dropdown.style.left = '0'
-    dropdown.style.right = 'auto'
-    const rect = dropdown.getBoundingClientRect()
-    if (rect.right > window.innerWidth - 8) {
-      dropdown.style.left = 'auto'
-      dropdown.style.right = '0'
+    const trigger = triggerRef.value
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    // Effective width: prefer the rendered dropdown width, else the minimum.
+    const maxWidth = Math.min(440, window.innerWidth - 32)
+    const width = Math.max(
+      DROPDOWN_MIN_WIDTH,
+      Math.min(maxWidth, dropdownRef.value?.getBoundingClientRect().width || DROPDOWN_MIN_WIDTH)
+    )
+    let left = rect.left
+    // Clamp so the dropdown never overflows the viewport right edge.
+    if (left + width > window.innerWidth - 8) {
+      left = window.innerWidth - 8 - width
+    }
+    if (left < 8) left = 8
+    dropdownStyle.value = {
+      position: 'fixed',
+      left: `${left}px`,
+      bottom: `${window.innerHeight - rect.top + 8}px`,
     }
   })
+}
+
+function handleScroll(): void {
+  if (isOpen.value) adjustDropdownPosition()
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -133,7 +154,13 @@ function isModelBusy(model: LMStudioModel): boolean {
 }
 
 function handleClickOutside(event: MouseEvent): void {
-  if (rootRef.value && !rootRef.value.contains(event.target as Node)) {
+  if (!isOpen.value) return
+  const target = event.target as Node
+  // The dropdown is teleported outside rootRef, so treat clicks inside it
+  // (or inside the trigger root) as "inside".
+  const insideRoot = rootRef.value?.contains(target) ?? false
+  const insideDropdown = dropdownRef.value?.contains(target) ?? false
+  if (!insideRoot && !insideDropdown) {
     isOpen.value = false
   }
 }
@@ -142,8 +169,10 @@ watch(isOpen, (val) => {
   if (val) {
     adjustDropdownPosition()
     document.addEventListener('keydown', handleKeydown)
+    window.addEventListener('scroll', handleScroll, true)
   } else {
     document.removeEventListener('keydown', handleKeydown)
+    window.removeEventListener('scroll', handleScroll, true)
   }
 })
 
@@ -156,6 +185,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('scroll', handleScroll, true)
   document.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -163,7 +193,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="rootRef" class="ms">
     <!-- Trigger button -->
-    <button class="ms__trigger" :class="{
+    <button ref="triggerRef" class="ms__trigger" :class="{
       'ms__trigger--embedding': props.modelType === 'embedding',
       'ms__trigger--open': isOpen
     }" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle" @keydown="handleKeydown">
@@ -179,9 +209,10 @@ onBeforeUnmount(() => {
         :stroke-width="2.5" />
     </button>
 
-    <!-- Dropdown -->
-    <Transition name="ms-drop">
-      <div v-if="isOpen" ref="dropdownRef" class="ms__dropdown" role="group">
+    <!-- Dropdown — teleported to body to escape the input bar's overflow:hidden -->
+    <Teleport to="body">
+      <Transition name="ms-drop">
+        <div v-if="isOpen" ref="dropdownRef" class="ms__dropdown" role="group" :style="dropdownStyle">
         <!-- Search (only when many models) -->
         <div v-if="showSearch" class="ms__search">
           <AppIcon class="ms__search-icon" name="search" :size="12" />
@@ -315,8 +346,9 @@ onBeforeUnmount(() => {
             </template>
           </template>
         </div>
-      </div>
-    </Transition>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -413,12 +445,13 @@ onBeforeUnmount(() => {
 .ms__chevron--open {
   transform: rotate(180deg);
 }
+</style>
 
+<!-- Dropdown styles are NOT scoped (teleported outside component DOM) -->
+<style>
 /* ── Dropdown ─────────────────────────────────────────────────── */
 .ms__dropdown {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
+  /* position is set inline (fixed) via dropdownStyle */
   min-width: 340px;
   max-width: min(440px, calc(100vw - 32px));
   background: var(--surface-2);

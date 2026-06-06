@@ -14,7 +14,7 @@
  *     disabled or when Tool RAG is active (auto-selection), since
  *     manual choice would have no effect in those cases.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import AppIcon from '../ui/AppIcon.vue'
 
@@ -22,8 +22,35 @@ const settingsStore = useSettingsStore()
 
 const isOpen = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
+/** Trigger chip ("Strumenti") — anchor for the teleported popover. */
+const triggerRef = ref<HTMLElement | null>(null)
+/** The teleported popover element (for outside-click detection). */
+const popRef = ref<HTMLElement | null>(null)
+/** Inline fixed-position style for the teleported popover. */
+const popStyle = ref<Record<string, string>>({})
 /** Plugin names whose tool list is expanded in the popover. */
 const expanded = ref<Set<string>>(new Set())
+
+/** Fixed width of the popover (keep in sync with CSS). */
+const POP_WIDTH = 320
+
+/** Recompute the popover's fixed position anchored above the trigger chip. */
+function updatePopPosition(): void {
+  const trigger = triggerRef.value
+  if (!trigger) return
+  const rect = trigger.getBoundingClientRect()
+  let left = rect.left
+  // Clamp so the popover never overflows the viewport right edge.
+  if (left + POP_WIDTH > window.innerWidth - 8) {
+    left = window.innerWidth - 8 - POP_WIDTH
+  }
+  if (left < 8) left = 8
+  popStyle.value = {
+    position: 'fixed',
+    left: `${left}px`,
+    bottom: `${window.innerHeight - rect.top + 8}px`,
+  }
+}
 
 /** Whether the agent loop is currently active (global config). */
 const agentEnabled = computed(() => settingsStore.settings.agent.enabled)
@@ -51,6 +78,20 @@ function toggleOpen(): void {
   isOpen.value = !isOpen.value
 }
 
+// Manage reposition listeners from the open-state itself so EVERY close path
+// (toggle, Escape, outside-click) tears them down symmetrically — not just the
+// toggle button.
+watch(isOpen, (open) => {
+  if (open) {
+    nextTick(updatePopPosition)
+    window.addEventListener('scroll', updatePopPosition, true)
+    window.addEventListener('resize', updatePopPosition)
+  } else {
+    window.removeEventListener('scroll', updatePopPosition, true)
+    window.removeEventListener('resize', updatePopPosition)
+  }
+})
+
 function toggleExpand(plugin: string): void {
   const next = new Set(expanded.value)
   if (next.has(plugin)) next.delete(plugin)
@@ -66,7 +107,13 @@ function isPluginEnabled(plugin: string): boolean {
 }
 
 function handleClickOutside(event: MouseEvent): void {
-  if (rootRef.value && !rootRef.value.contains(event.target as Node)) {
+  if (!isOpen.value) return
+  const target = event.target as Node
+  // The popover is teleported outside rootRef, so treat clicks inside it
+  // (or inside the trigger root) as "inside".
+  const insideRoot = rootRef.value?.contains(target) ?? false
+  const insidePop = popRef.value?.contains(target) ?? false
+  if (!insideRoot && !insidePop) {
     isOpen.value = false
   }
 }
@@ -83,6 +130,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleClickOutside)
   document.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('scroll', updatePopPosition, true)
+  window.removeEventListener('resize', updatePopPosition)
 })
 </script>
 
@@ -96,7 +145,8 @@ onBeforeUnmount(() => {
     </button>
 
     <!-- Tool selector chip -->
-    <button class="ctc__chip" :class="{ 'ctc__chip--open': isOpen, 'ctc__chip--muted': !available }"
+    <button ref="triggerRef" class="ctc__chip"
+      :class="{ 'ctc__chip--open': isOpen, 'ctc__chip--muted': !available }"
       :disabled="!available" :title="available ? 'Seleziona gli strumenti attivi' : disabledReason"
       aria-haspopup="true" :aria-expanded="isOpen" @click="toggleOpen">
       <AppIcon name="sliders" :size="11" />
@@ -104,9 +154,10 @@ onBeforeUnmount(() => {
       <span v-if="available && disabledCount > 0" class="ctc__badge">-{{ disabledCount }}</span>
     </button>
 
-    <!-- Popover -->
-    <Transition name="ctc-pop">
-      <div v-if="isOpen" class="ctc__pop">
+    <!-- Popover — teleported to body to escape the input bar's overflow:hidden -->
+    <Teleport to="body">
+      <Transition name="ctc-pop">
+        <div v-if="isOpen" ref="popRef" class="ctc__pop" :style="popStyle">
         <div class="ctc__pop-head">
           <span class="ctc__pop-title">Strumenti attivi</span>
           <button v-if="disabledCount > 0" class="ctc__reset" @click="settingsStore.resetToolSelection()">
@@ -149,8 +200,9 @@ onBeforeUnmount(() => {
             </ul>
           </li>
         </ul>
-      </div>
-    </Transition>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -227,11 +279,13 @@ onBeforeUnmount(() => {
   line-height: 14px;
 }
 
+</style>
+
+<!-- Popover styles are NOT scoped (teleported outside component DOM) -->
+<style>
 /* ── Popover ── */
 .ctc__pop {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
+  /* position is set inline (fixed) via popStyle */
   width: 320px;
   max-height: 360px;
   overflow-y: auto;
@@ -240,7 +294,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-md);
   background: var(--surface-1);
   box-shadow: var(--shadow-floating);
-  z-index: var(--z-dropdown);
+  z-index: var(--z-dropdown, 1000);
 }
 
 .ctc__pop-head {
@@ -351,7 +405,7 @@ onBeforeUnmount(() => {
 }
 
 /* ── Toggle switch ── */
-.ctc__sw {
+.ctc__pop .ctc__sw {
   position: relative;
   flex-shrink: 0;
   width: 30px;
@@ -363,11 +417,11 @@ onBeforeUnmount(() => {
   transition: background var(--duration-fast) ease;
 }
 
-.ctc__sw--on {
+.ctc__pop .ctc__sw--on {
   background: var(--accent);
 }
 
-.ctc__sw-thumb {
+.ctc__pop .ctc__sw-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -378,7 +432,7 @@ onBeforeUnmount(() => {
   transition: transform var(--duration-fast) ease;
 }
 
-.ctc__sw--on .ctc__sw-thumb {
+.ctc__pop .ctc__sw--on .ctc__sw-thumb {
   transform: translateX(14px);
 }
 

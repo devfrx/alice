@@ -11,7 +11,7 @@
  * - The send button is disabled when the input is empty (and no files) or streaming.
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { AudioDevice } from '../../composables/useVoice'
 import ModelSelector from '../settings/ModelSelector.vue'
 import ChatToolControls from './ChatToolControls.vue'
@@ -23,13 +23,27 @@ import { useVoiceStore } from '../../stores/voice'
 import AppIcon from '../ui/AppIcon.vue'
 
 const router = useRouter()
+const route = useRoute()
 const settingsStore = useSettingsStore()
 const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
 
-/** Navigate to Workspace (the primary chat surface; hybrid mode retired R3). */
+/** Whether the current view is the Workspace surface. */
+const isOnWorkspace = computed(() => route.path.startsWith('/workspace'))
+
+/** Destination view the toggle points to (the OTHER surface). */
+const modeTarget = computed(() => (isOnWorkspace.value ? 'assistant' : 'workspace'))
+
+/** Label/icon for the toggle chip — reflects the destination view. */
+const modeLabel = computed(() => (isOnWorkspace.value ? 'Assistente' : 'Workspace'))
+const modeIcon = computed(() => (isOnWorkspace.value ? 'orb' : 'hybrid-panel'))
+const modeTitle = computed(() =>
+  isOnWorkspace.value ? "Vai all'assistente" : 'Vai al workspace'
+)
+
+/** Switch between the two primary surfaces (Workspace ↔ Assistant). */
 function toggleMode(): void {
-  router.push({ name: 'workspace' })
+  router.push({ name: modeTarget.value })
 }
 
 const supportsVision = computed(() => settingsStore.activeModel?.capabilities.vision ?? false)
@@ -304,10 +318,10 @@ defineExpose({
         <!-- Agent mode + tool selector pills -->
         <ChatToolControls />
 
-        <!-- Workspace shortcut chip -->
-        <button class="ci__mode-toggle" @click="toggleMode">
-          <AppIcon name="hybrid-panel" :size="11" />
-          <span>Workspace</span>
+        <!-- View toggle chip — reflects the destination surface -->
+        <button class="ci__mode-toggle" :aria-label="modeTitle" :title="modeTitle" @click="toggleMode">
+          <AppIcon :name="modeIcon" :size="11" />
+          <span>{{ modeLabel }}</span>
         </button>
       </div>
 

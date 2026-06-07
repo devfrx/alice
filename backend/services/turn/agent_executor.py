@@ -31,23 +31,24 @@ import json
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from backend.services.turn.models import TurnInput, TurnResult
-from backend.services.turn.sink import WSEventSink
 from backend.services.turn._critic_bypass import (
     emit_critic_invoked,
     emit_warning,
 )
+from backend.services.turn.models import TurnInput, TurnResult
+from backend.services.turn.sink import WSEventSink
 
 if TYPE_CHECKING:  # pragma: no cover — typing only
     from fastapi import WebSocket
 
     from backend.core.config import AgentConfig
     from backend.services.agent import AgentComponents
-    from backend.services.agent.models import Plan, Step, Verdict
+    from backend.services.agent.models import Plan, Step
     from backend.services.turn.direct_executor import DirectTurnExecutor
 
 
@@ -93,7 +94,7 @@ class AnnotatingSink:
         return self._inner.is_connected
 
     @property
-    def _ws(self) -> "WebSocket | None":
+    def _ws(self) -> WebSocket | None:
         """Expose the underlying WebSocket, when any (Phase 1 escape hatch)."""
         return self._inner._ws
 
@@ -147,9 +148,9 @@ class AgentTurnExecutor:
     def __init__(
         self,
         *,
-        direct: "DirectTurnExecutor",
-        components: "AgentComponents",
-        cfg: "AgentConfig",
+        direct: DirectTurnExecutor,
+        components: AgentComponents,
+        cfg: AgentConfig,
     ) -> None:
         self._direct = direct
         self._classifier = components.classifier
@@ -618,7 +619,7 @@ class AgentTurnExecutor:
                 sub_result = await self._execute_step_with_timeout(
                     sub_turn, annotated, cancel_event, session
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 end_state = "failed"
                 end_error = f"step_timeout:{i}"
                 last_finish_reason = "error"
@@ -811,7 +812,7 @@ class AgentTurnExecutor:
     @staticmethod
     def _build_sub_turn(
         turn: TurnInput,
-        step: "Step",
+        step: Step,
         accumulated_content: str,
         step_index: int,
     ) -> TurnInput:
@@ -854,7 +855,7 @@ class AgentTurnExecutor:
         )
 
     @staticmethod
-    def _splice_plan(current: "Plan", index: int, replacement: "Plan") -> "Plan":
+    def _splice_plan(current: Plan, index: int, replacement: Plan) -> Plan:
         """Replace the tail of ``current`` from ``index+1`` with ``replacement``."""
         from backend.services.agent.models import Plan
 
@@ -866,7 +867,7 @@ class AgentTurnExecutor:
         return Plan(goal=current.goal, steps=head + new_tail)
 
     @staticmethod
-    def _summarise_history(plan: "Plan", index: int) -> str:
+    def _summarise_history(plan: Plan, index: int) -> str:
         """Short textual recap of the steps already executed (for re-plan)."""
         parts = []
         for step in plan.steps[: index + 1]:
@@ -1002,10 +1003,10 @@ class AgentTurnExecutor:
         """
         if run is None or session is None:
             return
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         try:
-            run.finished_at = datetime.now(timezone.utc)
+            run.finished_at = datetime.now(UTC)
             session.add(run)
         except Exception as exc:  # noqa: BLE001 — non-fatal
             logger.warning("AgentRun finalize prepare failed: {}", exc)
@@ -1064,7 +1065,7 @@ class AgentTurnExecutor:
 
 # Re-export of plan_json helper used by tests --------------------------------
 
-def serialize_plan_steps(plan: "Plan") -> str:
+def serialize_plan_steps(plan: Plan) -> str:
     """Return a JSON-encoded list of plan steps (used by tests)."""
     return json.dumps([s.model_dump(mode="json") for s in plan.steps])
 

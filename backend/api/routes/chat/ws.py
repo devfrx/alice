@@ -37,6 +37,9 @@ from ._shared import (
     router,
 )
 
+#: Hard cap on a single inbound user message (characters).
+_MAX_USER_MESSAGE_LENGTH = 50_000
+
 
 @router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket) -> None:
@@ -133,8 +136,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                 )
                 continue
 
-            MAX_USER_MESSAGE_LENGTH = 50_000  # 50K characters
-            if len(user_content) > MAX_USER_MESSAGE_LENGTH:
+            if len(user_content) > _MAX_USER_MESSAGE_LENGTH:
                 await websocket.send_json(
                     {"type": "error", "content": "Message too long"}
                 )

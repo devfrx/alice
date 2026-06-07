@@ -78,10 +78,7 @@ def _verify_magic_bytes(
 
     if _matches(primary):
         return True
-    for alt in _MAGIC_ALT.get(claimed_type, []):
-        if _matches(alt):
-            return True
-    return False
+    return any(_matches(alt) for alt in _MAGIC_ALT.get(claimed_type, []))
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +152,9 @@ async def import_conversation(request: Request) -> dict[str, Any]:
     try:
         body: dict[str, Any] = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(
+            status_code=400, detail="Invalid JSON body",
+        ) from None
 
     if "id" not in body:
         raise HTTPException(status_code=400, detail="Missing 'id' field")
@@ -163,7 +162,9 @@ async def import_conversation(request: Request) -> dict[str, Any]:
     try:
         conv_id = uuid.UUID(body["id"])
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid conversation id")
+        raise HTTPException(
+            status_code=400, detail="Invalid conversation id",
+        ) from None
 
     # Validate top-level timestamps if present.
     for ts_field in ("created_at", "updated_at"):
@@ -174,10 +175,10 @@ async def import_conversation(request: Request) -> dict[str, Any]:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid '{ts_field}' timestamp",
-                )
+                ) from None
 
     # Validate messages before touching the DB.
-    _ALLOWED_ROLES = ("user", "assistant", "system", "tool")
+    allowed_roles = ("user", "assistant", "system", "tool")
     for idx, msg_data in enumerate(body.get("messages", [])):
         for required in ("id", "role"):
             if required not in msg_data:
@@ -185,7 +186,7 @@ async def import_conversation(request: Request) -> dict[str, Any]:
                     status_code=400,
                     detail=f"Message {idx}: missing '{required}'",
                 )
-        if msg_data["role"] not in _ALLOWED_ROLES:
+        if msg_data["role"] not in allowed_roles:
             raise HTTPException(
                 status_code=400,
                 detail=f"Message {idx}: invalid role '{msg_data['role']}'",
@@ -196,7 +197,7 @@ async def import_conversation(request: Request) -> dict[str, Any]:
             raise HTTPException(
                 status_code=400,
                 detail=f"Message {idx}: invalid 'id'",
-            )
+            ) from None
         for att_data in msg_data.get("attachments") or []:
             for required in ("file_id", "filename", "content_type"):
                 if required not in att_data:
@@ -328,7 +329,7 @@ async def upload_image(
     except ValueError:
         raise HTTPException(
             status_code=400, detail="Invalid conversation_id",
-        )
+        ) from None
 
     if file.content_type not in _ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -410,7 +411,7 @@ async def upload_image(
         logger.exception("DB error during upload — cleaned up {}", abs_path)
         raise HTTPException(
             status_code=500, detail="Failed to save attachment record",
-        )
+        ) from None
 
     logger.info(
         "Uploaded {} ({}) for conversation {}",

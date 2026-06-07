@@ -165,7 +165,7 @@ class TestAgentPluginTools:
     async def test_plan_tool_can_be_disabled(self):
         plugin = AgentPlugin()
         ctx = _make_app_context()
-        ctx.config.agent_tools.plan_enabled = False
+        ctx.config.agent.planning = False
         await plugin.initialize(ctx)
         names = {t.name for t in plugin.get_tools()}
         assert names == {"spawn_subagent"}
@@ -174,7 +174,7 @@ class TestAgentPluginTools:
     async def test_subagent_tool_can_be_disabled(self):
         plugin = AgentPlugin()
         ctx = _make_app_context()
-        ctx.config.agent_tools.subagent_enabled = False
+        ctx.config.agent.delegation = False
         await plugin.initialize(ctx)
         names = {t.name for t in plugin.get_tools()}
         assert names == {"update_plan"}
@@ -373,7 +373,7 @@ class TestSpawnSubagent:
             chat_scripts=[loop_step],
             tools=[_tool_entry("system_info_get")],
         )
-        ctx.config.agent_tools.subagent_max_steps = 3
+        ctx.config.agent.subagent.max_steps = 3
         plugin = AgentPlugin()
         await plugin.initialize(ctx)
         result = await plugin.execute_tool(

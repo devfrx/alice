@@ -76,7 +76,7 @@ class WebSocketEventSink:
         ws: The accepted FastAPI ``WebSocket`` to forward events to.
     """
 
-    def __init__(self, ws: "WebSocket") -> None:
+    def __init__(self, ws: WebSocket) -> None:
         self._ws = ws
         self._closed = False
 

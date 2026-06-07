@@ -10,12 +10,11 @@ the normal :func:`run_tool_loop`.  So the engine is just the wrapped
 :class:`~backend.services.turn.direct_executor.DirectTurnExecutor`; this
 executor only adds reflection on top.
 
-Reflection reuses the structured-mode
-:class:`~backend.services.agent.critic.CriticService` but applies it **once**
-to the completed turn rather than grading every step.  It never rewrites or
-blocks the answer: a non-OK verdict is surfaced as an ``agent.warning`` WS
-event so the UI can flag it, mirroring the bypass-critic behaviour of
-:class:`~backend.services.turn.agent_executor.AgentTurnExecutor`.
+Reflection uses the self-contained
+:class:`~backend.services.turn._reflection.ReflectionCritic` and applies it
+**once** to the completed turn rather than grading every step.  It never
+rewrites or blocks the answer: a non-OK verdict is surfaced as an
+``agent.warning`` WS event so the UI can flag it.
 """
 
 from __future__ import annotations
@@ -25,13 +24,12 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from backend.services.turn._critic_bypass import emit_critic_invoked, emit_warning
+from backend.services.turn._reflection import ReflectionCritic
 from backend.services.turn.models import TurnInput, TurnResult
 from backend.services.turn.sink import WSEventSink
 
 if TYPE_CHECKING:  # pragma: no cover — typing only
     from backend.core.config import AgentConfig
-    from backend.services.agent.critic import CriticService
     from backend.services.turn.direct_executor import DirectTurnExecutor
 
 
@@ -39,9 +37,9 @@ class ReflectiveTurnExecutor:
     """Model-driven executor that adds an optional final-answer self-check.
 
     Args:
-        direct: The lite executor that actually runs the turn (its tool
-            loop already exposes the agentic meta-tools).
-        critic: The critic service reused for the reflection pass.
+        direct: The executor that actually runs the turn (its tool loop
+            already exposes the agentic meta-tools).
+        critic: The reflection critic reused for the self-check pass.
         cfg: ``ctx.config.agent`` — the agent config sub-tree.
     """
 
@@ -49,7 +47,7 @@ class ReflectiveTurnExecutor:
         self,
         *,
         direct: DirectTurnExecutor,
-        critic: CriticService,
+        critic: ReflectionCritic,
         cfg: AgentConfig,
     ) -> None:
         self._direct = direct
@@ -102,39 +100,34 @@ class ReflectiveTurnExecutor:
         sink: WSEventSink,
         cancel_event: asyncio.Event,
     ) -> None:
-        """Run a single critic pass and surface a non-blocking warning."""
-        from backend.services.agent.models import Plan, Step, VerdictAction
-
-        step = Step(
-            index=0,
-            description="Risposta diretta all'utente.",
-            expected_outcome=(
-                "Risposta coerente con la richiesta, senza degenerazioni."
-            ),
-            tool_hint=None,
+        """Run a single reflection pass and surface a non-blocking warning."""
+        verdict = await self._critic.evaluate(
+            output=result.content,
+            finish_reason=result.finish_reason,
+            goal=turn.user_content or "(richiesta vuota)",
+            cancel_event=cancel_event,
         )
-        plan = Plan(goal=turn.user_content or "(richiesta vuota)", steps=[step])
-        try:
-            verdict = await self._critic.evaluate(
-                step=step,
-                output=result.content,
-                plan=plan,
-                retries_used=0,
-                cancel_event=cancel_event,
-                finish_reason=result.finish_reason,
-            )
-        except Exception as exc:  # noqa: BLE001 — reflection must never break a turn
-            logger.warning("Reflection critic failed: {}", exc)
-            return
 
-        await emit_critic_invoked(sink, run_id=None, step_index=0, verdict=verdict)
-        if verdict.action != VerdictAction.OK:
+        await sink.send(
+            {
+                "type": "agent.critic_invoked",
+                "run_id": None,
+                "step_index": 0,
+                "source": verdict.source or "llm",
+            }
+        )
+        if not verdict.ok:
             logger.info("Reflection flagged output: {}", verdict.reason)
-            await emit_warning(
-                sink,
-                run_id=None,
-                code="degenerated_output",
-                message="La verifica ha rilevato un possibile problema con la risposta.",
+            await sink.send(
+                {
+                    "type": "agent.warning",
+                    "run_id": None,
+                    "code": "degenerated_output",
+                    "message": (
+                        "La verifica ha rilevato un possibile problema "
+                        "con la risposta."
+                    ),
+                }
             )
 
 

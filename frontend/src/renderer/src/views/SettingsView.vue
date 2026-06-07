@@ -139,29 +139,6 @@
         <div class="sv__group">
           <div class="sv__row">
             <div class="sv__row-text">
-              <span class="sv__row-label">Agent Loop</span>
-              <span class="sv__row-hint">
-                Attiva il classificatore + planner + critic. Quando disattivato il chat usa l'esecuzione diretta.
-              </span>
-            </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.settings.agent.enabled }" role="switch"
-              :aria-checked="settingsStore.settings.agent.enabled"
-              @click="settingsStore.settings.agent.enabled = !settingsStore.settings.agent.enabled">
-              <span class="sv__toggle-thumb" />
-            </button>
-          </div>
-          <Transition name="sv-warn">
-            <div v-if="settingsStore.settings.agent.enabled" class="sv__warn">
-              <AppIcon name="alert-triangle" :size="14" :stroke-width="2" />
-              <span>Le richieste con strumenti potrebbero richiedere più chiamate al modello e impiegare più
-                tempo.</span>
-            </div>
-          </Transition>
-
-          <div class="sv__divider" />
-
-          <div class="sv__row">
-            <div class="sv__row-text">
               <span class="sv__row-label">Mostra Plan Card sotto i messaggi</span>
               <span class="sv__row-hint">Aggiunge una checklist collassabile con il piano dell'agente sotto ogni
                 risposta.</span>
@@ -185,18 +162,6 @@
               @click="uiStore.agentSidebarAutoOpen = !uiStore.agentSidebarAutoOpen">
               <span class="sv__toggle-thumb" />
             </button>
-          </div>
-
-          <div class="sv__divider" />
-
-          <div class="sv__row">
-            <div class="sv__row-text">
-              <span class="sv__row-label">Modalità agente</span>
-              <span class="sv__row-hint">Stato corrente, gestito dalla configurazione del backend.</span>
-            </div>
-            <span class="sv__readonly-pill" :class="{ 'sv__readonly-pill--on': settingsStore.settings.agent.enabled }">
-              {{ settingsStore.settings.agent.enabled ? 'Attiva' : 'Inattiva' }}
-            </span>
           </div>
         </div>
       </section>
@@ -609,24 +574,6 @@ onUnmounted(() => {
   flex-shrink: 0;
   margin-top: 1px;
   color: var(--warning);
-}
-
-/* ── Read-only pill (Modalità agente status) ─────────────── */
-.sv__readonly-pill {
-  flex-shrink: 0;
-  padding: var(--space-0-5) var(--space-2);
-  border-radius: var(--radius-xs);
-  background: var(--white-subtle);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-normal);
-  text-transform: uppercase;
-}
-
-.sv__readonly-pill--on {
-  background: var(--success-medium);
-  color: var(--success);
 }
 
 /* Warning transition */

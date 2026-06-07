@@ -1,18 +1,12 @@
 <script setup lang="ts">
 /**
- * ChatToolControls.vue — In-chat agent-mode toggle + tool selector.
+ * ChatToolControls.vue — In-chat tool selector.
  *
- * Two compact chips meant to live in the input-bar toolbar:
- *
- *  1. Agent chip — toggles the *global* agent loop (drives
- *     `config.agent.enabled` through the settings store, so it is a
- *     true shortcut to the backend configuration).
- *
- *  2. Tools chip — opens a popover to pick which plugins / individual
- *     tools are offered to the LLM. The selection is persisted and
- *     sticky until changed. It is gated off when tools are globally
- *     disabled or when Tool RAG is active (auto-selection), since
- *     manual choice would have no effect in those cases.
+ * Tools chip — opens a popover to pick which plugins / individual
+ * tools are offered to the LLM. The selection is persisted and
+ * sticky until changed. It is gated off when tools are globally
+ * disabled or when Tool RAG is active (auto-selection), since
+ * manual choice would have no effect in those cases.
  */
 import { computed, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
@@ -27,9 +21,6 @@ const triggerRef = ref<HTMLElement | null>(null)
 /** Plugin names whose tool list is expanded in the popover. */
 const expanded = ref<Set<string>>(new Set())
 
-/** Whether the agent loop is currently active (global config). */
-const agentEnabled = computed(() => settingsStore.settings.agent.enabled)
-
 /** Whether manual tool selection has any effect right now. */
 const available = computed(() => settingsStore.toolSelectionAvailable)
 
@@ -42,11 +33,6 @@ const disabledReason = computed(() => {
 })
 
 const disabledCount = computed(() => settingsStore.disabledToolCount)
-
-/** Toggle the global agent loop. */
-function toggleAgent(): void {
-  settingsStore.settings.agent.enabled = !settingsStore.settings.agent.enabled
-}
 
 function toggleOpen(): void {
   if (!available.value) return
@@ -70,13 +56,6 @@ function isPluginEnabled(plugin: string): boolean {
 
 <template>
   <div class="ctc">
-    <!-- Agent loop chip (drives global config) -->
-    <button class="ctc__chip" :class="{ 'ctc__chip--on': agentEnabled }" role="switch"
-      :aria-checked="agentEnabled" title="Attiva/disattiva la modalità agente (loop)" @click="toggleAgent">
-      <AppIcon name="cpu" :size="11" />
-      <span>{{ agentEnabled ? 'Agente' : 'Chat' }}</span>
-    </button>
-
     <!-- Tool selector chip -->
     <button ref="triggerRef" class="ctc__chip"
       :class="{ 'ctc__chip--open': isOpen, 'ctc__chip--muted': !available }"
@@ -170,19 +149,6 @@ function isPluginEnabled(plugin: string): boolean {
   background: var(--surface-3);
   border-color: var(--border-hover);
   color: var(--text-primary);
-}
-
-/* Active agent state — accent tint */
-.ctc__chip--on {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.ctc__chip--on:hover:not(:disabled) {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 /* Tools popover open */

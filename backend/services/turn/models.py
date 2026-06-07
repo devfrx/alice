@@ -104,9 +104,9 @@ class TurnResult:
             The caller uses this to decide whether to skip persisting an
             empty final assistant message (intermediates already
             committed by the loop).
-        agent_run_id: Optional UUID of the persisted ``AgentRun`` row.
-            Always ``None`` for :class:`DirectTurnExecutor`. Populated by
-            ``AgentTurnExecutor`` (Phase 3).
+        agent_run_id: Optional UUID of a persisted ``AgentRun`` row.
+            Always ``None`` on the current model-driven path (kept for
+            backward-compatible serialization).
     """
 
     content: str

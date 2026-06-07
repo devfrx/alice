@@ -48,6 +48,7 @@ class MockDirect:
         sink: Any,
         cancel_event: asyncio.Event,
         session: Any,
+        channel: Any = None,
     ) -> TurnResult:
         return self._default
 

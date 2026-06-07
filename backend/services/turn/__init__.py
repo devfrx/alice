@@ -14,6 +14,11 @@ Public surface:
     * :func:`create_turn_executor` — factory used by ``ws_chat``.
 """
 
+from backend.services.turn.channel import (
+    InteractionChannel,
+    ScriptedInteractionChannel,
+    WebSocketInteractionChannel,
+)
 from backend.services.turn.direct_executor import DirectTurnExecutor
 from backend.services.turn.factory import create_turn_executor
 from backend.services.turn.models import TurnInput, TurnResult
@@ -27,12 +32,15 @@ from backend.services.turn.sink import (
 
 __all__ = [
     "DirectTurnExecutor",
+    "InteractionChannel",
     "RecordingEventSink",
     "ReflectiveTurnExecutor",
+    "ScriptedInteractionChannel",
     "TurnInput",
     "TurnResult",
     "WSEventSink",
     "WebSocketEventSink",
+    "WebSocketInteractionChannel",
     "create_turn_executor",
     "is_websocket_closed_runtime_error",
 ]

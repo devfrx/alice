@@ -7,7 +7,6 @@ or are auto-approved, while ensuring FORBIDDEN tools remain blocked.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,9 +14,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.api.routes._tool_loop import run_tool_loop
-from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
+from backend.core.plugin_models import ToolDefinition, ToolResult
 from backend.db.models import ToolConfirmationAudit
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -139,6 +137,7 @@ async def test_confirmations_enabled_requests_approval():
     ) as mock_confirm:
         await run_tool_loop(
             channel=ws,
+            sink=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,
@@ -174,6 +173,7 @@ async def test_confirmations_disabled_auto_approves():
     ) as mock_confirm:
         await run_tool_loop(
             channel=ws,
+            sink=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,
@@ -206,6 +206,7 @@ async def test_forbidden_blocked_even_when_confirmations_disabled():
 
     await run_tool_loop(
         channel=ws,
+        sink=ws,
         ctx=ctx,
         session=session,
         conv_id=conv_id,
@@ -244,6 +245,7 @@ async def test_audit_logged_when_auto_approved():
 
     await run_tool_loop(
         channel=ws,
+        sink=ws,
         ctx=ctx,
         session=session,
         conv_id=conv_id,
@@ -284,6 +286,7 @@ async def test_safe_tool_no_confirmation_regardless_of_toggle():
         ) as mock_confirm:
             await run_tool_loop(
                 channel=ws,
+                sink=ws,
                 ctx=ctx,
                 session=session,
                 conv_id=conv_id,
@@ -324,6 +327,7 @@ async def test_confirmations_enabled_rejected_by_user():
     ):
         await run_tool_loop(
             channel=ws,
+            sink=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,

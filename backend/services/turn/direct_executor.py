@@ -8,9 +8,10 @@ It preserves the *exact* behaviour of the original closure-based
    relaying ``token`` / ``thinking`` / ``tool_call`` / ``error`` / ``done``
    events through a :class:`WSEventSink`.
 2. If tool calls were requested, delegate to
-   :func:`backend.api.routes._tool_loop.run_tool_loop`
-   **without modifying it** (Phase 1 escape hatch — see ``sink._ws``).
-3. Honour ``cancel_event`` at every chunk and after the tool loop.
+   :func:`backend.api.routes._tool_loop.run_tool_loop`, passing the
+   outbound ``sink`` and the inbound :class:`InteractionChannel`.
+3. Honour ``cancel_event`` at every chunk and after the tool loop (the
+   channel's single read-pump sets it on a cancel frame).
 4. Capture LLM exceptions and ``WebSocketDisconnect`` internally so
    ``ws_chat`` only needs to inspect ``finish_reason`` to decide what to
    persist (no exception-based control flow).
@@ -25,7 +26,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -34,6 +34,7 @@ from loguru import logger
 
 from backend.core.context import AppContext
 from backend.services.llm_service import LLMService
+from backend.services.turn.channel import InteractionChannel
 from backend.services.turn.models import TurnInput, TurnResult
 from backend.services.turn.sink import (
     WSEventSink,
@@ -73,15 +74,19 @@ class DirectTurnExecutor:
         sink: WSEventSink,
         cancel_event: asyncio.Event,
         session: Any,
+        channel: InteractionChannel | None = None,
     ) -> TurnResult:
         """Run the full turn and return its outcome.
 
         Args:
             turn: Immutable input bundle.
             sink: Sink used for outbound WS events.
-            cancel_event: Event toggled by the caller (or the internal
-                cancel reader) to abort the turn early.
+            cancel_event: Event toggled by the caller (or the channel's
+                read-pump) to abort the turn early.
             session: Active async DB session (forwarded to the tool loop).
+            channel: Inbound interaction channel used by the tool loop for
+                confirmation / client-tool round-trips. ``None`` (e.g. in
+                tests with a non-WS sink) disables the tool-loop path.
 
         Returns:
             A :class:`TurnResult` describing the final state. The
@@ -160,15 +165,14 @@ class DirectTurnExecutor:
         had_tool_calls = False
         if tool_calls:
             had_tool_calls = True
-            ws_for_loop = sink._ws
-            if ws_for_loop is None:
-                # In tests with a RecordingEventSink, the tool loop is
-                # not exercised because run_tool_loop expects a real
-                # WebSocket.  Surface a deterministic error instead of a
-                # cryptic AttributeError.
+            if channel is None:
+                # In tests with a RecordingEventSink and no channel, the
+                # tool loop is not exercised because run_tool_loop needs an
+                # inbound channel.  Surface a deterministic error instead of
+                # a cryptic AttributeError.
                 logger.error(
-                    "DirectTurnExecutor: tool calls requested but sink "
-                    "has no underlying WebSocket — refusing to invoke "
+                    "DirectTurnExecutor: tool calls requested but no "
+                    "InteractionChannel was provided — refusing to invoke "
                     "run_tool_loop.",
                 )
                 return TurnResult(
@@ -202,7 +206,8 @@ class DirectTurnExecutor:
                     out_tok2,
                     loop_finish,
                 ) = await run_tool_loop(
-                    websocket=ws_for_loop,
+                    channel=channel,
+                    sink=sink,
                     ctx=self.ctx,
                     session=session,
                     conv_id=turn.conv_id,
@@ -297,9 +302,9 @@ class DirectTurnExecutor:
         """Stream the first LLM response and relay events to ``sink``.
 
         Mirrors the behaviour of the legacy ``_stream_and_collect``
-        closure in ``ws_chat`` but owns its own WebSocket cancel reader
-        (v3-1) so there is never an overlap with the per-request
-        readers spawned by :func:`run_tool_loop`.
+        closure in ``ws_chat``.  Cancellation is observed by the
+        :class:`InteractionChannel` read-pump (the single WS reader), which
+        sets ``cancel_event``; this method just honours it per chunk.
 
         Returns:
             ``(content, thinking, tool_calls, finish_reason,
@@ -319,9 +324,9 @@ class DirectTurnExecutor:
             None if turn.was_compressed else turn.user_content
         )
 
-        # v3-1: cancel reader scoped to the streaming phase only.
-        reader_task = self._spawn_cancel_reader(sink, cancel_event)
-
+        # Cancel during streaming is observed by the channel's single
+        # read-pump (it sets ``cancel_event``), which ``llm.chat`` honours
+        # per chunk — no dedicated reader here (avoids a second WS reader).
         async def _send(event: dict[str, Any]) -> bool:
             await sink.send(event)
             return sink.is_connected
@@ -402,11 +407,6 @@ class DirectTurnExecutor:
             with contextlib.suppress(Exception):
                 await sink.send({"type": "error", "content": err_detail})
             finish_reason = "error"
-        finally:
-            if reader_task is not None:
-                reader_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await reader_task
 
         return (
             full_content,
@@ -416,70 +416,6 @@ class DirectTurnExecutor:
             in_tok,
             out_tok,
         )
-
-    # ------------------------------------------------------------------
-    # Internal: WebSocket cancel reader.
-    # ------------------------------------------------------------------
-
-    def _spawn_cancel_reader(
-        self,
-        sink: WSEventSink,
-        cancel_event: asyncio.Event,
-    ) -> asyncio.Task[None] | None:
-        """Spawn an async task that watches for ``{"type": "cancel"}``.
-
-        Returns ``None`` if the sink is not backed by a real WebSocket
-        (e.g. :class:`RecordingEventSink` in tests). The task sets
-        ``cancel_event`` on cancel requests or disconnects, allowing the
-        streaming loop to exit on the next chunk (~1 ms).
-        """
-        ws = sink._ws
-        if ws is None:
-            return None
-
-        async def _reader() -> None:
-            while not cancel_event.is_set():
-                try:
-                    raw = await asyncio.wait_for(
-                        ws.receive_text(), timeout=2.0,
-                    )
-                except TimeoutError:
-                    continue
-                except WebSocketDisconnect:
-                    cancel_event.set()
-                    return
-                except asyncio.CancelledError:
-                    raise
-                except RuntimeError as exc:
-                    if is_websocket_closed_runtime_error(exc):
-                        cancel_event.set()
-                        return
-                    logger.warning(
-                        "Non-fatal error in cancel reader, ignoring",
-                    )
-                    continue
-                except Exception:
-                    logger.warning(
-                        "Non-fatal error in cancel reader, ignoring",
-                    )
-                    continue
-                try:
-                    data = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                if data.get("type") == "cancel":
-                    cancel_event.set()
-                    logger.debug("Client requested stream cancel")
-                    return
-                # Non-cancel messages received during streaming are
-                # rare in practice; log and discard to mirror the
-                # legacy ``msg_buffer`` behaviour without leaking
-                # state out of the executor.
-                logger.debug(
-                    "Discarding non-cancel WS message during streaming",
-                )
-
-        return asyncio.create_task(_reader())
 
 
 __all__ = ["DirectTurnExecutor"]

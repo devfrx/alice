@@ -7,7 +7,6 @@ DB session, LLMService, and ToolRegistry.
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
 from typing import Any
 
@@ -17,34 +16,89 @@ from backend.api.routes._tool_loop import run_tool_loop
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
 from backend.db.models import Message
 
-
 # ---------------------------------------------------------------------------
 # Mock helpers
 # ---------------------------------------------------------------------------
 
 
+# Maps an interaction *kind* to the outbound request frame type the real
+# channel emits — mirrored here so ``.sent`` assertions stay meaningful.
+_REQ_FRAME_TYPE = {
+    "tool_confirmation": "tool_confirmation_required",
+    "client_tool_call": "client_tool_call",
+    "ask_user": "ask_user_required",
+}
+
+
 class MockWebSocket:
-    """Fake WebSocket that records sent messages and optionally auto-confirms."""
+    """Combined sink + interaction channel double for ``run_tool_loop``.
+
+    Records outbound events in :attr:`sent` (sink role) and answers
+    interaction requests in-process (channel role): confirmations resolve
+    from ``auto_confirm`` and client-tool calls via :meth:`_answer_client`.
+    Each request also appends its outbound frame to :attr:`sent`, matching
+    what :class:`WebSocketInteractionChannel` puts on the wire.
+    """
 
     def __init__(self, *, auto_confirm: bool | None = None) -> None:
         self.sent: list[dict] = []
         self._auto_confirm = auto_confirm
+        self._cancel_event = asyncio.Event()
 
-    async def send_json(self, data: dict) -> None:
-        """Record outgoing WS messages."""
-        self.sent.append(data)
+    # --- sink role ---------------------------------------------------
+    async def send(self, event: dict) -> None:
+        """Record an outbound event."""
+        self.sent.append(event)
 
-    async def receive_text(self) -> str:
-        """Return auto-confirmation response or raise TimeoutError."""
-        if self._auto_confirm is not None:
-            for msg in reversed(self.sent):
-                if msg.get("type") == "tool_confirmation_required":
-                    return json.dumps({
-                        "type": "tool_confirmation_response",
-                        "execution_id": msg["execution_id"],
-                        "approved": self._auto_confirm,
-                    })
-        raise asyncio.TimeoutError
+    @property
+    def is_connected(self) -> bool:
+        return True
+
+    # --- channel role ------------------------------------------------
+    @property
+    def connected(self) -> bool:
+        return True
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancel_event.is_set()
+
+    @property
+    def cancel_event(self) -> asyncio.Event:
+        return self._cancel_event
+
+    def begin_turn(self) -> asyncio.Event:
+        self._cancel_event = asyncio.Event()
+        return self._cancel_event
+
+    async def request(
+        self,
+        kind: str,
+        payload: dict,
+        *,
+        execution_id: str,
+        timeout_s: float,
+        cancel_event: asyncio.Event | None = None,
+    ) -> dict | None:
+        """Mirror the real channel: emit the request frame, then answer it."""
+        self.sent.append(
+            {"type": _REQ_FRAME_TYPE[kind], "execution_id": execution_id, **payload},
+        )
+        if kind == "tool_confirmation":
+            if self._auto_confirm is None:
+                return None  # timeout → not approved
+            return {
+                "type": "tool_confirmation_response",
+                "execution_id": execution_id,
+                "approved": self._auto_confirm,
+            }
+        if kind == "client_tool_call":
+            return self._answer_client(execution_id)
+        return None
+
+    def _answer_client(self, execution_id: str) -> dict | None:
+        """Default: no client connected → timeout (overridden in subclass)."""
+        return None
 
 
 class _ResultSet:
@@ -221,7 +275,8 @@ async def _run(
     llm = MockLLM(llm_responses)
 
     await run_tool_loop(
-        websocket=websocket,
+        channel=websocket,
+        sink=websocket,
         ctx=_Ctx(reg),
         session=session,
         conv_id=conv_id,
@@ -436,11 +491,11 @@ class TestConfirmation:
 
 
 class _ClientToolWebSocket(MockWebSocket):
-    """WebSocket stub that answers ``client_tool_call`` frames.
+    """Channel double that answers ``client_tool_call`` requests.
 
-    Echoes back a ``client_tool_result`` for the most recent
-    ``client_tool_call`` it observed, simulating the Continuum web client
-    executing a block tool against the open editor.
+    Returns a ``client_tool_result`` for each delegated client tool,
+    simulating the Continuum web client executing a block tool against the
+    open editor.
     """
 
     def __init__(self, *, success: bool = True, result: Any = None,
@@ -450,21 +505,18 @@ class _ClientToolWebSocket(MockWebSocket):
         self._reply_result = result
         self._reply_error = error
 
-    async def receive_text(self) -> str:
-        """Return a client_tool_result matching the latest client_tool_call."""
-        for msg in reversed(self.sent):
-            if msg.get("type") == "client_tool_call":
-                payload: dict[str, Any] = {
-                    "type": "client_tool_result",
-                    "execution_id": msg["execution_id"],
-                    "success": self._reply_success,
-                }
-                if self._reply_success:
-                    payload["result"] = self._reply_result
-                else:
-                    payload["error"] = self._reply_error
-                return json.dumps(payload)
-        raise asyncio.TimeoutError
+    def _answer_client(self, execution_id: str) -> dict | None:
+        """Return a client_tool_result for the delegated call."""
+        payload: dict[str, Any] = {
+            "type": "client_tool_result",
+            "execution_id": execution_id,
+            "success": self._reply_success,
+        }
+        if self._reply_success:
+            payload["result"] = self._reply_result
+        else:
+            payload["error"] = self._reply_error
+        return payload
 
 
 class TestClientExecutedTools:

@@ -30,6 +30,7 @@ from backend.services.turn.sink import WSEventSink
 
 if TYPE_CHECKING:  # pragma: no cover — typing only
     from backend.core.config import AgentConfig
+    from backend.services.turn.channel import InteractionChannel
     from backend.services.turn.direct_executor import DirectTurnExecutor
 
 
@@ -60,13 +61,16 @@ class ReflectiveTurnExecutor:
         sink: WSEventSink,
         cancel_event: asyncio.Event,
         session: Any,
+        channel: InteractionChannel | None = None,
     ) -> TurnResult:
         """Run the turn, then reflect on the final answer when applicable.
 
         The returned :class:`TurnResult` is the direct executor's result,
         unchanged — reflection only emits diagnostic WS events.
         """
-        result = await self._direct.execute(turn, sink, cancel_event, session)
+        result = await self._direct.execute(
+            turn, sink, cancel_event, session, channel,
+        )
         if self._should_reflect(result, cancel_event):
             await self._reflect(turn, result, sink, cancel_event)
         return result

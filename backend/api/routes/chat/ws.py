@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -22,6 +21,7 @@ from backend.services.llm_service import LLMService
 from backend.services.turn import (
     TurnResult,
     WebSocketEventSink,
+    WebSocketInteractionChannel,
     create_turn_executor,
 )
 
@@ -31,7 +31,6 @@ from ._persist import _persist_final_turn
 from ._shared import (
     _ctx,
     _get_ws_lock,
-    _receive_ws_text,
     _utcnow,
     _ws_connections,
     router,
@@ -100,34 +99,19 @@ async def ws_chat(websocket: WebSocket) -> None:
         ctx, llm, continuum_scope=continuum_scope, client_ip=client_ip,
     )
 
+    # Single inbound read-pump: it owns ``receive`` for the whole connection
+    # and demultiplexes interaction responses / cancel / user messages, so
+    # there is never more than one concurrent reader on the socket.
+    channel = WebSocketInteractionChannel(websocket)
+    channel.start()
+
     try:
-        message_buffer: list[str] = []
-
         while True:
-            if message_buffer:
-                raw = message_buffer.pop(0)
-                await asyncio.sleep(0)  # yield to event loop
-            else:
-                raw = await _receive_ws_text(websocket)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json(
-                    {"type": "error", "content": "Invalid JSON"}
-                )
-                continue
-
-            message_type = data.get("type")
-            if message_type in {
-                "tool_confirmation_response",
-                "client_tool_result",
-                "cancel",
-            }:
-                # Control frames are consumed by the active generation/tool
-                # waiters. If a stale one arrives while the main chat loop is
-                # listening for a new user turn, ignore it instead of treating
-                # the missing `content` field as an empty message.
-                continue
+            # The pump delivers only non-interaction (user/idle) frames here,
+            # already JSON-parsed; ``None`` means the socket disconnected.
+            data = await channel.next_user_message()
+            if data is None:
+                break
 
             user_content: str = data.get("content", "").strip()
             if not user_content:
@@ -165,7 +149,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                 thinking_content = ""
                 tool_calls_collected: list[dict[str, Any]] = []
                 finish_reason = "stop"
-                cancel_event = asyncio.Event()
+                cancel_event = channel.begin_turn()
 
                 executor = create_turn_executor(
                     ctx, llm, sync_fn=_sync_conversation_to_file,
@@ -173,7 +157,9 @@ async def ws_chat(websocket: WebSocket) -> None:
                 sink = WebSocketEventSink(websocket)
 
                 executor_task = asyncio.create_task(
-                    executor.execute(turn, sink, cancel_event, session),
+                    executor.execute(
+                        turn, sink, cancel_event, session, channel,
+                    ),
                 )
 
                 try:
@@ -245,6 +231,7 @@ async def ws_chat(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("WebSocket unexpected error")
     finally:
+        await channel.aclose()
         async with ws_lock:
             _ws_connections[client_ip] = max(
                 0, _ws_connections[client_ip] - 1,

@@ -13,7 +13,7 @@ import json
 import uuid
 from typing import Any, Callable, Coroutine
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocketDisconnect
 from loguru import logger
 
 from backend.core.context import AppContext
@@ -21,7 +21,7 @@ from backend.core.plugin_models import ExecutionContext, ToolResult
 from backend.core.tool_progress import current_progress_emitter
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
-from backend.services.turn import is_websocket_closed_runtime_error
+from backend.services.turn import InteractionChannel, WSEventSink
 
 # Type alias for the sync callback.
 SyncFn = Callable[..., Coroutine[Any, Any, None]]
@@ -51,7 +51,8 @@ def _dedup_hash(tool_name: str, args: dict[str, Any]) -> str:
 
 async def run_tool_loop(
     *,
-    websocket: WebSocket,
+    channel: InteractionChannel,
+    sink: WSEventSink,
     ctx: AppContext,
     session: Any,
     conv_id: uuid.UUID,
@@ -80,7 +81,9 @@ async def run_tool_loop(
     and the LLM is re-queried with the updated history.
 
     Args:
-        websocket: The active WebSocket connection.
+        channel: Inbound interaction channel (confirmation / client-tool
+            round-trips, cancel signalling) — the single WS reader.
+        sink: Outbound event sink for streamed frames.
         ctx: Application context (tool registry, config, etc.).
         session: Active async DB session (caller manages commit).
         conv_id: Current conversation UUID.
@@ -244,7 +247,7 @@ async def run_tool_loop(
                         "content": _parse_err,
                         "tool_call_id": tc_id,
                     })
-                await websocket.send_json({
+                await sink.send({
                     "type": "tool_execution_done",
                     "tool_name": tool_name,
                     "result": _parse_err,
@@ -311,7 +314,7 @@ async def run_tool_loop(
                         "content": "Tool execution was rejected by user or timed out.",
                         "tool_call_id": tc_id,
                     })
-                await websocket.send_json({
+                await sink.send({
                     "type": "tool_execution_done",
                     "tool_name": tool_name,
                     "result": "Tool is forbidden and cannot be executed.",
@@ -339,7 +342,7 @@ async def run_tool_loop(
 
                 if confirmations_on:
                     approved = await _request_confirmation(
-                        websocket, tool_name, args, exec_id,
+                        channel, tool_name, args, exec_id,
                         confirmation_timeout_s,
                         risk_level=tool_def.risk_level,
                         description=tool_def.description,
@@ -378,7 +381,7 @@ async def run_tool_loop(
                             "content": "Tool execution was rejected by user or timed out.",
                             "tool_call_id": tc_id,
                         })
-                    await websocket.send_json({
+                    await sink.send({
                         "type": "tool_execution_done",
                         "tool_name": tool_name,
                         "result": "Tool execution rejected or timed out.",
@@ -387,7 +390,7 @@ async def run_tool_loop(
                     })
                     continue
 
-            await _send_json(websocket, {
+            await sink.send({
                 "type": "tool_execution_start",
                 "tool_name": tool_name,
                 "execution_id": exec_id,
@@ -408,11 +411,11 @@ async def run_tool_loop(
             # message so the LLM loop continues seamlessly.
             if is_client_tool:
                 client_result = await _execute_client_tool(
-                    websocket, tool_name, args, exec_id,
+                    channel, tool_name, args, exec_id,
                     tool_exec_timeout, cancel_event,
                 )
                 await _persist_client_tool_result(
-                    websocket=websocket,
+                    sink=sink,
                     session=session,
                     conv_id=conv_id,
                     tc_id=tc_id,
@@ -441,7 +444,7 @@ async def run_tool_loop(
 
         # 3. Execute all tools in parallel (with timeout).
         coros = [
-            asyncio.ensure_future(_exec_one(ctx, tc_id, name, a, c, websocket))
+            asyncio.ensure_future(_exec_one(ctx, tc_id, name, a, c, sink))
             for tc_id, name, a, c in tasks
         ]
         if coros:
@@ -484,7 +487,7 @@ async def run_tool_loop(
                         "content": _timeout_content,
                         "tool_call_id": tc_id,
                     })
-                await websocket.send_json({
+                await sink.send({
                     "type": "tool_execution_done",
                     "tool_name": tool_name,
                     "result": _timeout_content,
@@ -522,7 +525,7 @@ async def run_tool_loop(
                         "content": _fail_content,
                         "tool_call_id": failed_tc_id,
                     })
-                await websocket.send_json({
+                await sink.send({
                     "type": "tool_execution_done",
                     "tool_name": failed_tool_name,
                     "result": f"Tool '{failed_tool_name}' execution failed.",
@@ -636,7 +639,7 @@ async def run_tool_loop(
                 ws_payload["artifact_id"] = artifact_id
 
             try:
-                await _send_json(websocket, ws_payload)
+                await sink.send(ws_payload)
             except WebSocketDisconnect:
                 if ctx.conversation_file_manager and sync_fn:
                     await sync_fn(session, conv_id, ctx.conversation_file_manager)
@@ -711,7 +714,7 @@ async def run_tool_loop(
                     if context_window > 0 else 0.0
                 )
             if ctx.context_manager.should_compress(iter_usage):
-                await websocket.send_json(
+                await sink.send(
                     {"type": "context_compression_start"},
                 )
                 try:
@@ -777,7 +780,7 @@ async def run_tool_loop(
 
                     # Send updated context_info so the ContextBar reflects
                     # the post-compression state immediately.
-                    await websocket.send_json({
+                    await sink.send({
                         "type": "context_info",
                         "used": iter_comp.usage.used_tokens,
                         "available": iter_comp.usage.available_tokens,
@@ -800,12 +803,12 @@ async def run_tool_loop(
                         _comp_done_payload["summary_message_id"] = (
                             _summary_msg_id
                         )
-                    await websocket.send_json(_comp_done_payload)
+                    await sink.send(_comp_done_payload)
                 except Exception as exc:
                     logger.warning(
                         "Tool loop context compression failed: {}", exc,
                     )
-                    await websocket.send_json(
+                    await sink.send(
                         {"type": "context_compression_failed"},
                     )
 
@@ -822,7 +825,7 @@ async def run_tool_loop(
 
             if requery_attempt == 0:
                 query_messages = messages
-                await websocket.send_json({
+                await sink.send({
                     "type": "llm_requery",
                     "iteration": iteration + 1,
                 })
@@ -847,12 +850,9 @@ async def run_tool_loop(
                 ]
                 await asyncio.sleep(0.3)
 
-            # Spawn a reader task so cancel messages are detected
-            # during streaming.
-            reader_task = asyncio.create_task(
-                _ws_cancel_reader(websocket, cancel_event),
-            ) if cancel_event else None
-
+            # Cancel during streaming is observed by the channel's single
+            # read-pump (it sets ``cancel_event``), which ``llm.chat`` honours
+            # per chunk — no dedicated reader here (avoids a second WS reader).
             llm_error_in_requery = False
 
             try:
@@ -863,13 +863,13 @@ async def run_tool_loop(
                 ):
                     if event["type"] == "token":
                         full_content += event["content"]
-                        await websocket.send_json(event)
+                        await sink.send(event)
                     elif event["type"] == "thinking":
                         thinking_content += event["content"]
-                        await websocket.send_json(event)
+                        await sink.send(event)
                     elif event["type"] == "tool_call":
                         tool_calls_from_llm.append(event)
-                        await websocket.send_json(event)
+                        await sink.send(event)
                     elif event["type"] == "error":
                         logger.error(
                             "LLM error during tool loop re-query "
@@ -896,11 +896,6 @@ async def run_tool_loop(
                     iteration + 1, exc,
                 )
                 llm_error_in_requery = True
-            finally:
-                if reader_task and not reader_task.done():
-                    reader_task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await reader_task
 
             # Got content or tool calls or an error — accept the result.
             if (
@@ -944,7 +939,7 @@ async def run_tool_loop(
             "Tool loop hit max iterations ({}) — forcing final answer",
             max_iterations,
         )
-        await websocket.send_json({
+        await sink.send({
             "type": "warning",
             "content": f"Tool loop exceeded maximum iterations ({max_iterations}). Returning partial response.",
         })
@@ -969,47 +964,31 @@ async def run_tool_loop(
 # ---------------------------------------------------------------------------
 
 
-async def _send_json(websocket: WebSocket, payload: dict[str, Any]) -> None:
-    """Send a JSON frame, normalising Starlette closed-socket races."""
-    try:
-        await websocket.send_json(payload)
-    except WebSocketDisconnect:
-        raise
-    except RuntimeError as exc:
-        if is_websocket_closed_runtime_error(exc):
-            raise WebSocketDisconnect(code=1006) from exc
-        raise
-
-
 async def _exec_one(
     ctx: AppContext,
     tc_id: str,
     name: str,
     args: dict[str, Any],
     context: ExecutionContext,
-    websocket: WebSocket | None = None,
+    sink: WSEventSink | None = None,
 ) -> tuple[str, str, ToolResult, str]:
     """Execute a single tool and return its result alongside metadata.
 
     While the tool runs, a progress emitter is bound to the
     ``current_progress_emitter`` contextvar so long-running tools can
-    push ``tool_progress`` frames to the active WebSocket via
+    push ``tool_progress`` frames to the active sink via
     :func:`backend.core.tool_progress.emit_tool_progress`.
     """
-    if websocket is not None:
+    if sink is not None:
         async def _emit(progress: dict[str, Any]) -> None:
-            try:
-                await _send_json(websocket, {
-                    "type": "tool_progress",
-                    "tool_name": name,
-                    "execution_id": context.execution_id,
-                    **progress,
-                })
-            except WebSocketDisconnect:
-                # Client gone — swallow so the tool keeps running
-                # locally to completion (cancellation is handled
-                # elsewhere).
-                pass
+            # ``sink.send`` swallows transport-level errors itself, so the
+            # tool keeps running locally to completion if the client is gone.
+            await sink.send({
+                "type": "tool_progress",
+                "tool_name": name,
+                "execution_id": context.execution_id,
+                **progress,
+            })
 
         token = current_progress_emitter.set(_emit)
         try:
@@ -1101,7 +1080,7 @@ def _save_rejected_tool_msg(
 
 
 async def _execute_client_tool(
-    websocket: WebSocket,
+    channel: InteractionChannel,
     tool_name: str,
     args: dict[str, Any],
     execution_id: str,
@@ -1110,73 +1089,48 @@ async def _execute_client_tool(
 ) -> ToolResult:
     """Delegate a tool's execution to the connected client and await its result.
 
-    Sends a ``client_tool_call`` frame and blocks until a matching
-    ``client_tool_result`` arrives, mirroring the proven request/response
-    shape of :func:`_request_confirmation`. Used for tools flagged with
-    ``ToolDefinition.client_execution`` — operations that must run against
-    live client UI state (e.g. the open Continuum editor) rather than on
-    the server.
+    Issues a ``client_tool_call`` round-trip on the
+    :class:`~backend.services.turn.channel.InteractionChannel` and blocks
+    until the correlated ``client_tool_result`` arrives. Used for tools
+    flagged with ``ToolDefinition.client_execution`` — operations that must
+    run against live client UI state (e.g. the open Continuum editor)
+    rather than on the server.
 
     Args:
-        websocket: Active WebSocket connection.
+        channel: Inbound interaction channel (the single WS reader).
         tool_name: Namespaced tool name being delegated.
         args: Parsed arguments to forward to the client.
         execution_id: Unique execution ID used to correlate the response.
         timeout_s: Maximum seconds to wait for the client to respond.
-        cancel_event: Optional event set when a ``cancel`` message arrives.
+        cancel_event: Optional event honoured while waiting (the pump sets
+            it on a cancel frame).
 
     Returns:
         A :class:`ToolResult` carrying the client-supplied payload, or an
-        error result on timeout / disconnect / cancellation.
-    """
-    await websocket.send_json({
-        "type": "client_tool_call",
-        "tool_name": tool_name,
-        "args": args,
-        "execution_id": execution_id,
-    })
+        error result on timeout / cancellation.
 
-    deadline = asyncio.get_running_loop().time() + timeout_s
-    try:
-        while True:
-            remaining = deadline - asyncio.get_running_loop().time()
-            if remaining <= 0:
-                raise asyncio.TimeoutError
-            raw = await asyncio.wait_for(
-                websocket.receive_text(), timeout=remaining,
+    Raises:
+        WebSocketDisconnect: If the socket dropped while awaiting the reply.
+    """
+    msg = await channel.request(
+        "client_tool_call",
+        {"tool_name": tool_name, "args": args},
+        execution_id=execution_id,
+        timeout_s=timeout_s,
+        cancel_event=cancel_event,
+    )
+
+    if msg is None:
+        # Disambiguate the ``None`` outcome (disconnect wins over cancel,
+        # since a disconnect also trips the cancel signal).
+        if not channel.connected:
+            logger.warning(
+                "WebSocket disconnected during client tool '{}' (exec_id={})",
+                tool_name, execution_id,
             )
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                logger.debug(
-                    "Ignoring non-JSON message during client tool wait",
-                )
-                continue
-            if msg.get("type") == "cancel":
-                if cancel_event:
-                    cancel_event.set()
-                return ToolResult.error("Client tool cancelled by user.")
-            if (
-                msg.get("type") == "client_tool_result"
-                and msg.get("execution_id") == execution_id
-            ):
-                if msg.get("success", False):
-                    payload = msg.get("result")
-                    content = (
-                        payload
-                        if isinstance(payload, (str, dict, list))
-                        else str(payload)
-                    )
-                    return ToolResult.ok(
-                        content if content is not None else "OK",
-                        content_type="application/json"
-                        if isinstance(payload, (dict, list))
-                        else "text/plain",
-                    )
-                return ToolResult.error(
-                    str(msg.get("error") or "Client tool reported a failure."),
-                )
-    except asyncio.TimeoutError:
+            raise WebSocketDisconnect(code=1006)
+        if channel.cancelled:
+            return ToolResult.error("Client tool cancelled by user.")
         logger.warning(
             "Client tool '{}' timed out after {}s (exec_id={})",
             tool_name, timeout_s, execution_id,
@@ -1184,22 +1138,28 @@ async def _execute_client_tool(
         return ToolResult.error(
             f"Client tool '{tool_name}' timed out — is a Continuum note open?",
         )
-    except WebSocketDisconnect:
-        logger.warning(
-            "WebSocket disconnected during client tool '{}' (exec_id={})",
-            tool_name, execution_id,
+
+    if msg.get("success", False):
+        payload = msg.get("result")
+        content = (
+            payload
+            if isinstance(payload, (str, dict, list))
+            else str(payload)
         )
-        raise
-    except RuntimeError as exc:
-        if is_websocket_closed_runtime_error(exc):
-            raise WebSocketDisconnect(code=1006) from exc
-        logger.warning("Error receiving client tool result: {}", exc)
-        return ToolResult.error("Failed to receive client tool result.")
+        return ToolResult.ok(
+            content if content is not None else "OK",
+            content_type="application/json"
+            if isinstance(payload, (dict, list))
+            else "text/plain",
+        )
+    return ToolResult.error(
+        str(msg.get("error") or "Client tool reported a failure."),
+    )
 
 
 async def _persist_client_tool_result(
     *,
-    websocket: WebSocket,
+    sink: WSEventSink,
     session: Any,
     conv_id: uuid.UUID,
     tc_id: str,
@@ -1211,7 +1171,7 @@ async def _persist_client_tool_result(
     sync_fn: SyncFn | None,
     ctx: AppContext,
 ) -> None:
-    """Persist a client-executed tool result and notify the WebSocket.
+    """Persist a client-executed tool result and notify the client.
 
     Mirrors the persistence performed for server-side tool results in the
     main loop (DB ``role="tool"`` message + in-memory history append +
@@ -1240,7 +1200,7 @@ async def _persist_client_tool_result(
     if ctx.conversation_file_manager and sync_fn:
         await sync_fn(session, conv_id, ctx.conversation_file_manager)
 
-    await _send_json(websocket, {
+    await sink.send({
         "type": "tool_execution_done",
         "tool_name": tool_name,
         "result": content,
@@ -1250,7 +1210,7 @@ async def _persist_client_tool_result(
 
 
 async def _request_confirmation(
-    websocket: WebSocket,
+    channel: InteractionChannel,
     tool_name: str,
     args: dict[str, Any],
     execution_id: str,
@@ -1262,12 +1222,13 @@ async def _request_confirmation(
 ) -> bool:
     """Send a confirmation request and wait for the user's response.
 
-    Sends a ``tool_confirmation_required`` WS message and blocks until
-    a matching ``tool_confirmation_response`` arrives or *timeout_s*
-    elapses.
+    Issues a ``tool_confirmation`` round-trip on the
+    :class:`~backend.services.turn.channel.InteractionChannel` and blocks
+    until the correlated ``tool_confirmation_response`` arrives or
+    *timeout_s* elapses.
 
     Args:
-        websocket: Active WebSocket connection.
+        channel: Inbound interaction channel (the single WS reader).
         tool_name: Name of the tool requiring confirmation.
         args: Arguments the tool will be called with.
         execution_id: Unique execution ID for correlation.
@@ -1276,106 +1237,31 @@ async def _request_confirmation(
             ``"dangerous"``, ``"forbidden"``).
         description: Human-readable description of the tool action.
         reasoning: LLM thinking/reasoning content at invocation time.
-        cancel_event: Optional event to set when a cancel message arrives.
+        cancel_event: Optional event honoured while waiting (the pump sets
+            it on a cancel frame).
 
     Returns:
-        ``True`` if the user approved, ``False`` on rejection or timeout.
+        ``True`` if the user approved, ``False`` on rejection, timeout,
+        cancellation or disconnect.
     """
-    await websocket.send_json({
-        "type": "tool_confirmation_required",
-        "tool_name": tool_name,
-        "args": args,
-        "execution_id": execution_id,
-        "risk_level": risk_level,
-        "description": description,
-        "reasoning": reasoning,
-    })
-
-    deadline = asyncio.get_running_loop().time() + timeout_s
-    try:
-        while True:
-            remaining = deadline - asyncio.get_running_loop().time()
-            if remaining <= 0:
-                raise asyncio.TimeoutError
-            raw = await asyncio.wait_for(
-                websocket.receive_text(), timeout=remaining,
-            )
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                logger.debug(
-                    "Ignoring non-JSON message during confirmation wait",
-                )
-                continue
-            # Handle cancel messages during confirmation wait.
-            if msg.get("type") == "cancel":
-                if cancel_event:
-                    cancel_event.set()
-                return False
-            if (
-                msg.get("type") == "tool_confirmation_response"
-                and msg.get("execution_id") == execution_id
-            ):
-                return bool(msg.get("approved", False))
-    except asyncio.TimeoutError:
-        logger.warning(
-            "Confirmation timed out for tool '{}' (exec_id={})",
+    msg = await channel.request(
+        "tool_confirmation",
+        {
+            "tool_name": tool_name,
+            "args": args,
+            "risk_level": risk_level,
+            "description": description,
+            "reasoning": reasoning,
+        },
+        execution_id=execution_id,
+        timeout_s=timeout_s,
+        cancel_event=cancel_event,
+    )
+    if msg is None:
+        # Timeout, cancel or disconnect — all treated as "not approved".
+        logger.debug(
+            "Confirmation not granted for tool '{}' (exec_id={})",
             tool_name, execution_id,
         )
         return False
-    except WebSocketDisconnect:
-        logger.warning(
-            "WebSocket disconnected during confirmation for tool '{}' (exec_id={})",
-            tool_name, execution_id,
-        )
-        return False
-    except RuntimeError as exc:
-        if is_websocket_closed_runtime_error(exc):
-            logger.warning(
-                "WebSocket disconnected during confirmation for tool '{}' (exec_id={})",
-                tool_name, execution_id,
-            )
-            return False
-        logger.warning(
-            "Error receiving confirmation for tool '{}' (exec_id={})",
-            tool_name, execution_id,
-        )
-        return False
-    except Exception:
-        logger.warning(
-            "Error receiving confirmation for tool '{}' (exec_id={})",
-            tool_name, execution_id,
-        )
-        return False
-
-
-async def _ws_cancel_reader(
-    websocket: WebSocket,
-    cancel_event: asyncio.Event | None,
-) -> None:
-    """Read WebSocket messages in the background during LLM re-streaming.
-
-    Sets *cancel_event* when a ``{"type": "cancel"}`` message arrives.
-    Any non-cancel messages are silently discarded (the main loop handles
-    only LLM stream events during this phase).
-    """
-    if cancel_event is None:
-        return
-    try:
-        while not cancel_event.is_set():
-            raw = await websocket.receive_text()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            if msg.get("type") == "cancel":
-                cancel_event.set()
-                return
-    except (WebSocketDisconnect, asyncio.CancelledError):
-        return
-    except RuntimeError as exc:
-        if is_websocket_closed_runtime_error(exc):
-            return
-        logger.debug("WS cancel reader stopped unexpectedly")
-    except Exception:
-        logger.debug("WS cancel reader stopped unexpectedly")
+    return bool(msg.get("approved", False))

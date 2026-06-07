@@ -410,6 +410,7 @@ export type WsMessage =
   | WsToolCallMessage
   | WsToolExecutionStartMessage
   | WsToolExecutionDoneMessage
+  | WsToolProgressMessage
   | WsToolConfirmationRequiredMessage
   | WsLlmRequeryMessage
   | WsWarningMessage

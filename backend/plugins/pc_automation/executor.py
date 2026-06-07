@@ -192,7 +192,6 @@ def _find_executable(candidates: list[str]) -> str | None:
             os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
             os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
         ]
-        name_lower = name.lower()
         for base in bases:
             if not base or not os.path.isdir(base):
                 continue

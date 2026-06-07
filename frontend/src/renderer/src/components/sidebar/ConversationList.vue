@@ -8,7 +8,7 @@
  * - Keyboard navigation (arrow keys, Enter, Escape).
  * - ARIA roles for accessibility.
  */
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, nextTick, ref, onMounted, onBeforeUnmount } from 'vue'
 
 import type { ConversationSummary } from '../../types/chat'
 import AppIcon from '../ui/AppIcon.vue'
@@ -99,10 +99,26 @@ onBeforeUnmount(() => {
 const renamingId = ref<string | null>(null)
 /** Temporary value while the user edits the title. */
 const renameValue = ref('')
+/**
+ * The inline rename input. Only one renders at a time (the row whose id
+ * matches `renamingId`). A function ref is used because the input lives inside
+ * a `v-for`, where a static string ref would be collected as an array.
+ */
+const renameInputRef = ref<HTMLInputElement | null>(null)
+
+function setRenameInput(el: Element | null): void {
+  renameInputRef.value = el as HTMLInputElement | null
+}
 
 function startRename(conv: ConversationSummary): void {
   renamingId.value = conv.id
   renameValue.value = conv.title ?? ''
+  // `autofocus` is only honoured on initial page load, not for elements
+  // inserted dynamically — focus + select explicitly once the input renders.
+  nextTick(() => {
+    renameInputRef.value?.focus()
+    renameInputRef.value?.select()
+  })
 }
 
 function confirmRename(id: string): void {
@@ -232,8 +248,9 @@ function timeAgo(iso: string): string {
 
           <!-- Inline rename -->
           <template v-else>
-            <input v-model="renameValue" class="conv-item__rename-input" autofocus aria-label="Rinomina conversazione"
-              @keydown.enter.stop="confirmRename(conv.id)" @keydown.escape.stop="cancelRename" @click.stop />
+            <input :ref="(el) => setRenameInput(el as Element | null)" v-model="renameValue" class="conv-item__rename-input"
+              aria-label="Rinomina conversazione" @keydown.enter.stop="confirmRename(conv.id)"
+              @keydown.escape.stop="cancelRename" @click.stop />
           </template>
 
           <!-- Action buttons (slide-in on hover) -->

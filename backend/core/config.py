@@ -1178,6 +1178,63 @@ class AliceConfig(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
+    def _migrate_legacy_keys(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Fold renamed legacy config keys into their current location.
+
+        The agentic-chat refactor unified the standalone ``agent_tools``
+        section into the :class:`AgentConfig` tree
+        (``agent_tools.plan_enabled`` → ``agent.planning``,
+        ``agent_tools.delegation_enabled`` → ``agent.delegation`` and
+        ``agent_tools.subagent_*`` → ``agent.subagent.*``).  A persisted
+        ``system.yaml`` / ``user.yaml`` layer written by an older build can
+        still carry the legacy ``agent_tools`` block; because every config
+        model forbids unknown fields, leaving it in place makes the *whole*
+        config — and therefore the backend — fail to load.  Migrating the
+        recognised keys (and dropping the block) keeps upgrades seamless
+        without silently discarding the user's previous settings.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        legacy = data.pop("agent_tools", None)
+        if not isinstance(legacy, dict):
+            return data
+
+        agent = data.get("agent")
+        if not isinstance(agent, dict):
+            agent = {}
+            data["agent"] = agent
+        subagent = agent.get("subagent")
+        if not isinstance(subagent, dict):
+            subagent = {}
+
+        scalar_map = {
+            "plan_enabled": "planning",
+            "delegation_enabled": "delegation",
+        }
+        subagent_map = {
+            "subagent_max_steps": "max_steps",
+            "subagent_max_output_tokens": "max_output_tokens",
+            "subagent_timeout_seconds": "timeout_seconds",
+            "subagent_max_tools": "max_tools",
+        }
+        # New-tree keys win: never clobber an explicitly-set ``agent.*``
+        # value with a migrated legacy one.
+        for old_key, value in legacy.items():
+            if old_key in scalar_map and scalar_map[old_key] not in agent:
+                agent[scalar_map[old_key]] = value
+            elif old_key in subagent_map and subagent_map[old_key] not in subagent:
+                subagent[subagent_map[old_key]] = value
+            else:
+                logger.debug("Ignoring unknown legacy agent_tools key: {}", old_key)
+
+        if subagent:
+            agent["subagent"] = subagent
+        logger.info("Migrated legacy 'agent_tools' config block into 'agent'")
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
     def _resolve_paths(cls, data: dict[str, Any]) -> dict[str, Any]:
         """Resolve relative paths to absolute using the project root."""
         if not isinstance(data, dict):

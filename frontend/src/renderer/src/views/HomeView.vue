@@ -113,8 +113,8 @@ const launchOptions: LaunchOption[] = [
     route: 'workspace',
     label: 'Workspace',
     icon: 'hybrid-panel',
-    isActive: () => false, // workspace is not tracked by UIMode
-    select: () => { /* no UIMode to set */ },
+    isActive: () => uiStore.mode === 'workspace',
+    select: () => uiStore.setMode('workspace'),
   },
 ]
 

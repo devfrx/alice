@@ -281,6 +281,12 @@ async def get_conversation(
                                         ),
                                     )
                                 )
+                        # Estimate tool-definition tokens for BOTH the
+                        # tool-RAG and the full-toolset paths.  Keeping this
+                        # outside the if/else ensures the RAG branch does not
+                        # silently undercount context usage (the sample of
+                        # ``tool_rag_top_k`` tools still costs tokens).
+                        if avail_tools:
                             tool_tokens = (
                                 ctx.context_manager.estimate_tokens(
                                     json.dumps(

@@ -630,6 +630,10 @@ export const useChatStore = defineStore('chat', () => {
     // User navigated away — message is saved server-side.
     // Reset streaming state and refresh sidebar only.
     if (!currentConversation.value || currentConversation.value.id !== conversationId) {
+      // Still link the pending agent run to its (server-persisted) assistant
+      // message id so it remains lookup-able by `final_assistant_message_id`
+      // once the user navigates back, mirroring the in-view branch below.
+      linkAgentRunToMessage(messageId)
       currentStreamContent.value = ''
       currentThinkingContent.value = ''
       isStreaming.value = false

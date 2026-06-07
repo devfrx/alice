@@ -117,12 +117,29 @@ export function useArtifactAutoOpen(conversationIdRef?: Ref<string | null | unde
   )
 
   // ── Watcher: new chart payloads in messages ──────────────────────────────
+  //
+  // `chatStore.messages` switches wholesale when the active conversation
+  // changes.  Without a guard, every chart already present in the
+  // newly-opened conversation would look "new" and auto-open a tile on mere
+  // navigation.  Track the conversation the seen-set belongs to and, on a
+  // switch, re-baseline (seed the new conversation's existing charts as
+  // already-seen) instead of emitting.  Re-baselining runs even when
+  // auto-open is disabled so a later toggle never replays the backlog.
+
+  let lastChartConvId = conversationIdRef?.value ?? null
 
   watch(
     () => chatStore.messages,
     (messages) => {
-      if (!workspaceStore.autoOpenEnabled) return
+      const convId = conversationIdRef?.value ?? null
       const currentCharts = extractChartIds(messages)
+      if (convId !== lastChartConvId) {
+        lastChartConvId = convId
+        seenChartIds.clear()
+        for (const id of currentCharts.keys()) seenChartIds.add(id)
+        return
+      }
+      if (!workspaceStore.autoOpenEnabled) return
       for (const [chartId, payload] of currentCharts) {
         if (seenChartIds.has(chartId)) continue
         seenChartIds.add(chartId)
@@ -133,12 +150,22 @@ export function useArtifactAutoOpen(conversationIdRef?: Ref<string | null | unde
   )
 
   // ── Watcher: new whiteboard payloads in messages ─────────────────────────
+  // Same conversation-switch re-baseline as the chart watcher above.
+
+  let lastBoardConvId = conversationIdRef?.value ?? null
 
   watch(
     () => chatStore.messages,
     (messages) => {
-      if (!workspaceStore.autoOpenEnabled) return
+      const convId = conversationIdRef?.value ?? null
       const currentBoards = extractBoardIds(messages)
+      if (convId !== lastBoardConvId) {
+        lastBoardConvId = convId
+        seenBoardIds.clear()
+        for (const boardId of currentBoards) seenBoardIds.add(boardId)
+        return
+      }
+      if (!workspaceStore.autoOpenEnabled) return
       for (const boardId of currentBoards) {
         if (seenBoardIds.has(boardId)) continue
         seenBoardIds.add(boardId)

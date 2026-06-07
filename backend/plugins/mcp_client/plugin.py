@@ -277,7 +277,7 @@ class McpClientPlugin(BasePlugin):
                 # Stale connection cleanup is best-effort; the new
                 # session will be created regardless.  Log so operators
                 # can spot zombie subprocesses / leaked file handles.
-                logger.warning(
+                self.logger.warning(
                     "Failed to stop stale MCP session for '{}': {}",
                     server_name,
                     exc,

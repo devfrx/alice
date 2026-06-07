@@ -113,13 +113,15 @@ const launchOptions: LaunchOption[] = [
     route: 'workspace',
     label: 'Workspace',
     icon: 'hybrid-panel',
-    isActive: () => false, // workspace is not tracked by UIMode
-    select: () => { /* no UIMode to set */ },
+    isActive: () => uiStore.mode === 'workspace',
+    select: () => uiStore.setMode('workspace'),
   },
 ]
 
-/** Explicitly clicked option; takes priority over isActive() checks. */
-const chosenOption = ref<LaunchOption>(launchOptions[0])
+/** Explicitly clicked option; takes priority over isActive() checks. Starts
+ * null so the `isActive()` fallback (active surface) drives the initial
+ * highlight instead of always pinning to the first option. */
+const chosenOption = ref<LaunchOption | null>(null)
 
 /** Currently selected launch option: explicit click > first isActive match > first option. */
 const selectedOption = computed(

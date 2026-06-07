@@ -1,8 +1,13 @@
 ﻿/**
  * Pinia store managing UI mode state for AL\CE.
  *
- * Active modes:
- * - 'assistant' — Living AI orb, voice-first interaction
+ * Active modes (the two primary chat surfaces):
+ * - 'assistant' — Living AI orb, voice-first interaction.
+ * - 'workspace' — Tiling panel workspace.
+ *
+ * `mode` tracks whichever primary surface is active so the shell (root body
+ * class, ambient/orb gating, "return to chat surface" navigation) stays
+ * coherent. The router's `afterEach` keeps it in sync with the active route.
  *
  * The 'hybrid' dual-pane mode was retired (R3) in favour of Workspace; the
  * `/hybrid → /workspace` router redirect preserves old deep links, and any
@@ -11,7 +16,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 
-export type UIMode = 'assistant'
+export type UIMode = 'assistant' | 'workspace'
 
 const LS_PLAN_CARD = 'alice_agent_plan_card_enabled'
 const LS_SIDEBAR_AUTO = 'alice_agent_sidebar_auto_open'
@@ -115,7 +120,7 @@ export const useUIStore = defineStore('ui', () => {
   function loadMode(): UIMode {
     try {
       const stored = localStorage.getItem('alice_ui_mode')
-      if (stored === 'assistant') return stored
+      if (stored === 'assistant' || stored === 'workspace') return stored
       // Legacy 'hybrid' (retired R3) and any other value fall through to 'assistant'.
     } catch {
       /* localStorage may be unavailable */

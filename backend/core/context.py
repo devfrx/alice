@@ -136,13 +136,6 @@ class AppContext:
     at runtime; typed as :class:`Any` to avoid circular imports.
     """
 
-    config_service: Any = None
-    """Layered configuration service (defaults < system < user < runtime).
-
-    Always a :class:`backend.services.config_service.LayeredConfigService`
-    at runtime; typed as :class:`Any` to avoid circular imports.
-    """
-
     # ------------------------------------------------------------------
     # Plugin state helpers
     # ------------------------------------------------------------------

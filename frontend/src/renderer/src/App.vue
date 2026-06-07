@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 // AL\CE — Root App Component
 import { onErrorCaptured, onMounted, onUnmounted, provide, computed, ref, watchEffect } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
@@ -12,7 +12,6 @@ import { UiToast, AliceLoader } from './components/ui'
 import { useChat, ChatApiKey } from './composables/useChat'
 import { useEventsWebSocket } from './composables/useEventsWebSocket'
 import { useSettingsStore } from './stores/settings'
-import { useUIStore } from './stores/ui'
 import { usePluginsStore } from './stores/plugins'
 import { waitForBackend } from './services/api'
 
@@ -23,9 +22,17 @@ provide(ChatApiKey, chatApi)
 const eventsWs = useEventsWebSocket()
 
 const settingsStore = useSettingsStore()
-const uiStore = useUIStore()
 const pluginsStore = usePluginsStore()
 const router = useRouter()
+const route = useRoute()
+
+/**
+ * Assistant chrome (centered orb layout + surface-0 backdrop) must follow the
+ * ACTIVE ROUTE, not the persisted `uiStore.mode`. `mode` is sticky across
+ * secondary routes (mail/calendar/settings/…), so keying the layout off it
+ * would center those views depending on which primary surface you came from.
+ */
+const isAssistantRoute = computed(() => route.name === 'assistant')
 
 // Catch setup/render errors in child views (e.g. corrupted injection after HMR)
 // and redirect to home instead of crashing the whole app.
@@ -91,7 +98,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div id="alice-app" :class="`alice-app--${uiStore.mode}`">
+  <div id="alice-app" :class="{ 'alice-app--assistant': isAssistantRoute }">
     <TitleBar />
     <div v-if="settingsStore.isAnyOperationInProgress" class="global-operation-bar">
       <div class="global-operation-bar__track" role="progressbar" aria-label="Operazione modello in corso">

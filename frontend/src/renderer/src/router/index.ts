@@ -23,8 +23,8 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteLocationNormalized, RouterScrollBehavior } from 'vue-router'
 import { useUIStore, type UIMode } from '../stores/ui'
 
-/** Route names that correspond to a UI mode. */
-const MODE_ROUTES = new Set<string>(['assistant'])
+/** Route names that correspond to a UI mode (the primary chat surfaces). */
+const MODE_ROUTES = new Set<string>(['assistant', 'workspace'])
 
 /** Window-title suffix shared by every page. */
 const TITLE_SUFFIX = 'AL\\CE'

@@ -148,6 +148,7 @@ onMounted(async () => {
 
 .board-view__title {
     margin: 0;
+    font-family: var(--font-display);
     font-size: var(--text-2xl);
     font-weight: var(--weight-semibold);
     letter-spacing: -0.01em;
@@ -165,7 +166,7 @@ onMounted(async () => {
 .board-view__body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-5) var(--space-6) var(--space-6);
+    padding: var(--space-2) var(--space-6) var(--space-6);
 }
 
 .board-view__loading {
@@ -178,8 +179,9 @@ onMounted(async () => {
 
 .board-view__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: var(--space-5);
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--space-4);
+    align-content: start;
 }
 
 @media (max-width: 720px) {

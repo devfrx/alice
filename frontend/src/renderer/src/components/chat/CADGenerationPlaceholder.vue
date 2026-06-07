@@ -201,6 +201,7 @@ const elapsed = computed(() => {
 
 .cad-gen__heading {
     margin: 0;
+    font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     color: var(--text-primary);

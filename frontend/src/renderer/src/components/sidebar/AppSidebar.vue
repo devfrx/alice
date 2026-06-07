@@ -11,10 +11,10 @@
  * and delegates mutations back through events / store actions.
  */
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
-import { useUIStore, type UIMode } from '../../stores/ui'
+import { useUIStore } from '../../stores/ui'
 import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
 import { api } from '../../services/api'
@@ -23,26 +23,78 @@ import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
+
+/**
+ * When `docked` is true the sidebar renders inline inside its parent frame
+ * (see {@link DockedSidebar}) instead of as a floating overlay: no backdrop,
+ * no fixed positioning, no slide animation, and the close button is hidden
+ * (collapsing is handled by the docked frame). All content and conversation
+ * actions are identical between modes.
+ */
+const props = withDefaults(defineProps<{ docked?: boolean }>(), { docked: false })
 
 const chatStore = useChatStore()
 const uiStore = useUIStore()
 const emailStore = useEmailStore()
 const router = useRouter()
+const route = useRoute()
 const { confirm } = useModal()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
 
-/** Whether the sidebar is expanded (wired to central UI store). */
-const isOpen = computed(() => uiStore.sidebarOpen)
+/**
+ * Mode-tab active state is derived from the ROUTE (not `uiStore.mode`, which
+ * defaults to 'assistant' and would falsely mark Assistente active while on
+ * /workspace). Each tab is active only for its own surface, mutually exclusive.
+ */
+const isAssistantActive = computed(() => route.name === 'assistant')
+const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
-/** Toggle collapsed state via central UI store. */
-function toggle(): void {
-  uiStore.toggleSidebar()
+/** The two primary-surface options for the shared segmented control. */
+const modeTabOptions: UiSegmentedOption[] = [
+  { value: 'assistant', label: 'Assistente', icon: 'orb' },
+  { value: 'workspace', label: 'Workspace', icon: 'hybrid-panel' },
+]
+
+/** Active segment value derived from the route (null on other surfaces). */
+const activeModeValue = computed<string | null>(() => {
+  if (isAssistantActive.value) return 'assistant'
+  if (isWorkspaceActive.value) return 'workspace'
+  return null
+})
+
+/**
+ * Route to the chosen surface. Navigation is the source of truth — the
+ * router's afterEach guard syncs `uiStore.mode` from the active route — so
+ * BOTH segments must actually push their route (previously only Workspace did,
+ * which is why the Assistente tab appeared dead).
+ */
+async function onModeSelect(value: string | number): Promise<void> {
+  toggle() // close the floating overlay (no-op when docked)
+  if (activeModeValue.value === value) return
+  try {
+    await router.push(value === 'workspace' ? '/workspace' : '/assistant')
+  } catch (err) {
+    console.error('[AppSidebar] Mode navigation failed:', err)
+  }
 }
 
-function onModeTabClick(mode: UIMode): void {
-  uiStore.setMode(mode)
-  toggle()
+/**
+ * Whether the sidebar body is shown.
+ * - Docked: always rendered; the parent frame controls visibility/width.
+ * - Floating overlay: driven by the central UI store open state.
+ */
+const isOpen = computed(() => props.docked || uiStore.sidebarOpen)
+
+/**
+ * Close affordance. In floating mode this toggles the overlay; in docked mode
+ * nav links call this on click but we must NOT close the docked sidebar, so it
+ * is a no-op there (collapse is handled by the frame / TitleBar toggle).
+ */
+function toggle(): void {
+  if (props.docked) return
+  uiStore.toggleSidebar()
 }
 
 // Conversations are loaded by useChat's onConnected handler after the
@@ -61,7 +113,8 @@ async function onSelect(id: string): Promise<void> {
     return
   }
   const current = router.currentRoute.value.name as string
-  if (current !== 'assistant' && current !== 'hybrid') {
+  // 'workspace' and 'assistant' are the active chat surfaces; navigate there if not already on one.
+  if (current !== 'assistant' && current !== 'workspace') {
     try {
       await router.push({ name: uiStore.mode })
     } catch (err) {
@@ -75,7 +128,7 @@ async function onSelect(id: string): Promise<void> {
 async function onCreate(): Promise<void> {
   await chatStore.createConversation()
   const current = router.currentRoute.value.name as string
-  if (current !== 'assistant' && current !== 'hybrid') {
+  if (current !== 'assistant' && current !== 'workspace') {
     await router.push({ name: uiStore.mode })
   }
 }
@@ -123,38 +176,28 @@ async function onOpenFile(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="sidebar__root">
-    <!-- Backdrop overlay — click to close -->
-    <Transition name="sidebar-backdrop">
+  <div class="sidebar__root" :class="{ 'sidebar__root--docked': props.docked }">
+    <!-- Backdrop overlay — click to close (floating overlay mode only) -->
+    <Transition v-if="!props.docked" name="sidebar-backdrop">
       <div v-if="isOpen" class="sidebar__backdrop" @click="toggle" />
     </Transition>
 
-    <!-- Floating sidebar panel -->
-    <Transition name="sidebar-slide">
-      <aside v-if="isOpen" class="sidebar">
-        <!-- Header with close button -->
+    <!-- Sidebar panel: floating (overlay) or docked (inline frame) -->
+    <Transition :name="props.docked ? '' : 'sidebar-slide'">
+      <aside v-if="isOpen" class="sidebar" :class="{ 'sidebar--docked': props.docked }">
+        <!-- Header with close button (close hidden when docked) -->
         <div class="sidebar__header">
           <span class="sidebar__brand">
             <BrandWordmark brand="alce" />
           </span>
-          <button class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
+          <button v-if="!props.docked" class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
         </div>
 
-        <!-- Mode switcher tabs: Assistente / Ibrido -->
-        <div class="sidebar__mode-tabs">
-          <router-link to="/assistant" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
-            :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'assistant' }" @click="onModeTabClick('assistant')">
-            <AppIcon name="orb" :size="14" />
-            <span>Assistente</span>
-          </router-link>
-          <router-link to="/hybrid" class="sidebar__mode-tab" active-class="sidebar__mode-tab--active"
-            :class="{ 'sidebar__mode-tab--active': uiStore.mode === 'hybrid' }" @click="onModeTabClick('hybrid')">
-            <AppIcon name="hybrid-sidebar" :size="14" />
-            <span>Ibrido</span>
-          </router-link>
-        </div>
+        <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
+        <UiSegmented class="sidebar__mode-seg" :model-value="activeModeValue" :options="modeTabOptions"
+          aria-label="Modalità primaria" @update:model-value="(v) => void onModeSelect(v)" />
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
@@ -258,14 +301,40 @@ async function onOpenFile(id: string): Promise<void> {
   height: calc(100vh - var(--titlebar-height, 38px) - 16px);
   display: flex;
   flex-direction: column;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur-heavy));
-  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-  border: 1px solid var(--glass-border);
+  /* Solid, fully-opaque surface — no glass / semi-transparency. */
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 20px;
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--panel-shadow, var(--shadow-md));
   z-index: calc(var(--z-overlay) - 1);
   overflow: hidden;
+}
+
+/* ── Docked mode: fill the parent frame, no overlay chrome ───────── */
+.sidebar__root--docked {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Docked mode: fill the parent DockedSidebar frame, which now provides the
+ * floating card chrome (surface, border, radius, shadow). The sidebar itself
+ * is transparent and inherits the frame's rounded clip; its inner sections
+ * (nav / conversations / footer) scroll within the card.
+ */
+.sidebar--docked {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: inherit;
+  box-shadow: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  z-index: auto;
 }
 
 /* Slide animation */
@@ -331,54 +400,10 @@ async function onOpenFile(id: string): Promise<void> {
   flex-shrink: 0;
 }
 
-/* ── Mode tabs (Assistente / Ibrido) ───────────────────────── */
-.sidebar__mode-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
+/* ── Mode tabs (Assistente / Workspace) — shared UiSegmented ────── */
+.sidebar__mode-seg {
   margin: 0 var(--space-3) var(--space-3);
-  padding: 3px;
-  background: var(--surface-2);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
   flex-shrink: 0;
-}
-
-.sidebar__mode-tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1-5);
-  min-height: 34px;
-  padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-md) - 3px);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast),
-    box-shadow var(--transition-fast);
-  white-space: nowrap;
-}
-
-.sidebar__mode-tab:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.sidebar__mode-tab--active {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-xs);
-}
-
-.sidebar__mode-tab--active svg {
-  color: var(--accent);
 }
 
 /* ── Footer (impostazioni) ─────────────────────────────────── */
@@ -387,7 +412,6 @@ async function onOpenFile(id: string): Promise<void> {
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3) var(--space-3);
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -398,9 +422,6 @@ async function onOpenFile(id: string): Promise<void> {
   gap: var(--space-3);
   min-height: var(--input-height-md);
   padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
 }
 
 .sidebar__theme-label {

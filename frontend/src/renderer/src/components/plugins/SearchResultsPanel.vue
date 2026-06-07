@@ -166,10 +166,10 @@ function openUrl(url: string): void {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
 }
 
 .search-panel__title {
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 14px;
 }
@@ -195,7 +195,7 @@ function openUrl(url: string): void {
 }
 
 .search-panel__close:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--white-medium);
 }
 
 .search-panel__input-wrap {
@@ -262,13 +262,12 @@ function openUrl(url: string): void {
 .search-panel__card {
   padding: 10px;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  transition: border-color 0.15s;
+  background: var(--surface-2);
+  transition: background 0.15s;
 }
 
 .search-panel__card:hover {
-  border-color: var(--accent);
+  background: var(--surface-3);
 }
 
 .search-panel__card-title {
@@ -316,7 +315,7 @@ function openUrl(url: string): void {
   border-radius: 4px;
   border: none;
   font-size: 11px;
-  background: var(--bg-tertiary);
+  background: var(--surface-3);
   color: var(--text-primary);
   cursor: pointer;
   transition: opacity 0.15s;

@@ -68,11 +68,11 @@ const ambientStyle = computed<Record<string, string>>(() => {
 
 <style scoped>
 .ambient {
-    --ambient-primary: rgba(232, 220, 200, 0.055);
-    --ambient-secondary: rgba(160, 200, 192, 0.035);
-    --ambient-tertiary: rgba(218, 198, 168, 0.032);
-    --ambient-line: rgba(232, 220, 200, 0.13);
-    --ambient-particle: rgba(232, 220, 200, 0.50);
+    --ambient-primary: color-mix(in srgb, var(--accent) 6%, transparent);
+    --ambient-secondary: color-mix(in srgb, var(--accent) 4%, transparent);
+    --ambient-tertiary: color-mix(in srgb, var(--accent) 3%, transparent);
+    --ambient-line: color-mix(in srgb, var(--accent) 13%, transparent);
+    --ambient-particle: color-mix(in srgb, var(--accent) 50%, transparent);
     --ambient-flow-speed: 28s;
     --ambient-wave-speed: 12s;
     position: absolute;
@@ -86,41 +86,41 @@ const ambientStyle = computed<Record<string, string>>(() => {
 }
 
 .ambient--listening {
-    --ambient-primary: rgba(224, 96, 96, 0.070);
-    --ambient-secondary: rgba(232, 184, 128, 0.036);
-    --ambient-tertiary: rgba(160, 92, 92, 0.035);
-    --ambient-line: rgba(238, 112, 102, 0.15);
-    --ambient-particle: rgba(255, 194, 178, 0.52);
+    --ambient-primary: color-mix(in srgb, var(--listening) 7%, transparent);
+    --ambient-secondary: color-mix(in srgb, var(--listening) 4%, transparent);
+    --ambient-tertiary: color-mix(in srgb, var(--listening) 4%, transparent);
+    --ambient-line: color-mix(in srgb, var(--listening) 15%, transparent);
+    --ambient-particle: color-mix(in srgb, var(--listening) 52%, transparent);
     --ambient-flow-speed: 20s;
     --ambient-wave-speed: 7.4s;
 }
 
 .ambient--thinking {
-    --ambient-primary: rgba(168, 188, 218, 0.065);
-    --ambient-secondary: rgba(232, 220, 200, 0.038);
-    --ambient-tertiary: rgba(110, 155, 215, 0.032);
-    --ambient-line: rgba(190, 204, 230, 0.14);
-    --ambient-particle: rgba(218, 228, 242, 0.50);
+    --ambient-primary: color-mix(in srgb, var(--thinking) 7%, transparent);
+    --ambient-secondary: color-mix(in srgb, var(--thinking) 4%, transparent);
+    --ambient-tertiary: color-mix(in srgb, var(--thinking) 3%, transparent);
+    --ambient-line: color-mix(in srgb, var(--thinking) 14%, transparent);
+    --ambient-particle: color-mix(in srgb, var(--thinking) 50%, transparent);
     --ambient-flow-speed: 24s;
     --ambient-wave-speed: 9.5s;
 }
 
 .ambient--speaking {
-    --ambient-primary: rgba(92, 154, 110, 0.060);
-    --ambient-secondary: rgba(232, 184, 128, 0.040);
-    --ambient-tertiary: rgba(80, 185, 165, 0.030);
-    --ambient-line: rgba(148, 206, 166, 0.13);
-    --ambient-particle: rgba(170, 220, 180, 0.50);
+    --ambient-primary: color-mix(in srgb, var(--speaking) 6%, transparent);
+    --ambient-secondary: color-mix(in srgb, var(--speaking) 4%, transparent);
+    --ambient-tertiary: color-mix(in srgb, var(--speaking) 3%, transparent);
+    --ambient-line: color-mix(in srgb, var(--speaking) 13%, transparent);
+    --ambient-particle: color-mix(in srgb, var(--speaking) 50%, transparent);
     --ambient-flow-speed: 22s;
     --ambient-wave-speed: 8.2s;
 }
 
 .ambient--processing {
-    --ambient-primary: rgba(182, 244, 255, 0.058);
-    --ambient-secondary: rgba(246, 245, 240, 0.044);
-    --ambient-tertiary: rgba(170, 160, 220, 0.034);
-    --ambient-line: rgba(206, 236, 246, 0.15);
-    --ambient-particle: rgba(226, 244, 250, 0.56);
+    --ambient-primary: color-mix(in srgb, var(--info) 6%, transparent);
+    --ambient-secondary: color-mix(in srgb, var(--info) 4%, transparent);
+    --ambient-tertiary: color-mix(in srgb, var(--info) 3%, transparent);
+    --ambient-line: color-mix(in srgb, var(--info) 15%, transparent);
+    --ambient-particle: color-mix(in srgb, var(--info) 56%, transparent);
     --ambient-flow-speed: 18s;
     --ambient-wave-speed: 6.8s;
 }
@@ -220,7 +220,7 @@ const ambientStyle = computed<Record<string, string>>(() => {
 
 .ambient__grain {
     opacity: 0.18;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 0.7px, transparent 0.7px);
+    background-image: radial-gradient(var(--white-medium) 0.7px, transparent 0.7px);
     background-size: 28px 28px;
     mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
 }

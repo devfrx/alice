@@ -321,6 +321,7 @@ function close(): void {
 }
 
 .agent-sidebar__title {
+    font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     color: var(--text-primary);

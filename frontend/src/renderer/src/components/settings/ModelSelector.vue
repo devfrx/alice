@@ -7,11 +7,12 @@
  * bar area. On click, opens a dropdown listing models with size, capability
  * badges, load status, and metadata.
  */
-import { computed, onBeforeUnmount, onMounted, ref, nextTick, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiPopover from '../ui/UiPopover.vue'
 
 const props = withDefaults(defineProps<{
   /** Which model type to show: 'llm' (default) or 'embedding'. */
@@ -22,8 +23,7 @@ const settingsStore = useSettingsStore()
 
 const isOpen = ref(false)
 const errorMessage = ref<string | null>(null)
-const rootRef = ref<HTMLElement | null>(null)
-const dropdownRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
 
 /** All models for this selector's type. */
@@ -62,30 +62,6 @@ const triggerLabel = computed(() => {
   if (props.modelType === 'embedding') return 'Nessun embedding'
   return settingsStore.settings.llm.model
 })
-
-function adjustDropdownPosition(): void {
-  nextTick(() => {
-    const dropdown = dropdownRef.value
-    if (!dropdown) return
-    dropdown.style.left = '0'
-    dropdown.style.right = 'auto'
-    const rect = dropdown.getBoundingClientRect()
-    if (rect.right > window.innerWidth - 8) {
-      dropdown.style.left = 'auto'
-      dropdown.style.right = '0'
-    }
-  })
-}
-
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    isOpen.value = false
-  }
-}
-
-function handleResize(): void {
-  if (isOpen.value) adjustDropdownPosition()
-}
 
 function formatSize(bytes: number): string {
   const gb = bytes / 1_073_741_824
@@ -132,41 +108,18 @@ function isModelBusy(model: LMStudioModel): boolean {
   return false
 }
 
-function handleClickOutside(event: MouseEvent): void {
-  if (rootRef.value && !rootRef.value.contains(event.target as Node)) {
-    isOpen.value = false
-  }
-}
-
-watch(isOpen, (val) => {
-  if (val) {
-    adjustDropdownPosition()
-    document.addEventListener('keydown', handleKeydown)
-  } else {
-    document.removeEventListener('keydown', handleKeydown)
-  }
-})
-
 onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside)
-  window.addEventListener('resize', handleResize)
   settingsStore.loadModels()
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-  window.removeEventListener('resize', handleResize)
-  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
 <template>
-  <div ref="rootRef" class="ms">
+  <div class="ms">
     <!-- Trigger button -->
-    <button class="ms__trigger" :class="{
+    <button ref="triggerRef" class="ms__trigger" :class="{
       'ms__trigger--embedding': props.modelType === 'embedding',
       'ms__trigger--open': isOpen
-    }" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle" @keydown="handleKeydown">
+    }" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle">
       <!-- Type icon -->
       <AppIcon v-if="props.modelType === 'embedding'" class="ms__type-icon" name="embedding" :size="11"
         title="Embedding model" />
@@ -179,9 +132,16 @@ onBeforeUnmount(() => {
         :stroke-width="2.5" />
     </button>
 
-    <!-- Dropdown -->
-    <Transition name="ms-drop">
-      <div v-if="isOpen" ref="dropdownRef" class="ms__dropdown" role="group">
+    <!-- Dropdown — UiPopover owns teleport/positioning/outside-click/Escape.
+         Opens upward (placement="top") since the selector lives in the bottom bar. -->
+    <UiPopover
+      :open="isOpen"
+      :anchor-el="triggerRef"
+      placement="top"
+      aria-label="Selettore modello"
+      @update:open="isOpen = $event"
+    >
+      <div class="ms__dropdown" role="group">
         <!-- Search (only when many models) -->
         <div v-if="showSearch" class="ms__search">
           <AppIcon class="ms__search-icon" name="search" :size="12" />
@@ -316,13 +276,13 @@ onBeforeUnmount(() => {
           </template>
         </div>
       </div>
-    </Transition>
+    </UiPopover>
   </div>
 </template>
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════════
-   ModelSelector — Glassmorphism dropdown coherent with FloatingInputBar
+   ModelSelector — solid dropdown coherent with the chat input bar
    ═══════════════════════════════════════════════════════════════ */
 
 .ms {
@@ -335,40 +295,42 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  background: var(--white-subtle);
+  padding: 0 8px;
+  height: 26px;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   cursor: pointer;
   white-space: nowrap;
-  height: 24px;
   transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 .ms__trigger:hover {
-  background: var(--white-light);
+  background: var(--surface-3);
   border-color: var(--border-hover);
   color: var(--text-primary);
 }
 
 .ms__trigger--open {
-  background: var(--white-medium);
+  background: var(--surface-3);
   border-color: var(--accent-border);
   color: var(--text-primary);
 }
 
+/* Embedding selector: same style, no special background needed */
 .ms__trigger--embedding {
-  background: var(--white-faint);
+  background: var(--surface-2);
 }
 
 .ms__trigger--embedding:hover {
-  background: var(--white-light);
+  background: var(--surface-3);
 }
 
 .ms__warn-icon {
@@ -411,24 +373,18 @@ onBeforeUnmount(() => {
 .ms__chevron--open {
   transform: rotate(180deg);
 }
+</style>
 
-/* ── Dropdown ─────────────────────────────────────────────────── */
+<!-- Dropdown content lives inside UiPopover's teleported slot, so these
+     rules are NOT scoped. Panel chrome (surface/border/radius/shadow/position/
+     z-index/transition) is owned by UiPopover — only content layout lives here. -->
+<style>
+/* ── Dropdown content (chrome comes from UiPopover) ───────────── */
 .ms__dropdown {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
   min-width: 340px;
   max-width: min(440px, calc(100vw - 32px));
-  background: var(--surface-2);
-  backdrop-filter: blur(var(--glass-blur-heavy));
-  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-floating), inset 0 1px 0 var(--white-subtle);
-  z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* ── Search ───────────────────────────────────────────────────── */
@@ -482,20 +438,6 @@ onBeforeUnmount(() => {
 
 .ms__list::-webkit-scrollbar-thumb:hover {
   background: var(--accent-medium);
-}
-
-/* ── Dropdown transition ──────────────────────────────────────── */
-.ms-drop-enter-active,
-.ms-drop-leave-active {
-  transition:
-    opacity 200ms var(--ease-smooth),
-    transform 200ms var(--ease-smooth);
-}
-
-.ms-drop-enter-from,
-.ms-drop-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.97);
 }
 
 /* ── Error ────────────────────────────────────────────────────── */
@@ -609,7 +551,7 @@ onBeforeUnmount(() => {
 }
 
 .ms__item:hover {
-  background: var(--white-subtle);
+  background: var(--surface-hover);
 }
 
 .ms__item--loaded {
@@ -758,7 +700,6 @@ onBeforeUnmount(() => {
   width: 18px;
   height: 18px;
   background: var(--white-faint);
-  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   transition: all var(--transition-fast);
@@ -766,7 +707,6 @@ onBeforeUnmount(() => {
 
 .ms__item:hover .ms__cap {
   color: var(--text-secondary);
-  border-color: var(--border-hover);
 }
 
 /* ── Loading progress ─────────────────────────────────────────── */

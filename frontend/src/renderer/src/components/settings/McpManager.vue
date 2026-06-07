@@ -143,10 +143,10 @@ onMounted(() => {
 }
 
 .mcp-hint {
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
     color: var(--text-muted);
-    margin: 0 0 var(--space-3, 12px) 0;
-    line-height: 1.4;
+    margin: 0 0 var(--space-3) 0;
+    line-height: var(--leading-snug);
 }
 
 .mcp-hint code {
@@ -161,16 +161,16 @@ onMounted(() => {
 /* ── Stats bar ──────────────────────────────────────────────── */
 .mcp-stats {
     display: flex;
-    gap: var(--space-4, 16px);
-    margin-bottom: var(--space-3, 12px);
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
-    border-radius: var(--radius-sm, 4px);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    gap: var(--space-4);
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
 }
 
 .mcp-stat {
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
     color: var(--text-muted);
 }
 
@@ -197,7 +197,7 @@ onMounted(() => {
 
 .mcp-empty__icon {
     color: var(--text-muted);
-    opacity: var(--opacity-faint);
+    opacity: var(--opacity-muted);
 }
 
 .mcp-empty__text {

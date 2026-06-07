@@ -7,10 +7,11 @@
  * Shows multi-ring audio visualization while recording,
  * conic gradient + bouncing dots when processing STT.
  */
-import { ref, computed, onBeforeUnmount, watch } from 'vue'
+import { ref, computed } from 'vue'
 import type { AudioDevice } from '../../composables/useVoice'
 import { useVoiceStore } from '../../stores/voice'
 import AppIcon from '../ui/AppIcon.vue'
+import UiPopover from '../ui/UiPopover.vue'
 
 const store = useVoiceStore()
 
@@ -57,6 +58,9 @@ const showPermissionNotice = computed(() => permissionDenied.value && !isActive.
 /** Whether the device dropdown is visible. */
 const showDeviceMenu = ref(false)
 
+/** The mic button element — anchor for the device popover. */
+const triggerRef = ref<HTMLButtonElement | null>(null)
+
 /** Ripple animation trigger. */
 const clicking = ref(false)
 
@@ -80,34 +84,11 @@ function onClick(): void {
   }
 }
 
-/** Close the menu if clicking outside the wrapper. */
-function onClickOutside(e: MouseEvent): void {
-  const wrapper = (e.target as HTMLElement)?.closest('.mic-wrapper')
-  if (!wrapper) showDeviceMenu.value = false
-}
-
 function onContextMenu(e: MouseEvent): void {
   e.preventDefault()
   emit('refresh-devices')
   showDeviceMenu.value = !showDeviceMenu.value
 }
-
-// Keep the document-level click listener strictly in sync with menu visibility.
-// Using `{ once: true }` previously leaked listeners when the menu was closed
-// programmatically (right-click toggle, selectDevice) before any document click
-// fired — every reopen stacked another listener on document.
-watch(showDeviceMenu, (open) => {
-  if (open) {
-    document.addEventListener('click', onClickOutside)
-  } else {
-    document.removeEventListener('click', onClickOutside)
-  }
-})
-
-/** Cleanup on unmount: remove stale document listener if menu is still open. */
-onBeforeUnmount(() => {
-  document.removeEventListener('click', onClickOutside)
-})
 
 function selectDevice(deviceId: string): void {
   emit('select-device', deviceId)
@@ -131,7 +112,7 @@ const ringOuterStyle = computed(() => ({
 
 <template>
   <div class="mic-wrapper">
-    <button class="mic-btn" :class="{
+    <button ref="triggerRef" class="mic-btn" :class="{
       'mic-btn--active': isActive,
       'mic-btn--processing': isProcessing,
       'mic-btn--disabled': !available || !connected,
@@ -151,7 +132,7 @@ const ringOuterStyle = computed(() => ({
 
       <!-- Icon: mic or processing dots -->
       <Transition name="icon-morph" mode="out-in">
-        <AppIcon v-if="!isProcessing" key="mic" name="mic" :size="20" class="mic-btn__icon"
+        <AppIcon v-if="!isProcessing" key="mic" name="mic" :size="15" class="mic-btn__icon"
           :class="{ 'mic-btn__icon--rec': isActive }" />
         <span v-else key="dots" class="mic-btn__dots">
           <span /><span /><span />
@@ -166,8 +147,9 @@ const ringOuterStyle = computed(() => ({
     </Transition>
 
     <!-- Device selection dropdown (right-click) -->
-    <Transition name="menu-fade">
-      <div v-if="showDeviceMenu" class="mic-menu">
+    <UiPopover :open="showDeviceMenu" :anchor-el="triggerRef" placement="top" align="end" width="240px"
+      aria-label="Selezione microfono" @update:open="showDeviceMenu = $event">
+      <div class="mic-menu">
         <div class="mic-menu__title">Microfono</div>
         <div v-if="audioDevices.length === 0" class="mic-menu__empty">
           Nessun dispositivo trovato
@@ -183,7 +165,7 @@ const ringOuterStyle = computed(() => ({
           Predefinito di sistema
         </button>
       </div>
-    </Transition>
+    </UiPopover>
   </div>
 </template>
 
@@ -201,16 +183,16 @@ const ringOuterStyle = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-hover);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color var(--transition-fast),
-    background var(--transition-fast),
-    border-color var(--transition-fast);
+  transition: color var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
   outline: none;
   -webkit-app-region: no-drag;
 }
@@ -411,21 +393,13 @@ const ringOuterStyle = computed(() => ({
   transform: scale(0.7);
 }
 
-/* ── Device selection dropdown ── */
+/* ── Device selection dropdown ──
+   Chrome (surface/border/radius/shadow/position) is owned by UiPopover; this
+   is just the inner content container teleported inside the popover panel. */
 .mic-menu {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  right: 0;
+  display: flex;
+  flex-direction: column;
   min-width: 240px;
-  max-width: 340px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-1) 0;
-  box-shadow: var(--shadow-md);
-  z-index: var(--z-dropdown);
 }
 
 .mic-menu__title {
@@ -441,7 +415,6 @@ const ringOuterStyle = computed(() => ({
   padding: var(--space-2-5) var(--space-3);
   font-size: var(--text-sm);
   color: var(--text-muted);
-  font-style: italic;
 }
 
 .mic-menu__item {
@@ -481,18 +454,6 @@ const ringOuterStyle = computed(() => ({
   text-align: center;
   flex-shrink: 0;
   font-size: var(--text-xs);
-}
-
-.menu-fade-enter-active,
-.menu-fade-leave-active {
-  transition: opacity var(--duration-normal) var(--ease-smooth),
-    transform var(--duration-normal) var(--ease-smooth);
-}
-
-.menu-fade-enter-from,
-.menu-fade-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.97);
 }
 
 @media (prefers-reduced-motion: reduce) {

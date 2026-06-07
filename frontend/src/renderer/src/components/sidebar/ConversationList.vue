@@ -35,8 +35,13 @@ const emit = defineEmits<{
 // Virtual scroll state
 // -----------------------------------------------------------------------
 
-/** Height of each conversation item in pixels. */
-const ITEM_HEIGHT = 48
+/** Height of each conversation item in pixels.
+ *  Each item renders at exactly 56 px (height: 56px in CSS, no top offset).
+ *  Breakdown: padding-top (10px) + title line (≈15px) + gap (2px) + meta line (≈11px) + padding-bottom (10px) = 48px,
+ *  but height is set explicitly to 56px so content is vertically centered with extra breathing room.
+ *  left/right inset of 4px is purely visual (border-radius detached effect) and does not affect slot height.
+ */
+const ITEM_HEIGHT = 56
 /** Extra items rendered above/below the visible area. */
 const BUFFER = 5
 
@@ -266,13 +271,13 @@ function timeAgo(iso: string): string {
 </template>
 
 <style scoped>
-/* ─── ConversationList — compact sidebar list ─── */
+/* ─── ConversationList — Claude-style compact sidebar list ─── */
 
 /* Root */
 .conv-list {
   display: flex;
   flex-direction: column;
-  padding: 0 var(--space-2) var(--space-2);
+  padding: 0 var(--space-1-5) var(--space-2);
   flex: 1;
   min-height: 0;
   position: relative;
@@ -284,15 +289,15 @@ function timeAgo(iso: string): string {
   align-items: center;
   padding: var(--space-2) var(--space-2) var(--space-1-5);
   margin-top: var(--space-1);
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
+/* Uppercase muted label with generous letter-spacing — Claude section header style */
 .conv-list__title {
   flex: 1;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -300,15 +305,16 @@ function timeAgo(iso: string): string {
 .conv-list__header-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-0-5);
 }
 
+/* Compact icon button — subtle, accent on hover */
 .conv-list__header-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -321,11 +327,12 @@ function timeAgo(iso: string): string {
 
 .conv-list__header-btn:hover {
   background: var(--surface-hover);
-  color: var(--text-secondary);
+  color: var(--accent);
 }
 
 .conv-list__header-btn--danger:hover {
   color: var(--danger);
+  background: var(--danger-hover);
 }
 
 .conv-list__header-btn:focus-visible {
@@ -369,17 +376,25 @@ function timeAgo(iso: string): string {
 }
 
 /* ─── Conversation item ─────────────────────────────────────── */
+/*
+ * ITEM_HEIGHT = 56px (matches the constant in <script>).
+ * Item is exactly 56px tall (height: 56px). No top offset — item fills its slot cleanly.
+ * Padding: 10px top + 10px bottom gives comfortable breathing room.
+ * left/right inset of 4px creates the detached floating-row look without affecting slot height.
+ * The virtual-scroll spacer is n*56px; slots and items are in perfect alignment.
+ */
 .conv-item {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: var(--space-1-5) var(--space-2-5);
-  border-radius: var(--radius-sm);
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 48px;
+  left: 4px;
+  right: 4px;
+  top: 0;
+  height: 56px;
   transition:
     background var(--transition-fast),
     box-shadow var(--transition-fast);
@@ -389,35 +404,48 @@ function timeAgo(iso: string): string {
   background: var(--surface-hover);
 }
 
-/* Active: accent left bar via inset shadow */
+/*
+ * Active: --surface-selected background is the sole selection cue (no accent bar).
+ */
 .conv-item--active {
-  background: var(--surface-active);
+  background: var(--surface-selected);
 }
 
 .conv-item--active:hover {
-  background: var(--surface-active);
+  background: var(--surface-selected);
 }
 
-/* Streaming — accent fill + pulsing dot */
+/* Streaming — same base as active; the pulsing dot indicates progress */
 .conv-item--streaming {
-  background: var(--surface-active);
+  background: var(--surface-selected);
 }
 
 /* Keyboard-focused item */
 .conv-item--focused {
   outline: none;
+  background: var(--surface-hover);
+}
+
+.conv-item--focused.conv-item--active {
+  background: var(--surface-selected);
 }
 
 /* ─── Title ─────────────────────────────────────────────────── */
 .conv-item__title {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 52px;
+  padding-right: 54px;
   line-height: 1.3;
+}
+
+/* Active/selected: title becomes primary text color */
+.conv-item--active .conv-item__title,
+.conv-item--streaming .conv-item__title {
+  color: var(--text-primary);
 }
 
 /* ─── Meta row ──────────────────────────────────────────────── */
@@ -426,13 +454,13 @@ function timeAgo(iso: string): string {
   align-items: center;
   gap: var(--space-1-5);
   margin-top: 2px;
-  padding-right: 52px;
+  padding-right: 54px;
 }
 
 .conv-item__count {
   font-size: var(--text-2xs);
   color: var(--text-muted);
-  opacity: 0.55;
+  opacity: 0.6;
   font-variant-numeric: tabular-nums;
 }
 
@@ -440,15 +468,16 @@ function timeAgo(iso: string): string {
   font-size: var(--text-2xs);
   color: var(--text-muted);
   margin-left: auto;
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
 .conv-item--active .conv-item__count,
 .conv-item--active .conv-item__time {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 /* ─── Streaming dot ─────────────────────────────────────────── */
+/* Small pulsing accent dot — subtle indicator of in-progress generation */
 .conv-item__streaming-dot {
   display: inline-block;
   width: 5px;
@@ -462,47 +491,49 @@ function timeAgo(iso: string): string {
 }
 
 @keyframes streaming-pulse {
-
   0%,
   100% {
     opacity: 1;
   }
 
   50% {
-    opacity: 0.35;
+    opacity: 0.3;
   }
 }
 
 /* ─── Rename input ──────────────────────────────────────────── */
+/* Tokenized clean field: subtle border, radius-sm, accent focus ring */
 .conv-item__rename-input {
   width: 100%;
   padding: var(--space-1) var(--space-1-5);
-  background: var(--surface-0);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: 1px solid var(--border-hover);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-family: var(--font-sans);
   outline: none;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .conv-item__rename-input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
 /* ─── Action buttons ────────────────────────────────────────── */
+/* Compact icon tray — appears on row hover/focus; subtle glass background */
 .conv-item__actions {
   position: absolute;
   top: 50%;
-  right: var(--space-1);
+  right: var(--space-1-5);
   transform: translateY(-50%);
   display: flex;
   gap: 1px;
   opacity: 0;
   pointer-events: none;
   background: var(--surface-2);
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
   transition: opacity var(--transition-fast);
@@ -514,12 +545,13 @@ function timeAgo(iso: string): string {
   pointer-events: auto;
 }
 
+/* Icon button: --text-muted default → --text-primary on hover */
 .conv-item__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border: none;
   border-radius: var(--radius-xs);
   background: transparent;
@@ -543,8 +575,10 @@ function timeAgo(iso: string): string {
   color: var(--success);
 }
 
+/* Delete → danger color on hover */
 .conv-item__action--danger:hover {
   color: var(--danger);
+  background: var(--danger-hover);
 }
 
 /* ─── Empty state ───────────────────────────────────────────── */
@@ -562,7 +596,7 @@ function timeAgo(iso: string): string {
 
 .conv-list__empty-icon {
   color: var(--text-muted);
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .conv-list__empty-text {
@@ -578,7 +612,6 @@ function timeAgo(iso: string): string {
 
 /* ─── Reduced motion ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-
   .conv-item,
   .conv-item__actions,
   .conv-item__rename-input,

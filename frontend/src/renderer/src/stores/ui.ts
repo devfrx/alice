@@ -1,14 +1,17 @@
 ﻿/**
  * Pinia store managing UI mode state for AL\CE.
  *
- * Supports two modes:
+ * Active modes:
  * - 'assistant' — Living AI orb, voice-first interaction
- * - 'hybrid'    — Chat with ambient orb overlay
+ *
+ * The 'hybrid' dual-pane mode was retired (R3) in favour of Workspace; the
+ * `/hybrid → /workspace` router redirect preserves old deep links, and any
+ * stale persisted `alice_ui_mode = 'hybrid'` resolves to 'assistant' on load.
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 
-export type UIMode = 'assistant' | 'hybrid'
+export type UIMode = 'assistant'
 
 const LS_PLAN_CARD = 'alice_agent_plan_card_enabled'
 const LS_SIDEBAR_AUTO = 'alice_agent_sidebar_auto_open'
@@ -34,8 +37,12 @@ function _saveBool(key: string, value: boolean): void {
 export const useUIStore = defineStore('ui', () => {
   const mode = ref<UIMode>(loadMode())
 
-  /** Sidebar open state — floating sidebar starts closed. */
-  const sidebarOpen = ref(false)
+  /**
+   * Sidebar open state — source of truth for the docked sidebar's
+   * visible(expanded/rail) ↔ closed state. Starts open since the docked
+   * sidebar is now a primary surface of the shell.
+   */
+  const sidebarOpen = ref(true)
 
   // ---------------------------------------------------------------------
   // Agent UX preferences
@@ -91,13 +98,10 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   /** Whether the ambient background is visible. */
-  const ambientEnabled = computed(() => mode.value === 'assistant' || mode.value === 'hybrid')
-
-  /** Whether chat panel is visible. */
-  const chatVisible = computed(() => mode.value === 'hybrid')
+  const ambientEnabled = computed(() => mode.value === 'assistant')
 
   /** Whether the orb/living visualization is visible. */
-  const orbVisible = computed(() => mode.value === 'assistant' || mode.value === 'hybrid')
+  const orbVisible = computed(() => mode.value === 'assistant')
 
   function setMode(newMode: UIMode): void {
     mode.value = newMode
@@ -111,7 +115,8 @@ export const useUIStore = defineStore('ui', () => {
   function loadMode(): UIMode {
     try {
       const stored = localStorage.getItem('alice_ui_mode')
-      if (stored === 'assistant' || stored === 'hybrid') return stored
+      if (stored === 'assistant') return stored
+      // Legacy 'hybrid' (retired R3) and any other value fall through to 'assistant'.
     } catch {
       /* localStorage may be unavailable */
     }
@@ -126,7 +131,6 @@ export const useUIStore = defineStore('ui', () => {
     mode,
     sidebarOpen,
     ambientEnabled,
-    chatVisible,
     orbVisible,
     setMode,
     toggleSidebar,

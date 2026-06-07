@@ -17,16 +17,11 @@
 
         <!-- Filters row -->
         <div class="mem-filters">
-            <select v-model="scopeFilter" class="mem-select" aria-label="Filtra per ambito">
-                <option value="">Tutti gli ambiti</option>
-                <option value="long_term">Lungo termine</option>
-                <option value="session">Sessione</option>
-            </select>
+            <UiSelect :model-value="scopeFilter" :options="scopeOptions" size="sm"
+                aria-label="Filtra per ambito" @update:model-value="(v) => (scopeFilter = String(v))" />
 
-            <select v-model="categoryFilter" class="mem-select" aria-label="Filtra per categoria">
-                <option value="">Tutte le categorie</option>
-                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
+            <UiSelect :model-value="categoryFilter" :options="categoryOptions" size="sm"
+                aria-label="Filtra per categoria" @update:model-value="(v) => (categoryFilter = String(v))" />
 
             <div class="mem-search">
                 <input v-model="searchQuery" type="text" class="mem-search__input" placeholder="Ricerca semantica…"
@@ -125,6 +120,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useMemoryStore } from '../../stores/memory'
 import type { MemoryEntry } from '../../types/memory'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 const store = useMemoryStore()
 
@@ -139,6 +135,19 @@ const categories = computed<string[]>(() => {
     if (!store.stats) return []
     return Object.keys(store.stats.by_category).sort()
 })
+
+/** Static scope filter options (leading "all" entry uses the empty value). */
+const scopeOptions: UiSelectOption[] = [
+    { value: '', label: 'Tutti gli ambiti' },
+    { value: 'long_term', label: 'Lungo termine' },
+    { value: 'session', label: 'Sessione' },
+]
+
+/** Category filter options, derived from stats with a leading "all" entry. */
+const categoryOptions = computed<UiSelectOption[]>(() => [
+    { value: '', label: 'Tutte le categorie' },
+    ...categories.value.map((cat) => ({ value: cat, label: cat })),
+])
 
 // ── Confirmation dialog ───────────────────────────────────────────────────
 const confirmAction = ref<(() => Promise<void>) | null>(null)
@@ -248,99 +257,77 @@ onMounted(() => {
 .mem-stats {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3, 12px);
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: var(--bg-secondary, #13161c);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-3);
 }
 
 .mem-stats__item {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-secondary, #8a8578);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
 }
 
 .mem-stats__item strong {
-    color: var(--accent, #c9a84c);
-    font-weight: 600;
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
 }
 
 /* ── Filters ───────────────────────────────────────────────── */
 .mem-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2, 8px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
     align-items: center;
-}
-
-.mem-select {
-    padding: var(--space-1, 4px) var(--space-2, 8px);
-    background: var(--bg-input, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #e8e4de);
-    font-size: var(--text-sm, 0.8125rem);
-    font-family: inherit;
-    outline: none;
-    cursor: pointer;
-    transition: border-color 0.2s;
-}
-
-.mem-select:focus {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
-}
-
-.mem-select option {
-    background: var(--bg-tertiary, #1a1e26);
-    color: var(--text-primary, #e8e4de);
 }
 
 .mem-search {
     display: flex;
     flex: 1;
     min-width: 180px;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1);
 }
 
 .mem-search__input {
     flex: 1;
-    padding: var(--space-1, 4px) var(--space-2, 8px);
-    background: var(--bg-input, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #e8e4de);
-    font-size: var(--text-sm, 0.8125rem);
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color var(--transition-fast);
 }
 
 .mem-search__input::placeholder {
-    color: var(--text-muted, #5c584f);
-    opacity: 0.7;
+    color: var(--text-muted);
+    opacity: var(--opacity-medium);
 }
 
 .mem-search__input:focus {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
+    border-color: var(--accent-border);
 }
 
 .mem-search__btn {
-    padding: var(--space-1, 4px) var(--space-3, 12px);
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
-    border: 1px solid var(--accent-border, rgba(201, 168, 76, 0.25));
-    border-radius: var(--radius-sm, 4px);
-    color: var(--accent, #c9a84c);
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 500;
+    padding: var(--space-1) var(--space-3);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .mem-search__btn:hover:not(:disabled) {
-    background: var(--accent-light, rgba(201, 168, 76, 0.10));
-    border-color: var(--accent, #c9a84c);
+    background: var(--accent-light);
+    border-color: var(--accent);
 }
 
 .mem-search__btn:disabled {
@@ -351,29 +338,29 @@ onMounted(() => {
 /* ── Action buttons ────────────────────────────────────────── */
 .mem-actions {
     display: flex;
-    gap: var(--space-2, 8px);
-    margin-bottom: var(--space-3, 12px);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
 }
 
 .mem-btn {
-    padding: var(--space-1, 4px) var(--space-3, 12px);
-    border-radius: var(--radius-sm, 4px);
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 500;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     cursor: pointer;
     border: 1px solid transparent;
-    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .mem-btn--secondary {
-    background: var(--bg-tertiary, #1a1e26);
-    border-color: var(--border, rgba(255, 255, 255, 0.08));
-    color: var(--text-secondary, #8a8578);
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-secondary);
 }
 
 .mem-btn--secondary:hover:not(:disabled) {
     background: var(--white-light);
-    color: var(--text-primary, #e8e4de);
+    color: var(--text-primary);
 }
 
 .mem-btn--danger {
@@ -390,9 +377,9 @@ onMounted(() => {
 .mem-btn--text {
     background: none;
     border: none;
-    color: var(--accent, #c9a84c);
+    color: var(--accent);
     padding: 0;
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-xs);
 }
 
 .mem-btn--text:hover {
@@ -406,54 +393,55 @@ onMounted(() => {
 
 /* ── Loading / Error / Empty ───────────────────────────────── */
 .mem-loading {
-    color: var(--text-muted, #5c584f);
-    padding: var(--space-2, 8px);
-    font-size: var(--text-sm, 0.8125rem);
+    color: var(--text-muted);
+    padding: var(--space-2);
+    font-size: var(--text-sm);
 }
 
 .mem-error {
     color: var(--danger);
-    padding: var(--space-2, 8px);
-    font-size: var(--text-sm, 0.8125rem);
+    padding: var(--space-2);
+    font-size: var(--text-sm);
     background: var(--danger-faint);
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-2, 8px);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-2);
 }
 
 .mem-empty {
-    color: var(--text-muted, #5c584f);
-    padding: var(--space-4, 16px);
+    color: var(--text-muted);
+    padding: var(--space-4);
     text-align: center;
-    font-size: var(--text-sm, 0.8125rem);
+    font-size: var(--text-sm);
 }
 
 /* ── Section header ────────────────────────────────────────── */
 .mem-section {
-    margin-bottom: var(--space-3, 12px);
+    margin-bottom: var(--space-3);
 }
 
 .mem-section__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-2, 8px);
+    margin-bottom: var(--space-2);
 }
 
 .mem-section__title {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-secondary, #8a8578);
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-weight: var(--weight-semibold);
 }
 
 /* ── Memory list ───────────────────────────────────────────── */
 .mem-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
     max-height: 400px;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--accent-dim, rgba(201, 168, 76, 0.12)) transparent;
+    scrollbar-color: var(--accent-dim) transparent;
 }
 
 .mem-list::-webkit-scrollbar {
@@ -465,8 +453,8 @@ onMounted(() => {
 }
 
 .mem-list::-webkit-scrollbar-thumb {
-    background: var(--accent-dim, rgba(201, 168, 76, 0.12));
-    border-radius: 4px;
+    background: var(--accent-dim);
+    border-radius: var(--radius-xs);
 }
 
 .mem-list::-webkit-scrollbar-thumb:hover {
@@ -475,22 +463,22 @@ onMounted(() => {
 
 /* ── Memory entry card ─────────────────────────────────────── */
 .mem-entry {
-    padding: var(--space-3, 12px);
-    background: var(--bg-secondary, #13161c);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-sm, 4px);
-    transition: border-color 0.2s;
+    padding: var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast);
 }
 
 .mem-entry:hover {
-    border-color: var(--accent-border, rgba(201, 168, 76, 0.25));
+    border-color: var(--accent-border);
 }
 
 .mem-entry__content {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-primary, #e8e4de);
-    line-height: 1.5;
-    margin-bottom: var(--space-2, 8px);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: var(--leading-normal);
+    margin-bottom: var(--space-2);
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -499,22 +487,22 @@ onMounted(() => {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1);
 }
 
 /* ── Badges ────────────────────────────────────────────────── */
 .mem-badge {
-    font-size: 0.65rem;
+    font-size: var(--text-2xs);
     padding: 1px 6px;
-    border-radius: 9999px;
-    font-weight: 500;
+    border-radius: var(--radius-pill);
+    font-weight: var(--weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-normal);
 }
 
 .mem-badge--scope {
     background: var(--accent-light);
-    color: var(--accent, #c9a84c);
+    color: var(--accent);
 }
 
 .mem-badge--category {
@@ -524,19 +512,19 @@ onMounted(() => {
 
 .mem-badge--source {
     background: var(--surface-hover);
-    color: var(--text-muted, #5c584f);
+    color: var(--text-muted);
 }
 
 .mem-entry__score {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--accent, #c9a84c);
-    opacity: 0.8;
+    font-size: var(--text-xs);
+    color: var(--accent);
+    opacity: var(--opacity-visible);
     margin-left: auto;
 }
 
 .mem-entry__date {
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--text-muted, #5c584f);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
     margin-left: auto;
 }
 
@@ -546,15 +534,15 @@ onMounted(() => {
     justify-content: center;
     width: 20px;
     height: 20px;
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     border: none;
     background: transparent;
-    color: var(--text-muted, #5c584f);
-    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition: background var(--transition-fast), color var(--transition-fast);
     flex-shrink: 0;
-    margin-left: var(--space-1, 4px);
+    margin-left: var(--space-1);
 }
 
 .mem-entry__delete:hover {
@@ -571,31 +559,29 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     background: var(--black-heavy);
-    backdrop-filter: blur(var(--blur-sm));
-    -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .mem-confirm {
-    background: var(--bg-tertiary, #1a1e26);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-md, 8px);
-    padding: var(--space-6, 24px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
     max-width: 400px;
     width: 90%;
     box-shadow: var(--shadow-floating);
 }
 
 .mem-confirm__message {
-    font-size: var(--text-sm, 0.8125rem);
-    color: var(--text-primary, #e8e4de);
-    line-height: 1.5;
-    margin: 0 0 var(--space-4, 16px);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: var(--leading-normal);
+    margin: 0 0 var(--space-4);
     white-space: pre-line;
 }
 
 .mem-confirm__actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--space-2, 8px);
+    gap: var(--space-2);
 }
 </style>

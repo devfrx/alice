@@ -128,7 +128,7 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
             </span>
             <span v-if="contextInfo.wasCompressed" class="ctx__compressed" title="Contesto compresso">
                 <svg width="7" height="7" viewBox="0 0 8 8" fill="none">
-                    <circle cx="4" cy="4" r="3" fill="#C49A3C" />
+                    <circle cx="4" cy="4" r="3" fill="var(--warning)" />
                 </svg>
             </span>
         </template>
@@ -160,11 +160,17 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
 .ctx {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    height: 22px;
+    gap: 4px;
+    height: 26px;
     flex-shrink: 0;
     cursor: default;
     position: relative;
+    opacity: 0.85;
+    transition: opacity var(--duration-fast) ease;
+}
+
+.ctx:hover {
+    opacity: 1;
 }
 
 /* ── Ring SVG ── */
@@ -255,13 +261,13 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
 <style>
 .alice-ctx-tip {
     position: fixed;
-    z-index: 9999;
+    z-index: var(--z-tooltip);
     transform: translateX(-50%) translateY(-100%);
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 8px 10px;
-    min-width: 192px;
+    padding: var(--space-2) var(--space-2-5);
+    min-width: 192px; /* layout dimension — intentional literal */
     box-shadow: var(--shadow-dropdown);
     pointer-events: none;
     font-size: 11px;

@@ -154,7 +154,7 @@ onUnmounted(() => {
     flex-shrink: 0;
     margin: 0 var(--space-3) var(--space-2);
     border-radius: var(--radius-md);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--border);
     background: var(--surface-2);
     overflow: hidden;
 }
@@ -189,7 +189,7 @@ onUnmounted(() => {
 .cal-widget__header-right {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
     flex-shrink: 0;
 }
 
@@ -301,12 +301,12 @@ onUnmounted(() => {
 .cal-widget__list {
     max-height: 140px;
     overflow-y: auto;
-    padding: 0 0 6px;
-    border-top: 1px solid var(--glass-border);
+    padding: 0 0 var(--space-1-5);
+    border-top: 1px solid var(--border);
 }
 
 .cal-widget__list::-webkit-scrollbar {
-    width: 2px;
+    width: var(--space-0-5);
 }
 
 .cal-widget__list::-webkit-scrollbar-track {
@@ -314,7 +314,7 @@ onUnmounted(() => {
 }
 
 .cal-widget__list::-webkit-scrollbar-thumb {
-    background: var(--glass-border);
+    background: var(--border);
     border-radius: var(--radius-full);
 }
 
@@ -364,7 +364,7 @@ onUnmounted(() => {
     font-size: var(--text-2xs);
     color: var(--text-muted);
     font-style: italic;
-    border-top: 1px solid var(--glass-border);
+    border-top: 1px solid var(--border);
 }
 
 /* ── Transitions ──────────────────────────────────────────── */
@@ -425,7 +425,7 @@ onUnmounted(() => {
 }
 
 .cal-widget__icon-btn:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-hover);
     color: var(--text-primary);
 }
 
@@ -441,14 +441,14 @@ onUnmounted(() => {
     padding: 0 3px;
     border-radius: var(--radius-full);
     background: var(--accent);
-    color: var(--bg-primary);
-    font-size: 0.6rem;
-    font-weight: 700;
+    color: var(--text-on-accent);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-bold);
     line-height: 1;
 }
 
 .cal-widget__mini-time {
-    font-size: 0.6rem;
+    font-size: var(--text-2xs);
     color: var(--text-muted);
     text-align: center;
     line-height: 1;

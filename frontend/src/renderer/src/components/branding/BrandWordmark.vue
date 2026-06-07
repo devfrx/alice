@@ -31,7 +31,7 @@ const label = computed(() => (props.brand === 'alce' ? 'AL\\CE' : 'CONT\\NUUM'))
     display: inline-flex;
     align-items: center;
     gap: 0.052em;
-    font-family: var(--font-display);
+    font-family: var(--font-brand);
     font-size: 1em;
     font-weight: var(--weight-semibold);
     letter-spacing: 0;

@@ -130,12 +130,9 @@
                         <h4 class="kg-dialog__title">Nuova relazione</h4>
                         <label class="kg-field">
                             <span class="kg-field__label">Da (entità)</span>
-                            <select v-model="newRelation.from" class="kg-input">
-                                <option value="" disabled>Seleziona…</option>
-                                <option v-for="e in store.entities" :key="e.name" :value="e.name">
-                                    {{ e.name }} ({{ e.entityType }})
-                                </option>
-                            </select>
+                            <UiSelect :model-value="newRelation.from" :options="entityOptions" size="md"
+                                placeholder="Seleziona…" aria-label="Entità di partenza"
+                                @update:model-value="(v) => (newRelation.from = String(v))" />
                         </label>
                         <label class="kg-field">
                             <span class="kg-field__label">Tipo relazione</span>
@@ -144,12 +141,9 @@
                         </label>
                         <label class="kg-field">
                             <span class="kg-field__label">A (entità)</span>
-                            <select v-model="newRelation.to" class="kg-input">
-                                <option value="" disabled>Seleziona…</option>
-                                <option v-for="e in store.entities" :key="e.name" :value="e.name">
-                                    {{ e.name }} ({{ e.entityType }})
-                                </option>
-                            </select>
+                            <UiSelect :model-value="newRelation.to" :options="entityOptions" size="md"
+                                placeholder="Seleziona…" aria-label="Entità di destinazione"
+                                @update:model-value="(v) => (newRelation.to = String(v))" />
                         </label>
                         <div class="kg-dialog__actions">
                             <button class="kg-btn kg-btn--secondary"
@@ -206,6 +200,7 @@ import { useMcpStore } from '../../stores/mcp'
 import type { KGRelation } from '../../types/mcpMemory'
 import EntityCard from './EntityCard.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
@@ -255,6 +250,11 @@ async function onCreate(): Promise<void> {
 // ── Create Relation ───────────────────────────────────────────────────────
 const showCreateRelation = ref(false)
 const newRelation = reactive({ from: '', to: '', relationType: '' })
+
+/** Entity options for the relation endpoints, labelled with their type. */
+const entityOptions = computed<UiSelectOption[]>(() =>
+    store.entities.map((e) => ({ value: e.name, label: `${e.name} (${e.entityType})` })),
+)
 
 async function onCreateRelation(): Promise<void> {
     await store.createRelations([
@@ -600,6 +600,7 @@ watch(memoryConnected, (connected) => {
 }
 
 .kg-section__title {
+    font-family: var(--font-display);
     font-size: var(--text-sm);
     color: var(--text-secondary);
     font-weight: var(--weight-semibold);
@@ -642,8 +643,6 @@ watch(memoryConnected, (connected) => {
     align-items: center;
     justify-content: center;
     background: var(--black-heavy);
-    backdrop-filter: blur(var(--blur-sm));
-    -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .kg-dialog {
@@ -706,11 +705,6 @@ watch(memoryConnected, (connected) => {
 
 .kg-input:focus {
     border-color: var(--accent-border);
-}
-
-.kg-input option {
-    background: var(--surface-3);
-    color: var(--text-primary);
 }
 
 .kg-textarea {

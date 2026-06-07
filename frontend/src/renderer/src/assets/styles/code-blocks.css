@@ -5,7 +5,7 @@
  *  Styles for code blocks rendered by `useMarkdown` inside v-html.
  *  Imported globally so MessageBubble, StreamingIndicator,
  *  AssistantResponse (and any future component)
- *  share one source.  Clean Supabase-dashboard inspired display.
+ *  share one source.  Clean Claude-style floating-card display.
  *
  *  Parent selector shorthand ─ every markdown-rendering context:
  *    :is(.bubble__content, .streaming-bubble__content,
@@ -13,35 +13,39 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-/* Shorthand: all parents that render markdown via v-html */
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) code {
+/* ─── Inline code — subtle chip (shared across all markdown parents) ─── */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :not(pre) > code {
   font-family: var(--font-mono);
   font-size: 0.85em;
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--text-primary);
   padding: 2px 6px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  font-weight: var(--weight-normal);
+  word-break: break-word;
 }
 
-/* ----- Code block wrapper */
+/* ─── Code block wrapper — floating card ─── */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-wrapper {
-  margin: var(--space-2) 0;
-  border-radius: var(--radius-sm);
+  margin: var(--space-3) 0;
+  border-radius: var(--panel-radius, var(--radius-md));
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface-2);
+  box-shadow: var(--shadow-xs);
 }
 
-/* ----- Code block header (language label + copy button) */
+/* ─── Code block header (language label + copy button) ─── */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-1) var(--space-3);
-  background: var(--surface-1);
+  padding: var(--space-1-5) var(--space-3);
+  background: var(--surface-3);
   border-bottom: 1px solid var(--border);
   min-height: 32px;
+  border-radius: var(--panel-radius, var(--radius-md)) var(--panel-radius, var(--radius-md)) 0 0;
 }
 
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-lang {
@@ -49,7 +53,7 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-wide);
   user-select: none;
 }
 
@@ -65,14 +69,17 @@
   font-size: var(--text-xs);
   padding: var(--space-0-5) var(--space-2);
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast);
   user-select: none;
 }
 
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-copy:hover {
-  color: var(--text-secondary);
-  background: var(--surface-3);
-  border-color: var(--border);
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
 }
 
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-copy--copied {
@@ -89,15 +96,15 @@
   flex-shrink: 0;
 }
 
-/* ----- Code block body */
+/* ─── Code block body ─── */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block {
   background: var(--surface-0);
-  padding: var(--space-3) 14px;
+  padding: var(--space-3) var(--space-4);
   overflow-x: auto;
   margin: 0;
   font-family: var(--font-mono);
-  font-size: var(--text-base);
-  line-height: var(--leading-relaxed);
+  font-size: var(--text-sm);
+  line-height: 1.65;
   border-radius: 0;
 }
 
@@ -107,75 +114,193 @@
   font-size: inherit;
   border-radius: 0;
   border: none;
+  font-weight: var(--weight-normal);
+  word-break: normal;
 }
 
-/* ----- highlight.js token colors (warm neutral palette) ─── */
+/*
+ * ═══════════════════════════════════════════════════════════════
+ *  Highlight.js token colors — warm neutral palette
+ *
+ *  Dark theme base: code block bg is --surface-0 = #1A1A19 (very dark).
+ *  Token colors below are tuned for legibility on that dark surface.
+ *
+ *  Light theme override: code block bg is --surface-0 = #FAF9F5 (ivory).
+ *  Syntax tokens are overridden inside [data-theme="light"] below
+ *  with darker, higher-contrast equivalents.
+ * ═══════════════════════════════════════════════════════════════
+ */
+
+/* Base text — warm off-white on dark */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs {
-  color: #d4d0c8;
+  color: #d6d2c8;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name) {
-  color: var(--accent);
+/* Keywords, selectors, built-ins — cream accent */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name) {
+  color: #ddd0b8;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-string, .hljs-addition) {
-  color: #8fbc6a;
+/* Strings, additions — muted sage green */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-string, .hljs-addition) {
+  color: #8db87a;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-comment, .hljs-quote) {
-  color: var(--text-muted);
+/* Comments, quotes — muted, italic */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-comment, .hljs-quote) {
+  color: #71706a;
   font-style: italic;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-number, .hljs-literal) {
-  color: #CC9B6D;
+/* Numbers, literals — warm amber */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-number, .hljs-literal) {
+  color: #c99a62;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-type, .hljs-title) {
-  color: #D4C8B0;
+/* Types, titles — slightly brighter neutral */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-type, .hljs-title) {
+  color: #c8bfa8;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-attr, .hljs-variable, .hljs-template-variable) {
-  color: #BDB3A0;
+/* Attributes, variables, template variables — warm mid-tone */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-attr, .hljs-variable, .hljs-template-variable) {
+  color: #b8ae9a;
 }
 
+/* Functions — clean neutral */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-function {
-  color: #C8BCA8;
+  color: #c4b89a;
 }
 
+/* Params — slightly dimmer neutral */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-params {
-  color: #B5AE9C;
+  color: #aca598;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-regexp, .hljs-link) {
-  color: #B89878;
+/* Regexp, links — muted terracotta */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-regexp, .hljs-link) {
+  color: #b89070;
 }
 
+/* Meta — secondary text */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-meta {
-  color: var(--text-secondary);
+  color: #9a9488;
 }
 
+/* Deletions — muted red */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-deletion {
-  color: var(--danger);
+  color: #b05c5c;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) :is(.hljs-symbol, .hljs-bullet) {
-  color: var(--accent);
+/* Symbols, bullets — cream accent */
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-symbol, .hljs-bullet) {
+  color: #ddd0b8;
 }
 
+/* Subst — default base */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-subst {
-  color: #d4d0c8;
+  color: #d6d2c8;
 }
 
+/* Sections (e.g. markdown headings in code) — cream, bold */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-section {
-  color: var(--accent);
+  color: #ddd0b8;
   font-weight: 600;
 }
 
+/* Emphasis / strong — keep structural intent */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-emphasis {
   font-style: italic;
 }
 
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-strong {
-  font-weight: bold;
+  font-weight: 700;
+}
+
+/*
+ * ═══════════════════════════════════════════════════════════════
+ *  Light-theme syntax overrides
+ *
+ *  On ivory (#FAF9F5) surface, dark warm-ink colors replace the
+ *  near-white dark-theme tokens. Concrete hex values are kept
+ *  (syntax highlighting needs explicit contrast, not CSS vars).
+ * ═══════════════════════════════════════════════════════════════
+ */
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs {
+  color: #2c2820;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name) {
+  color: #6b4a2a;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-string, .hljs-addition) {
+  color: #3d7a3a;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-comment, .hljs-quote) {
+  color: #8c8278;
+  font-style: italic;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-number, .hljs-literal) {
+  color: #8b5e2a;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-type, .hljs-title) {
+  color: #3a5a7a;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-attr, .hljs-variable, .hljs-template-variable) {
+  color: #5a4030;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-function {
+  color: #3a5a7a;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-params {
+  color: #4a3828;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-regexp, .hljs-link) {
+  color: #7a3a20;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-meta {
+  color: #6a6258;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-deletion {
+  color: #8b2020;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  :is(.hljs-symbol, .hljs-bullet) {
+  color: #6b4a2a;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-subst {
+  color: #2c2820;
+}
+
+[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-section {
+  color: #6b4a2a;
+  font-weight: 600;
 }

@@ -495,6 +495,7 @@ onUnmounted(() => {
 }
 
 .chart-viewer__title {
+    font-family: var(--font-display);
     font-weight: 600;
     font-size: 0.875rem;
     color: var(--text-primary);

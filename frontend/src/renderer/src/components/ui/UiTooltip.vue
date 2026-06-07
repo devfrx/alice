@@ -45,12 +45,13 @@ withDefaults(defineProps<UiTooltipProps>(), {
     position: absolute;
     z-index: var(--z-dropdown);
     padding: var(--space-1) var(--space-2);
-    background: var(--surface-3);
+    background: var(--surface-2);
     color: var(--text-primary);
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
+    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-dropdown);
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;

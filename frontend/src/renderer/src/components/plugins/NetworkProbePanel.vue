@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { api } from '../../services/api'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 /* ── Type definitions ───────────────────────────────────────────────── */
 
@@ -151,6 +152,16 @@ const scanResult = ref<ScanResult | null>(null)
 const scanLoading = ref(false)
 const scanError = ref('')
 const showClosedPorts = ref(false)
+
+/* Protocol options shared by the service-check and connection-list selects. */
+const svcProtocolOptions: UiSelectOption[] = [
+    { value: 'tcp', label: 'TCP' },
+    { value: 'udp', label: 'UDP' },
+]
+const connProtocolOptions: UiSelectOption[] = [
+    ...svcProtocolOptions,
+    { value: 'all', label: 'All' },
+]
 
 /* Service check (quick-check section) */
 const svcHost = ref('')
@@ -471,10 +482,9 @@ function fmtMs(v: number | null): string {
                             @keydown.enter="checkService" />
                         <input v-model.number="svcPort" class="net-probe__input net-probe__input--sm" type="number"
                             min="1" max="65535" placeholder="Port" />
-                        <select v-model="svcProtocol" class="net-probe__select">
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                        </select>
+                        <UiSelect :model-value="svcProtocol" :options="svcProtocolOptions" size="sm"
+                            aria-label="Protocollo" class="net-probe__select"
+                            @update:model-value="(v) => (svcProtocol = v === 'udp' ? 'udp' : 'tcp')" />
                     </div>
                     <button class="net-probe__btn net-probe__btn--sm" :disabled="svcLoading" @click="checkService">
                         <span v-if="svcLoading" class="net-probe__spinner" />
@@ -696,11 +706,9 @@ function fmtMs(v: number | null): string {
                 <!-- ─── Connections ──────────────────────────────────── -->
                 <div v-if="activeTab === 'connections'" class="net-probe__section">
                     <div class="net-probe__field-row">
-                        <select v-model="connProtocol" class="net-probe__select">
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                            <option value="all">All</option>
-                        </select>
+                        <UiSelect :model-value="connProtocol" :options="connProtocolOptions" size="sm"
+                            aria-label="Protocollo" class="net-probe__select"
+                            @update:model-value="(v) => (connProtocol = v === 'udp' ? 'udp' : v === 'all' ? 'all' : 'tcp')" />
                         <button class="net-probe__btn" :disabled="connLoading" @click="getConnections">
                             <span v-if="connLoading" class="net-probe__spinner" />
                             {{ connLoading ? 'Loading…' : '🔗 List Connections' }}
@@ -763,10 +771,10 @@ function fmtMs(v: number | null): string {
     align-items: center;
     justify-content: space-between;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--border);
 }
 
 .net-probe__title {
+    font-family: var(--font-display);
     font-weight: 600;
     font-size: 14px;
     display: flex;
@@ -891,20 +899,8 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__select {
-    padding: 7px 8px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text-primary);
-    font-size: 12px;
-    font-family: inherit;
-    outline: none;
-    cursor: pointer;
     flex-shrink: 0;
-}
-
-.net-probe__select:focus {
-    border-color: var(--accent);
+    min-width: 84px;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */
@@ -961,8 +957,7 @@ function fmtMs(v: number | null): string {
 .net-probe__card {
     padding: 10px;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
+    background: var(--surface-2);
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -972,7 +967,7 @@ function fmtMs(v: number | null): string {
     margin-top: 4px;
     padding: 8px;
     border-radius: 4px;
-    background: var(--surface-2);
+    background: var(--surface-3);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1000,7 +995,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__mono {
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
 }
 
@@ -1043,7 +1038,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__port-num {
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
     min-width: 44px;
 }
@@ -1062,10 +1057,10 @@ function fmtMs(v: number | null): string {
 
 .net-probe__closed-port {
     font-size: 11px;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     color: var(--text-muted);
     padding: 1px 5px;
-    background: var(--surface-2);
+    background: var(--surface-3);
     border-radius: 3px;
 }
 
@@ -1074,14 +1069,14 @@ function fmtMs(v: number | null): string {
 .net-probe__conn-proto {
     font-size: 11px;
     font-weight: 600;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: var(--font-mono);
 }
 
 .net-probe__conn-status {
     font-size: 10px;
     color: var(--text-secondary);
     padding: 1px 6px;
-    background: var(--surface-2);
+    background: var(--surface-3);
     border-radius: 3px;
     margin-left: auto;
 }
@@ -1095,6 +1090,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__sub-title {
+    font-family: var(--font-display);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);

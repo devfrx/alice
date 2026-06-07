@@ -117,9 +117,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .guide-modal {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-overlay);
   background: var(--black-heavy);
-  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -139,9 +138,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.5),
-    0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-floating);
   animation: guide-pop 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 @keyframes guide-pop {
@@ -156,7 +153,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--border);
   background: var(--surface-1);
 }
 .guide-modal__head-left {
@@ -299,7 +295,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   border-bottom-color: var(--accent);
 }
 .guide-modal__markdown :deep(code) {
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
   font-size: 0.92em;
   background: var(--surface-3);
   color: var(--accent);

@@ -272,6 +272,27 @@ select:focus {
 }
 
 
+/* ═══ FLOATING-CARD UTILITIES (opt-in, T14) ══════════════════ */
+
+/* Floating card surface */
+.u-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius, var(--radius-md));
+  box-shadow: var(--panel-shadow, var(--shadow-floating));
+}
+
+/* Detached spacing (gutter margin) */
+.u-inset    { margin: var(--gutter, 6px); }
+.u-inset-lg { margin: var(--gutter-lg, 10px); }
+
+/* Compact density helper */
+.u-compact {
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+
 /* ═══ SKELETON LOADING ═══════════════════════════════════════ */
 
 .skeleton {

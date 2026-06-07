@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * UiContextMenu — Floating glassmorphism context menu.
+ * UiContextMenu — Floating context menu (unified solid-surface recipe).
  *
  * Features:
  *  - Auto-reposition so the menu never overflows the viewport.
@@ -56,9 +56,13 @@ async function adjustPosition(): Promise<void> {
     const rect = el.getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
+    const MARGIN = 8
 
-    adjustedX.value = props.x + rect.width > vw ? vw - rect.width - 4 : props.x
-    adjustedY.value = props.y + rect.height > vh ? vh - rect.height - 4 : props.y
+    // Clamp on every side so the menu never leaves the app viewport: prefer the
+    // requested position, pull it in if it would overflow right/bottom, and
+    // never let it cross the top/left margins.
+    adjustedX.value = Math.max(MARGIN, Math.min(props.x, vw - rect.width - MARGIN))
+    adjustedY.value = Math.max(MARGIN, Math.min(props.y, vh - rect.height - MARGIN))
 
     // Move initial focus to the first enabled item so arrow keys work
     // immediately. Falls back to the menu container itself.
@@ -134,14 +138,13 @@ onUnmounted(() => {
     z-index: var(--z-dropdown);
     min-width: 180px;
     padding: var(--space-1) 0;
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-dropdown);
     user-select: none;
     outline: none;
+    /* NO glass / NO backdrop-filter — solid surface only (unified recipe). */
 }
 
 .ctx-menu:focus-visible {

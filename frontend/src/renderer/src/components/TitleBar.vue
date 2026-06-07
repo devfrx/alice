@@ -12,13 +12,15 @@ import { useUIStore } from '../stores/ui'
 import BrandWordmark from './branding/BrandWordmark.vue'
 import AliceSpinner from './ui/AliceSpinner.vue'
 import AppIcon from './ui/AppIcon.vue'
+import UiPopover from './ui/UiPopover.vue'
 import type { AppIconName } from '../assets/icons'
 
 const isMaximized = ref(false)
 const serviceAccordionOpen = ref(false)
 const refreshingServices = ref(false)
 const lastRefreshAt = ref<Date | null>(null)
-const serviceMenuRef = ref<HTMLElement | null>(null)
+/** The service-status trigger button — UiPopover anchors to it. */
+const serviceTriggerRef = ref<HTMLElement | null>(null)
 
 const settingsStore = useSettingsStore()
 const servicesStore = useServicesStore()
@@ -153,17 +155,6 @@ function formatLastCheck(service: ServiceSnapshot): string {
     }
 }
 
-function handleGlobalPointerDown(event: PointerEvent): void {
-    if (!serviceAccordionOpen.value) return
-    const target = event.target
-    if (target instanceof Node && serviceMenuRef.value?.contains(target)) return
-    serviceAccordionOpen.value = false
-}
-
-function handleGlobalKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') serviceAccordionOpen.value = false
-}
-
 function handleMinimize(): void {
     windowControls?.minimize()
 }
@@ -182,15 +173,11 @@ onMounted(() => {
     unsubMaximize = windowControls?.onMaximizeChange((maximized: boolean) => {
         isMaximized.value = maximized
     })
-    window.addEventListener('pointerdown', handleGlobalPointerDown)
-    window.addEventListener('keydown', handleGlobalKeydown)
     void refreshServiceStatus()
 })
 
 onUnmounted(() => {
     unsubMaximize?.()
-    window.removeEventListener('pointerdown', handleGlobalPointerDown)
-    window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
 
@@ -207,9 +194,9 @@ onUnmounted(() => {
         </div>
 
         <div class="titlebar__center">
-            <div ref="serviceMenuRef" class="titlebar__service-menu">
-                <button class="titlebar__service-trigger" :class="statusClass(overallStatus)" type="button"
-                    aria-controls="titlebar-services-panel" :aria-expanded="serviceAccordionOpen"
+            <div class="titlebar__service-menu">
+                <button ref="serviceTriggerRef" class="titlebar__service-trigger" :class="statusClass(overallStatus)"
+                    type="button" aria-controls="titlebar-services-panel" :aria-expanded="serviceAccordionOpen"
                     @click="toggleServiceAccordion">
                     <span class="titlebar__service-dot" />
                     <AppIcon name="server" :size="13" />
@@ -219,9 +206,9 @@ onUnmounted(() => {
                         :class="{ 'is-open': serviceAccordionOpen }" />
                 </button>
 
-                <Transition name="titlebar-accordion">
-                    <section v-if="serviceAccordionOpen" id="titlebar-services-panel" class="titlebar__service-panel"
-                        aria-label="Stato servizi">
+                <UiPopover :open="serviceAccordionOpen" :anchor-el="serviceTriggerRef" placement="bottom" align="center"
+                    aria-label="Stato servizi" @update:open="serviceAccordionOpen = $event">
+                    <section id="titlebar-services-panel" class="titlebar__service-panel">
                         <header class="titlebar__service-panel-head">
                             <div class="titlebar__service-heading">
                                 <span class="titlebar__service-title">Servizi locali</span>
@@ -300,7 +287,7 @@ onUnmounted(() => {
                             </span>
                         </footer>
                     </section>
-                </Transition>
+                </UiPopover>
             </div>
         </div>
 
@@ -333,7 +320,6 @@ onUnmounted(() => {
     height: var(--titlebar-height, 38px);
     min-height: var(--titlebar-height, 38px);
     background: transparent;
-    border-bottom: 1px solid var(--border);
     backdrop-filter: blur(var(--glass-blur));
     z-index: var(--z-sticky);
     user-select: none;
@@ -381,7 +367,7 @@ onUnmounted(() => {
 }
 
 .titlebar__title {
-    font-family: var(--font-display);
+    font-family: var(--font-brand);
     font-size: 10px;
     font-weight: var(--weight-semibold);
     letter-spacing: 0;
@@ -479,22 +465,15 @@ onUnmounted(() => {
     transform: rotate(180deg);
 }
 
+/* Content container only — UiPopover provides the floating chrome
+   (surface, border, radius, shadow, positioning, no glass). */
 .titlebar__service-panel {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 50%;
-    width: min(420px, calc(100vw - 32px));
+    width: min(420px, calc(100vw - 48px));
     max-height: min(560px, calc(100vh - 72px));
     display: flex;
     flex-direction: column;
     gap: var(--space-2-5);
-    padding: var(--space-3);
-    border: 1px solid var(--border-hover);
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
-    box-shadow: var(--shadow-dropdown);
-    backdrop-filter: blur(var(--glass-blur-heavy));
-    transform: translateX(-50%);
+    padding: var(--space-1-5);
     overflow: hidden;
 }
 
@@ -513,6 +492,7 @@ onUnmounted(() => {
 }
 
 .titlebar__service-title {
+    font-family: var(--font-display);
     color: var(--text-primary);
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
@@ -833,19 +813,6 @@ onUnmounted(() => {
     animation: titlebar-spin 0.9s linear infinite;
 }
 
-.titlebar-accordion-enter-active,
-.titlebar-accordion-leave-active {
-    transition:
-        opacity 140ms ease,
-        transform 140ms ease;
-}
-
-.titlebar-accordion-enter-from,
-.titlebar-accordion-leave-to {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-6px);
-}
-
 @keyframes titlebar-spin {
     to {
         transform: rotate(360deg);
@@ -887,9 +854,7 @@ onUnmounted(() => {
 @media (prefers-reduced-motion: reduce) {
 
     .titlebar__service-trigger,
-    .titlebar__service-chevron,
-    .titlebar-accordion-enter-active,
-    .titlebar-accordion-leave-active {
+    .titlebar__service-chevron {
         transition: none;
     }
 }

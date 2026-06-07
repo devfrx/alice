@@ -53,10 +53,8 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
     max-width: 420px;
     width: 100%;
     padding: var(--space-3) var(--space-4);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
     box-shadow: inset 0 1px 0 var(--white-faint);
@@ -70,7 +68,7 @@ const audioBarWidth = computed(() => Math.min(props.audioLevel * 100, 100))
     border-color: var(--listening-border);
     box-shadow:
         inset 0 1px 0 var(--white-faint),
-        0 0 14px rgba(224, 96, 96, 0.06);
+        0 0 14px var(--listening-dim);
 }
 
 /* ── Phase: Processing ── */

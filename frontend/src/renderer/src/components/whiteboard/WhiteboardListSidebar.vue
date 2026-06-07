@@ -83,7 +83,6 @@ function formatDate(iso: string): string {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4) var(--space-2-5);
-  border-bottom: 1px solid var(--border);
 }
 
 .wb-sidebar__title {

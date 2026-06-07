@@ -125,6 +125,7 @@ onBeforeUnmount(() => {
 }
 
 .error-boundary__title {
+    font-family: var(--font-display);
     font-size: var(--text-md);
     color: var(--text-primary);
     font-weight: var(--weight-medium);

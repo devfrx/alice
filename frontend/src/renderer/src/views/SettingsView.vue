@@ -239,10 +239,9 @@
           <label class="sv__field">
             <span class="sv__field-label">Tema</span>
             <div class="sv__input-wrap">
-              <select v-model="settingsStore.settings.ui.theme" class="sv__input">
-                <option value="dark">Scuro</option>
-                <option value="light">Chiaro</option>
-              </select>
+              <UiSelect class="sv__select" :model-value="settingsStore.settings.ui.theme" :options="themeOptions"
+                size="md" aria-label="Tema"
+                @update:model-value="(v) => (settingsStore.settings.ui.theme = v === 'light' ? 'light' : 'dark')" />
             </div>
           </label>
           <label class="sv__field">
@@ -272,12 +271,19 @@ import KnowledgeGraphManager from '../components/settings/KnowledgeGraphManager.
 import MemoryManager from '../components/settings/MemoryManager.vue'
 import VectorStoreManager from '../components/settings/VectorStoreManager.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../components/ui/UiSelect.vue'
 import type { AppIconName } from '../assets/icons'
 import { useSettingsStore } from '../stores/settings'
 import { useUIStore } from '../stores/ui'
 
 const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
+
+/* ── UI theme select ────────────────────────────────────────── */
+const themeOptions: UiSelectOption[] = [
+  { value: 'dark', label: 'Scuro' },
+  { value: 'light', label: 'Chiaro' },
+]
 
 /* ── Navigation ─────────────────────────────────────────────── */
 type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
@@ -380,12 +386,10 @@ onUnmounted(() => {
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-5) var(--space-3);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur-heavy));
-  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-floating);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow-y: auto;
 }
 
@@ -610,19 +614,19 @@ onUnmounted(() => {
 /* ── Read-only pill (Modalità agente status) ─────────────── */
 .sv__readonly-pill {
   flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: var(--space-0-5) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--white-subtle);
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-normal);
   text-transform: uppercase;
 }
 
 .sv__readonly-pill--on {
-  background: rgba(110, 200, 140, 0.14);
-  color: rgb(150, 220, 175);
+  background: var(--success-medium);
+  color: var(--success);
 }
 
 /* Warning transition */
@@ -695,12 +699,8 @@ onUnmounted(() => {
 }
 
 /* Select dropdown */
-select.sv__input {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 32px;
+.sv__select {
+  width: 100%;
 }
 
 /* ── Bottom spacer ────────────────────────────────────────── */

@@ -1,18 +1,24 @@
 <script setup lang="ts">
 /**
- * ServicesView — Standalone Service Status & Configuration panel.
+ * ServicesView — Service status & configuration, master-detail layout.
  *
- * Lists every managed service (LM Studio, STT, TTS, VRAM, Trellis, …)
- * with a live status badge fed by the events WebSocket and exposes:
+ * Left rail = single selectable list of ALL managed services (standard +
+ * TRELLIS, grouped with sub-labels). Right pane = the full detail of the
+ * selected service, rendered by reusing the existing per-service
+ * components:
  *
- * - Restart / Configure actions per service.
- * - Model download for STT / TTS with WS-driven progress bars.
- * - A dedicated Trellis2 configuration card with directory picker
- *   and a button that opens the in-app setup guide modal.
+ * - `ServiceCard`        for standard services (LM Studio, STT, TTS, VRAM…)
+ * - `TrellisConfigCard`  for the TRELLIS 3D-generation family.
+ *
+ * All behaviour (refresh, start/stop/restart, model downloads, TRELLIS
+ * config form + setup-guide modal) lives inside those components and the
+ * services store — this view only adds local selection state.
  */
-import { computed, onMounted, ref } from 'vue'
-import { useServicesStore } from '../stores/services'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useServicesStore, type ServiceSnapshot } from '../stores/services'
+import type { AppIconName } from '../assets/icons'
 import AppIcon from '../components/ui/AppIcon.vue'
+import UiEmptyState from '../components/ui/UiEmptyState.vue'
 import ServiceCard from '../components/services/ServiceCard.vue'
 import TrellisConfigCard from '../components/services/TrellisConfigCard.vue'
 import TrellisSetupGuideModal from '../components/services/TrellisSetupGuideModal.vue'
@@ -48,26 +54,88 @@ onMounted(() => {
 const TRELLIS_NAMES = ['trellis', 'trellis2', 'trellis2multiview'] as const
 type TrellisGuideService = 'trellis2' | 'trellis2multiview'
 
+function isTrellis(name: string): boolean {
+  return TRELLIS_NAMES.includes(name as (typeof TRELLIS_NAMES)[number])
+}
+
 const stdServices = computed(() =>
-  store.services.filter(
-    (s) => !TRELLIS_NAMES.includes(s.name as (typeof TRELLIS_NAMES)[number]),
-  ),
+  store.services.filter((s) => !isTrellis(s.name)),
 )
 const trellisServices = computed(() =>
-  store.services.filter((s) =>
-    TRELLIS_NAMES.includes(s.name as (typeof TRELLIS_NAMES)[number]),
-  ),
+  store.services.filter((s) => isTrellis(s.name)),
 )
 
-const summary = computed(() => {
-  const counts = { up: 0, degraded: 0, down: 0, starting: 0 }
-  for (const svc of store.services) counts[svc.status] += 1
-  return counts
-})
+// ── Row display metadata (icon + human label) ───────────────────
+const STATUS_LABELS: Record<string, string> = {
+  up: 'Attivo',
+  down: 'Spento',
+  degraded: 'Degradato',
+  starting: 'Avvio…',
+}
+const SERVICE_LABELS: Record<string, { label: string; icon: AppIconName }> = {
+  llm: { label: 'LM Studio', icon: 'server' },
+  stt: { label: 'Speech-to-Text', icon: 'mic' },
+  tts: { label: 'Text-to-Speech', icon: 'volume' },
+  vram: { label: 'VRAM Monitor', icon: 'cpu' },
+  trellis: { label: 'TRELLIS', icon: 'box-3d' },
+  trellis2: { label: 'TRELLIS.2', icon: 'box-3d' },
+  trellis2multiview: { label: 'TRELLIS.2 Multi-view', icon: 'box-3d' },
+}
+function metaFor(svc: ServiceSnapshot): { label: string; icon: AppIconName } {
+  return SERVICE_LABELS[svc.name] ?? { label: svc.name, icon: 'server' }
+}
+function statusLabelFor(svc: ServiceSnapshot): string {
+  return STATUS_LABELS[svc.status] ?? svc.status
+}
+
+// ── Header summary ──────────────────────────────────────────────
+const upCount = computed(
+  () => store.services.filter((s) => s.status === 'up').length,
+)
 const totalServices = computed(() => store.services.length)
 const activeDownloads = computed(
   () => Object.values(store.downloads).filter((d) => d.phase === 'downloading').length,
 )
+const overallClass = computed(() => {
+  if (!totalServices.value) return 'is-neutral'
+  if (store.services.some((s) => s.status === 'down')) return 'is-down'
+  if (store.services.some((s) => s.status === 'degraded')) return 'is-degraded'
+  if (store.services.some((s) => s.status === 'starting')) return 'is-starting'
+  return 'is-up'
+})
+
+// ── Selection (local view state only) ───────────────────────────
+const selectedServiceName = ref<string | null>(null)
+
+watch(
+  () => store.services,
+  (list) => {
+    if (!list.length) {
+      selectedServiceName.value = null
+      return
+    }
+    // Default to first service, and stay valid if the list changes / the
+    // selected service disappears.
+    if (
+      !selectedServiceName.value ||
+      !list.some((s) => s.name === selectedServiceName.value)
+    ) {
+      selectedServiceName.value = list[0].name
+    }
+  },
+  { immediate: true },
+)
+
+const selectedService = computed<ServiceSnapshot | null>(
+  () => store.services.find((s) => s.name === selectedServiceName.value) ?? null,
+)
+const selectedIsTrellis = computed(() =>
+  selectedService.value ? isTrellis(selectedService.value.name) : false,
+)
+
+function select(name: string): void {
+  selectedServiceName.value = name
+}
 
 async function refreshAll(): Promise<void> {
   if (refreshing.value) return
@@ -87,13 +155,28 @@ async function refreshAll(): Promise<void> {
 <template>
   <main class="services-view">
     <header class="services-view__head">
-      <div class="services-view__head-row">
-        <div class="services-view__title-block">
-          <h1 class="services-view__title">Servizi</h1>
-          <p class="services-view__subtitle">
-            Stato dei microservizi locali, gestione dei modelli STT/TTS e configurazione 3D.
-          </p>
-        </div>
+      <div class="services-view__title-block">
+        <h1 class="services-view__title">Servizi</h1>
+        <p class="services-view__subtitle">
+          Stato dei microservizi locali, gestione dei modelli STT/TTS e configurazione 3D.
+        </p>
+      </div>
+
+      <div class="services-view__head-aside">
+        <span
+          class="services-view__overall"
+          :class="overallClass"
+          :title="`${upCount} di ${totalServices} servizi attivi`"
+        >
+          <span class="services-view__overall-dot" />
+          <span class="services-view__overall-value">{{ upCount }}/{{ totalServices }}</span>
+          <span class="services-view__overall-label">attivi</span>
+        </span>
+        <span v-if="activeDownloads > 0" class="services-view__overall is-accent">
+          <AppIcon name="download" :size="11" />
+          <span class="services-view__overall-value">{{ activeDownloads }}</span>
+          <span class="services-view__overall-label">download</span>
+        </span>
         <button
           class="services-view__refresh"
           type="button"
@@ -104,78 +187,77 @@ async function refreshAll(): Promise<void> {
           <span>{{ refreshing ? 'Aggiorno…' : 'Aggiorna' }}</span>
         </button>
       </div>
-
-      <div class="services-view__stats">
-        <div class="stat-pill stat-pill--up">
-          <span class="stat-pill__dot" />
-          <span class="stat-pill__value">{{ summary.up }}</span>
-          <span class="stat-pill__label">attivi</span>
-        </div>
-        <div v-if="summary.degraded" class="stat-pill stat-pill--degraded">
-          <span class="stat-pill__dot" />
-          <span class="stat-pill__value">{{ summary.degraded }}</span>
-          <span class="stat-pill__label">degradati</span>
-        </div>
-        <div v-if="summary.down" class="stat-pill stat-pill--down">
-          <span class="stat-pill__dot" />
-          <span class="stat-pill__value">{{ summary.down }}</span>
-          <span class="stat-pill__label">spenti</span>
-        </div>
-        <div v-if="summary.starting" class="stat-pill stat-pill--starting">
-          <span class="stat-pill__dot" />
-          <span class="stat-pill__value">{{ summary.starting }}</span>
-          <span class="stat-pill__label">avvio</span>
-        </div>
-        <div class="stat-pill stat-pill--neutral">
-          <span class="stat-pill__value">{{ totalServices }}</span>
-          <span class="stat-pill__label">totali</span>
-        </div>
-        <div v-if="activeDownloads > 0" class="stat-pill stat-pill--accent">
-          <AppIcon name="download" :size="11" />
-          <span class="stat-pill__value">{{ activeDownloads }}</span>
-          <span class="stat-pill__label">{{ activeDownloads === 1 ? 'download' : 'download attivi' }}</span>
-        </div>
-      </div>
-
-      <div v-if="store.error" class="services-view__error" role="alert">
-        <AppIcon name="alert-triangle" :size="14" />
-        <span>{{ store.error }}</span>
-      </div>
     </header>
 
-    <section v-if="stdServices.length" class="services-view__section">
-      <div class="services-view__section-head">
-        <h2 class="services-view__section-title">Microservizi</h2>
-        <span class="services-view__section-count">{{ stdServices.length }}</span>
-      </div>
-      <div class="services-view__grid">
-        <ServiceCard
-          v-for="svc in stdServices"
-          :key="svc.name"
-          :service="svc"
-          @restart="store.restart(svc.name)"
-        />
-      </div>
-    </section>
+    <div v-if="store.error" class="services-view__error" role="alert">
+      <AppIcon name="alert-triangle" :size="14" />
+      <span>{{ store.error }}</span>
+    </div>
 
-    <section v-if="trellisServices.length" class="services-view__section">
-      <div class="services-view__section-head">
-        <h2 class="services-view__section-title">TRELLIS — Generazione 3D</h2>
-        <span class="services-view__section-count">{{ trellisServices.length }}</span>
-      </div>
-      <div class="services-view__grid services-view__grid--wide">
-        <TrellisConfigCard
-          v-for="svc in trellisServices"
-          :key="svc.name"
-          :service="svc"
-          @open-guide="openGuideForService(svc.name)"
-        />
-      </div>
-    </section>
+    <div class="services-view__body">
+      <nav
+        v-if="store.services.length"
+        class="services-view__rail"
+        aria-label="Elenco servizi"
+      >
+        <template v-if="stdServices.length">
+          <p class="services-view__rail-label">Microservizi</p>
+          <button
+            v-for="svc in stdServices"
+            :key="svc.name"
+            type="button"
+            class="rail-row"
+            :class="[`is-${svc.status}`, { 'is-selected': svc.name === selectedServiceName }]"
+            :aria-current="svc.name === selectedServiceName ? 'true' : undefined"
+            @click="select(svc.name)"
+          >
+            <span class="rail-row__dot" :class="`is-${svc.status}`" />
+            <span class="rail-row__icon"><AppIcon :name="metaFor(svc).icon" :size="15" /></span>
+            <span class="rail-row__name">{{ metaFor(svc).label }}</span>
+            <span class="rail-row__status">{{ statusLabelFor(svc) }}</span>
+          </button>
+        </template>
 
-    <div v-if="!store.services.length && !store.error" class="services-view__empty">
-      <AppIcon name="server" :size="32" />
-      <p>Nessun servizio registrato.</p>
+        <template v-if="trellisServices.length">
+          <p class="services-view__rail-label">TRELLIS — 3D</p>
+          <button
+            v-for="svc in trellisServices"
+            :key="svc.name"
+            type="button"
+            class="rail-row"
+            :class="[`is-${svc.status}`, { 'is-selected': svc.name === selectedServiceName }]"
+            :aria-current="svc.name === selectedServiceName ? 'true' : undefined"
+            @click="select(svc.name)"
+          >
+            <span class="rail-row__dot" :class="`is-${svc.status}`" />
+            <span class="rail-row__icon"><AppIcon :name="metaFor(svc).icon" :size="15" /></span>
+            <span class="rail-row__name">{{ metaFor(svc).label }}</span>
+            <span class="rail-row__status">{{ statusLabelFor(svc) }}</span>
+          </button>
+        </template>
+      </nav>
+
+      <section class="services-view__detail">
+        <div v-if="selectedService" class="services-view__detail-inner">
+          <TrellisConfigCard
+            v-if="selectedIsTrellis"
+            :key="selectedService.name"
+            :service="selectedService"
+            @open-guide="openGuideForService(selectedService.name)"
+          />
+          <ServiceCard
+            v-else
+            :key="selectedService.name"
+            :service="selectedService"
+            @restart="store.restart(selectedService.name)"
+          />
+        </div>
+        <UiEmptyState
+          v-else-if="!store.error"
+          icon="server"
+          title="Nessun servizio registrato"
+        />
+      </section>
     </div>
 
     <TrellisSetupGuideModal
@@ -192,35 +274,20 @@ async function refreshAll(): Promise<void> {
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-6) clamp(var(--space-4), 3vw, var(--space-8)) var(--space-8);
+  overflow: hidden;
+  padding: var(--space-6) clamp(var(--space-4), 3vw, var(--space-8)) var(--space-6);
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  background:
-    linear-gradient(180deg, var(--surface-0) 0%, var(--bg-primary) 34%, var(--surface-0) 100%);
+  gap: var(--space-4);
+  background: var(--surface-0);
 }
 
-/* ── Header ───────────────────────────────────────────────────── */
+/* ── Header (blended onto surface, no bordered panel) ─────────── */
 .services-view__head {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
+  flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
-  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--shadow-sm);
-}
-.services-view__head-row {
-  display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
 }
@@ -228,13 +295,16 @@ async function refreshAll(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 .services-view__title {
   margin: 0;
-  font-size: var(--text-xl);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   letter-spacing: 0;
+  line-height: var(--leading-tight);
 }
 .services-view__subtitle {
   margin: 0;
@@ -243,12 +313,62 @@ async function refreshAll(): Promise<void> {
   line-height: var(--leading-snug);
   max-width: 64ch;
 }
+.services-view__head-aside {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Overall status pill ──────────────────────────────────────── */
+.services-view__overall {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
+  border-radius: 8px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.services-view__overall-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.services-view__overall-value {
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.services-view__overall-label {
+  text-transform: lowercase;
+}
+.services-view__overall.is-up { color: var(--success); }
+.services-view__overall.is-up .services-view__overall-value { color: var(--success); }
+.services-view__overall.is-degraded { color: var(--warning); }
+.services-view__overall.is-degraded .services-view__overall-value { color: var(--warning); }
+.services-view__overall.is-down { color: var(--danger); }
+.services-view__overall.is-down .services-view__overall-value { color: var(--danger); }
+.services-view__overall.is-starting { color: var(--accent); }
+.services-view__overall.is-starting .services-view__overall-value { color: var(--accent); }
+.services-view__overall.is-neutral .services-view__overall-value { color: var(--text-secondary); }
+.services-view__overall.is-accent {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.services-view__overall.is-accent .services-view__overall-value { color: var(--accent); }
+
+/* ── Refresh button ───────────────────────────────────────────── */
 .services-view__refresh {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 34px;
+  min-height: 30px;
   padding: 0 var(--space-3);
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -275,58 +395,9 @@ async function refreshAll(): Promise<void> {
   to { transform: rotate(360deg); }
 }
 
-/* ── Stats pills ─────────────────────────────────────────────── */
-.services-view__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.stat-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 28px;
-  padding: 0 var(--space-3);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  letter-spacing: 0;
-}
-.stat-pill__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: currentColor;
-  box-shadow: 0 0 8px currentColor;
-}
-.stat-pill__value {
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.stat-pill__label {
-  text-transform: lowercase;
-}
-.stat-pill--up { color: var(--success); }
-.stat-pill--up .stat-pill__value { color: var(--success); }
-.stat-pill--degraded { color: var(--warning); }
-.stat-pill--degraded .stat-pill__value { color: var(--warning); }
-.stat-pill--down { color: var(--danger); }
-.stat-pill--down .stat-pill__value { color: var(--danger); }
-.stat-pill--starting { color: var(--accent); }
-.stat-pill--starting .stat-pill__value { color: var(--accent); }
-.stat-pill--accent {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-.stat-pill--accent .stat-pill__value { color: var(--accent); }
-.stat-pill--neutral .stat-pill__value { color: var(--text-secondary); }
-
 /* ── Error banner ────────────────────────────────────────────── */
 .services-view__error {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -338,84 +409,149 @@ async function refreshAll(): Promise<void> {
   font-size: var(--text-sm);
 }
 
-/* ── Sections ────────────────────────────────────────────────── */
-.services-view__section {
+/* ── Master-detail body ──────────────────────────────────────── */
+.services-view__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* ── Left rail (master list) ─────────────────────────────────── */
+.services-view__rail {
+  flex: 0 0 272px;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface-1);
+  border-radius: var(--radius-md);
 }
-.services-view__section-head {
+.services-view__rail-label {
+  margin: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+}
+.services-view__rail-label:first-child {
+  margin-top: var(--space-1);
+}
+
+/* ── Rail row ─────────────────────────────────────────────────── */
+.rail-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-2-5);
+  width: 100%;
+  padding: var(--space-2) var(--space-2-5);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-secondary);
+  transition: background 120ms ease, color 120ms ease;
 }
-.services-view__section-title {
-  margin: 0;
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
+.rail-row:hover {
+  background: var(--surface-hover);
   color: var(--text-primary);
-  letter-spacing: 0;
 }
-.services-view__section-count {
+.rail-row.is-selected {
+  background: var(--surface-selected);
+  color: var(--text-primary);
+}
+.rail-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-border);
+}
+.rail-row__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+  box-shadow: 0 0 6px transparent;
+}
+.rail-row__dot.is-up { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.rail-row__dot.is-degraded { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+.rail-row__dot.is-down { background: var(--danger); }
+.rail-row__dot.is-starting {
+  background: var(--accent);
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.rail-row__icon {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 20px;
-  padding: 0 var(--space-2);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
-.services-view__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-3);
+.rail-row.is-selected .rail-row__icon {
+  color: var(--text-secondary);
 }
-.services-view__grid--wide {
-  grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
+.rail-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-row__status {
+  flex: 0 0 auto;
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  letter-spacing: var(--tracking-tight);
 }
 
-/* ── Empty state ─────────────────────────────────────────────── */
-.services-view__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-8);
-  background: var(--surface-1);
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  color: var(--text-muted);
-  gap: var(--space-3);
-  font-size: var(--text-sm);
+/* ── Right detail pane ───────────────────────────────────────── */
+.services-view__detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
-.services-view__empty p { margin: 0; }
+.services-view__detail-inner {
+  max-width: 680px;
+}
 
 @media (max-width: 760px) {
   .services-view {
-    padding: var(--space-4) var(--space-3) var(--space-6);
-    gap: var(--space-5);
+    padding: var(--space-4) var(--space-3) var(--space-4);
+    overflow-y: auto;
   }
-
   .services-view__head {
-    position: static;
-    margin: 0;
-  }
-
-  .services-view__head-row {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
-
+  .services-view__head-aside {
+    flex-wrap: wrap;
+  }
   .services-view__refresh {
-    justify-content: center;
+    margin-left: auto;
+  }
+  .services-view__body {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .services-view__rail {
+    flex: 0 0 auto;
+    max-height: 280px;
+  }
+  .services-view__detail {
+    overflow-y: visible;
+  }
+  .services-view__detail-inner {
+    max-width: none;
   }
 }
 </style>

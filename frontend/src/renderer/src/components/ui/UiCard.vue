@@ -14,7 +14,7 @@
  */
 
 export interface UiCardProps {
-    variant?: 'default' | 'subtle' | 'elevated' | 'glass'
+    variant?: 'default' | 'subtle' | 'elevated' | 'glass' | 'floating'
     /** Makes the card focusable + keyboard-activatable. */
     interactive?: boolean
     /** Strip internal padding (useful for media-first layouts). */
@@ -83,6 +83,13 @@ function onKeydown(e: KeyboardEvent): void {
     border-color: var(--glass-border);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.ui-card--floating {
+    background: var(--surface-1);
+    box-shadow: var(--panel-shadow, var(--shadow-floating));
+    border: 1px solid var(--border);
+    border-radius: var(--panel-radius, var(--radius-md));
 }
 
 /* ── Interactive ── */

@@ -62,8 +62,8 @@ watch(() => props.id, (id) => { void syncDeepLink(id) })
   grid-template-columns: 200px 340px 1fr;
   height: 100%;
   width: 100%;
-  padding: 10px;
-  gap: 10px;
+  padding: var(--space-2-5);
+  gap: var(--space-2-5);
   overflow: hidden;
   background: var(--surface-0);
   color: var(--text-primary);
@@ -72,18 +72,16 @@ watch(() => props.id, (id) => { void syncDeepLink(id) })
 
 .email-page__inbox {
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   background: var(--surface-0);
-  /* box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15); */
 }
 
 .email-page__viewer {
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   background: var(--surface-1);
-  /* box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15); */
 }
 
 .email-page__empty {
@@ -105,6 +103,7 @@ watch(() => props.id, (id) => { void syncDeepLink(id) })
 }
 
 .email-page__empty-title {
+  font-family: var(--font-display);
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
   color: var(--text-secondary);

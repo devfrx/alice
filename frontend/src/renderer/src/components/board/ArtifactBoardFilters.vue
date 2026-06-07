@@ -7,6 +7,8 @@
  */
 import { computed } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 import type { ArtifactKind } from '../../types/artifacts'
 import type { ConversationSummary } from '../../types/chat'
 
@@ -23,33 +25,29 @@ const emit = defineEmits<{
     'update:conversationFilter': [value: string | 'all']
 }>()
 
-interface KindOption {
-    value: ArtifactKind | 'all'
-    label: string
-}
-
-const KIND_OPTIONS: KindOption[] = [
+const KIND_OPTIONS: UiSegmentedOption[] = [
     { value: 'all', label: 'Tutti' },
     { value: 'cad_3d_text', label: '3D da testo' },
     { value: 'cad_3d_image', label: '3D da immagine' },
 ]
 
-/** Bound select value (must be a writable computed for v-model). */
-const conversationModel = computed({
+/** Bound select value (writable computed; widened to accept UiSelect's `string | number`). */
+const conversationModel = computed<string | number>({
     get: () => props.conversationFilter,
-    set: (v) => emit('update:conversationFilter', v),
+    set: (v) => emit('update:conversationFilter', String(v)),
 })
+
+/** Options for the conversation filter, with the leading "Tutte" entry. */
+const conversationOptions = computed<UiSelectOption[]>(() => [
+    { value: 'all', label: 'Tutte' },
+    ...props.conversations.map((c) => ({ value: c.id, label: c.title || 'Senza titolo' })),
+])
 </script>
 
 <template>
     <div class="artifact-filters">
-        <div class="artifact-filters__chips" role="tablist" aria-label="Filtra per tipo">
-            <button v-for="opt in KIND_OPTIONS" :key="opt.value" class="artifact-filters__chip"
-                :class="{ 'artifact-filters__chip--active': kindFilter === opt.value }" role="tab"
-                :aria-selected="kindFilter === opt.value" @click="emit('update:kindFilter', opt.value)">
-                {{ opt.label }}
-            </button>
-        </div>
+        <UiSegmented :equal="false" :model-value="kindFilter" :options="KIND_OPTIONS" aria-label="Filtra per tipo"
+            @update:model-value="(v) => emit('update:kindFilter', v as ArtifactKind | 'all')" />
 
         <label class="artifact-filters__pinned" :class="{ 'artifact-filters__pinned--active': pinnedOnly }">
             <input type="checkbox" :checked="pinnedOnly"
@@ -60,12 +58,8 @@ const conversationModel = computed({
 
         <label class="artifact-filters__conv">
             <span class="artifact-filters__conv-label">Conversazione</span>
-            <select v-model="conversationModel" class="artifact-filters__select">
-                <option value="all">Tutte</option>
-                <option v-for="c in conversations" :key="c.id" :value="c.id">
-                    {{ c.title || 'Senza titolo' }}
-                </option>
-            </select>
+            <UiSelect v-model="conversationModel" :options="conversationOptions" size="sm"
+                aria-label="Conversazione" class="artifact-filters__select" />
         </label>
     </div>
 </template>
@@ -76,41 +70,8 @@ const conversationModel = computed({
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-1);
-}
-
-/* ── Kind chips ── */
-.artifact-filters__chips {
-    display: inline-flex;
-    gap: var(--space-1);
-    padding: 2px;
-    border-radius: var(--radius-md);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-}
-
-.artifact-filters__chip {
-    padding: var(--space-1-5) var(--space-3);
-    border: none;
+    padding: var(--space-2) var(--space-6) var(--space-4);
     background: transparent;
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition:
-        color var(--transition-fast),
-        background var(--transition-fast);
-}
-
-.artifact-filters__chip:hover {
-    color: var(--text-primary);
-}
-
-.artifact-filters__chip--active {
-    color: var(--accent);
-    background: var(--accent-dim);
 }
 
 /* ── Pinned toggle ── */
@@ -168,20 +129,20 @@ const conversationModel = computed({
 }
 
 .artifact-filters__select {
-    background: var(--surface-2);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 6px var(--space-2);
-    font-size: var(--text-xs);
-    font-family: inherit;
     min-width: 200px;
-    cursor: pointer;
 }
 
-.artifact-filters__select:focus {
-    outline: none;
-    border-color: var(--accent-border);
-    box-shadow: 0 0 0 2px var(--accent-glow);
+@media (max-width: 720px) {
+    .artifact-filters {
+        padding: var(--space-2) var(--space-4) var(--space-3);
+    }
+
+    .artifact-filters__conv {
+        margin-left: 0;
+    }
+
+    .artifact-filters__select {
+        min-width: 160px;
+    }
 }
 </style>

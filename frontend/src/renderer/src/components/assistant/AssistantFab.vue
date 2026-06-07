@@ -10,7 +10,6 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatStore } from '../../stores/chat'
-import { useUIStore } from '../../stores/ui'
 import AppIcon from '../ui/AppIcon.vue'
 
 const props = defineProps<{
@@ -24,7 +23,6 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const chatStore = useChatStore()
-const uiStore = useUIStore()
 
 const expanded = ref(false)
 const fabRef = ref<HTMLElement | null>(null)
@@ -49,8 +47,8 @@ function handleAction(id: string): void {
             emit('toggle-history')
             break
         case 'mode':
-            uiStore.setMode('hybrid')
-            router.push({ name: 'hybrid' })
+            // 'hybrid' mode retired (R3) — Workspace is now the primary surface.
+            router.push({ name: 'workspace' })
             break
         case 'new-conv':
             chatStore.createConversation().catch(console.error)
@@ -130,10 +128,8 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
     width: 42px;
     height: 42px;
     border-radius: var(--radius-full);
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border);
+    background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;
     display: flex;
@@ -209,11 +205,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-1-5) var(--space-3) var(--space-1-5) var(--space-2-5);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--border);
     border-radius: var(--radius-pill);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur-heavy));
-    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+    background: var(--surface-2);
     color: var(--text-secondary);
     font-size: var(--text-xs);
     white-space: nowrap;
@@ -230,7 +224,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onClickOutside
     background: var(--surface-3);
     border-color: var(--accent-border);
     color: var(--text-primary);
-    box-shadow: 0 0 16px var(--accent-glow);
+    box-shadow: var(--shadow-md);
 }
 
 .fab__action-icon {

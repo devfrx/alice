@@ -18,12 +18,21 @@ import { resolveBackendUrl } from '../../services/api'
 import type { CadModelPayload } from '../../types/chat'
 import AppIcon from '../ui/AppIcon.vue'
 
-const props = defineProps<{
-  /** All CAD models in the conversation. */
-  models: CadModelPayload[]
-  /** Index of the currently displayed model. */
-  activeIndex: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** All CAD models in the conversation. */
+    models: CadModelPayload[]
+    /** Index of the currently displayed model. */
+    activeIndex: number
+    /**
+     * Hide the inline prev/next multi-model navigation. Used by the workspace
+     * Cad3dModule, which provides its own ModuleSelectorBar instead; assistant
+     * mode leaves this false to keep the built-in nav.
+     */
+    hideNav?: boolean
+  }>(),
+  { hideNav: false }
+)
 
 const emit = defineEmits<{
   close: []
@@ -322,7 +331,7 @@ onUnmounted(() => {
     <!-- Footer: navigation + controls -->
     <div class="side-cad__footer">
       <!-- Multi-model navigation -->
-      <div v-if="hasMultiple" class="side-cad__nav">
+      <div v-if="hasMultiple && !hideNav" class="side-cad__nav">
         <button class="side-cad__nav-btn" :disabled="!canPrev" title="Modello precedente" @click="goPrev">
           <AppIcon name="chevron-left" :size="14" />
         </button>
@@ -459,13 +468,13 @@ onUnmounted(() => {
 }
 
 .side-cad__retry-btn {
-  margin-top: 8px;
-  padding: 4px 14px;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-4);
   font-size: var(--text-xs);
   color: var(--text-primary);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -479,7 +488,7 @@ onUnmounted(() => {
   height: 24px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: side-cad-spin 0.8s linear infinite;
 }
 

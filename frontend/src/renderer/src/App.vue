@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
-import AppSidebar from './components/sidebar/AppSidebar.vue'
+import DockedSidebar from './components/canvas/DockedSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
 // ModeSwitcher is managed inside AssistantFab for assistant mode
 import { UiToast, AliceLoader } from './components/ui'
@@ -100,14 +100,18 @@ onUnmounted(() => {
       <span class="global-operation-bar__text">{{ settingsStore.operationDescription }}</span>
     </div>
     <div class="app-body">
+      <!-- Docked, resizable, collapsible sidebar (hosts AppSidebar inline) -->
+      <DockedSidebar />
       <main class="app-content">
         <ErrorBoundary>
-          <router-view />
+          <router-view v-slot="{ Component }">
+            <Transition name="view" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </router-view>
         </ErrorBoundary>
       </main>
     </div>
-    <!-- Floating sidebar (renders its own backdrop) -->
-    <AppSidebar />
     <!-- <ModeSwitcher v-if="uiStore.mode !== 'assistant'" /> NON ATTIVARE! -->
     <ModalContainer />
     <UiToast />
@@ -126,6 +130,7 @@ onUnmounted(() => {
 }
 
 .app-body {
+  position: relative;
   flex: 1;
   display: flex;
   overflow: hidden;
@@ -181,6 +186,44 @@ onUnmounted(() => {
   color: var(--text-muted);
   margin-top: var(--space-0-5);
   letter-spacing: var(--tracking-tight);
+}
+
+/* ── Route view transition — fluid cross-fade + slight lift ─────── */
+.view-enter-active {
+  transition:
+    opacity 280ms var(--ease-out-quart),
+    transform 280ms var(--ease-out-quart);
+  will-change: opacity, transform;
+}
+
+.view-leave-active {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+  will-change: opacity, transform;
+}
+
+.view-enter-from {
+  opacity: 0;
+  transform: translateY(8px) scale(0.995);
+}
+
+.view-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.995);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .view-enter-active,
+  .view-leave-active {
+    transition: opacity 120ms ease;
+  }
+
+  .view-enter-from,
+  .view-leave-to {
+    transform: none;
+  }
 }
 
 /* ── Mode-specific adjustments ──────────────────────────────────── */

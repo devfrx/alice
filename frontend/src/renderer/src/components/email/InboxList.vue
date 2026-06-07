@@ -8,12 +8,20 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useEmailStore } from '../../stores/email'
 import UiSkeleton from '../ui/UiSkeleton.vue'
+import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 import AppIcon from '../ui/AppIcon.vue'
 
 const emailStore = useEmailStore()
 
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'unread'>('all')
+
+/** Segmented filter options; the unread tab carries the unread-count badge. */
+const filterOptions = computed<UiSegmentedOption[]>(() => {
+  const unread: UiSegmentedOption = { value: 'unread', label: 'Non lette' }
+  if (emailStore.unreadCount > 0) unread.badge = emailStore.unreadCount
+  return [{ value: 'all', label: 'Tutte' }, unread]
+})
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(searchQuery, (val) => {
@@ -89,19 +97,8 @@ function subjectPreview(subject: string): string {
 
     <!-- Toolbar: count + filters + refresh -->
     <div class="inbox__toolbar">
-      <div class="inbox__filters">
-        <button class="inbox__filter" :class="{ 'inbox__filter--active': filterMode === 'all' }"
-          @click="filterMode = 'all'">
-          Tutte
-        </button>
-        <button class="inbox__filter" :class="{ 'inbox__filter--active': filterMode === 'unread' }"
-          @click="filterMode = 'unread'">
-          Non lette
-          <span v-if="emailStore.unreadCount > 0" class="inbox__filter-count">
-            {{ emailStore.unreadCount }}
-          </span>
-        </button>
-      </div>
+      <UiSegmented size="sm" :equal="false" :model-value="filterMode" :options="filterOptions"
+        aria-label="Filtro email" @update:model-value="(v) => filterMode = v as 'all' | 'unread'" />
       <button class="inbox__refresh" :disabled="emailStore.loading"
         :class="{ 'inbox__refresh--spinning': emailStore.loading }" title="Aggiorna"
         @click="emailStore.fetchInbox(emailStore.currentFolder)">
@@ -224,50 +221,6 @@ function subjectPreview(subject: string): string {
   justify-content: space-between;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
-}
-
-.inbox__filters {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.inbox__filter {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2-5);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-family: var(--font-sans);
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.inbox__filter:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.inbox__filter--active {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent-border);
-}
-
-.inbox__filter-count {
-  background: var(--accent);
-  color: var(--surface-0);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  line-height: 1.5;
 }
 
 .inbox__refresh {

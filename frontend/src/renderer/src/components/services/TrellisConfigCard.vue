@@ -278,14 +278,14 @@ async function stopService(): Promise<void> {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: color-mix(in srgb, var(--surface-1) 86%, var(--surface-0));
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
   transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 .trellis-card:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
   border-color: var(--border-hover);
   box-shadow: var(--shadow-sm);
 }
@@ -320,7 +320,6 @@ async function stopService(): Promise<void> {
   align-items: center;
   justify-content: center;
   background: var(--surface-2);
-  border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-secondary);
 }
@@ -381,7 +380,6 @@ async function stopService(): Promise<void> {
   margin: 0;
   padding: var(--space-2) var(--space-2-5);
   background: var(--surface-0);
-  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: var(--text-xs);
   color: var(--text-secondary);
@@ -424,7 +422,7 @@ async function stopService(): Promise<void> {
   border-radius: 8px;
   color: var(--text-primary);
   font-size: var(--text-xs);
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
   transition: border-color 120ms ease, background 120ms ease;
 }
 .trellis-card__input::placeholder { color: var(--text-muted); }

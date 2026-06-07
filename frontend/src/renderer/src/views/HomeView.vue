@@ -118,8 +118,10 @@ const launchOptions: LaunchOption[] = [
   },
 ]
 
-/** Explicitly clicked option; takes priority over isActive() checks. */
-const chosenOption = ref<LaunchOption>(launchOptions[0])
+/** Explicitly clicked option; takes priority over isActive() checks. Starts
+ * null so the `isActive()` fallback (active surface) drives the initial
+ * highlight instead of always pinning to the first option. */
+const chosenOption = ref<LaunchOption | null>(null)
 
 /** Currently selected launch option: explicit click > first isActive match > first option. */
 const selectedOption = computed(

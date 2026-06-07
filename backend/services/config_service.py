@@ -41,6 +41,7 @@ from backend.core.config import (
     DEFAULT_CONFIG_PATH,
     AliceConfig,
     _load_yaml,
+    migrate_legacy_config_keys,
 )
 from backend.core.event_bus import EventBus
 
@@ -238,10 +239,23 @@ class LayeredConfigService:
     # -- disk loading ----------------------------------------------------
 
     def _load_disk_layers(self) -> None:
-        """Read defaults/system/user YAML files into the layer dicts."""
-        self._layers[ConfigLayer.DEFAULTS] = _read_yaml_safe(self._defaults_path)
-        self._layers[ConfigLayer.SYSTEM] = _read_yaml_safe(self._system_path)
-        self._layers[ConfigLayer.USER] = _read_yaml_safe(self._user_path)
+        """Read defaults/system/user YAML files into the layer dicts.
+
+        Each layer is run through :func:`migrate_legacy_config_keys` *before*
+        merging, so a legacy ``agent_tools`` block in (say) ``user.yaml`` is
+        folded into that layer's ``agent.*`` and therefore keeps the user
+        layer's precedence over lower layers — preserving the user's value
+        across the rename instead of letting the defaults layer win.
+        """
+        self._layers[ConfigLayer.DEFAULTS] = migrate_legacy_config_keys(
+            _read_yaml_safe(self._defaults_path)
+        )
+        self._layers[ConfigLayer.SYSTEM] = migrate_legacy_config_keys(
+            _read_yaml_safe(self._system_path)
+        )
+        self._layers[ConfigLayer.USER] = migrate_legacy_config_keys(
+            _read_yaml_safe(self._user_path)
+        )
         logger.debug(
             "Loaded config layers: defaults={}, system={} (exists={}), user={} (exists={})",
             self._defaults_path,

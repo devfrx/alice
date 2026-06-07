@@ -1103,6 +1103,83 @@ class AgentConfig(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
+# Legacy-key migration (shared by AliceConfig and the layered config service)
+# ---------------------------------------------------------------------------
+
+_LEGACY_AGENT_SCALAR_MAP = {
+    "plan_enabled": "planning",
+    "delegation_enabled": "delegation",
+}
+_LEGACY_AGENT_SUBAGENT_MAP = {
+    "subagent_max_steps": "max_steps",
+    "subagent_max_output_tokens": "max_output_tokens",
+    "subagent_timeout_seconds": "timeout_seconds",
+    "subagent_max_tools": "max_tools",
+}
+
+
+def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
+    """Fold renamed legacy config keys into their current location, in place.
+
+    The agentic-chat refactor unified the standalone ``agent_tools`` section
+    into the :class:`AgentConfig` tree (``agent_tools.plan_enabled`` →
+    ``agent.planning``, ``agent_tools.delegation_enabled`` →
+    ``agent.delegation`` and ``agent_tools.subagent_*`` → ``agent.subagent.*``).
+    A persisted ``system.yaml`` / ``user.yaml`` written by an older build can
+    still carry the legacy block; because every config model forbids unknown
+    fields, leaving it in place makes the whole config — and therefore the
+    backend — fail to load.
+
+    This helper is applied **per layer** by
+    :class:`~backend.services.config_service.LayeredConfigService` *before* the
+    layers are merged, so a user's legacy value lands in its own layer and
+    wins over lower-precedence defaults exactly like a native ``agent.*`` key
+    would. It is also wired as a ``model_validator(before)`` on
+    :class:`AliceConfig` as a safety net for the runtime/env layer and direct
+    construction (e.g. tests). Within a single dict, an explicitly-set new
+    ``agent.*`` key always wins over a migrated legacy one.
+
+    Args:
+        data: A raw config dict (one layer, or the merged result). Mutated and
+            returned; non-dict input is returned unchanged.
+
+    Returns:
+        The same dict with any ``agent_tools`` block folded into ``agent``.
+    """
+    if not isinstance(data, dict):
+        return data
+
+    legacy = data.pop("agent_tools", None)
+    if not isinstance(legacy, dict):
+        return data
+
+    agent = data.get("agent")
+    if not isinstance(agent, dict):
+        agent = {}
+        data["agent"] = agent
+    subagent = agent.get("subagent")
+    if not isinstance(subagent, dict):
+        subagent = {}
+
+    for old_key, value in legacy.items():
+        if old_key in _LEGACY_AGENT_SCALAR_MAP:
+            new_key = _LEGACY_AGENT_SCALAR_MAP[old_key]
+            if new_key not in agent:
+                agent[new_key] = value
+        elif old_key in _LEGACY_AGENT_SUBAGENT_MAP:
+            new_key = _LEGACY_AGENT_SUBAGENT_MAP[old_key]
+            if new_key not in subagent:
+                subagent[new_key] = value
+        else:
+            logger.warning("Dropping unrecognized legacy agent_tools key: {}", old_key)
+
+    if subagent:
+        agent["subagent"] = subagent
+    logger.info("Migrated legacy 'agent_tools' config block into 'agent'")
+    return data
+
+
+# ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
 
@@ -1179,59 +1256,14 @@ class AliceConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_keys(cls, data: dict[str, Any]) -> dict[str, Any]:
-        """Fold renamed legacy config keys into their current location.
+        """Safety-net legacy-key migration for direct construction / env layer.
 
-        The agentic-chat refactor unified the standalone ``agent_tools``
-        section into the :class:`AgentConfig` tree
-        (``agent_tools.plan_enabled`` → ``agent.planning``,
-        ``agent_tools.delegation_enabled`` → ``agent.delegation`` and
-        ``agent_tools.subagent_*`` → ``agent.subagent.*``).  A persisted
-        ``system.yaml`` / ``user.yaml`` layer written by an older build can
-        still carry the legacy ``agent_tools`` block; because every config
-        model forbids unknown fields, leaving it in place makes the *whole*
-        config — and therefore the backend — fail to load.  Migrating the
-        recognised keys (and dropping the block) keeps upgrades seamless
-        without silently discarding the user's previous settings.
+        Delegates to :func:`migrate_legacy_config_keys`. The primary migration
+        happens per-layer in the layered config service (so values keep their
+        layer precedence); this validator covers direct ``AliceConfig(**d)``
+        construction (e.g. tests) and the runtime/env layer.
         """
-        if not isinstance(data, dict):
-            return data
-
-        legacy = data.pop("agent_tools", None)
-        if not isinstance(legacy, dict):
-            return data
-
-        agent = data.get("agent")
-        if not isinstance(agent, dict):
-            agent = {}
-            data["agent"] = agent
-        subagent = agent.get("subagent")
-        if not isinstance(subagent, dict):
-            subagent = {}
-
-        scalar_map = {
-            "plan_enabled": "planning",
-            "delegation_enabled": "delegation",
-        }
-        subagent_map = {
-            "subagent_max_steps": "max_steps",
-            "subagent_max_output_tokens": "max_output_tokens",
-            "subagent_timeout_seconds": "timeout_seconds",
-            "subagent_max_tools": "max_tools",
-        }
-        # New-tree keys win: never clobber an explicitly-set ``agent.*``
-        # value with a migrated legacy one.
-        for old_key, value in legacy.items():
-            if old_key in scalar_map and scalar_map[old_key] not in agent:
-                agent[scalar_map[old_key]] = value
-            elif old_key in subagent_map and subagent_map[old_key] not in subagent:
-                subagent[subagent_map[old_key]] = value
-            else:
-                logger.debug("Ignoring unknown legacy agent_tools key: {}", old_key)
-
-        if subagent:
-            agent["subagent"] = subagent
-        logger.info("Migrated legacy 'agent_tools' config block into 'agent'")
-        return data
+        return migrate_legacy_config_keys(data)
 
     @model_validator(mode="before")
     @classmethod

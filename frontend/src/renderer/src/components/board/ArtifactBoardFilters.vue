@@ -8,6 +8,7 @@
 import { computed } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 import type { ArtifactKind } from '../../types/artifacts'
 import type { ConversationSummary } from '../../types/chat'
 
@@ -24,12 +25,7 @@ const emit = defineEmits<{
     'update:conversationFilter': [value: string | 'all']
 }>()
 
-interface KindOption {
-    value: ArtifactKind | 'all'
-    label: string
-}
-
-const KIND_OPTIONS: KindOption[] = [
+const KIND_OPTIONS: UiSegmentedOption[] = [
     { value: 'all', label: 'Tutti' },
     { value: 'cad_3d_text', label: '3D da testo' },
     { value: 'cad_3d_image', label: '3D da immagine' },
@@ -50,13 +46,8 @@ const conversationOptions = computed<UiSelectOption[]>(() => [
 
 <template>
     <div class="artifact-filters">
-        <div class="artifact-filters__chips" role="tablist" aria-label="Filtra per tipo">
-            <button v-for="opt in KIND_OPTIONS" :key="opt.value" class="artifact-filters__chip"
-                :class="{ 'artifact-filters__chip--active': kindFilter === opt.value }" role="tab"
-                :aria-selected="kindFilter === opt.value" @click="emit('update:kindFilter', opt.value)">
-                {{ opt.label }}
-            </button>
-        </div>
+        <UiSegmented :equal="false" :model-value="kindFilter" :options="KIND_OPTIONS" aria-label="Filtra per tipo"
+            @update:model-value="(v) => emit('update:kindFilter', v as ArtifactKind | 'all')" />
 
         <label class="artifact-filters__pinned" :class="{ 'artifact-filters__pinned--active': pinnedOnly }">
             <input type="checkbox" :checked="pinnedOnly"
@@ -81,38 +72,6 @@ const conversationOptions = computed<UiSelectOption[]>(() => [
     gap: var(--space-3);
     padding: var(--space-2) var(--space-6) var(--space-4);
     background: transparent;
-}
-
-/* ── Kind chips ── */
-.artifact-filters__chips {
-    display: inline-flex;
-    gap: var(--space-1);
-    padding: 2px;
-    border-radius: var(--radius-md);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-}
-
-.artifact-filters__chip {
-    padding: var(--space-1-5) var(--space-3);
-    border: none;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition:
-        color var(--transition-fast),
-        background var(--transition-fast);
-}
-
-.artifact-filters__chip:hover {
-    color: var(--text-primary);
-}
-
-.artifact-filters__chip--active {
-    color: var(--accent);
-    background: var(--accent-dim);
 }
 
 /* ── Pinned toggle ── */

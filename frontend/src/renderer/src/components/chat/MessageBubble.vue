@@ -15,6 +15,7 @@ import { useGenerationState } from '../../composables/useGenerationState'
 import { useArtifactsStore } from '../../stores/artifacts'
 import { useChatStore } from '../../stores/chat'
 import { useUIStore } from '../../stores/ui'
+import { isChartPayload } from '../../stores/charts'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
@@ -193,14 +194,8 @@ const cadPayload = computed((): CadModelPayload | null => {
 const chartPayload = computed((): ChartPayload | null => {
   if (props.message.role !== 'tool') return null
   try {
-    const p = JSON.parse(props.message.content)
-    if (
-      typeof p.chart_id === 'string' &&
-      typeof p.chart_url === 'string' &&
-      typeof p.chart_type === 'string'
-    ) {
-      return p as ChartPayload
-    }
+    const p = JSON.parse(props.message.content) as unknown
+    if (isChartPayload(p)) return p
   } catch { /* not JSON chart payload */ }
   return null
 })

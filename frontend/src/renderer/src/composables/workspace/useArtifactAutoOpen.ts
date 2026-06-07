@@ -22,6 +22,7 @@ import { watch, type Ref } from 'vue'
 import { useArtifactsStore } from '../../stores/artifacts'
 import { useChatStore } from '../../stores/chat'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { extractCharts } from '../../stores/charts'
 import { emitOpenModule } from './moduleIntents'
 import type { ChatMessage, ChartPayload } from '../../types/chat'
 import { isWhiteboardPayload } from '../../types/chat'
@@ -52,23 +53,8 @@ export function diffNewIds(seen: Set<string>, current: string[]): string[] {
 
 function extractChartIds(messages: ChatMessage[]): Map<string, ChartPayload> {
   const result = new Map<string, ChartPayload>()
-  for (const msg of messages) {
-    if (msg.role !== 'tool') continue
-    try {
-      const p = JSON.parse(msg.content) as unknown
-      if (
-        typeof p === 'object' &&
-        p !== null &&
-        'chart_id' in p &&
-        'chart_url' in p &&
-        'chart_type' in p
-      ) {
-        const payload = p as ChartPayload
-        result.set(payload.chart_id, payload)
-      }
-    } catch {
-      // not JSON — skip
-    }
+  for (const payload of extractCharts(messages)) {
+    result.set(payload.chart_id, payload)
   }
   return result
 }

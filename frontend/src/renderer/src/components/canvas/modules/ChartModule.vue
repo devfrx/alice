@@ -10,11 +10,15 @@
  *   adapter only needs to forward this object.  T10 (useArtifactAutoOpen)
  *   must supply this key when opening the tile.
  *
- * If `params.chartPayload` is absent or malformed, a UiEmptyState is
- * rendered instead of crashing.
+ * ## Fallback
+ * If `params.chartPayload` is absent or malformed, the adapter falls back to
+ * the most-recent chart in the active conversation (`chartsStore.currentChart`),
+ * mirroring WhiteboardModule (`store.currentBoard`) and Cad3dModule
+ * (`store.items`). Only when no chart exists at all is a UiEmptyState rendered.
  */
 import { computed, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
+import { useChartsStore, isChartPayload } from '../../../stores/charts'
 import type { ChartPayload } from '../../../types/chat'
 
 const ChartViewer = defineAsyncComponent(() => import('../../chat/ChartViewer.vue'))
@@ -23,20 +27,17 @@ const props = defineProps<{
   params?: Record<string, unknown>
 }>()
 
-/** Resolve and type-guard the ChartPayload from params. */
+const chartsStore = useChartsStore()
+
+/**
+ * Resolve the ChartPayload to display:
+ * 1. The explicit `chartPayload` param (set by useArtifactAutoOpen on open).
+ * 2. Fallback: the most-recent chart in the active conversation.
+ */
 const chartPayload = computed((): ChartPayload | null => {
   const p = props.params?.chartPayload
-  if (
-    p &&
-    typeof p === 'object' &&
-    !Array.isArray(p) &&
-    typeof (p as Record<string, unknown>).chart_id === 'string' &&
-    typeof (p as Record<string, unknown>).chart_url === 'string' &&
-    typeof (p as Record<string, unknown>).chart_type === 'string'
-  ) {
-    return p as ChartPayload
-  }
-  return null
+  if (isChartPayload(p)) return p
+  return chartsStore.currentChart
 })
 </script>
 

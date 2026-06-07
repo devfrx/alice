@@ -14,7 +14,7 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
-import { useUIStore, type UIMode } from '../../stores/ui'
+import { useUIStore } from '../../stores/ui'
 import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
 import { api } from '../../services/api'
@@ -64,10 +64,20 @@ const activeModeValue = computed<string | null>(() => {
   return null
 })
 
-/** Route to the chosen surface, preserving the existing per-tab side effects. */
-function onModeSelect(value: string | number): void {
-  if (value === 'assistant') onModeTabClick('assistant')
-  else if (value === 'workspace') void onWorkspaceTabClick()
+/**
+ * Route to the chosen surface. Navigation is the source of truth — the
+ * router's afterEach guard syncs `uiStore.mode` from the active route — so
+ * BOTH segments must actually push their route (previously only Workspace did,
+ * which is why the Assistente tab appeared dead).
+ */
+async function onModeSelect(value: string | number): Promise<void> {
+  toggle() // close the floating overlay (no-op when docked)
+  if (activeModeValue.value === value) return
+  try {
+    await router.push(value === 'workspace' ? '/workspace' : '/assistant')
+  } catch (err) {
+    console.error('[AppSidebar] Mode navigation failed:', err)
+  }
 }
 
 /**
@@ -85,17 +95,6 @@ const isOpen = computed(() => props.docked || uiStore.sidebarOpen)
 function toggle(): void {
   if (props.docked) return
   uiStore.toggleSidebar()
-}
-
-function onModeTabClick(mode: UIMode): void {
-  uiStore.setMode(mode)
-  toggle()
-}
-
-/** Navigate to Workspace (not a UIMode — handled separately). */
-async function onWorkspaceTabClick(): Promise<void> {
-  toggle()
-  await router.push('/workspace')
 }
 
 // Conversations are loaded by useChat's onConnected handler after the
@@ -198,7 +197,7 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
         <UiSegmented class="sidebar__mode-seg" :model-value="activeModeValue" :options="modeTabOptions"
-          aria-label="Modalità primaria" @update:model-value="onModeSelect" />
+          aria-label="Modalità primaria" @update:model-value="(v) => void onModeSelect(v)" />
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">

@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 
 from backend.services.turn.channel import (
+    MALFORMED_FRAME_KEY,
     ScriptedInteractionChannel,
     WebSocketInteractionChannel,
 )
@@ -270,12 +271,17 @@ async def test_unknown_kind_raises() -> None:
         await ch.aclose()
 
 
-async def test_non_json_frame_discarded() -> None:
+async def test_malformed_frame_surfaced_to_idle_loop() -> None:
     ws = FakeWebSocket()
     ch = WebSocketInteractionChannel(ws)  # type: ignore[arg-type]
     ch.start()
     try:
+        # Malformed input must surface as a marker (not be silently dropped),
+        # so the idle loop can reply with the "Invalid JSON" error.
         ws.feed_raw("not-json{{")
+        marker = await asyncio.wait_for(ch.next_user_message(), timeout=1.0)
+        assert marker is not None and marker.get(MALFORMED_FRAME_KEY) is True
+        # A genuine user frame still flows afterwards.
         ws.feed({"type": "user_message", "content": "ok"})
         msg = await asyncio.wait_for(ch.next_user_message(), timeout=1.0)
         assert msg is not None and msg["content"] == "ok"

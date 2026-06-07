@@ -122,6 +122,11 @@ class _Pending:
 # that :meth:`next_user_message` can wake and report end-of-stream.
 _DISCONNECT_SENTINEL: dict[str, Any] = {"__disconnect__": True}
 
+#: Key set on a user-queue frame the pump could not JSON-decode.  The idle
+#: loop turns it into the legacy ``{"type": "error", "content": "Invalid
+#: JSON"}`` response instead of silently dropping malformed input.
+MALFORMED_FRAME_KEY = "__malformed__"
+
 
 class WebSocketInteractionChannel:
     """Production channel wrapping a FastAPI ``WebSocket`` with one pump.
@@ -296,7 +301,10 @@ class WebSocketInteractionChannel:
         try:
             msg = json.loads(raw)
         except json.JSONDecodeError:
-            logger.debug("InteractionChannel: discarding non-JSON frame")
+            # Surface malformed input to the idle loop so it can reply with
+            # the legacy "Invalid JSON" error rather than swallow it.
+            logger.debug("InteractionChannel: malformed (non-JSON) frame")
+            self._user_messages.put_nowait({MALFORMED_FRAME_KEY: True})
             return
         if not isinstance(msg, dict):
             return
@@ -454,6 +462,7 @@ class ScriptedInteractionChannel:
 
 
 __all__ = [
+    "MALFORMED_FRAME_KEY",
     "InteractionChannel",
     "ScriptedInteractionChannel",
     "WebSocketInteractionChannel",

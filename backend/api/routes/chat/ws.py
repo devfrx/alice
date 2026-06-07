@@ -24,6 +24,7 @@ from backend.services.turn import (
     WebSocketInteractionChannel,
     create_turn_executor,
 )
+from backend.services.turn.channel import MALFORMED_FRAME_KEY
 
 from ._assembly import TurnAssembler
 from ._helpers import _sync_conversation_to_file
@@ -112,6 +113,11 @@ async def ws_chat(websocket: WebSocket) -> None:
             data = await channel.next_user_message()
             if data is None:
                 break
+            if data.get(MALFORMED_FRAME_KEY):
+                await websocket.send_json(
+                    {"type": "error", "content": "Invalid JSON"}
+                )
+                continue
 
             user_content: str = data.get("content", "").strip()
             if not user_content:

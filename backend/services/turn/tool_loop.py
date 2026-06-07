@@ -21,7 +21,8 @@ from backend.core.plugin_models import ExecutionContext, ToolResult
 from backend.core.tool_progress import current_progress_emitter
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
-from backend.services.turn import InteractionChannel, WSEventSink
+from backend.services.turn.channel import InteractionChannel
+from backend.services.turn.sink import WSEventSink
 
 # Type alias for the sync callback.
 SyncFn = Callable[..., Coroutine[Any, Any, None]]

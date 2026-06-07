@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.api.routes._tool_loop import run_tool_loop
+from backend.services.turn.tool_loop import run_tool_loop
 from backend.core.plugin_models import ToolDefinition, ToolResult
 from backend.db.models import ToolConfirmationAudit
 
@@ -131,7 +131,7 @@ async def test_confirmations_enabled_requests_approval():
     conv_id = uuid.uuid4()
 
     with patch(
-        "backend.api.routes._tool_loop._request_confirmation",
+        "backend.services.turn.tool_loop._request_confirmation",
         new_callable=AsyncMock,
         return_value=True,
     ) as mock_confirm:
@@ -167,7 +167,7 @@ async def test_confirmations_disabled_auto_approves():
     conv_id = uuid.uuid4()
 
     with patch(
-        "backend.api.routes._tool_loop._request_confirmation",
+        "backend.services.turn.tool_loop._request_confirmation",
         new_callable=AsyncMock,
         return_value=True,
     ) as mock_confirm:
@@ -281,7 +281,7 @@ async def test_safe_tool_no_confirmation_regardless_of_toggle():
         conv_id = uuid.uuid4()
 
         with patch(
-            "backend.api.routes._tool_loop._request_confirmation",
+            "backend.services.turn.tool_loop._request_confirmation",
             new_callable=AsyncMock,
         ) as mock_confirm:
             await run_tool_loop(
@@ -321,7 +321,7 @@ async def test_confirmations_enabled_rejected_by_user():
     conv_id = uuid.uuid4()
 
     with patch(
-        "backend.api.routes._tool_loop._request_confirmation",
+        "backend.services.turn.tool_loop._request_confirmation",
         new_callable=AsyncMock,
         return_value=False,
     ):

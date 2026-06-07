@@ -4,9 +4,10 @@ Defines the :class:`WSEventSink` protocol used by the turn executors
 together with two concrete implementations:
 
 *   :class:`WebSocketEventSink` — production sink wrapping a FastAPI
-    :class:`fastapi.WebSocket`.  Exposes ``_ws`` as a Phase 1 escape
-    hatch so :func:`backend.api.routes._tool_loop.run_tool_loop` (which
-    still expects a raw WebSocket) keeps working unchanged.
+    :class:`fastapi.WebSocket`.  It still exposes ``_ws`` for any caller
+    that needs the raw socket, but the turn engine
+    (:func:`backend.services.turn.tool_loop.run_tool_loop`) now consumes
+    only the :class:`WSEventSink` (out) + ``InteractionChannel`` (in).
 *   :class:`RecordingEventSink` — in-memory test double that captures
     every event emitted by an executor.
 
@@ -68,9 +69,9 @@ class WSEventSink(Protocol):
 class WebSocketEventSink:
     """Production sink that forwards events to a FastAPI WebSocket.
 
-    The raw WebSocket is exposed via :attr:`_ws` because the legacy
-    :func:`backend.api.routes._tool_loop.run_tool_loop` still accepts a
-    ``WebSocket`` directly (Phase 1 escape hatch — see plan §3.3).
+    The raw WebSocket is still exposed via :attr:`_ws` for callers that
+    need it, but the turn engine no longer reaches through the sink — it
+    takes an explicit ``InteractionChannel`` for inbound interactions.
 
     Args:
         ws: The accepted FastAPI ``WebSocket`` to forward events to.

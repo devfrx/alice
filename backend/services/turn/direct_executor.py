@@ -196,7 +196,7 @@ class DirectTurnExecutor:
             # Lazy import to break the circular dependency between
             # backend.services.turn and backend.api.routes (chat.py
             # imports from this package at module load).
-            from backend.api.routes._tool_loop import run_tool_loop
+            from backend.services.turn.tool_loop import run_tool_loop
 
             try:
                 (

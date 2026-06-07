@@ -1,6 +1,6 @@
 """Tool-loop dispatch tests for :class:`DirectTurnExecutor`.
 
-The executor delegates to :func:`backend.api.routes._tool_loop.run_tool_loop`
+The executor delegates to :func:`backend.services.turn.tool_loop.run_tool_loop`
 when the LLM emits at least one ``tool_call`` event.  The tool-loop path now
 requires an :class:`InteractionChannel`, so we exercise two complementary
 scenarios:
@@ -23,7 +23,7 @@ from typing import Any
 
 import pytest
 
-import backend.api.routes._tool_loop as tool_loop_mod
+import backend.services.turn.tool_loop as tool_loop_mod
 from backend.services.turn.channel import ScriptedInteractionChannel
 from backend.services.turn.direct_executor import DirectTurnExecutor
 from backend.services.turn.sink import RecordingEventSink

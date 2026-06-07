@@ -4,32 +4,30 @@
  *
  * ## Param keys (params?: Record<string, unknown>)
  *
- * - `params.artifactId` — string UUID of a single CAD artifact to open.
- *   The adapter fetches (or looks up) the artifact from the artifacts store
- *   and converts its `artifact_metadata` into a `CadModelPayload` for
- *   ImmersiveCADCanvas.
- *   T10 (useArtifactAutoOpen) must supply this key when opening the tile.
+ * - `params.artifactId` — string UUID of a CAD artifact to focus.
+ *   useArtifactAutoOpen supplies this key when auto-opening the tile for a
+ *   freshly-generated model.
  *
- * ## Fallback
- * If `params.artifactId` is absent, the adapter renders all CAD artifacts
- * currently loaded in the store (newest first).  If the store is empty, a
- * UiEmptyState is shown.  The adapter does NOT automatically fetch — T10
- * is responsible for ensuring the store is populated before the tile opens.
- *
- * ## Emits from ImmersiveCADCanvas
- * - `update:activeIndex` — managed via a local `activeIndex` ref.
- * - `close` — ignored (the ModulePanel header handles tile removal).
+ * ## Multi-model handling
+ * The tile always carries every CAD model in the conversation; a
+ * {@link ModuleSelectorBar} switches between them. Selection is resolved by
+ * {@link useModuleItemSelection} (manual pick → `artifactId` param →
+ * most-recent) and drives ImmersiveCADCanvas's `activeIndex`. The canvas's own
+ * inline prev/next nav is hidden here (`hide-nav`) since the bar replaces it;
+ * assistant mode keeps that nav.
  *
  * ## CadModelPayload derivation
  * Each CAD `Artifact` stores `{ model_name, export_url, format, description }`
- * in `artifact_metadata` (set by the backend parser in
- * `backend/services/artifacts/parsers.py`).  The adapter reads those fields
- * and falls back to `artifact.title` for the model name and
- * `artifact.download_url` for the export URL when the metadata keys are absent.
+ * in `artifact_metadata` (set by the backend parser). The adapter reads those
+ * fields and falls back to `artifact.title` / `artifact.download_url` when a
+ * metadata key is absent.
  */
-import { computed, ref, watch, onMounted, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
+import ModuleSelectorBar from '../ModuleSelectorBar.vue'
 import { useArtifactsStore } from '../../../stores/artifacts'
+import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
+import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
 import type { CadModelPayload } from '../../../types/chat'
 import type { Artifact } from '../../../types/artifacts'
 
@@ -43,7 +41,21 @@ const props = defineProps<{
 
 const store = useArtifactsStore()
 
-/** Convert a store Artifact into the CadModelPayload expected by ImmersiveCADCanvas. */
+/** All CAD artifacts currently in the store (oldest → newest as stored end). */
+const cadArtifacts = computed<Artifact[]>(() =>
+  store.items.filter((a) => a.kind === 'cad_3d_text' || a.kind === 'cad_3d_image')
+)
+
+const { currentId, select } = useModuleItemSelection<Artifact>({
+  items: () => cadArtifacts.value,
+  getId: (a) => a.id,
+  preferredId: () => {
+    const id = props.params?.artifactId
+    return typeof id === 'string' && id.length > 0 ? id : null
+  },
+})
+
+/** Convert a store Artifact into the CadModelPayload expected by the canvas. */
 function artifactToModel(artifact: Artifact): CadModelPayload {
   const meta = artifact.artifact_metadata
   return {
@@ -61,45 +73,33 @@ function artifactToModel(artifact: Artifact): CadModelPayload {
   }
 }
 
-/** The pinned/target artifact when params.artifactId is provided. */
-const targetArtifact = computed((): Artifact | null => {
-  const id = props.params?.artifactId
-  if (typeof id !== 'string' || id.length === 0) return null
-  return store.findById(id)
+/** Full model list handed to the canvas (kept stable so navigation works). */
+const models = computed<CadModelPayload[]>(() => cadArtifacts.value.map(artifactToModel))
+
+/** Index of the resolved selection within the model list. */
+const activeIndex = computed<number>(() => {
+  const idx = cadArtifacts.value.findIndex((a) => a.id === currentId.value)
+  return idx >= 0 ? idx : Math.max(0, cadArtifacts.value.length - 1)
 })
 
-/**
- * Model list passed to ImmersiveCADCanvas.
- * - When a specific artifactId is given: show only that artifact.
- * - Otherwise: show all CAD artifacts from the store (newest first, as stored).
- */
-const models = computed((): CadModelPayload[] => {
-  if (targetArtifact.value) {
-    return [artifactToModel(targetArtifact.value)]
-  }
-  const cadArtifacts = store.items.filter(
-    (a) => a.kind === 'cad_3d_text' || a.kind === 'cad_3d_image'
-  )
-  return cadArtifacts.map(artifactToModel)
-})
-
-/** Local active index — reset when the model list changes meaningfully. */
-const activeIndex = ref(0)
-
-watch(
-  () => models.value.length,
-  (newLen) => {
-    if (activeIndex.value >= newLen) {
-      activeIndex.value = Math.max(0, newLen - 1)
-    }
-  }
+/** One selector option per CAD model in the conversation. */
+const options = computed<UiSegmentedOption[]>(() =>
+  cadArtifacts.value.map((a, i) => ({
+    value: a.id,
+    label:
+      (typeof a.artifact_metadata.model_name === 'string' && a.artifact_metadata.model_name) ||
+      a.title ||
+      `Modello ${i + 1}`,
+  }))
 )
 
-/**
- * If params.artifactId is provided but not yet in the store, fetch it.
- * This handles the case where T10 opens the tile before the artifact
- * has been loaded into the store.
- */
+/** Map a canvas-driven index change back onto the selection. */
+function onActiveIndexUpdate(i: number): void {
+  const artifact = cadArtifacts.value[i]
+  if (artifact) select(artifact.id)
+}
+
+/** If a param artifactId is provided but not yet in the store, fetch it. */
 onMounted(async () => {
   const id = props.params?.artifactId
   if (typeof id === 'string' && id.length > 0 && !store.findById(id)) {
@@ -111,10 +111,7 @@ watch(
   () => props.params?.artifactId,
   async (id) => {
     if (typeof id === 'string' && id.length > 0 && !store.findById(id)) {
-      activeIndex.value = 0
       await store.fetchById(id)
-    } else {
-      activeIndex.value = 0
     }
   }
 )
@@ -122,15 +119,18 @@ watch(
 
 <template>
   <div class="cad3d-module">
+    <ModuleSelectorBar
+      :model-value="currentId"
+      :options="options"
+      aria-label="Seleziona modello 3D"
+      @update:model-value="(v) => select(String(v))"
+    />
     <ImmersiveCADCanvas
       v-if="models.length > 0"
       :models="models"
       :active-index="activeIndex"
-      @update:active-index="
-        (i) => {
-          activeIndex = i
-        }
-      "
+      hide-nav
+      @update:active-index="onActiveIndexUpdate"
       @close="
         () => {
           /* handled by ModulePanel header */
@@ -150,6 +150,14 @@ watch(
 .cad3d-module {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+
+/* Let the canvas fill the height remaining under the selector bar. */
+.cad3d-module :deep(.side-cad) {
+  flex: 1 1 0;
+  min-height: 0;
 }
 </style>

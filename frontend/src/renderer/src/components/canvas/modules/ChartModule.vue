@@ -7,18 +7,25 @@
  * - `params.chartPayload` — a full {@link ChartPayload} object
  *   `{ chart_id, chart_url, title, chart_type, created_at }`.
  *   ChartViewer fetches the ECharts spec from `chart_url` itself, so the
- *   adapter only needs to forward this object.  T10 (useArtifactAutoOpen)
- *   must supply this key when opening the tile.
+ *   adapter only needs to forward this object. useArtifactAutoOpen supplies
+ *   this key when auto-opening the tile for a freshly-generated chart.
+ *
+ * ## Multi-chart handling
+ * When a conversation contains several charts, a {@link ModuleSelectorBar} lets
+ * the user switch between them. Selection is resolved by
+ * {@link useModuleItemSelection}: manual pick → `chartPayload` param →
+ * most-recent chart. The chart list comes from {@link useChartsStore} (derived
+ * from the conversation messages), mirroring WhiteboardModule/Cad3dModule.
  *
  * ## Fallback
- * If `params.chartPayload` is absent or malformed, the adapter falls back to
- * the most-recent chart in the active conversation (`chartsStore.currentChart`),
- * mirroring WhiteboardModule (`store.currentBoard`) and Cad3dModule
- * (`store.items`). Only when no chart exists at all is a UiEmptyState rendered.
+ * Only when no chart exists at all is a UiEmptyState rendered.
  */
 import { computed, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
+import ModuleSelectorBar from '../ModuleSelectorBar.vue'
 import { useChartsStore, isChartPayload } from '../../../stores/charts'
+import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
+import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
 import type { ChartPayload } from '../../../types/chat'
 
 const ChartViewer = defineAsyncComponent(() => import('../../chat/ChartViewer.vue'))
@@ -29,20 +36,39 @@ const props = defineProps<{
 
 const chartsStore = useChartsStore()
 
-/**
- * Resolve the ChartPayload to display:
- * 1. The explicit `chartPayload` param (set by useArtifactAutoOpen on open).
- * 2. Fallback: the most-recent chart in the active conversation.
- */
-const chartPayload = computed((): ChartPayload | null => {
-  const p = props.params?.chartPayload
-  if (isChartPayload(p)) return p
-  return chartsStore.currentChart
+const { current, currentId, select } = useModuleItemSelection<ChartPayload>({
+  items: () => chartsStore.charts,
+  getId: (c) => c.chart_id,
+  preferredId: () => {
+    const p = props.params?.chartPayload
+    return isChartPayload(p) ? p.chart_id : null
+  },
 })
+
+/**
+ * Chart to display: the resolved selection, falling back to the raw param
+ * payload if the store list hasn't populated yet (initial-load race).
+ */
+const chartPayload = computed<ChartPayload | null>(() => {
+  if (current.value) return current.value
+  const p = props.params?.chartPayload
+  return isChartPayload(p) ? p : null
+})
+
+/** One selector option per chart in the conversation. */
+const options = computed<UiSegmentedOption[]>(() =>
+  chartsStore.charts.map((c, i) => ({ value: c.chart_id, label: c.title || `Grafico ${i + 1}` })),
+)
 </script>
 
 <template>
   <div class="chart-module">
+    <ModuleSelectorBar
+      :model-value="currentId"
+      :options="options"
+      aria-label="Seleziona grafico"
+      @update:model-value="(v) => select(String(v))"
+    />
     <ChartViewer v-if="chartPayload" :key="chartPayload.chart_id" :payload="chartPayload" />
     <UiEmptyState
       v-else

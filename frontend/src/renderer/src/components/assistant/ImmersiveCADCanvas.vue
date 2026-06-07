@@ -18,12 +18,21 @@ import { resolveBackendUrl } from '../../services/api'
 import type { CadModelPayload } from '../../types/chat'
 import AppIcon from '../ui/AppIcon.vue'
 
-const props = defineProps<{
-  /** All CAD models in the conversation. */
-  models: CadModelPayload[]
-  /** Index of the currently displayed model. */
-  activeIndex: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** All CAD models in the conversation. */
+    models: CadModelPayload[]
+    /** Index of the currently displayed model. */
+    activeIndex: number
+    /**
+     * Hide the inline prev/next multi-model navigation. Used by the workspace
+     * Cad3dModule, which provides its own ModuleSelectorBar instead; assistant
+     * mode leaves this false to keep the built-in nav.
+     */
+    hideNav?: boolean
+  }>(),
+  { hideNav: false }
+)
 
 const emit = defineEmits<{
   close: []
@@ -322,7 +331,7 @@ onUnmounted(() => {
     <!-- Footer: navigation + controls -->
     <div class="side-cad__footer">
       <!-- Multi-model navigation -->
-      <div v-if="hasMultiple" class="side-cad__nav">
+      <div v-if="hasMultiple && !hideNav" class="side-cad__nav">
         <button class="side-cad__nav-btn" :disabled="!canPrev" title="Modello precedente" @click="goPrev">
           <AppIcon name="chevron-left" :size="14" />
         </button>

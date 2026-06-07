@@ -68,6 +68,27 @@ const emit = defineEmits<{
   background: var(--surface-1);
   border: none;
   overflow: hidden;
+  /* Entry animation: fade + subtle rise/scale when a module opens. */
+  animation: module-panel-in var(--duration-slow, 320ms) var(--ease-out-quart);
+  transform-origin: center;
+}
+
+@keyframes module-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-panel {
+    animation: none;
+  }
 }
 
 /* Active leaf: lift it with a stronger shadow + faint accent glow ring

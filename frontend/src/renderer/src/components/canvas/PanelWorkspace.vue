@@ -153,17 +153,50 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
   height: 100%;
 }
 
-/* Resizable divider between chat column and tree. */
+/* Resizable divider between chat column and tree — carries the same refined
+   pill grip as the in-tree PaneDividers for a coherent, premium feel. */
 .panel-workspace__divider {
-  width: 6px;
+  position: relative;
+  width: 8px;
   flex-shrink: 0;
   cursor: col-resize;
   background: transparent;
-  transition: background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.panel-workspace__divider:hover,
-.panel-workspace__divider--active {
-  background: var(--accent-border);
+.panel-workspace__divider::after {
+  content: '';
+  width: 5px;
+  height: 36px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  opacity: 0.7;
+  transition:
+    background-color var(--duration-fast) var(--ease-out-quart),
+    border-color var(--duration-fast) var(--ease-out-quart),
+    opacity var(--duration-fast) var(--ease-out-quart),
+    transform var(--duration-normal) var(--ease-out-back);
+}
+
+.panel-workspace__divider:hover::after,
+.panel-workspace__divider--active::after {
+  background: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+  transform: scaleX(1.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-workspace__divider::after {
+    transition: background-color var(--duration-fast) ease;
+  }
+
+  .panel-workspace__divider:hover::after,
+  .panel-workspace__divider--active::after {
+    transform: none;
+  }
 }
 </style>

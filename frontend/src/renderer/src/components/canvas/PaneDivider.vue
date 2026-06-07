@@ -114,52 +114,77 @@ onBeforeUnmount(() => {
 <style scoped>
 .pane-divider {
   position: relative;
-  flex: 0 0 6px;
+  flex: 0 0 8px;
   align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: var(--z-raised, 2);
   background: transparent;
-  transition: background-color var(--duration-fast, 120ms) ease;
 }
 
 .pane-divider--x {
   cursor: col-resize;
-  width: 6px;
+  width: 8px;
 }
 
 .pane-divider--y {
   cursor: row-resize;
-  height: 6px;
+  height: 8px;
 }
 
-.pane-divider:hover,
-.pane-divider:active {
-  background: var(--accent-dim, rgba(255, 255, 255, 0.04));
-}
-
+/* Refined pill grip — identical on both axes (mirrored), matching the
+   side-panel resize knob: solid surface + hairline border, grows and turns
+   accent on hover/drag for a tactile, premium feel. */
 .pane-divider__grip {
-  background: var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--surface-3);
+  border: 1px solid var(--border);
   border-radius: var(--radius-full, 9999px);
+  opacity: 0.7;
   transition:
-    background-color var(--duration-fast, 120ms) ease,
-    opacity var(--duration-fast, 120ms) ease;
-  opacity: 0.6;
+    background-color var(--duration-fast, 120ms) var(--ease-out-quart),
+    border-color var(--duration-fast, 120ms) var(--ease-out-quart),
+    opacity var(--duration-fast, 120ms) var(--ease-out-quart),
+    transform var(--duration-normal, 200ms) var(--ease-out-back);
 }
 
 .pane-divider--x .pane-divider__grip {
-  width: 2px;
-  height: 28px;
+  width: 5px;
+  height: 36px;
 }
 
 .pane-divider--y .pane-divider__grip {
-  width: 28px;
-  height: 2px;
+  width: 36px;
+  height: 5px;
 }
 
-.pane-divider:hover .pane-divider__grip {
-  background: var(--accent, var(--text-secondary));
+.pane-divider:hover .pane-divider__grip,
+.pane-divider:active .pane-divider__grip {
+  background: var(--accent);
+  border-color: var(--accent);
   opacity: 1;
+}
+
+.pane-divider--x:hover .pane-divider__grip,
+.pane-divider--x:active .pane-divider__grip {
+  transform: scaleX(1.4);
+}
+
+.pane-divider--y:hover .pane-divider__grip,
+.pane-divider--y:active .pane-divider__grip {
+  transform: scaleY(1.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-divider__grip {
+    transition: background-color var(--duration-fast, 120ms) ease;
+  }
+
+  .pane-divider--x:hover .pane-divider__grip,
+  .pane-divider--x:active .pane-divider__grip,
+  .pane-divider--y:hover .pane-divider__grip,
+  .pane-divider--y:active .pane-divider__grip {
+    transform: none;
+  }
 }
 </style>

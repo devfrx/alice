@@ -51,6 +51,25 @@ const isAssistantActive = computed(() => route.name === 'assistant')
 const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
 /**
+ * Which mode tab is active (0 = Assistente, 1 = Workspace, null = neither).
+ * Drives the sliding indicator that glides between the two options.
+ */
+const activeModeTab = computed<0 | 1 | null>(() => {
+  if (isAssistantActive.value) return 0
+  if (isWorkspaceActive.value) return 1
+  return null
+})
+
+/** Inline transform/opacity for the sliding mode-tab indicator. */
+const modeIndicatorStyle = computed<Record<string, string>>(() => {
+  const x = activeModeTab.value === 1 ? 'calc(100% + var(--space-1))' : '0px'
+  return {
+    transform: `translateX(${x})`,
+    opacity: activeModeTab.value === null ? '0' : '1',
+  }
+})
+
+/**
  * Whether the sidebar body is shown.
  * - Docked: always rendered; the parent frame controls visibility/width.
  * - Floating overlay: driven by the central UI store open state.
@@ -178,6 +197,8 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
         <div class="sidebar__mode-tabs">
+          <!-- Sliding active indicator (glides between the two options) -->
+          <span class="sidebar__mode-indicator" :style="modeIndicatorStyle" aria-hidden="true" />
           <router-link to="/assistant" class="sidebar__mode-tab"
             :class="{ 'sidebar__mode-tab--active': isAssistantActive }" @click="onModeTabClick('assistant')">
             <AppIcon name="orb" :size="14" />
@@ -394,6 +415,7 @@ async function onOpenFile(id: string): Promise<void> {
 
 /* ── Mode tabs (Assistente / Ibrido) ───────────────────────── */
 .sidebar__mode-tabs {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-1);
@@ -401,7 +423,28 @@ async function onOpenFile(id: string): Promise<void> {
   flex-shrink: 0;
 }
 
+/* Sliding active indicator — glides between the two tabs. Width matches a
+   single column (accounting for the grid gap); position is driven by an
+   inline transform from the component. */
+.sidebar__mode-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc((100% - var(--space-1)) / 2);
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  box-shadow: var(--shadow-xs);
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 340ms var(--ease-out-expo),
+    opacity 200ms ease;
+}
+
 .sidebar__mode-tab {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -417,26 +460,29 @@ async function onOpenFile(id: string): Promise<void> {
   background: transparent;
   cursor: pointer;
   transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
     color var(--transition-fast),
-    box-shadow var(--transition-fast);
+    background var(--transition-fast);
   white-space: nowrap;
 }
 
-.sidebar__mode-tab:hover {
+/* Hover only on the inactive tab so it never paints over the accent indicator. */
+.sidebar__mode-tab:not(.sidebar__mode-tab--active):hover {
   color: var(--text-primary);
   background: var(--surface-hover);
 }
 
 .sidebar__mode-tab--active {
-  background: var(--accent-dim);
   color: var(--text-primary);
-  box-shadow: var(--shadow-xs);
 }
 
 .sidebar__mode-tab--active svg {
   color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__mode-indicator {
+    transition: opacity 200ms ease;
+  }
 }
 
 /* ── Footer (impostazioni) ─────────────────────────────────── */

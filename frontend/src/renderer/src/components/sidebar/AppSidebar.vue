@@ -23,6 +23,7 @@ import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 /**
  * When `docked` is true the sidebar renders inline inside its parent frame
@@ -50,24 +51,24 @@ const unreadBadge = computed(() => emailStore.unreadCount)
 const isAssistantActive = computed(() => route.name === 'assistant')
 const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
-/**
- * Which mode tab is active (0 = Assistente, 1 = Workspace, null = neither).
- * Drives the sliding indicator that glides between the two options.
- */
-const activeModeTab = computed<0 | 1 | null>(() => {
-  if (isAssistantActive.value) return 0
-  if (isWorkspaceActive.value) return 1
+/** The two primary-surface options for the shared segmented control. */
+const modeTabOptions: UiSegmentedOption[] = [
+  { value: 'assistant', label: 'Assistente', icon: 'orb' },
+  { value: 'workspace', label: 'Workspace', icon: 'hybrid-panel' },
+]
+
+/** Active segment value derived from the route (null on other surfaces). */
+const activeModeValue = computed<string | null>(() => {
+  if (isAssistantActive.value) return 'assistant'
+  if (isWorkspaceActive.value) return 'workspace'
   return null
 })
 
-/** Inline transform/opacity for the sliding mode-tab indicator. */
-const modeIndicatorStyle = computed<Record<string, string>>(() => {
-  const x = activeModeTab.value === 1 ? 'calc(100% + var(--space-1))' : '0px'
-  return {
-    transform: `translateX(${x})`,
-    opacity: activeModeTab.value === null ? '0' : '1',
-  }
-})
+/** Route to the chosen surface, preserving the existing per-tab side effects. */
+function onModeSelect(value: string | number): void {
+  if (value === 'assistant') onModeTabClick('assistant')
+  else if (value === 'workspace') void onWorkspaceTabClick()
+}
 
 /**
  * Whether the sidebar body is shown.
@@ -196,21 +197,8 @@ async function onOpenFile(id: string): Promise<void> {
         </div>
 
         <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
-        <div class="sidebar__mode-tabs">
-          <!-- Sliding active indicator (glides between the two options) -->
-          <span class="sidebar__mode-indicator" :style="modeIndicatorStyle" aria-hidden="true" />
-          <router-link to="/assistant" class="sidebar__mode-tab"
-            :class="{ 'sidebar__mode-tab--active': isAssistantActive }" @click="onModeTabClick('assistant')">
-            <AppIcon name="orb" :size="14" />
-            <span>Assistente</span>
-          </router-link>
-          <button class="sidebar__mode-tab"
-            :class="{ 'sidebar__mode-tab--active': isWorkspaceActive }"
-            @click="onWorkspaceTabClick">
-            <AppIcon name="hybrid-panel" :size="14" />
-            <span>Workspace</span>
-          </button>
-        </div>
+        <UiSegmented class="sidebar__mode-seg" :model-value="activeModeValue" :options="modeTabOptions"
+          aria-label="Modalità primaria" @update:model-value="onModeSelect" />
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
@@ -413,76 +401,10 @@ async function onOpenFile(id: string): Promise<void> {
   flex-shrink: 0;
 }
 
-/* ── Mode tabs (Assistente / Ibrido) ───────────────────────── */
-.sidebar__mode-tabs {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-1);
+/* ── Mode tabs (Assistente / Workspace) — shared UiSegmented ────── */
+.sidebar__mode-seg {
   margin: 0 var(--space-3) var(--space-3);
   flex-shrink: 0;
-}
-
-/* Sliding active indicator — glides between the two tabs. Width matches a
-   single column (accounting for the grid gap); position is driven by an
-   inline transform from the component. */
-.sidebar__mode-indicator {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: calc((100% - var(--space-1)) / 2);
-  border-radius: var(--radius-sm);
-  background: var(--accent-dim);
-  box-shadow: var(--shadow-xs);
-  pointer-events: none;
-  z-index: 0;
-  transition:
-    transform 340ms var(--ease-out-expo),
-    opacity 200ms ease;
-}
-
-.sidebar__mode-tab {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1-5);
-  min-height: 34px;
-  padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--text-secondary);
-  text-decoration: none;
-  background: transparent;
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-  white-space: nowrap;
-}
-
-/* Hover only on the inactive tab so it never paints over the accent indicator. */
-.sidebar__mode-tab:not(.sidebar__mode-tab--active):hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.sidebar__mode-tab--active {
-  color: var(--text-primary);
-}
-
-.sidebar__mode-tab--active svg {
-  color: var(--accent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sidebar__mode-indicator {
-    transition: opacity 200ms ease;
-  }
 }
 
 /* ── Footer (impostazioni) ─────────────────────────────────── */

@@ -133,58 +133,30 @@ onBeforeUnmount(() => {
   height: 8px;
 }
 
-/* Refined pill grip — identical on both axes (mirrored), matching the
-   side-panel resize knob: solid surface + hairline border, grows and turns
-   accent on hover/drag for a tactile, premium feel. */
+/* Thin, long line grip — identical on both axes (mirrored). A clean hairline
+   that brightens to accent on hover/drag; no pill/ellipse. */
 .pane-divider__grip {
-  background: var(--surface-3);
-  border: 1px solid var(--border);
+  background: var(--border);
   border-radius: var(--radius-full, 9999px);
-  opacity: 0.7;
+  opacity: 0.8;
   transition:
     background-color var(--duration-fast, 120ms) var(--ease-out-quart),
-    border-color var(--duration-fast, 120ms) var(--ease-out-quart),
-    opacity var(--duration-fast, 120ms) var(--ease-out-quart),
-    transform var(--duration-normal, 200ms) var(--ease-out-back);
+    opacity var(--duration-fast, 120ms) var(--ease-out-quart);
 }
 
 .pane-divider--x .pane-divider__grip {
-  width: 5px;
-  height: 36px;
+  width: 2px;
+  height: 48px;
 }
 
 .pane-divider--y .pane-divider__grip {
-  width: 36px;
-  height: 5px;
+  width: 48px;
+  height: 2px;
 }
 
 .pane-divider:hover .pane-divider__grip,
 .pane-divider:active .pane-divider__grip {
   background: var(--accent);
-  border-color: var(--accent);
   opacity: 1;
-}
-
-.pane-divider--x:hover .pane-divider__grip,
-.pane-divider--x:active .pane-divider__grip {
-  transform: scaleX(1.4);
-}
-
-.pane-divider--y:hover .pane-divider__grip,
-.pane-divider--y:active .pane-divider__grip {
-  transform: scaleY(1.4);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pane-divider__grip {
-    transition: background-color var(--duration-fast, 120ms) ease;
-  }
-
-  .pane-divider--x:hover .pane-divider__grip,
-  .pane-divider--x:active .pane-divider__grip,
-  .pane-divider--y:hover .pane-divider__grip,
-  .pane-divider--y:active .pane-divider__grip {
-    transform: none;
-  }
 }
 </style>

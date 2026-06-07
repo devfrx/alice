@@ -33,6 +33,7 @@ import type { CadModelPayload, ChartPayload, WhiteboardPayload, ToolCall } from 
 import { isWhiteboardPayload } from '../types/chat'
 import { api } from '../services/api'
 import AppIcon from '../components/ui/AppIcon.vue'
+import UiSegmented, { type UiSegmentedOption } from '../components/ui/UiSegmented.vue'
 import CADGenerationPlaceholder from '../components/chat/CADGenerationPlaceholder.vue'
 import type { OrbState } from '../components/assistant/veil-orb/types'
 
@@ -327,6 +328,32 @@ watch(whiteboardPayloads, (boards) => {
         whiteboardActiveIndex.value = Math.max(0, boards.length - 1)
     }
 })
+
+/** Side-panel tab options (only the content types that currently exist). */
+const sidePanelTabOptions = computed<UiSegmentedOption[]>(() => {
+    const tabs: UiSegmentedOption[] = []
+    if (hasCadPanel.value) {
+        const t: UiSegmentedOption = { value: '3d', label: '3D', icon: 'box-3d' }
+        if (cadModels.value.length > 1) t.badge = cadModels.value.length
+        tabs.push(t)
+    }
+    if (hasCharts.value) {
+        const t: UiSegmentedOption = { value: 'chart', label: 'Grafici', icon: 'bar-chart' }
+        if (chartPayloads.value.length > 1) t.badge = chartPayloads.value.length
+        tabs.push(t)
+    }
+    if (hasWhiteboards.value) {
+        const t: UiSegmentedOption = { value: 'whiteboard', label: 'Lavagna', icon: 'whiteboard-card' }
+        if (whiteboardPayloads.value.length > 1) t.badge = whiteboardPayloads.value.length
+        tabs.push(t)
+    }
+    return tabs
+})
+
+/** Apply a side-panel tab selection from the shared segmented control. */
+function onSidePanelTabSelect(value: string | number): void {
+    sidePanelTab.value = value as '3d' | 'chart' | 'whiteboard'
+}
 
 /** Pending tool confirmations for ToolConfirmationDialog. */
 const pendingConfirmationsList = computed(() =>
@@ -646,30 +673,10 @@ onMounted(() => {
                     </div>
                 </div>
                 <!-- Tab switcher (when multiple content types exist) -->
-                <div v-if="[hasCadPanel, hasCharts, hasWhiteboards].filter(Boolean).length > 1"
-                    class="side-panel__tabs">
-                    <button v-if="hasCadPanel" class="side-panel__tab"
-                        :class="{ 'side-panel__tab--active': sidePanelTab === '3d' }" @click="sidePanelTab = '3d'">
-                        <AppIcon name="box-3d" :size="14" :stroke-width="1.5" />
-                        <span>3D</span>
-                        <span v-if="cadModels.length > 1" class="side-panel__tab-badge">{{ cadModels.length }}</span>
-                    </button>
-                    <button v-if="hasCharts" class="side-panel__tab"
-                        :class="{ 'side-panel__tab--active': sidePanelTab === 'chart' }"
-                        @click="sidePanelTab = 'chart'">
-                        <AppIcon name="bar-chart" :size="14" :stroke-width="1.5" />
-                        <span>Grafici</span>
-                        <span v-if="chartPayloads.length > 1" class="side-panel__tab-badge">{{ chartPayloads.length
-                        }}</span>
-                    </button>
-                    <button v-if="hasWhiteboards" class="side-panel__tab"
-                        :class="{ 'side-panel__tab--active': sidePanelTab === 'whiteboard' }"
-                        @click="sidePanelTab = 'whiteboard'">
-                        <AppIcon name="whiteboard-card" :size="14" :stroke-width="1.5" />
-                        <span>Lavagna</span>
-                        <span v-if="whiteboardPayloads.length > 1" class="side-panel__tab-badge">{{
-                            whiteboardPayloads.length }}</span>
-                    </button>
+                <div v-if="sidePanelTabOptions.length > 1" class="side-panel__tabs">
+                    <UiSegmented class="side-panel__seg" size="sm" :model-value="sidePanelTab"
+                        :options="sidePanelTabOptions" aria-label="Contenuto pannello"
+                        @update:model-value="onSidePanelTabSelect" />
                     <button class="side-panel__close" aria-label="Chiudi pannello" @click="closeSidePanel">
                         <AppIcon name="x" :size="14" />
                     </button>
@@ -1116,51 +1123,16 @@ onMounted(() => {
 .side-panel__tabs {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-1);
     padding: 6px 8px;
     border-bottom: 1px solid var(--border);
     background: transparent;
     border-radius: 16px 16px 0 0;
 }
 
-.side-panel__tab {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 5px 10px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 0.75rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 150ms, color 150ms;
-}
-
-.side-panel__tab:hover {
-    background: var(--surface-3);
-    color: var(--text-primary);
-}
-
-.side-panel__tab--active {
-    background: var(--surface-3);
-    color: var(--accent);
-}
-
-.side-panel__tab-badge {
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    border-radius: var(--radius-pill);
-    background: var(--accent);
-    color: var(--surface-0);
-    font-size: 10px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
+.side-panel__seg {
+    flex: 1;
+    min-width: 0;
 }
 
 .side-panel__close {

@@ -1033,6 +1033,9 @@ class AgentConfig(BaseSettings):
     delegation: bool = True
     """Expose the ``spawn_subagent`` delegation tool in the model-driven loop."""
 
+    clarification: bool = True
+    """Expose the ``ask_user`` clarifying-question tool in the model-driven loop."""
+
     reflection: AgentReflectionConfig = Field(
         default_factory=AgentReflectionConfig
     )

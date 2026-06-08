@@ -154,11 +154,11 @@ class TestAgentPluginTools:
         assert plugin.plugin_priority == 5
 
     @pytest.mark.asyncio
-    async def test_both_tools_exposed_by_default(self):
+    async def test_all_tools_exposed_by_default(self):
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"update_plan", "spawn_subagent"}
+        assert names == {"update_plan", "spawn_subagent", "ask_user"}
         assert all(isinstance(t, ToolDefinition) for t in plugin.get_tools())
 
     @pytest.mark.asyncio
@@ -168,7 +168,7 @@ class TestAgentPluginTools:
         ctx.config.agent.planning = False
         await plugin.initialize(ctx)
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"spawn_subagent"}
+        assert names == {"spawn_subagent", "ask_user"}
 
     @pytest.mark.asyncio
     async def test_subagent_tool_can_be_disabled(self):
@@ -177,7 +177,40 @@ class TestAgentPluginTools:
         ctx.config.agent.delegation = False
         await plugin.initialize(ctx)
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"update_plan"}
+        assert names == {"update_plan", "ask_user"}
+
+    @pytest.mark.asyncio
+    async def test_ask_user_tool_exposed_by_default(self):
+        plugin = AgentPlugin()
+        await plugin.initialize(_make_app_context())
+        tool = next(t for t in plugin.get_tools() if t.name == "ask_user")
+        assert tool.user_interaction is True
+        assert tool.risk_level == "safe"
+        assert tool.requires_confirmation is False
+        assert "question" in tool.parameters["required"]
+
+    @pytest.mark.asyncio
+    async def test_ask_user_tool_can_be_disabled(self):
+        plugin = AgentPlugin()
+        ctx = _make_app_context()
+        ctx.config.agent.clarification = False
+        await plugin.initialize(ctx)
+        names = {t.name for t in plugin.get_tools()}
+        assert "ask_user" not in names
+        # Planning / delegation remain governed by their own flags.
+        assert names == {"update_plan", "spawn_subagent"}
+
+    @pytest.mark.asyncio
+    async def test_ask_user_execute_is_defensive(self):
+        plugin = AgentPlugin()
+        await plugin.initialize(_make_app_context())
+        result = await plugin.execute_tool(
+            "ask_user",
+            {"question": "Which one?"},
+            _make_exec_ctx(),
+        )
+        assert isinstance(result, ToolResult)
+        assert result.success is False
 
     @pytest.mark.asyncio
     async def test_connection_status_degraded_without_services(self):

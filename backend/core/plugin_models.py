@@ -62,6 +62,17 @@ class ToolDefinition:
             open Continuum editor) and feeds the client-supplied result back
             into the LLM loop. The owning plugin's :meth:`execute_tool` is a
             defensive no-op for these tools — they only ever run client-side.
+        capabilities: Coarse capability tags consumed by the central
+            ``PermissionService`` / ``PermissionMiddleware`` to confine a tool
+            **by construction** (e.g. ``"fs_read"``, ``"fs_write"``,
+            ``"process_exec"``). Any ``fs_*`` capability marks the tool as
+            path-confined: a new tool that forgets a manual check still cannot
+            escape the conversation scope (deny-by-default outside it). Empty
+            ⇒ no special policy. Inert until Fase 6 wires a workspace scope.
+        path_args: Names of the ``parameters`` keys that carry filesystem
+            paths (e.g. ``("path",)``, ``("cwd",)``). The permission layer
+            resolves these against the active scope to decide allow/deny — so
+            confinement is generic, not per-plugin.
     """
 
     name: str
@@ -77,6 +88,8 @@ class ToolDefinition:
     sanitise_output: bool = True
     max_result_chars: int = MAX_TOOL_RESULT_LENGTH
     client_execution: bool = False
+    capabilities: tuple[str, ...] = ()
+    path_args: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.parameters, dict):

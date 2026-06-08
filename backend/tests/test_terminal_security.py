@@ -1,10 +1,12 @@
 """AL\\CE — Tests for the terminal plugin security primitives (Fase 6d).
 
-Pure unit tests: they use ``tmp_path`` only and never spawn a subprocess.  They
-exercise the three primitives adversarially — ``..`` traversal, symlink escape,
-UNC/device paths, forbidden-root precedence, id-driven traversal and shell
-metacharacters — because these functions are the entire security boundary for
-the scoped terminal.
+Pure unit tests: they use ``tmp_path`` only.  They exercise the three primitives
+adversarially — ``..`` traversal, symlink/junction escape, UNC/device paths,
+forbidden-root precedence, id-driven traversal and shell metacharacters —
+because these functions are the entire security boundary for the scoped
+terminal.  The single Windows-only junction test shells out to ``mklink /J`` (no
+privilege required) to build its fixture and is skipped elsewhere; every other
+test is subprocess-free.
 """
 
 from __future__ import annotations
@@ -86,6 +88,36 @@ def test_cwd_symlink_escape_rejected(tmp_path: Path) -> None:
         os.symlink(other, link, target_is_directory=True)
     except (OSError, NotImplementedError) as exc:  # pragma: no cover - platform gate
         pytest.skip(f"symlink not permitted on this platform: {exc}")
+
+    with pytest.raises(ValueError, match="outside the workspace scope"):
+        validate_cwd_within_scope(str(link), [ws.resolve()])
+
+
+def test_cwd_junction_escape_rejected(tmp_path: Path) -> None:
+    """An NTFS *junction* inside the scope pointing outside it must be rejected.
+
+    Junctions are a distinct reparse-point type from symlinks, but ``resolve()``
+    follows them too, so the resolved target lands outside ``ws`` and fails
+    containment.  This pins that load-bearing behaviour separately from the
+    symlink case.  Windows-only (``mklink /J`` — no privilege required); skipped
+    on other platforms or if junction creation fails.
+    """
+    if os.name != "nt":
+        pytest.skip("NTFS junctions are Windows-only")
+    import subprocess  # local: keep the rest of the module subprocess-free
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    link = ws / "jct"
+    proc = subprocess.run(  # noqa: S603,S607 - fixed args, fixture setup only
+        ["cmd", "/c", "mklink", "/J", str(link), str(other)],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0 or not link.exists():
+        pytest.skip(f"could not create junction: {proc.stderr.strip()}")
 
     with pytest.raises(ValueError, match="outside the workspace scope"):
         validate_cwd_within_scope(str(link), [ws.resolve()])
@@ -223,6 +255,27 @@ def test_ensure_sandbox_rejects_control_char_id(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Unsafe conversation id"):
         ensure_sandbox("a\x00b", root)
+
+
+def test_ensure_sandbox_creation_failure_becomes_valueerror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A filesystem failure during the lazy ``mkdir`` surfaces as ``ValueError``.
+
+    Honours the documented contract (callers only ever catch ``ValueError``):
+    an OS-level error — e.g. an over-long id past the path limit, or a
+    permission error — must not leak as a raw ``OSError``.
+    """
+    root = tmp_path / "workspaces"
+    cid = "123e4567-e89b-12d3-a456-426614174000"
+
+    def _boom(self: Path, *args: object, **kwargs: object) -> None:
+        raise OSError("simulated mkdir failure")
+
+    monkeypatch.setattr(Path, "mkdir", _boom)
+
+    with pytest.raises(ValueError, match="Could not create sandbox directory"):
+        ensure_sandbox(cid, root)
 
 
 # ---------------------------------------------------------------------------

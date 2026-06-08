@@ -177,7 +177,8 @@ def ensure_sandbox(conversation_id: str, sandbox_root: str | Path) -> Path:
 
     Raises:
         ValueError: If *conversation_id* is empty or not a single safe path
-            component, or if the computed target escapes *sandbox_root*.
+            component, if the computed target escapes *sandbox_root*, or if the
+            sandbox directory cannot be created.
     """
     # 1. Empty / blank.
     if not conversation_id or not conversation_id.strip():
@@ -212,8 +213,15 @@ def ensure_sandbox(conversation_id: str, sandbox_root: str | Path) -> Path:
             f"Sandbox path '{target}' escaped the sandbox root '{base}'"
         )
 
-    # 4. Lazy creation (idempotent).
-    target.mkdir(parents=True, exist_ok=True)
+    # 4. Lazy creation (idempotent).  Any OS-level failure (e.g. an absurdly
+    #    long id past the path limit, or a permission error) is surfaced as the
+    #    documented ValueError so callers only ever catch one exception type.
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ValueError(
+            f"Could not create sandbox directory '{target}': {exc}"
+        ) from exc
     logger.debug("Terminal sandbox ready for conversation {}: {}", cid, target)
 
     # 5. Confined and present.

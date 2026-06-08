@@ -13,7 +13,7 @@ from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.db.models import Conversation, ConversationPlan
-from backend.services.plan_service import PlanService
+from backend.services.plan_service import PlanService, render_plan_steps
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -191,3 +191,38 @@ async def test_delete_conversation_cascades_plan(
     async with session_factory() as session:
         rows = (await session.exec(select(ConversationPlan))).all()
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# render_plan_steps (pure re-injection rendering)
+# ---------------------------------------------------------------------------
+
+
+def test_render_plan_steps_empty_returns_empty_string():
+    # No steps ⇒ no context block (caller guards on this too).
+    assert render_plan_steps([]) == ""
+
+
+def test_render_plan_steps_includes_each_step_and_status():
+    steps = [
+        {"step": "Research the API", "status": "completed"},
+        {"step": "Write the client", "status": "in_progress"},
+        {"step": "Add tests", "status": "pending"},
+    ]
+    rendered = render_plan_steps(steps)
+
+    assert isinstance(rendered, str)
+    # Every step's text and status surfaces in the block.
+    for step in steps:
+        assert step["step"] in rendered
+        assert step["status"] in rendered
+    # Carries a "continue, don't restart" instruction referencing update_plan.
+    assert "update_plan" in rendered
+    assert "Continue" in rendered
+
+
+def test_render_plan_steps_reads_keys_defensively():
+    # Missing keys must not raise; status defaults to "pending".
+    rendered = render_plan_steps([{}])
+    assert isinstance(rendered, str)
+    assert "[pending]" in rendered

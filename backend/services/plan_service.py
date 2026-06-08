@@ -33,6 +33,37 @@ def _to_uuid(value: uuid.UUID | str) -> uuid.UUID:
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 
+def render_plan_steps(steps: list[dict[str, Any]]) -> str:
+    """Render a persisted plan as a context block for re-injection.
+
+    Produces a compact, model-readable block (empty string when there are no
+    steps) so the model can CONTINUE an in-progress plan across turns instead
+    of re-planning.  Each step shows its status.
+
+    Args:
+        steps: The persisted plan as an ordered list of
+            ``{"step": str, "status": str}`` dicts (the shape returned by
+            :meth:`PlanService.get_plan`).  Keys are read defensively.
+
+    Returns:
+        A heading-plus-numbered-list block, or ``""`` when *steps* is empty.
+    """
+    if not steps:
+        return ""
+    lines = [
+        "# Current plan",
+        (
+            "You are partway through this plan. Continue executing it and "
+            "call update_plan to update step statuses. Do not restart it."
+        ),
+    ]
+    for index, step in enumerate(steps, start=1):
+        text = str(step.get("step", ""))
+        status = str(step.get("status", "pending"))
+        lines.append(f"{index}. [{status}] {text}")
+    return "\n".join(lines)
+
+
 class PlanService:
     """Persist and retrieve the per-conversation plan (todo-list).
 

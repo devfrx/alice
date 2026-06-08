@@ -617,12 +617,32 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     plan_service.set_event_callback(_broadcast_plan_event)
     ctx.plan_service = plan_service
 
+    # -- Scope service (per-conversation workspace folder scope) --------
+    from backend.services.scope_service import ScopeService
+
+    scope_service = ScopeService(
+        session_factory=session_factory,
+        config=ctx.config.scope,
+    )
+
+    async def _broadcast_scope_event(event: dict) -> None:
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast(event)
+
+    scope_service.set_event_callback(_broadcast_scope_event)
+    await scope_service.load_all()
+    ctx.scope_service = scope_service
+
     # -- Permission service (central tool risk / scope authority) -------
-    # Fase 2: no scope provider yet (ScopeService arrives in Fase 6), so it
-    # enforces forbidden-tool risk policy only and imposes no new denials.
+    # Fase 6: ScopeService supplies the per-conversation scope provider, so a
+    # tool tagged fs_read/fs_write is confined by construction once a scope is
+    # set. No scope set ⇒ no confinement (behavior preserved).
     from backend.services.permission_service import PermissionService
 
-    ctx.permission_service = PermissionService()
+    ctx.permission_service = PermissionService(
+        scope_provider=scope_service.scope_roots,
+        forbidden_paths=ctx.config.scope.forbidden_paths,
+    )
 
     app.state.context = ctx
     app.state.engine = engine

@@ -160,6 +160,8 @@ class FileSearchPlugin(BasePlugin):
                 },
                 result_type="json",
                 risk_level="safe",
+                capabilities=("fs_read",),
+                path_args=("path",),
                 timeout_ms=60_000,
             ),
             ToolDefinition(
@@ -180,6 +182,8 @@ class FileSearchPlugin(BasePlugin):
                 },
                 result_type="json",
                 risk_level="safe",
+                capabilities=("fs_read",),
+                path_args=("path",),
                 timeout_ms=3_000,
             ),
             ToolDefinition(
@@ -211,6 +215,8 @@ class FileSearchPlugin(BasePlugin):
                 result_type="json",
                 risk_level="medium",
                 requires_confirmation=True,
+                capabilities=("fs_read",),
+                path_args=("path",),
                 timeout_ms=15_000,
             ),
             ToolDefinition(
@@ -232,6 +238,8 @@ class FileSearchPlugin(BasePlugin):
                 result_type="string",
                 risk_level="medium",
                 requires_confirmation=True,
+                capabilities=("fs_read",),
+                path_args=("path",),
                 timeout_ms=5_000,
             ),
             ToolDefinition(
@@ -263,6 +271,8 @@ class FileSearchPlugin(BasePlugin):
                 result_type="string",
                 risk_level="medium",
                 requires_confirmation=True,
+                capabilities=("fs_write",),
+                path_args=("path",),
                 timeout_ms=10_000,
             ),
         ]

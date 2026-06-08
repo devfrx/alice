@@ -57,6 +57,7 @@ import type {
   ArtifactKind,
   ArtifactListResponse,
 } from '../types/artifacts'
+import type { PlanResponse } from '../types/plan'
 
 /** Backend host (without /api), configurable via VITE_API_BASE_URL env var.
  *  Default uses 127.0.0.1 (not `localhost`) because on Windows Electron's
@@ -810,5 +811,11 @@ export const api = {
       { method: 'DELETE' },
     )
   },
+
+  // -- Plan -----------------------------------------------------------------
+
+  /** Fetch the persisted plan (todo-list) for a conversation. */
+  getPlan: (conversationId: string): Promise<PlanResponse> =>
+    request<PlanResponse>(`/plans/${encodeURIComponent(conversationId)}`),
 
 }

@@ -110,14 +110,3 @@ export interface AgentRun {
   toolCalls: number
   finishReason: string | null
 }
-
-/**
- * One step of a plan.
- *
- * Consumed by a later phase (the `plan.updated` frame); declared here so the
- * turn-event type module is complete.
- */
-export interface PlanStep {
-  step: string
-  status: string
-}

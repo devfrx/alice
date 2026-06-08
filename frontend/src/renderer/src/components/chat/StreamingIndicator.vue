@@ -14,6 +14,7 @@ import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import { useChatStore } from '../../stores/chat'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolExecutionIndicator from './ToolExecutionIndicator.vue'
+import AgentActivityCard from './AgentActivityCard.vue'
 import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 
 const props = defineProps<{
@@ -51,6 +52,9 @@ const chatStore = useChatStore()
 
       <!-- Tool execution indicator -->
       <ToolExecutionIndicator :executions="chatStore.activeToolExecutions" />
+
+      <!-- Per-turn run budget / status (canonical turn-event stream; self-guards) -->
+      <AgentActivityCard />
 
       <!-- Main content -->
       <Transition name="content-fade">

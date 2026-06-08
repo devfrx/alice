@@ -546,6 +546,17 @@ async def delete_conversation(
             await asyncio.to_thread(shutil.rmtree, upload_dir, True)
             logger.debug("Removed upload dir {}", upload_dir)
 
+        # Kill any live interactive terminal sessions (PTYs + process trees)
+        # for this conversation — they have no DB row to cascade-delete.
+        terminal_manager = getattr(ctx, "terminal_session_manager", None)
+        if terminal_manager is not None:
+            try:
+                await terminal_manager.cleanup_conversation(str(conversation_id))
+            except Exception as exc:
+                logger.warning(
+                    "Terminal cleanup failed for {}: {}", conversation_id, exc,
+                )
+
         return {"status": "deleted"}
 
 

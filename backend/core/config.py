@@ -415,6 +415,19 @@ class TerminalConfig(BaseSettings):
         default=False,
         description="Best-effort network policy hint (not a hard guarantee on Windows).",
     )
+    max_sessions: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        description="Max concurrent interactive PTY sessions per conversation (Fase 7).",
+    )
+    interactive_shell: str | None = Field(
+        default=None,
+        description=(
+            "Shell program for interactive PTY sessions (Fase 7). None ⇒ ComSpec "
+            "(cmd.exe) on Windows, $SHELL (/bin/bash) on POSIX."
+        ),
+    )
 
 
 class VRAMConfig(BaseSettings):

@@ -672,6 +672,25 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         forbidden_paths=ctx.config.scope.forbidden_paths,
     )
 
+    # -- Interactive terminal session manager (Fase 7 E1) ---------------
+    # Live PTY shells, scope-confined via ScopeService.scope_roots; output is
+    # broadcast on the events WS, input/resize arrive over its receive loop.
+    from backend.services.terminal import TerminalSessionManager
+
+    terminal_manager = TerminalSessionManager(
+        scope_provider=scope_service.scope_roots,
+        scope_config=ctx.config.scope,
+        shell=ctx.config.terminal.interactive_shell,
+        max_sessions=ctx.config.terminal.max_sessions,
+    )
+
+    async def _broadcast_terminal_event(event: dict) -> None:
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast(event)
+
+    terminal_manager.set_event_callback(_broadcast_terminal_event)
+    ctx.terminal_session_manager = terminal_manager
+
     app.state.context = ctx
     app.state.engine = engine
 
@@ -688,6 +707,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await ctx.orchestrator.shutdown_polling()
             except Exception as exc:
                 logger.error("Orchestrator shutdown error: {}", exc)
+        if ctx is not None and ctx.terminal_session_manager is not None:
+            try:
+                await ctx.terminal_session_manager.shutdown()
+            except Exception as exc:
+                logger.error("Terminal manager shutdown error: {}", exc)
         if plugin_manager is not None:
             try:
                 await plugin_manager.shutdown()

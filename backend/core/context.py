@@ -149,6 +149,15 @@ class AppContext:
     :class:`backend.services.permission_rules.PermissionRuleService`. Wired in
     the lifespan; its ``match`` is the ``PermissionService`` rule provider."""
 
+    terminal_session_manager: Any = None
+    """Interactive PTY terminal sessions, keyed by conversation (Fase 7 E1).
+
+    Typed as :class:`Any` to avoid a core→services import cycle; concrete type
+    :class:`backend.services.terminal.manager.TerminalSessionManager`. Wired in
+    the lifespan; owns live shells the user types into and the one session
+    assignable to the agent. Output is broadcast on the events WS; input/resize
+    arrive over the events WS receive loop."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

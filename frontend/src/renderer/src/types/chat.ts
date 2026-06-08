@@ -193,6 +193,17 @@ export interface WsToolExecutionDoneMessage {
   artifact_id?: string
 }
 
+/**
+ * A "don't ask again" persistence choice the user can attach to an approval.
+ *
+ * - `none` — one-shot, ask again next time (the default).
+ * - `session` — grant this tool for the rest of the conversation (in-memory).
+ * - `persistent` — write a persistent allow-rule (survives restarts).
+ *
+ * Mirrors the backend `_REMEMBER_CHOICES` in `services/turn/pipeline.py`.
+ */
+export type RememberChoice = 'none' | 'session' | 'persistent'
+
 /** Server requests user confirmation before running a tool. */
 export interface WsToolConfirmationRequiredMessage {
   type: 'tool_confirmation_required'
@@ -203,6 +214,11 @@ export interface WsToolConfirmationRequiredMessage {
   description: string
   /** LLM reasoning/thinking content explaining why this tool was called. */
   reasoning?: string
+  /**
+   * When `true` the server accepts a `remember` choice on the response so the
+   * client may offer "don't ask again" (session / persistent) options.
+   */
+  allow_remember?: boolean
 }
 
 /** Payload the client sends to approve/reject a tool confirmation. */
@@ -210,6 +226,12 @@ export interface WsToolConfirmationResponsePayload {
   type: 'tool_confirmation_response'
   execution_id: string
   approved: boolean
+  /**
+   * Optional persistence for the decision. Only honoured by the server on an
+   * approval (`approved: true`); omitted/ignored on rejection. Defaults to
+   * `none` when absent.
+   */
+  remember?: RememberChoice
 }
 
 /**
@@ -403,6 +425,11 @@ export interface ConfirmationRequest {
   description: string
   /** LLM reasoning for invoking this tool (from thinking content). */
   reasoning?: string
+  /**
+   * When `true` the server accepts a `remember` choice, so the dialog may
+   * offer "don't ask again" (session / persistent) options.
+   */
+  allowRemember?: boolean
 }
 
 /** A pending `ask_user` request awaiting the user's free-form answer. */

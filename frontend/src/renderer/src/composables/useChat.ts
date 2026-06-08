@@ -35,6 +35,7 @@ import type {
   WsDoneMessage,
   WsErrorMessage,
   WsLlmRequeryMessage,
+  RememberChoice,
   WsSendPayload,
   WsThinkingMessage,
   WsTokenMessage,
@@ -212,7 +213,8 @@ export function useChat(): UseChatReturn {
       args: msg.args,
       riskLevel: msg.risk_level,
       description: msg.description,
-      reasoning: msg.reasoning
+      reasoning: msg.reasoning,
+      allowRemember: msg.allow_remember
     })
   }
 
@@ -603,13 +605,22 @@ export function useChat(): UseChatReturn {
 
   /**
    * Respond to a tool confirmation request (approve or reject).
+   *
+   * `remember` carries an optional "don't ask again" persistence choice and is
+   * only meaningful on an approval — the server ignores it on rejection. It is
+   * sent only when not `'none'` to keep the wire frame minimal.
    */
-  function respondToConfirmation(executionId: string, approved: boolean): void {
+  function respondToConfirmation(
+    executionId: string,
+    approved: boolean,
+    remember: RememberChoice = 'none'
+  ): void {
     const payload: WsToolConfirmationResponsePayload = {
       type: 'tool_confirmation_response',
       execution_id: executionId,
       approved
     }
+    if (remember !== 'none') payload.remember = remember
     wsManager.send(payload)
     store.removePendingConfirmation(executionId)
   }

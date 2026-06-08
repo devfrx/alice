@@ -59,7 +59,12 @@ import type {
 } from '../types/artifacts'
 import type { PlanResponse } from '../types/plan'
 import type { ScopeResponse } from '../types/scope'
-import type { PermissionMode, PermissionModeResponse } from '../types/permission'
+import type {
+  PermissionMode,
+  PermissionModeResponse,
+  PermissionRule,
+  PermissionRuleCreate,
+} from '../types/permission'
 
 /**
  * Error thrown by {@link request} on a non-2xx HTTP response.
@@ -883,5 +888,36 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ mode }),
     }),
+
+  // -- Permission rules (persistent allow/ask/deny, Fase 7) -----------------
+
+  /**
+   * List the persistent rules visible to a conversation: its own
+   * conversation-scoped rules plus all global rules.
+   */
+  listPermissionRules: (conversationId: string): Promise<PermissionRule[]> =>
+    request<PermissionRule[]>(`/permission-rules/${encodeURIComponent(conversationId)}`),
+
+  /**
+   * Add or update a persistent rule. `scope` selects whether the rule is tied
+   * to this conversation or applies globally. UPSERT — one rule per
+   * (scope, tool_name).
+   */
+  addPermissionRule: (
+    conversationId: string, body: PermissionRuleCreate,
+  ): Promise<PermissionRule> =>
+    request<PermissionRule>(`/permission-rules/${encodeURIComponent(conversationId)}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** Delete a persistent rule by id (no-op if it does not exist). */
+  deletePermissionRule: (
+    conversationId: string, ruleId: string,
+  ): Promise<void> =>
+    request<void>(
+      `/permission-rules/${encodeURIComponent(conversationId)}/${encodeURIComponent(ruleId)}`,
+      { method: 'DELETE' },
+    ),
 
 }

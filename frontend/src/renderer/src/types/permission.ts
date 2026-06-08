@@ -29,3 +29,35 @@ export interface WsPermissionModeUpdatedMessage {
   conversation_id: string
   mode: PermissionMode
 }
+
+/**
+ * The effect of a persistent permission rule (mirrors backend ``RuleEffect``).
+ * Precedence at match time is ``deny`` > ``ask`` > ``allow``.
+ */
+export type RuleEffect = 'allow' | 'ask' | 'deny'
+
+/**
+ * Where a rule applies. ``conversation`` ties it to one conversation;
+ * ``global`` applies everywhere. A null ``conversation_id`` in
+ * {@link PermissionRule} denotes a global rule.
+ */
+export type RuleScope = 'conversation' | 'global'
+
+/**
+ * A persisted permission rule, as returned by
+ * `GET/POST /api/permission-rules/{conversation_id}`.
+ */
+export interface PermissionRule {
+  id: string
+  /** Null for a global rule; otherwise the owning conversation id. */
+  conversation_id: string | null
+  tool_name: string
+  effect: RuleEffect
+}
+
+/** Request body for `POST /api/permission-rules/{conversation_id}`. */
+export interface PermissionRuleCreate {
+  tool_name: string
+  effect: RuleEffect
+  scope: RuleScope
+}

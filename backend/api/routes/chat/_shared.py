@@ -11,7 +11,9 @@ instance so the ``@router`` decorators register on the same object.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -35,6 +37,45 @@ _ws_connections: dict[str, int] = defaultdict(int)
 # that run in multiple event loops (e.g. threads with TestClient) to each
 # get a lock bound to the correct loop.
 _ws_locks: dict[int, asyncio.Lock] = {}
+
+# Conversations with an in-flight turn (Fase 6b idle-guard).  A conversation
+# in this set is "busy": workspace-scope mutations are rejected (409) until the
+# turn completes.  Membership is bound to the turn lifecycle in ``ws.py``.
+_active_conversations: set[str] = set()
+
+
+def is_conversation_active(conversation_id: str) -> bool:
+    """Return whether a turn is currently executing for the conversation.
+
+    Args:
+        conversation_id: Canonical string form of the conversation id.
+
+    Returns:
+        ``True`` while a turn is in flight for the conversation, else ``False``.
+    """
+    return conversation_id in _active_conversations
+
+
+@contextlib.contextmanager
+def conversation_active(conversation_id: str) -> Iterator[None]:
+    """Mark a conversation busy for the duration of a turn (idle-guard).
+
+    The id is added on entry and **always** discarded on exit — normal
+    completion, cancellation, or error — so the idle state stays bound to the
+    turn lifecycle and a crashed turn never leaves a conversation wedged
+    "busy".
+
+    Args:
+        conversation_id: Canonical string form of the conversation id.
+
+    Yields:
+        ``None`` for the duration of the active turn.
+    """
+    _active_conversations.add(conversation_id)
+    try:
+        yield
+    finally:
+        _active_conversations.discard(conversation_id)
 
 
 def _get_ws_lock() -> asyncio.Lock:

@@ -34,6 +34,7 @@ from ._shared import (
     _get_ws_lock,
     _utcnow,
     _ws_connections,
+    conversation_active,
     router,
 )
 
@@ -168,20 +169,25 @@ async def ws_chat(websocket: WebSocket) -> None:
                     ),
                 )
 
-                try:
-                    result: TurnResult = await executor_task
-                except asyncio.CancelledError:
-                    cancel_event.set()
-                    logger.debug("Executor task cancelled")
-                    result = TurnResult(
-                        content=full_content,
-                        thinking=thinking_content,
-                        input_tokens=0,
-                        output_tokens=0,
-                        finish_reason="cancelled",
-                        final_assistant_message_id=None,
-                        had_tool_calls=bool(tool_calls_collected),
-                    )
+                # Idle-guard (Fase 6b): mark the conversation busy for the
+                # executor's lifetime so scope mutations are rejected (409)
+                # while a turn is running.  Persist below runs idle — it does
+                # not touch the workspace scope.
+                with conversation_active(str(conv_id)):
+                    try:
+                        result: TurnResult = await executor_task
+                    except asyncio.CancelledError:
+                        cancel_event.set()
+                        logger.debug("Executor task cancelled")
+                        result = TurnResult(
+                            content=full_content,
+                            thinking=thinking_content,
+                            input_tokens=0,
+                            output_tokens=0,
+                            finish_reason="cancelled",
+                            final_assistant_message_id=None,
+                            had_tool_calls=bool(tool_calls_collected),
+                        )
 
                 # Mirror legacy behaviour: feed locals from the result so
                 # disconnect-recovery has access to partial content.

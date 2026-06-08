@@ -131,8 +131,9 @@ class ToolMiddleware(Protocol):
 class DedupMiddleware:
     """Collapse identical *server* tool-calls seen earlier in the turn.
 
-    Client-executed tools are never deduplicated: re-listing/re-reading live
-    UI state after a mutation is legitimate. ``seen`` is owned by the engine
+    Client-executed *and* user-interaction tools are never deduplicated:
+    re-listing/re-reading live UI state after a mutation is legitimate, and
+    re-asking the human a question is too. ``seen`` is owned by the engine
     (loop-level, across iterations) and is only *written* once a call is
     greenlit (see :class:`InteractionMiddleware`), so a call the user merely
     rejected once can be retried later.
@@ -142,7 +143,8 @@ class DedupMiddleware:
         self._seen = seen
 
     async def handle(self, call: ToolCall, nxt: NextHandler) -> ToolOutcome:
-        if not call.is_client and call.dedup_key in self._seen:
+        _interactive = call.tool_def is not None and call.tool_def.user_interaction
+        if not call.is_client and not _interactive and call.dedup_key in self._seen:
             logger.warning(
                 "Dedup: skipping duplicate tool call {}(…)", call.tool_name,
             )
@@ -265,11 +267,13 @@ class InteractionMiddleware:
     * **client-executed** tools are delegated to the connected client over the
       :class:`~backend.services.turn.channel.InteractionChannel` (never
       ``execute_tool``) and resolve to :attr:`Disposition.CLIENT_EXECUTED`;
+    * **user-interaction** tools (``ask_user``) round-trip the human over the
+      same channel and likewise resolve to :attr:`Disposition.CLIENT_EXECUTED`,
+      so the answer is persisted and fed back to the LLM exactly like a
+      client-tool result;
     * **server** tools fall through to ``nxt`` — in :meth:`ToolPipeline.gate`
       that terminal returns :attr:`Disposition.EXECUTE`, deferring them to the
       engine's parallel execution batch.
-
-    ``user_interaction`` (``ask_user``) is reserved for Fase 4.
     """
 
     def __init__(
@@ -303,6 +307,17 @@ class InteractionMiddleware:
                 self._channel, call.tool_name, call.args, call.exec_id,
                 self._tool_exec_timeout, self._cancel_event,
             )
+            return ToolOutcome(call, Disposition.CLIENT_EXECUTED, result=result)
+
+        if td is not None and td.user_interaction:
+            result = await _execute_user_interaction(
+                self._channel, call.tool_name, call.args, call.exec_id,
+                self._tool_exec_timeout, self._cancel_event,
+            )
+            # Reuse CLIENT_EXECUTED on purpose: the engine's
+            # _persist_gate_outcome routes it to _persist_client_tool_result
+            # (DB tool message + tool_execution_done frame) — exactly how the
+            # user's answer should be persisted and fed back to the LLM.
             return ToolOutcome(call, Disposition.CLIENT_EXECUTED, result=result)
 
         return await nxt(call)
@@ -511,4 +526,58 @@ async def _execute_client_tool(
         )
     return ToolResult.error(
         str(msg.get("error") or "Client tool reported a failure."),
+    )
+
+
+async def _execute_user_interaction(
+    channel: InteractionChannel,
+    tool_name: str,
+    args: dict[str, Any],
+    execution_id: str,
+    timeout_s: float,
+    cancel_event: asyncio.Event | None = None,
+) -> ToolResult:
+    """Ask the human a question and return their answer as a tool result.
+
+    Issues an ``ask_user`` round-trip on the InteractionChannel (emitting an
+    ``ask_user_required`` frame) and blocks until the correlated
+    ``ask_user_response`` arrives. Used for tools flagged
+    ``ToolDefinition.user_interaction`` (the ``ask_user`` meta-tool). The
+    answer text becomes the tool result fed back into the LLM loop.
+
+    Returns:
+        A successful :class:`ToolResult` carrying the user's answer, or an
+        error result on cancellation / timeout.
+
+    Raises:
+        WebSocketDisconnect: If the socket dropped while awaiting the answer.
+    """
+    question = str(args.get("question", "")).strip()
+    payload: dict[str, Any] = {"question": question}
+    options = args.get("options")
+    if isinstance(options, list):
+        payload["options"] = [str(o) for o in options]
+
+    msg = await channel.request(
+        "ask_user", payload,
+        execution_id=execution_id, timeout_s=timeout_s, cancel_event=cancel_event,
+    )
+    if msg is None:
+        # Same disambiguation as client tools: disconnect > cancel > timeout.
+        if not channel.connected:
+            logger.warning(
+                "WebSocket disconnected during ask_user (exec_id={})", execution_id,
+            )
+            raise WebSocketDisconnect(code=1006)
+        if channel.cancelled:
+            return ToolResult.error("Question cancelled by the user.")
+        logger.warning(
+            "ask_user timed out after {}s (exec_id={})", timeout_s, execution_id,
+        )
+        return ToolResult.error(f"No answer received (timed out after {timeout_s}s).")
+
+    answer = msg.get("answer")
+    return ToolResult.ok(
+        str(answer) if answer is not None else "",
+        content_type="text/plain",
     )

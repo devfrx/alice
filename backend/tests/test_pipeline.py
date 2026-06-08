@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from fastapi import WebSocketDisconnect
 
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
 from backend.services.permission_service import PermissionService
@@ -44,12 +45,14 @@ class _FakeChannel:
         *,
         confirm: bool | None = None,
         client_reply: dict | None = None,
+        ask_user_reply: dict | None = None,
         connected: bool = True,
         cancelled: bool = False,
     ) -> None:
         self.requests: list[tuple[str, dict, str]] = []
         self._confirm = confirm
         self._client_reply = client_reply
+        self._ask_user_reply = ask_user_reply
         self._connected = connected
         self._cancelled = cancelled
 
@@ -70,6 +73,8 @@ class _FakeChannel:
             return None if self._confirm is None else {"approved": self._confirm}
         if kind == "client_tool_call":
             return self._client_reply
+        if kind == "ask_user":
+            return self._ask_user_reply
         return None
 
 
@@ -94,6 +99,7 @@ def _tool(
     risk_level: str = "safe",
     requires_confirmation: bool = False,
     client_execution: bool = False,
+    user_interaction: bool = False,
     capabilities: tuple[str, ...] = (),
     path_args: tuple[str, ...] = (),
 ) -> ToolDefinition:
@@ -103,6 +109,7 @@ def _tool(
         risk_level=risk_level,  # type: ignore[arg-type]
         requires_confirmation=requires_confirmation,
         client_execution=client_execution,
+        user_interaction=user_interaction,
         capabilities=capabilities,
         path_args=path_args,
     )
@@ -158,6 +165,15 @@ class TestDedup:
         seen = {"k"}
         outcome = await DedupMiddleware(seen).handle(
             _call(is_client=True), _proceed,
+        )
+        assert outcome.disposition is Disposition.EXECUTE
+
+    @pytest.mark.asyncio
+    async def test_user_interaction_call_never_deduped(self) -> None:
+        """``ask_user`` is exempt from dedup — re-asking the human is valid."""
+        seen = {"k"}
+        outcome = await DedupMiddleware(seen).handle(
+            _call(tool_def=_tool(user_interaction=True)), _proceed,
         )
         assert outcome.disposition is Disposition.EXECUTE
 
@@ -308,6 +324,98 @@ class TestInteraction:
         outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert outcome.disposition is Disposition.CLIENT_EXECUTED
         assert outcome.result is not None and outcome.result.success is False
+
+
+# ---------------------------------------------------------------------------
+# InteractionMiddleware — user-interaction (ask_user) routing (Fase 4)
+# ---------------------------------------------------------------------------
+
+
+class TestUserInteraction:
+    @pytest.mark.asyncio
+    async def test_ask_user_round_trips_answer_as_result(self) -> None:
+        """``ask_user`` round-trips the human; the answer becomes the result."""
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply={"answer": "blue"})
+        call = _call(
+            tool_def=_tool(user_interaction=True),
+            args={"question": "fav colour?"},
+        )
+        outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        # Reuses CLIENT_EXECUTED so the engine persists/feeds it like a client tool.
+        assert outcome.disposition is Disposition.CLIENT_EXECUTED
+        assert outcome.result is not None and outcome.result.success is True
+        assert outcome.result.content == "blue"
+        assert outcome.result.content_type == "text/plain"
+        # Round-trip used the ask_user kind; payload carries the question.
+        assert ch.requests and ch.requests[0][0] == "ask_user"
+        assert ch.requests[0][1] == {"question": "fav colour?"}
+        # start emitted before the round-trip; call marked seen.
+        assert sink.sent[0]["type"] == "tool_execution_start"
+        assert "k" in seen
+
+    @pytest.mark.asyncio
+    async def test_ask_user_payload_includes_options(self) -> None:
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply={"answer": "red"})
+        call = _call(
+            tool_def=_tool(user_interaction=True),
+            args={"question": "pick", "options": ["red", "blue"]},
+        )
+        outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        assert outcome.disposition is Disposition.CLIENT_EXECUTED
+        payload = ch.requests[0][1]
+        assert payload["question"] == "pick"
+        assert payload["options"] == ["red", "blue"]
+
+    @pytest.mark.asyncio
+    async def test_two_identical_ask_user_calls_both_reach_channel(self) -> None:
+        """Dedup exemption end-to-end: two identical asks both hit the channel.
+
+        Contrast with ``TestDedup.test_duplicate_server_call_short_circuits``: a
+        repeated server call is collapsed, but re-asking the human is not.
+        """
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply={"answer": "ok"})
+        pipe = ToolPipeline(
+            [DedupMiddleware(seen), _interaction_mw(sink, ch, seen)],
+            ExecuteMiddleware(tool_registry=_FakeRegistry(), sink=sink),
+        )
+        td = _tool(user_interaction=True)
+        o1 = await pipe.gate(_call(tool_def=td, args={"question": "again?"}))
+        o2 = await pipe.gate(_call(tool_def=td, args={"question": "again?"}))
+        assert o1.disposition is Disposition.CLIENT_EXECUTED
+        assert o2.disposition is Disposition.CLIENT_EXECUTED
+        assert [r[0] for r in ch.requests] == ["ask_user", "ask_user"]  # neither deduped
+
+    @pytest.mark.asyncio
+    async def test_ask_user_timeout_is_error_result(self) -> None:
+        """No answer while still connected ⇒ error result (timeout)."""
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply=None)  # request returns None
+        call = _call(tool_def=_tool(user_interaction=True))
+        outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        assert outcome.disposition is Disposition.CLIENT_EXECUTED
+        assert outcome.result is not None and outcome.result.success is False
+        assert "timed out" in (outcome.result.error_message or "")
+
+    @pytest.mark.asyncio
+    async def test_ask_user_cancelled_is_error_result(self) -> None:
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply=None, cancelled=True)
+        call = _call(tool_def=_tool(user_interaction=True))
+        outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        assert outcome.disposition is Disposition.CLIENT_EXECUTED
+        assert outcome.result is not None and outcome.result.success is False
+        assert "cancel" in (outcome.result.error_message or "").lower()
+
+    @pytest.mark.asyncio
+    async def test_ask_user_disconnect_raises(self) -> None:
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply=None, connected=False)
+        call = _call(tool_def=_tool(user_interaction=True))
+        with pytest.raises(WebSocketDisconnect):
+            await _interaction_mw(sink, ch, seen).handle(call, _proceed)
 
 
 # ---------------------------------------------------------------------------

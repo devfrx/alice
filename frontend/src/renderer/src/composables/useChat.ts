@@ -46,6 +46,8 @@ import type {
   WsWarningMessage
 } from '../types/chat'
 import type {
+  WsInteractionRequestedMessage,
+  WsInteractionResolvedMessage,
   WsToolCallMessage,
   WsToolResultMessage,
   WsTurnFinishedMessage,
@@ -312,6 +314,14 @@ export function useChat(): UseChatReturn {
     agentRunStore.applyToolResult(data as WsToolResultMessage)
   }
 
+  const onInteractionRequested = (data: unknown): void => {
+    agentRunStore.applyInteractionRequested(data as WsInteractionRequestedMessage)
+  }
+
+  const onInteractionResolved = (data: unknown): void => {
+    agentRunStore.applyInteractionResolved(data as WsInteractionResolvedMessage)
+  }
+
   const onTurnUsage = (data: unknown): void => {
     agentRunStore.applyTurnUsage(data as WsTurnUsageMessage)
   }
@@ -348,6 +358,8 @@ export function useChat(): UseChatReturn {
   wsManager.on('turn.llm_step', onTurnLlmStep)
   wsManager.on('tool.call', onTurnToolCall)
   wsManager.on('tool.result', onTurnToolResult)
+  wsManager.on('interaction.requested', onInteractionRequested)
+  wsManager.on('interaction.resolved', onInteractionResolved)
   wsManager.on('turn.usage', onTurnUsage)
   wsManager.on('turn.finished', onTurnFinished)
 
@@ -390,6 +402,8 @@ export function useChat(): UseChatReturn {
     wsManager.off('turn.llm_step', onTurnLlmStep)
     wsManager.off('tool.call', onTurnToolCall)
     wsManager.off('tool.result', onTurnToolResult)
+    wsManager.off('interaction.requested', onInteractionRequested)
+    wsManager.off('interaction.resolved', onInteractionResolved)
     wsManager.off('turn.usage', onTurnUsage)
     wsManager.off('turn.finished', onTurnFinished)
     wsManager.disconnect()

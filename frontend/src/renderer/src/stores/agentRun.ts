@@ -18,7 +18,10 @@ import { computed, ref } from 'vue'
 
 import type {
   AgentRun,
+  InteractionActivity,
   ToolActivity,
+  WsInteractionRequestedMessage,
+  WsInteractionResolvedMessage,
   WsToolCallMessage,
   WsToolResultMessage,
   WsTurnFinishedMessage,
@@ -73,6 +76,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       step: 0,
       maxSteps: 0,
       tools: [],
+      interactions: [],
       inputTokens: 0,
       outputTokens: 0,
       toolCalls: 0,
@@ -95,6 +99,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       step: 0,
       maxSteps: 0,
       tools: [],
+      interactions: [],
       inputTokens: 0,
       outputTokens: 0,
       toolCalls: 0,
@@ -151,6 +156,54 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     run.tools = [...run.tools.slice(0, idx), updated, ...run.tools.slice(idx + 1)]
   }
 
+  /**
+   * `interaction.requested` → append a `pending` interaction activity.
+   *
+   * Idempotent: a repeated request for the same `execution_id` is ignored
+   * (the existing entry — possibly already `resolved` — is left untouched).
+   */
+  function applyInteractionRequested(msg: WsInteractionRequestedMessage): void {
+    const run = ensureRun(msg.turn_id)
+    if (run.interactions.some((i) => i.executionId === msg.execution_id)) return
+    const activity: InteractionActivity = {
+      executionId: msg.execution_id,
+      kind: msg.kind,
+      toolName: msg.tool_name,
+      status: 'pending',
+    }
+    run.interactions = [...run.interactions, activity]
+  }
+
+  /**
+   * `interaction.resolved` → resolve the matching interaction with its
+   * outcome (create it already-`resolved` when the request never arrived,
+   * mirroring {@link applyToolResult}'s create-if-absent path).
+   */
+  function applyInteractionResolved(msg: WsInteractionResolvedMessage): void {
+    const run = ensureRun(msg.turn_id)
+    const idx = run.interactions.findIndex((i) => i.executionId === msg.execution_id)
+    if (idx === -1) {
+      const activity: InteractionActivity = {
+        executionId: msg.execution_id,
+        kind: msg.kind,
+        status: 'resolved',
+        outcome: msg.outcome,
+      }
+      run.interactions = [...run.interactions, activity]
+      return
+    }
+    const updated: InteractionActivity = {
+      ...run.interactions[idx],
+      status: 'resolved',
+      outcome: msg.outcome,
+    }
+    run.interactions = [
+      ...run.interactions.slice(0, idx),
+      updated,
+      ...run.interactions.slice(idx + 1),
+    ]
+  }
+
   /** `turn.usage` → record per-step token/tool counters. */
   function applyTurnUsage(msg: WsTurnUsageMessage): void {
     const run = ensureRun(msg.turn_id)
@@ -189,6 +242,8 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     applyLlmStep,
     applyToolCall,
     applyToolResult,
+    applyInteractionRequested,
+    applyInteractionResolved,
     applyTurnUsage,
     applyTurnFinished,
     reset,

@@ -49,6 +49,46 @@ export interface WsToolResultMessage {
   artifact_id?: string
 }
 
+/** Kind of mid-turn user interaction surfaced by the engine. */
+export type InteractionKind = 'tool_confirmation' | 'client_tool_call' | 'ask_user'
+
+/** Terminal disposition of a resolved interaction. */
+export type InteractionOutcome =
+  | 'approved'
+  | 'rejected'
+  | 'answered'
+  | 'executed'
+  | 'failed'
+  | 'cancelled'
+  | 'timeout'
+
+/**
+ * Server signals a pending user interaction (a confirmation round-trip, a
+ * client-side tool call, or an `ask_user` question). Correlates with its
+ * later {@link WsInteractionResolvedMessage} — and with the related tool's
+ * `tool.call`/`tool.result` — via `execution_id`.
+ */
+export interface WsInteractionRequestedMessage {
+  type: 'interaction.requested'
+  turn_id: string
+  execution_id: string
+  kind: InteractionKind
+  /** Name of the tool the interaction relates to, when applicable. */
+  tool_name?: string
+}
+
+/**
+ * Server reports the resolution of a prior interaction. Carries no
+ * `tool_name` — correlate back to the request by `execution_id`.
+ */
+export interface WsInteractionResolvedMessage {
+  type: 'interaction.resolved'
+  turn_id: string
+  execution_id: string
+  kind: InteractionKind
+  outcome: InteractionOutcome
+}
+
 /** Server reports per-step resource usage for a turn. */
 export interface WsTurnUsageMessage {
   type: 'turn.usage'
@@ -77,6 +117,8 @@ export type WsTurnEventMessage =
   | WsTurnLlmStepMessage
   | WsToolCallMessage
   | WsToolResultMessage
+  | WsInteractionRequestedMessage
+  | WsInteractionResolvedMessage
   | WsTurnUsageMessage
   | WsTurnFinishedMessage
 
@@ -97,6 +139,16 @@ export interface ToolActivity {
   artifactId?: string
 }
 
+/** Tracks the lifecycle of a single mid-turn user interaction within a run. */
+export interface InteractionActivity {
+  executionId: string
+  kind: InteractionKind
+  /** Name of the related tool, when the request carried one. */
+  toolName?: string
+  status: 'pending' | 'resolved'
+  outcome?: InteractionOutcome
+}
+
 /** Per-turn "agent run" view-model folded from the canonical event stream. */
 export interface AgentRun {
   turnId: string
@@ -105,6 +157,7 @@ export interface AgentRun {
   step: number
   maxSteps: number
   tools: ToolActivity[]
+  interactions: InteractionActivity[]
   inputTokens: number
   outputTokens: number
   toolCalls: number

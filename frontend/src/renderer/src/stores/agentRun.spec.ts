@@ -10,6 +10,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAgentRunStore } from './agentRun'
 import type {
+  WsInteractionRequestedMessage,
+  WsInteractionResolvedMessage,
   WsToolCallMessage,
   WsToolResultMessage,
   WsTurnFinishedMessage,
@@ -57,6 +59,36 @@ function toolResult(
     tool_name: 'web_search',
     success: true,
     result: 'ok',
+    ...overrides,
+  }
+}
+
+function interactionRequested(
+  turnId: string,
+  executionId: string,
+  overrides: Partial<WsInteractionRequestedMessage> = {},
+): WsInteractionRequestedMessage {
+  return {
+    type: 'interaction.requested',
+    turn_id: turnId,
+    execution_id: executionId,
+    kind: 'tool_confirmation',
+    tool_name: 'run_terminal_command',
+    ...overrides,
+  }
+}
+
+function interactionResolved(
+  turnId: string,
+  executionId: string,
+  overrides: Partial<WsInteractionResolvedMessage> = {},
+): WsInteractionResolvedMessage {
+  return {
+    type: 'interaction.resolved',
+    turn_id: turnId,
+    execution_id: executionId,
+    kind: 'tool_confirmation',
+    outcome: 'approved',
     ...overrides,
   }
 }
@@ -186,6 +218,87 @@ describe('tool.result handling', () => {
 })
 
 // ---------------------------------------------------------------------------
+// interaction handling
+// ---------------------------------------------------------------------------
+
+describe('interaction handling', () => {
+  it('initialises interactions to [] on turn.started', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    expect(s.currentRun!.interactions).toEqual([])
+  })
+
+  it('appends a pending entry on interaction.requested', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1'))
+    expect(s.currentRun!.interactions).toHaveLength(1)
+    expect(s.currentRun!.interactions[0]).toEqual({
+      executionId: 'x1',
+      kind: 'tool_confirmation',
+      toolName: 'run_terminal_command',
+      status: 'pending',
+    })
+  })
+
+  it('dedups a repeated interaction.requested by executionId', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1', { kind: 'ask_user' }))
+    expect(s.currentRun!.interactions).toHaveLength(1)
+    // The original pending entry is left untouched.
+    expect(s.currentRun!.interactions[0].kind).toBe('tool_confirmation')
+    expect(s.currentRun!.interactions[0].status).toBe('pending')
+  })
+
+  it('flips a pending entry to resolved with its outcome', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1'))
+    s.applyInteractionResolved(interactionResolved('t1', 'x1', { outcome: 'rejected' }))
+    const io = s.currentRun!.interactions[0]
+    expect(io.status).toBe('resolved')
+    expect(io.outcome).toBe('rejected')
+    // The requested-side metadata (tool name) is preserved across the flip.
+    expect(io.toolName).toBe('run_terminal_command')
+  })
+
+  it('creates a resolved entry when resolved arrives before requested (out of order)', () => {
+    const s = useAgentRunStore()
+    // No turn.started, no requested — the resolved frame arrives first.
+    s.applyInteractionResolved(
+      interactionResolved('t1', 'x1', { kind: 'ask_user', outcome: 'answered' }),
+    )
+
+    const run = s.runByTurnId('t1')
+    expect(run).not.toBeNull()
+    expect(run!.status).toBe('running')
+    expect(run!.interactions).toHaveLength(1)
+    expect(run!.interactions[0]).toMatchObject({
+      executionId: 'x1',
+      kind: 'ask_user',
+      status: 'resolved',
+      outcome: 'answered',
+    })
+
+    // A subsequent requested for the same executionId must NOT duplicate it.
+    s.applyInteractionRequested(interactionRequested('t1', 'x1', { kind: 'ask_user' }))
+    expect(s.runByTurnId('t1')!.interactions).toHaveLength(1)
+  })
+
+  it('keeps an entry pending forever when no resolved arrives (client disconnect)', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1', { kind: 'ask_user' }))
+    // The socket is gone — no interaction.resolved will ever arrive.
+    const io = s.currentRun!.interactions[0]
+    expect(io.status).toBe('pending')
+    expect(io.outcome).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // reset
 // ---------------------------------------------------------------------------
 
@@ -194,7 +307,9 @@ describe('reset', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
     s.applyToolCall(toolCall('t1', 'e1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1'))
     expect(s.currentRun).not.toBeNull()
+    expect(s.currentRun!.interactions).toHaveLength(1)
 
     s.reset()
     expect(s.currentTurnId).toBeNull()

@@ -13,7 +13,9 @@
  */
 import { computed } from 'vue'
 
+import type { AppIconName } from '../../assets/icons'
 import { useAgentRunStore } from '../../stores/agentRun'
+import type { InteractionKind, InteractionOutcome } from '../../types/turn'
 import { summarizeTools } from '../../utils/turnActivity'
 import AliceSpinner from '../ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
@@ -31,6 +33,49 @@ const statusLabel = computed(() => (isRunning.value ? 'In esecuzione' : 'Complet
 
 /** Per-status tool counts for the compact summary pills. */
 const toolSummary = computed(() => summarizeTools(run.value?.tools ?? []))
+
+/** Mid-turn interaction entries (confirmations / client calls / questions). */
+const interactions = computed(() => run.value?.interactions ?? [])
+
+/** Localised label + icon for an interaction kind. */
+interface KindMeta {
+  label: string
+  icon: AppIconName
+}
+
+const KIND_META: Record<InteractionKind, KindMeta> = {
+  tool_confirmation: { label: 'Conferma', icon: 'shield' },
+  ask_user: { label: 'Domanda', icon: 'message' },
+  client_tool_call: { label: 'Client', icon: 'link' },
+}
+
+function kindMeta(kind: InteractionKind): KindMeta {
+  return KIND_META[kind]
+}
+
+/** Localised label, glyph and tone for a resolved interaction outcome. */
+interface OutcomeMeta {
+  label: string
+  glyph: string
+  tone: 'ok' | 'err' | 'muted'
+}
+
+const OUTCOME_META: Record<InteractionOutcome, OutcomeMeta> = {
+  approved: { label: 'Approvato', glyph: '✓', tone: 'ok' },
+  rejected: { label: 'Rifiutato', glyph: '✗', tone: 'err' },
+  answered: { label: 'Risposto', glyph: '✎', tone: 'ok' },
+  executed: { label: 'Eseguito', glyph: '✓', tone: 'ok' },
+  failed: { label: 'Fallito', glyph: '✗', tone: 'err' },
+  cancelled: { label: 'Annullato', glyph: '⊘', tone: 'muted' },
+  timeout: { label: 'Scaduto', glyph: '⏱', tone: 'muted' },
+}
+
+/** Neutral fallback if a resolved entry somehow lacks an outcome. */
+const FALLBACK_OUTCOME: OutcomeMeta = { label: 'Risolto', glyph: '•', tone: 'muted' }
+
+function outcomeMeta(outcome: InteractionOutcome | undefined): OutcomeMeta {
+  return outcome ? OUTCOME_META[outcome] : FALLBACK_OUTCOME
+}
 
 /** Step-budget completion as a CSS width string (guards divide-by-zero). */
 const progressWidth = computed(() => {
@@ -96,6 +141,25 @@ const progressWidth = computed(() => {
         </span>
       </span>
     </div>
+
+    <!-- Interaction timeline: confirmations / client calls / questions -->
+    <ul v-if="interactions.length > 0" class="agent-card__io" aria-label="Interazioni del turno">
+      <li v-for="io in interactions" :key="io.executionId" class="agent-card__io-item">
+        <AppIcon :name="kindMeta(io.kind).icon" :size="12" class="agent-card__io-icon" />
+        <span class="agent-card__io-label">
+          {{ kindMeta(io.kind).label }}<span v-if="io.toolName" class="agent-card__io-tool">: {{ io.toolName }}</span>
+        </span>
+        <span v-if="io.status === 'pending'" class="agent-card__io-pending" aria-label="In attesa">
+          <AliceSpinner size="xs" />
+          <span class="agent-card__io-pending-text">in attesa…</span>
+        </span>
+        <span v-else class="agent-card__io-chip" :class="`agent-card__io-chip--${outcomeMeta(io.outcome).tone}`"
+          :aria-label="`Esito: ${outcomeMeta(io.outcome).label}`">
+          <span class="agent-card__io-glyph" aria-hidden="true">{{ outcomeMeta(io.outcome).glyph }}</span>
+          {{ outcomeMeta(io.outcome).label }}
+        </span>
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -248,6 +312,92 @@ const progressWidth = computed(() => {
 .agent-card__pill--run .agent-card__pill-dot {
   background: var(--accent);
   animation: agentCardPulse 1.4s ease-in-out infinite;
+}
+
+/* Interaction timeline (confirmations / client calls / questions) */
+.agent-card__io {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1-5) 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.agent-card__io-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+
+.agent-card__io-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.agent-card__io-label {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-card__io-tool {
+  color: var(--accent);
+}
+
+.agent-card__io-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.agent-card__io-pending-text {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--accent);
+}
+
+.agent-card__io-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  padding: 1px var(--space-1-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.agent-card__io-glyph {
+  line-height: 1;
+}
+
+.agent-card__io-chip--ok {
+  color: var(--success);
+  border-color: var(--success-border);
+  background: var(--success-light);
+}
+
+.agent-card__io-chip--err {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-light);
+}
+
+.agent-card__io-chip--muted {
+  color: var(--text-muted);
 }
 
 @keyframes agentCardPulse {

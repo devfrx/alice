@@ -15,13 +15,13 @@ from typing import Any
 
 from loguru import logger
 
+from backend.core.screenshot_lockout import get_lockout
 from backend.plugins.pc_automation.constants import (
     ALLOWED_APPS,
     CMD_BUILTINS,
     MAX_SCREENSHOT_PIXELS,
 )
 from backend.plugins.pc_automation.security import (
-    ScreenshotLockout,
     validate_app_name,
     validate_command,
     validate_keys,
@@ -56,13 +56,11 @@ except ImportError:
     pywinauto = None  # type: ignore[assignment]
     _PYWINAUTO_AVAILABLE = False
 
-# Shared lockout instance (one per plugin lifecycle)
-_lockout = ScreenshotLockout()
-
-
-def get_lockout() -> ScreenshotLockout:
-    """Return the shared screenshot lockout instance."""
-    return _lockout
+# Bind the process-wide lockout singleton (owned by core) so this module's
+# call sites and the plugin share one instance — a screenshot also locks out
+# the terminal tool. ``get_lockout`` (imported above) stays importable from
+# here for backward compatibility (e.g. plugin.py).
+_lockout = get_lockout()
 
 
 def check_dependencies() -> list[str]:

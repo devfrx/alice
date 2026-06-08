@@ -384,6 +384,29 @@ class WorkspaceScopeConfig(BaseSettings):
     """Project-relative root for ephemeral per-conversation sandboxes."""
 
 
+class TerminalConfig(BaseSettings):
+    """Scoped-terminal plugin policy (Fase 6).  Disabled by default."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_TERMINAL__")
+
+    enabled: bool = Field(default=False, description="Expose run_terminal_command.")
+    command_timeout_s: int = Field(
+        default=30,
+        ge=1,
+        le=600,
+        description="Per-command wall-clock timeout (seconds).",
+    )
+    max_output_bytes: int = Field(
+        default=100_000,
+        ge=1,
+        description="Cap on captured stdout+stderr bytes.",
+    )
+    allow_network: bool = Field(
+        default=False,
+        description="Best-effort network policy hint (not a hard guarantee on Windows).",
+    )
+
+
 class VRAMConfig(BaseSettings):
     """VRAM monitoring configuration."""
 
@@ -1226,6 +1249,7 @@ class AliceConfig(BaseSettings):
         default_factory=PermissionsConfig
     )
     scope: WorkspaceScopeConfig = Field(default_factory=WorkspaceScopeConfig)
+    terminal: TerminalConfig = Field(default_factory=TerminalConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     ui: UIConfig = Field(default_factory=UIConfig)

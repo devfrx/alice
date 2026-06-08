@@ -117,7 +117,7 @@ class TestPostScreenshotLockout:
         assert not lockout.is_locked("click")
         assert not lockout.is_locked("move_mouse")
 
-    @patch("backend.plugins.pc_automation.security.time.monotonic")
+    @patch("backend.core.screenshot_lockout.time.monotonic")
     def test_lockout_expires(self, mock_time):
         """Lockout expires after SCREENSHOT_LOCKOUT_S seconds."""
         lockout = ScreenshotLockout()
@@ -133,7 +133,7 @@ class TestPostScreenshotLockout:
         mock_time.return_value = 161.0
         assert not lockout.is_locked("execute_command")
 
-    @patch("backend.plugins.pc_automation.security.time.monotonic")
+    @patch("backend.core.screenshot_lockout.time.monotonic")
     def test_remaining_seconds_accuracy(self, mock_time):
         """get_remaining_s returns correct remaining time."""
         lockout = ScreenshotLockout()

@@ -19,6 +19,7 @@ import AssistantTranscript from '../components/assistant/AssistantTranscript.vue
 import ConversationDrawer from '../components/assistant/ConversationDrawer.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
+import AskUserPrompt from '../components/chat/AskUserPrompt.vue'
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import AgentActivitySidebar from '../components/chat/AgentActivitySidebar.vue'
 import { ChatApiKey } from '../composables/useChat'
@@ -66,6 +67,7 @@ const stopGeneration = chatApi?.stopGeneration ?? _noop
 const editMessage = chatApi?.editMessage ?? _asyncNoop
 const isConnected = chatApi?.isConnected ?? ref(false)
 const respondToConfirmation = chatApi?.respondToConfirmation ?? _noop
+const answerAskUser = chatApi?.answerAskUser ?? _noop
 
 /**
  * Reply submitted from the AgentActivitySidebar when the agent is
@@ -360,6 +362,11 @@ const pendingConfirmationsList = computed(() =>
     Object.values(chatStore.pendingConfirmations)
 )
 
+/** Pending ask_user prompts for the inline AskUserPrompt. */
+const pendingAskUserList = computed(() =>
+    Object.values(chatStore.pendingAskUser)
+)
+
 /** Determine the orb's state based on what AL\CE is doing. */
 const orbState = computed<'idle' | 'listening' | 'thinking' | 'speaking' | 'processing'>(() => {
     if (voiceStore.isSpeaking) return 'speaking'
@@ -597,6 +604,9 @@ onMounted(() => {
                             :tool-calls="lastToolCalls" :user-query="lastUserQuery" :orb-state="orbState"
                             key="response" />
                     </Transition>
+
+                    <AskUserPrompt v-for="r in pendingAskUserList" :key="r.executionId" :request="r"
+                        @answer="answerAskUser" />
 
                     <Transition name="transcript-fade">
                         <AssistantTranscript v-if="transcript || voiceStore.isListening || voiceStore.isProcessing"

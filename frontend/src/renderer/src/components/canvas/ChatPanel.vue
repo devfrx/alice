@@ -18,6 +18,7 @@ import MessageBubble from '../chat/MessageBubble.vue'
 import StreamingIndicator from '../chat/StreamingIndicator.vue'
 import ChatInput from '../chat/ChatInput.vue'
 import ToolConfirmationDialog from '../chat/ToolConfirmationDialog.vue'
+import AskUserPrompt from '../chat/AskUserPrompt.vue'
 import MessageEditDialog from '../chat/MessageEditDialog.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import ModuleLauncher from './ModuleLauncher.vue'
@@ -48,6 +49,7 @@ const isConnected = chatApi?.isConnected ?? ref(false)
 const stopGeneration = chatApi?.stopGeneration ?? _noop
 const editMessage = chatApi?.editMessage ?? _asyncNoop
 const respondToConfirmation = chatApi?.respondToConfirmation ?? _noop
+const answerAskUser = chatApi?.answerAskUser ?? _noop
 
 const {
   startListening,
@@ -98,6 +100,7 @@ async function handleSend(content: string, attachments: File[]): Promise<void> {
 }
 
 const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
+const pendingAskUserList = computed(() => Object.values(chatStore.pendingAskUser))
 
 // ── Auto-scroll ─────────────────────────────────────────────────────────────
 function scrollConversation(): void {
@@ -166,6 +169,13 @@ const conversationTitle = computed<string>(() => {
             :thinking-content="chatStore.currentThinkingContent"
           />
         </div>
+
+        <AskUserPrompt
+          v-for="r in pendingAskUserList"
+          :key="r.executionId"
+          :request="r"
+          @answer="answerAskUser"
+        />
       </div>
     </div>
 

@@ -212,6 +212,26 @@ export interface WsToolConfirmationResponsePayload {
   approved: boolean
 }
 
+/**
+ * Server requests free-form input from the user before a tool can proceed
+ * (the `ask_user` meta-tool). Unlike a tool confirmation this always needs
+ * human input — there is no auto-approve path. `options` is omitted when the
+ * tool passed no suggested choices.
+ */
+export interface WsAskUserRequiredMessage {
+  type: 'ask_user_required'
+  execution_id: string
+  question: string
+  options?: string[]
+}
+
+/** Payload the client sends back with the user's answer to an `ask_user`. */
+export interface WsAskUserResponsePayload {
+  type: 'ask_user_response'
+  execution_id: string
+  answer: string
+}
+
 /** Server signals it is re-querying the LLM after tool execution. */
 export interface WsLlmRequeryMessage {
   type: 'llm_requery'
@@ -385,6 +405,14 @@ export interface ConfirmationRequest {
   reasoning?: string
 }
 
+/** A pending `ask_user` request awaiting the user's free-form answer. */
+export interface AskUserRequest {
+  executionId: string
+  question: string
+  /** Optional suggested choices the user can click instead of typing. */
+  options?: string[]
+}
+
 /** Snapshot of context window utilization (camelCase, from WS snake_case). */
 export interface ContextInfo {
   used: number
@@ -412,6 +440,7 @@ export type WsMessage =
   | WsToolExecutionDoneMessage
   | WsToolProgressMessage
   | WsToolConfirmationRequiredMessage
+  | WsAskUserRequiredMessage
   | WsLlmRequeryMessage
   | WsWarningMessage
   | WsContextInfoMessage

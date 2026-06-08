@@ -29,6 +29,8 @@ import { useUIStore } from '../stores/ui'
 import type { AgentEvent } from '../types/agent'
 import type {
   FileAttachment,
+  WsAskUserRequiredMessage,
+  WsAskUserResponsePayload,
   WsCancelPayload,
   WsContextCompressionDoneMessage,
   WsContextInfoMessage,
@@ -70,6 +72,8 @@ export interface UseChatReturn {
   stopGeneration: () => void
   /** Respond to a tool confirmation request. */
   respondToConfirmation: (executionId: string, approved: boolean) => void
+  /** Answer an inline `ask_user` prompt with free-form text. */
+  answerAskUser: (executionId: string, answer: string) => void
   /** Reactive flag — `true` while the socket is open. */
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
@@ -213,6 +217,18 @@ export function useChat(): UseChatReturn {
     })
   }
 
+  const onAskUserRequired = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsAskUserRequiredMessage
+
+    // ask_user always needs human input — there is no auto-approve path.
+    store.addPendingAskUser({
+      executionId: msg.execution_id,
+      question: msg.question,
+      options: msg.options
+    })
+  }
+
   const onLlmRequery = (data: unknown): void => {
     if (store.streamGeneration !== activeGeneration) return
     const msg = data as WsLlmRequeryMessage
@@ -345,6 +361,7 @@ export function useChat(): UseChatReturn {
   wsManager.on('tool_execution_done', onToolExecutionDone)
   wsManager.on('tool_progress', onToolProgress)
   wsManager.on('tool_confirmation_required', onToolConfirmationRequired)
+  wsManager.on('ask_user_required', onAskUserRequired)
   wsManager.on('llm_requery', onLlmRequery)
   wsManager.on('warning', onWarning)
   wsManager.on('error', onWsError) // also catches server-side error frames
@@ -395,6 +412,7 @@ export function useChat(): UseChatReturn {
     wsManager.off('tool_execution_done', onToolExecutionDone)
     wsManager.off('tool_progress', onToolProgress)
     wsManager.off('tool_confirmation_required', onToolConfirmationRequired)
+    wsManager.off('ask_user_required', onAskUserRequired)
     wsManager.off('llm_requery', onLlmRequery)
     wsManager.off('warning', onWarning)
     wsManager.off('error', onWsError)
@@ -625,11 +643,25 @@ export function useChat(): UseChatReturn {
     store.removePendingConfirmation(executionId)
   }
 
+  /**
+   * Answer an inline `ask_user` prompt with the user's free-form text.
+   */
+  function answerAskUser(executionId: string, answer: string): void {
+    const payload: WsAskUserResponsePayload = {
+      type: 'ask_user_response',
+      execution_id: executionId,
+      answer
+    }
+    wsManager.send(payload)
+    store.removePendingAskUser(executionId)
+  }
+
   return {
     sendMessage,
     editMessage,
     stopGeneration,
     respondToConfirmation,
+    answerAskUser,
     isConnected,
     connectionStatus,
     isCancelling: computed(() => store.isCancelling)

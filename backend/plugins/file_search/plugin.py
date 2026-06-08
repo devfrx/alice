@@ -538,10 +538,15 @@ class FileSearchPlugin(BasePlugin):
         validation applies the same allowed/forbidden rules as read.
 
         Args:
-            args: Must contain "path" and "content".
+            args: Must contain "path" and a non-empty string "content".
 
         Returns:
             A success message string.
+
+        Raises:
+            ValueError: If "path" or "content" is missing/empty, "content" is
+                not a string, the target is an executable, or content exceeds
+                the maximum write size.
         """
         raw_path: str = args.get("path", "")
         if not raw_path:
@@ -552,6 +557,8 @@ class FileSearchPlugin(BasePlugin):
             raise ValueError("'content' parameter is required")
         if not isinstance(content, str):
             raise ValueError("'content' must be a string")
+        if not content:
+            raise ValueError("'content' parameter must not be empty")
 
         cfg = self.ctx.config.file_search
         resolved = _validate_path(

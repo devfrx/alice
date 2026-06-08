@@ -117,3 +117,22 @@ class TurnResult:
     final_assistant_message_id: uuid.UUID | None = None
     had_tool_calls: bool = False
     agent_run_id: uuid.UUID | None = None
+
+
+@dataclass
+class TurnProgress:
+    """Mutable per-turn counters shared between the executor and the tool loop.
+
+    Used to emit the canonical turn-lifecycle events with a stable
+    ``turn_id`` and accurate step/tool-call counts without threading extra
+    return values out of :func:`run_tool_loop`.
+
+    Args:
+        turn_id: Stable identifier minted once at the start of the turn.
+        steps: Number of LLM steps emitted so far this turn.
+        tool_calls: Cumulative tool calls dispatched this turn.
+    """
+
+    turn_id: str
+    steps: int = 0
+    tool_calls: int = 0

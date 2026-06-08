@@ -18,6 +18,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from backend.services.turn.direct_executor import DirectTurnExecutor
+from backend.services.turn.events import CANONICAL_TURN_EVENT_TYPES
 from backend.services.turn.sink import (
     RecordingEventSink,
     is_websocket_closed_runtime_error,
@@ -91,7 +92,10 @@ async def test_sink_disconnect_mid_stream_returns_disconnected() -> None:
 
     assert result.finish_reason == "disconnected"
     assert result.content == "partial"
-    assert sink.events == [{"type": "token", "content": "partial"}]
+    # Among the legacy frames, only "partial" was streamed before the sink
+    # disconnect halted streaming (additive turn.* frames are filtered out).
+    legacy = [e for e in sink.events if e["type"] not in CANONICAL_TURN_EVENT_TYPES]
+    assert legacy == [{"type": "token", "content": "partial"}]
 
 
 @pytest.mark.asyncio

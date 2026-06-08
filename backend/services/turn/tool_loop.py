@@ -21,7 +21,9 @@ from backend.core.plugin_models import ExecutionContext, ToolResult
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
 from backend.services.permission_service import PermissionService
+from backend.services.turn import events
 from backend.services.turn.channel import InteractionChannel
+from backend.services.turn.models import TurnProgress
 from backend.services.turn.pipeline import (
     ConfirmationMiddleware,
     DedupMiddleware,
@@ -77,6 +79,7 @@ async def run_tool_loop(
     client_ip: str,
     sync_fn: SyncFn | None,
     cancel_event: asyncio.Event | None = None,
+    turn_progress: TurnProgress | None = None,
     memory_context: str | None = None,
     tools: list[dict[str, Any]] | None = None,
     initial_history: list[dict[str, Any]] | None = None,
@@ -109,6 +112,12 @@ async def run_tool_loop(
         sync_fn: Async callback to sync conversation to JSON file.
         cancel_event: Optional event that, when set, signals the loop
             to stop early and return accumulated content.
+        turn_progress: Optional mutable per-turn counters shared with the
+            executor. When provided, the per-iteration ``turn.llm_step`` /
+            ``turn.usage`` frames reuse its ``turn_id`` and advance its
+            ``steps`` / ``tool_calls``. When ``None`` (direct callers and
+            unit tests), a private :class:`TurnProgress` is minted locally
+            so the loop's emissions still carry a stable ``turn_id``.
         memory_context: Optional pre-formatted memory block to inject
             into the system prompt on each LLM re-query.
         tools: Pre-fetched tool definitions (avoids re-fetching each
@@ -129,6 +138,16 @@ async def run_tool_loop(
     if ctx.tool_registry is None:
         logger.error("Tool registry not available, cannot execute tool loop")
         return full_content, thinking_content, 0, 0, "stop"
+
+    # Resolve a per-turn progress object so the per-iteration lifecycle
+    # frames carry a stable turn_id and accurate counters even when the
+    # loop is invoked directly (no executor, e.g. unit tests).
+    progress = (
+        turn_progress
+        if turn_progress is not None
+        else TurnProgress(turn_id=uuid.uuid4().hex)
+    )
+    max_steps = max_iterations + 1
 
     llm_error_in_requery = False
 
@@ -271,6 +290,10 @@ async def run_tool_loop(
                             "tool_call_id": tc_id,
                         })
                 continue
+
+            # Count every named tool call dispatched this turn (cumulative
+            # across iterations, regardless of the gate disposition).
+            progress.tool_calls += 1
 
             raw_args = fn.get("arguments", "{}") or "{}"
             try:
@@ -763,6 +786,12 @@ async def run_tool_loop(
                     "type": "llm_requery",
                     "iteration": iteration + 1,
                 })
+                # Additive: mark a new LLM step for this iteration.
+                progress.steps += 1
+                with contextlib.suppress(Exception):
+                    await sink.send(events.turn_llm_step(
+                        turn_id=progress.turn_id, step=progress.steps,
+                    ))
             else:
                 logger.info(
                     "Re-query retry {}/{} (iter {}) — LLM returned empty, "
@@ -864,6 +893,18 @@ async def run_tool_loop(
             llm_error_in_requery,
             requery_attempt,
         )
+
+        # Additive: per-step usage snapshot for this iteration (uses the
+        # real token counts captured from the re-query ``usage`` event).
+        with contextlib.suppress(Exception):
+            await sink.send(events.turn_usage(
+                turn_id=progress.turn_id,
+                step=progress.steps,
+                input_tokens=_loop_last_input_tokens,
+                output_tokens=_loop_last_output_tokens,
+                tool_calls=progress.tool_calls,
+                max_steps=max_steps,
+            ))
 
     # Log why the tool loop exited.
     if cancel_event and cancel_event.is_set():

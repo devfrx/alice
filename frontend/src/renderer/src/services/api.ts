@@ -58,6 +58,24 @@ import type {
   ArtifactListResponse,
 } from '../types/artifacts'
 import type { PlanResponse } from '../types/plan'
+import type { ScopeResponse } from '../types/scope'
+
+/**
+ * Error thrown by {@link request} on a non-2xx HTTP response.
+ *
+ * Extends the native `Error` so existing callers that catch `Error` or read
+ * `.message` are unaffected, while carrying the HTTP `status` so callers that
+ * need to branch on it (e.g. detecting a 409 `scope_locked` conflict) can.
+ */
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
 
 /** Backend host (without /api), configurable via VITE_API_BASE_URL env var.
  *  Default uses 127.0.0.1 (not `localhost`) because on Windows Electron's
@@ -143,7 +161,8 @@ function withTimeout(
  * @param options  - Standard `RequestInit` overrides; pass `signal` for cancellation.
  * @param timeoutMs - Per-request timeout in ms (default {@link DEFAULT_REQUEST_TIMEOUT_MS}).
  * @returns Parsed JSON body cast to `T`.
- * @throws {Error} On non-2xx status codes, network failure, timeout, or abort.
+ * @throws {ApiError} On non-2xx status codes (carries the HTTP `status`).
+ * @throws {Error} On network failure, timeout, or abort.
  */
 async function request<T>(
   endpoint: string,
@@ -169,7 +188,7 @@ async function request<T>(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new Error(`API Error ${response.status}: ${response.statusText} — ${body}`)
+    throw new ApiError(response.status, `API Error ${response.status}: ${response.statusText} — ${body}`)
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
@@ -817,5 +836,32 @@ export const api = {
   /** Fetch the persisted plan (todo-list) for a conversation. */
   getPlan: (conversationId: string): Promise<PlanResponse> =>
     request<PlanResponse>(`/plans/${encodeURIComponent(conversationId)}`),
+
+  // -- Scope ----------------------------------------------------------------
+
+  /** Fetch the persisted workspace scope (folders + idle flag) for a conversation. */
+  getScope: (conversationId: string): Promise<ScopeResponse> =>
+    request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`),
+
+  /**
+   * Replace the workspace scope folders for a conversation.
+   *
+   * Idle-guarded server-side: throws {@link ApiError} with `status === 409`
+   * (detail `"scope_locked"`) when a turn is running for the conversation.
+   */
+  setScope: (conversationId: string, folders: string[]): Promise<ScopeResponse> =>
+    request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ folders }),
+    }),
+
+  /**
+   * Clear the workspace scope for a conversation (empties the folder list).
+   *
+   * Idle-guarded server-side: throws {@link ApiError} with `status === 409`
+   * (detail `"scope_locked"`) when a turn is running for the conversation.
+   */
+  clearScope: (conversationId: string): Promise<ScopeResponse> =>
+    request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, { method: 'DELETE' }),
 
 }

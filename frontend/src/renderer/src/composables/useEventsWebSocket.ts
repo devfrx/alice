@@ -14,6 +14,8 @@ import { useArtifactsStore } from '../stores/artifacts'
 import { useServicesStore } from '../stores/services'
 import { usePlanStore } from '../stores/plan'
 import type { WsPlanUpdatedMessage } from '../types/plan'
+import { useScopeStore } from '../stores/scope'
+import type { WsScopeUpdatedMessage } from '../types/scope'
 import { BACKEND_HOST } from '../services/api'
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
 
@@ -26,6 +28,7 @@ export function useEventsWebSocket() {
   const artifactsStore = useArtifactsStore()
   const servicesStore = useServicesStore()
   const planStore = usePlanStore()
+  const scopeStore = useScopeStore()
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -99,6 +102,11 @@ export function useEventsWebSocket() {
         // Handle plan updates: fold the full pushed step list into the store.
         if (data.type === 'plan.updated' && typeof data.conversation_id === 'string') {
           planStore.applyPlanUpdated(data as WsPlanUpdatedMessage)
+        }
+
+        // Handle scope updates: fold the full pushed folder list into the store.
+        if (data.type === 'scope.updated' && typeof data.conversation_id === 'string') {
+          scopeStore.applyScopeUpdated(data as WsScopeUpdatedMessage)
         }
       } catch {
         console.warn('[ALICE Events WS] Failed to parse message')

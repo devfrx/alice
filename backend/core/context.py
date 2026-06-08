@@ -108,6 +108,17 @@ class AppContext:
     artifact_registry: Any = None
     """Unified registry for tool-generated artifacts (3D, images, audio, …)."""
 
+    permission_service: Any = None
+    """Central tool-permission authority (Fase 2, foundation D).
+
+    Owns risk policy (forbidden), by-construction filesystem scope
+    confinement and per-conversation grants for the turn engine's
+    permission middleware. Typed as :class:`Any` to avoid a ``core`` →
+    ``services`` import cycle (the concrete type lives in
+    :mod:`backend.services.permission_service`). The workspace scope it
+    confines against arrives in Fase 6; until then it imposes no new
+    denials."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

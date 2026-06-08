@@ -605,6 +605,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     artifact_registry.set_event_callback(_broadcast_artifact_event)
     ctx.artifact_registry = artifact_registry
 
+    # -- Permission service (central tool risk / scope authority) -------
+    # Fase 2: no scope provider yet (ScopeService arrives in Fase 6), so it
+    # enforces forbidden-tool risk policy only and imposes no new denials.
+    from backend.services.permission_service import PermissionService
+
+    ctx.permission_service = PermissionService()
+
     app.state.context = ctx
     app.state.engine = engine
 

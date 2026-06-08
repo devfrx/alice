@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
    that brightens to accent on hover/drag; no pill/ellipse. */
 .pane-divider__grip {
   background: var(--border);
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-xs, 9999px);
   opacity: 0.8;
   transition:
     background-color var(--duration-fast, 120ms) var(--ease-out-quart),
@@ -145,13 +145,13 @@ onBeforeUnmount(() => {
 }
 
 .pane-divider--x .pane-divider__grip {
-  width: 2px;
+  width: 3px;
   height: 48px;
 }
 
 .pane-divider--y .pane-divider__grip {
   width: 48px;
-  height: 2px;
+  height: 3px;
 }
 
 .pane-divider:hover .pane-divider__grip,

@@ -166,13 +166,13 @@ const progressWidth = computed(() => {
   height: 3px;
   width: 100%;
   background: var(--surface-1);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
 .agent-card__bar-fill {
   height: 100%;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-xs);
   background: var(--accent);
   transition: width var(--duration-normal) ease;
 }

@@ -120,7 +120,7 @@ pc_automation:
 # Scoped-terminal plugin policy (Fase 6). Disabled by default; while
 # enabled=false the plugin registers but exposes no tools.
 terminal:
-  enabled: false
+  enabled: true
   command_timeout_s: 30
   max_output_bytes: 100000
   allow_network: false

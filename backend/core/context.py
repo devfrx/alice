@@ -127,6 +127,13 @@ class AppContext:
     in the lifespan. Used by the ``agent`` plugin's ``update_plan`` and the
     turn engine's plan re-inject."""
 
+    scope_service: Any = None
+    """Per-conversation workspace folder scope (Fase 6).
+
+    Typed as :class:`Any` to avoid a core→services import cycle; concrete type
+    :class:`backend.services.scope_service.ScopeService`. Wired in the lifespan;
+    its ``scope_roots`` is the ``PermissionService`` scope provider."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

@@ -498,3 +498,31 @@ class ConversationPlan(SQLModel, table=True):
     )
     updated_at: datetime = Field(default_factory=_utcnow)
 
+
+# ---------------------------------------------------------------------------
+# Conversation Scope (workspace folder confinement, Fase 6)
+# ---------------------------------------------------------------------------
+
+
+class ConversationScope(SQLModel, table=True):
+    """The workspace folder scope for a conversation (one row per conversation).
+
+    ``folders`` is a JSON list of absolute folder paths the conversation's
+    tools are confined to. Mutable only while the conversation is idle
+    (enforced by the API layer in a later task)."""
+
+    __tablename__ = "conversation_scopes"
+
+    conversation_id: uuid.UUID = Field(
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+    )
+    folders: Any = Field(
+        default_factory=list,
+        sa_column=sa.Column(sa.JSON, nullable=False),
+    )
+    updated_at: datetime = Field(default_factory=_utcnow)
+

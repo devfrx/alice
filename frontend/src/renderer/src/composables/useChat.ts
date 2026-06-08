@@ -25,8 +25,6 @@ import { wsManager } from '../services/ws'
 import { useAgentRunStore } from '../stores/agentRun'
 import { useChatStore } from '../stores/chat'
 import { useSettingsStore } from '../stores/settings'
-import { useUIStore } from '../stores/ui'
-import type { AgentEvent } from '../types/agent'
 import type {
   FileAttachment,
   WsAskUserRequiredMessage,
@@ -93,7 +91,6 @@ export const ChatApiKey: InjectionKey<UseChatReturn> = Symbol('chatApi')
 export function useChat(): UseChatReturn {
   const store = useChatStore()
   const settingsStore = useSettingsStore()
-  const uiStore = useUIStore()
   const agentRunStore = useAgentRunStore()
 
   const isConnected = ref(false)
@@ -283,28 +280,6 @@ export function useChat(): UseChatReturn {
     store.setCompressingContext(false)
   }
 
-  // -- Agent Loop v2 events ----------------------------------------------
-
-  const onAgentEvent = (data: unknown): void => {
-    // Apply unconditionally — agent runs are persisted server-side and the
-    // tracker is keyed by `run_id`, so stale-generation checks would just
-    // drop legitimate events when the user navigates away mid-run.
-    const event = data as AgentEvent
-    store.applyAgentEvent(event)
-
-    // Auto-open the activity sidebar on the first event of a real
-    // agent run.  Bypass runs (direct LLM answers with critic-only
-    // verification) never auto-open the panel — the bubble's micro
-    // banner offers an explicit affordance for debug.
-    if (
-      event.type === 'agent.run_started' &&
-      uiStore.agentSidebarAutoOpen &&
-      (event.mode ?? 'agent') === 'agent'
-    ) {
-      uiStore.openAgentSidebar(event.run_id)
-    }
-  }
-
   const onWsError = (data: unknown): void => {
     // Only handle server-side error frames (JSON objects with content),
     // skip native WebSocket error Events.
@@ -369,15 +344,6 @@ export function useChat(): UseChatReturn {
   wsManager.on('context_compression_start', onContextCompressionStart)
   wsManager.on('context_compression_done', onContextCompressionDone)
   wsManager.on('context_compression_failed', onContextCompressionFailed)
-  wsManager.on('agent.run_started', onAgentEvent)
-  wsManager.on('agent.plan_created', onAgentEvent)
-  wsManager.on('agent.step_started', onAgentEvent)
-  wsManager.on('agent.step_completed', onAgentEvent)
-  wsManager.on('agent.replanned', onAgentEvent)
-  wsManager.on('agent.critic_invoked', onAgentEvent)
-  wsManager.on('agent.warning', onAgentEvent)
-  wsManager.on('agent.ask_user', onAgentEvent)
-  wsManager.on('agent.run_finished', onAgentEvent)
   wsManager.on('turn.started', onTurnStarted)
   wsManager.on('turn.llm_step', onTurnLlmStep)
   wsManager.on('tool.call', onTurnToolCall)
@@ -420,15 +386,6 @@ export function useChat(): UseChatReturn {
     wsManager.off('context_compression_start', onContextCompressionStart)
     wsManager.off('context_compression_done', onContextCompressionDone)
     wsManager.off('context_compression_failed', onContextCompressionFailed)
-    wsManager.off('agent.run_started', onAgentEvent)
-    wsManager.off('agent.plan_created', onAgentEvent)
-    wsManager.off('agent.step_started', onAgentEvent)
-    wsManager.off('agent.step_completed', onAgentEvent)
-    wsManager.off('agent.replanned', onAgentEvent)
-    wsManager.off('agent.critic_invoked', onAgentEvent)
-    wsManager.off('agent.warning', onAgentEvent)
-    wsManager.off('agent.ask_user', onAgentEvent)
-    wsManager.off('agent.run_finished', onAgentEvent)
     wsManager.off('turn.started', onTurnStarted)
     wsManager.off('turn.llm_step', onTurnLlmStep)
     wsManager.off('tool.call', onTurnToolCall)

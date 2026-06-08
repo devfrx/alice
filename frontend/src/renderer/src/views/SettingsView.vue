@@ -130,42 +130,6 @@
         <VectorStoreManager />
       </section>
 
-      <!-- Agent Loop -->
-      <section :ref="(el) => setSectionRef('agent', el)" id="section-agent" class="sv__section">
-        <div class="sv__section-head">
-          <h3 class="sv__section-title">Modalità agente</h3>
-          <p class="sv__section-desc">Pianifica, esegui e verifica le richieste complesse passo dopo passo</p>
-        </div>
-        <div class="sv__group">
-          <div class="sv__row">
-            <div class="sv__row-text">
-              <span class="sv__row-label">Mostra Plan Card sotto i messaggi</span>
-              <span class="sv__row-hint">Aggiunge una checklist collassabile con il piano dell'agente sotto ogni
-                risposta.</span>
-            </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': uiStore.agentPlanCardEnabled }" role="switch"
-              :aria-checked="uiStore.agentPlanCardEnabled"
-              @click="uiStore.agentPlanCardEnabled = !uiStore.agentPlanCardEnabled">
-              <span class="sv__toggle-thumb" />
-            </button>
-          </div>
-
-          <div class="sv__divider" />
-
-          <div class="sv__row">
-            <div class="sv__row-text">
-              <span class="sv__row-label">Apri Activity Sidebar automaticamente</span>
-              <span class="sv__row-hint">Apre il pannello laterale al primo evento dell'agente.</span>
-            </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': uiStore.agentSidebarAutoOpen }" role="switch"
-              :aria-checked="uiStore.agentSidebarAutoOpen"
-              @click="uiStore.agentSidebarAutoOpen = !uiStore.agentSidebarAutoOpen">
-              <span class="sv__toggle-thumb" />
-            </button>
-          </div>
-        </div>
-      </section>
-
       <!-- Security -->
       <section :ref="(el) => setSectionRef('security', el)" id="section-security" class="sv__section">
         <div class="sv__section-head">
@@ -239,10 +203,8 @@ import AppIcon from '../components/ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../components/ui/UiSelect.vue'
 import type { AppIconName } from '../assets/icons'
 import { useSettingsStore } from '../stores/settings'
-import { useUIStore } from '../stores/ui'
 
 const settingsStore = useSettingsStore()
-const uiStore = useUIStore()
 
 /* ── UI theme select ────────────────────────────────────────── */
 const themeOptions: UiSelectOption[] = [
@@ -251,7 +213,7 @@ const themeOptions: UiSelectOption[] = [
 ]
 
 /* ── Navigation ─────────────────────────────────────────────── */
-type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'agent' | 'security' | 'ui'
+type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'security' | 'ui'
 
 const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'model', label: 'Modello', iconName: 'package' },
@@ -263,7 +225,6 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'knowledge', label: 'Knowledge Graph', iconName: 'share-graph' },
   { id: 'memory', label: 'Memoria', iconName: 'book' },
   { id: 'vectorstore', label: 'Vector Store', iconName: 'database' },
-  { id: 'agent', label: 'Modalità agente', iconName: 'cpu' },
   { id: 'security', label: 'Sicurezza', iconName: 'shield' },
   { id: 'ui', label: 'Interfaccia', iconName: 'settings' },
 ]
@@ -271,7 +232,7 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
 const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
-  model: null, llm: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, agent: null, security: null, ui: null,
+  model: null, llm: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, security: null, ui: null,
 })
 
 function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null) {

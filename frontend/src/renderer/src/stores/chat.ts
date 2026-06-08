@@ -12,8 +12,6 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
 import { api, resolveBackendUrl } from '../services/api'
-import { useAgentRun } from '../composables/useAgentRun'
-import type { AgentEvent, AgentRun } from '../types/agent'
 import type {
   AskUserRequest,
   ChatMessage,
@@ -155,34 +153,6 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Whether context compression is currently in progress. */
   const isCompressingContext = ref(false)
-
-  // -----------------------------------------------------------------------
-  // Agent loop tracker (Agent Loop v2)
-  // -----------------------------------------------------------------------
-
-  const agentTracker = useAgentRun()
-
-  /** Reactive map of in-flight / completed agent runs, keyed by `run_id`. */
-  const agentRuns = agentTracker.agentRuns
-
-  /** Apply an `agent.*` WebSocket event to the local tracker. */
-  function applyAgentEvent(event: AgentEvent): void {
-    agentTracker.applyAgentEvent(event)
-  }
-
-  /**
-   * Associate the most recently started agent run with an assistant
-   * message id.  Called from `finalizeStream` so the UI can look the
-   * run up by `final_assistant_message_id`.
-   */
-  function linkAgentRunToMessage(messageId: string): void {
-    agentTracker.linkRunToMessage(messageId)
-  }
-
-  /** Look up the agent run that produced a given assistant message. */
-  function getAgentRunByMessageId(messageId: string | null | undefined): AgentRun | null {
-    return agentTracker.getRunByMessageId(messageId)
-  }
 
   // -----------------------------------------------------------------------
   // Computed
@@ -634,10 +604,6 @@ export const useChatStore = defineStore('chat', () => {
     // User navigated away — message is saved server-side.
     // Reset streaming state and refresh sidebar only.
     if (!currentConversation.value || currentConversation.value.id !== conversationId) {
-      // Still link the pending agent run to its (server-persisted) assistant
-      // message id so it remains lookup-able by `final_assistant_message_id`
-      // once the user navigates back, mirroring the in-view branch below.
-      linkAgentRunToMessage(messageId)
       currentStreamContent.value = ''
       currentThinkingContent.value = ''
       isStreaming.value = false
@@ -665,9 +631,6 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     currentConversation.value.messages.push(assistantMsg)
-    // Link any pending agent run to the freshly persisted assistant message
-    // so MessageBubble can look it up by `final_assistant_message_id`.
-    linkAgentRunToMessage(messageId)
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
     isStreaming.value = false
@@ -911,7 +874,6 @@ export const useChatStore = defineStore('chat', () => {
     pendingAskUser,
     contextInfo,
     isCompressingContext,
-    agentRuns,
 
     // computed
     messages,
@@ -955,10 +917,5 @@ export const useChatStore = defineStore('chat', () => {
     updateContextInfo,
     setCompressingContext,
     setCompressionDone,
-
-    // agent loop
-    applyAgentEvent,
-    linkAgentRunToMessage,
-    getAgentRunByMessageId
   }
 })

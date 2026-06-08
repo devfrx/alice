@@ -7,6 +7,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy import event as sa_event
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
@@ -17,6 +22,7 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
+from backend.db.models import Conversation
 from backend.plugins.agent._plan import (
     MAX_STEPS,
     PlanStep,
@@ -30,6 +36,7 @@ from backend.plugins.agent._subagent import (
     run_subagent,
 )
 from backend.plugins.agent.plugin import AgentPlugin
+from backend.services.plan_service import PlanService
 
 
 # ---------------------------------------------------------------------------
@@ -501,3 +508,91 @@ class TestSpawnSubagent:
         )
         passed = {t["function"]["name"] for t in (captured["tools"] or [])}
         assert passed == {"web_search_search"}
+
+
+# ===========================================================================
+# 5.  update_plan persistence via a wired PlanService
+# ===========================================================================
+
+
+@pytest.fixture
+async def plan_session_factory():
+    """In-memory SQLite + session factory (mirrors test_plan_service.py).
+
+    Foreign-key enforcement is enabled per-connection so the
+    ``ConversationPlan -> Conversation`` FK is exercised.
+    """
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+
+    @sa_event.listens_for(engine.sync_engine, "connect")
+    def _enable_sqlite_fk(dbapi_conn, _record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    factory = async_sessionmaker(
+        engine, class_=SQLModelAsyncSession, expire_on_commit=False,
+    )
+    yield factory
+    await engine.dispose()
+
+
+class TestUpdatePlanPersistence:
+    """``update_plan`` persists via ``ctx.plan_service`` when one is wired."""
+
+    @pytest.mark.asyncio
+    async def test_update_plan_persists_and_broadcasts(
+        self, plan_session_factory,
+    ):
+        # Parent conversation row (FK target for ConversationPlan).
+        async with plan_session_factory() as session:
+            conv = Conversation(title="t")
+            session.add(conv)
+            await session.commit()
+            await session.refresh(conv)
+            conv_id = conv.id
+
+        captured: list[dict[str, Any]] = []
+
+        async def _capture(event_payload: dict[str, Any]) -> None:
+            captured.append(event_payload)
+
+        plan_service = PlanService(session_factory=plan_session_factory)
+        plan_service.set_event_callback(_capture)
+
+        ctx = _make_app_context()
+        ctx.plan_service = plan_service
+
+        plugin = AgentPlugin()
+        await plugin.initialize(ctx)
+
+        expected_steps = [
+            {"step": "research", "status": "in_progress"},
+            {"step": "write", "status": "pending"},
+        ]
+        result = await plugin.execute_tool(
+            "update_plan",
+            {"plan": [{"step": "research", "status": "in_progress"}, "write"]},
+            _make_exec_ctx(str(conv_id)),
+        )
+        assert result.success
+
+        # Persisted to the DB via the service (not the in-memory store).
+        assert await plan_service.get_plan(conv_id) == expected_steps
+        # The in-memory fallback store was NOT written to.
+        assert await plugin._plans.get_plan(str(conv_id)) == []
+
+        # The plan.updated broadcast fired once with the canonical payload.
+        assert captured == [
+            {
+                "type": "plan.updated",
+                "conversation_id": str(conv_id),
+                "steps": expected_steps,
+            }
+        ]

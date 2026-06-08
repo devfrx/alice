@@ -266,7 +266,12 @@ class AgentPlugin(BasePlugin):
         except ValueError as exc:
             return ToolResult.error(str(exc))
 
-        await self._plans.set_plan(context.conversation_id, steps)
+        steps_dicts = [s.to_dict() for s in steps]
+        plan_service = self._ctx.plan_service if self._ctx is not None else None
+        if plan_service is not None:
+            await plan_service.set_plan(context.conversation_id, steps_dicts)
+        else:
+            await self._plans.set_plan(context.conversation_id, steps)
         elapsed = (time.perf_counter() - start) * 1000.0
         completed = sum(1 for s in steps if s.status == "completed")
         return ToolResult.ok(

@@ -526,3 +526,95 @@ class ConversationScope(SQLModel, table=True):
     )
     updated_at: datetime = Field(default_factory=_utcnow)
 
+
+# ---------------------------------------------------------------------------
+# Conversation Permission Mode (tiered authorization, Fase 7)
+# ---------------------------------------------------------------------------
+
+
+class ConversationPermissionMode(SQLModel, table=True):
+    """The permission tier for a conversation (one row per conversation).
+
+    ``mode`` is one of ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``
+    (see :class:`backend.services.permission_mode_service.PermissionMode`).
+    Unlike :class:`ConversationScope`, this is settable at any time (including
+    mid-turn) because the turn engine reads the mode synchronously per
+    tool-call. Only the user may mutate it (the row is never reachable from a
+    tool) — the anti-privilege-escalation invariant."""
+
+    __tablename__ = "conversation_permission_modes"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "mode IN ('strict', 'auto_edits', 'plan', 'autopilot')",
+            name="ck_permission_mode_value",
+        ),
+    )
+
+    conversation_id: uuid.UUID = Field(
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+    )
+    mode: str = Field(
+        default="strict",
+        max_length=16,
+        description="Permission tier: strict/auto_edits/plan/autopilot.",
+    )
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Permission Rule (persistent allow/ask/deny grants, Fase 7)
+# ---------------------------------------------------------------------------
+
+
+class PermissionRule(SQLModel, table=True):
+    """A persistent per-tool permission rule (survives restarts).
+
+    ``conversation_id`` is ``NULL`` for a global rule and set for a
+    conversation-scoped rule; a conversation-scoped rule wins over a global one
+    for the same tool, and within a scope ``deny`` > ``ask`` > ``allow``.
+    ``tool_name`` is matched exactly for now; ``pattern`` is reserved so a
+    future bash-prefix matcher (``git *``) can land without a contract
+    migration."""
+
+    __tablename__ = "permission_rules"
+    __table_args__ = (
+        sa.Index("ix_permission_rule_conversation_id", "conversation_id"),
+        sa.Index("ix_permission_rule_tool_name", "tool_name"),
+        sa.CheckConstraint(
+            "effect IN ('allow', 'ask', 'deny')",
+            name="ck_permission_rule_effect",
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=_new_uuid,
+        primary_key=True,
+    )
+    conversation_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="CASCADE"),
+            nullable=True,
+        ),
+        description="Owning conversation, or NULL for a global rule.",
+    )
+    tool_name: str = Field(
+        max_length=128,
+        description="Namespaced tool name the rule applies to (exact match).",
+    )
+    effect: str = Field(
+        max_length=8,
+        description="Rule effect: allow/ask/deny.",
+    )
+    pattern: Optional[str] = Field(
+        default=None,
+        max_length=256,
+        description="Reserved for a future argument/bash-prefix matcher.",
+    )
+    created_at: datetime = Field(default_factory=_utcnow)
+

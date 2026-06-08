@@ -366,6 +366,12 @@ class PermissionsConfig(BaseSettings):
     """Whether tool confirmations are required (safety feature)."""
     confirmation_timeout_s: int = 60
     """Seconds to wait for user confirmation on dangerous tools."""
+    default_mode: Literal["strict", "auto_edits", "plan", "autopilot"] = "strict"
+    """Default permission tier for a conversation with no explicit mode set.
+
+    ``strict`` reproduces the pre-Fase-7 behaviour (prompt for every
+    confirmation-required tool); the per-conversation mode (set only by the
+    user, never the model) overrides this default."""
 
 
 class WorkspaceScopeConfig(BaseSettings):

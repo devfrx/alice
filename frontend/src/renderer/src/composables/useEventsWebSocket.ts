@@ -16,6 +16,8 @@ import { usePlanStore } from '../stores/plan'
 import type { WsPlanUpdatedMessage } from '../types/plan'
 import { useScopeStore } from '../stores/scope'
 import type { WsScopeUpdatedMessage } from '../types/scope'
+import { usePermissionModeStore } from '../stores/permissionMode'
+import type { WsPermissionModeUpdatedMessage } from '../types/permission'
 import { BACKEND_HOST } from '../services/api'
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
 
@@ -29,6 +31,7 @@ export function useEventsWebSocket() {
   const servicesStore = useServicesStore()
   const planStore = usePlanStore()
   const scopeStore = useScopeStore()
+  const permissionModeStore = usePermissionModeStore()
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -107,6 +110,11 @@ export function useEventsWebSocket() {
         // Handle scope updates: fold the full pushed folder list into the store.
         if (data.type === 'scope.updated' && typeof data.conversation_id === 'string') {
           scopeStore.applyScopeUpdated(data as WsScopeUpdatedMessage)
+        }
+
+        // Handle permission-tier updates: fold the pushed tier into the store.
+        if (data.type === 'permission_mode.updated' && typeof data.conversation_id === 'string') {
+          permissionModeStore.applyModeUpdated(data as WsPermissionModeUpdatedMessage)
         }
       } catch {
         console.warn('[ALICE Events WS] Failed to parse message')

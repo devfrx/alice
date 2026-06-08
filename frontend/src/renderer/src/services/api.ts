@@ -59,6 +59,7 @@ import type {
 } from '../types/artifacts'
 import type { PlanResponse } from '../types/plan'
 import type { ScopeResponse } from '../types/scope'
+import type { PermissionMode, PermissionModeResponse } from '../types/permission'
 
 /**
  * Error thrown by {@link request} on a non-2xx HTTP response.
@@ -863,5 +864,24 @@ export const api = {
    */
   clearScope: (conversationId: string): Promise<ScopeResponse> =>
     request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, { method: 'DELETE' }),
+
+  // -- Permission mode (authorization tier, Fase 7) -------------------------
+
+  /** Fetch the permission tier for a conversation. */
+  getPermissionMode: (conversationId: string): Promise<PermissionModeResponse> =>
+    request<PermissionModeResponse>(`/permission-mode/${encodeURIComponent(conversationId)}`),
+
+  /**
+   * Set the permission tier for a conversation. NOT idle-guarded — the engine
+   * reads the tier per tool-call, so a mid-turn change takes effect on the next
+   * gated call.
+   */
+  setPermissionMode: (
+    conversationId: string, mode: PermissionMode,
+  ): Promise<PermissionModeResponse> =>
+    request<PermissionModeResponse>(`/permission-mode/${encodeURIComponent(conversationId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ mode }),
+    }),
 
 }

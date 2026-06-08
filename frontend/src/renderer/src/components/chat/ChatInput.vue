@@ -15,6 +15,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { AudioDevice } from '../../composables/useVoice'
 import ModelSelector from '../settings/ModelSelector.vue'
 import ChatToolControls from './ChatToolControls.vue'
+import PermissionTierSelector from './PermissionTierSelector.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import ContextBar from './ContextBar.vue'
 import { useChatStore } from '../../stores/chat'
@@ -317,6 +318,9 @@ defineExpose({
 
         <!-- Agent mode + tool selector pills -->
         <ChatToolControls />
+
+        <!-- Permission tier selector (Fase 7) — user-only authorization tier -->
+        <PermissionTierSelector />
 
         <!-- View toggle chip — reflects the destination surface -->
         <button class="ci__mode-toggle" :aria-label="modeTitle" :title="modeTitle" @click="toggleMode">

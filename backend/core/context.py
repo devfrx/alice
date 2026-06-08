@@ -119,6 +119,14 @@ class AppContext:
     confines against arrives in Fase 6; until then it imposes no new
     denials."""
 
+    plan_service: Any = None
+    """Persisted per-conversation plan store (Fase 5).
+
+    Typed as :class:`Any` to avoid a ``core`` → ``services`` import cycle; the
+    concrete type is :class:`backend.services.plan_service.PlanService`. Wired
+    in the lifespan. Used by the ``agent`` plugin's ``update_plan`` and the
+    turn engine's plan re-inject."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

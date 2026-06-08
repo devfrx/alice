@@ -469,3 +469,32 @@ class AgentRun(SQLModel, table=True):
     finished_at: Optional[datetime] = Field(default=None)
     error: Optional[str] = Field(default=None)
 
+
+# ---------------------------------------------------------------------------
+# Conversation Plan (model-driven todo-list, Fase 5)
+# ---------------------------------------------------------------------------
+
+
+class ConversationPlan(SQLModel, table=True):
+    """The model-owned todo-list for a conversation (one row per conversation).
+
+    Persisted by ``update_plan`` (via :class:`PlanService`) so the plan
+    survives reloads and is re-injected into the next turn. ``steps`` is an
+    ordered JSON list of ``{"step": str, "status": str}`` items.
+    """
+
+    __tablename__ = "conversation_plans"
+
+    conversation_id: uuid.UUID = Field(
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+    )
+    steps: Any = Field(
+        default_factory=list,
+        sa_column=sa.Column(sa.JSON, nullable=False),
+    )
+    updated_at: datetime = Field(default_factory=_utcnow)
+

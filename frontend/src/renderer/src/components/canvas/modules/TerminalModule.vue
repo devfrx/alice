@@ -7,12 +7,10 @@
  * subject from the chat store's current conversation rather than tile params.
  *
  * ## Layout
- * - **Top (non-scrolling):** an embedded {@link ScopeManager} — the folder
- *   scope the model's `run_terminal_command` calls are confined to. It is
- *   self-contained (derives its own conversation from the chat store) and owns
- *   its internal scroll, so it is given a capped flex region here.
- * - **Below (scrollable):** a chronological log of `run_terminal_command`
- *   activity for the active conversation.
+ * A chronological log of `run_terminal_command` activity for the active
+ * conversation. The workspace folder scope now lives in its own first-class
+ * {@link ScopeModule} (it governs the whole session, not just the terminal),
+ * so it is no longer embedded here.
  *
  * ## Data flow
  * This view is read-only: the user does not type shell commands. The model runs
@@ -26,7 +24,6 @@
  */
 import { computed } from 'vue'
 
-import ScopeManager from '../ScopeManager.vue'
 import AliceSpinner from '../../ui/AliceSpinner.vue'
 import AppIcon from '../../ui/AppIcon.vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
@@ -60,11 +57,6 @@ const commands = computed(() =>
 
 <template>
   <div class="terminal-module">
-    <!-- Scope editor (non-scrolling header region; owns its own internal scroll) -->
-    <div class="terminal-module__scope">
-      <ScopeManager />
-    </div>
-
     <!-- Command / output log -->
     <div v-if="commands.length > 0" class="terminal-module__log">
       <ul class="term-log" role="list">
@@ -115,16 +107,6 @@ const commands = computed(() =>
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* Capped scope region — ScopeManager fills it and scrolls internally. */
-.terminal-module__scope {
-  flex: 0 0 auto;
-  max-height: 45%;
-  min-height: 0;
-  display: flex;
-  overflow: hidden;
-  border-bottom: 1px solid var(--border);
 }
 
 /* Scrollable command log fills the remaining height of the tile. */

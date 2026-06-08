@@ -95,6 +95,15 @@ const terminal: ModuleDef = {
   singleton: true
 }
 
+const scope: ModuleDef = {
+  id: 'scope',
+  label: 'Scope',
+  icon: 'folder',
+  component: () => import('../../components/canvas/modules/ScopeModule.vue'),
+  defaultZone: 'right',
+  singleton: true
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -105,7 +114,8 @@ export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   whiteboard,
   cad3d,
   plan,
-  terminal
+  terminal,
+  scope
 }
 
 // ---------------------------------------------------------------------------

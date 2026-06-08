@@ -22,6 +22,7 @@ import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
 
 import { api } from '../services/api'
 import { wsManager } from '../services/ws'
+import { useAgentRunStore } from '../stores/agentRun'
 import { useChatStore } from '../stores/chat'
 import { useSettingsStore } from '../stores/settings'
 import { useUIStore } from '../stores/ui'
@@ -44,6 +45,14 @@ import type {
   WsToolProgressMessage,
   WsWarningMessage
 } from '../types/chat'
+import type {
+  WsToolCallMessage,
+  WsToolResultMessage,
+  WsTurnFinishedMessage,
+  WsTurnLlmStepMessage,
+  WsTurnStartedMessage,
+  WsTurnUsageMessage
+} from '../types/turn'
 
 /** Connection status reported by the composable. */
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -81,6 +90,7 @@ export function useChat(): UseChatReturn {
   const store = useChatStore()
   const settingsStore = useSettingsStore()
   const uiStore = useUIStore()
+  const agentRunStore = useAgentRunStore()
 
   const isConnected = ref(false)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
@@ -290,6 +300,35 @@ export function useChat(): UseChatReturn {
     // proper "done" event when the response is truly finished.
   }
 
+  // -- Canonical turn-event stream (Fase 3) ------------------------------
+  // Additive, run-scoped frames folded into the agentRun store. They are
+  // NOT gated on the stale-generation guard: runs are keyed by `turn_id`,
+  // so late frames after navigation still land on the correct run.
+
+  const onTurnStarted = (data: unknown): void => {
+    agentRunStore.applyTurnStarted(data as WsTurnStartedMessage)
+  }
+
+  const onTurnLlmStep = (data: unknown): void => {
+    agentRunStore.applyLlmStep(data as WsTurnLlmStepMessage)
+  }
+
+  const onTurnToolCall = (data: unknown): void => {
+    agentRunStore.applyToolCall(data as WsToolCallMessage)
+  }
+
+  const onTurnToolResult = (data: unknown): void => {
+    agentRunStore.applyToolResult(data as WsToolResultMessage)
+  }
+
+  const onTurnUsage = (data: unknown): void => {
+    agentRunStore.applyTurnUsage(data as WsTurnUsageMessage)
+  }
+
+  const onTurnFinished = (data: unknown): void => {
+    agentRunStore.applyTurnFinished(data as WsTurnFinishedMessage)
+  }
+
   // -----------------------------------------------------------------------
   // Register handlers & connect
   // -----------------------------------------------------------------------
@@ -322,6 +361,12 @@ export function useChat(): UseChatReturn {
   wsManager.on('agent.warning', onAgentEvent)
   wsManager.on('agent.ask_user', onAgentEvent)
   wsManager.on('agent.run_finished', onAgentEvent)
+  wsManager.on('turn.started', onTurnStarted)
+  wsManager.on('turn.llm_step', onTurnLlmStep)
+  wsManager.on('tool.call', onTurnToolCall)
+  wsManager.on('tool.result', onTurnToolResult)
+  wsManager.on('turn.usage', onTurnUsage)
+  wsManager.on('turn.finished', onTurnFinished)
 
   // WebSocket connection is deferred — App.vue calls wsManager.connect()
   // after the backend health check passes.
@@ -366,6 +411,12 @@ export function useChat(): UseChatReturn {
     wsManager.off('agent.warning', onAgentEvent)
     wsManager.off('agent.ask_user', onAgentEvent)
     wsManager.off('agent.run_finished', onAgentEvent)
+    wsManager.off('turn.started', onTurnStarted)
+    wsManager.off('turn.llm_step', onTurnLlmStep)
+    wsManager.off('tool.call', onTurnToolCall)
+    wsManager.off('tool.result', onTurnToolResult)
+    wsManager.off('turn.usage', onTurnUsage)
+    wsManager.off('turn.finished', onTurnFinished)
     wsManager.disconnect()
   })
 

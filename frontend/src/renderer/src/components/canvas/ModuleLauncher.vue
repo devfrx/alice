@@ -7,8 +7,12 @@
  * and pass the bottom-left corner as viewport coords to UiContextMenu, which
  * auto-adjusts if the menu would overflow the viewport.
  *
- * Filtering: chat is excluded (singleton, conversion handled elsewhere);
- * any module whose available() guard returns false is also excluded.
+ * Filtering: chat is excluded (its anchored/tiled conversion is handled
+ * elsewhere); any module whose available() guard returns false is also excluded.
+ *
+ * Toggle semantics (Claude Code desktop style): each module type is
+ * single-instance. Clicking an entry opens + focuses it when closed, and closes
+ * it when already open; open entries show a ✓ marker.
  */
 import { ref, computed } from 'vue'
 import UiIconButton from '../ui/UiIconButton.vue'
@@ -75,7 +79,7 @@ function closeMenu(): void {
 }
 
 function selectModule(moduleId: string): void {
-  workspaceStore.openModule(moduleId)
+  workspaceStore.toggleModule(moduleId)
   closeMenu()
 }
 </script>
@@ -104,6 +108,7 @@ function selectModule(moduleId: string): void {
         v-for="mod in visibleModules"
         :key="mod.id"
         :label="mod.label"
+        :hint="workspaceStore.openModuleIds.has(mod.id) ? '✓' : undefined"
         @click="selectModule(mod.id)"
       >
         <template #icon>

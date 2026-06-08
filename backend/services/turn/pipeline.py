@@ -41,6 +41,7 @@ from loguru import logger
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
 from backend.core.tool_progress import current_progress_emitter
 from backend.services.permission_service import PermissionOutcome, PermissionService
+from backend.services.turn import events
 from backend.services.turn.channel import InteractionChannel
 from backend.services.turn.sink import WSEventSink
 
@@ -96,6 +97,7 @@ class ToolCall:
     dedup_key: str
     is_client: bool
     audit_decision: AuditDecision | None = None
+    turn_id: str = ""
 
 
 @dataclass(slots=True)
@@ -210,6 +212,7 @@ class ConfirmationMiddleware:
     def __init__(
         self,
         *,
+        sink: WSEventSink,
         channel: InteractionChannel,
         permission_service: PermissionService,
         confirmations_enabled: bool,
@@ -217,6 +220,7 @@ class ConfirmationMiddleware:
         reasoning: str,
         cancel_event: asyncio.Event | None,
     ) -> None:
+        self._sink = sink
         self._channel = channel
         self._permission = permission_service
         self._confirmations_enabled = confirmations_enabled
@@ -229,6 +233,15 @@ class ConfirmationMiddleware:
         if not self._permission.requires_confirmation(td):
             return await nxt(call)
         assert td is not None  # requires_confirmation is False for None
+
+        # Canonical interaction frame: a confirmation round-trip is now pending
+        # (covers both the channel-asked and the auto-approved paths below).
+        await self._sink.send(events.interaction_requested(
+            turn_id=call.turn_id,
+            execution_id=call.exec_id,
+            kind="tool_confirmation",
+            tool_name=call.tool_name,
+        ))
 
         if self._confirmations_enabled:
             approved = await _request_confirmation(
@@ -245,6 +258,17 @@ class ConfirmationMiddleware:
                 call.tool_name, call.exec_id,
             )
             approved = True
+
+        # Canonical interaction frame: the confirmation resolved. ``approved``
+        # is True for a user-approval or an auto-approval; False covers an
+        # explicit rejection, a timeout, a cancel or a disconnect (all of which
+        # ``_request_confirmation`` collapses to ``False``) — never mislabeled.
+        await self._sink.send(events.interaction_resolved(
+            turn_id=call.turn_id,
+            execution_id=call.exec_id,
+            kind="tool_confirmation",
+            outcome="approved" if approved else "rejected",
+        ))
 
         call.audit_decision = AuditDecision(
             approved=approved,
@@ -303,17 +327,73 @@ class InteractionMiddleware:
 
         td = call.tool_def
         if td is not None and td.client_execution:
+            # Canonical interaction frame: delegating to the connected client.
+            await self._sink.send(events.interaction_requested(
+                turn_id=call.turn_id,
+                execution_id=call.exec_id,
+                kind="client_tool_call",
+                tool_name=call.tool_name,
+            ))
             result = await _execute_client_tool(
                 self._channel, call.tool_name, call.args, call.exec_id,
                 self._tool_exec_timeout, self._cancel_event,
             )
+            # Outcome mapping. ``_execute_client_tool`` returns
+            # ``ToolResult.ok(...)`` on a genuine client reply, or
+            # ``ToolResult.error(...)`` on cancel / timeout / a client-reported
+            # failure (a disconnect RAISES ``WebSocketDisconnect`` before this
+            # point, so no resolved frame is emitted then — the socket is gone).
+            # success -> "executed"; a turn cancel -> "cancelled"; anything else
+            # (a timeout and a client-reported failure are indistinguishable
+            # from the result alone) -> "failed". A non-success is never
+            # mislabeled "executed".
+            if result.success:
+                outcome = "executed"
+            elif self._channel.cancelled:
+                outcome = "cancelled"
+            else:
+                outcome = "failed"
+            await self._sink.send(events.interaction_resolved(
+                turn_id=call.turn_id,
+                execution_id=call.exec_id,
+                kind="client_tool_call",
+                outcome=outcome,
+            ))
             return ToolOutcome(call, Disposition.CLIENT_EXECUTED, result=result)
 
         if td is not None and td.user_interaction:
+            # Canonical interaction frame: asking the human a question.
+            await self._sink.send(events.interaction_requested(
+                turn_id=call.turn_id,
+                execution_id=call.exec_id,
+                kind="ask_user",
+                tool_name=call.tool_name,
+            ))
             result = await _execute_user_interaction(
                 self._channel, call.tool_name, call.args, call.exec_id,
                 self._tool_exec_timeout, self._cancel_event,
             )
+            # Outcome mapping. ``_execute_user_interaction`` returns
+            # ``ToolResult.ok(answer)`` on a real answer (or ``ok("")`` if the
+            # user replied with no answer), or ``ToolResult.error(...)`` on
+            # cancel / timeout (a disconnect RAISES before this point). A
+            # genuine non-empty answer -> "answered"; a user cancel or an empty
+            # (declined) answer -> "cancelled"; otherwise (an error result while
+            # still connected, i.e. no reply in the window) -> "timeout". A
+            # timeout/cancel is never mislabeled "answered".
+            answer_text = result.content if isinstance(result.content, str) else ""
+            if result.success:
+                outcome = "answered" if answer_text.strip() else "cancelled"
+            elif self._channel.cancelled:
+                outcome = "cancelled"
+            else:
+                outcome = "timeout"
+            await self._sink.send(events.interaction_resolved(
+                turn_id=call.turn_id,
+                execution_id=call.exec_id,
+                kind="ask_user",
+                outcome=outcome,
+            ))
             # Reuse CLIENT_EXECUTED on purpose: the engine's
             # _persist_gate_outcome routes it to _persist_client_tool_result
             # (DB tool message + tool_execution_done frame) — exactly how the

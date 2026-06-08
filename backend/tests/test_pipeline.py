@@ -14,6 +14,7 @@ from fastapi import WebSocketDisconnect
 
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
 from backend.services.permission_service import PermissionService
+from backend.services.turn.events import CANONICAL_TURN_EVENT_TYPES
 from backend.services.turn.pipeline import (
     ConfirmationMiddleware,
     DedupMiddleware,
@@ -122,6 +123,7 @@ def _call(
     args: dict | None = None,
     dedup_key: str = "k",
     is_client: bool = False,
+    turn_id: str = "turn-1",
 ) -> ToolCall:
     return ToolCall(
         tc_id="call_1",
@@ -135,12 +137,23 @@ def _call(
         ),
         dedup_key=dedup_key,
         is_client=is_client,
+        turn_id=turn_id,
     )
 
 
 async def _proceed(call: ToolCall) -> ToolOutcome:
     """A terminal that signals the call passed (server execute)."""
     return ToolOutcome(call, Disposition.EXECUTE)
+
+
+def _canonical(sink: _FakeSink) -> list[dict]:
+    """The canonical turn-event frames recorded on *sink*, in order.
+
+    Mirrors the filter used in the executor tests: legacy frames are kept out
+    so a sequence assertion can target just the canonical ``interaction.*``
+    stream (and, inverted, lets the legacy assertions stay unchanged).
+    """
+    return [e for e in sink.sent if e["type"] in CANONICAL_TURN_EVENT_TYPES]
 
 
 # ---------------------------------------------------------------------------
@@ -219,8 +232,11 @@ class TestPermission:
 # ---------------------------------------------------------------------------
 
 
-def _confirm_mw(channel: _FakeChannel, *, enabled: bool) -> ConfirmationMiddleware:
+def _confirm_mw(
+    channel: _FakeChannel, *, enabled: bool, sink: _FakeSink | None = None,
+) -> ConfirmationMiddleware:
     return ConfirmationMiddleware(
+        sink=sink if sink is not None else _FakeSink(),
         channel=channel,
         permission_service=PermissionService(),
         confirmations_enabled=enabled,
@@ -278,6 +294,64 @@ class TestConfirmation:
         assert call.audit_decision is not None
         assert call.audit_decision.approved is True
 
+    @pytest.mark.asyncio
+    async def test_emits_interaction_requested_then_resolved_approved(self) -> None:
+        """A confirmed tool brackets the round-trip with canonical frames."""
+        sink, ch = _FakeSink(), _FakeChannel(confirm=True)
+        call = _call(tool_def=_tool(requires_confirmation=True, risk_level="dangerous"))
+        await _confirm_mw(ch, enabled=True, sink=sink).handle(call, _proceed)
+        canon = _canonical(sink)
+        assert [e["type"] for e in canon] == [
+            "interaction.requested",
+            "interaction.resolved",
+        ]
+        req, res = canon
+        # Both frames correlate via turn_id + execution_id (FE timeline keying).
+        assert req["kind"] == "tool_confirmation"
+        assert req["tool_name"] == "t"
+        assert req["turn_id"] == call.turn_id == "turn-1"
+        assert req["execution_id"] == call.exec_id == "exec_1"
+        assert res["kind"] == "tool_confirmation"
+        assert res["outcome"] == "approved"
+        assert res["turn_id"] == call.turn_id
+        assert res["execution_id"] == call.exec_id
+
+    @pytest.mark.asyncio
+    async def test_emits_interaction_resolved_rejected_on_reject(self) -> None:
+        sink, ch = _FakeSink(), _FakeChannel(confirm=False)
+        call = _call(tool_def=_tool(requires_confirmation=True, risk_level="dangerous"))
+        await _confirm_mw(ch, enabled=True, sink=sink).handle(call, _proceed)
+        canon = _canonical(sink)
+        assert [e["type"] for e in canon] == [
+            "interaction.requested",
+            "interaction.resolved",
+        ]
+        assert canon[1]["kind"] == "tool_confirmation"
+        assert canon[1]["outcome"] == "rejected"
+
+    @pytest.mark.asyncio
+    async def test_auto_approve_still_brackets_with_resolved_approved(self) -> None:
+        """Disabled confirmations skip the prompt but still emit both frames."""
+        sink, ch = _FakeSink(), _FakeChannel()
+        call = _call(tool_def=_tool(requires_confirmation=True, risk_level="medium"))
+        await _confirm_mw(ch, enabled=False, sink=sink).handle(call, _proceed)
+        canon = _canonical(sink)
+        assert [e["type"] for e in canon] == [
+            "interaction.requested",
+            "interaction.resolved",
+        ]
+        assert canon[1]["outcome"] == "approved"
+        assert ch.requests == []  # no prompt, yet still bracketed
+
+    @pytest.mark.asyncio
+    async def test_no_confirmation_emits_no_interaction_frames(self) -> None:
+        """A tool that needs no confirmation emits zero interaction.* frames."""
+        sink, ch = _FakeSink(), _FakeChannel()
+        await _confirm_mw(ch, enabled=True, sink=sink).handle(
+            _call(tool_def=_tool()), _proceed,
+        )
+        assert _canonical(sink) == []
+
 
 # ---------------------------------------------------------------------------
 # InteractionMiddleware
@@ -324,6 +398,38 @@ class TestInteraction:
         outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert outcome.disposition is Disposition.CLIENT_EXECUTED
         assert outcome.result is not None and outcome.result.success is False
+
+    @pytest.mark.asyncio
+    async def test_client_tool_brackets_with_interaction_executed(self) -> None:
+        """A client tool brackets its round-trip with canonical interaction.*."""
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(client_reply={"success": True, "result": {"n": 1}})
+        call = _call(tool_def=_tool(client_execution=True))
+        await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        canon = _canonical(sink)
+        assert [e["type"] for e in canon] == [
+            "interaction.requested",
+            "interaction.resolved",
+        ]
+        req, res = canon
+        assert req["kind"] == "client_tool_call"
+        assert req["tool_name"] == "t"
+        assert req["turn_id"] == call.turn_id
+        assert req["execution_id"] == call.exec_id
+        assert res["kind"] == "client_tool_call"
+        assert res["outcome"] == "executed"
+        # The legacy start frame is untouched and still first overall.
+        assert sink.sent[0]["type"] == "tool_execution_start"
+
+    @pytest.mark.asyncio
+    async def test_client_tool_failure_resolves_failed(self) -> None:
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(client_reply={"success": False, "error": "boom"})
+        call = _call(tool_def=_tool(client_execution=True))
+        await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        res = _canonical(sink)[-1]
+        assert res["kind"] == "client_tool_call"
+        assert res["outcome"] == "failed"
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +522,56 @@ class TestUserInteraction:
         call = _call(tool_def=_tool(user_interaction=True))
         with pytest.raises(WebSocketDisconnect):
             await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+
+    @pytest.mark.asyncio
+    async def test_ask_user_brackets_with_interaction_answered(self) -> None:
+        """A genuine answer brackets the round-trip and resolves "answered"."""
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply={"answer": "blue"})
+        call = _call(
+            tool_def=_tool(user_interaction=True), args={"question": "fav?"},
+        )
+        await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        canon = _canonical(sink)
+        assert [e["type"] for e in canon] == [
+            "interaction.requested",
+            "interaction.resolved",
+        ]
+        req, res = canon
+        assert req["kind"] == "ask_user"
+        assert req["turn_id"] == call.turn_id
+        assert req["execution_id"] == call.exec_id
+        assert res["kind"] == "ask_user"
+        assert res["outcome"] == "answered"
+
+    @pytest.mark.asyncio
+    async def test_ask_user_timeout_resolves_timeout(self) -> None:
+        """No answer while still connected ⇒ resolved outcome "timeout"."""
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply=None)  # connected, not cancelled
+        call = _call(tool_def=_tool(user_interaction=True))
+        await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        assert _canonical(sink)[-1]["outcome"] == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_ask_user_cancelled_resolves_cancelled(self) -> None:
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply=None, cancelled=True)
+        call = _call(tool_def=_tool(user_interaction=True))
+        await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        assert _canonical(sink)[-1]["outcome"] == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_ask_user_disconnect_emits_requested_not_resolved(self) -> None:
+        """A disconnect raises mid-round-trip: requested fires, resolved does not."""
+        sink, seen = _FakeSink(), set()
+        ch = _FakeChannel(ask_user_reply=None, connected=False)
+        call = _call(tool_def=_tool(user_interaction=True))
+        with pytest.raises(WebSocketDisconnect):
+            await _interaction_mw(sink, ch, seen).handle(call, _proceed)
+        canon = _canonical(sink)
+        assert [e["type"] for e in canon] == ["interaction.requested"]
+        assert canon[0]["kind"] == "ask_user"
 
 
 # ---------------------------------------------------------------------------

@@ -41,7 +41,6 @@ class TurnEventType(StrEnum):
     INTERACTION_RESOLVED = "interaction.resolved"
     TURN_USAGE = "turn.usage"
     TURN_FINISHED = "turn.finished"
-    PLAN_UPDATED = "plan.updated"
 
 
 CANONICAL_TURN_EVENT_TYPES: frozenset[str] = frozenset(member.value for member in TurnEventType)
@@ -285,37 +284,11 @@ def turn_finished(
     }
 
 
-def plan_updated(
-    *,
-    turn_id: str,
-    conversation_id: str,
-    steps: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Build a ``plan.updated`` frame carrying the current plan snapshot.
-
-    Args:
-        turn_id: Stable identifier of the turn.
-        conversation_id: Conversation the plan belongs to.
-        steps: Ordered plan steps as plain dicts (e.g. ``id``/``title``/
-            ``status``), serialised by the caller.
-
-    Returns:
-        The JSON-serialisable event frame.
-    """
-    return {
-        "type": TurnEventType.PLAN_UPDATED.value,
-        "turn_id": turn_id,
-        "conversation_id": conversation_id,
-        "steps": steps,
-    }
-
-
 __all__ = [
     "CANONICAL_TURN_EVENT_TYPES",
     "TurnEventType",
     "interaction_requested",
     "interaction_resolved",
-    "plan_updated",
     "tool_call",
     "tool_result",
     "turn_finished",

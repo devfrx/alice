@@ -77,11 +77,6 @@ SAMPLE_FRAMES: list[dict[str, Any]] = [
         output_tokens=0,
         steps=0,
     ),
-    events.plan_updated(
-        turn_id="t1",
-        conversation_id="c1",
-        steps=[{"id": "1", "title": "research", "status": "in_progress"}],
-    ),
 ]
 
 
@@ -90,7 +85,7 @@ SAMPLE_FRAMES: list[dict[str, Any]] = [
 # ---------------------------------------------------------------------------
 
 
-def test_canonical_event_types_are_the_nine_expected_strings() -> None:
+def test_canonical_event_types_are_the_eight_expected_strings() -> None:
     expected = {
         "turn.started",
         "turn.llm_step",
@@ -100,10 +95,9 @@ def test_canonical_event_types_are_the_nine_expected_strings() -> None:
         "interaction.resolved",
         "turn.usage",
         "turn.finished",
-        "plan.updated",
     }
     assert set(CANONICAL_TURN_EVENT_TYPES) == expected
-    assert len(CANONICAL_TURN_EVENT_TYPES) == 9
+    assert len(CANONICAL_TURN_EVENT_TYPES) == 8
 
 
 def test_canonical_event_types_is_a_frozenset_derived_from_the_enum() -> None:
@@ -291,14 +285,6 @@ def test_turn_finished_keeps_finish_reason_when_none() -> None:
     }
     assert "finish_reason" in frame
     assert frame["finish_reason"] is None
-
-
-def test_plan_updated() -> None:
-    steps = [{"id": "1", "title": "research", "status": "in_progress"}]
-    frame = events.plan_updated(turn_id="t1", conversation_id="c1", steps=steps)
-    assert frame["type"] == TurnEventType.PLAN_UPDATED.value == "plan.updated"
-    assert set(frame) == {"type", "turn_id", "conversation_id", "steps"}
-    assert frame["steps"] == steps
 
 
 # ---------------------------------------------------------------------------

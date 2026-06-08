@@ -245,6 +245,7 @@ async def run_tool_loop(
                 DedupMiddleware(seen),
                 PermissionMiddleware(permission_service),
                 ConfirmationMiddleware(
+                    sink=sink,
                     channel=channel,
                     permission_service=permission_service,
                     confirmations_enabled=confirmations_on,
@@ -347,6 +348,7 @@ async def run_tool_loop(
                 ),
                 dedup_key=_dedup_hash(tool_name, args),
                 is_client=bool(tool_def and tool_def.client_execution),
+                turn_id=progress.turn_id,
             )
 
             # Additive canonical frame: announce every well-formed (named +

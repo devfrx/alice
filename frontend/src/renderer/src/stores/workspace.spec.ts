@@ -102,6 +102,46 @@ describe('openModule', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 2b. Single-instance + toggle (Fase 7 D)
+// ---------------------------------------------------------------------------
+
+describe('single-instance + toggle', () => {
+  it('re-opening the same module focuses the existing tile (no duplicate)', () => {
+    const ws = useWorkspaceStore()
+    ws.openModule('chart')
+    const firstId = (ws.activeLeaf as LeafNode).id
+    ws.openModule('cad3d') // focus moves to cad3d
+    ws.openModule('chart') // re-open chart → should focus, not duplicate
+    expect((ws.activeLeaf as LeafNode).moduleId).toBe('chart')
+    expect((ws.activeLeaf as LeafNode).id).toBe(firstId)
+    // Only two tiles total (chart + cad3d), root remains a single split.
+    const root = ws.layout.root as SplitNode
+    expect(root.kind).toBe('split')
+    expect(root.children.every((c) => c.kind === 'leaf')).toBe(true)
+  })
+
+  it('toggleModule opens when absent and closes when present', () => {
+    const ws = useWorkspaceStore()
+    expect(ws.isModuleOpen('chart')).toBe(false)
+    ws.toggleModule('chart')
+    expect(ws.isModuleOpen('chart')).toBe(true)
+    ws.toggleModule('chart')
+    expect(ws.isModuleOpen('chart')).toBe(false)
+    expect(ws.hasModules).toBe(false)
+  })
+
+  it('openModuleIds and activeModuleId reflect the live layout', () => {
+    const ws = useWorkspaceStore()
+    ws.openModule('chart')
+    ws.openModule('cad3d')
+    expect(ws.openModuleIds.has('chart')).toBe(true)
+    expect(ws.openModuleIds.has('cad3d')).toBe(true)
+    expect(ws.openModuleIds.has('plan')).toBe(false)
+    expect(ws.activeModuleId).toBe('cad3d')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 3. closeLeaf
 // ---------------------------------------------------------------------------
 

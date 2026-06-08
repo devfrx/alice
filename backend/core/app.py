@@ -633,16 +633,63 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     await scope_service.load_all()
     ctx.scope_service = scope_service
 
-    # -- Permission service (central tool risk / scope authority) -------
+    # -- Permission mode service (per-conversation tier, Fase 7) --------
+    from backend.services.permission_mode_service import (
+        PermissionMode,
+        PermissionModeService,
+    )
+
+    mode_service = PermissionModeService(
+        session_factory=session_factory,
+        default_mode=PermissionMode(ctx.config.permissions.default_mode),
+    )
+
+    async def _broadcast_permission_event(event: dict) -> None:
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast(event)
+
+    mode_service.set_event_callback(_broadcast_permission_event)
+    await mode_service.load_all()
+    ctx.permission_mode_service = mode_service
+
+    # -- Permission rule service (persistent allow/ask/deny, Fase 7) ----
+    from backend.services.permission_rules import PermissionRuleService
+
+    rule_service = PermissionRuleService(session_factory=session_factory)
+    await rule_service.load_all()
+    ctx.permission_rule_service = rule_service
+
+    # -- Permission service (central tool risk / scope / tier authority) -
     # Fase 6: ScopeService supplies the per-conversation scope provider, so a
     # tool tagged fs_read/fs_write is confined by construction once a scope is
-    # set. No scope set ⇒ no confinement (behavior preserved).
+    # set. Fase 7: PermissionRuleService supplies persistent allow/ask/deny
+    # rules. No scope set ⇒ filesystem tools are blocked (even in autopilot).
     from backend.services.permission_service import PermissionService
 
     ctx.permission_service = PermissionService(
         scope_provider=scope_service.scope_roots,
+        rule_provider=rule_service.match,
         forbidden_paths=ctx.config.scope.forbidden_paths,
     )
+
+    # -- Interactive terminal session manager (Fase 7 E1) ---------------
+    # Live PTY shells, scope-confined via ScopeService.scope_roots; output is
+    # broadcast on the events WS, input/resize arrive over its receive loop.
+    from backend.services.terminal import TerminalSessionManager
+
+    terminal_manager = TerminalSessionManager(
+        scope_provider=scope_service.scope_roots,
+        scope_config=ctx.config.scope,
+        shell=ctx.config.terminal.interactive_shell,
+        max_sessions=ctx.config.terminal.max_sessions,
+    )
+
+    async def _broadcast_terminal_event(event: dict) -> None:
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast(event)
+
+    terminal_manager.set_event_callback(_broadcast_terminal_event)
+    ctx.terminal_session_manager = terminal_manager
 
     app.state.context = ctx
     app.state.engine = engine
@@ -660,6 +707,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await ctx.orchestrator.shutdown_polling()
             except Exception as exc:
                 logger.error("Orchestrator shutdown error: {}", exc)
+        if ctx is not None and ctx.terminal_session_manager is not None:
+            try:
+                await ctx.terminal_session_manager.shutdown()
+            except Exception as exc:
+                logger.error("Terminal manager shutdown error: {}", exc)
         if plugin_manager is not None:
             try:
                 await plugin_manager.shutdown()

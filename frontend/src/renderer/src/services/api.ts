@@ -59,6 +59,18 @@ import type {
 } from '../types/artifacts'
 import type { PlanResponse } from '../types/plan'
 import type { ScopeResponse } from '../types/scope'
+import type {
+  PermissionMode,
+  PermissionModeResponse,
+  PermissionRule,
+  PermissionRuleCreate,
+} from '../types/permission'
+import type {
+  TerminalCreateRequest,
+  TerminalListResponse,
+  TerminalSession,
+  TerminalUpdateRequest,
+} from '../types/terminal'
 
 /**
  * Error thrown by {@link request} on a non-2xx HTTP response.
@@ -863,5 +875,88 @@ export const api = {
    */
   clearScope: (conversationId: string): Promise<ScopeResponse> =>
     request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, { method: 'DELETE' }),
+
+  // -- Permission mode (authorization tier, Fase 7) -------------------------
+
+  /** Fetch the permission tier for a conversation. */
+  getPermissionMode: (conversationId: string): Promise<PermissionModeResponse> =>
+    request<PermissionModeResponse>(`/permission-mode/${encodeURIComponent(conversationId)}`),
+
+  /**
+   * Set the permission tier for a conversation. NOT idle-guarded — the engine
+   * reads the tier per tool-call, so a mid-turn change takes effect on the next
+   * gated call.
+   */
+  setPermissionMode: (
+    conversationId: string, mode: PermissionMode,
+  ): Promise<PermissionModeResponse> =>
+    request<PermissionModeResponse>(`/permission-mode/${encodeURIComponent(conversationId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ mode }),
+    }),
+
+  // -- Permission rules (persistent allow/ask/deny, Fase 7) -----------------
+
+  /**
+   * List the persistent rules visible to a conversation: its own
+   * conversation-scoped rules plus all global rules.
+   */
+  listPermissionRules: (conversationId: string): Promise<PermissionRule[]> =>
+    request<PermissionRule[]>(`/permission-rules/${encodeURIComponent(conversationId)}`),
+
+  /**
+   * Add or update a persistent rule. `scope` selects whether the rule is tied
+   * to this conversation or applies globally. UPSERT — one rule per
+   * (scope, tool_name).
+   */
+  addPermissionRule: (
+    conversationId: string, body: PermissionRuleCreate,
+  ): Promise<PermissionRule> =>
+    request<PermissionRule>(`/permission-rules/${encodeURIComponent(conversationId)}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** Delete a persistent rule by id (no-op if it does not exist). */
+  deletePermissionRule: (
+    conversationId: string, ruleId: string,
+  ): Promise<void> =>
+    request<void>(
+      `/permission-rules/${encodeURIComponent(conversationId)}/${encodeURIComponent(ruleId)}`,
+      { method: 'DELETE' },
+    ),
+
+  // -- Interactive terminal sessions (Fase 7 E1) ----------------------------
+
+  /** List a conversation's live terminal sessions (+ the enabled flag). */
+  listTerminals: (conversationId: string): Promise<TerminalListResponse> =>
+    request<TerminalListResponse>(`/terminal/${encodeURIComponent(conversationId)}`),
+
+  /** Open a new interactive terminal session (scope-confined). */
+  createTerminal: (
+    conversationId: string, body: TerminalCreateRequest = {},
+  ): Promise<TerminalSession> =>
+    request<TerminalSession>(`/terminal/${encodeURIComponent(conversationId)}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** Rename and/or (re)assign a terminal session to the agent. */
+  updateTerminal: (
+    conversationId: string, sessionId: string, body: TerminalUpdateRequest,
+  ): Promise<TerminalSession> =>
+    request<TerminalSession>(
+      `/terminal/${encodeURIComponent(conversationId)}/${encodeURIComponent(sessionId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  /** Kill a terminal session (its whole process tree). */
+  deleteTerminal: (
+    conversationId: string, sessionId: string,
+  ): Promise<void> =>
+    request<void>(
+      `/terminal/${encodeURIComponent(conversationId)}/${encodeURIComponent(sessionId)}`,
+      { method: 'DELETE' },
+    ),
 
 }

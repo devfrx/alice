@@ -134,6 +134,30 @@ class AppContext:
     :class:`backend.services.scope_service.ScopeService`. Wired in the lifespan;
     its ``scope_roots`` is the ``PermissionService`` scope provider."""
 
+    permission_mode_service: Any = None
+    """Per-conversation permission tier (Fase 7).
+
+    Typed as :class:`Any` to avoid a core→services import cycle; concrete type
+    :class:`backend.services.permission_mode_service.PermissionModeService`.
+    Wired in the lifespan; its ``get_mode`` is the turn engine's tier provider.
+    Settable only by the user (never reachable from a tool)."""
+
+    permission_rule_service: Any = None
+    """Persistent per-tool permission rules (Fase 7).
+
+    Typed as :class:`Any` to avoid a core→services import cycle; concrete type
+    :class:`backend.services.permission_rules.PermissionRuleService`. Wired in
+    the lifespan; its ``match`` is the ``PermissionService`` rule provider."""
+
+    terminal_session_manager: Any = None
+    """Interactive PTY terminal sessions, keyed by conversation (Fase 7 E1).
+
+    Typed as :class:`Any` to avoid a core→services import cycle; concrete type
+    :class:`backend.services.terminal.manager.TerminalSessionManager`. Wired in
+    the lifespan; owns live shells the user types into and the one session
+    assignable to the agent. Output is broadcast on the events WS; input/resize
+    arrive over the events WS receive loop."""
+
     plugin_local_state: dict[str, dict] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
 

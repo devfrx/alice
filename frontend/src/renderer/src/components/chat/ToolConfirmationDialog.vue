@@ -7,7 +7,7 @@
  */
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
-import type { ConfirmationRequest } from '../../types/chat'
+import type { ConfirmationRequest, RememberChoice } from '../../types/chat'
 
 const props = defineProps<{
     /** The pending confirmation request to display. */
@@ -15,8 +15,20 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-    respond: [executionId: string, approved: boolean]
+    respond: [executionId: string, approved: boolean, remember: RememberChoice]
 }>()
+
+/* ── Remember choice ──
+ * Only offered when the server advertised `allowRemember`. The selection is
+ * applied solely on approval; a rejection always sends `none` so a declined
+ * tool is never silently remembered. */
+const rememberChoice = ref<RememberChoice>('none')
+
+const REMEMBER_OPTIONS: { value: RememberChoice; label: string; hint: string }[] = [
+    { value: 'none', label: 'Solo ora', hint: 'Chiedi di nuovo la prossima volta' },
+    { value: 'session', label: 'Questa sessione', hint: 'Consenti per questa conversazione' },
+    { value: 'persistent', label: 'Sempre', hint: 'Crea una regola permanente' }
+]
 
 const dialogRoot = ref<HTMLElement | null>(null)
 
@@ -40,11 +52,11 @@ const formattedTime = computed(() => {
 const showReasoning = ref(false)
 
 function approve(): void {
-    emit('respond', props.confirmation.executionId, true)
+    emit('respond', props.confirmation.executionId, true, rememberChoice.value)
 }
 
 function reject(): void {
-    emit('respond', props.confirmation.executionId, false)
+    emit('respond', props.confirmation.executionId, false, 'none')
 }
 
 function handleKeydown(e: KeyboardEvent): void {
@@ -72,7 +84,7 @@ onMounted(() => {
                 clearInterval(timerInterval)
                 timerInterval = null
             }
-            emit('respond', props.confirmation.executionId, false)
+            emit('respond', props.confirmation.executionId, false, 'none')
         }
     }, 1000)
 })
@@ -126,6 +138,21 @@ onUnmounted(() => {
                 <div class="confirm-card__args-wrap">
                     <span class="confirm-card__args-label">Argomenti:</span>
                     <pre class="confirm-card__args"><code>{{ formatArgs(confirmation.args) }}</code></pre>
+                </div>
+
+                <!-- Remember decision (only when the server allows it) -->
+                <div v-if="confirmation.allowRemember" class="confirm-card__remember">
+                    <span class="confirm-card__remember-label">Ricorda la decisione</span>
+                    <div class="confirm-card__remember-options" role="radiogroup"
+                        aria-label="Ricorda la decisione">
+                        <button v-for="opt in REMEMBER_OPTIONS" :key="opt.value" type="button"
+                            role="radio" :aria-checked="rememberChoice === opt.value"
+                            class="confirm-card__remember-btn"
+                            :class="{ 'confirm-card__remember-btn--active': rememberChoice === opt.value }"
+                            :title="opt.hint" @click="rememberChoice = opt.value">
+                            {{ opt.label }}
+                        </button>
+                    </div>
                 </div>
 
                 <div class="confirm-card__actions">
@@ -324,6 +351,56 @@ onUnmounted(() => {
     white-space: pre-wrap;
     word-break: break-all;
     max-height: 200px;
+}
+
+.confirm-card__remember {
+    margin-bottom: var(--space-4);
+}
+
+.confirm-card__remember-label {
+    display: block;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-1-5);
+}
+
+.confirm-card__remember-options {
+    display: flex;
+    gap: var(--space-1);
+    padding: var(--space-0-5);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.confirm-card__remember-btn {
+    flex: 1;
+    padding: var(--space-1-5) var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+.confirm-card__remember-btn:hover {
+    color: var(--text-primary);
+    background: var(--surface-3);
+}
+
+.confirm-card__remember-btn--active {
+    color: var(--surface-0);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.confirm-card__remember-btn--active:hover {
+    color: var(--surface-0);
+    background: var(--accent-hover);
 }
 
 .confirm-card__actions {

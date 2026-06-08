@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections import defaultdict
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -22,6 +23,38 @@ router = APIRouter(prefix="/events", tags=["events"])
 _event_connections: dict[str, int] = defaultdict(int)
 _event_lock = asyncio.Lock()
 _MAX_EVENT_CONNECTIONS_PER_IP = 5
+
+
+async def _handle_terminal_frame(
+    ctx: AppContext, frame_type: str, data: dict[str, Any],
+) -> None:
+    """Route a live terminal control frame to the session manager.
+
+    Handles ``terminal.input`` (``{conversation_id, session_id, data}``) and
+    ``terminal.resize`` (``{conversation_id, session_id, rows, cols}``).
+    Best-effort: unknown sessions and a disabled/unwired manager are silently
+    ignored — the user simply sees no echo.  Never raises (a bad frame must not
+    drop the events socket).
+    """
+    mgr = getattr(ctx, "terminal_session_manager", None)
+    if mgr is None or not ctx.config.terminal.enabled:
+        return
+    conv = data.get("conversation_id")
+    session_id = data.get("session_id")
+    if not isinstance(conv, str) or not isinstance(session_id, str):
+        return
+    try:
+        if frame_type == "terminal.input":
+            payload = data.get("data")
+            if isinstance(payload, str):
+                await mgr.write_input(conv, session_id, payload)
+        else:  # terminal.resize
+            rows = data.get("rows")
+            cols = data.get("cols")
+            if isinstance(rows, int) and isinstance(cols, int):
+                await mgr.resize(conv, session_id, rows, cols)
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.debug("terminal control frame failed: {}", exc)
 
 
 @router.websocket("/ws")
@@ -57,9 +90,15 @@ async def ws_events(websocket: WebSocket) -> None:
                 data = await asyncio.wait_for(
                     websocket.receive_json(), timeout=60.0,
                 )
-                if data.get("type") == "ping":
+                mtype = data.get("type")
+                if mtype == "ping":
                     await websocket.send_json({"type": "pong"})
-            except asyncio.TimeoutError:
+                elif mtype in ("terminal.input", "terminal.resize"):
+                    # Live terminal keystrokes / resizes. Never idle-guarded —
+                    # the user types during a turn. Output flows back out via
+                    # the broadcast channel (terminal.output events).
+                    await _handle_terminal_frame(ctx, mtype, data)
+            except TimeoutError:
                 await websocket.send_json({"type": "heartbeat"})
             except WebSocketDisconnect:
                 break

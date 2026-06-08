@@ -237,6 +237,25 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** Id of the leaf rendering the chat module in the current layout, or null. */
   const chatLeafId = computed<string | null>(() => findLeafIdByModule(layout.value.root, 'chat'))
 
+  /** The set of moduleIds currently open as tiles (reactive, for launchers). */
+  const openModuleIds = computed<Set<string>>(() => {
+    const ids = new Set<string>()
+    const walk = (n: TileNode | null): void => {
+      if (n === null) return
+      if (n.kind === 'leaf') {
+        ids.add(n.moduleId)
+        return
+      }
+      walk(n.children[0])
+      walk(n.children[1])
+    }
+    walk(layout.value.root)
+    return ids
+  })
+
+  /** The moduleId of the currently active (focused) tile, or null. */
+  const activeModuleId = computed<string | null>(() => activeLeaf.value?.moduleId ?? null)
+
   // -------------------------------------------------------------------------
   // Layout actions (wrap pure tree fns; persist inside each action)
   // -------------------------------------------------------------------------
@@ -249,9 +268,42 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  /**
+   * Open a module as a tile. Single-instance per type (like Claude Code
+   * desktop): if a tile for this moduleId already exists it is focused rather
+   * than duplicated. `params` are applied only when a new tile is created.
+   */
   function openModule(moduleId: string, params?: Record<string, unknown>): void {
+    const existingId = findLeafIdByModule(layout.value.root, moduleId)
+    if (existingId !== null) {
+      if (layout.value.activeLeafId !== existingId) {
+        layout.value = { ...layout.value, activeLeafId: existingId }
+        _persistLayout()
+      }
+      return
+    }
     layout.value = treeOpenModule(layout.value, moduleId, params)
     _persistLayout()
+  }
+
+  /**
+   * Toggle a module from the launcher/context-menu: open + focus it when
+   * absent, close it when already open. Visibility only — closing a tile never
+   * destroys the underlying module state (terminal sessions, scope, plan…),
+   * which lives in the respective stores/services.
+   */
+  function toggleModule(moduleId: string, params?: Record<string, unknown>): void {
+    const existingId = findLeafIdByModule(layout.value.root, moduleId)
+    if (existingId !== null) {
+      closeLeaf(existingId)
+      return
+    }
+    openModule(moduleId, params)
+  }
+
+  /** True when a tile for `moduleId` is currently open. */
+  function isModuleOpen(moduleId: string): boolean {
+    return findLeafIdByModule(layout.value.root, moduleId) !== null
   }
 
   function closeLeaf(leafId: string): void {
@@ -362,8 +414,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     hasModules,
     activeLeaf,
     chatLeafId,
+    openModuleIds,
+    activeModuleId,
     // Layout actions
     openModule,
+    toggleModule,
+    isModuleOpen,
     closeLeaf,
     setRatio,
     resetLayout,

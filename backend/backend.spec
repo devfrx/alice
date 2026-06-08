@@ -162,13 +162,16 @@ for opt in (
     "onnxruntime",
     "numpy",
     "pynvml",
+    # Interactive PTY terminal (Windows ConPTY). Importable as ``winpty``;
+    # ships native winpty.dll / winpty-agent.exe collected as dynamic libs.
+    "winpty",
 ):
     if not _optional(opt):
         continue
     optional_hidden.append(opt)
     optional_hidden.extend(collect_submodules(opt))
     # Native libraries (DLLs / .pyd / .so) — required for ctranslate2,
-    # onnxruntime, soundfile, etc.
+    # onnxruntime, soundfile, winpty, etc.
     optional_binaries.extend(collect_dynamic_libs(opt))
     optional_datas.extend(collect_data_files(opt))
 

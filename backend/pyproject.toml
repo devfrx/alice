@@ -42,6 +42,8 @@ dependencies = [
     # Media Control (Windows)
     "pycaw>=20230407",
     "comtypes>=1.4",
+    # Interactive PTY terminal (Windows ConPTY, Fase 7)
+    "pywinpty>=2.0; sys_platform == 'win32'",
     # Clipboard
     "pyperclip>=1.9",
     # News

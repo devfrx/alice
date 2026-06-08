@@ -7,8 +7,12 @@
  * and pass the bottom-left corner as viewport coords to UiContextMenu, which
  * auto-adjusts if the menu would overflow the viewport.
  *
- * Filtering: chat is excluded (singleton, conversion handled elsewhere);
- * any module whose available() guard returns false is also excluded.
+ * Filtering: chat is excluded (its anchored/tiled conversion is handled
+ * elsewhere); any module whose available() guard returns false is also excluded.
+ *
+ * Toggle semantics (Claude Code desktop style): each module type is
+ * single-instance. Clicking an entry opens + focuses it when closed, and closes
+ * it when already open; open entries show a ✓ marker.
  */
 import { ref, computed } from 'vue'
 import UiIconButton from '../ui/UiIconButton.vue'
@@ -17,6 +21,7 @@ import UiContextMenuItem from '../ui/UiContextMenuItem.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import { listModules, type ModuleDef } from '../../composables/workspace/moduleRegistry'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { useTerminalSessionsStore } from '../../stores/terminalSessions'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -34,6 +39,7 @@ const props = withDefaults(
 // ---------------------------------------------------------------------------
 
 const workspaceStore = useWorkspaceStore()
+const terminalStore = useTerminalSessionsStore()
 
 const menuVisible = ref(false)
 const menuX = ref(0)
@@ -75,8 +81,21 @@ function closeMenu(): void {
 }
 
 function selectModule(moduleId: string): void {
-  workspaceStore.openModule(moduleId)
+  workspaceStore.toggleModule(moduleId)
   closeMenu()
+}
+
+/**
+ * Menu hint per module: ✓ when open; for a *closed* terminal module, the count
+ * of live sessions so the user sees "N terminals active" without opening it.
+ */
+function hintFor(mod: ModuleDef): string | undefined {
+  if (workspaceStore.openModuleIds.has(mod.id)) return '✓'
+  if (mod.id === 'terminal') {
+    const n = terminalStore.activeCountFor(props.conversationId ?? null)
+    if (n > 0) return String(n)
+  }
+  return undefined
 }
 </script>
 
@@ -104,6 +123,7 @@ function selectModule(moduleId: string): void {
         v-for="mod in visibleModules"
         :key="mod.id"
         :label="mod.label"
+        :hint="hintFor(mod)"
         @click="selectModule(mod.id)"
       >
         <template #icon>

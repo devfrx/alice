@@ -33,10 +33,16 @@ from pathlib import Path
 from loguru import logger
 
 from backend.core.plugin_models import ToolDefinition
+from backend.services.permission_mode_service import PermissionMode
+from backend.services.permission_rules import RuleEffect
 
 # A scope provider maps a conversation id to its allowed root folders, or
 # ``None``/empty when no workspace scope is configured (the Fase 2 default).
 ScopeProvider = Callable[[str], "list[Path] | None"]
+
+# A rule provider maps (conversation_id, tool_name) to a persisted rule effect,
+# or ``None`` when no rule applies (the gate then falls back to the tier).
+RuleProvider = Callable[[str, str], "RuleEffect | None"]
 
 # Capability tags that mark a tool as filesystem-path-confined.
 _DEFAULT_FS_CAPABILITIES: frozenset[str] = frozenset({"fs_read", "fs_write"})
@@ -48,6 +54,17 @@ class PermissionOutcome(StrEnum):
     ALLOW = "allow"
     DENY_FORBIDDEN = "deny_forbidden"
     DENY_SCOPE = "deny_scope"
+    DENY_NO_SCOPE = "deny_no_scope"
+    DENY_PLAN_MODE = "deny_plan_mode"
+    DENY_RULE = "deny_rule"
+
+
+class GateAction(StrEnum):
+    """The action the permission gate asks the engine to take for a tool-call."""
+
+    ALLOW = "allow"
+    DENY = "deny"
+    NEEDS_CONFIRMATION = "needs_confirmation"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +93,37 @@ class PermissionDecision:
         return cls(allowed=False, outcome=outcome, reason=reason)
 
 
+@dataclass(frozen=True, slots=True)
+class GateDecision:
+    """The three-valued verdict returned by :meth:`PermissionService.decide`.
+
+    Attributes:
+        action: ``ALLOW`` (run, no prompt), ``DENY`` (hard block), or
+            ``NEEDS_CONFIRMATION`` (round-trip with the user).
+        outcome: The classification behind the verdict (for audit / messaging).
+        reason: Short machine-friendly reason when denied; ``None`` otherwise.
+    """
+
+    action: GateAction
+    outcome: PermissionOutcome
+    reason: str | None = None
+
+    @classmethod
+    def allow(cls, outcome: PermissionOutcome = PermissionOutcome.ALLOW) -> GateDecision:
+        """Return an allowing verdict."""
+        return cls(action=GateAction.ALLOW, outcome=outcome, reason=None)
+
+    @classmethod
+    def confirm(cls) -> GateDecision:
+        """Return a verdict requesting a user confirmation round-trip."""
+        return cls(action=GateAction.NEEDS_CONFIRMATION, outcome=PermissionOutcome.ALLOW)
+
+    @classmethod
+    def deny(cls, outcome: PermissionOutcome, reason: str) -> GateDecision:
+        """Return a denying verdict with *reason*."""
+        return cls(action=GateAction.DENY, outcome=outcome, reason=reason)
+
+
 class PermissionService:
     """Central authority for tool risk policy, scope confinement and grants."""
 
@@ -83,6 +131,7 @@ class PermissionService:
         self,
         *,
         scope_provider: ScopeProvider | None = None,
+        rule_provider: RuleProvider | None = None,
         forbidden_paths: Iterable[str | Path] = (),
         fs_capabilities: Iterable[str] = _DEFAULT_FS_CAPABILITIES,
     ) -> None:
@@ -92,12 +141,16 @@ class PermissionService:
             scope_provider: Callable returning the allowed root folders for a
                 conversation, or ``None`` when no scope is set. ``None``
                 (the Fase 2 default) disables confinement entirely.
+            rule_provider: Callable returning the persisted rule effect for a
+                ``(conversation_id, tool_name)`` pair, or ``None`` when no rule
+                applies (Fase 7). ``None`` disables persistent-rule consultation.
             forbidden_paths: Roots that are always out of scope even when a
                 workspace scope is set (Fase 6 ``WorkspaceScopeConfig``).
             fs_capabilities: Capability tags that mark a tool as
                 path-confined. Defaults to ``{"fs_read", "fs_write"}``.
         """
         self._scope_provider = scope_provider
+        self._rule_provider = rule_provider
         self._fs_capabilities = frozenset(fs_capabilities)
         self._forbidden_paths: tuple[Path, ...] = tuple(
             self._safe_resolve(p) for p in forbidden_paths
@@ -156,6 +209,123 @@ class PermissionService:
                 PermissionOutcome.DENY_FORBIDDEN, "forbidden_tool",
             )
         return self._check_scope(tool_name, args, tool_def, conversation_id)
+
+    def decide(
+        self,
+        *,
+        tool_name: str,
+        args: dict[str, object],
+        tool_def: ToolDefinition | None,
+        conversation_id: str,
+        mode: PermissionMode,
+    ) -> GateDecision:
+        """Resolve a tool-call to ALLOW / DENY / NEEDS_CONFIRMATION for *mode*.
+
+        The single policy function the turn engine's permission gate consults.
+        Precedence (top wins); circuit-breakers and explicit user rules are
+        evaluated before the tier defaults so they hold in **every** tier,
+        autopilot included:
+
+        1. forbidden risk → DENY (breaker).
+        2. explicit ``deny`` rule → DENY (a user prohibition wins everywhere).
+        3. fs tool with no scope set → DENY (scope is the workspace boundary —
+           holds even in autopilot).
+        4. fs tool whose path is out of scope → DENY (a session grant or an
+           explicit ``allow`` rule bypasses *only* this check, never #3).
+        5. ``plan`` tier + write/exec → DENY (read-only stance; allow-rules and
+           grants do not reopen writes in plan mode).
+        6. read-only fs in scope → ALLOW (reads never prompt, any tier).
+        7. session grant / ``allow`` rule → ALLOW; ``ask`` rule → confirmation.
+        8. ``autopilot`` → ALLOW.
+        9. ``auto_edits`` → confirmation for exec/dangerous, ALLOW for safe
+           in-scope writes, confirmation for other confirmation-required tools.
+        10. ``strict`` (default) → confirmation iff the tool requires it, else
+            ALLOW (reproduces the pre-Fase-7 behaviour exactly).
+
+        Args:
+            tool_name: Namespaced tool name.
+            args: Parsed tool arguments.
+            tool_def: The tool's definition (``None`` ⇒ unknown tool).
+            conversation_id: Conversation the call belongs to (scope/rules/grants).
+            mode: The conversation's permission tier.
+
+        Returns:
+            A :class:`GateDecision`.
+        """
+        caps = set(tool_def.capabilities) if tool_def is not None else set()
+        is_write = "fs_write" in caps
+        is_exec = "process_exec" in caps
+        is_fs = bool(caps & self._fs_capabilities)
+        is_read_only_fs = ("fs_read" in caps) and not (is_write or is_exec)
+
+        # 1. forbidden risk — absolute.
+        if self.is_forbidden(tool_def):
+            return GateDecision.deny(PermissionOutcome.DENY_FORBIDDEN, "forbidden_tool")
+
+        rule = (
+            self._rule_provider(conversation_id, tool_name)
+            if self._rule_provider is not None
+            else None
+        )
+        granted = self.is_granted(conversation_id, tool_name)
+
+        # 2. explicit deny rule — a user prohibition wins in every tier.
+        if rule is RuleEffect.DENY:
+            return GateDecision.deny(PermissionOutcome.DENY_RULE, "user_denied")
+
+        # 3 + 4. filesystem scope confinement (by construction).
+        if is_fs:
+            scope_roots = self._resolve_scope(conversation_id)
+            if not scope_roots:
+                # No workspace boundary ⇒ no filesystem access, even in autopilot.
+                return GateDecision.deny(PermissionOutcome.DENY_NO_SCOPE, "no_scope")
+            # A session grant or an explicit allow-rule bypasses ONLY the
+            # out-of-scope path check (never the no-scope breaker above).
+            if not granted and rule is not RuleEffect.ALLOW:
+                path_args = tool_def.path_args if tool_def is not None else ()
+                for arg_name in path_args:
+                    raw = args.get(arg_name)
+                    if raw is None:
+                        continue
+                    if not self._within_scope(str(raw), scope_roots):
+                        logger.warning(
+                            "Permission: '{}' arg '{}'={!r} is outside conversation "
+                            "scope (conv={})",
+                            tool_name, arg_name, raw, conversation_id,
+                        )
+                        return GateDecision.deny(
+                            PermissionOutcome.DENY_SCOPE, "outside_scope",
+                        )
+
+        # 5. plan tier is read-only: block writes / process-exec.
+        if mode is PermissionMode.PLAN and (is_write or is_exec):
+            return GateDecision.deny(PermissionOutcome.DENY_PLAN_MODE, "plan_mode")
+
+        # 6. reads inside scope never prompt, in any tier.
+        if is_read_only_fs:
+            return GateDecision.allow()
+
+        # 7. explicit user grant / rule override the tier default.
+        if granted or rule is RuleEffect.ALLOW:
+            return GateDecision.allow()
+        if rule is RuleEffect.ASK:
+            return GateDecision.confirm()
+
+        # 8-10. tier defaults.
+        if mode is PermissionMode.AUTOPILOT:
+            return GateDecision.allow()
+        if mode is PermissionMode.AUTO_EDITS:
+            if is_exec or (tool_def is not None and tool_def.risk_level == "dangerous"):
+                return GateDecision.confirm()
+            if is_write:
+                return GateDecision.allow()
+            if self.requires_confirmation(tool_def):
+                return GateDecision.confirm()
+            return GateDecision.allow()
+        # plan (neutral, non-write/exec tools) and strict share the default tail.
+        if self.requires_confirmation(tool_def):
+            return GateDecision.confirm()
+        return GateDecision.allow()
 
     def _check_scope(
         self,

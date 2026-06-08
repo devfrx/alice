@@ -40,10 +40,22 @@ from loguru import logger
 
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
 from backend.core.tool_progress import current_progress_emitter
-from backend.services.permission_service import PermissionOutcome, PermissionService
+from backend.services.permission_mode_service import PermissionMode
+from backend.services.permission_rules import PermissionRuleService, RuleEffect
+from backend.services.permission_service import (
+    GateAction,
+    GateDecision,
+    PermissionOutcome,
+    PermissionService,
+)
 from backend.services.turn import events
 from backend.services.turn.channel import InteractionChannel
 from backend.services.turn.sink import WSEventSink
+
+# Permission-mode provider: maps a conversation id to its current tier. Read
+# synchronously per tool-call by ``PermissionMiddleware`` so a mid-turn change
+# takes effect on the next gate.
+ModeProvider = Callable[[str], PermissionMode]
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -67,8 +79,24 @@ class Disposition(StrEnum):
     REJECTED = "rejected"
     """User declined / timed out / cancelled the confirmation."""
     SCOPE_DENIED = "scope_denied"
-    """A path argument fell outside the conversation workspace scope. Inert
-    until Fase 6 wires a scope (no scope ⇒ never produced)."""
+    """A path argument fell outside the conversation workspace scope."""
+    NO_SCOPE_DENIED = "no_scope_denied"
+    """A filesystem tool was called with no workspace scope set (Fase 7).
+    Holds in every tier, autopilot included — scope is the workspace boundary."""
+    PLAN_DENIED = "plan_denied"
+    """A write / process-exec tool was blocked by the read-only ``plan`` tier."""
+    RULE_DENIED = "rule_denied"
+    """Blocked by a persistent ``deny`` permission rule (Fase 7)."""
+
+
+# Maps a denying permission outcome to its terminal gate disposition. The
+# forbidden outcome is handled separately because it also writes an audit row.
+_DENY_DISPOSITION: dict[PermissionOutcome, Disposition] = {
+    PermissionOutcome.DENY_SCOPE: Disposition.SCOPE_DENIED,
+    PermissionOutcome.DENY_NO_SCOPE: Disposition.NO_SCOPE_DENIED,
+    PermissionOutcome.DENY_PLAN_MODE: Disposition.PLAN_DENIED,
+    PermissionOutcome.DENY_RULE: Disposition.RULE_DENIED,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +106,21 @@ class AuditDecision:
     approved: bool
     reason: str | None
     risk_level: str
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmationOutcome:
+    """The result of a confirmation round-trip: approval + a remember choice.
+
+    Attributes:
+        approved: ``True`` when the user (or auto-approval) greenlit the call.
+        remember: ``"none"`` (ask again next time), ``"session"`` (grant for the
+            rest of this conversation), or ``"persistent"`` (write a durable
+            permission rule).
+    """
+
+    approved: bool
+    remember: str = "none"
 
 
 @dataclass(slots=True)
@@ -97,6 +140,7 @@ class ToolCall:
     dedup_key: str
     is_client: bool
     audit_decision: AuditDecision | None = None
+    gate_decision: GateDecision | None = None
     turn_id: str = ""
 
 
@@ -155,26 +199,45 @@ class DedupMiddleware:
 
 
 class PermissionMiddleware:
-    """Enforce risk policy + by-construction scope confinement.
+    """Enforce the permission tier: risk policy, scope confinement, rules.
 
-    Delegates the actual decision to the central
-    :class:`~backend.services.permission_service.PermissionService`. A
-    forbidden tool is blocked; an out-of-scope path is denied. (In Fase 2 no
-    scope is configured, so only the forbidden branch can fire — no new
-    denials, behaviour preserved.)
+    Delegates the actual verdict to the central
+    :class:`~backend.services.permission_service.PermissionService` via
+    :meth:`PermissionService.decide`, passing the conversation's current tier
+    (read synchronously from *mode_provider* so a mid-turn change is honoured on
+    the next gate). The three-valued verdict is stashed on the call as
+    ``gate_decision`` so :class:`ConfirmationMiddleware` need not recompute it: a
+    DENY short-circuits here (mapped to the matching disposition + an audit row
+    for the forbidden case), while ALLOW / NEEDS_CONFIRMATION fall through.
+
+    *mode_provider* defaults to a constant ``strict`` provider, so an isolated
+    construction (``PermissionMiddleware(svc)``) reproduces the pre-Fase-7
+    behaviour exactly.
     """
 
-    def __init__(self, permission_service: PermissionService) -> None:
+    def __init__(
+        self,
+        permission_service: PermissionService,
+        mode_provider: ModeProvider | None = None,
+    ) -> None:
         self._permission = permission_service
+        self._mode_provider = mode_provider
 
     async def handle(self, call: ToolCall, nxt: NextHandler) -> ToolOutcome:
-        decision = self._permission.evaluate(
+        mode = (
+            self._mode_provider(call.conversation_id)
+            if self._mode_provider is not None
+            else PermissionMode.STRICT
+        )
+        decision = self._permission.decide(
             tool_name=call.tool_name,
             args=call.args,
             tool_def=call.tool_def,
             conversation_id=call.conversation_id,
+            mode=mode,
         )
-        if decision.allowed:
+        call.gate_decision = decision
+        if decision.action is not GateAction.DENY:
             return await nxt(call)
 
         risk_level = call.tool_def.risk_level if call.tool_def else "forbidden"
@@ -188,14 +251,14 @@ class PermissionMiddleware:
             )
             return ToolOutcome(call, Disposition.FORBIDDEN)
 
-        # DENY_SCOPE (inert until Fase 6).
+        # Scope / no-scope / plan-mode / rule denials: a rejected tool message
+        # plus a failed done frame (the engine maps the disposition to text).
+        disposition = _DENY_DISPOSITION.get(decision.outcome, Disposition.SCOPE_DENIED)
         logger.warning(
-            "Blocked out-of-scope tool '{}' (exec_id={}): {}",
-            call.tool_name, call.exec_id, decision.reason,
+            "Blocked tool '{}' (exec_id={}): {} ({})",
+            call.tool_name, call.exec_id, decision.reason, decision.outcome.value,
         )
-        return ToolOutcome(
-            call, Disposition.SCOPE_DENIED, reason=decision.reason,
-        )
+        return ToolOutcome(call, disposition, reason=decision.reason)
 
 
 class ConfirmationMiddleware:
@@ -219,6 +282,7 @@ class ConfirmationMiddleware:
         confirmation_timeout_s: int,
         reasoning: str,
         cancel_event: asyncio.Event | None,
+        rule_service: PermissionRuleService | None = None,
     ) -> None:
         self._sink = sink
         self._channel = channel
@@ -227,12 +291,26 @@ class ConfirmationMiddleware:
         self._timeout_s = confirmation_timeout_s
         self._reasoning = reasoning
         self._cancel_event = cancel_event
+        self._rule_service = rule_service
 
     async def handle(self, call: ToolCall, nxt: NextHandler) -> ToolOutcome:
         td = call.tool_def
-        if not self._permission.requires_confirmation(td):
+        # Gate on the tier verdict stamped by PermissionMiddleware. When the
+        # gate decision is absent (a unit test driving this middleware in
+        # isolation), fall back to the legacy ``requires_confirmation`` flag so
+        # behaviour is preserved without the upstream stage.
+        gd = call.gate_decision
+        if gd is not None:
+            needs = gd.action is GateAction.NEEDS_CONFIRMATION
+        else:
+            needs = self._permission.requires_confirmation(td)
+        if not needs:
             return await nxt(call)
-        assert td is not None  # requires_confirmation is False for None
+
+        # ``td`` is non-None for ``requires_confirmation`` tools; an ``ask`` rule
+        # could in principle target an unknown tool, so default its metadata.
+        risk_level = td.risk_level if td is not None else "medium"
+        description = td.description if td is not None else ""
 
         # Canonical interaction frame: a confirmation round-trip is now pending
         # (covers both the channel-asked and the auto-approved paths below).
@@ -244,20 +322,23 @@ class ConfirmationMiddleware:
         ))
 
         if self._confirmations_enabled:
-            approved = await _request_confirmation(
+            confirmation = await _request_confirmation(
                 self._channel, call.tool_name, call.args, call.exec_id,
                 self._timeout_s,
-                risk_level=td.risk_level,
-                description=td.description,
+                risk_level=risk_level,
+                description=description,
                 reasoning=self._reasoning,
                 cancel_event=self._cancel_event,
             )
+            approved = confirmation.approved
+            remember = confirmation.remember
         else:
             logger.info(
                 "Confirmations disabled — auto-approving '{}' (exec_id={})",
                 call.tool_name, call.exec_id,
             )
             approved = True
+            remember = "none"
 
         # Canonical interaction frame: the confirmation resolved. ``approved``
         # is True for a user-approval or an auto-approval; False covers an
@@ -273,11 +354,34 @@ class ConfirmationMiddleware:
         call.audit_decision = AuditDecision(
             approved=approved,
             reason=None if approved else "user_rejected",
-            risk_level=td.risk_level,
+            risk_level=risk_level,
         )
+        await self._persist_remember(call, approved, remember)
         if not approved:
             return ToolOutcome(call, Disposition.REJECTED)
         return await nxt(call)
+
+    async def _persist_remember(
+        self, call: ToolCall, approved: bool, remember: str,
+    ) -> None:
+        """Apply a "don't ask again" choice (best-effort, never raises).
+
+        ``session`` records an in-memory grant on the permission service (only
+        meaningful for an approval); ``persistent`` writes a durable allow/deny
+        rule when a rule service is wired.
+        """
+        if remember == "session" and approved:
+            self._permission.grant(call.conversation_id, call.tool_name)
+        elif remember == "persistent" and self._rule_service is not None:
+            effect = RuleEffect.ALLOW if approved else RuleEffect.DENY
+            try:
+                await self._rule_service.add_rule(
+                    tool_name=call.tool_name,
+                    effect=effect,
+                    conversation_id=call.conversation_id,
+                )
+            except Exception as exc:  # never let persistence break the turn
+                logger.warning("Failed to persist permission rule: {}", exc)
 
 
 class InteractionMiddleware:
@@ -498,6 +602,9 @@ class ToolPipeline:
 # ---------------------------------------------------------------------------
 
 
+_REMEMBER_CHOICES: frozenset[str] = frozenset({"none", "session", "persistent"})
+
+
 async def _request_confirmation(
     channel: InteractionChannel,
     tool_name: str,
@@ -508,16 +615,20 @@ async def _request_confirmation(
     description: str = "",
     reasoning: str = "",
     cancel_event: asyncio.Event | None = None,
-) -> bool:
+) -> ConfirmationOutcome:
     """Send a confirmation request and wait for the user's response.
 
     Issues a ``tool_confirmation`` round-trip on the
     :class:`~backend.services.turn.channel.InteractionChannel` and blocks
-    until the correlated response arrives or *timeout_s* elapses.
+    until the correlated response arrives or *timeout_s* elapses. The request
+    payload advertises ``allow_remember`` so the client can offer the
+    "don't ask again" options; the response may carry a ``remember`` field
+    (``none`` / ``session`` / ``persistent``).
 
     Returns:
-        ``True`` if the user approved, ``False`` on rejection, timeout,
-        cancellation or disconnect.
+        A :class:`ConfirmationOutcome`: ``approved=False`` on rejection,
+        timeout, cancellation or disconnect; the ``remember`` choice (defaulting
+        to ``"none"``) otherwise.
     """
     msg = await channel.request(
         "tool_confirmation",
@@ -527,6 +638,7 @@ async def _request_confirmation(
             "risk_level": risk_level,
             "description": description,
             "reasoning": reasoning,
+            "allow_remember": True,
         },
         execution_id=execution_id,
         timeout_s=timeout_s,
@@ -537,8 +649,13 @@ async def _request_confirmation(
             "Confirmation not granted for tool '{}' (exec_id={})",
             tool_name, execution_id,
         )
-        return False
-    return bool(msg.get("approved", False))
+        return ConfirmationOutcome(approved=False)
+    remember = msg.get("remember", "none")
+    if remember not in _REMEMBER_CHOICES:
+        remember = "none"
+    return ConfirmationOutcome(
+        approved=bool(msg.get("approved", False)), remember=remember,
+    )
 
 
 async def _execute_client_tool(

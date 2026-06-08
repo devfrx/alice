@@ -156,6 +156,9 @@
             </div>
           </Transition>
         </div>
+        <div class="sv__group">
+          <PermissionRulesManager />
+        </div>
       </section>
 
       <!-- UI -->
@@ -199,6 +202,7 @@ import McpManager from '../components/settings/McpManager.vue'
 import KnowledgeGraphManager from '../components/settings/KnowledgeGraphManager.vue'
 import MemoryManager from '../components/settings/MemoryManager.vue'
 import VectorStoreManager from '../components/settings/VectorStoreManager.vue'
+import PermissionRulesManager from '../components/settings/PermissionRulesManager.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../components/ui/UiSelect.vue'
 import type { AppIconName } from '../assets/icons'
@@ -235,11 +239,11 @@ const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
   model: null, llm: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, security: null, ui: null,
 })
 
-function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null) {
+function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null): void {
   sectionRefs[id] = el as HTMLElement | null
 }
 
-function scrollTo(id: SectionId) {
+function scrollTo(id: SectionId): void {
   const el = sectionRefs[id]
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -247,7 +251,7 @@ function scrollTo(id: SectionId) {
 /* ── Track active section via IntersectionObserver ──────────── */
 let observer: IntersectionObserver | null = null
 
-function onScroll() {
+function onScroll(): void {
   /* Fallback for browsers without IO — find topmost visible section */
   if (observer) return
   const container = contentRef.value

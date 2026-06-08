@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.services.turn.tool_loop import run_tool_loop
+from backend.services.turn.pipeline import ConfirmationOutcome
 from backend.core.plugin_models import ToolDefinition, ToolResult
 from backend.db.models import ToolConfirmationAudit
 
@@ -133,7 +134,7 @@ async def test_confirmations_enabled_requests_approval():
     with patch(
         "backend.services.turn.pipeline._request_confirmation",
         new_callable=AsyncMock,
-        return_value=True,
+        return_value=ConfirmationOutcome(approved=True),
     ) as mock_confirm:
         await run_tool_loop(
             channel=ws,
@@ -169,7 +170,7 @@ async def test_confirmations_disabled_auto_approves():
     with patch(
         "backend.services.turn.pipeline._request_confirmation",
         new_callable=AsyncMock,
-        return_value=True,
+        return_value=ConfirmationOutcome(approved=True),
     ) as mock_confirm:
         await run_tool_loop(
             channel=ws,
@@ -323,7 +324,7 @@ async def test_confirmations_enabled_rejected_by_user():
     with patch(
         "backend.services.turn.pipeline._request_confirmation",
         new_callable=AsyncMock,
-        return_value=False,
+        return_value=ConfirmationOutcome(approved=False),
     ):
         await run_tool_loop(
             channel=ws,

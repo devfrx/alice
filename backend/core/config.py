@@ -366,6 +366,12 @@ class PermissionsConfig(BaseSettings):
     """Whether tool confirmations are required (safety feature)."""
     confirmation_timeout_s: int = 60
     """Seconds to wait for user confirmation on dangerous tools."""
+    default_mode: Literal["strict", "auto_edits", "plan", "autopilot"] = "strict"
+    """Default permission tier for a conversation with no explicit mode set.
+
+    ``strict`` reproduces the pre-Fase-7 behaviour (prompt for every
+    confirmation-required tool); the per-conversation mode (set only by the
+    user, never the model) overrides this default."""
 
 
 class WorkspaceScopeConfig(BaseSettings):
@@ -376,9 +382,13 @@ class WorkspaceScopeConfig(BaseSettings):
     forbidden_paths: list[str] = Field(default_factory=list)
     """Roots always out of scope even when a workspace scope is set."""
 
-    fallback_mode: Literal["sandbox", "disabled"] = "sandbox"
-    """When no explicit scope is set: 'sandbox' ⇒ an ephemeral per-conversation
-    working dir is allowed; 'disabled' ⇒ scoped tools refuse to run."""
+    fallback_mode: Literal["sandbox", "disabled"] = "disabled"
+    """When no explicit scope is set: 'disabled' (the default, Fase 7) ⇒ scoped
+    filesystem tools refuse to run until the user sets a workspace folder;
+    'sandbox' ⇒ an ephemeral per-conversation working dir is allowed (reserved
+    for the human interactive terminal). The central no-scope breaker in
+    :class:`~backend.services.permission_service.PermissionService` already
+    blocks the *model's* filesystem tools when no scope is set, in every tier."""
 
     sandbox_root: str = "data/workspaces"
     """Project-relative root for ephemeral per-conversation sandboxes."""
@@ -404,6 +414,19 @@ class TerminalConfig(BaseSettings):
     allow_network: bool = Field(
         default=False,
         description="Best-effort network policy hint (not a hard guarantee on Windows).",
+    )
+    max_sessions: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        description="Max concurrent interactive PTY sessions per conversation (Fase 7).",
+    )
+    interactive_shell: str | None = Field(
+        default=None,
+        description=(
+            "Shell program for interactive PTY sessions (Fase 7). None ⇒ ComSpec "
+            "(cmd.exe) on Windows, $SHELL (/bin/bash) on POSIX."
+        ),
     )
 
 

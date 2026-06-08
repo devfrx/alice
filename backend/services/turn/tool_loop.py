@@ -20,6 +20,8 @@ from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext, ToolResult
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
+from backend.services.permission_mode_service import PermissionMode, PermissionModeService
+from backend.services.permission_rules import PermissionRuleService
 from backend.services.permission_service import PermissionService
 from backend.services.turn import events
 from backend.services.turn.channel import InteractionChannel
@@ -178,6 +180,35 @@ async def run_tool_loop(
     permission_service = (
         _ps if isinstance(_ps, PermissionService) else PermissionService()
     )
+    # Persistent permission-rule service (durable allow/ask/deny), if wired.
+    _rs = getattr(ctx, "permission_rule_service", None)
+    rule_service = _rs if isinstance(_rs, PermissionRuleService) else None
+
+    # Per-conversation permission tier. Resolve a synchronous provider that the
+    # gate reads per tool-call (so a mid-turn change is honoured). For a
+    # lightweight/MagicMock context with no mode service, fall back to the
+    # configured default coerced to a valid tier — anything invalid degrades to
+    # STRICT, which reproduces the pre-Fase-7 behaviour exactly.
+    _ms = getattr(ctx, "permission_mode_service", None)
+    mode_provider: Callable[[str], PermissionMode]
+    if isinstance(_ms, PermissionModeService):
+        _mode_service = _ms
+
+        def mode_provider_from_service(conversation_id: str) -> PermissionMode:
+            return _mode_service.get_mode(conversation_id)
+
+        mode_provider = mode_provider_from_service
+    else:
+        _default_mode = PermissionMode.coerce(
+            getattr(ctx.config.permissions, "default_mode", PermissionMode.STRICT),
+            PermissionMode.STRICT,
+        )
+
+        def mode_provider_constant(conversation_id: str) -> PermissionMode:
+            return _default_mode
+
+        mode_provider = mode_provider_constant
+
     # Runtime confirmation toggle (constant for the turn).
     confirmations_on = ctx.config.permissions.confirmations_enabled
 
@@ -243,7 +274,7 @@ async def run_tool_loop(
         gate_pipeline = ToolPipeline(
             [
                 DedupMiddleware(seen),
-                PermissionMiddleware(permission_service),
+                PermissionMiddleware(permission_service, mode_provider),
                 ConfirmationMiddleware(
                     sink=sink,
                     channel=channel,
@@ -252,6 +283,7 @@ async def run_tool_loop(
                     confirmation_timeout_s=confirmation_timeout_s,
                     reasoning=thinking_content,
                     cancel_event=cancel_event,
+                    rule_service=rule_service,
                 ),
                 InteractionMiddleware(
                     sink=sink,
@@ -1096,6 +1128,15 @@ async def _persist_gate_outcome(
         result_text = "Tool is forbidden and cannot be executed."
     elif outcome.disposition is Disposition.SCOPE_DENIED:
         result_text = "Tool execution denied: path outside the workspace scope."
+    elif outcome.disposition is Disposition.NO_SCOPE_DENIED:
+        result_text = (
+            "Tool execution denied: no workspace folder is set for this "
+            "conversation. Ask the user to set a scope folder first."
+        )
+    elif outcome.disposition is Disposition.PLAN_DENIED:
+        result_text = "Tool execution denied: plan mode is read-only (no writes/commands)."
+    elif outcome.disposition is Disposition.RULE_DENIED:
+        result_text = "Tool execution denied by a permission rule."
     else:
         result_text = "Tool execution rejected or timed out."
     await sink.send({

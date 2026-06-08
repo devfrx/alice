@@ -27,7 +27,10 @@ entirely until the user opts in.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
+
+from loguru import logger
 
 from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import (
@@ -169,6 +172,17 @@ class TerminalPlugin(BasePlugin):
 
         requested_cwd = args.get("cwd")
 
+        # Fase E2: resolve (auto-creating when absent) the agent's assigned
+        # interactive terminal so the command runs in the directory the user
+        # sees and its output is mirrored into that terminal tab.  Best-effort:
+        # any failure (no scope, missing PTY backend) leaves ``assigned`` None
+        # and falls back to plain scoped execution below.
+        manager = getattr(self.ctx, "terminal_session_manager", None)
+        assigned = None
+        if manager is not None:
+            with contextlib.suppress(Exception):
+                assigned = await manager.ensure_agent_session(context.conversation_id)
+
         # Resolve the working directory.  Any primitive ValueError (bad sandbox
         # id, out-of-scope/forbidden/nonexistent cwd) becomes a tool error.
         scope_cfg = self.ctx.config.scope
@@ -187,6 +201,9 @@ class TerminalPlugin(BasePlugin):
                 workdir = validate_cwd_within_scope(
                     str(requested_cwd), roots, scope_cfg.forbidden_paths
                 )
+            elif assigned is not None:
+                # Run in the assigned terminal's directory (already in-scope).
+                workdir = assigned.cwd
             else:
                 workdir = roots[0]
         except ValueError as exc:
@@ -214,7 +231,28 @@ class TerminalPlugin(BasePlugin):
             return ToolResult.error(str(exc))
 
         text = self._format_result(str(command), result, cfg.max_output_bytes)
+
+        # Fase E2: mirror the command + result into the assigned terminal tab so
+        # the user watches what the agent ran (display-only — the bounded command
+        # ran in its own subprocess, not by injecting keystrokes). Audit it; the
+        # confirmation gate already recorded the authorization decision upstream.
+        if manager is not None and assigned is not None:
+            with contextlib.suppress(Exception):
+                await manager.echo_agent_output(
+                    context.conversation_id, assigned.id, self._terminal_echo(text),
+                )
+            logger.info(
+                "terminal(agent): conv={} session={} cmd={!r}",
+                context.conversation_id, assigned.id, str(command),
+            )
+
         return ToolResult.ok(text, execution_time_ms=result.duration_ms)
+
+    @staticmethod
+    def _terminal_echo(text: str) -> str:
+        """Frame a result block for display in an xterm terminal (CRLF + spacing)."""
+        crlf = text.replace("\r\n", "\n").replace("\n", "\r\n")
+        return f"\r\n{crlf}\r\n"
 
     def _format_result(self, command: str, result: TerminalResult, cap: int) -> str:
         """Render a compact, model/human-readable summary of a run.

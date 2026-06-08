@@ -296,6 +296,28 @@ class TerminalSessionManager:
         })
         return True
 
+    async def echo_agent_output(
+        self, conversation_id: str, session_id: str, text: str,
+    ) -> bool:
+        """Mirror agent-run output into a session's stream (display-only).
+
+        Emits a ``terminal.output`` event so the assigned terminal tab shows what
+        the agent ran — it does **not** write to the PTY (the agent's bounded
+        command runs in its own subprocess, not by injecting keystrokes).
+
+        Returns:
+            ``True`` if the session exists, ``False`` otherwise.
+        """
+        if self.get_session(conversation_id, session_id) is None:
+            return False
+        await self._emit({
+            "type": "terminal.output",
+            "conversation_id": str(conversation_id),
+            "session_id": session_id,
+            "data": text,
+        })
+        return True
+
     async def ensure_agent_session(
         self, conversation_id: str,
     ) -> TerminalSession:

@@ -349,6 +349,16 @@ async def run_tool_loop(
                 is_client=bool(tool_def and tool_def.client_execution),
             )
 
+            # Additive canonical frame: announce every well-formed (named +
+            # JSON-parsed) tool call exactly once, before the gate decides.
+            with contextlib.suppress(Exception):
+                await sink.send(events.tool_call(
+                    turn_id=progress.turn_id,
+                    execution_id=call.exec_id,
+                    tool_name=tool_name,
+                    args=args,
+                ))
+
             # Decision lives in the pipeline; persistence/audit stays here.
             outcome = await gate_pipeline.gate(call)
 
@@ -381,6 +391,7 @@ async def run_tool_loop(
                     ver=_ver,
                     sync_fn=sync_fn,
                     ctx=ctx,
+                    turn_id=progress.turn_id,
                 )
 
         # Release the SQLite write lock held by pending flush()es so that
@@ -443,6 +454,14 @@ async def run_tool_loop(
                     "execution_id": call.exec_id,
                     "success": False,
                 })
+                await _emit_tool_result(
+                    sink,
+                    turn_id=progress.turn_id,
+                    execution_id=call.exec_id,
+                    tool_name=tool_name,
+                    success=False,
+                    result=_timeout_content,
+                )
             await session.commit()
 
         # 4. Process results — persist and notify WS.
@@ -483,6 +502,14 @@ async def run_tool_loop(
                     "execution_id": call.exec_id,
                     "success": False,
                 })
+                await _emit_tool_result(
+                    sink,
+                    turn_id=progress.turn_id,
+                    execution_id=call.exec_id,
+                    tool_name=failed_tool_name,
+                    success=False,
+                    result=_fail_content,
+                )
                 continue
 
             outcome = fut.result()
@@ -601,6 +628,19 @@ async def run_tool_loop(
                 if ctx.conversation_file_manager and sync_fn:
                     await sync_fn(session, conv_id, ctx.conversation_file_manager)
                 raise
+
+            # Additive canonical frame mirrors the legacy done frame above
+            # (same content / success / content_type / artifact_id).
+            await _emit_tool_result(
+                sink,
+                turn_id=progress.turn_id,
+                execution_id=exec_id,
+                tool_name=tool_name,
+                success=tool_result.success,
+                result=content,
+                content_type=tool_result.content_type or None,
+                artifact_id=artifact_id,
+            )
 
         await session.commit()
 
@@ -939,6 +979,35 @@ async def run_tool_loop(
 # ---------------------------------------------------------------------------
 
 
+async def _emit_tool_result(
+    sink: WSEventSink,
+    *,
+    turn_id: str,
+    execution_id: str,
+    tool_name: str,
+    success: bool,
+    result: str,
+    content_type: str | None = None,
+    artifact_id: str | None = None,
+) -> None:
+    """Best-effort emit of the additive canonical ``tool.result`` frame.
+
+    Wrapped in :func:`contextlib.suppress` so a sink failure never alters the
+    surrounding control flow (the legacy ``tool_execution_done`` frame is
+    emitted separately and unchanged).
+    """
+    with contextlib.suppress(Exception):
+        await sink.send(events.tool_result(
+            turn_id=turn_id,
+            execution_id=execution_id,
+            tool_name=tool_name,
+            success=success,
+            result=result,
+            content_type=content_type,
+            artifact_id=artifact_id,
+        ))
+
+
 async def _persist_gate_outcome(
     outcome: ToolOutcome,
     *,
@@ -949,6 +1018,7 @@ async def _persist_gate_outcome(
     ver: dict[str, Any],
     sync_fn: SyncFn | None,
     ctx: AppContext,
+    turn_id: str,
 ) -> None:
     """Persist a terminal (non-executed) gate outcome.
 
@@ -957,6 +1027,9 @@ async def _persist_gate_outcome(
     produced: deduped, forbidden, confirmation-rejected, scope-denied, or a
     client-executed result. Audit rows are written by the caller from
     ``call.audit_decision``; this handles only messages and frames.
+
+    ``turn_id`` correlates the additive canonical ``tool.result`` frame this
+    emits (alongside each legacy frame) so the timeline entry is closed.
     """
     call = outcome.call
 
@@ -974,6 +1047,7 @@ async def _persist_gate_outcome(
             ver=ver,
             sync_fn=sync_fn,
             ctx=ctx,
+            turn_id=turn_id,
         )
         return
 
@@ -994,6 +1068,16 @@ async def _persist_gate_outcome(
                 "content": dedup_content,
                 "tool_call_id": call.tc_id,
             })
+        # Canonical-only: a deduped call has no legacy done frame, but the
+        # timeline still needs its entry closed.
+        await _emit_tool_result(
+            sink,
+            turn_id=turn_id,
+            execution_id=call.exec_id,
+            tool_name=call.tool_name,
+            success=True,
+            result=dedup_content,
+        )
         return
 
     # FORBIDDEN / REJECTED / SCOPE_DENIED: a rejected tool message plus a
@@ -1019,6 +1103,14 @@ async def _persist_gate_outcome(
         "execution_id": call.exec_id,
         "success": False,
     })
+    await _emit_tool_result(
+        sink,
+        turn_id=turn_id,
+        execution_id=call.exec_id,
+        tool_name=call.tool_name,
+        success=False,
+        result=result_text,
+    )
 
 
 def _result_to_str(tool_result: ToolResult) -> str:
@@ -1113,6 +1205,7 @@ async def _persist_client_tool_result(
     ver: dict[str, Any],
     sync_fn: SyncFn | None,
     ctx: AppContext,
+    turn_id: str,
 ) -> None:
     """Persist a client-executed tool result and notify the client.
 
@@ -1120,6 +1213,9 @@ async def _persist_client_tool_result(
     main loop (DB ``role="tool"`` message + in-memory history append +
     ``tool_execution_done`` frame), minus the image/artifact handling that
     only applies to server-produced binary payloads.
+
+    ``turn_id`` correlates the additive canonical ``tool.result`` frame
+    emitted alongside the legacy ``tool_execution_done`` frame.
     """
     content = _result_to_str(result)
     tool_msg = Message(
@@ -1150,3 +1246,11 @@ async def _persist_client_tool_result(
         "execution_id": exec_id,
         "success": result.success,
     })
+    await _emit_tool_result(
+        sink,
+        turn_id=turn_id,
+        execution_id=exec_id,
+        tool_name=tool_name,
+        success=result.success,
+        result=content,
+    )

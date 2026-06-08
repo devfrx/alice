@@ -132,13 +132,13 @@ describe('_clearOpenModuleHandlers', () => {
 
 describe('MODULE_REGISTRY shape', () => {
   // Optional registry shape tests co-located here for convenience.
-  it('module registry has the five expected ids', async () => {
+  it('module registry has the six expected ids', async () => {
     const { MODULE_REGISTRY } = await import('./moduleRegistry')
 
     expect(Object.keys(MODULE_REGISTRY)).toEqual(
-      expect.arrayContaining(['chat', 'chart', 'whiteboard', 'cad3d', 'plan'])
+      expect.arrayContaining(['chat', 'chart', 'whiteboard', 'cad3d', 'plan', 'terminal'])
     )
-    expect(Object.keys(MODULE_REGISTRY)).toHaveLength(5)
+    expect(Object.keys(MODULE_REGISTRY)).toHaveLength(6)
   })
 
   it('each entry has a non-empty label and a function component', async () => {
@@ -160,20 +160,22 @@ describe('MODULE_REGISTRY shape', () => {
     expect(isModuleRegistered('whiteboard')).toBe(true)
     expect(isModuleRegistered('cad3d')).toBe(true)
     expect(isModuleRegistered('plan')).toBe(true)
+    expect(isModuleRegistered('terminal')).toBe(true)
     expect(isModuleRegistered('nonexistent')).toBe(false)
     expect(isModuleRegistered('')).toBe(false)
   })
 
-  it('listModules returns all five defs', async () => {
+  it('listModules returns all six defs', async () => {
     const { listModules } = await import('./moduleRegistry')
 
     const modules = listModules()
-    expect(modules).toHaveLength(5)
+    expect(modules).toHaveLength(6)
     expect(modules.map((m) => m.id).sort()).toEqual([
       'cad3d',
       'chart',
       'chat',
       'plan',
+      'terminal',
       'whiteboard',
     ])
   })

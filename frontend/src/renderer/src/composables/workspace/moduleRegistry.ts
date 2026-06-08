@@ -86,6 +86,15 @@ const plan: ModuleDef = {
   singleton: true
 }
 
+const terminal: ModuleDef = {
+  id: 'terminal',
+  label: 'Terminal',
+  icon: 'embedding',
+  component: () => import('../../components/canvas/modules/TerminalModule.vue'),
+  defaultZone: 'bottom',
+  singleton: true
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -95,7 +104,8 @@ export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   chart,
   whiteboard,
   cad3d,
-  plan
+  plan,
+  terminal
 }
 
 // ---------------------------------------------------------------------------

@@ -1,26 +1,28 @@
 """Tests for backend.core.plugin_models — data models, enums, validation.
 
 Covers ConnectionStatus, ToolDefinition, ToolResult, ExecutionContext,
-and module-level constants.
+CommandDefinition, and module-level constants.
 """
 
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 import pytest
 
+from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import (
     MAX_TOOL_DESCRIPTION_LENGTH,
     MAX_TOOL_RESULT_LENGTH,
     PLUGIN_API_VERSION,
     TOOL_NAME_PATTERN,
+    CommandDefinition,
     ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
     ToolResult,
 )
-
 
 # ===================================================================
 # ConnectionStatus
@@ -91,6 +93,10 @@ class TestToolDefinition:
         td = ToolDefinition(name="t", description="d")
         assert td.risk_level == "safe"
 
+    def test_default_user_interaction(self) -> None:
+        td = ToolDefinition(name="t", description="d")
+        assert td.user_interaction is False
+
     def test_custom_fields(self) -> None:
         td = ToolDefinition(
             name="nuke",
@@ -106,6 +112,18 @@ class TestToolDefinition:
         assert td.timeout_ms == 60_000
         assert td.requires_confirmation is True
         assert td.risk_level == "dangerous"
+
+    def test_user_interaction_true_frozen_and_validates(self) -> None:
+        """user_interaction=True is honoured, validates, and stays frozen."""
+        td = ToolDefinition(
+            name="ask_user",
+            description="Ask the human a question",
+            user_interaction=True,
+        )
+        assert td.user_interaction is True
+        td.validate()  # should not raise
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            td.user_interaction = False  # type: ignore[misc]
 
     # -- validate() -----------------------------------------------------
 
@@ -303,3 +321,69 @@ class TestConstants:
 
     def test_plugin_api_version(self) -> None:
         assert PLUGIN_API_VERSION == "1.0.0"
+
+
+# ===================================================================
+# CommandDefinition
+# ===================================================================
+
+
+class TestCommandDefinition:
+    """Creation, defaults, and immutability of the ``/``-command seam."""
+
+    def test_creation_minimal(self) -> None:
+        cmd = CommandDefinition(name="plan", description="d")
+        assert cmd.name == "plan"
+        assert cmd.description == "d"
+
+    def test_default_kind_is_tool(self) -> None:
+        cmd = CommandDefinition(name="plan", description="d")
+        assert cmd.kind == "tool"
+
+    def test_default_params_schema(self) -> None:
+        cmd = CommandDefinition(name="plan", description="d")
+        assert cmd.params_schema == {"type": "object", "properties": {}}
+
+    def test_custom_kind_and_schema(self) -> None:
+        schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+        cmd = CommandDefinition(
+            name="note", description="d", params_schema=schema, kind="prompt"
+        )
+        assert cmd.kind == "prompt"
+        assert cmd.params_schema is schema
+
+    def test_frozen_cannot_set_name(self) -> None:
+        cmd = CommandDefinition(name="plan", description="d")
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            cmd.name = "other"  # type: ignore[misc]
+
+
+# ===================================================================
+# BasePlugin.get_commands
+# ===================================================================
+
+
+class _MinimalPlugin(BasePlugin):
+    """Bare plugin implementing only the abstract methods."""
+
+    plugin_name = "minimal"
+    plugin_version = "1.0.0"
+    plugin_description = "Minimal plugin for get_commands default"
+    plugin_dependencies: list[str] = []
+
+    def get_tools(self) -> list[ToolDefinition]:
+        """Expose no tools."""
+        return []
+
+    async def execute_tool(
+        self, tool_name: str, args: dict[str, Any], context: ExecutionContext
+    ) -> ToolResult:
+        """Never called in these tests."""
+        return ToolResult.ok(None)
+
+
+class TestBasePluginGetCommands:
+    """Default :meth:`BasePlugin.get_commands` contract."""
+
+    def test_default_returns_empty_list(self) -> None:
+        assert _MinimalPlugin().get_commands() == []

@@ -77,6 +77,24 @@ const cad3d: ModuleDef = {
   defaultZone: 'right'
 }
 
+const plan: ModuleDef = {
+  id: 'plan',
+  label: 'Plan',
+  icon: 'file-lines',
+  component: () => import('../../components/canvas/modules/PlanModule.vue'),
+  defaultZone: 'right',
+  singleton: true
+}
+
+const terminal: ModuleDef = {
+  id: 'terminal',
+  label: 'Terminal',
+  icon: 'embedding',
+  component: () => import('../../components/canvas/modules/TerminalModule.vue'),
+  defaultZone: 'bottom',
+  singleton: true
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -85,7 +103,9 @@ export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   chat,
   chart,
   whiteboard,
-  cad3d
+  cad3d,
+  plan,
+  terminal
 }
 
 // ---------------------------------------------------------------------------

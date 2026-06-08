@@ -157,7 +157,7 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
    the in-tree PaneDividers for a coherent, professional feel. */
 .panel-workspace__divider {
   position: relative;
-  width: 8px;
+  width: 12px;
   flex-shrink: 0;
   cursor: col-resize;
   background: transparent;
@@ -168,10 +168,10 @@ useArtifactAutoOpen(toRef(props, 'conversationId'))
 
 .panel-workspace__divider::after {
   content: '';
-  width: 2px;
+  width: 6px;
   height: 48px;
   background: var(--border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-xs);
   opacity: 0.8;
   transition:
     background-color var(--duration-fast) var(--ease-out-quart),

@@ -1,23 +1,21 @@
-"""Tests for the confirmations_enabled security toggle in _tool_loop.py.
+"""Tests for the confirmations_enabled security toggle in the turn engine.
 
-Verifies that `ctx.config.pc_automation.confirmations_enabled` correctly
+Verifies that `ctx.config.permissions.confirmations_enabled` correctly
 controls whether dangerous tools require interactive user confirmation
 or are auto-approved, while ensuring FORBIDDEN tools remain blocked.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.api.routes._tool_loop import run_tool_loop
-from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
+from backend.services.turn.tool_loop import run_tool_loop
+from backend.core.plugin_models import ToolDefinition, ToolResult
 from backend.db.models import ToolConfirmationAudit
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -53,15 +51,15 @@ def _make_tool_def(
 def _build_mocks(*, confirmations_enabled: bool = True):
     """Return (ctx, ws, session, llm) mocks wired for run_tool_loop."""
     # --- Config ---
-    pc_auto_cfg = MagicMock()
-    pc_auto_cfg.confirmations_enabled = confirmations_enabled
+    permissions_cfg = MagicMock()
+    permissions_cfg.confirmations_enabled = confirmations_enabled
 
     llm_cfg = MagicMock()
     llm_cfg.tool_execution_timeout = 120.0
     llm_cfg.context_compression_enabled = False
 
     cfg = MagicMock()
-    cfg.pc_automation = pc_auto_cfg
+    cfg.permissions = permissions_cfg
     cfg.llm = llm_cfg
 
     # --- Tool registry ---
@@ -133,12 +131,13 @@ async def test_confirmations_enabled_requests_approval():
     conv_id = uuid.uuid4()
 
     with patch(
-        "backend.api.routes._tool_loop._request_confirmation",
+        "backend.services.turn.pipeline._request_confirmation",
         new_callable=AsyncMock,
         return_value=True,
     ) as mock_confirm:
         await run_tool_loop(
             channel=ws,
+            sink=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,
@@ -168,12 +167,13 @@ async def test_confirmations_disabled_auto_approves():
     conv_id = uuid.uuid4()
 
     with patch(
-        "backend.api.routes._tool_loop._request_confirmation",
+        "backend.services.turn.pipeline._request_confirmation",
         new_callable=AsyncMock,
         return_value=True,
     ) as mock_confirm:
         await run_tool_loop(
             channel=ws,
+            sink=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,
@@ -206,6 +206,7 @@ async def test_forbidden_blocked_even_when_confirmations_disabled():
 
     await run_tool_loop(
         channel=ws,
+        sink=ws,
         ctx=ctx,
         session=session,
         conv_id=conv_id,
@@ -244,6 +245,7 @@ async def test_audit_logged_when_auto_approved():
 
     await run_tool_loop(
         channel=ws,
+        sink=ws,
         ctx=ctx,
         session=session,
         conv_id=conv_id,
@@ -279,11 +281,12 @@ async def test_safe_tool_no_confirmation_regardless_of_toggle():
         conv_id = uuid.uuid4()
 
         with patch(
-            "backend.api.routes._tool_loop._request_confirmation",
+            "backend.services.turn.pipeline._request_confirmation",
             new_callable=AsyncMock,
         ) as mock_confirm:
             await run_tool_loop(
                 channel=ws,
+                sink=ws,
                 ctx=ctx,
                 session=session,
                 conv_id=conv_id,
@@ -318,12 +321,13 @@ async def test_confirmations_enabled_rejected_by_user():
     conv_id = uuid.uuid4()
 
     with patch(
-        "backend.api.routes._tool_loop._request_confirmation",
+        "backend.services.turn.pipeline._request_confirmation",
         new_callable=AsyncMock,
         return_value=False,
     ):
         await run_tool_loop(
             channel=ws,
+            sink=ws,
             ctx=ctx,
             session=session,
             conv_id=conv_id,

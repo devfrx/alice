@@ -9,14 +9,13 @@ a single non-blocking critic pass that may emit ``agent.critic_invoked`` and
 from __future__ import annotations
 
 import asyncio
+import uuid
 from types import SimpleNamespace
 from typing import Any
 
-from backend.services.agent.models import Verdict, VerdictAction
-from backend.services.turn.models import TurnResult
+from backend.services.turn._reflection import ReflectionVerdict
+from backend.services.turn.models import TurnInput, TurnResult
 from backend.services.turn.reflective_executor import ReflectiveTurnExecutor
-
-from ._agent_helpers import MockCritic, MockDirect, make_agent_turn
 
 
 class RecordingSink:
@@ -35,6 +34,66 @@ class RecordingSink:
     @property
     def _ws(self) -> None:
         return None
+
+
+class MockDirect:
+    """Stub direct executor returning a fixed :class:`TurnResult`."""
+
+    def __init__(self, default: TurnResult) -> None:
+        self._default = default
+
+    async def execute(
+        self,
+        turn: TurnInput,
+        sink: Any,
+        cancel_event: asyncio.Event,
+        session: Any,
+        channel: Any = None,
+    ) -> TurnResult:
+        return self._default
+
+
+class MockCritic:
+    """Stub reflection critic returning queued :class:`ReflectionVerdict`s."""
+
+    def __init__(self, verdicts: list[ReflectionVerdict]) -> None:
+        self._verdicts = list(verdicts)
+        self.calls: list[dict[str, Any]] = []
+
+    async def evaluate(
+        self,
+        *,
+        output: str,
+        finish_reason: str | None,
+        goal: str,
+        cancel_event: asyncio.Event | None = None,
+    ) -> ReflectionVerdict:
+        self.calls.append(
+            {"output": output, "finish_reason": finish_reason, "goal": goal},
+        )
+        if self._verdicts:
+            return self._verdicts.pop(0)
+        return ReflectionVerdict(ok=True, reason="ok", source="llm")
+
+
+def make_agent_turn() -> TurnInput:
+    """Build a minimal :class:`TurnInput` for executor tests."""
+    return TurnInput(
+        conv_id=uuid.uuid4(),
+        user_msg_id=uuid.uuid4(),
+        user_content="richiesta",
+        history=[],
+        messages=[],
+        tools=None,
+        memory_context=None,
+        cached_sys_prompt=None,
+        attachment_info=None,
+        context_window=8192,
+        version_group_id=None,
+        version_index=0,
+        client_ip="127.0.0.1",
+        resolved_max_tokens=None,
+    )
 
 
 def _cfg(*, enabled: bool, tool_turns_only: bool = True) -> Any:
@@ -60,7 +119,10 @@ def _result(
 
 
 async def _run(
-    *, cfg: Any, result: TurnResult, verdicts: list[Verdict] | None = None,
+    *,
+    cfg: Any,
+    result: TurnResult,
+    verdicts: list[ReflectionVerdict] | None = None,
 ) -> tuple[TurnResult, RecordingSink, MockCritic]:
     direct = MockDirect(default=result)
     critic = MockCritic(verdicts or [])
@@ -101,7 +163,7 @@ async def test_reflection_runs_on_tool_turn_verdict_ok() -> None:
     out, sink, critic = await _run(
         cfg=_cfg(enabled=True),
         result=_result(had_tool_calls=True),
-        verdicts=[Verdict(action=VerdictAction.OK, reason="ok")],
+        verdicts=[ReflectionVerdict(ok=True, reason="ok", source="llm")],
     )
     assert len(critic.calls) == 1
     assert "agent.critic_invoked" in _event_types(sink)
@@ -112,7 +174,9 @@ async def test_reflection_warns_on_non_ok_verdict() -> None:
     out, sink, critic = await _run(
         cfg=_cfg(enabled=True),
         result=_result(had_tool_calls=True),
-        verdicts=[Verdict(action=VerdictAction.RETRY, reason="degenerato")],
+        verdicts=[
+            ReflectionVerdict(ok=False, reason="degenerato", source="detector"),
+        ],
     )
     types = _event_types(sink)
     assert "agent.critic_invoked" in types
@@ -125,7 +189,7 @@ async def test_reflection_runs_every_turn_when_not_tool_only() -> None:
     out, sink, critic = await _run(
         cfg=_cfg(enabled=True, tool_turns_only=False),
         result=_result(had_tool_calls=False),
-        verdicts=[Verdict(action=VerdictAction.OK, reason="ok")],
+        verdicts=[ReflectionVerdict(ok=True, reason="ok", source="llm")],
     )
     assert len(critic.calls) == 1
 
@@ -151,7 +215,7 @@ async def test_result_returned_unchanged() -> None:
     out, sink, critic = await _run(
         cfg=_cfg(enabled=True),
         result=original,
-        verdicts=[Verdict(action=VerdictAction.RETRY, reason="x")],
+        verdicts=[ReflectionVerdict(ok=False, reason="x", source="llm")],
     )
     # Reflection never rewrites the answer.
     assert out.content == "originale"

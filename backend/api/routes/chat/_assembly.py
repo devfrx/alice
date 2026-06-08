@@ -33,6 +33,7 @@ from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
 from backend.services.context_manager import CompressionResult, ContextUsage
 from backend.services.llm_service import LLMService
+from backend.services.plan_service import render_plan_steps
 from backend.services.turn import TurnInput
 
 from ._helpers import (
@@ -388,6 +389,18 @@ class TurnAssembler:
                 if memory_context
                 else wb_ctx
             )
+
+        # --- inject persisted plan so the model continues it (Fase 5) ---
+        if ctx.plan_service is not None:
+            plan_steps = await ctx.plan_service.get_plan(conv_id)
+            if plan_steps:
+                plan_ctx = render_plan_steps(plan_steps)
+                if plan_ctx:
+                    memory_context = (
+                        f"{memory_context}\n\n{plan_ctx}"
+                        if memory_context
+                        else plan_ctx
+                    )
 
         # --- call LLM (streaming) ---------------------------------
         # Build system prompt once for the entire request — reused

@@ -14,6 +14,7 @@ import asyncio
 import pytest
 
 from backend.services.turn.direct_executor import DirectTurnExecutor
+from backend.services.turn.events import CANONICAL_TURN_EVENT_TYPES
 from backend.services.turn.sink import RecordingEventSink
 
 from ._turn_helpers import StreamingMockLLM, make_ctx, make_turn
@@ -41,10 +42,13 @@ async def test_stream_relays_tokens_and_done_in_order() -> None:
         session=None,
     )
 
-    types = [e["type"] for e in sink.events]
+    # Filter out the additive canonical turn.* lifecycle frames so this
+    # still pins the exact ordering of the legacy stream frames.
+    legacy = [e for e in sink.events if e["type"] not in CANONICAL_TURN_EVENT_TYPES]
+    types = [e["type"] for e in legacy]
     assert types == ["token", "thinking", "token"]
-    assert sink.events[0]["content"] == "Ciao "
-    assert sink.events[2]["content"] == "mondo"
+    assert legacy[0]["content"] == "Ciao "
+    assert legacy[2]["content"] == "mondo"
 
     assert result.content == "Ciao mondo"
     assert result.thinking == "(reasoning)"

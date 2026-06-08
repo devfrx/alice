@@ -8,9 +8,10 @@ It preserves the *exact* behaviour of the original closure-based
    relaying ``token`` / ``thinking`` / ``tool_call`` / ``error`` / ``done``
    events through a :class:`WSEventSink`.
 2. If tool calls were requested, delegate to
-   :func:`backend.api.routes._tool_loop.run_tool_loop`
-   **without modifying it** (Phase 1 escape hatch — see ``sink._ws``).
-3. Honour ``cancel_event`` at every chunk and after the tool loop.
+   :func:`backend.api.routes._tool_loop.run_tool_loop`, passing the
+   outbound ``sink`` and the inbound :class:`InteractionChannel`.
+3. Honour ``cancel_event`` at every chunk and after the tool loop (the
+   channel's single read-pump sets it on a cancel frame).
 4. Capture LLM exceptions and ``WebSocketDisconnect`` internally so
    ``ws_chat`` only needs to inspect ``finish_reason`` to decide what to
    persist (no exception-based control flow).
@@ -25,7 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
+import uuid
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -34,7 +35,9 @@ from loguru import logger
 
 from backend.core.context import AppContext
 from backend.services.llm_service import LLMService
-from backend.services.turn.models import TurnInput, TurnResult
+from backend.services.turn import events
+from backend.services.turn.channel import InteractionChannel
+from backend.services.turn.models import TurnInput, TurnProgress, TurnResult
 from backend.services.turn.sink import (
     WSEventSink,
     is_websocket_closed_runtime_error,
@@ -73,15 +76,19 @@ class DirectTurnExecutor:
         sink: WSEventSink,
         cancel_event: asyncio.Event,
         session: Any,
+        channel: InteractionChannel | None = None,
     ) -> TurnResult:
         """Run the full turn and return its outcome.
 
         Args:
             turn: Immutable input bundle.
             sink: Sink used for outbound WS events.
-            cancel_event: Event toggled by the caller (or the internal
-                cancel reader) to abort the turn early.
+            cancel_event: Event toggled by the caller (or the channel's
+                read-pump) to abort the turn early.
             session: Active async DB session (forwarded to the tool loop).
+            channel: Inbound interaction channel used by the tool loop for
+                confirmation / client-tool round-trips. ``None`` (e.g. in
+                tests with a non-WS sink) disables the tool-loop path.
 
         Returns:
             A :class:`TurnResult` describing the final state. The
@@ -89,10 +96,24 @@ class DirectTurnExecutor:
             errors, surfacing them through ``finish_reason``
             (``"disconnected"`` / ``"error"``).
         """
+        progress = TurnProgress(turn_id=uuid.uuid4().hex)
+        max_steps = self.ctx.config.llm.max_tool_iterations + 1
+        with contextlib.suppress(Exception):
+            await sink.send(events.turn_started(
+                turn_id=progress.turn_id,
+                conversation_id=str(turn.conv_id),
+            ))
+
         # ------------------------------------------------------------------
         # Phase 1 — stream initial LLM response.  Owns its own cancel
         # reader so the WebSocket never has two concurrent readers (v3-1).
         # ------------------------------------------------------------------
+        progress.steps = 1
+        with contextlib.suppress(Exception):
+            await sink.send(
+                events.turn_llm_step(turn_id=progress.turn_id, step=1),
+            )
+
         try:
             (
                 full_content,
@@ -107,7 +128,7 @@ class DirectTurnExecutor:
             # has been collected yet — bubble up as "disconnected" with
             # whatever the executor managed to accumulate (typically "").
             logger.debug("WS disconnected during initial stream")
-            return TurnResult(
+            return await self._finish(sink, progress, TurnResult(
                 content="",
                 thinking="",
                 input_tokens=0,
@@ -115,12 +136,24 @@ class DirectTurnExecutor:
                 finish_reason="disconnected",
                 final_assistant_message_id=None,
                 had_tool_calls=False,
-            )
+            ))
+
+        # Step-1 usage snapshot (success path only — the disconnect branch
+        # above returns before reaching here).
+        with contextlib.suppress(Exception):
+            await sink.send(events.turn_usage(
+                turn_id=progress.turn_id,
+                step=1,
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                tool_calls=0,
+                max_steps=max_steps,
+            ))
 
         # v3-2 (also valid post-stream): cancel takes precedence over
         # any other finish reason emitted by the LLM.
         if finish_reason == "disconnected":
-            return TurnResult(
+            return await self._finish(sink, progress, TurnResult(
                 content=full_content,
                 thinking=thinking,
                 input_tokens=in_tok,
@@ -128,10 +161,10 @@ class DirectTurnExecutor:
                 finish_reason="disconnected",
                 final_assistant_message_id=None,
                 had_tool_calls=False,
-            )
+            ))
 
         if cancel_event.is_set():
-            return TurnResult(
+            return await self._finish(sink, progress, TurnResult(
                 content=full_content,
                 thinking=thinking,
                 input_tokens=in_tok,
@@ -139,12 +172,12 @@ class DirectTurnExecutor:
                 finish_reason="cancelled",
                 final_assistant_message_id=None,
                 had_tool_calls=False,
-            )
+            ))
 
         # The streaming layer captured an LLM error (already emitted as
         # WS event by ``_stream_initial``) — short-circuit.
         if finish_reason == "error":
-            return TurnResult(
+            return await self._finish(sink, progress, TurnResult(
                 content=full_content,
                 thinking=thinking,
                 input_tokens=in_tok,
@@ -152,7 +185,7 @@ class DirectTurnExecutor:
                 finish_reason="error",
                 final_assistant_message_id=None,
                 had_tool_calls=False,
-            )
+            ))
 
         # ------------------------------------------------------------------
         # Phase 2 — tool loop.
@@ -160,18 +193,17 @@ class DirectTurnExecutor:
         had_tool_calls = False
         if tool_calls:
             had_tool_calls = True
-            ws_for_loop = sink._ws
-            if ws_for_loop is None:
-                # In tests with a RecordingEventSink, the tool loop is
-                # not exercised because run_tool_loop expects a real
-                # WebSocket.  Surface a deterministic error instead of a
-                # cryptic AttributeError.
+            if channel is None:
+                # In tests with a RecordingEventSink and no channel, the
+                # tool loop is not exercised because run_tool_loop needs an
+                # inbound channel.  Surface a deterministic error instead of
+                # a cryptic AttributeError.
                 logger.error(
-                    "DirectTurnExecutor: tool calls requested but sink "
-                    "has no underlying WebSocket — refusing to invoke "
+                    "DirectTurnExecutor: tool calls requested but no "
+                    "InteractionChannel was provided — refusing to invoke "
                     "run_tool_loop.",
                 )
-                return TurnResult(
+                return await self._finish(sink, progress, TurnResult(
                     content=full_content,
                     thinking=thinking,
                     input_tokens=in_tok,
@@ -179,7 +211,7 @@ class DirectTurnExecutor:
                     finish_reason="error",
                     final_assistant_message_id=None,
                     had_tool_calls=True,
-                )
+                ))
 
             # Use the compressed history (when available) so the loop
                 # does not re-trigger compression on its first iteration.
@@ -192,7 +224,7 @@ class DirectTurnExecutor:
             # Lazy import to break the circular dependency between
             # backend.services.turn and backend.api.routes (chat.py
             # imports from this package at module load).
-            from backend.api.routes._tool_loop import run_tool_loop
+            from backend.services.turn.tool_loop import run_tool_loop
 
             try:
                 (
@@ -202,7 +234,8 @@ class DirectTurnExecutor:
                     out_tok2,
                     loop_finish,
                 ) = await run_tool_loop(
-                    websocket=ws_for_loop,
+                    channel=channel,
+                    sink=sink,
                     ctx=self.ctx,
                     session=session,
                     conv_id=turn.conv_id,
@@ -212,7 +245,7 @@ class DirectTurnExecutor:
                     thinking_content=thinking,
                     max_iterations=self.ctx.config.llm.max_tool_iterations,
                     confirmation_timeout_s=(
-                        self.ctx.config.pc_automation.confirmation_timeout_s
+                        self.ctx.config.permissions.confirmation_timeout_s
                     ),
                     client_ip=turn.client_ip,
                     sync_fn=self._sync_fn,
@@ -224,6 +257,7 @@ class DirectTurnExecutor:
                     version_group_id=turn.version_group_id,
                     version_index=turn.version_index,
                     context_window=turn.context_window,
+                    turn_progress=progress,
                 )
                 if in_tok2 > 0:
                     in_tok = in_tok2
@@ -232,7 +266,7 @@ class DirectTurnExecutor:
             except WebSocketDisconnect:
                 # v2-4: keep partial content for recovery in ws_chat.
                 logger.debug("WS disconnected during tool loop")
-                return TurnResult(
+                return await self._finish(sink, progress, TurnResult(
                     content=full_content,
                     thinking=thinking,
                     input_tokens=in_tok,
@@ -240,7 +274,7 @@ class DirectTurnExecutor:
                     finish_reason="disconnected",
                     final_assistant_message_id=None,
                     had_tool_calls=True,
-                )
+                ))
             except Exception:
                 # Preserve legacy behaviour: a generic tool-loop failure
                 # surfaces as a sink error event + finish_reason="error".
@@ -250,7 +284,7 @@ class DirectTurnExecutor:
                         "type": "error",
                         "content": "Tool execution error",
                     })
-                return TurnResult(
+                return await self._finish(sink, progress, TurnResult(
                     content=full_content,
                     thinking=thinking,
                     input_tokens=in_tok,
@@ -258,13 +292,13 @@ class DirectTurnExecutor:
                     finish_reason="error",
                     final_assistant_message_id=None,
                     had_tool_calls=True,
-                )
+                ))
 
             # v3-2: cancel during the tool loop returns the loop's last
             # finish_reason (typically "stop") — override it to
             # "cancelled" so the persistence layer takes the cancel path.
             if cancel_event.is_set():
-                return TurnResult(
+                return await self._finish(sink, progress, TurnResult(
                     content=full_content,
                     thinking=thinking,
                     input_tokens=in_tok,
@@ -272,9 +306,9 @@ class DirectTurnExecutor:
                     finish_reason="cancelled",
                     final_assistant_message_id=None,
                     had_tool_calls=True,
-                )
+                ))
 
-        return TurnResult(
+        return await self._finish(sink, progress, TurnResult(
             content=full_content,
             thinking=thinking,
             input_tokens=in_tok,
@@ -282,7 +316,40 @@ class DirectTurnExecutor:
             finish_reason=finish_reason,
             final_assistant_message_id=None,
             had_tool_calls=had_tool_calls,
-        )
+        ))
+
+    async def _finish(
+        self,
+        sink: WSEventSink,
+        progress: TurnProgress,
+        result: TurnResult,
+    ) -> TurnResult:
+        """Emit the terminal ``turn.finished`` frame, then return ``result``.
+
+        Routing every :meth:`execute` exit through this helper guarantees a
+        single ``turn.finished`` per turn, carrying the result's real
+        ``finish_reason`` / token usage and the per-turn step count. The
+        emission is best-effort (wrapped in :func:`contextlib.suppress`) so
+        it can never alter the existing control flow or return value.
+
+        Args:
+            sink: Outbound event sink for the turn.
+            progress: Mutable per-turn counters (supplies ``turn_id`` and
+                ``steps``).
+            result: The :class:`TurnResult` about to be returned.
+
+        Returns:
+            The unmodified ``result`` argument.
+        """
+        with contextlib.suppress(Exception):
+            await sink.send(events.turn_finished(
+                turn_id=progress.turn_id,
+                finish_reason=result.finish_reason,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                steps=progress.steps,
+            ))
+        return result
 
     # ------------------------------------------------------------------
     # Internal: initial streaming pass (legacy ``_stream_and_collect``).
@@ -297,9 +364,9 @@ class DirectTurnExecutor:
         """Stream the first LLM response and relay events to ``sink``.
 
         Mirrors the behaviour of the legacy ``_stream_and_collect``
-        closure in ``ws_chat`` but owns its own WebSocket cancel reader
-        (v3-1) so there is never an overlap with the per-request
-        readers spawned by :func:`run_tool_loop`.
+        closure in ``ws_chat``.  Cancellation is observed by the
+        :class:`InteractionChannel` read-pump (the single WS reader), which
+        sets ``cancel_event``; this method just honours it per chunk.
 
         Returns:
             ``(content, thinking, tool_calls, finish_reason,
@@ -319,9 +386,9 @@ class DirectTurnExecutor:
             None if turn.was_compressed else turn.user_content
         )
 
-        # v3-1: cancel reader scoped to the streaming phase only.
-        reader_task = self._spawn_cancel_reader(sink, cancel_event)
-
+        # Cancel during streaming is observed by the channel's single
+        # read-pump (it sets ``cancel_event``), which ``llm.chat`` honours
+        # per chunk — no dedicated reader here (avoids a second WS reader).
         async def _send(event: dict[str, Any]) -> bool:
             await sink.send(event)
             return sink.is_connected
@@ -402,11 +469,6 @@ class DirectTurnExecutor:
             with contextlib.suppress(Exception):
                 await sink.send({"type": "error", "content": err_detail})
             finish_reason = "error"
-        finally:
-            if reader_task is not None:
-                reader_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await reader_task
 
         return (
             full_content,
@@ -416,70 +478,6 @@ class DirectTurnExecutor:
             in_tok,
             out_tok,
         )
-
-    # ------------------------------------------------------------------
-    # Internal: WebSocket cancel reader.
-    # ------------------------------------------------------------------
-
-    def _spawn_cancel_reader(
-        self,
-        sink: WSEventSink,
-        cancel_event: asyncio.Event,
-    ) -> asyncio.Task[None] | None:
-        """Spawn an async task that watches for ``{"type": "cancel"}``.
-
-        Returns ``None`` if the sink is not backed by a real WebSocket
-        (e.g. :class:`RecordingEventSink` in tests). The task sets
-        ``cancel_event`` on cancel requests or disconnects, allowing the
-        streaming loop to exit on the next chunk (~1 ms).
-        """
-        ws = sink._ws
-        if ws is None:
-            return None
-
-        async def _reader() -> None:
-            while not cancel_event.is_set():
-                try:
-                    raw = await asyncio.wait_for(
-                        ws.receive_text(), timeout=2.0,
-                    )
-                except TimeoutError:
-                    continue
-                except WebSocketDisconnect:
-                    cancel_event.set()
-                    return
-                except asyncio.CancelledError:
-                    raise
-                except RuntimeError as exc:
-                    if is_websocket_closed_runtime_error(exc):
-                        cancel_event.set()
-                        return
-                    logger.warning(
-                        "Non-fatal error in cancel reader, ignoring",
-                    )
-                    continue
-                except Exception:
-                    logger.warning(
-                        "Non-fatal error in cancel reader, ignoring",
-                    )
-                    continue
-                try:
-                    data = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                if data.get("type") == "cancel":
-                    cancel_event.set()
-                    logger.debug("Client requested stream cancel")
-                    return
-                # Non-cancel messages received during streaming are
-                # rare in practice; log and discard to mirror the
-                # legacy ``msg_buffer`` behaviour without leaking
-                # state out of the executor.
-                logger.debug(
-                    "Discarding non-cancel WS message during streaming",
-                )
-
-        return asyncio.create_task(_reader())
 
 
 __all__ = ["DirectTurnExecutor"]

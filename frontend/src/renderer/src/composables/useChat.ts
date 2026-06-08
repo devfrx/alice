@@ -22,12 +22,13 @@ import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
 
 import { api } from '../services/api'
 import { wsManager } from '../services/ws'
+import { useAgentRunStore } from '../stores/agentRun'
 import { useChatStore } from '../stores/chat'
 import { useSettingsStore } from '../stores/settings'
-import { useUIStore } from '../stores/ui'
-import type { AgentEvent } from '../types/agent'
 import type {
   FileAttachment,
+  WsAskUserRequiredMessage,
+  WsAskUserResponsePayload,
   WsCancelPayload,
   WsContextCompressionDoneMessage,
   WsContextInfoMessage,
@@ -44,6 +45,16 @@ import type {
   WsToolProgressMessage,
   WsWarningMessage
 } from '../types/chat'
+import type {
+  WsInteractionRequestedMessage,
+  WsInteractionResolvedMessage,
+  WsToolCallMessage,
+  WsToolResultMessage,
+  WsTurnFinishedMessage,
+  WsTurnLlmStepMessage,
+  WsTurnStartedMessage,
+  WsTurnUsageMessage
+} from '../types/turn'
 
 /** Connection status reported by the composable. */
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -61,6 +72,8 @@ export interface UseChatReturn {
   stopGeneration: () => void
   /** Respond to a tool confirmation request. */
   respondToConfirmation: (executionId: string, approved: boolean) => void
+  /** Answer an inline `ask_user` prompt with free-form text. */
+  answerAskUser: (executionId: string, answer: string) => void
   /** Reactive flag — `true` while the socket is open. */
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
@@ -80,7 +93,7 @@ export const ChatApiKey: InjectionKey<UseChatReturn> = Symbol('chatApi')
 export function useChat(): UseChatReturn {
   const store = useChatStore()
   const settingsStore = useSettingsStore()
-  const uiStore = useUIStore()
+  const agentRunStore = useAgentRunStore()
 
   const isConnected = ref(false)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
@@ -203,6 +216,18 @@ export function useChat(): UseChatReturn {
     })
   }
 
+  const onAskUserRequired = (data: unknown): void => {
+    if (store.streamGeneration !== activeGeneration) return
+    const msg = data as WsAskUserRequiredMessage
+
+    // ask_user always needs human input — there is no auto-approve path.
+    store.addPendingAskUser({
+      executionId: msg.execution_id,
+      question: msg.question,
+      options: msg.options
+    })
+  }
+
   const onLlmRequery = (data: unknown): void => {
     if (store.streamGeneration !== activeGeneration) return
     const msg = data as WsLlmRequeryMessage
@@ -257,28 +282,6 @@ export function useChat(): UseChatReturn {
     store.setCompressingContext(false)
   }
 
-  // -- Agent Loop v2 events ----------------------------------------------
-
-  const onAgentEvent = (data: unknown): void => {
-    // Apply unconditionally — agent runs are persisted server-side and the
-    // tracker is keyed by `run_id`, so stale-generation checks would just
-    // drop legitimate events when the user navigates away mid-run.
-    const event = data as AgentEvent
-    store.applyAgentEvent(event)
-
-    // Auto-open the activity sidebar on the first event of a real
-    // agent run.  Bypass runs (direct LLM answers with critic-only
-    // verification) never auto-open the panel — the bubble's micro
-    // banner offers an explicit affordance for debug.
-    if (
-      event.type === 'agent.run_started' &&
-      uiStore.agentSidebarAutoOpen &&
-      (event.mode ?? 'agent') === 'agent'
-    ) {
-      uiStore.openAgentSidebar(event.run_id)
-    }
-  }
-
   const onWsError = (data: unknown): void => {
     // Only handle server-side error frames (JSON objects with content),
     // skip native WebSocket error Events.
@@ -288,6 +291,43 @@ export function useChat(): UseChatReturn {
     // Don't cancel stream here — transient LLM errors during tool loop
     // re-queries would kill the entire stream.  The backend sends a
     // proper "done" event when the response is truly finished.
+  }
+
+  // -- Canonical turn-event stream (Fase 3) ------------------------------
+  // Additive, run-scoped frames folded into the agentRun store. They are
+  // NOT gated on the stale-generation guard: runs are keyed by `turn_id`,
+  // so late frames after navigation still land on the correct run.
+
+  const onTurnStarted = (data: unknown): void => {
+    agentRunStore.applyTurnStarted(data as WsTurnStartedMessage)
+  }
+
+  const onTurnLlmStep = (data: unknown): void => {
+    agentRunStore.applyLlmStep(data as WsTurnLlmStepMessage)
+  }
+
+  const onTurnToolCall = (data: unknown): void => {
+    agentRunStore.applyToolCall(data as WsToolCallMessage)
+  }
+
+  const onTurnToolResult = (data: unknown): void => {
+    agentRunStore.applyToolResult(data as WsToolResultMessage)
+  }
+
+  const onInteractionRequested = (data: unknown): void => {
+    agentRunStore.applyInteractionRequested(data as WsInteractionRequestedMessage)
+  }
+
+  const onInteractionResolved = (data: unknown): void => {
+    agentRunStore.applyInteractionResolved(data as WsInteractionResolvedMessage)
+  }
+
+  const onTurnUsage = (data: unknown): void => {
+    agentRunStore.applyTurnUsage(data as WsTurnUsageMessage)
+  }
+
+  const onTurnFinished = (data: unknown): void => {
+    agentRunStore.applyTurnFinished(data as WsTurnFinishedMessage)
   }
 
   // -----------------------------------------------------------------------
@@ -306,6 +346,7 @@ export function useChat(): UseChatReturn {
   wsManager.on('tool_execution_done', onToolExecutionDone)
   wsManager.on('tool_progress', onToolProgress)
   wsManager.on('tool_confirmation_required', onToolConfirmationRequired)
+  wsManager.on('ask_user_required', onAskUserRequired)
   wsManager.on('llm_requery', onLlmRequery)
   wsManager.on('warning', onWarning)
   wsManager.on('error', onWsError) // also catches server-side error frames
@@ -313,15 +354,14 @@ export function useChat(): UseChatReturn {
   wsManager.on('context_compression_start', onContextCompressionStart)
   wsManager.on('context_compression_done', onContextCompressionDone)
   wsManager.on('context_compression_failed', onContextCompressionFailed)
-  wsManager.on('agent.run_started', onAgentEvent)
-  wsManager.on('agent.plan_created', onAgentEvent)
-  wsManager.on('agent.step_started', onAgentEvent)
-  wsManager.on('agent.step_completed', onAgentEvent)
-  wsManager.on('agent.replanned', onAgentEvent)
-  wsManager.on('agent.critic_invoked', onAgentEvent)
-  wsManager.on('agent.warning', onAgentEvent)
-  wsManager.on('agent.ask_user', onAgentEvent)
-  wsManager.on('agent.run_finished', onAgentEvent)
+  wsManager.on('turn.started', onTurnStarted)
+  wsManager.on('turn.llm_step', onTurnLlmStep)
+  wsManager.on('tool.call', onTurnToolCall)
+  wsManager.on('tool.result', onTurnToolResult)
+  wsManager.on('interaction.requested', onInteractionRequested)
+  wsManager.on('interaction.resolved', onInteractionResolved)
+  wsManager.on('turn.usage', onTurnUsage)
+  wsManager.on('turn.finished', onTurnFinished)
 
   // WebSocket connection is deferred — App.vue calls wsManager.connect()
   // after the backend health check passes.
@@ -350,6 +390,7 @@ export function useChat(): UseChatReturn {
     wsManager.off('tool_execution_done', onToolExecutionDone)
     wsManager.off('tool_progress', onToolProgress)
     wsManager.off('tool_confirmation_required', onToolConfirmationRequired)
+    wsManager.off('ask_user_required', onAskUserRequired)
     wsManager.off('llm_requery', onLlmRequery)
     wsManager.off('warning', onWarning)
     wsManager.off('error', onWsError)
@@ -357,15 +398,14 @@ export function useChat(): UseChatReturn {
     wsManager.off('context_compression_start', onContextCompressionStart)
     wsManager.off('context_compression_done', onContextCompressionDone)
     wsManager.off('context_compression_failed', onContextCompressionFailed)
-    wsManager.off('agent.run_started', onAgentEvent)
-    wsManager.off('agent.plan_created', onAgentEvent)
-    wsManager.off('agent.step_started', onAgentEvent)
-    wsManager.off('agent.step_completed', onAgentEvent)
-    wsManager.off('agent.replanned', onAgentEvent)
-    wsManager.off('agent.critic_invoked', onAgentEvent)
-    wsManager.off('agent.warning', onAgentEvent)
-    wsManager.off('agent.ask_user', onAgentEvent)
-    wsManager.off('agent.run_finished', onAgentEvent)
+    wsManager.off('turn.started', onTurnStarted)
+    wsManager.off('turn.llm_step', onTurnLlmStep)
+    wsManager.off('tool.call', onTurnToolCall)
+    wsManager.off('tool.result', onTurnToolResult)
+    wsManager.off('interaction.requested', onInteractionRequested)
+    wsManager.off('interaction.resolved', onInteractionResolved)
+    wsManager.off('turn.usage', onTurnUsage)
+    wsManager.off('turn.finished', onTurnFinished)
     wsManager.disconnect()
   })
 
@@ -574,11 +614,25 @@ export function useChat(): UseChatReturn {
     store.removePendingConfirmation(executionId)
   }
 
+  /**
+   * Answer an inline `ask_user` prompt with the user's free-form text.
+   */
+  function answerAskUser(executionId: string, answer: string): void {
+    const payload: WsAskUserResponsePayload = {
+      type: 'ask_user_response',
+      execution_id: executionId,
+      answer
+    }
+    wsManager.send(payload)
+    store.removePendingAskUser(executionId)
+  }
+
   return {
     sendMessage,
     editMessage,
     stopGeneration,
     respondToConfirmation,
+    answerAskUser,
     isConnected,
     connectionStatus,
     isCancelling: computed(() => store.isCancelling)

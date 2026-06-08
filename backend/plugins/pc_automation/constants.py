@@ -4,6 +4,14 @@ Whitelists and configuration constants for safe PC automation.
 All security-critical data is defined here for easy auditing.
 """
 
+# The post-screenshot lockout policy lives in core (single source of truth,
+# shared process-wide instance). Re-exported so existing readers of
+# ``constants.SCREENSHOT_LOCKOUT_S`` / ``constants.LOCKOUT_TOOLS`` resolve to it.
+from backend.core.screenshot_lockout import (  # noqa: F401
+    LOCKOUT_TOOLS,
+    SCREENSHOT_LOCKOUT_S,
+)
+
 # -- Application Whitelist ------------------------------------------------
 # Maps friendly app names to executable names/paths.
 # Only these applications can be opened/closed by the plugin.
@@ -156,13 +164,9 @@ SYSTEM_DIRS: list[str] = [p.lower().replace("\\", "/") for p in FORBIDDEN_PATHS]
 MAX_SCREENSHOT_PIXELS: int = 2_000_000
 """Maximum screenshot resolution (width * height). Downscale if exceeded."""
 
-SCREENSHOT_LOCKOUT_S: int = 60
-"""Seconds to lock dangerous tools after a screenshot is taken."""
-
-# Tools that are blocked after a screenshot (anti-exfiltration)
-LOCKOUT_TOOLS: set[str] = {
-    "execute_command",
-}
+# SCREENSHOT_LOCKOUT_S and LOCKOUT_TOOLS were promoted to
+# backend.core.screenshot_lockout (shared process-wide lockout) and are
+# re-exported at the top of this module for backward compatibility.
 
 # Per-command forbidden flags (prevent destructive operations)
 FORBIDDEN_FLAGS: dict[str, set[str]] = {

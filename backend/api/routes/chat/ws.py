@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -22,8 +21,10 @@ from backend.services.llm_service import LLMService
 from backend.services.turn import (
     TurnResult,
     WebSocketEventSink,
+    WebSocketInteractionChannel,
     create_turn_executor,
 )
+from backend.services.turn.channel import MALFORMED_FRAME_KEY
 
 from ._assembly import TurnAssembler
 from ._helpers import _sync_conversation_to_file
@@ -31,9 +32,9 @@ from ._persist import _persist_final_turn
 from ._shared import (
     _ctx,
     _get_ws_lock,
-    _receive_ws_text,
     _utcnow,
     _ws_connections,
+    conversation_active,
     router,
 )
 
@@ -100,33 +101,23 @@ async def ws_chat(websocket: WebSocket) -> None:
         ctx, llm, continuum_scope=continuum_scope, client_ip=client_ip,
     )
 
-    try:
-        message_buffer: list[str] = []
+    # Single inbound read-pump: it owns ``receive`` for the whole connection
+    # and demultiplexes interaction responses / cancel / user messages, so
+    # there is never more than one concurrent reader on the socket.
+    channel = WebSocketInteractionChannel(websocket)
+    channel.start()
 
+    try:
         while True:
-            if message_buffer:
-                raw = message_buffer.pop(0)
-                await asyncio.sleep(0)  # yield to event loop
-            else:
-                raw = await _receive_ws_text(websocket)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
+            # The pump delivers only non-interaction (user/idle) frames here,
+            # already JSON-parsed; ``None`` means the socket disconnected.
+            data = await channel.next_user_message()
+            if data is None:
+                break
+            if data.get(MALFORMED_FRAME_KEY):
                 await websocket.send_json(
                     {"type": "error", "content": "Invalid JSON"}
                 )
-                continue
-
-            message_type = data.get("type")
-            if message_type in {
-                "tool_confirmation_response",
-                "client_tool_result",
-                "cancel",
-            }:
-                # Control frames are consumed by the active generation/tool
-                # waiters. If a stale one arrives while the main chat loop is
-                # listening for a new user turn, ignore it instead of treating
-                # the missing `content` field as an empty message.
                 continue
 
             user_content: str = data.get("content", "").strip()
@@ -165,7 +156,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                 thinking_content = ""
                 tool_calls_collected: list[dict[str, Any]] = []
                 finish_reason = "stop"
-                cancel_event = asyncio.Event()
+                cancel_event = channel.begin_turn()
 
                 executor = create_turn_executor(
                     ctx, llm, sync_fn=_sync_conversation_to_file,
@@ -173,23 +164,30 @@ async def ws_chat(websocket: WebSocket) -> None:
                 sink = WebSocketEventSink(websocket)
 
                 executor_task = asyncio.create_task(
-                    executor.execute(turn, sink, cancel_event, session),
+                    executor.execute(
+                        turn, sink, cancel_event, session, channel,
+                    ),
                 )
 
-                try:
-                    result: TurnResult = await executor_task
-                except asyncio.CancelledError:
-                    cancel_event.set()
-                    logger.debug("Executor task cancelled")
-                    result = TurnResult(
-                        content=full_content,
-                        thinking=thinking_content,
-                        input_tokens=0,
-                        output_tokens=0,
-                        finish_reason="cancelled",
-                        final_assistant_message_id=None,
-                        had_tool_calls=bool(tool_calls_collected),
-                    )
+                # Idle-guard (Fase 6b): mark the conversation busy for the
+                # executor's lifetime so scope mutations are rejected (409)
+                # while a turn is running.  Persist below runs idle — it does
+                # not touch the workspace scope.
+                with conversation_active(str(conv_id)):
+                    try:
+                        result: TurnResult = await executor_task
+                    except asyncio.CancelledError:
+                        cancel_event.set()
+                        logger.debug("Executor task cancelled")
+                        result = TurnResult(
+                            content=full_content,
+                            thinking=thinking_content,
+                            input_tokens=0,
+                            output_tokens=0,
+                            finish_reason="cancelled",
+                            final_assistant_message_id=None,
+                            had_tool_calls=bool(tool_calls_collected),
+                        )
 
                 # Mirror legacy behaviour: feed locals from the result so
                 # disconnect-recovery has access to partial content.
@@ -245,6 +243,7 @@ async def ws_chat(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("WebSocket unexpected error")
     finally:
+        await channel.aclose()
         async with ws_lock:
             _ws_connections[client_ip] = max(
                 0, _ws_connections[client_ip] - 1,

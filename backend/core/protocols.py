@@ -661,7 +661,7 @@ class TurnExecutorProtocol(Protocol):
     """Structural type for turn execution strategies.
 
     Concrete implementations live in :mod:`backend.services.turn`
-    (``DirectTurnExecutor``, ``AgentTurnExecutor``).  ``turn`` and
+    (``DirectTurnExecutor``, ``ReflectiveTurnExecutor``).  ``turn`` and
     ``result`` are intentionally typed as :class:`Any` to avoid pulling
     the DTO definitions into this protocol layer (they would create an
     import cycle through the executors).

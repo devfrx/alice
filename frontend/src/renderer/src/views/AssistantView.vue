@@ -19,8 +19,8 @@ import AssistantTranscript from '../components/assistant/AssistantTranscript.vue
 import ConversationDrawer from '../components/assistant/ConversationDrawer.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
+import AskUserPrompt from '../components/chat/AskUserPrompt.vue'
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
-import AgentActivitySidebar from '../components/chat/AgentActivitySidebar.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useResizablePane } from '../composables/useResizablePane'
 import { useVoice } from '../composables/useVoice'
@@ -28,7 +28,6 @@ import { useGenerationState } from '../composables/useGenerationState'
 import { useArtifactsStore } from '../stores/artifacts'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
-import { useUIStore } from '../stores/ui'
 import type { CadModelPayload, ChartPayload, WhiteboardPayload, ToolCall } from '../types/chat'
 import { isWhiteboardPayload } from '../types/chat'
 import { api } from '../services/api'
@@ -49,7 +48,6 @@ const TldrawCanvas = defineAsyncComponent(
 
 const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
-const uiStore = useUIStore()
 const artifactsStore = useArtifactsStore()
 const { cadGenerationInProgress } = useGenerationState()
 const chatApi = inject(ChatApiKey, null)
@@ -66,14 +64,7 @@ const stopGeneration = chatApi?.stopGeneration ?? _noop
 const editMessage = chatApi?.editMessage ?? _asyncNoop
 const isConnected = chatApi?.isConnected ?? ref(false)
 const respondToConfirmation = chatApi?.respondToConfirmation ?? _noop
-
-/**
- * Reply submitted from the AgentActivitySidebar when the agent is
- * paused on `asked_user`.  Forwarded as a normal user message.
- */
-async function onAgentReply(payload: { text: string; runId: string }): Promise<void> {
-    await send(payload.text)
-}
+const answerAskUser = chatApi?.answerAskUser ?? _noop
 
 const {
     startListening, stopListening, cancelProcessing, connect: connectVoice,
@@ -84,45 +75,10 @@ const {
 /** Whether the conversation history drawer is visible. */
 const historyDrawerOpen = ref(false)
 
-/**
- * Latest agent run id (most recently started) — used by the
- * floating activity toggle to reopen the sidebar after dismissal.
- */
-const latestAgentRunId = computed<string | null>(() => {
-    let latestId: string | null = null
-    let latestAt = ''
-    for (const run of chatStore.agentRuns.values()) {
-        if (run.started_at > latestAt) {
-            latestAt = run.started_at
-            latestId = run.id
-        }
-    }
-    return latestId
-})
-
-const hasAgentProcessing = computed<boolean>(() => {
-    if (chatStore.activeToolExecutions.length > 0) return true
-    for (const run of chatStore.agentRuns.values()) {
-        if (run.mode === 'agent' && run.state === 'running') return true
-    }
-    return false
-})
-
-/** True when an activity feed exists and the sidebar is currently hidden. */
-const showAgentSidebarToggle = computed<boolean>(
-    () => !uiStore.agentSidebarOpen && latestAgentRunId.value !== null,
+/** True while tool executions tied to the current turn are in flight. */
+const hasAgentProcessing = computed<boolean>(
+    () => chatStore.activeToolExecutions.length > 0,
 )
-
-/**
- * Reopen the activity sidebar focusing on the most recent run,
- * clearing any prior dismissal so the panel becomes visible again.
- */
-function openAgentSidebar(): void {
-    const id = latestAgentRunId.value
-    if (!id) return
-    uiStore.agentSidebarDismissedRunIds.delete(id)
-    uiStore.openAgentSidebar(id)
-}
 
 /* ── Message editing state ── */
 const editingMessageId = ref<string | null>(null)
@@ -358,6 +314,11 @@ function onSidePanelTabSelect(value: string | number): void {
 /** Pending tool confirmations for ToolConfirmationDialog. */
 const pendingConfirmationsList = computed(() =>
     Object.values(chatStore.pendingConfirmations)
+)
+
+/** Pending ask_user prompts for the inline AskUserPrompt. */
+const pendingAskUserList = computed(() =>
+    Object.values(chatStore.pendingAskUser)
 )
 
 /** Determine the orb's state based on what AL\CE is doing. */
@@ -598,6 +559,9 @@ onMounted(() => {
                             key="response" />
                     </Transition>
 
+                    <AskUserPrompt v-for="r in pendingAskUserList" :key="r.executionId" :request="r"
+                        @answer="answerAskUser" />
+
                     <Transition name="transcript-fade">
                         <AssistantTranscript v-if="transcript || voiceStore.isListening || voiceStore.isProcessing"
                             :text="transcript" :is-listening="voiceStore.isListening"
@@ -639,14 +603,6 @@ onMounted(() => {
                     <AppIcon name="whiteboard-card" :size="16" :stroke-width="1.5" />
                     <span v-if="whiteboardPayloads.length > 1" class="assistant-view__wb-badge">{{
                         whiteboardPayloads.length }}</span>
-                </button>
-            </Transition>
-
-            <!-- Toggle agent activity sidebar button -->
-            <Transition name="toggle-fade">
-                <button v-if="showAgentSidebarToggle" class="assistant-view__agent-toggle"
-                    title="Mostra attività agente" @click="openAgentSidebar">
-                    <AppIcon name="cpu" :size="16" :stroke-width="1.5" />
                 </button>
             </Transition>
 
@@ -764,8 +720,6 @@ onMounted(() => {
         <ToolConfirmationDialog v-if="pendingConfirmationsList.length > 0"
             :key="pendingConfirmationsList[0].executionId" :confirmation="pendingConfirmationsList[0]"
             @respond="respondToConfirmation" />
-
-        <AgentActivitySidebar side="left" @reply="onAgentReply" />
     </div>
 </template>
 
@@ -1083,40 +1037,6 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     line-height: 1;
-}
-
-/* ── Agent activity sidebar toggle ── */
-.assistant-view__agent-toggle {
-    position: absolute;
-    left: 16px;
-    top: 16px;
-    z-index: var(--z-sticky);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-2);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition:
-        background 200ms var(--ease-smooth),
-        border-color 200ms var(--ease-smooth),
-        color 200ms var(--ease-smooth),
-        transform 200ms var(--ease-smooth);
-}
-
-.assistant-view__agent-toggle:hover {
-    background: var(--surface-3);
-    border-color: var(--border-hover);
-    color: var(--accent);
-    transform: scale(1.08);
-}
-
-.assistant-view__agent-toggle:active {
-    transform: scale(0.95);
 }
 
 /* ── Side panel tabs ── */

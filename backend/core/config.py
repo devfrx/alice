@@ -329,7 +329,15 @@ class VoiceConfig(BaseSettings):
 
 
 class PcAutomationConfig(BaseSettings):
-    """PC Automation plugin configuration."""
+    """PC Automation plugin configuration.
+
+    Note:
+        The ``confirmations_enabled`` / ``confirmation_timeout_s`` knobs used
+        to live here but were promoted to the neutral :class:`PermissionsConfig`
+        (``permissions.*``) in Fase 2 — they gate **every** dangerous tool, not
+        just PC-automation ones. Legacy ``pc_automation.*`` values still load
+        (folded into ``permissions`` by :func:`migrate_legacy_config_keys`).
+    """
 
     model_config = SettingsConfigDict(env_prefix="ALICE_PC_AUTOMATION__")
 
@@ -341,10 +349,62 @@ class PcAutomationConfig(BaseSettings):
     """Maximum seconds a command can run."""
     max_command_output_chars: int = 500
     """Maximum characters of command output to return."""
+
+
+class PermissionsConfig(BaseSettings):
+    """Central tool-permission / confirmation policy (neutral home).
+
+    Owns the cross-cutting safety knobs that gate **any** dangerous tool,
+    independent of the plugin that exposes it. Consumed by the turn engine's
+    ``ConfirmationMiddleware`` and ``PermissionService``. Promoted out of
+    :class:`PcAutomationConfig` in Fase 2; old keys migrate transparently.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_PERMISSIONS__")
+
     confirmations_enabled: bool = True
     """Whether tool confirmations are required (safety feature)."""
     confirmation_timeout_s: int = 60
     """Seconds to wait for user confirmation on dangerous tools."""
+
+
+class WorkspaceScopeConfig(BaseSettings):
+    """Workspace-scope policy for tool filesystem confinement (Fase 6)."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_SCOPE__")
+
+    forbidden_paths: list[str] = Field(default_factory=list)
+    """Roots always out of scope even when a workspace scope is set."""
+
+    fallback_mode: Literal["sandbox", "disabled"] = "sandbox"
+    """When no explicit scope is set: 'sandbox' ⇒ an ephemeral per-conversation
+    working dir is allowed; 'disabled' ⇒ scoped tools refuse to run."""
+
+    sandbox_root: str = "data/workspaces"
+    """Project-relative root for ephemeral per-conversation sandboxes."""
+
+
+class TerminalConfig(BaseSettings):
+    """Scoped-terminal plugin policy (Fase 6).  Disabled by default."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_TERMINAL__")
+
+    enabled: bool = Field(default=False, description="Expose run_terminal_command.")
+    command_timeout_s: int = Field(
+        default=30,
+        ge=1,
+        le=600,
+        description="Per-command wall-clock timeout (seconds).",
+    )
+    max_output_bytes: int = Field(
+        default=100_000,
+        ge=1,
+        description="Cap on captured stdout+stderr bytes.",
+    )
+    allow_network: bool = Field(
+        default=False,
+        description="Best-effort network policy hint (not a hard guarantee on Windows).",
+    )
 
 
 class VRAMConfig(BaseSettings):
@@ -924,72 +984,16 @@ class McpConfig(BaseSettings):
 # ---------------------------------------------------------------------------
 
 
-class AgentClassifierConfig(BaseSettings):
-    """Transport config for the task-complexity classifier service."""
+class AgentVoiceConfig(BaseSettings):
+    """Voice-turn tuning for the model-driven loop."""
 
-    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__CLASSIFIER__")
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__VOICE__")
 
-    enabled: bool = True
-    """If False the executor always runs the full agent loop (no fast path)."""
+    max_tools: int = 8
+    """Cap on the number of tools exposed in voice turns, for latency.
 
-    cache_ttl_seconds: int = 300
-    """How long classifier verdicts are cached for identical inputs."""
-
-    max_output_tokens: int = 20
-    """Cap on the classifier LLM response (verdict is a short label)."""
-
-    temperature: float = 0.0
-    """Sampling temperature (0.0 = deterministic)."""
-
-
-class AgentPlannerConfig(BaseSettings):
-    """Transport config for the planner service."""
-
-    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__PLANNER__")
-
-    max_output_tokens: int = 600
-    """Cap on planner output (full JSON plan)."""
-
-    temperature: float = 0.2
-    """Slight randomness keeps the planner from repeating identical plans."""
-
-    require_json_object: bool = True
-    """Forward ``response_format={\"type\":\"json_object\"}`` to the LLM."""
-
-
-class AgentCriticConfig(BaseSettings):
-    """Transport config for the critic / verdict service."""
-
-    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__CRITIC__")
-
-    max_output_tokens: int = 80
-    """Critic responses are short (verdict + brief reason)."""
-
-    temperature: float = 0.0
-    """Deterministic verdicts."""
-
-    fail_open: bool = True
-    """On parse error, default to verdict OK so the user is not blocked."""
-
-    always_run: bool = True
-    """If True the critic is invoked after every turn — including TRIVIAL,
-    OPEN_ENDED and SINGLE_TOOL — so degenerations (loops, fake tool_code)
-    can be caught even outside the MULTI_STEP path."""
-
-    degeneration_detector_enabled: bool = True
-    """If True the critic runs a local rule-based degeneration detector
-    BEFORE issuing the LLM call.  Saves one round-trip when an obvious
-    pathological output (paragraph repetition, inline ``<tool_code>`` /
-    fake JSON tool calls, ``finish_reason=length``) is present."""
-
-
-class AgentPersistenceConfig(BaseSettings):
-    """Persistence options for agent runs."""
-
-    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__PERSISTENCE__")
-
-    save_runs: bool = True
-    """If True, every agent run is recorded in the ``agent_runs`` table."""
+    Voice interactions favour a fast, terse reply over broad tool
+    coverage; trimming the toolset keeps the first token quick."""
 
 
 class AgentReflectionConfig(BaseSettings):
@@ -1010,6 +1014,21 @@ class AgentReflectionConfig(BaseSettings):
     tool_turns_only: bool = True
     """When True, only verify turns that actually used tools (where a mistake
     is most likely); when False, verify every turn."""
+
+    max_output_tokens: int = 80
+    """Cap on the reflection LLM response (verdict + brief reason)."""
+
+    temperature: float = 0.0
+    """Sampling temperature for the reflection call (0.0 = deterministic)."""
+
+    fail_open: bool = True
+    """On LLM/parse error, treat the answer as OK so the user is not blocked."""
+
+    degeneration_detector_enabled: bool = True
+    """If True, run a local rule-based degeneration detector BEFORE the LLM
+    call.  Saves one round-trip when an obvious pathological output
+    (paragraph repetition, inline ``<tool_code>`` / fake JSON tool calls,
+    ``finish_reason=length``) is present."""
 
 
 class AgentSubagentConfig(BaseSettings):
@@ -1035,28 +1054,17 @@ class AgentSubagentConfig(BaseSettings):
 
 
 class AgentConfig(BaseSettings):
-    """Configuration for agentic chat execution.
+    """Configuration for the (only) model-driven agentic chat path.
 
-    Default = a single **model-driven** loop: the model itself decides
-    step-by-step what to do, with the ``update_plan`` and ``spawn_subagent``
-    meta-tools for structure and an optional reflection pass. The legacy
-    ``classifier -> planner -> critic`` pipeline is preserved but gated
-    behind :attr:`structured_mode` (opt-in, off by default). When
-    :attr:`enabled` is False the chat path uses the lite
-    :class:`DirectTurnExecutor` with no agentic affordances.
+    The model itself decides step-by-step what to do, with the
+    ``update_plan`` and ``spawn_subagent`` meta-tools for structure and an
+    optional, non-blocking reflection pass on the final answer. There is no
+    separate ``enabled`` switch and no legacy structured pipeline: the engine
+    is always :class:`DirectTurnExecutor`, optionally wrapped by
+    :class:`ReflectiveTurnExecutor` when :attr:`reflection` is enabled.
     """
 
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
-
-    enabled: bool = False
-    """Master switch for agentic chat. False = lite direct execution."""
-
-    structured_mode: bool = False
-    """Opt-in legacy plan->act->critic pipeline (classifier/planner/critic).
-    When False (default) chat uses the model-driven loop below."""
-
-    voice_mode_bypass: bool = True
-    """In voice mode always fall back to :class:`DirectTurnExecutor`."""
 
     planning: bool = True
     """Expose the ``update_plan`` todo-list tool in the model-driven loop."""
@@ -1064,42 +1072,19 @@ class AgentConfig(BaseSettings):
     delegation: bool = True
     """Expose the ``spawn_subagent`` delegation tool in the model-driven loop."""
 
+    clarification: bool = True
+    """Expose the ``ask_user`` clarifying-question tool in the model-driven loop."""
+
     reflection: AgentReflectionConfig = Field(
         default_factory=AgentReflectionConfig
     )
-    """Optional final-answer self-check (model-driven critic replacement)."""
+    """Optional final-answer self-check (non-blocking reflection pass)."""
 
     subagent: AgentSubagentConfig = Field(default_factory=AgentSubagentConfig)
     """Runtime limits for ``spawn_subagent``."""
 
-    # --- structured_mode knobs (used only when structured_mode is True) ---
-
-    max_steps: int = 8
-    """Hard cap on the number of plan steps executed in a single run."""
-
-    max_retries_per_step: int = 2
-    """How many times a single step may be retried after a failed verdict."""
-
-    max_replans: int = 2
-    """How many times the planner may rewrite the plan mid-run."""
-
-    step_timeout_seconds: int = 60
-    """Maximum wall-clock seconds for a single step (excludes user wait)."""
-
-    total_timeout_seconds: int = 240
-    """Maximum wall-clock seconds for the entire run (excludes user wait)."""
-
-    pause_timeout_during_confirmation: bool = True
-    """If True the timeout clock is paused while awaiting tool confirmation."""
-
-    classifier: AgentClassifierConfig = Field(
-        default_factory=AgentClassifierConfig
-    )
-    planner: AgentPlannerConfig = Field(default_factory=AgentPlannerConfig)
-    critic: AgentCriticConfig = Field(default_factory=AgentCriticConfig)
-    persistence: AgentPersistenceConfig = Field(
-        default_factory=AgentPersistenceConfig
-    )
+    voice: AgentVoiceConfig = Field(default_factory=AgentVoiceConfig)
+    """Voice-turn tuning (e.g. tool cap for latency)."""
 
 
 # ---------------------------------------------------------------------------
@@ -1116,6 +1101,45 @@ _LEGACY_AGENT_SUBAGENT_MAP = {
     "subagent_timeout_seconds": "timeout_seconds",
     "subagent_max_tools": "max_tools",
 }
+# Confirmation knobs promoted from ``pc_automation`` to the neutral
+# ``permissions`` block in Fase 2. They are *moved* (popped) because every
+# config model forbids unknown fields, so a stale key left under
+# ``pc_automation`` would otherwise fail validation.
+_LEGACY_PC_AUTOMATION_PERMISSION_KEYS = (
+    "confirmations_enabled",
+    "confirmation_timeout_s",
+)
+
+
+def _migrate_pc_automation_permissions(data: dict[str, Any]) -> None:
+    """Fold legacy ``pc_automation`` confirmation keys into ``permissions``.
+
+    Mutates ``data`` in place. Pops ``confirmations_enabled`` /
+    ``confirmation_timeout_s`` out of any ``pc_automation`` block and moves
+    them under ``permissions`` (an explicitly-set new key always wins). A
+    no-op when neither legacy key is present.
+    """
+    pc_auto = data.get("pc_automation")
+    if not isinstance(pc_auto, dict):
+        return
+    if not any(k in pc_auto for k in _LEGACY_PC_AUTOMATION_PERMISSION_KEYS):
+        return
+
+    permissions = data.get("permissions")
+    if not isinstance(permissions, dict):
+        permissions = {}
+
+    for key in _LEGACY_PC_AUTOMATION_PERMISSION_KEYS:
+        if key in pc_auto:
+            value = pc_auto.pop(key)
+            if key not in permissions:
+                permissions[key] = value
+
+    if permissions:
+        data["permissions"] = permissions
+    logger.info(
+        "Migrated legacy 'pc_automation' confirmation keys into 'permissions'"
+    )
 
 
 def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
@@ -1148,6 +1172,9 @@ def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
     """
     if not isinstance(data, dict):
         return data
+
+    # pc_automation → permissions (independent of the agent_tools block below).
+    _migrate_pc_automation_permissions(data)
 
     legacy = data.pop("agent_tools", None)
     if not isinstance(legacy, dict):
@@ -1218,6 +1245,11 @@ class AliceConfig(BaseSettings):
     pc_automation: PcAutomationConfig = Field(
         default_factory=PcAutomationConfig
     )
+    permissions: PermissionsConfig = Field(
+        default_factory=PermissionsConfig
+    )
+    scope: WorkspaceScopeConfig = Field(default_factory=WorkspaceScopeConfig)
+    terminal: TerminalConfig = Field(default_factory=TerminalConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     ui: UIConfig = Field(default_factory=UIConfig)

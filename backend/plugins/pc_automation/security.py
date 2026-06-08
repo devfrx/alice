@@ -1,74 +1,30 @@
 """AL\\CE — PC Automation security framework.
 
-Validates tool inputs against whitelists and manages the post-screenshot
-lockout to prevent data exfiltration via tool chaining.
+Validates tool inputs (apps, commands, keys, paths) against whitelists.
+
+The post-screenshot lockout (:class:`ScreenshotLockout`) was promoted to
+:mod:`backend.core.screenshot_lockout` so a single process-wide instance
+protects every dangerous tool. It is re-exported here so existing imports
+(``from backend.plugins.pc_automation.security import ScreenshotLockout``)
+keep working against that shared instance.
 """
 
 from __future__ import annotations
 
-import re
-import time
-import threading
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
-from loguru import logger
-
+# Re-exported from core (single source of truth, shared process-wide lockout).
+from backend.core.screenshot_lockout import ScreenshotLockout  # noqa: F401
 from backend.plugins.pc_automation.constants import (
     ALLOWED_APPS,
-    ALLOWED_KEYS,
     ALLOWED_KEY_COMBOS,
+    ALLOWED_KEYS,
     COMMAND_WHITELIST,
     FILE_MANAGEMENT_CMDS,
     FORBIDDEN_FLAGS,
     FORBIDDEN_KEY_COMBOS,
-    FORBIDDEN_PATHS,
-    LOCKOUT_TOOLS,
-    SCREENSHOT_LOCKOUT_S,
     SYSTEM_DIRS,
 )
-
-
-class ScreenshotLockout:
-    """Thread-safe lockout manager for post-screenshot security.
-
-    After a screenshot is taken, certain dangerous tools (like execute_command)
-    are blocked for SCREENSHOT_LOCKOUT_S seconds to prevent prompt injection
-    attacks that could exfiltrate screenshot data.
-    """
-
-    def __init__(self) -> None:
-        self._last_screenshot: float = 0.0
-        self._lock = threading.Lock()
-
-    def record_screenshot(self) -> None:
-        """Record that a screenshot was just taken."""
-        with self._lock:
-            self._last_screenshot = time.monotonic()
-
-    def is_locked(self, tool_name: str) -> bool:
-        """Check if a tool is currently locked due to recent screenshot.
-
-        Args:
-            tool_name: The raw tool name (without plugin prefix).
-
-        Returns:
-            True if the tool is blocked, False otherwise.
-        """
-        if tool_name not in LOCKOUT_TOOLS:
-            return False
-        with self._lock:
-            if self._last_screenshot == 0.0:
-                return False
-            return (time.monotonic() - self._last_screenshot) < SCREENSHOT_LOCKOUT_S
-
-    def get_remaining_s(self) -> float:
-        """Get remaining lockout seconds (0.0 if not locked)."""
-        with self._lock:
-            if self._last_screenshot == 0.0:
-                return 0.0
-            elapsed = time.monotonic() - self._last_screenshot
-            remaining = SCREENSHOT_LOCKOUT_S - elapsed
-            return max(0.0, remaining)
 
 
 def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:

@@ -220,7 +220,7 @@ class TestScreenshotLockout:
         lockout = ScreenshotLockout()
         lockout.record_screenshot()
         # Fast-forward time past the lockout window
-        with patch("backend.plugins.pc_automation.security.time") as mock_time:
+        with patch("backend.core.screenshot_lockout.time") as mock_time:
             # First call to monotonic() is the record (already happened),
             # subsequent calls simulate time after lockout expiry.
             t0 = time.monotonic()

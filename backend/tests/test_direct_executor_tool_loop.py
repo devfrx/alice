@@ -1,18 +1,18 @@
 """Tool-loop dispatch tests for :class:`DirectTurnExecutor`.
 
-The executor delegates to :func:`backend.api.routes._tool_loop.run_tool_loop`
-when the LLM emits at least one ``tool_call`` event.  Because
-:class:`RecordingEventSink` exposes no real WebSocket and ``run_tool_loop``
-requires one, we exercise two complementary scenarios:
+The executor delegates to :func:`backend.services.turn.tool_loop.run_tool_loop`
+when the LLM emits at least one ``tool_call`` event.  The tool-loop path now
+requires an :class:`InteractionChannel`, so we exercise two complementary
+scenarios:
 
-* **Refuse-to-loop fast path** — with a recording sink (``_ws is None``)
+* **Refuse-to-loop fast path** — with no channel (``channel is None``)
   the executor must NOT call ``run_tool_loop`` and must return
   ``finish_reason="error"`` along with ``had_tool_calls=True``.  This
   protects production code from silently dropping tool calls when the
-  sink type is wrong.
-* **Patched ``run_tool_loop``** — with the helper monkey-patched, the
-  executor delegates exactly once and propagates the loop's tuple
-  result (content, thinking, tokens, finish_reason).
+  channel is missing.
+* **Patched ``run_tool_loop``** — with the helper monkey-patched and a
+  channel supplied, the executor delegates exactly once and propagates the
+  loop's tuple result (content, thinking, tokens, finish_reason).
 """
 
 from __future__ import annotations
@@ -23,7 +23,8 @@ from typing import Any
 
 import pytest
 
-import backend.api.routes._tool_loop as tool_loop_mod
+import backend.services.turn.tool_loop as tool_loop_mod
+from backend.services.turn.channel import ScriptedInteractionChannel
 from backend.services.turn.direct_executor import DirectTurnExecutor
 from backend.services.turn.sink import RecordingEventSink
 
@@ -84,21 +85,17 @@ async def test_tool_calls_delegate_to_run_tool_loop(
         ],
     )
 
-    # Stub a sink whose ``_ws`` is truthy (a sentinel object is enough
-    # because the patched run_tool_loop never touches it).
-    class _StubWSSink(RecordingEventSink):
-        @property
-        def _ws(self) -> Any:  # type: ignore[override]
-            return object()
-
-    sink = _StubWSSink()
+    sink = RecordingEventSink()
     executor = DirectTurnExecutor(make_ctx(), llm)
 
+    # A non-None channel is what enables the tool-loop path now (the
+    # patched run_tool_loop never touches it).
     result = await executor.execute(
         turn=make_turn(tools=[{"type": "function", "function": {"name": "noop"}}]),
         sink=sink,
         cancel_event=asyncio.Event(),
         session=None,
+        channel=ScriptedInteractionChannel(),
     )
 
     assert captured, "run_tool_loop was never invoked"
@@ -126,11 +123,6 @@ async def test_tool_loop_cancel_overrides_finish_reason(
 
     monkeypatch.setattr(tool_loop_mod, "run_tool_loop", _fake_loop)
 
-    class _StubWSSink(RecordingEventSink):
-        @property
-        def _ws(self) -> Any:  # type: ignore[override]
-            return object()
-
     llm = StreamingMockLLM(
         events=[
             _tool_call_event(),
@@ -141,9 +133,10 @@ async def test_tool_loop_cancel_overrides_finish_reason(
 
     result = await executor.execute(
         turn=make_turn(tools=[{"type": "function", "function": {"name": "noop"}}]),
-        sink=_StubWSSink(),
+        sink=RecordingEventSink(),
         cancel_event=cancel_event,
         session=None,
+        channel=ScriptedInteractionChannel(),
     )
 
     assert result.finish_reason == "cancelled"

@@ -6,7 +6,7 @@
  * with exponential back-off.
  */
 
-import { onScopeDispose, ref } from 'vue'
+import { onScopeDispose, ref, type Ref } from 'vue'
 import { useCalendarStore } from '../stores/calendar'
 import { useEmailStore } from '../stores/email'
 import { useMcpStore } from '../stores/mcp'
@@ -18,10 +18,45 @@ import { useScopeStore } from '../stores/scope'
 import type { WsScopeUpdatedMessage } from '../types/scope'
 import { usePermissionModeStore } from '../stores/permissionMode'
 import type { WsPermissionModeUpdatedMessage } from '../types/permission'
+import { useTerminalSessionsStore } from '../stores/terminalSessions'
+import type {
+  WsTerminalAssignedMessage,
+  WsTerminalClosedMessage,
+  WsTerminalOutputMessage,
+  WsTerminalRenamedMessage,
+  WsTerminalSessionOpenedMessage,
+} from '../types/terminal'
 import { BACKEND_HOST } from '../services/api'
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
 
-export function useEventsWebSocket() {
+/**
+ * Module-level singleton socket. The events WS is connected exactly once (in
+ * App.vue), so a module-scoped reference lets non-composable callers — notably
+ * the terminal store — send control frames (`terminal.input` / `terminal.resize`)
+ * over the same connection via {@link sendEventsMessage}.
+ */
+let ws: WebSocket | null = null
+
+/**
+ * Send a JSON frame over the events WebSocket if it is open.
+ *
+ * @returns `true` if the frame was sent, `false` when the socket is not open
+ *   (the caller may drop the frame — terminal I/O is best-effort).
+ */
+export function sendEventsMessage(frame: Record<string, unknown>): boolean {
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(frame))
+    return true
+  }
+  return false
+}
+
+export function useEventsWebSocket(): {
+  isConnected: Ref<boolean>
+  isError: Ref<boolean>
+  connect: () => void
+  disconnect: () => void
+} {
   const isConnected = ref(false)
   const isError = ref(false)
   const calendarStore = useCalendarStore()
@@ -32,8 +67,8 @@ export function useEventsWebSocket() {
   const planStore = usePlanStore()
   const scopeStore = useScopeStore()
   const permissionModeStore = usePermissionModeStore()
+  const terminalStore = useTerminalSessionsStore()
 
-  let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let reconnectAttempts = 0
   let intentionalClose = false
@@ -115,6 +150,19 @@ export function useEventsWebSocket() {
         // Handle permission-tier updates: fold the pushed tier into the store.
         if (data.type === 'permission_mode.updated' && typeof data.conversation_id === 'string') {
           permissionModeStore.applyModeUpdated(data as WsPermissionModeUpdatedMessage)
+        }
+
+        // Handle interactive-terminal lifecycle + output frames.
+        if (data.type === 'terminal.output') {
+          terminalStore.applyOutput(data as WsTerminalOutputMessage)
+        } else if (data.type === 'terminal.session_opened') {
+          terminalStore.applySessionOpened(data as WsTerminalSessionOpenedMessage)
+        } else if (data.type === 'terminal.closed') {
+          terminalStore.applyClosed(data as WsTerminalClosedMessage)
+        } else if (data.type === 'terminal.renamed') {
+          terminalStore.applyRenamed(data as WsTerminalRenamedMessage)
+        } else if (data.type === 'terminal.assigned') {
+          terminalStore.applyAssigned(data as WsTerminalAssignedMessage)
         }
       } catch {
         console.warn('[ALICE Events WS] Failed to parse message')

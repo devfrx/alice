@@ -21,6 +21,7 @@ import UiContextMenuItem from '../ui/UiContextMenuItem.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import { listModules, type ModuleDef } from '../../composables/workspace/moduleRegistry'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { useTerminalSessionsStore } from '../../stores/terminalSessions'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -38,6 +39,7 @@ const props = withDefaults(
 // ---------------------------------------------------------------------------
 
 const workspaceStore = useWorkspaceStore()
+const terminalStore = useTerminalSessionsStore()
 
 const menuVisible = ref(false)
 const menuX = ref(0)
@@ -82,6 +84,19 @@ function selectModule(moduleId: string): void {
   workspaceStore.toggleModule(moduleId)
   closeMenu()
 }
+
+/**
+ * Menu hint per module: ✓ when open; for a *closed* terminal module, the count
+ * of live sessions so the user sees "N terminals active" without opening it.
+ */
+function hintFor(mod: ModuleDef): string | undefined {
+  if (workspaceStore.openModuleIds.has(mod.id)) return '✓'
+  if (mod.id === 'terminal') {
+    const n = terminalStore.activeCountFor(props.conversationId ?? null)
+    if (n > 0) return String(n)
+  }
+  return undefined
+}
 </script>
 
 <template>
@@ -108,7 +123,7 @@ function selectModule(moduleId: string): void {
         v-for="mod in visibleModules"
         :key="mod.id"
         :label="mod.label"
-        :hint="workspaceStore.openModuleIds.has(mod.id) ? '✓' : undefined"
+        :hint="hintFor(mod)"
         @click="selectModule(mod.id)"
       >
         <template #icon>

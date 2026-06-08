@@ -62,6 +62,12 @@ class ToolDefinition:
             open Continuum editor) and feeds the client-supplied result back
             into the LLM loop. The owning plugin's :meth:`execute_tool` is a
             defensive no-op for these tools — they only ever run client-side.
+        user_interaction: When ``True`` the tool does not execute on the
+            server or client; instead it **suspends the loop to ask the human
+            a question** over the InteractionChannel (the ``ask_user``
+            meta-tool). The answer becomes the tool result. Handled by
+            ``InteractionMiddleware`` (never ``execute_tool``). Mutually
+            exclusive with ``client_execution`` in practice.
         capabilities: Coarse capability tags consumed by the central
             ``PermissionService`` / ``PermissionMiddleware`` to confine a tool
             **by construction** (e.g. ``"fs_read"``, ``"fs_write"``,
@@ -88,6 +94,7 @@ class ToolDefinition:
     sanitise_output: bool = True
     max_result_chars: int = MAX_TOOL_RESULT_LENGTH
     client_execution: bool = False
+    user_interaction: bool = False
     capabilities: tuple[str, ...] = ()
     path_args: tuple[str, ...] = ()
 
@@ -210,3 +217,25 @@ class ExecutionContext:
     conversation_id: str
     execution_id: str
     user_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CommandDefinition:
+    """Descriptor for a future ``/``-command (pre-parsing UX → resolves to a
+    tool-call / prompt / UI action). Contract only — no registry or palette
+    exists yet (see PLAN.md "Predisposizione comandi /").
+
+    Attributes:
+        name: Command name without the leading slash (e.g. ``"plan"``).
+        description: Human-readable summary.
+        params_schema: JSON Schema for the command's arguments.
+        kind: How the command resolves — ``"tool"`` (a tool-call),
+            ``"prompt"`` (injected prompt text) or ``"ui"`` (a frontend action).
+    """
+
+    name: str
+    description: str
+    params_schema: dict[str, Any] = field(
+        default_factory=lambda: {"type": "object", "properties": {}},
+    )
+    kind: Literal["tool", "prompt", "ui"] = "tool"

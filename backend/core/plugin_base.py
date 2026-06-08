@@ -15,6 +15,7 @@ from typing import Any, TYPE_CHECKING
 from loguru import logger as _loguru_logger
 
 from backend.core.plugin_models import (
+    CommandDefinition,
     ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
@@ -151,6 +152,15 @@ class BasePlugin(ABC):
 
         May return an empty list — not every plugin provides tools.
         """
+
+    def get_commands(self) -> list[CommandDefinition]:
+        """Return the ``/``-commands this plugin contributes (default none).
+
+        Override to declare command aliases alongside the plugin's tools. The
+        command registry/palette is future work (see PLAN.md); this is the
+        seam so plugins can start declaring commands.
+        """
+        return []
 
     @abstractmethod
     async def execute_tool(

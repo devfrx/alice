@@ -57,12 +57,12 @@ def make_ctx() -> Any:
 
     Only the attributes accessed by ``DirectTurnExecutor`` are populated
     (``config.llm.max_tool_iterations`` and
-    ``config.pc_automation.confirmation_timeout_s``).
+    ``config.permissions.confirmation_timeout_s``).
     """
     return SimpleNamespace(
         config=SimpleNamespace(
             llm=SimpleNamespace(max_tool_iterations=4),
-            pc_automation=SimpleNamespace(confirmation_timeout_s=60),
+            permissions=SimpleNamespace(confirmation_timeout_s=60),
         ),
     )
 

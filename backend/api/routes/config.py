@@ -304,7 +304,9 @@ async def get_config(request: Request) -> dict[str, Any]:
         },
         "pc_automation": {
             "enabled": cfg.pc_automation.enabled,
-            "confirmations_enabled": cfg.pc_automation.confirmations_enabled,
+            # Storage moved to the neutral ``permissions`` block in Fase 2;
+            # the response keeps the historical shape for the settings UI.
+            "confirmations_enabled": cfg.permissions.confirmations_enabled,
             "screenshot_lockout_s": cfg.pc_automation.screenshot_lockout_s,
         },
         "email": {
@@ -627,8 +629,10 @@ async def update_config(request: Request) -> dict[str, Any]:
         if "confirmations_enabled" in pc_updates:
             if not isinstance(pc_updates["confirmations_enabled"], bool):
                 raise HTTPException(400, "confirmations_enabled must be a boolean")
+            # Promoted to the neutral ``permissions`` block in Fase 2; the
+            # request keeps the historical shape (persisted body is migrated).
             object.__setattr__(
-                cfg.pc_automation, "confirmations_enabled",
+                cfg.permissions, "confirmations_enabled",
                 pc_updates["confirmations_enabled"],
             )
 

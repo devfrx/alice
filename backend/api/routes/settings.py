@@ -36,24 +36,26 @@ async def set_tool_confirmations(
 ) -> ToolConfirmationsResponse:
     """Toggle tool confirmations at runtime.
 
-    Updates ``ctx.config.pc_automation.confirmations_enabled`` so that
-    the frontend can sync its toggle with the backend state.
+    Updates ``ctx.config.permissions.confirmations_enabled`` so that
+    the frontend can sync its toggle with the backend state. (The flag was
+    promoted out of ``pc_automation`` to the neutral ``permissions`` block in
+    Fase 2; the API field name is unchanged.)
     """
     ctx = _ctx(request)
     object.__setattr__(
-        ctx.config.pc_automation,
+        ctx.config.permissions,
         "confirmations_enabled",
         body.enabled,
     )
     if ctx.preferences_service is not None:
         try:
             await ctx.preferences_service.save_preference(
-                "pc_automation.confirmations_enabled", body.enabled,
+                "permissions.confirmations_enabled", body.enabled,
             )
         except Exception as exc:
             logger.warning("Failed to persist tool-confirmations preference: {}", exc)
     return ToolConfirmationsResponse(
-        confirmations_enabled=ctx.config.pc_automation.confirmations_enabled,
+        confirmations_enabled=ctx.config.permissions.confirmations_enabled,
     )
 
 
@@ -64,7 +66,7 @@ async def get_tool_confirmations(
     """Read the current tool confirmations state."""
     ctx = _ctx(request)
     return ToolConfirmationsResponse(
-        confirmations_enabled=ctx.config.pc_automation.confirmations_enabled,
+        confirmations_enabled=ctx.config.permissions.confirmations_enabled,
     )
 
 

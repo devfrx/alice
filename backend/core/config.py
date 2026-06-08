@@ -329,7 +329,15 @@ class VoiceConfig(BaseSettings):
 
 
 class PcAutomationConfig(BaseSettings):
-    """PC Automation plugin configuration."""
+    """PC Automation plugin configuration.
+
+    Note:
+        The ``confirmations_enabled`` / ``confirmation_timeout_s`` knobs used
+        to live here but were promoted to the neutral :class:`PermissionsConfig`
+        (``permissions.*``) in Fase 2 — they gate **every** dangerous tool, not
+        just PC-automation ones. Legacy ``pc_automation.*`` values still load
+        (folded into ``permissions`` by :func:`migrate_legacy_config_keys`).
+    """
 
     model_config = SettingsConfigDict(env_prefix="ALICE_PC_AUTOMATION__")
 
@@ -341,6 +349,19 @@ class PcAutomationConfig(BaseSettings):
     """Maximum seconds a command can run."""
     max_command_output_chars: int = 500
     """Maximum characters of command output to return."""
+
+
+class PermissionsConfig(BaseSettings):
+    """Central tool-permission / confirmation policy (neutral home).
+
+    Owns the cross-cutting safety knobs that gate **any** dangerous tool,
+    independent of the plugin that exposes it. Consumed by the turn engine's
+    ``ConfirmationMiddleware`` and ``PermissionService``. Promoted out of
+    :class:`PcAutomationConfig` in Fase 2; old keys migrate transparently.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_PERMISSIONS__")
+
     confirmations_enabled: bool = True
     """Whether tool confirmations are required (safety feature)."""
     confirmation_timeout_s: int = 60
@@ -1038,6 +1059,45 @@ _LEGACY_AGENT_SUBAGENT_MAP = {
     "subagent_timeout_seconds": "timeout_seconds",
     "subagent_max_tools": "max_tools",
 }
+# Confirmation knobs promoted from ``pc_automation`` to the neutral
+# ``permissions`` block in Fase 2. They are *moved* (popped) because every
+# config model forbids unknown fields, so a stale key left under
+# ``pc_automation`` would otherwise fail validation.
+_LEGACY_PC_AUTOMATION_PERMISSION_KEYS = (
+    "confirmations_enabled",
+    "confirmation_timeout_s",
+)
+
+
+def _migrate_pc_automation_permissions(data: dict[str, Any]) -> None:
+    """Fold legacy ``pc_automation`` confirmation keys into ``permissions``.
+
+    Mutates ``data`` in place. Pops ``confirmations_enabled`` /
+    ``confirmation_timeout_s`` out of any ``pc_automation`` block and moves
+    them under ``permissions`` (an explicitly-set new key always wins). A
+    no-op when neither legacy key is present.
+    """
+    pc_auto = data.get("pc_automation")
+    if not isinstance(pc_auto, dict):
+        return
+    if not any(k in pc_auto for k in _LEGACY_PC_AUTOMATION_PERMISSION_KEYS):
+        return
+
+    permissions = data.get("permissions")
+    if not isinstance(permissions, dict):
+        permissions = {}
+
+    for key in _LEGACY_PC_AUTOMATION_PERMISSION_KEYS:
+        if key in pc_auto:
+            value = pc_auto.pop(key)
+            if key not in permissions:
+                permissions[key] = value
+
+    if permissions:
+        data["permissions"] = permissions
+    logger.info(
+        "Migrated legacy 'pc_automation' confirmation keys into 'permissions'"
+    )
 
 
 def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
@@ -1070,6 +1130,9 @@ def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
     """
     if not isinstance(data, dict):
         return data
+
+    # pc_automation → permissions (independent of the agent_tools block below).
+    _migrate_pc_automation_permissions(data)
 
     legacy = data.pop("agent_tools", None)
     if not isinstance(legacy, dict):
@@ -1139,6 +1202,9 @@ class AliceConfig(BaseSettings):
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
     pc_automation: PcAutomationConfig = Field(
         default_factory=PcAutomationConfig
+    )
+    permissions: PermissionsConfig = Field(
+        default_factory=PermissionsConfig
     )
     agent: AgentConfig = Field(default_factory=AgentConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)

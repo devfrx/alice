@@ -203,8 +203,8 @@ class MockToolRegistry:
         return self._definitions.get(name)
 
 
-class _PcAutoCfg:
-    """Minimal PcAutomationConfig stand-in."""
+class _PermissionsCfg:
+    """Minimal PermissionsConfig stand-in."""
 
     def __init__(self) -> None:
         self.confirmations_enabled: bool = True
@@ -224,7 +224,7 @@ class _Cfg:
     """Minimal config stand-in."""
 
     def __init__(self) -> None:
-        self.pc_automation = _PcAutoCfg()
+        self.permissions = _PermissionsCfg()
         self.llm = _LLMCfg()
 
 

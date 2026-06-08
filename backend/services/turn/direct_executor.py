@@ -217,7 +217,7 @@ class DirectTurnExecutor:
                     thinking_content=thinking,
                     max_iterations=self.ctx.config.llm.max_tool_iterations,
                     confirmation_timeout_s=(
-                        self.ctx.config.pc_automation.confirmation_timeout_s
+                        self.ctx.config.permissions.confirmation_timeout_s
                     ),
                     client_ip=turn.client_ip,
                     sync_fn=self._sync_fn,

@@ -115,6 +115,10 @@ pc_automation:
   screenshot_lockout_s: 60
   command_timeout_s: 30
   max_command_output_chars: 500
+
+# Central tool-permission / confirmation policy (neutral home; gates every
+# dangerous tool, not just pc_automation). Legacy pc_automation.* keys migrate.
+permissions:
   confirmations_enabled: true
   confirmation_timeout_s: 60
 

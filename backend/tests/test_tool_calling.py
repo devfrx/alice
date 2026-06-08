@@ -180,19 +180,21 @@ class TestToolCallingConfig:
         assert config.max_tool_iterations == 25
 
     def test_default_confirmation_timeout(self):
-        from backend.core.config import PcAutomationConfig
+        # Promoted from PcAutomationConfig to the neutral PermissionsConfig
+        # (``permissions.*``) in Fase 2.
+        from backend.core.config import PermissionsConfig
 
-        config = PcAutomationConfig()
+        config = PermissionsConfig()
         assert config.confirmation_timeout_s == 60
 
     def test_custom_values(self):
-        from backend.core.config import LLMConfig, PcAutomationConfig
+        from backend.core.config import LLMConfig, PermissionsConfig
 
         llm_config = LLMConfig(max_tool_iterations=5)
         assert llm_config.max_tool_iterations == 5
 
-        pc_config = PcAutomationConfig(confirmation_timeout_s=30)
-        assert pc_config.confirmation_timeout_s == 30
+        perm_config = PermissionsConfig(confirmation_timeout_s=30)
+        assert perm_config.confirmation_timeout_s == 30
 
 
 # ---------- D. Tool execution integration ----------

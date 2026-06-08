@@ -339,7 +339,7 @@ async def run_tool_loop(
 
             if tool_def and tool_def.requires_confirmation:
                 # Check if confirmations are globally disabled in config
-                confirmations_on = ctx.config.pc_automation.confirmations_enabled
+                confirmations_on = ctx.config.permissions.confirmations_enabled
 
                 if confirmations_on:
                     approved = await _request_confirmation(

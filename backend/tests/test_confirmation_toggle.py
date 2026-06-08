@@ -1,6 +1,6 @@
-"""Tests for the confirmations_enabled security toggle in _tool_loop.py.
+"""Tests for the confirmations_enabled security toggle in the turn engine.
 
-Verifies that `ctx.config.pc_automation.confirmations_enabled` correctly
+Verifies that `ctx.config.permissions.confirmations_enabled` correctly
 controls whether dangerous tools require interactive user confirmation
 or are auto-approved, while ensuring FORBIDDEN tools remain blocked.
 """
@@ -51,15 +51,15 @@ def _make_tool_def(
 def _build_mocks(*, confirmations_enabled: bool = True):
     """Return (ctx, ws, session, llm) mocks wired for run_tool_loop."""
     # --- Config ---
-    pc_auto_cfg = MagicMock()
-    pc_auto_cfg.confirmations_enabled = confirmations_enabled
+    permissions_cfg = MagicMock()
+    permissions_cfg.confirmations_enabled = confirmations_enabled
 
     llm_cfg = MagicMock()
     llm_cfg.tool_execution_timeout = 120.0
     llm_cfg.context_compression_enabled = False
 
     cfg = MagicMock()
-    cfg.pc_automation = pc_auto_cfg
+    cfg.permissions = permissions_cfg
     cfg.llm = llm_cfg
 
     # --- Tool registry ---

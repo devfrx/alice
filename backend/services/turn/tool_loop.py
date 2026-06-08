@@ -18,10 +18,21 @@ from loguru import logger
 
 from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext, ToolResult
-from backend.core.tool_progress import current_progress_emitter
 from backend.db.models import Message, ToolConfirmationAudit
 from backend.services.llm_service import LLMService
+from backend.services.permission_service import PermissionService
 from backend.services.turn.channel import InteractionChannel
+from backend.services.turn.pipeline import (
+    ConfirmationMiddleware,
+    DedupMiddleware,
+    Disposition,
+    ExecuteMiddleware,
+    InteractionMiddleware,
+    PermissionMiddleware,
+    ToolCall,
+    ToolOutcome,
+    ToolPipeline,
+)
 from backend.services.turn.sink import WSEventSink
 
 # Type alias for the sync callback.
@@ -141,6 +152,16 @@ async def run_tool_loop(
     # even when LLM re-requests the same tool in a later round.
     seen: set[str] = set()
 
+    # Central permission authority (forbidden risk + by-construction scope
+    # confinement). Fall back to a default instance for lightweight test
+    # contexts that don't wire one onto the AppContext.
+    _ps = getattr(ctx, "permission_service", None)
+    permission_service = (
+        _ps if isinstance(_ps, PermissionService) else PermissionService()
+    )
+    # Runtime confirmation toggle (constant for the turn).
+    confirmations_on = ctx.config.permissions.confirmations_enabled
+
     # Track usage and finish_reason from the last LLM re-query so
     # the caller can use real token data for context management.
     _loop_last_input_tokens = 0
@@ -196,8 +217,34 @@ async def run_tool_loop(
                 "tool_calls": normalized_tcs,
             })
 
-        # 2. Build execution tasks — dedup and check confirmation.
-        tasks: list[tuple[str, str, dict[str, Any], ExecutionContext]] = []
+        # 2. Gate every tool-call through the composable middleware pipeline.
+        #    ``seen`` / ``permission_service`` / ``channel`` / ``sink`` are
+        #    stable across iterations; the confirmation reasoning is this
+        #    iteration's thinking content.
+        gate_pipeline = ToolPipeline(
+            [
+                DedupMiddleware(seen),
+                PermissionMiddleware(permission_service),
+                ConfirmationMiddleware(
+                    channel=channel,
+                    permission_service=permission_service,
+                    confirmations_enabled=confirmations_on,
+                    confirmation_timeout_s=confirmation_timeout_s,
+                    reasoning=thinking_content,
+                    cancel_event=cancel_event,
+                ),
+                InteractionMiddleware(
+                    sink=sink,
+                    channel=channel,
+                    seen=seen,
+                    tool_exec_timeout=tool_exec_timeout,
+                    cancel_event=cancel_event,
+                ),
+            ],
+            ExecuteMiddleware(tool_registry=ctx.tool_registry, sink=sink),
+        )
+        # Server tools that clear the gate are collected for parallel execution.
+        deferred: list[ToolCall] = []
 
         for tc in tool_calls_from_llm:
             tc_id = tc["id"]
@@ -257,185 +304,61 @@ async def run_tool_loop(
                 })
                 continue
 
-            dedup_key = _dedup_hash(tool_name, args)
-
-            # Resolve the tool definition early so we can branch on its
-            # execution location (client vs server) and skip dedup for
-            # client-executed tools, whose effect is stateful: re-listing
-            # or re-reading live UI state after a mutation is legitimate
-            # and must not be collapsed into a "duplicate" response.
             tool_def = (
                 ctx.tool_registry.get_tool_definition(tool_name)
                 if ctx.tool_registry
                 else None
             )
-            is_client_tool = bool(tool_def and tool_def.client_execution)
+            exec_id = str(uuid.uuid4())
+            call = ToolCall(
+                tc_id=tc_id,
+                tool_name=tool_name,
+                args=args,
+                tool_def=tool_def,
+                exec_id=exec_id,
+                conversation_id=str(conv_id),
+                context=ExecutionContext(
+                    session_id=client_ip,
+                    conversation_id=str(conv_id),
+                    execution_id=exec_id,
+                ),
+                dedup_key=_dedup_hash(tool_name, args),
+                is_client=bool(tool_def and tool_def.client_execution),
+            )
 
-            if dedup_key in seen and not is_client_tool:
-                logger.warning(
-                    "Dedup: skipping duplicate tool call {}(…)", tool_name,
-                )
-                # OpenAI API requires a tool response for EVERY tool_call_id.
-                _dedup_content = "Duplicate call \u2014 see prior result."
-                session.add(Message(
+            # Decision lives in the pipeline; persistence/audit stays here.
+            outcome = await gate_pipeline.gate(call)
+
+            # An audit row is written for any call the pipeline classified:
+            # the forbidden block, or a confirmation-requiring tool (whether
+            # approved or rejected). Safe tools set no decision, so no audit.
+            if call.audit_decision is not None:
+                session.add(ToolConfirmationAudit(
                     conversation_id=conv_id,
-                    role="tool",
-                    content=_dedup_content,
-                    tool_call_id=tc_id,
-                    **_ver,
+                    execution_id=exec_id,
+                    tool_name=tool_name,
+                    args_json=json.dumps(args, default=str),
+                    risk_level=call.audit_decision.risk_level,
+                    user_approved=call.audit_decision.approved,
+                    rejection_reason=call.audit_decision.reason,
+                    thinking_content=thinking_content or None,
                 ))
                 await session.flush()
-                if mem_history is not None:
-                    mem_history.append({
-                        "role": "tool",
-                        "content": _dedup_content,
-                        "tool_call_id": tc_id,
-                    })
-                continue
-            # NOTE: ``seen.add(dedup_key)`` is intentionally deferred until
-            # AFTER the FORBIDDEN / confirmation gate below.  Adding it
-            # eagerly would permanently block the LLM from re-attempting
-            # a tool the user merely *rejected once* — the user might
-            # legitimately approve the same call later in the conversation
-            # (e.g. after providing missing context).
 
-            exec_id = str(uuid.uuid4())
-
-            # FORBIDDEN enforcement — block tools with risk_level "forbidden"
-            if tool_def and tool_def.risk_level == "forbidden":
-                logger.warning(
-                    "Blocked FORBIDDEN tool '{}' (exec_id={})",
-                    tool_name, exec_id,
-                )
-                _save_rejected_tool_msg(session, conv_id, tc_id, **_ver)
-                await session.flush()
-                if mem_history is not None:
-                    mem_history.append({
-                        "role": "tool",
-                        "content": "Tool execution was rejected by user or timed out.",
-                        "tool_call_id": tc_id,
-                    })
-                await sink.send({
-                    "type": "tool_execution_done",
-                    "tool_name": tool_name,
-                    "result": "Tool is forbidden and cannot be executed.",
-                    "execution_id": exec_id,
-                    "success": False,
-                })
-                # Log audit entry for forbidden tool
-                audit_entry = ToolConfirmationAudit(
-                    conversation_id=conv_id,
-                    execution_id=exec_id,
-                    tool_name=tool_name,
-                    args_json=json.dumps(args, default=str),
-                    risk_level="forbidden",
-                    user_approved=False,
-                    rejection_reason="forbidden_tool",
-                    thinking_content=thinking_content or None,
-                )
-                session.add(audit_entry)
-                await session.flush()
-                continue
-
-            if tool_def and tool_def.requires_confirmation:
-                # Check if confirmations are globally disabled in config
-                confirmations_on = ctx.config.permissions.confirmations_enabled
-
-                if confirmations_on:
-                    approved = await _request_confirmation(
-                        channel, tool_name, args, exec_id,
-                        confirmation_timeout_s,
-                        risk_level=tool_def.risk_level,
-                        description=tool_def.description,
-                        reasoning=thinking_content,
-                        cancel_event=cancel_event,
-                    )
-                else:
-                    logger.info(
-                        "Confirmations disabled — auto-approving '{}' (exec_id={})",
-                        tool_name, exec_id,
-                    )
-                    approved = True
-
-                # Log audit entry for confirmation decision
-                audit_entry = ToolConfirmationAudit(
-                    conversation_id=conv_id,
-                    execution_id=exec_id,
-                    tool_name=tool_name,
-                    args_json=json.dumps(args, default=str),
-                    risk_level=tool_def.risk_level,
-                    user_approved=approved,
-                    rejection_reason=None if approved else "user_rejected",
-                    thinking_content=thinking_content or None,
-                )
-                session.add(audit_entry)
-                await session.flush()
-
-                if not approved:
-                    _save_rejected_tool_msg(
-                        session, conv_id, tc_id, **_ver,
-                    )
-                    await session.flush()
-                    if mem_history is not None:
-                        mem_history.append({
-                            "role": "tool",
-                            "content": "Tool execution was rejected by user or timed out.",
-                            "tool_call_id": tc_id,
-                        })
-                    await sink.send({
-                        "type": "tool_execution_done",
-                        "tool_name": tool_name,
-                        "result": "Tool execution rejected or timed out.",
-                        "execution_id": exec_id,
-                        "success": False,
-                    })
-                    continue
-
-            await sink.send({
-                "type": "tool_execution_start",
-                "tool_name": tool_name,
-                "execution_id": exec_id,
-            })
-
-            # Mark the call as seen ONLY now that it has cleared every
-            # rejection gate and is about to actually execute.  This way
-            # a previously-rejected call can be retried in a later
-            # iteration if the user changes their mind.
-            seen.add(dedup_key)
-
-            # Client-executed tools (e.g. Continuum live-editor block
-            # operations) are not run on the server: the owning plugin
-            # cannot reach the user's open document. Delegate execution to
-            # the connected client over the same WebSocket, mirroring the
-            # request/response shape of the tool-confirmation handshake,
-            # then persist the client-supplied result like any other tool
-            # message so the LLM loop continues seamlessly.
-            if is_client_tool:
-                client_result = await _execute_client_tool(
-                    channel, tool_name, args, exec_id,
-                    tool_exec_timeout, cancel_event,
-                )
-                await _persist_client_tool_result(
+            if outcome.disposition is Disposition.EXECUTE:
+                # Cleared every gate: defer to the parallel execution batch.
+                deferred.append(call)
+            else:
+                await _persist_gate_outcome(
+                    outcome,
                     sink=sink,
                     session=session,
                     conv_id=conv_id,
-                    tc_id=tc_id,
-                    tool_name=tool_name,
-                    exec_id=exec_id,
-                    result=client_result,
                     mem_history=mem_history,
                     ver=_ver,
                     sync_fn=sync_fn,
                     ctx=ctx,
                 )
-                continue
-
-            context = ExecutionContext(
-                session_id=client_ip,
-                conversation_id=str(conv_id),
-                execution_id=exec_id,
-            )
-            tasks.append((tc_id, tool_name, args, context))
 
         # Release the SQLite write lock held by pending flush()es so that
         # plugin tools can write to the DB on their own connections.
@@ -445,8 +368,8 @@ async def run_tool_loop(
 
         # 3. Execute all tools in parallel (with timeout).
         coros = [
-            asyncio.ensure_future(_exec_one(ctx, tc_id, name, a, c, sink))
-            for tc_id, name, a, c in tasks
+            asyncio.ensure_future(gate_pipeline.execute(call))
+            for call in deferred
         ]
         if coros:
             done, pending = await asyncio.wait(
@@ -457,7 +380,7 @@ async def run_tool_loop(
 
         # Build a lookup from future to task metadata — used for
         # both pending (timeout) and done (exception) handling.
-        future_to_task = dict(zip(coros, tasks))
+        future_to_call = dict(zip(coros, deferred))
 
         if pending:
             logger.error(
@@ -470,7 +393,9 @@ async def run_tool_loop(
                 with contextlib.suppress(asyncio.CancelledError):
                     await fut
             for fut in pending:
-                tc_id, tool_name, _, exec_ctx = future_to_task[fut]
+                call = future_to_call[fut]
+                tc_id = call.tc_id
+                tool_name = call.tool_name
                 _timeout_content = (
                     f"Tool '{tool_name}' timed out after "
                     f"{tool_exec_timeout}s."
@@ -492,7 +417,7 @@ async def run_tool_loop(
                     "type": "tool_execution_done",
                     "tool_name": tool_name,
                     "result": _timeout_content,
-                    "execution_id": exec_ctx.execution_id,
+                    "execution_id": call.exec_id,
                     "success": False,
                 })
             await session.commit()
@@ -507,7 +432,9 @@ async def run_tool_loop(
                     raise exc
                 # Look up the correct task metadata via the future,
                 # NOT by index — `done` is a set with arbitrary order.
-                failed_tc_id, failed_tool_name, _, failed_ctx = future_to_task[fut]
+                call = future_to_call[fut]
+                failed_tc_id = call.tc_id
+                failed_tool_name = call.tool_name
                 logger.error(
                     "Tool execution exception for '{}': {}",
                     failed_tool_name, exc,
@@ -530,12 +457,18 @@ async def run_tool_loop(
                     "type": "tool_execution_done",
                     "tool_name": failed_tool_name,
                     "result": f"Tool '{failed_tool_name}' execution failed.",
-                    "execution_id": failed_ctx.execution_id,
+                    "execution_id": call.exec_id,
                     "success": False,
                 })
                 continue
 
-            tc_id, tool_name, tool_result, exec_id = fut.result()
+            outcome = fut.result()
+            call = outcome.call
+            assert outcome.result is not None
+            tc_id = call.tc_id
+            tool_name = call.tool_name
+            tool_result = outcome.result
+            exec_id = call.exec_id
 
             content = _result_to_str(tool_result)
             is_image = (
@@ -965,40 +898,86 @@ async def run_tool_loop(
 # ---------------------------------------------------------------------------
 
 
-async def _exec_one(
+async def _persist_gate_outcome(
+    outcome: ToolOutcome,
+    *,
+    sink: WSEventSink,
+    session: Any,
+    conv_id: uuid.UUID,
+    mem_history: list[dict[str, Any]] | None,
+    ver: dict[str, Any],
+    sync_fn: SyncFn | None,
     ctx: AppContext,
-    tc_id: str,
-    name: str,
-    args: dict[str, Any],
-    context: ExecutionContext,
-    sink: WSEventSink | None = None,
-) -> tuple[str, str, ToolResult, str]:
-    """Execute a single tool and return its result alongside metadata.
+) -> None:
+    """Persist a terminal (non-executed) gate outcome.
 
-    While the tool runs, a progress emitter is bound to the
-    ``current_progress_emitter`` contextvar so long-running tools can
-    push ``tool_progress`` frames to the active sink via
-    :func:`backend.core.tool_progress.emit_tool_progress`.
+    Routes a pipeline :class:`ToolOutcome` that did not reach server
+    execution to the same DB message / sink frame the legacy inline ladder
+    produced: deduped, forbidden, confirmation-rejected, scope-denied, or a
+    client-executed result. Audit rows are written by the caller from
+    ``call.audit_decision``; this handles only messages and frames.
     """
-    if sink is not None:
-        async def _emit(progress: dict[str, Any]) -> None:
-            # ``sink.send`` swallows transport-level errors itself, so the
-            # tool keeps running locally to completion if the client is gone.
-            await sink.send({
-                "type": "tool_progress",
-                "tool_name": name,
-                "execution_id": context.execution_id,
-                **progress,
-            })
+    call = outcome.call
 
-        token = current_progress_emitter.set(_emit)
-        try:
-            result = await ctx.tool_registry.execute_tool(name, args, context)
-        finally:
-            current_progress_emitter.reset(token)
+    if outcome.disposition is Disposition.CLIENT_EXECUTED:
+        assert outcome.result is not None
+        await _persist_client_tool_result(
+            sink=sink,
+            session=session,
+            conv_id=conv_id,
+            tc_id=call.tc_id,
+            tool_name=call.tool_name,
+            exec_id=call.exec_id,
+            result=outcome.result,
+            mem_history=mem_history,
+            ver=ver,
+            sync_fn=sync_fn,
+            ctx=ctx,
+        )
+        return
+
+    if outcome.disposition is Disposition.DEDUPED:
+        # OpenAI API requires a tool response for EVERY tool_call_id.
+        dedup_content = "Duplicate call — see prior result."
+        session.add(Message(
+            conversation_id=conv_id,
+            role="tool",
+            content=dedup_content,
+            tool_call_id=call.tc_id,
+            **ver,
+        ))
+        await session.flush()
+        if mem_history is not None:
+            mem_history.append({
+                "role": "tool",
+                "content": dedup_content,
+                "tool_call_id": call.tc_id,
+            })
+        return
+
+    # FORBIDDEN / REJECTED / SCOPE_DENIED: a rejected tool message plus a
+    # failed tool_execution_done frame.
+    _save_rejected_tool_msg(session, conv_id, call.tc_id, **ver)
+    await session.flush()
+    if mem_history is not None:
+        mem_history.append({
+            "role": "tool",
+            "content": "Tool execution was rejected by user or timed out.",
+            "tool_call_id": call.tc_id,
+        })
+    if outcome.disposition is Disposition.FORBIDDEN:
+        result_text = "Tool is forbidden and cannot be executed."
+    elif outcome.disposition is Disposition.SCOPE_DENIED:
+        result_text = "Tool execution denied: path outside the workspace scope."
     else:
-        result = await ctx.tool_registry.execute_tool(name, args, context)
-    return tc_id, name, result, context.execution_id
+        result_text = "Tool execution rejected or timed out."
+    await sink.send({
+        "type": "tool_execution_done",
+        "tool_name": call.tool_name,
+        "result": result_text,
+        "execution_id": call.exec_id,
+        "success": False,
+    })
 
 
 def _result_to_str(tool_result: ToolResult) -> str:
@@ -1080,84 +1059,6 @@ def _save_rejected_tool_msg(
     session.add(msg)
 
 
-async def _execute_client_tool(
-    channel: InteractionChannel,
-    tool_name: str,
-    args: dict[str, Any],
-    execution_id: str,
-    timeout_s: float,
-    cancel_event: asyncio.Event | None = None,
-) -> ToolResult:
-    """Delegate a tool's execution to the connected client and await its result.
-
-    Issues a ``client_tool_call`` round-trip on the
-    :class:`~backend.services.turn.channel.InteractionChannel` and blocks
-    until the correlated ``client_tool_result`` arrives. Used for tools
-    flagged with ``ToolDefinition.client_execution`` — operations that must
-    run against live client UI state (e.g. the open Continuum editor)
-    rather than on the server.
-
-    Args:
-        channel: Inbound interaction channel (the single WS reader).
-        tool_name: Namespaced tool name being delegated.
-        args: Parsed arguments to forward to the client.
-        execution_id: Unique execution ID used to correlate the response.
-        timeout_s: Maximum seconds to wait for the client to respond.
-        cancel_event: Optional event honoured while waiting (the pump sets
-            it on a cancel frame).
-
-    Returns:
-        A :class:`ToolResult` carrying the client-supplied payload, or an
-        error result on timeout / cancellation.
-
-    Raises:
-        WebSocketDisconnect: If the socket dropped while awaiting the reply.
-    """
-    msg = await channel.request(
-        "client_tool_call",
-        {"tool_name": tool_name, "args": args},
-        execution_id=execution_id,
-        timeout_s=timeout_s,
-        cancel_event=cancel_event,
-    )
-
-    if msg is None:
-        # Disambiguate the ``None`` outcome (disconnect wins over cancel,
-        # since a disconnect also trips the cancel signal).
-        if not channel.connected:
-            logger.warning(
-                "WebSocket disconnected during client tool '{}' (exec_id={})",
-                tool_name, execution_id,
-            )
-            raise WebSocketDisconnect(code=1006)
-        if channel.cancelled:
-            return ToolResult.error("Client tool cancelled by user.")
-        logger.warning(
-            "Client tool '{}' timed out after {}s (exec_id={})",
-            tool_name, timeout_s, execution_id,
-        )
-        return ToolResult.error(
-            f"Client tool '{tool_name}' timed out — is a Continuum note open?",
-        )
-
-    if msg.get("success", False):
-        payload = msg.get("result")
-        content = (
-            payload
-            if isinstance(payload, (str, dict, list))
-            else str(payload)
-        )
-        return ToolResult.ok(
-            content if content is not None else "OK",
-            content_type="application/json"
-            if isinstance(payload, (dict, list))
-            else "text/plain",
-        )
-    return ToolResult.error(
-        str(msg.get("error") or "Client tool reported a failure."),
-    )
-
-
 async def _persist_client_tool_result(
     *,
     sink: WSEventSink,
@@ -1208,61 +1109,3 @@ async def _persist_client_tool_result(
         "execution_id": exec_id,
         "success": result.success,
     })
-
-
-async def _request_confirmation(
-    channel: InteractionChannel,
-    tool_name: str,
-    args: dict[str, Any],
-    execution_id: str,
-    timeout_s: int,
-    risk_level: str = "medium",
-    description: str = "",
-    reasoning: str = "",
-    cancel_event: asyncio.Event | None = None,
-) -> bool:
-    """Send a confirmation request and wait for the user's response.
-
-    Issues a ``tool_confirmation`` round-trip on the
-    :class:`~backend.services.turn.channel.InteractionChannel` and blocks
-    until the correlated ``tool_confirmation_response`` arrives or
-    *timeout_s* elapses.
-
-    Args:
-        channel: Inbound interaction channel (the single WS reader).
-        tool_name: Name of the tool requiring confirmation.
-        args: Arguments the tool will be called with.
-        execution_id: Unique execution ID for correlation.
-        timeout_s: Maximum seconds to wait.
-        risk_level: Risk classification (``"safe"``, ``"medium"``,
-            ``"dangerous"``, ``"forbidden"``).
-        description: Human-readable description of the tool action.
-        reasoning: LLM thinking/reasoning content at invocation time.
-        cancel_event: Optional event honoured while waiting (the pump sets
-            it on a cancel frame).
-
-    Returns:
-        ``True`` if the user approved, ``False`` on rejection, timeout,
-        cancellation or disconnect.
-    """
-    msg = await channel.request(
-        "tool_confirmation",
-        {
-            "tool_name": tool_name,
-            "args": args,
-            "risk_level": risk_level,
-            "description": description,
-            "reasoning": reasoning,
-        },
-        execution_id=execution_id,
-        timeout_s=timeout_s,
-        cancel_event=cancel_event,
-    )
-    if msg is None:
-        # Timeout, cancel or disconnect — all treated as "not approved".
-        logger.debug(
-            "Confirmation not granted for tool '{}' (exec_id={})",
-            tool_name, execution_id,
-        )
-        return False
-    return bool(msg.get("approved", False))

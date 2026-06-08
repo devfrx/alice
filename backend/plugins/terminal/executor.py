@@ -212,9 +212,17 @@ def _force_close_pipes(proc: asyncio.subprocess.Process) -> None:
         proc: The child whose pipe transports should be closed.
     """
     transport = getattr(proc, "_transport", None)
-    if transport is not None:
-        with contextlib.suppress(Exception):
-            transport.close()
+    if transport is None:
+        # The transport handle is asyncio-internal; if a future CPython renames
+        # it this lookup returns None and the anti-hang close silently no-ops,
+        # so make the regression LOUD rather than let reaps wedge in silence.
+        logger.warning(
+            "terminal: subprocess transport not found (asyncio internals "
+            "changed?) — reap may hang on undrained output"
+        )
+        return
+    with contextlib.suppress(Exception):
+        transport.close()
 
 
 async def _terminate(proc: asyncio.subprocess.Process) -> None:

@@ -16,19 +16,23 @@ the Python 3.13 default used by the test runner).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
+import sys
 import time
 from pathlib import Path
 
 import pytest
 
-from backend.plugins.terminal.executor import TerminalResult, run_command
+from backend.plugins.terminal.executor import (
+    TerminalResult,
+    _force_close_pipes,
+    run_command,
+)
 
 
 def _py(script: str) -> list[str]:
     """Build a shell-free argv that runs *script* via the test interpreter."""
-    import sys
-
     return [sys.executable, "-c", script]
 
 
@@ -163,11 +167,16 @@ async def test_run_command_reduced_env_keeps_path(tmp_path: Path) -> None:
 async def test_run_command_timeout_kills(tmp_path: Path) -> None:
     """A 30s sleeper with a 0.5s budget must be killed in well under 5s."""
     t0 = time.monotonic()
-    result = await run_command(
-        _py("import time; time.sleep(30)"),
-        tmp_path,
-        timeout_s=0.5,
-        max_output_bytes=1_000_000,
+    # Outer wait_for is a fail-fast guard: a regressed kill/reap should surface
+    # as a TimeoutError here rather than wedging the whole suite indefinitely.
+    result = await asyncio.wait_for(
+        run_command(
+            _py("import time; time.sleep(30)"),
+            tmp_path,
+            timeout_s=0.5,
+            max_output_bytes=1_000_000,
+        ),
+        timeout=10.0,
     )
     elapsed = time.monotonic() - t0
 
@@ -184,11 +193,17 @@ async def test_run_command_timeout_kills(tmp_path: Path) -> None:
 async def test_run_command_output_cap_truncates(tmp_path: Path) -> None:
     """A 1 MB producer with a 1 KB cap is truncated; we never buffer the 1 MB."""
     t0 = time.monotonic()
-    result = await run_command(
-        _py("print('x' * 1_000_000)"),
-        tmp_path,
-        timeout_s=30.0,
-        max_output_bytes=1000,
+    # This case exercises the Windows anti-hang force-close (undrained pipe bytes
+    # at the cap-kill). The outer wait_for turns a regressed force-close into a
+    # fast TimeoutError instead of an indefinitely wedged suite.
+    result = await asyncio.wait_for(
+        run_command(
+            _py("print('x' * 1_000_000)"),
+            tmp_path,
+            timeout_s=30.0,
+            max_output_bytes=1000,
+        ),
+        timeout=10.0,
     )
     elapsed = time.monotonic() - t0
 
@@ -197,6 +212,47 @@ async def test_run_command_output_cap_truncates(tmp_path: Path) -> None:
     assert captured <= 4000, f"captured {captured} bytes — cap not enforced"
     assert captured < 1_000_000  # never the full producer output
     assert elapsed < 5.0, f"cap kill was not prompt (took {elapsed:.2f}s)"
+
+
+# ---------------------------------------------------------------------------
+# Anti-hang mechanism: force-closing pipes lets a kill reap with undrained bytes
+# ---------------------------------------------------------------------------
+
+
+async def test_force_close_pipes_enables_reap_with_undrained_bytes(tmp_path: Path) -> None:
+    """Direct regression guard for the Windows-Proactor anti-hang fix.
+
+    A child that floods stdout then sleeps leaves **undrained** bytes in the
+    pipe.  On the Windows ProactorEventLoop ``proc.wait()`` blocks indefinitely
+    in that state unless the pipe transport is force-closed.  This reproduces
+    the exact scenario in isolation (bypassing the cap logic) and asserts that
+    after :func:`_force_close_pipes` the reap returns; the outer ``wait_for``
+    makes a regressed force-close fail FAST (``TimeoutError``) instead of
+    wedging the suite.  On non-Windows platforms ``wait()`` never hangs on
+    undrained bytes, so the test simply passes there.
+    """
+    flood_then_sleep = (
+        "import sys, time; sys.stdout.write('x' * 200_000); "
+        "sys.stdout.flush(); time.sleep(30)"
+    )
+    proc = await asyncio.create_subprocess_exec(
+        *_py(flood_then_sleep),
+        cwd=str(tmp_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        await asyncio.sleep(0.3)  # let it fill the pipe buffer and block on write
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        _force_close_pipes(proc)  # without this, the wait below hangs on Windows
+        await asyncio.wait_for(proc.wait(), timeout=8.0)
+        assert proc.returncode is not None  # reaped, not wedged
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(proc.wait(), timeout=8.0)
 
 
 # ---------------------------------------------------------------------------

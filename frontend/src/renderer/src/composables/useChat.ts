@@ -466,6 +466,10 @@ export function useChat(): UseChatReturn {
     // Optimistic UI update
     store.addUserMessage(trimmed, uploaded)
 
+    // Reset the live agent thread so it shows a fresh "starting" state instead
+    // of the previous (finished) run during the send→turn.started gap.
+    agentRunStore.beginPendingTurn()
+
     // Capture the generation counter so stale events from previous streams are ignored.
     activeGeneration = store.streamGeneration
 
@@ -564,6 +568,10 @@ export function useChat(): UseChatReturn {
       versionGroupId,
       versionIndex: newVersionIndex,
     })
+
+    // Reset the live agent thread so it shows a fresh "starting" state instead
+    // of the previous (finished) run during the send→turn.started gap.
+    agentRunStore.beginPendingTurn()
 
     activeGeneration = store.streamGeneration
 

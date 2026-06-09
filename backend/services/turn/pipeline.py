@@ -744,27 +744,44 @@ async def _execute_user_interaction(
     timeout_s: float,
     cancel_event: asyncio.Event | None = None,
 ) -> ToolResult:
-    """Ask the human a question and return their answer as a tool result.
+    """Ask the user one or more questions (sequential wizard) and await answers.
 
     Issues an ``ask_user`` round-trip on the InteractionChannel (emitting an
     ``ask_user_required`` frame) and blocks until the correlated
     ``ask_user_response`` arrives. Used for tools flagged
-    ``ToolDefinition.user_interaction`` (the ``ask_user`` meta-tool). The
-    answer text becomes the tool result fed back into the LLM loop.
+    ``ToolDefinition.user_interaction`` (the ``ask_user`` meta-tool).
+
+    The request payload carries ``{"questions": [...]}`` — each question has an
+    ``id``, ``text``, ``type`` (``"radio"`` | ``"checkbox"``), ``options`` and
+    ``allow_free_text``. The response carries ``{"answers": [...]}`` with each
+    answer correlated by ``question_id`` (``selected`` list + optional
+    ``free_text``). The answers are flattened into a labelled ``Q:``/``A:``
+    transcript fed back into the LLM loop.
 
     Returns:
-        A successful :class:`ToolResult` carrying the user's answer, or an
-        error result on cancellation / timeout.
+        A successful :class:`ToolResult` carrying the labelled answers, or an
+        error result on empty input / cancellation / timeout.
 
     Raises:
         WebSocketDisconnect: If the socket dropped while awaiting the answer.
     """
-    question = str(args.get("question", "")).strip()
-    payload: dict[str, Any] = {"question": question}
-    options = args.get("options")
-    if isinstance(options, list):
-        payload["options"] = [str(o) for o in options]
+    raw_questions = args.get("questions")
+    questions: list[dict[str, Any]] = []
+    if isinstance(raw_questions, list):
+        for i, q in enumerate(raw_questions):
+            if not isinstance(q, dict):
+                continue
+            questions.append({
+                "id": str(q.get("id") or f"q{i + 1}"),
+                "text": str(q.get("text", "")).strip(),
+                "type": "checkbox" if q.get("type") == "checkbox" else "radio",
+                "options": [str(o) for o in q.get("options", []) if o is not None],
+                "allow_free_text": bool(q.get("allow_free_text", False)),
+            })
+    if not questions:
+        return ToolResult.error("ask_user called with no questions")
 
+    payload: dict[str, Any] = {"questions": questions}
     msg = await channel.request(
         "ask_user", payload,
         execution_id=execution_id, timeout_s=timeout_s, cancel_event=cancel_event,
@@ -783,8 +800,18 @@ async def _execute_user_interaction(
         )
         return ToolResult.error(f"No answer received (timed out after {timeout_s}s).")
 
-    answer = msg.get("answer")
-    return ToolResult.ok(
-        str(answer) if answer is not None else "",
-        content_type="text/plain",
-    )
+    answers = msg.get("answers") if isinstance(msg, dict) else None
+    if not isinstance(answers, list):
+        return ToolResult.ok("(no answer provided)", content_type="text/plain")
+
+    by_id = {str(a.get("question_id")): a for a in answers if isinstance(a, dict)}
+    lines: list[str] = []
+    for q in questions:
+        a = by_id.get(q["id"], {})
+        selected = a.get("selected") if isinstance(a.get("selected"), list) else []
+        free = str(a.get("free_text", "")).strip()
+        parts = [str(s) for s in selected]
+        if free:
+            parts.append(free)
+        lines.append(f"Q: {q['text']}\nA: {', '.join(parts) if parts else '(no answer)'}")
+    return ToolResult.ok("\n\n".join(lines), content_type="text/plain")

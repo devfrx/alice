@@ -41,7 +41,7 @@ async def get_stats(request: Request) -> dict[str, Any]:
             collections_info.append({
                 "name": coll_name,
                 "points_count": count,
-                "vectors_size": dim,
+                "vectors_size": dim if dim is not None else 0,
             })
         except Exception as exc:
             logger.warning(

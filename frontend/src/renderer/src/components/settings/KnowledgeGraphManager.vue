@@ -93,26 +93,6 @@
                 </div>
             </div>
 
-            <!-- Add Observation dialog -->
-            <Teleport to="body">
-                <div v-if="showAddObservation" class="kg-overlay" @click.self="showAddObservation = false">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <h4 class="kg-dialog__title">Aggiungi osservazione a "{{ observationTarget }}"</h4>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Nuove osservazioni (una per riga)</span>
-                            <textarea v-model="newObservationText" class="kg-textarea" rows="3"
-                                placeholder="es. Ha un cane di nome Rex" />
-                        </label>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary"
-                                @click="showAddObservation = false">Annulla</button>
-                            <button class="kg-btn kg-btn--accent" :disabled="!newObservationText.trim()"
-                                @click="onAddObservation">Aggiungi</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
         </template>
     </section>
 </template>
@@ -128,6 +108,7 @@ import { type UiSelectOption } from '../ui/UiSelect.vue'
 import { useModal } from '../../composables/useModal'
 import KgCreateEntityDialog from './KgCreateEntityDialog.vue'
 import KgCreateRelationDialog from './KgCreateRelationDialog.vue'
+import KgAddObservationDialog from './KgAddObservationDialog.vue'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
@@ -182,25 +163,15 @@ async function openCreateRelation(): Promise<void> {
 }
 
 // ── Add Observation ───────────────────────────────────────────────────────
-const showAddObservation = ref(false)
-const observationTarget = ref('')
-const newObservationText = ref('')
 
-function openAddObservation(entityName: string): void {
-    observationTarget.value = entityName
-    newObservationText.value = ''
-    showAddObservation.value = true
-}
-
-async function onAddObservation(): Promise<void> {
-    const contents = newObservationText.value
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-    if (contents.length > 0) {
-        await store.addObservations(observationTarget.value, contents)
-    }
-    showAddObservation.value = false
+async function openAddObservation(entityName: string): Promise<void> {
+    const result = await openCustom({
+        component: KgAddObservationDialog,
+        props: { entityName },
+        title: `Aggiungi osservazione · ${entityName}`,
+        width: '480px',
+    })
+    if (result) await store.loadGraph()
 }
 
 // ── Confirmation dialog ───────────────────────────────────────────────────
@@ -554,93 +525,5 @@ watch(memoryConnected, (connected) => {
     background: var(--border-hover);
 }
 
-/* ── Dialog overlay ────────────────────────────────────── */
-.kg-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-modal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--black-heavy);
-}
 
-.kg-dialog {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--space-6);
-    max-width: 440px;
-    width: 90%;
-    box-shadow: var(--shadow-floating);
-}
-
-.kg-dialog__title {
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
-    margin: 0 0 var(--space-4);
-}
-
-.kg-dialog__message {
-    font-size: var(--text-sm);
-    color: var(--text-primary);
-    line-height: var(--leading-normal);
-    margin: 0 0 var(--space-4);
-    white-space: pre-line;
-}
-
-.kg-dialog__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
-}
-
-/* ── Form fields ───────────────────────────────────────── */
-.kg-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    margin-bottom: var(--space-3);
-}
-
-.kg-field__label {
-    font-size: var(--text-xs);
-    color: var(--text-secondary);
-    font-weight: var(--weight-medium);
-}
-
-.kg-input {
-    padding: var(--space-1) var(--space-2);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    font-family: inherit;
-    outline: none;
-    transition: border-color var(--transition-fast);
-}
-
-.kg-input:focus {
-    border-color: var(--accent-border);
-}
-
-.kg-textarea {
-    padding: var(--space-2);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    font-family: inherit;
-    outline: none;
-    resize: vertical;
-    transition: border-color var(--transition-fast);
-}
-
-.kg-textarea:focus {
-    border-color: var(--accent-border);
-}
 </style>

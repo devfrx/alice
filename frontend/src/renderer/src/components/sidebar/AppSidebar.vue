@@ -51,6 +51,18 @@ const unreadBadge = computed(() => emailStore.unreadCount)
 const isAssistantActive = computed(() => route.name === 'assistant')
 const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
+/**
+ * The Home surface is the empty-conversation state of the Workspace, so the
+ * Home nav item is "active" exactly when that surface is on screen: we're on
+ * the workspace route and the active conversation holds no messages.
+ */
+const isHomeActive = computed(
+  () =>
+    isWorkspaceActive.value &&
+    chatStore.messages.length === 0 &&
+    !chatStore.isStreamingCurrentConversation
+)
+
 /** The two primary-surface options for the shared segmented control. */
 const modeTabOptions: UiSegmentedOption[] = [
   { value: 'assistant', label: 'Assistente', icon: 'orb' },
@@ -124,12 +136,44 @@ async function onSelect(id: string): Promise<void> {
   }
 }
 
-/** Create a new conversation — stay in the current mode. */
+/**
+ * Go to the Home surface (the empty Workspace). Only spin up a fresh draft
+ * when the current conversation already has content, so we never leave a trail
+ * of empty chats; an already-empty conversation is reused as-is.
+ */
+async function onHome(): Promise<void> {
+  toggle()
+  if (chatStore.messages.length > 0) {
+    try {
+      await chatStore.createConversation()
+    } catch (err) {
+      console.error('[AppSidebar] Failed to start a new conversation:', err)
+    }
+  }
+  if (router.currentRoute.value.name !== 'workspace') {
+    try {
+      await router.push('/workspace')
+    } catch (err) {
+      console.error('[AppSidebar] Home navigation failed:', err)
+    }
+  }
+}
+
+/**
+ * Start a new conversation on the Home — the empty-conversation state of the
+ * Workspace. A fresh conversation always opens as the Home (never the assistant
+ * orb, never a stale secondary route); typing the first message then cross-fades
+ * it into the live Workspace chat. `createConversation` reuses any existing
+ * empty conversation, so this never leaves a trail of blank chats.
+ */
 async function onCreate(): Promise<void> {
   await chatStore.createConversation()
-  const current = router.currentRoute.value.name as string
-  if (current !== 'assistant' && current !== 'workspace') {
-    await router.push({ name: uiStore.mode })
+  if (router.currentRoute.value.name !== 'workspace') {
+    try {
+      await router.push('/workspace')
+    } catch (err) {
+      console.error('[AppSidebar] New-conversation navigation failed:', err)
+    }
   }
 }
 
@@ -201,13 +245,13 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
-          <router-link to="/home" class="sidebar__link" active-class="sidebar__link--active" title="Home"
-            @click="toggle">
+          <button type="button" class="sidebar__link" :class="{ 'sidebar__link--active': isHomeActive }"
+            title="Home" @click="onHome">
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="home" :size="15" />
             </span>
             <span class="sidebar__link-label">Home</span>
-          </router-link>
+          </button>
 
           <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
             @click="toggle">
@@ -451,17 +495,23 @@ async function onOpenFile(id: string): Promise<void> {
   color: var(--text-secondary);
 }
 
-/* Nav link */
+/* Nav link — shared by <router-link> (<a>) and the Home <button>. */
 .sidebar__link {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  width: 100%;
   padding: var(--space-2) var(--space-3);
+  border: none;
   border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: inherit;
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
   color: var(--text-secondary);
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
   transition:
     background var(--transition-fast) ease,
     color var(--transition-fast) ease;

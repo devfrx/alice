@@ -54,13 +54,15 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/home'
+      redirect: '/workspace'
     },
     {
+      // The Home is no longer a standalone page — it is the empty-conversation
+      // state of the Workspace (see WorkspaceView). This named redirect keeps
+      // old `#/home` deep links and `{ name: 'home' }` fallbacks resolving.
       path: '/home',
       name: 'home',
-      component: () => import('../views/HomeView.vue'),
-      meta: { title: 'Home', transition: DEFAULT_PAGE_TRANSITION }
+      redirect: '/workspace'
     },
     {
       path: '/workspace',

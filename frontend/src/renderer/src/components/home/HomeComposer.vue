@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
  * Hero composer for the home. Purely presentational: it owns no chat logic,
- * just two-way text binding + a `submit` event. The parent (HomeView) calls
- * the real `useChat().sendMessage` flow and navigates. Enter submits;
- * Shift+Enter inserts a newline.
+ * just two-way text binding + a `submit` event. The parent (HomeSurface) calls
+ * the real `useChat().sendMessage` flow; sending fills the conversation, which
+ * lets the Workspace cross-fade into the live chat (no navigation). Enter
+ * submits; Shift+Enter inserts a newline.
  */
 import { ref } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'

@@ -1,30 +1,31 @@
 <script setup lang="ts">
 /**
- * AL\CE — Home ("editorial dossier").
+ * HomeSurface — AL\CE's "editorial dossier" entry surface.
  *
- * A personal, agentic entry surface (not a launcher): time-of-day greeting,
- * a hero composer that starts a REAL turn via useChat().sendMessage, recent
- * conversations to resume, and a runtime colophon. Real signals only.
+ * This is NOT a route: it is the empty-conversation state of the Workspace.
+ * {@link WorkspaceView} renders it whenever the active conversation has no
+ * messages, and cross-fades it into the live chat the instant a turn starts —
+ * so there is no page navigation, just a seamless hand-off on the same surface.
+ *
+ * Because the swap is driven purely by the conversation becoming non-empty,
+ * this component owns no navigation: it only starts a real turn (or reopens a
+ * conversation) and lets the parent react. Real signals only.
  */
 import { computed, inject, nextTick, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
-import { ChatApiKey } from '../composables/useChat'
-import { useChatStore } from '../stores/chat'
-import { useMemoryStore } from '../stores/memory'
-import { useUIStore } from '../stores/ui'
+import { ChatApiKey } from '../../composables/useChat'
+import { useChatStore } from '../../stores/chat'
+import { useMemoryStore } from '../../stores/memory'
 
-import HomeGreeting from '../components/home/HomeGreeting.vue'
-import HomeComposer from '../components/home/HomeComposer.vue'
-import HomeIntents from '../components/home/HomeIntents.vue'
-import HomeResume from '../components/home/HomeResume.vue'
-import HomeColophon from '../components/home/HomeColophon.vue'
+import HomeGreeting from './HomeGreeting.vue'
+import HomeComposer from './HomeComposer.vue'
+import HomeIntents from './HomeIntents.vue'
+import HomeResume from './HomeResume.vue'
+import HomeColophon from './HomeColophon.vue'
 
-const router = useRouter()
 const chatStore = useChatStore()
 const memoryStore = useMemoryStore()
-const uiStore = useUIStore()
-const chatApi = inject(ChatApiKey)
+const chatApi = inject(ChatApiKey, null)
 
 const draft = ref('')
 const composerRef = ref<InstanceType<typeof HomeComposer> | null>(null)
@@ -34,22 +35,16 @@ const conversationCount = computed(
 )
 const memoryCount = computed(() => memoryStore.stats?.total ?? 0)
 
-/** Navigate into the user's active chat surface (workspace/assistant). */
-async function enterActiveSurface(): Promise<void> {
-  try {
-    await router.push({ name: uiStore.mode })
-  } catch (err) {
-    console.error('[HomeView] Navigation failed:', err)
-  }
-}
-
-/** Submit the composer: start a real turn, then enter the active surface. */
+/**
+ * Submit the composer: start a real turn. No navigation — pushing the user
+ * message flips the conversation to non-empty, and the parent Workspace
+ * cross-fades from this surface into the live chat.
+ */
 async function onSubmit(): Promise<void> {
   const text = draft.value.trim()
   if (!text || !chatApi) return
   draft.value = ''
   await chatApi.sendMessage(text)
-  await enterActiveSurface()
 }
 
 /** Prefill the composer from an intent chip and focus it. */
@@ -66,15 +61,16 @@ async function onResumeLast(): Promise<void> {
   if (last) await onOpen(last.id)
 }
 
-/** Open a specific conversation, then enter the active surface. */
+/**
+ * Open a specific conversation. Loading it fills the message list, which the
+ * parent Workspace observes to reveal the chat — again, no navigation here.
+ */
 async function onOpen(id: string): Promise<void> {
   try {
     await chatStore.loadConversation(id)
   } catch (err) {
-    console.error(`[HomeView] Failed to load conversation ${id}:`, err)
-    return
+    console.error(`[HomeSurface] Failed to load conversation ${id}:`, err)
   }
-  await enterActiveSurface()
 }
 </script>
 

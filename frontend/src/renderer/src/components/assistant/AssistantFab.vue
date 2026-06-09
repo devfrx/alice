@@ -51,7 +51,12 @@ function handleAction(id: string): void {
             router.push({ name: 'workspace' })
             break
         case 'new-conv':
-            chatStore.createConversation().catch(console.error)
+            // A new conversation always opens as the Home (the empty-conversation
+            // state of the Workspace), then cross-fades into the chat on first send.
+            chatStore
+                .createConversation()
+                .then(() => router.push('/workspace'))
+                .catch((err) => console.error('[AssistantFab] New chat failed:', err))
             break
         case 'settings':
             router.push({ name: 'settings' })

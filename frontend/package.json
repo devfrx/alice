@@ -26,6 +26,7 @@
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
     "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource/fraunces": "^5.2.9",
     "@iconify-json/solar": "^1.2.5",
     "@iconify/utils": "^3.1.0",
     "@iconify/vue": "^5.0.0",

@@ -4,8 +4,8 @@
  *
  * Renders an ordered list of {@link PlanStep}s with a status-aware leading
  * mark: a check for `completed`, a pulsing dot for `in_progress`, and a plain
- * muted dot for `pending`. Visual language mirrors the inline plan checklist
- * in {@link ToolExecutionIndicator}.
+ * muted dot for `pending`. Visual language mirrors the inline plan-checklist
+ * style used elsewhere in the chat.
  *
  * Stateless: no store, no fetch. The empty case is rendered as an empty list;
  * the caller decides whether to show this component or an empty state instead.

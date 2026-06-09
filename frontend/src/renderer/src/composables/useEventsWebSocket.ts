@@ -137,6 +137,11 @@ export function useEventsWebSocket(): {
           servicesStore.onDownloadProgress(data)
         }
 
+        // Knowledge/RAG readiness changes (e.g. after a vector-store repair).
+        if (data.type === 'knowledge.status') {
+          servicesStore.onKnowledgeStatus(data)
+        }
+
         // Handle plan updates: fold the full pushed step list into the store.
         if (data.type === 'plan.updated' && typeof data.conversation_id === 'string') {
           planStore.applyPlanUpdated(data as WsPlanUpdatedMessage)

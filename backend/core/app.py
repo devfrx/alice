@@ -622,6 +622,21 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         AliceEvent.SERVICE_STATUS, _forward_service_status,
     )
 
+    # -- Bridge knowledge/RAG readiness changes to the events WS --------
+    # Lets the UI reflect, live, when memory + tool-RAG are (re)enabled —
+    # e.g. after the user triggers the vector-store "repair" CTA.
+    async def _forward_knowledge_status(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "knowledge.status",
+                "ready": kwargs.get("ready"),
+                "reason": kwargs.get("reason"),
+                "memory_enabled": kwargs.get("memory_enabled"),
+                "tool_rag_enabled": kwargs.get("tool_rag_enabled"),
+            })
+
+    ctx.event_bus.subscribe("knowledge.status", _forward_knowledge_status)
+
     # -- Artifact registry (unified tool-output store) ------------------
     from backend.services.artifacts import ArtifactRegistry
 

@@ -7,6 +7,7 @@ Does NOT handle embedding — callers provide pre-computed vectors.
 from __future__ import annotations
 
 import asyncio
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any
@@ -146,6 +147,29 @@ class QdrantService:
         await self.close()
         self._in_memory = False
         await self.initialize()
+
+    def clear_embedded_data(self) -> bool:
+        """Delete the embedded vector-store directory (destructive).
+
+        Backs the user-triggered "repair" action: when the on-disk data was
+        written by an incompatible ``qdrant-client`` version (so the client
+        can no longer open it), removing the directory lets a fresh store be
+        created on the next :meth:`initialize`.  Only touches the configured
+        embedded path and never raises.
+
+        Returns:
+            True if the directory is gone afterwards (removed or already
+            absent); False in server mode or if removal failed.
+        """
+        if self._config.mode != "embedded":
+            return False
+        root = Path(self._config.path)
+        try:
+            if root.exists():
+                shutil.rmtree(root, ignore_errors=True)
+            return not root.exists()
+        except OSError:
+            return False
 
     # ------------------------------------------------------------------
     # Collection management

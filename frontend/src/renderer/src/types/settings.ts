@@ -117,10 +117,20 @@ export interface VectorStoreCollectionInfo {
   vectors_size: number
 }
 
+/** Whether the vector/embedding (RAG) stack is currently usable. */
+export interface RagReadinessStatus {
+  ready: boolean
+  reason: string
+  memory_enabled: boolean
+  tool_rag_enabled: boolean
+}
+
 export interface VectorStoreStats {
   mode: string
   connected: boolean
   collections: VectorStoreCollectionInfo[]
+  /** Effective RAG readiness (independent of the persisted toggle). */
+  rag: RagReadinessStatus
 }
 
 /** A single tool in the chat tool-picker catalog. */

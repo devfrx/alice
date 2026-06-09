@@ -800,6 +800,13 @@ export const api = {
   reembedTools: (): Promise<{ status: string }> =>
     request<{ status: string }>('/vector-store/reembed-tools', { method: 'POST' }),
 
+  /**
+   * Reset the embedded vector store and re-wire the RAG stack (manual repair).
+   * Destructive: clears persisted embedded vectors. Returns refreshed stats.
+   */
+  repairVectorStore: (): Promise<VectorStoreStats> =>
+    request<VectorStoreStats>('/vector-store/repair', { method: 'POST' }),
+
   // -- Artifacts ------------------------------------------------------------
 
   /** List artifacts with optional filters and pagination. */

@@ -195,6 +195,14 @@ class ToolRegistry:
         self._embedder = embedding_client
         self._llm_config = llm_config
 
+        # Per-plugin connection-status cache: name -> (monotonic_ts, status).
+        # Tool selection resolves each plugin's status ONCE per call, bounded
+        # by a timeout and reused within a short TTL, so a slow/down plugin
+        # (e.g. continuum probing a dead endpoint) cannot stall a turn.
+        self._status_cache: dict[str, tuple[float, ConnectionStatus]] = {}
+        self._status_cache_ttl: float = 30.0
+        self._status_probe_timeout: float = 3.0
+
     # ------------------------------------------------------------------
     # Refresh / rebuild
     # ------------------------------------------------------------------
@@ -321,6 +329,28 @@ class ToolRegistry:
             except Exception as exc:
                 self._logger.warning("Tool embedding failed: {}", exc)
 
+    def set_vector_backends(
+        self,
+        qdrant_service: QdrantServiceProtocol | None,
+        embedding_client: EmbeddingClientProtocol | None,
+    ) -> None:
+        """Swap the Qdrant / embedding backends at runtime.
+
+        Used by the vector-store repair flow after Qdrant is re-initialised,
+        so tool-RAG picks up the freshly-wired services without a restart.
+        """
+        self._qdrant = qdrant_service
+        self._embedder = embedding_client
+
+    def clear_status_cache(self) -> None:
+        """Drop all cached plugin connection statuses (force a fresh probe).
+
+        Called after the knowledge stack is re-wired so plugins whose backing
+        service just changed (e.g. ``memory`` after a Qdrant repair) are
+        re-evaluated instead of serving a stale cached status.
+        """
+        self._status_cache.clear()
+
     # ------------------------------------------------------------------
     # Query methods
     # ------------------------------------------------------------------
@@ -335,12 +365,81 @@ class ToolRegistry:
         # via list() is safe without the async lock in sync context.
         return list(self._openai_cache)
 
-    async def get_available_tools(self) -> list[dict[str, Any]]:
-        """Return tools whose owning plugin is CONNECTED or DEGRADED.
+    async def _resolve_plugin_statuses(
+        self, plugin_names: set[str],
+    ) -> dict[str, ConnectionStatus]:
+        """Resolve each plugin's connection status once — bounded and cached.
 
-        Plugins with ``ConnectionStatus.DISCONNECTED`` or ``ERROR``
-        are filtered out so the LLM is not offered tools that would
-        certainly fail at execution time.
+        Within a call each plugin is probed at most once (deduped across its
+        many tools); probes for distinct plugins run concurrently and are each
+        capped by :attr:`_status_probe_timeout`, so a hanging health check
+        (e.g. an HTTP probe to a service that is down) cannot stall the turn.
+        Results are cached for :attr:`_status_cache_ttl` seconds so
+        back-to-back turns reuse them instead of re-probing.
+
+        Args:
+            plugin_names: Owning-plugin names to resolve a status for.
+
+        Returns:
+            Mapping of plugin name to its (possibly cached) status.
+        """
+        now = time.monotonic()
+        statuses: dict[str, ConnectionStatus] = {}
+        stale: list[str] = []
+        for name in plugin_names:
+            cached = self._status_cache.get(name)
+            if cached is not None and (now - cached[0]) < self._status_cache_ttl:
+                statuses[name] = cached[1]
+            else:
+                stale.append(name)
+
+        if stale:
+            probed = await asyncio.gather(
+                *(self._probe_plugin_status(name) for name in stale)
+            )
+            probe_ts = time.monotonic()
+            for name, status in zip(stale, probed, strict=True):
+                self._status_cache[name] = (probe_ts, status)
+                statuses[name] = status
+
+        return statuses
+
+    async def _probe_plugin_status(self, plugin_name: str) -> ConnectionStatus:
+        """Probe one plugin's status, bounded by :attr:`_status_probe_timeout`.
+
+        Returns ``DISCONNECTED`` on a missing plugin, a timeout, or any error
+        so callers treat the plugin as unavailable instead of blocking.
+        """
+        plugin = self._plugin_manager.get_plugin(plugin_name)
+        if plugin is None:
+            return ConnectionStatus.DISCONNECTED
+        try:
+            return await asyncio.wait_for(
+                plugin.get_connection_status(),
+                timeout=self._status_probe_timeout,
+            )
+        except TimeoutError:
+            self._logger.warning(
+                "Connection-status probe for plugin '{}' timed out after "
+                "{:.1f}s — treating it as disconnected",
+                plugin_name, self._status_probe_timeout,
+            )
+            return ConnectionStatus.DISCONNECTED
+        except Exception as exc:  # noqa: BLE001 — never block selection
+            self._logger.debug(
+                "Connection-status probe for plugin '{}' failed: {}",
+                plugin_name, exc,
+            )
+            return ConnectionStatus.DISCONNECTED
+
+    async def get_available_tools(self) -> list[dict[str, Any]]:
+        """Return tools whose owning plugin is CONNECTED, DEGRADED or UNKNOWN.
+
+        Plugins reporting ``DISCONNECTED`` / ``ERROR`` (or whose status probe
+        times out) are filtered out so the LLM is not offered tools that would
+        certainly fail at execution time.  Status is resolved once per plugin
+        via :meth:`_resolve_plugin_statuses` (bounded + cached), never once per
+        tool.
 
         Returns:
             Filtered list of OpenAI-format tool dicts.
@@ -349,20 +448,20 @@ class ToolRegistry:
             cache_snapshot = list(self._openai_cache)
             plugin_map_snapshot = dict(self._tool_to_plugin)
 
+        plugin_names = {p for p in plugin_map_snapshot.values() if p}
+        statuses = await self._resolve_plugin_statuses(plugin_names)
+
         available: list[dict[str, Any]] = []
         for entry in cache_snapshot:
             ns_name: str = entry["function"]["name"]
             plugin_name = plugin_map_snapshot.get(ns_name)
             if plugin_name is None:
                 continue
-            plugin = self._plugin_manager.get_plugin(plugin_name)
-            if plugin is None:
-                continue
-            try:
-                status = await plugin.get_connection_status()
-            except Exception:
-                continue
-            if status in (ConnectionStatus.CONNECTED, ConnectionStatus.DEGRADED, ConnectionStatus.UNKNOWN):
+            if statuses.get(plugin_name) in (
+                ConnectionStatus.CONNECTED,
+                ConnectionStatus.DEGRADED,
+                ConnectionStatus.UNKNOWN,
+            ):
                 available.append(entry)
         return available
 
@@ -675,28 +774,32 @@ class ToolRegistry:
         result: list[dict[str, Any]] = []
         seen: set[str] = set()
 
-        # First pass: add tools from hits + priority plugins
+        # Candidate plugins = owners of a hit tool or a priority-plugin tool.
+        # Resolve their status once (deduped + bounded + cached) instead of
+        # probing per tool, so a down plugin cannot stall selection.
+        candidates: set[str] = set()
         for entry in cache_snapshot:
-            ns_name: str = entry["function"]["name"]
+            ns_name = entry["function"]["name"]
+            plugin_name = plugin_map.get(ns_name)
+            if plugin_name is None:
+                continue
+            if ns_name in hit_names or plugin_name in priority_plugins:
+                candidates.add(plugin_name)
+        statuses = await self._resolve_plugin_statuses(candidates)
+
+        # Second pass: keep hit / priority tools whose plugin is available.
+        for entry in cache_snapshot:
+            ns_name = entry["function"]["name"]
             plugin_name = plugin_map.get(ns_name)
             if plugin_name is None:
                 continue
 
             is_hit = ns_name in hit_names
             is_priority = plugin_name in priority_plugins
-
             if not is_hit and not is_priority:
                 continue
 
-            # Filter by plugin status
-            plugin = self._plugin_manager.get_plugin(plugin_name)
-            if plugin is None:
-                continue
-            try:
-                status = await plugin.get_connection_status()
-            except Exception:
-                continue
-            if status not in (
+            if statuses.get(plugin_name) not in (
                 ConnectionStatus.CONNECTED,
                 ConnectionStatus.DEGRADED,
                 ConnectionStatus.UNKNOWN,

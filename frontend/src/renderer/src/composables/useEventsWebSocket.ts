@@ -14,6 +14,8 @@ import { useArtifactsStore } from '../stores/artifacts'
 import { useServicesStore } from '../stores/services'
 import { useTasksStore } from '../stores/tasks'
 import type { WsTasksUpdatedMessage } from '../types/tasks'
+import { usePlanDocumentStore } from '../stores/planDocument'
+import type { WsPlanDocumentUpdatedMessage } from '../types/planDocument'
 import { useScopeStore } from '../stores/scope'
 import type { WsScopeUpdatedMessage } from '../types/scope'
 import { usePermissionModeStore } from '../stores/permissionMode'
@@ -65,6 +67,7 @@ export function useEventsWebSocket(): {
   const artifactsStore = useArtifactsStore()
   const servicesStore = useServicesStore()
   const tasksStore = useTasksStore()
+  const planDocumentStore = usePlanDocumentStore()
   const scopeStore = useScopeStore()
   const permissionModeStore = usePermissionModeStore()
   const terminalStore = useTerminalSessionsStore()
@@ -145,6 +148,11 @@ export function useEventsWebSocket(): {
         // Handle task updates: fold the full pushed step list into the store.
         if (data.type === 'tasks.updated' && typeof data.conversation_id === 'string') {
           tasksStore.applyTasksUpdated(data as WsTasksUpdatedMessage)
+        }
+
+        // Handle plan-document updates: fold the pushed markdown doc into the store.
+        if (data.type === 'plan_document.updated' && typeof data.conversation_id === 'string') {
+          planDocumentStore.applyPlanDocumentUpdated(data as WsPlanDocumentUpdatedMessage)
         }
 
         // Handle scope updates: fold the full pushed folder list into the store.

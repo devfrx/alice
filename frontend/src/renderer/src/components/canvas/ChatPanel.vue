@@ -18,6 +18,7 @@ import MessageBubble from '../chat/MessageBubble.vue'
 import StreamingIndicator from '../chat/StreamingIndicator.vue'
 import ReasoningThread from '../chat/ReasoningThread.vue'
 import ChatInput from '../chat/ChatInput.vue'
+import TaskStrip from '../chat/TaskStrip.vue'
 import ToolConfirmationDialog from '../chat/ToolConfirmationDialog.vue'
 import AskUserPrompt from '../chat/AskUserPrompt.vue'
 import MessageEditDialog from '../chat/MessageEditDialog.vue'
@@ -179,6 +180,11 @@ const conversationTitle = computed<string>(() => {
         />
       </div>
     </div>
+
+    <TaskStrip
+      class="chat-panel__tasks"
+      :conversation-id="chatStore.currentConversation?.id ?? null"
+    />
 
     <div class="chat-panel__input">
       <ChatInput

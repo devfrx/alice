@@ -87,7 +87,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
       <AppIcon name="sliders" :size="11" />
       <span class="ctc__chip-label">Strumenti</span>
       <span v-if="blockedCount > 0" class="ctc__badge" :title="`${blockedCount} strumenti bloccati dalla modalità`">
-        <AppIcon name="lock" :size="9" />{{ blockedCount }}
+        <AppIcon name="minus" :size="9" />{{ blockedCount }}
       </span>
     </button>
 
@@ -137,7 +137,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
             >
               <span class="ctc__tool-state" aria-hidden="true">
                 <AppIcon
-                  :name="tool.allowed ? (tool.planning ? 'lightbulb' : 'check') : 'lock'"
+                  :name="tool.allowed ? (tool.planning ? 'lightbulb' : 'check') : 'minus'"
                   :size="12"
                 />
               </span>

@@ -95,18 +95,13 @@ const terminal: ModuleDef = {
   singleton: true
 }
 
-const scope: ModuleDef = {
-  id: 'scope',
-  label: 'Scope',
-  icon: 'folder',
-  component: () => import('../../components/canvas/modules/ScopeModule.vue'),
-  defaultZone: 'right',
-  singleton: true
-}
-
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
+//
+// NB: the former `scope` module was retired — scope is now managed inline via
+// the ScopeIndicator chip + popover in the composer, so a separate tile is
+// redundant.
 
 export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   chat,
@@ -114,8 +109,7 @@ export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   whiteboard,
   cad3d,
   plan,
-  terminal,
-  scope
+  terminal
 }
 
 // ---------------------------------------------------------------------------

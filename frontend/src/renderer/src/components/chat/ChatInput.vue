@@ -16,6 +16,7 @@ import type { AudioDevice } from '../../composables/useVoice'
 import ModelSelector from '../settings/ModelSelector.vue'
 import ChatToolControls from './ChatToolControls.vue'
 import PermissionTierSelector from './PermissionTierSelector.vue'
+import ScopeIndicator from './ScopeIndicator.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import ContextBar from './ContextBar.vue'
 import { useChatStore } from '../../stores/chat'
@@ -340,6 +341,7 @@ defineExpose({
 
         <span class="ci__glabel ci__glabel--agent">Agente</span>
         <div class="ci__seg ci__seg--agent">
+          <ScopeIndicator :conversation-id="chatStore.currentConversation?.id ?? null" />
           <ChatToolControls />
           <PermissionTierSelector />
         </div>

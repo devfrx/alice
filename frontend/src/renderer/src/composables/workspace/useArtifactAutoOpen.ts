@@ -22,6 +22,7 @@ import { watch, type Ref } from 'vue'
 import { useArtifactsStore } from '../../stores/artifacts'
 import { useChatStore } from '../../stores/chat'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { usePlanDocumentStore } from '../../stores/planDocument'
 import { extractCharts } from '../../stores/charts'
 import { emitOpenModule } from './moduleIntents'
 import type { ChatMessage, ChartPayload } from '../../types/chat'
@@ -83,6 +84,7 @@ export function useArtifactAutoOpen(conversationIdRef?: Ref<string | null | unde
   const artifactsStore = useArtifactsStore()
   const chatStore = useChatStore()
   const workspaceStore = useWorkspaceStore()
+  const planDocumentStore = usePlanDocumentStore()
 
   // ── Seed seen-id sets from the current state at mount time ──────────────
 
@@ -174,4 +176,30 @@ export function useArtifactAutoOpen(conversationIdRef?: Ref<string | null | unde
     },
     { deep: false }
   )
+
+  // ── Watcher: plan document written/updated ───────────────────────────────
+  // The agent's `write_plan` replaces the living plan doc; every change should
+  // auto-open / foreground the plan module. Re-baseline on conversation switch
+  // (same guard as the chart/board watchers) so mere navigation never opens it.
+
+  const stampFor = (): string | null => {
+    const id = conversationIdRef?.value ?? null
+    return id ? (planDocumentStore.documentFor(id)?.updatedAt ?? null) : null
+  }
+  let lastPlanConvId = conversationIdRef?.value ?? null
+  let lastPlanStamp = stampFor()
+
+  watch(stampFor, (stamp) => {
+    const convId = conversationIdRef?.value ?? null
+    if (convId !== lastPlanConvId) {
+      lastPlanConvId = convId
+      lastPlanStamp = stamp
+      return
+    }
+    if (stamp === lastPlanStamp) return
+    lastPlanStamp = stamp
+    if (!stamp) return
+    if (!workspaceStore.autoOpenEnabled) return
+    emitOpenModule('plan')
+  })
 }

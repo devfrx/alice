@@ -1,21 +1,18 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * StreamingIndicator.vue — Shows the in-progress assistant response.
  *
  * Renders partial markdown as it streams in, styled identically to an
- * assistant {@link MessageBubble} but with a blinking cursor appended.
+ * assistant {@link MessageBubble} but with a glowing caret cursor appended.
  * Includes a collapsible "Ragionamento" section for thinking tokens.
  * The parent controls visibility (`v-if="isStreaming"` outside).
+ * The ReasoningThread / tool-execution card is mounted separately in ChatPanel.
  */
 import { computed } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
-import { useChatStore } from '../../stores/chat'
 import ThinkingSection from './ThinkingSection.vue'
-import ToolExecutionIndicator from './ToolExecutionIndicator.vue'
-import AgentActivityCard from './AgentActivityCard.vue'
-import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 
 const props = defineProps<{
   /** Accumulated tokens so far (`currentStreamContent` from the store). */
@@ -31,35 +28,38 @@ const htmlContent = computed(() => renderMarkdown(props.content))
 const thinkingHtml = computed(() => renderMarkdown(props.thinkingContent))
 
 const { handleCodeBlockClick } = useCodeBlocks()
-
-const chatStore = useChatStore()
 </script>
 
 <template>
   <div class="bubble-row row--assistant">
     <div class="streaming-bubble">
-      <!-- Thinking-only state indicator -->
+      <!-- Thinking-only state: shimmer label -->
       <div v-if="thinkingContent && !content" class="streaming-bubble__thinking-state">
-        <AliceSpinner size="xs" />
-        <span class="streaming-bubble__thinking-label">Ragionamento in corso…</span>
+        <span class="streaming-bubble__thinking-label streaming-bubble__thinking-label--shimmer"
+          >Ragionamento…</span
+        >
       </div>
 
       <!-- Thinking section -->
-      <ThinkingSection v-if="thinkingContent" :thinking-html="thinkingHtml" :initial-collapsed="true"
-        :auto-expand="true" :content-length="thinkingContent.length">
+      <ThinkingSection
+        v-if="thinkingContent"
+        :thinking-html="thinkingHtml"
+        :initial-collapsed="true"
+        :auto-expand="true"
+        :content-length="thinkingContent.length"
+      >
         <span v-if="!content" class="streaming-bubble__cursor" />
       </ThinkingSection>
-
-      <!-- Tool execution indicator -->
-      <ToolExecutionIndicator :executions="chatStore.activeToolExecutions" />
-
-      <!-- Per-turn run budget / status (canonical turn-event stream; self-guards) -->
-      <AgentActivityCard />
 
       <!-- Main content -->
       <Transition name="content-fade">
         <!-- eslint-disable-next-line vue/no-v-html -->
-        <div v-if="content" class="streaming-bubble__content" v-html="htmlContent" @click="handleCodeBlockClick" />
+        <div
+          v-if="content"
+          class="streaming-bubble__content"
+          @click="handleCodeBlockClick"
+          v-html="htmlContent"
+        />
       </Transition>
       <span v-if="content || !thinkingContent" class="streaming-bubble__cursor" />
     </div>
@@ -126,14 +126,52 @@ const chatStore = useChatStore()
   color: var(--text-muted);
 }
 
+.streaming-bubble__thinking-label--shimmer {
+  font-size: var(--text-xs);
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 28%,
+    var(--accent) 50%,
+    var(--text-muted) 72%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinkingShimmer 2.3s linear infinite;
+}
+
+@keyframes thinkingShimmer {
+  0% {
+    background-position: 170% 0;
+  }
+  100% {
+    background-position: -70% 0;
+  }
+}
+
 .streaming-bubble__cursor {
   display: inline-block;
   width: 2px;
-  height: 1em;
-  margin-left: 2px;
+  height: 1.05em;
+  margin-left: 3px;
   vertical-align: text-bottom;
+  border-radius: 1px;
   background: var(--accent);
-  animation: cursorBlink 1s steps(2) infinite;
+  box-shadow:
+    -9px 0 10px -3px var(--accent-glow),
+    0 0 6px var(--accent-glow);
+  animation: cursorPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cursorPulse {
+  0%,
+  100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 
 .content-fade-enter-active {
@@ -144,27 +182,21 @@ const chatStore = useChatStore()
   opacity: 0;
 }
 
-@keyframes cursorBlink {
-
-  0%,
-  49.9% {
-    opacity: 1;
-  }
-
-  50%,
-  100% {
-    opacity: 0;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .streaming-bubble__cursor {
     animation: none;
     opacity: 1;
+    box-shadow: 0 0 4px var(--accent-glow);
   }
 
   .content-fade-enter-active {
     transition: none;
+  }
+
+  .streaming-bubble__thinking-label--shimmer {
+    animation: none;
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
   }
 }
 </style>

@@ -25,7 +25,7 @@ const greetingWord = computed<string>(() => {
 const name = computed<string>(() => settingsStore.settings.llm.userPreferredName?.trim() ?? '')
 
 const dateLabel = computed<string>(() =>
-  new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(now),
+  new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(now)
 )
 
 const lede = computed<string>(() => {
@@ -46,13 +46,20 @@ const lede = computed<string>(() => {
       <span>{{ dateLabel }} · runtime locale</span>
     </p>
     <h1 class="hg__greet">
-      {{ greetingWord }}<template v-if="name">, <em>{{ name }}</em></template>.
+      {{ greetingWord
+      }}<template v-if="name"
+        >, <em>{{ name }}</em></template
+      >.
     </h1>
     <p class="hg__lede">{{ lede }}</p>
   </header>
 </template>
 
 <style scoped>
+.hg {
+  margin-bottom: var(--space-8);
+}
+
 .hg__kicker {
   display: flex;
   align-items: center;
@@ -78,9 +85,9 @@ const lede = computed<string>(() => {
   /* Fraunces — scoped to this one element. Everything else stays sans. */
   font-family: 'Fraunces', Georgia, serif;
   font-weight: 600;
-  font-size: clamp(2.4rem, 4.4vw, 3.4rem);
-  line-height: 1.04;
-  letter-spacing: -0.015em;
+  font-size: clamp(2.6rem, 4.6vw, 3.7rem);
+  line-height: 1.03;
+  letter-spacing: -0.018em;
   color: var(--text-primary);
 }
 

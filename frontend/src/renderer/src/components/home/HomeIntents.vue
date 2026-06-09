@@ -18,7 +18,7 @@ const intents: Intent[] = [
   { label: 'Pianifica un lavoro', prefill: 'Aiutami a pianificare: ', lead: true },
   { label: 'Cerca nei file', prefill: 'Cerca nei miei file: ' },
   { label: 'Genera un grafico', prefill: 'Genera un grafico che mostri ' },
-  { label: "Riprendi l'ultima", resumeLast: true },
+  { label: "Riprendi l'ultima", resumeLast: true }
 ]
 
 function activate(intent: Intent): void {
@@ -29,7 +29,13 @@ function activate(intent: Intent): void {
 
 <template>
   <div class="hi">
-    <button v-for="intent in intents" :key="intent.label" class="hi__chip" type="button" @click="activate(intent)">
+    <button
+      v-for="intent in intents"
+      :key="intent.label"
+      class="hi__chip"
+      type="button"
+      @click="activate(intent)"
+    >
       <AppIcon v-if="intent.lead" name="plus" :size="13" />
       <span>{{ intent.label }}</span>
     </button>
@@ -48,14 +54,16 @@ function activate(intent: Intent): void {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1-5);
-  padding: var(--space-2) var(--space-3-5, 14px);
+  padding: var(--space-2) var(--space-3-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface-1);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .hi__chip:hover {

@@ -33,10 +33,23 @@ defineExpose({ focus: (): void => el.value?.focus() })
 
 <template>
   <div class="hc">
-    <textarea ref="el" class="hc__input" rows="1" :value="modelValue"
-      placeholder="Chiedi, pianifica, o lascia che me ne occupi io…" aria-label="Messaggio per Alice"
-      @input="onInput" @keydown="onKeydown" />
-    <button class="hc__send" type="button" aria-label="Invia" :disabled="!modelValue.trim()" @click="submit">
+    <textarea
+      ref="el"
+      class="hc__input"
+      rows="1"
+      :value="modelValue"
+      placeholder="Chiedi, pianifica, o lascia che me ne occupi io…"
+      aria-label="Messaggio per Alice"
+      @input="onInput"
+      @keydown="onKeydown"
+    />
+    <button
+      class="hc__send"
+      type="button"
+      aria-label="Invia"
+      :disabled="!modelValue.trim()"
+      @click="submit"
+    >
       <AppIcon name="send" :size="16" />
     </button>
   </div>
@@ -47,21 +60,26 @@ defineExpose({ focus: (): void => el.value?.focus() })
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  transition: border-color var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .hc:focus-within {
   border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
 }
 
 .hc__input {
   flex: 1;
-  min-height: 28px;
+  min-height: 36px;
   max-height: 160px;
+  padding-block: var(--space-1);
   resize: none;
   border: none;
   outline: none;
@@ -81,14 +99,16 @@ defineExpose({ focus: (): void => el.value?.focus() })
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--text-on-accent);
   cursor: pointer;
-  transition: background var(--transition-fast), opacity var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .hc__send:hover:not(:disabled) {

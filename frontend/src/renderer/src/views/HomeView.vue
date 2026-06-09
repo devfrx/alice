@@ -30,7 +30,7 @@ const draft = ref('')
 const composerRef = ref<InstanceType<typeof HomeComposer> | null>(null)
 
 const conversationCount = computed(
-  () => chatStore.conversations.filter((c) => c.message_count > 0).length,
+  () => chatStore.conversations.filter((c) => c.message_count > 0).length
 )
 const memoryCount = computed(() => memoryStore.stats?.total ?? 0)
 
@@ -81,13 +81,15 @@ async function onOpen(id: string): Promise<void> {
 <template>
   <div class="home">
     <div class="home__atmosphere" aria-hidden="true" />
-    <main class="home__page">
-      <HomeGreeting :conversation-count="conversationCount" :memory-count="memoryCount" />
-      <HomeComposer ref="composerRef" v-model="draft" @submit="onSubmit" />
-      <HomeIntents @prefill="onPrefill" @resume-last="onResumeLast" />
-      <HomeResume :conversations="chatStore.conversations" @open="onOpen" />
-      <HomeColophon />
-    </main>
+    <div class="home__stage">
+      <main class="home__page">
+        <HomeGreeting :conversation-count="conversationCount" :memory-count="memoryCount" />
+        <HomeComposer ref="composerRef" v-model="draft" @submit="onSubmit" />
+        <HomeIntents @prefill="onPrefill" @resume-last="onResumeLast" />
+        <HomeResume :conversations="chatStore.conversations" @open="onOpen" />
+        <HomeColophon />
+      </main>
+    </div>
   </div>
 </template>
 
@@ -101,26 +103,37 @@ async function onOpen(id: string): Promise<void> {
   color: var(--text-primary);
 }
 
-/* A single warm light source, top-right — atmosphere, not decoration. */
+/* Ambient depth — two faint warm sources, top-right + bottom-left. */
 .home__atmosphere {
   position: absolute;
   inset: 0;
   z-index: var(--z-base);
   pointer-events: none;
-  background: radial-gradient(120% 90% at 88% -10%, var(--accent-glow), transparent 55%);
+  background:
+    radial-gradient(68% 52% at 84% 6%, var(--accent-glow), transparent 60%),
+    radial-gradient(72% 60% at 10% 104%, var(--accent-faint), transparent 58%);
+}
+
+/* Center the editorial column in the viewport; scroll only when taller. */
+.home__stage {
+  position: relative;
+  z-index: var(--z-raised);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100%;
+  padding: var(--space-12) var(--space-8) var(--space-14);
 }
 
 .home__page {
-  position: relative;
-  z-index: var(--z-raised);
-  width: min(680px, 100%);
-  margin-inline: auto;
-  padding: clamp(var(--space-10), 9vh, var(--space-20)) var(--space-8) var(--space-12);
+  width: min(720px, 100%);
 }
 
 @media (max-width: 680px) {
-  .home__page {
-    padding: var(--space-10) var(--space-5) var(--space-8);
+  .home__stage {
+    justify-content: flex-start;
+    padding: var(--space-10) var(--space-5) var(--space-10);
   }
 }
 </style>

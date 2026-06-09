@@ -18,7 +18,7 @@ const recent = computed<ConversationSummary[]>(() =>
   [...props.conversations]
     .filter((c) => c.message_count > 0)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-    .slice(0, MAX),
+    .slice(0, MAX)
 )
 </script>
 
@@ -31,17 +31,27 @@ const recent = computed<ConversationSummary[]>(() =>
     </p>
 
     <div v-if="recent.length" class="hr__list">
-      <HomeResumeEntry v-for="c in recent" :key="c.id" :conversation="c" @open="(id) => emit('open', id)" />
+      <HomeResumeEntry
+        v-for="c in recent"
+        :key="c.id"
+        :conversation="c"
+        @open="(id) => emit('open', id)"
+      />
     </div>
 
-    <UiEmptyState v-else compact icon="message" title="Iniziamo da qui."
-      subtitle="Le conversazioni che apri compariranno qui per riprenderle al volo." />
+    <UiEmptyState
+      v-else
+      compact
+      icon="message"
+      title="Iniziamo da qui."
+      subtitle="Le conversazioni che apri compariranno qui per riprenderle al volo."
+    />
   </section>
 </template>
 
 <style scoped>
 .hr {
-  margin-top: var(--space-12);
+  margin-top: var(--space-14);
 }
 
 .hr__label {
@@ -65,5 +75,10 @@ const recent = computed<ConversationSummary[]>(() =>
 .hr__list {
   display: flex;
   flex-direction: column;
+}
+
+/* No trailing rule before the colophon's own top border. */
+.hr__list :deep(.hre:last-child) {
+  border-bottom: none;
 }
 </style>

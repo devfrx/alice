@@ -40,7 +40,10 @@ async def _probe(ctx: Any) -> tuple[bool, str]:
     if not vec or len(vec) != int(emb.dimensions):
         return False, "embedding round-trip returned wrong/empty vector"
     if getattr(ctx, "memory_service", None) is not None:
-        dim = await qd.get_collection_dim(COLLECTION_MEMORY)
+        try:
+            dim = await qd.get_collection_dim(COLLECTION_MEMORY)
+        except Exception as exc:
+            return False, f"memory collection probe failed: {exc}"
         if dim is not None and dim != int(emb.dimensions):
             return False, f"memory collection dim {dim} != {emb.dimensions}"
     return True, "ok"
@@ -73,7 +76,10 @@ async def check_rag_readiness(ctx: Any) -> RagReadiness:
                 logger.warning("Qdrant reinitialize after lock-clear failed: {}", exc)
         if repaired:
             ok, reason = await _probe(ctx)
-    tool_rag = bool(getattr(ctx.config.llm, "tool_rag_enabled", False))
+    try:
+        tool_rag = bool(getattr(ctx.config.llm, "tool_rag_enabled", False))
+    except Exception:
+        tool_rag = False
     if not ok:
         logger.warning("RAG readiness FAILED — memory + tool-RAG disabled: {}", reason)
         return RagReadiness(False, reason, memory_enabled=False, tool_rag_enabled=False)

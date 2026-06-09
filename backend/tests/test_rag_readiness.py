@@ -8,7 +8,7 @@ import pytest
 from backend.services.rag_readiness import RagReadiness, check_rag_readiness
 
 
-def _ctx(*, in_memory=False, embed_ok=True, mem_dim=1024, tool_count=3):
+def _ctx(*, in_memory=False, embed_ok=True, mem_dim=1024):
     ctx = MagicMock()
     ctx.config.llm.tool_rag_enabled = True
     qd = MagicMock()
@@ -16,7 +16,6 @@ def _ctx(*, in_memory=False, embed_ok=True, mem_dim=1024, tool_count=3):
     qd.try_clear_stale_lock = MagicMock(return_value=False)
     qd.reinitialize = AsyncMock()
     qd.get_collection_dim = AsyncMock(return_value=mem_dim)
-    qd.count = AsyncMock(return_value=tool_count)
     ctx.qdrant_service = qd
     emb = MagicMock()
     emb.dimensions = 1024

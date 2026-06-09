@@ -54,6 +54,14 @@ export const useChatStore = defineStore('chat', () => {
   /** The currently open conversation (includes messages). */
   const currentConversation = ref<ConversationDetail | null>(null)
 
+  /** True while a conversation's full detail is being fetched. */
+  const isLoadingConversation = ref(false)
+  // Monotonic token: each loadConversation() call bumps this so a slow
+  // response for an earlier selection can never overwrite a newer one.
+  let _loadGeneration = 0
+  // In-flight detail fetch; aborted when a newer selection starts.
+  let _loadAbort: AbortController | null = null
+
   watch(
     () => currentConversation.value?.id ?? null,
     (id) => storeActiveConversationId(id),
@@ -238,6 +246,16 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Load a full conversation (with messages) and set it as active. */
   async function loadConversation(id: string): Promise<void> {
+    // Generation guard: bump the token up-front and capture it locally. Any
+    // older in-flight load that resolves after a newer selection started will
+    // see `myGen !== _loadGeneration` and bail (latest click wins).
+    const myGen = ++_loadGeneration
+    // Abort the previous in-flight detail fetch and arm a fresh controller.
+    // NOTE: this aborts only the GET request — never a streaming response.
+    _loadAbort?.abort()
+    _loadAbort = new AbortController()
+    const signal = _loadAbort.signal
+
     // Reset context info only when switching to a DIFFERENT conversation.
     // When reloading the same conversation (e.g. after finalizeStream),
     // keep the existing contextInfo to avoid flicker and data loss.
@@ -262,11 +280,17 @@ export const useChatStore = defineStore('chat', () => {
         updated_at: summary.updated_at,
         messages: []
       }
+      // Resolved synchronously; this selection has fully superseded any prior
+      // in-flight load (which we aborted above), so clear the loading flag.
+      isLoadingConversation.value = false
       return
     }
 
+    isLoadingConversation.value = true
     try {
-      const detail = await api.getConversation(id)
+      const detail = await api.getConversation(id, signal)
+      // A newer selection won the race — discard this stale result.
+      if (myGen !== _loadGeneration) return
       // Resolve relative attachment URLs to absolute backend URLs.
       for (const msg of detail.messages) {
         if (msg.attachments) {
@@ -296,6 +320,10 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
     } catch (err) {
+      // The fetch was aborted by a newer selection — silently discard.
+      if ((err as { name?: string })?.name === 'AbortError') return
+      // A newer selection already took over — don't apply a stale fallback.
+      if (myGen !== _loadGeneration) return
       // Fallback: if the backend returns 404 (conversation not persisted yet),
       // build a local ConversationDetail so the UI doesn't break.
       if (summary) {
@@ -310,6 +338,9 @@ export const useChatStore = defineStore('chat', () => {
         // No local record either — propagate the error.
         throw err
       }
+    } finally {
+      // Only the latest generation owns the flag.
+      if (myGen === _loadGeneration) isLoadingConversation.value = false
     }
   }
 
@@ -861,6 +892,7 @@ export const useChatStore = defineStore('chat', () => {
     // state
     conversations,
     currentConversation,
+    isLoadingConversation,
     isStreaming,
     lastStreamEndedAt,
     streamingConversationId,

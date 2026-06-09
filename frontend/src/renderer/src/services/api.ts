@@ -275,8 +275,8 @@ export const api = {
     request<{ path: string }>(`/chat/conversations/${encodeURIComponent(id)}/file-path`),
 
   /** Fetch a single conversation with its full message list. */
-  getConversation: (id: string): Promise<ConversationDetail> =>
-    request<ConversationDetail>(`/chat/conversations/${encodeURIComponent(id)}`),
+  getConversation: (id: string, signal?: AbortSignal): Promise<ConversationDetail> =>
+    request<ConversationDetail>(`/chat/conversations/${encodeURIComponent(id)}`, { signal }),
 
   /** Delete a conversation and all its messages. */
   deleteConversation: (id: string): Promise<DeleteConversationResponse> =>

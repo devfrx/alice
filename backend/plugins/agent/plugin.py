@@ -119,6 +119,47 @@ class AgentPlugin(BasePlugin):
                     },
                     result_type="json",
                     risk_level="safe",
+                    capabilities=("planning",),
+                    timeout_ms=5000,
+                ),
+            )
+            tools.append(
+                ToolDefinition(
+                    name="write_plan",
+                    description=(
+                        "Scrivi o sostituisci il documento di piano della "
+                        "conversazione: un documento di strategia in markdown "
+                        "(la pianificazione discorsiva ed estesa), distinto "
+                        "dalla checklist dei task di `update_tasks`. Ogni "
+                        "chiamata SOSTITUISCE integralmente il documento "
+                        "esistente. Usalo per registrare e raffinare il tuo "
+                        "piano d'azione in forma narrativa, e tienilo "
+                        "aggiornato man mano che procedi."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": (
+                                    "Titolo breve e opzionale del documento "
+                                    "di piano."
+                                ),
+                            },
+                            "document": {
+                                "type": "string",
+                                "description": (
+                                    "Il corpo del documento di piano in "
+                                    "markdown. Sostituisce per intero il "
+                                    "documento precedente."
+                                ),
+                            },
+                        },
+                        "required": ["document"],
+                    },
+                    result_type="json",
+                    risk_level="safe",
+                    capabilities=("planning",),
                     timeout_ms=5000,
                 ),
             )
@@ -171,6 +212,7 @@ class AgentPlugin(BasePlugin):
                     },
                     result_type="json",
                     risk_level="safe",
+                    capabilities=("planning",),
                     timeout_ms=300_000,
                 ),
             )
@@ -245,6 +287,7 @@ class AgentPlugin(BasePlugin):
                     },
                     result_type="string",
                     risk_level="safe",
+                    capabilities=("planning",),
                     user_interaction=True,
                     timeout_ms=300_000,
                 ),
@@ -261,9 +304,10 @@ class AgentPlugin(BasePlugin):
         """Dispatch to the requested agent meta-tool.
 
         Args:
-            tool_name: ``"update_tasks"``, ``"spawn_subagent"``, or
-                ``"ask_user"`` (the last is handled defensively — it is
-                normally intercepted by the interaction channel).
+            tool_name: ``"update_tasks"``, ``"write_plan"``,
+                ``"spawn_subagent"``, or ``"ask_user"`` (the last is handled
+                defensively — it is normally intercepted by the interaction
+                channel).
             args: Caller-supplied arguments.
             context: Execution metadata (session, conversation).
 
@@ -273,6 +317,8 @@ class AgentPlugin(BasePlugin):
         try:
             if tool_name == "update_tasks":
                 return await self._update_tasks(args, context)
+            if tool_name == "write_plan":
+                return await self._write_plan(args, context)
             if tool_name == "spawn_subagent":
                 return await self._spawn_subagent(args, context)
             if tool_name == "ask_user":
@@ -312,6 +358,42 @@ class AgentPlugin(BasePlugin):
                 "completed_steps": completed,
                 "tasks": [s.to_dict() for s in steps],
                 "rendered": render_tasks(steps),
+            },
+            content_type="application/json",
+            execution_time_ms=elapsed,
+        )
+
+    async def _write_plan(
+        self, args: dict[str, Any], context: ExecutionContext,
+    ) -> ToolResult:
+        """Replace the conversation's living plan document (markdown strategy).
+
+        Distinct from ``update_tasks`` (the task checklist): this persists a
+        free-form markdown strategy document via
+        :attr:`AppContext.plan_document_service`.  Each call replaces the
+        document wholesale.  When no plan-document service is wired the call
+        still validates and reports success so the model's loop is unaffected.
+        """
+        start = time.perf_counter()
+        document = args.get("document")
+        if not isinstance(document, str) or not document.strip():
+            return ToolResult.error(
+                "'document' is required and must be a non-empty string",
+            )
+        title_raw = args.get("title")
+        title = str(title_raw).strip() if title_raw else ""
+
+        service = getattr(self._ctx, "plan_document_service", None)
+        if service is not None:
+            await service.set_document(
+                context.conversation_id, title or "", document,
+            )
+        elapsed = (time.perf_counter() - start) * 1000.0
+        return ToolResult.ok(
+            {
+                "ok": True,
+                "title": title,
+                "chars": len(document),
             },
             content_type="application/json",
             execution_time_ms=elapsed,

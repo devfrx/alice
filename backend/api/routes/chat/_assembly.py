@@ -35,6 +35,7 @@ from backend.services.context_manager import CompressionResult, ContextUsage
 from backend.services.llm_service import LLMService
 from backend.services.permission_mode_policy import ModePolicy, policy_for
 from backend.services.permission_mode_service import PermissionMode
+from backend.services.plan_document_service import render_plan_document
 from backend.services.plan_service import render_task_steps
 from backend.services.turn import TurnInput
 
@@ -49,6 +50,37 @@ from ._helpers import (
     _format_memory_context,
     _sync_conversation_to_file,
 )
+
+
+def _coerce_tier_guidance(
+    raw: dict[str, str] | None,
+) -> dict[PermissionMode, str]:
+    """Map a tier-string→text config dict to ``{PermissionMode: str}``.
+
+    The user-facing config (``agent.prompts.tier_guidance``) is keyed by tier
+    *strings* (``"strict"``, ``"auto_edits"``, ``"plan"``, ``"autopilot"``).
+    This converts those keys to :class:`PermissionMode` members, dropping any
+    unknown key or empty/blank value so they transparently fall back to the
+    built-in per-tier defaults inside :func:`policy_for`.
+
+    Args:
+        raw: The config mapping (possibly ``None`` / empty).
+
+    Returns:
+        A ``{PermissionMode: guidance}`` mapping (empty when nothing applies).
+    """
+    if not raw:
+        return {}
+    result: dict[PermissionMode, str] = {}
+    for key, text in raw.items():
+        if not text or not str(text).strip():
+            continue
+        try:
+            mode = PermissionMode(key)
+        except ValueError:
+            continue
+        result[mode] = str(text)
+    return result
 
 
 @dataclass(slots=True)
@@ -328,7 +360,19 @@ class TurnAssembler:
             mode = PermissionMode.coerce(
                 mode_service.get_mode(conv_id), PermissionMode.STRICT,
             )
-            policy = policy_for(mode)
+            # Resolve the tier policy with the user's per-tier guidance
+            # overrides (config keyed by tier strings). Skipped under the
+            # Continuum-scoped agent, which owns its own persona/toolset and
+            # never uses this policy.
+            if continuum_scope:
+                policy = policy_for(mode)
+            else:
+                policy = policy_for(
+                    mode,
+                    custom_guidance=_coerce_tier_guidance(
+                        ctx.config.agent.prompts.tier_guidance,
+                    ),
+                )
 
         # --- fetch available tools for LLM ------------------------
         tools: list[dict[str, Any]] | None = None
@@ -386,6 +430,7 @@ class TurnAssembler:
                 tools = ctx.tool_registry.apply_mode_policy(
                     tools,
                     drop_capabilities=policy.blocked_capabilities,
+                    always_allow_tools=policy.always_allow_tools,
                     priority_plugins=policy.priority_plugins,
                 )
 
@@ -439,6 +484,22 @@ class TurnAssembler:
                 else wb_ctx
             )
 
+        # --- inject the living plan document so the model continues it ---
+        # The free-form markdown strategy doc (distinct from the task
+        # checklist below). Placed after the permission block (prepended last,
+        # so it leads) and before the task steps. Skipped for the
+        # Continuum-scoped agent, which owns its own persona/context.
+        if ctx.plan_document_service is not None and not continuum_scope:
+            plan_doc = await ctx.plan_document_service.get_document(conv_id)
+            if plan_doc:
+                plan_doc_ctx = render_plan_document(plan_doc)
+                if plan_doc_ctx:
+                    memory_context = (
+                        f"{memory_context}\n\n{plan_doc_ctx}"
+                        if memory_context
+                        else plan_doc_ctx
+                    )
+
         # --- inject persisted plan so the model continues it (Fase 5) ---
         if ctx.plan_service is not None:
             plan_steps = await ctx.plan_service.get_plan(conv_id)
@@ -477,6 +538,7 @@ class TurnAssembler:
         else:
             cached_sys_prompt = llm.get_system_prompt(
                 memory_context=memory_context,
+                persona=ctx.config.agent.prompts.persona,
             )
 
         messages = llm.build_messages(

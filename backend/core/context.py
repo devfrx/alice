@@ -23,6 +23,7 @@ from backend.core.protocols import (
     LLMServiceProtocol,
     LMStudioManagerProtocol,
     MemoryServiceProtocol,
+    PlanDocumentServiceProtocol,
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     QdrantServiceProtocol,
@@ -138,6 +139,16 @@ class AppContext:
     concrete type is :class:`backend.services.plan_service.PlanService`. Wired
     in the lifespan. Used by the ``agent`` plugin's ``update_tasks`` and the
     turn engine's task re-inject."""
+
+    plan_document_service: PlanDocumentServiceProtocol | None = None
+    """Persisted per-conversation plan *document* store (living strategy doc).
+
+    The free-form markdown plan document (distinct from the ``plan_service``
+    task checklist), persisted one row per conversation and replaced wholesale
+    on each write. Concrete type is
+    :class:`backend.services.plan_document_service.PlanDocumentService`. Wired
+    in the lifespan. Used by the ``agent`` plugin's ``write_plan`` meta-tool
+    and the turn engine's plan-document re-injection."""
 
     scope_service: Any = None
     """Per-conversation workspace folder scope (Fase 6).

@@ -36,6 +36,7 @@ from backend.plugins.agent._subagent import (
     run_subagent,
 )
 from backend.plugins.agent.plugin import AgentPlugin
+from backend.services.plan_document_service import PlanDocumentService
 from backend.services.plan_service import PlanService
 
 
@@ -165,8 +166,21 @@ class TestAgentPluginTools:
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"update_tasks", "spawn_subagent", "ask_user"}
+        assert names == {
+            "update_tasks", "write_plan", "spawn_subagent", "ask_user",
+        }
         assert all(isinstance(t, ToolDefinition) for t in plugin.get_tools())
+
+    @pytest.mark.asyncio
+    async def test_planning_tools_carry_planning_capability(self):
+        # The tier whitelist (plan mode) exempts ``planning``-tagged tools from
+        # the capability-blocking pass, so every planning meta-tool must carry
+        # the ("planning",) capability.
+        plugin = AgentPlugin()
+        await plugin.initialize(_make_app_context())
+        by_name = {t.name: t for t in plugin.get_tools()}
+        for name in ("update_tasks", "write_plan", "spawn_subagent", "ask_user"):
+            assert by_name[name].capabilities == ("planning",), name
 
     @pytest.mark.asyncio
     async def test_plan_tool_can_be_disabled(self):
@@ -184,7 +198,7 @@ class TestAgentPluginTools:
         ctx.config.agent.delegation = False
         await plugin.initialize(ctx)
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"update_tasks", "ask_user"}
+        assert names == {"update_tasks", "write_plan", "ask_user"}
 
     @pytest.mark.asyncio
     async def test_ask_user_tool_exposed_by_default(self):
@@ -211,7 +225,7 @@ class TestAgentPluginTools:
         names = {t.name for t in plugin.get_tools()}
         assert "ask_user" not in names
         # Planning / delegation remain governed by their own flags.
-        assert names == {"update_tasks", "spawn_subagent"}
+        assert names == {"update_tasks", "write_plan", "spawn_subagent"}
 
     @pytest.mark.asyncio
     async def test_ask_user_execute_is_defensive(self):
@@ -280,6 +294,91 @@ class TestUpdateTasksTool:
         await plugin.initialize(_make_app_context())
         result = await plugin.execute_tool("nope", {}, _make_exec_ctx())
         assert not result.success
+
+
+# ===========================================================================
+# 3b.  write_plan tool
+# ===========================================================================
+
+
+class _StubPlanDocumentService:
+    """Minimal stand-in capturing ``set_document`` calls."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, str]] = []
+
+    async def set_document(
+        self, conversation_id: Any, title: str, body: str,
+    ) -> None:
+        self.calls.append((str(conversation_id), title, body))
+
+
+class TestWritePlanTool:
+    @pytest.mark.asyncio
+    async def test_write_plan_persists_and_returns_ok(self):
+        ctx = _make_app_context()
+        stub = _StubPlanDocumentService()
+        ctx.plan_document_service = stub  # type: ignore[assignment]
+        plugin = AgentPlugin()
+        await plugin.initialize(ctx)
+
+        body = "## Goal\nShip it."
+        result = await plugin.execute_tool(
+            "write_plan",
+            {"title": "Strategy", "document": body},
+            _make_exec_ctx("conv-7"),
+        )
+        assert result.success
+        assert result.content["ok"] is True
+        assert result.content["title"] == "Strategy"
+        assert result.content["chars"] == len(body)
+        # Persisted wholesale via the wired service (title + body).
+        assert stub.calls == [("conv-7", "Strategy", body)]
+
+    @pytest.mark.asyncio
+    async def test_write_plan_without_title_passes_empty_string(self):
+        ctx = _make_app_context()
+        stub = _StubPlanDocumentService()
+        ctx.plan_document_service = stub  # type: ignore[assignment]
+        plugin = AgentPlugin()
+        await plugin.initialize(ctx)
+
+        result = await plugin.execute_tool(
+            "write_plan", {"document": "body only"}, _make_exec_ctx("c-1"),
+        )
+        assert result.success
+        assert result.content["title"] == ""
+        assert stub.calls == [("c-1", "", "body only")]
+
+    @pytest.mark.asyncio
+    async def test_write_plan_empty_document_returns_error(self):
+        plugin = AgentPlugin()
+        await plugin.initialize(_make_app_context())
+        result = await plugin.execute_tool(
+            "write_plan", {"document": "   "}, _make_exec_ctx(),
+        )
+        assert not result.success
+
+    @pytest.mark.asyncio
+    async def test_write_plan_missing_document_returns_error(self):
+        plugin = AgentPlugin()
+        await plugin.initialize(_make_app_context())
+        result = await plugin.execute_tool(
+            "write_plan", {}, _make_exec_ctx(),
+        )
+        assert not result.success
+
+    @pytest.mark.asyncio
+    async def test_write_plan_without_service_still_ok(self):
+        # No plan_document_service wired → still validates + reports success
+        # so the model's tool loop is unaffected.
+        plugin = AgentPlugin()
+        await plugin.initialize(_make_app_context())
+        result = await plugin.execute_tool(
+            "write_plan", {"document": "x"}, _make_exec_ctx(),
+        )
+        assert result.success
+        assert result.content["chars"] == 1
 
 
 # ===========================================================================
@@ -602,3 +701,61 @@ class TestUpdateTasksPersistence:
                 "steps": expected_steps,
             }
         ]
+
+
+# ===========================================================================
+# 6.  write_plan persistence via a wired PlanDocumentService
+# ===========================================================================
+
+
+class TestWritePlanPersistence:
+    """``write_plan`` persists the document via ``ctx.plan_document_service``."""
+
+    @pytest.mark.asyncio
+    async def test_write_plan_persists_and_broadcasts(
+        self, plan_session_factory,
+    ):
+        # Parent conversation row (FK target for ConversationPlanDocument).
+        async with plan_session_factory() as session:
+            conv = Conversation(title="t")
+            session.add(conv)
+            await session.commit()
+            await session.refresh(conv)
+            conv_id = conv.id
+
+        captured: list[dict[str, Any]] = []
+
+        async def _capture(event_payload: dict[str, Any]) -> None:
+            captured.append(event_payload)
+
+        doc_service = PlanDocumentService(session_factory=plan_session_factory)
+        doc_service.set_event_callback(_capture)
+
+        ctx = _make_app_context()
+        ctx.plan_document_service = doc_service
+
+        plugin = AgentPlugin()
+        await plugin.initialize(ctx)
+
+        body = "## Plan\n1. analyse\n2. build"
+        result = await plugin.execute_tool(
+            "write_plan",
+            {"title": "Release", "document": body},
+            _make_exec_ctx(str(conv_id)),
+        )
+        assert result.success
+        assert result.content["title"] == "Release"
+        assert result.content["chars"] == len(body)
+
+        # Persisted to the DB via the service (round-trips title + body).
+        stored = await doc_service.get_document(conv_id)
+        assert stored is not None
+        assert stored["title"] == "Release"
+        assert stored["body"] == body
+
+        # The plan_document.updated broadcast fired once.
+        assert len(captured) == 1
+        assert captured[0]["type"] == "plan_document.updated"
+        assert captured[0]["conversation_id"] == str(conv_id)
+        assert captured[0]["title"] == "Release"
+        assert captured[0]["body"] == body

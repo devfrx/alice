@@ -9,6 +9,7 @@ useful to verify without creating hard import cycles.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
@@ -40,9 +41,12 @@ class LLMServiceProtocol(Protocol):
         ...
 
     def get_system_prompt(
-        self, memory_context: str | None = None,
+        self,
+        memory_context: str | None = None,
+        *,
+        persona: str | None = None,
     ) -> str:
-        """Build the full system prompt with optional memory context."""
+        """Build the full system prompt with optional persona + memory context."""
         ...
 
     def build_messages(
@@ -622,6 +626,44 @@ class EmailServiceProtocol(Protocol):
     async def list_folders(self) -> list[str]: ...
 
     async def close(self) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# Plan document service (living markdown strategy doc)
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class PlanDocumentServiceProtocol(Protocol):
+    """Protocol for the per-conversation plan-document persistence service.
+
+    Mirrors the public surface of
+    :class:`backend.services.plan_document_service.PlanDocumentService`: a
+    free-form markdown strategy document (one per conversation) replaced
+    wholesale on each write, with an in-memory mirror hydrated at startup.
+    """
+
+    async def get_document(
+        self, conversation_id: uuid.UUID | str,
+    ) -> dict[str, Any] | None:
+        """Return the stored plan document, or ``None`` when unset."""
+        ...
+
+    async def set_document(
+        self, conversation_id: uuid.UUID | str, title: str, body: str,
+    ) -> None:
+        """Replace the conversation's plan document wholesale."""
+        ...
+
+    async def clear_document(
+        self, conversation_id: uuid.UUID | str,
+    ) -> None:
+        """Delete the conversation's plan document."""
+        ...
+
+    async def load_all(self) -> None:
+        """Hydrate the in-memory mirror from persisted rows at startup."""
+        ...
 
 
 # ---------------------------------------------------------------------------

@@ -661,6 +661,19 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     plan_service.set_event_callback(_broadcast_tasks_event)
     ctx.plan_service = plan_service
 
+    # -- Plan document service (persisted per-conversation strategy doc) -
+    from backend.services.plan_document_service import PlanDocumentService
+
+    plan_document_service = PlanDocumentService(session_factory=session_factory)
+
+    async def _broadcast_plan_document_event(event: dict) -> None:
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast(event)
+
+    plan_document_service.set_event_callback(_broadcast_plan_document_event)
+    await plan_document_service.load_all()
+    ctx.plan_document_service = plan_document_service
+
     # -- Scope service (per-conversation workspace folder scope) --------
     from backend.services.scope_service import ScopeService
 

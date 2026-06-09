@@ -176,19 +176,6 @@
                 </div>
             </Teleport>
 
-            <!-- Confirm dialog -->
-            <Teleport to="body">
-                <div v-if="confirmAction" class="kg-overlay" @click.self="cancelConfirm">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <p class="kg-dialog__message">{{ confirmMessage }}</p>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary" @click="cancelConfirm">Annulla</button>
-                            <button class="kg-btn kg-btn--danger" @click="executeConfirm">Conferma</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
         </template>
     </section>
 </template>
@@ -201,9 +188,11 @@ import type { KGRelation } from '../../types/mcpMemory'
 import EntityCard from './EntityCard.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import { useModal } from '../../composables/useModal'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
+const { confirm } = useModal()
 
 /** Whether the MCP memory server is connected. */
 const memoryConnected = computed(() => {
@@ -289,33 +278,38 @@ async function onAddObservation(): Promise<void> {
 }
 
 // ── Confirmation dialog ───────────────────────────────────────────────────
-const confirmAction = ref<(() => Promise<void>) | null>(null)
-const confirmMessage = ref('')
 
-function confirmDeleteEntity(name: string): void {
-    confirmMessage.value = `Eliminare l'entità "${name}" e tutte le sue relazioni?`
-    confirmAction.value = () => store.deleteEntities([name])
+async function confirmDeleteEntity(name: string): Promise<void> {
+    const ok = await confirm({
+        title: 'Elimina entità',
+        message: `Eliminare l'entità "${name}" e tutte le sue relazioni?`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteEntities([name])
 }
 
-function confirmDeleteObservation(entityName: string, observation: string): void {
-    confirmMessage.value = `Rimuovere questa osservazione da "${entityName}"?\n\n"${observation.slice(0, 100)}…"`
-    confirmAction.value = () => store.deleteObservations(entityName, [observation])
+async function confirmDeleteObservation(entityName: string, observation: string): Promise<void> {
+    const ok = await confirm({
+        title: 'Rimuovi osservazione',
+        message: `Rimuovere questa osservazione da "${entityName}"?\n\n"${observation.slice(0, 100)}…"`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteObservations(entityName, [observation])
 }
 
-function confirmDeleteRelation(rel: KGRelation): void {
-    confirmMessage.value = `Eliminare la relazione "${rel.from}" → ${rel.relationType} → "${rel.to}"?`
-    confirmAction.value = () => store.deleteRelations([rel])
-}
-
-async function executeConfirm(): Promise<void> {
-    if (confirmAction.value) await confirmAction.value()
-    confirmAction.value = null
-    confirmMessage.value = ''
-}
-
-function cancelConfirm(): void {
-    confirmAction.value = null
-    confirmMessage.value = ''
+async function confirmDeleteRelation(rel: KGRelation): Promise<void> {
+    const ok = await confirm({
+        title: 'Elimina relazione',
+        message: `Eliminare la relazione "${rel.from}" → ${rel.relationType} → "${rel.to}"?`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteRelations([rel])
 }
 
 // ── Search / Refresh ──────────────────────────────────────────────────────

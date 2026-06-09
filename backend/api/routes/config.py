@@ -273,6 +273,7 @@ async def get_config(request: Request) -> dict[str, Any]:
             "context_compression_reserve": cfg.llm.context_compression_reserve,
             "tool_rag_enabled": cfg.llm.tool_rag_enabled,
             "tool_rag_top_k": cfg.llm.tool_rag_top_k,
+            "user_preferred_name": cfg.llm.user_preferred_name,
         },
         "stt": {
             "engine": cfg.stt.engine,

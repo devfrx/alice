@@ -12,7 +12,7 @@
  * Supports `v-model`. Where toggling has a side effect, bind `:model-value`
  * and handle `@update:model-value` explicitly instead of a bare v-model.
  */
-import { computed, useSlots } from 'vue'
+import { computed, useId, useSlots } from 'vue'
 
 export interface UiToggleProps {
     /** Current on/off state. */
@@ -43,8 +43,14 @@ const emit = defineEmits<{
 
 const slots = useSlots()
 
-/** True when there is text to render → use the row layout. */
-const hasText = computed(() => Boolean(props.label || props.hint || slots.default))
+/** Stable ids for aria-labelledby / aria-describedby in row mode. */
+const labelId = useId()
+const hintId = useId()
+
+/** True when there is a visible label (prop or slot) to name the switch. */
+const hasLabel = computed(() => Boolean(props.label || slots.default))
+/** True when there is any text to render → use the row layout. */
+const hasText = computed(() => hasLabel.value || Boolean(props.hint))
 
 function toggle(): void {
     if (props.disabled) return
@@ -55,14 +61,15 @@ function toggle(): void {
 <template>
     <div v-if="hasText" class="ui-toggle-row" :class="{ 'ui-toggle-row--disabled': disabled }" @click="toggle">
         <div class="ui-toggle-row__text">
-            <span v-if="label || slots.default" class="ui-toggle-row__label">
+            <span v-if="hasLabel" :id="labelId" class="ui-toggle-row__label">
                 <slot>{{ label }}</slot>
             </span>
-            <span v-if="hint" class="ui-toggle-row__hint">{{ hint }}</span>
+            <span v-if="hint" :id="hintId" class="ui-toggle-row__hint">{{ hint }}</span>
         </div>
         <button class="ui-toggle" :class="[`ui-toggle--${size}`, { 'ui-toggle--on': modelValue }]" type="button"
-            role="switch" :aria-checked="modelValue" :aria-label="ariaLabel || label" :disabled="disabled"
-            @click.stop="toggle">
+            role="switch" :aria-checked="modelValue" :aria-labelledby="hasLabel ? labelId : undefined"
+            :aria-label="hasLabel ? undefined : ariaLabel" :aria-describedby="hint ? hintId : undefined"
+            :disabled="disabled" @click.stop="toggle">
             <span class="ui-toggle__thumb" />
         </button>
     </div>
@@ -114,8 +121,12 @@ function toggle(): void {
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
-    outline: none;
     transition: background var(--duration-fast) ease;
+}
+
+.ui-toggle:focus-visible {
+    outline: 2px solid var(--accent-border);
+    outline-offset: 2px;
 }
 
 .ui-toggle:disabled {

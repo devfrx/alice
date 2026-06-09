@@ -11,6 +11,7 @@ import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
+import UiCheckbox from '../ui/UiCheckbox.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -325,10 +326,7 @@ onBeforeUnmount(() => {
                             <span class="mm-dialog__vram-base">(modello: {{ formatSize(loadDialogModel.size) }})</span>
                         </div>
 
-                        <label class="mm-dialog__toggle">
-                            <input v-model="loadFlashAttention" type="checkbox" />
-                            <span>Flash Attention</span>
-                        </label>
+                        <UiCheckbox v-model="loadFlashAttention" label="Flash Attention" />
 
                         <div class="mm-dialog__actions">
                             <button class="mm-btn mm-btn--ghost" @click="closeLoadDialog">Annulla</button>
@@ -922,20 +920,6 @@ onBeforeUnmount(() => {
     color: var(--text-muted);
     margin-left: auto;
     font-size: var(--text-xs);
-}
-
-.mm-dialog__toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    margin-bottom: var(--space-5);
-}
-
-.mm-dialog__toggle input {
-    accent-color: var(--accent);
 }
 
 .mm-dialog__actions {

@@ -5,37 +5,23 @@
  * Provides a comprehensive view of all available models with load/unload
  * controls, a load configuration dialog, download section, and status header.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
-import UiCheckbox from '../ui/UiCheckbox.vue'
+import { useModal } from '../../composables/useModal'
+import ModelLoadDialog from './ModelLoadDialog.vue'
 
 const settingsStore = useSettingsStore()
-
-// ── Load configuration dialog state ──
-const showLoadDialog = ref(false)
-const loadDialogModel = ref<LMStudioModel | null>(null)
-const loadContextLength = ref(4096)
-const loadFlashAttention = ref(false)
+const { openCustom } = useModal()
 
 // ── Download section state ──
 const downloadModelId = ref('')
 const downloadQuantization = ref('')
 const isDownloading = ref(false)
 const downloadError = ref<string | null>(null)
-
-/** Estimated VRAM usage for the model being configured in load dialog. */
-const estimatedVram = computed(() => {
-    if (!loadDialogModel.value) return ''
-    const baseGb = loadDialogModel.value.size / 1_073_741_824
-    // KV cache rough estimate: ~0.5GB per 4096 tokens for typical models
-    const kvEstimate = (loadContextLength.value / 4096) * 0.5
-    const total = baseGb + kvEstimate
-    return total.toFixed(1)
-})
 
 // ── General error state ──
 const errorMessage = ref<string | null>(null)
@@ -74,26 +60,8 @@ function downloadProgress(downloaded?: number, total?: number): number {
 }
 
 /** Open the load configuration dialog for a model. */
-function openLoadDialog(model: LMStudioModel): void {
-    loadDialogModel.value = model
-    loadContextLength.value = Math.min(model.max_context_length, 8192)
-    loadFlashAttention.value = false
-    showLoadDialog.value = true
-}
-
-/** Confirm loading a model with configuration. */
-async function confirmLoad(): Promise<void> {
-    if (!loadDialogModel.value) return
-    errorMessage.value = null
-    try {
-        await settingsStore.loadModel(loadDialogModel.value.name, {
-            context_length: loadContextLength.value,
-            flash_attention: loadFlashAttention.value
-        })
-        closeLoadDialog()
-    } catch (e) {
-        errorMessage.value = e instanceof Error ? e.message : 'Errore nel caricamento del modello'
-    }
+async function openLoadDialog(model: LMStudioModel): Promise<void> {
+    await openCustom({ component: ModelLoadDialog, props: { model }, title: `Carica · ${model.display_name || model.name}`, width: '480px' })
 }
 
 /** Unload a model instance. */
@@ -125,25 +93,6 @@ async function handleDownload(): Promise<void> {
     }
 }
 
-/**
- * Close the load dialog (used by ESC handler and overlay click).
- */
-function closeLoadDialog(): void {
-    showLoadDialog.value = false
-    loadDialogModel.value = null
-}
-
-/** Window-level ESC handler — overlay div cannot receive keydown without focus. */
-function onDialogKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') closeLoadDialog()
-}
-
-// Attach/detach the ESC listener only while the dialog is open.
-watch(showLoadDialog, (open) => {
-    if (open) window.addEventListener('keydown', onDialogKeydown)
-    else window.removeEventListener('keydown', onDialogKeydown)
-})
-
 onMounted(() => {
     // Avoid redundant refetch — the store may already be populated by other panels.
     if (settingsStore.models.length === 0) {
@@ -151,9 +100,6 @@ onMounted(() => {
     }
 })
 
-onBeforeUnmount(() => {
-    window.removeEventListener('keydown', onDialogKeydown)
-})
 </script>
 
 <template>
@@ -301,45 +247,6 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <!-- ── Load Configuration Dialog ── -->
-        <Teleport to="body">
-            <Transition name="dialog">
-                <div v-if="showLoadDialog && loadDialogModel" class="mm-overlay" @click.self="closeLoadDialog">
-                    <div class="mm-dialog" role="dialog" aria-modal="true" aria-labelledby="mm-dialog-title">
-                        <h4 id="mm-dialog-title" class="mm-dialog__title">Carica modello</h4>
-                        <p class="mm-dialog__subtitle">{{ loadDialogModel.display_name || loadDialogModel.name }}</p>
-
-                        <label class="mm-dialog__label">
-                            Lunghezza contesto
-                            <span class="mm-dialog__label-val">{{ loadContextLength.toLocaleString() }}</span>
-                        </label>
-                        <input v-model.number="loadContextLength" type="range" class="mm-dialog__slider" :min="512"
-                            :max="loadDialogModel.max_context_length" :step="256" />
-                        <div class="mm-dialog__range-labels">
-                            <span>512</span>
-                            <span>{{ loadDialogModel.max_context_length.toLocaleString() }}</span>
-                        </div>
-
-                        <div class="mm-dialog__vram">
-                            <AppIcon name="chip" :size="14" />
-                            <span>VRAM stimata: ~{{ estimatedVram }} GB</span>
-                            <span class="mm-dialog__vram-base">(modello: {{ formatSize(loadDialogModel.size) }})</span>
-                        </div>
-
-                        <UiCheckbox v-model="loadFlashAttention" label="Flash Attention" />
-
-                        <div class="mm-dialog__actions">
-                            <button class="mm-btn mm-btn--ghost" @click="closeLoadDialog">Annulla</button>
-                            <button class="mm-btn mm-btn--primary"
-                                :disabled="settingsStore.isModelLoading(loadDialogModel.name) || settingsStore.isAnyOperationInProgress"
-                                @click="confirmLoad">
-                                {{ settingsStore.isModelLoading(loadDialogModel.name) ? 'Caricamento…' : 'Carica' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </Transition>
-        </Teleport>
     </section>
 </template>
 
@@ -833,121 +740,5 @@ onBeforeUnmount(() => {
     font-weight: var(--weight-semibold);
 }
 
-/* ── Dialog overlay ── */
-.mm-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--black-heavy);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-overlay);
-}
 
-.mm-dialog {
-    background: var(--surface-2);
-    border-radius: var(--radius-lg);
-    padding: var(--space-6);
-    width: 420px;
-    max-width: 90vw;
-    box-shadow: var(--shadow-floating);
-}
-
-.mm-dialog__title {
-    margin: 0 0 var(--space-1) 0;
-    font-family: var(--font-display);
-    font-size: var(--text-md);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
-}
-
-.mm-dialog__subtitle {
-    margin: 0 0 var(--space-5) 0;
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-}
-
-.mm-dialog__label {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-1-5);
-}
-
-.mm-dialog__label-val {
-    color: var(--accent);
-    font-weight: var(--weight-semibold);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-}
-
-.mm-dialog__slider {
-    width: 100%;
-    accent-color: var(--accent);
-    margin-bottom: var(--space-1);
-}
-
-.mm-dialog__range-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--text-2xs);
-    color: var(--text-muted);
-    margin-bottom: var(--space-4);
-}
-
-.mm-dialog__vram {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    padding: var(--space-2) var(--space-3);
-    background: var(--accent-faint);
-    border: 1px solid var(--accent-border);
-    border-radius: var(--radius-sm);
-    color: var(--accent);
-    font-size: var(--text-sm);
-    margin-bottom: var(--space-4);
-}
-
-.mm-dialog__vram svg {
-    flex-shrink: 0;
-    opacity: var(--opacity-medium);
-}
-
-.mm-dialog__vram-base {
-    color: var(--text-muted);
-    margin-left: auto;
-    font-size: var(--text-xs);
-}
-
-.mm-dialog__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border);
-}
-
-/* ── Dialog transition ── */
-.dialog-enter-active,
-.dialog-leave-active {
-    transition: opacity var(--transition-normal);
-}
-
-.dialog-enter-active .mm-dialog,
-.dialog-leave-active .mm-dialog {
-    transition: transform var(--transition-normal);
-}
-
-.dialog-enter-from,
-.dialog-leave-to {
-    opacity: 0;
-}
-
-.dialog-enter-from .mm-dialog,
-.dialog-leave-to .mm-dialog {
-    transform: scale(0.96) translateY(8px);
-}
 </style>

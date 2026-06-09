@@ -35,7 +35,7 @@
                         @click="onSearch">Cerca</button>
                 </div>
                 <div class="kg-actions">
-                    <button class="kg-btn kg-btn--accent" @click="showCreateEntity = true">
+                    <button class="kg-btn kg-btn--accent" @click="openCreateEntity">
                         + Entità
                     </button>
                     <button class="kg-btn kg-btn--accent" :disabled="store.entityCount < 2"
@@ -92,36 +92,6 @@
                         @delete-observation="confirmDeleteObservation" @delete-relation="confirmDeleteRelation" />
                 </div>
             </div>
-
-            <!-- Create Entity dialog -->
-            <Teleport to="body">
-                <div v-if="showCreateEntity" class="kg-overlay" @click.self="showCreateEntity = false">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <h4 class="kg-dialog__title">Nuova entità</h4>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Nome</span>
-                            <input v-model="newEntity.name" type="text" class="kg-input"
-                                placeholder="es. Mario Rossi" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Tipo</span>
-                            <input v-model="newEntity.entityType" type="text" class="kg-input"
-                                placeholder="es. persona, luogo, concetto" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Osservazioni (una per riga)</span>
-                            <textarea v-model="newEntity.observationsText" class="kg-textarea" rows="3"
-                                placeholder="es. Lavora come ingegnere&#10;Vive a Milano" />
-                        </label>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary" @click="showCreateEntity = false">Annulla</button>
-                            <button class="kg-btn kg-btn--accent"
-                                :disabled="!newEntity.name.trim() || !newEntity.entityType.trim()"
-                                @click="onCreate">Crea</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
 
             <!-- Create Relation dialog -->
             <Teleport to="body">
@@ -189,10 +159,11 @@ import EntityCard from './EntityCard.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 import { useModal } from '../../composables/useModal'
+import KgCreateEntityDialog from './KgCreateEntityDialog.vue'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
-const { confirm } = useModal()
+const { confirm, openCustom } = useModal()
 
 /** Whether the MCP memory server is connected. */
 const memoryConnected = computed(() => {
@@ -219,21 +190,10 @@ function relationsFor(entityName: string, relations: KGRelation[]): KGRelation[]
 }
 
 // ── Create Entity ─────────────────────────────────────────────────────────
-const showCreateEntity = ref(false)
-const newEntity = reactive({ name: '', entityType: '', observationsText: '' })
 
-async function onCreate(): Promise<void> {
-    const observations = newEntity.observationsText
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-    await store.createEntities([
-        { name: newEntity.name.trim(), entityType: newEntity.entityType.trim(), observations },
-    ])
-    newEntity.name = ''
-    newEntity.entityType = ''
-    newEntity.observationsText = ''
-    showCreateEntity.value = false
+async function openCreateEntity(): Promise<void> {
+    const result = await openCustom({ component: KgCreateEntityDialog, title: 'Nuova entità', width: '480px' })
+    if (result) await store.loadGraph()
 }
 
 // ── Create Relation ───────────────────────────────────────────────────────

@@ -33,12 +33,9 @@
                         </span>
                     </div>
                 </div>
-                <button class="settings-toggle" :class="{ 'settings-toggle--on': plugin.enabled }" role="switch"
-                    :aria-checked="plugin.enabled"
+                <UiToggle :model-value="plugin.enabled"
                     :aria-label="`${plugin.enabled ? 'Disattiva' : 'Attiva'} plugin ${plugin.name}`"
-                    @click="pluginsStore.togglePlugin(plugin.name, !plugin.enabled)">
-                    <span class="settings-toggle__thumb" />
-                </button>
+                    @update:model-value="(v) => pluginsStore.togglePlugin(plugin.name, v)" />
             </div>
         </div>
     </section>
@@ -47,6 +44,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { usePluginsStore } from '../../stores/plugins'
+import UiToggle from '../ui/UiToggle.vue'
 
 const pluginsStore = usePluginsStore()
 
@@ -185,38 +183,4 @@ onMounted(() => {
     cursor: default;
 }
 
-/* Toggle switch — aligned with sv__toggle design in SettingsView */
-.settings-toggle {
-    position: relative;
-    width: 36px;
-    height: 20px;
-    border-radius: var(--radius-pill);
-    border: none;
-    background: var(--surface-3);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-    flex-shrink: 0;
-    padding: 0;
-}
-
-.settings-toggle--on {
-    background: var(--accent);
-}
-
-.settings-toggle__thumb {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 14px;
-    height: 14px;
-    border-radius: var(--radius-full);
-    background: var(--text-primary);
-    transition:
-        transform var(--transition-fast),
-        background var(--transition-fast);
-}
-
-.settings-toggle--on .settings-toggle__thumb {
-    transform: translateX(16px);
-}
 </style>

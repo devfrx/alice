@@ -56,6 +56,30 @@ def test_no_workspace_root_does_not_confine(tmp_path):
     assert ok is True
 
 
+def test_relative_parent_traversal_is_rejected(tmp_path):
+    """A relative ``..\\..`` token climbing above the sandbox is rejected."""
+    ws = str(tmp_path / "ws")
+    ok, reason = command_paths_within_workspace("mkdir ..\\..\\PWNED", ws)
+    assert ok is False
+    assert "workspace" in reason.lower()
+
+
+def test_deep_traversal_to_user_home_is_rejected(tmp_path):
+    """A weaponised deep ``..`` traversal to the user home is rejected."""
+    ws = str(tmp_path / "outer" / "ws")
+    ok, _ = command_paths_within_workspace(
+        "copy a.txt ..\\..\\..\\..\\Users\\victim\\evil.txt", ws
+    )
+    assert ok is False
+
+
+def test_drive_relative_other_drive_is_rejected(tmp_path):
+    """A drive-relative ``D:foo`` token (no separator) is rejected."""
+    ws = str(tmp_path / "ws")
+    ok, _ = command_paths_within_workspace("mkdir D:foo", ws)
+    assert ok is False
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher wiring: cwd=workspace_root and escape rejection
 # ---------------------------------------------------------------------------

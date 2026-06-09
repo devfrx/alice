@@ -226,48 +226,48 @@ def validate_path(path: str) -> tuple[bool, str]:
     return True, "Path is valid"
 
 
-def _is_absolute_fs_path(token: str) -> bool:
-    """Return ``True`` when *token* is an absolute Windows or UNC path.
-
-    Only paths that escape the current working directory are flagged:
-
-    * UNC / device paths — ``\\\\server\\share`` or ``//server/share``.
-    * Drive-letter absolutes — ``X:\\...`` or ``X:/...`` (a separator must
-      follow the colon).
-
-    Drive-relative references like ``C:`` / ``C:foo`` (no separator) and
-    single-``/``-leading tokens (which collide with cmd flags such as
-    ``/E``) are intentionally **not** treated as absolute.
+def _is_within(candidate: Path, root: Path) -> bool:
+    """Return ``True`` when *candidate* is *root* itself or nested under it.
 
     Args:
-        token: A single command token (quotes already stripped).
+        candidate: An already-resolved absolute path.
+        root: The resolved workspace root.
 
     Returns:
-        ``True`` if the token denotes an absolute filesystem location.
+        ``True`` if *candidate* does not escape *root*.
     """
-    if not token:
-        return False
-    if token.startswith("\\\\") or token.startswith("//"):
+    try:
+        candidate.relative_to(root)
         return True
-    return (
-        len(token) >= 3
-        and token[0].isalpha()
-        and token[1] == ":"
-        and token[2] in ("\\", "/")
-    )
+    except ValueError:
+        return False
 
 
 def command_paths_within_workspace(
     command: str, workspace_root: str | None
 ) -> tuple[bool, str]:
-    """Check every absolute path in a command stays inside the workspace.
+    """Confine every path token in a command to the workspace sandbox.
 
-    The command is tokenised exactly as :func:`~backend.plugins.pc_automation.executor.exec_command`
-    tokenises it (after backslash normalisation) so the paths validated here
-    are the same ones the subprocess will receive. Each token that is an
-    *absolute* filesystem path (Windows drive ``X:\\...`` / ``X:/...`` or UNC
-    ``\\\\...``) must resolve to a location within ``workspace_root``. Relative
-    tokens are fine — they resolve under ``cwd=workspace_root``.
+    The command is tokenised exactly as
+    :func:`~backend.plugins.pc_automation.executor.exec_command` tokenises it
+    (after backslash normalisation) so the paths validated here are the same
+    ones the subprocess will receive. For **each** argument token (the command
+    verb and ``/``- or ``-``-prefixed flags are skipped) the path it will
+    actually resolve to when run with ``cwd=workspace_root`` is computed and
+    required to stay inside ``workspace_root``:
+
+    * A relative token (``subdir``, ``..\\..\\PWNED``) is joined onto the
+      workspace root, so ``..`` traversal that climbs above the sandbox lands
+      outside it and is rejected.
+    * A fully-anchored token — drive absolute ``X:\\...``, UNC ``\\\\...`` or
+      drive-relative ``D:foo`` — carries its own anchor, so the
+      :class:`~pathlib.Path` join *replaces* the workspace anchor and the
+      candidate resolves to the token's own location, outside the sandbox, and
+      is likewise rejected.
+
+    This single resolve-and-contain check closes both the ``..`` traversal and
+    the drive-relative escapes; it does not depend on first classifying a token
+    as "absolute".
 
     Confinement is skipped (returns ``(True, "")``) when ``workspace_root`` is
     falsy, so unit/edge cases without a workspace keep working. Production
@@ -280,7 +280,7 @@ def command_paths_within_workspace(
 
     Returns:
         Tuple of ``(is_within, reason)``. ``reason`` is empty on success and
-        names the offending path on failure.
+        names the offending token on failure.
     """
     if not workspace_root:
         return True, ""
@@ -298,14 +298,19 @@ def command_paths_within_workspace(
     except (OSError, ValueError) as exc:
         return False, f"Invalid workspace root: {exc}"
 
-    for token in _tokenize_command(_normalize_backslashes(command)):
-        if not _is_absolute_fs_path(token):
-            continue
+    tokens = _tokenize_command(_normalize_backslashes(command))
+    for token in tokens[1:]:  # skip the command verb (tokens[0])
+        if not token or token.startswith(("/", "-")):
+            continue  # cmd flag / switch, not a path
+        # Resolve where the token actually lands when run with cwd=ws_root.
+        # A token carrying its own drive/anchor replaces ws_root (so it falls
+        # outside and is rejected); a relative ``..`` token climbs above
+        # ws_root and is rejected too.
         try:
-            resolved = Path(token).resolve()
+            candidate = (ws_root / token).resolve()
         except (OSError, ValueError):
             return False, f"'{token}' is not a valid path inside the workspace"
-        if not resolved.is_relative_to(ws_root):
+        if not _is_within(candidate, ws_root):
             return False, f"'{token}' is outside the workspace"
 
     return True, ""

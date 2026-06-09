@@ -60,7 +60,22 @@ class TestPolicyFor:
             policy = policy_for(mode)
             assert policy.blocked_capabilities == frozenset()
             assert policy.priority_plugins == ()
+            assert policy.always_allow_tools == frozenset()
             assert policy.guidance  # every tier contributes guidance
+
+    def test_plan_always_allows_planning_metatools(self) -> None:
+        policy = policy_for(PermissionMode.PLAN)
+        assert "agent_update_tasks" in policy.always_allow_tools
+        assert "agent_write_plan" in policy.always_allow_tools
+
+    def test_custom_guidance_overrides_for_plan_and_falls_back(self) -> None:
+        custom = {PermissionMode.PLAN: "X"}
+        # explicit override wins for the keyed tier.
+        assert policy_for(PermissionMode.PLAN, custom_guidance=custom).guidance == "X"
+        # tiers absent from the override fall back to the default text.
+        strict = policy_for(PermissionMode.STRICT, custom_guidance=custom)
+        assert strict.guidance == policy_for(PermissionMode.STRICT).guidance
+        assert strict.guidance != "X"
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +158,34 @@ class TestApplyModePolicy:
             tools, drop_capabilities=frozenset({"fs_write"}),
         )
         assert [t["function"]["name"] for t in out] == ["mystery_tool"]
+
+    def test_always_allow_survives_capability_block(self) -> None:
+        tools_defs = {
+            "some_write_tool": ToolDefinition(
+                name="some_write_tool", description="w", capabilities=("fs_write",),
+            ),
+            "other_write_tool": ToolDefinition(
+                name="other_write_tool", description="w", capabilities=("fs_write",),
+            ),
+        }
+        plugins = {
+            "some_write_tool": "alpha",
+            "other_write_tool": "beta",
+        }
+        reg = _registry(tools_defs, plugins)
+        tools = [_entry("some_write_tool"), _entry("other_write_tool")]
+        out = reg.apply_mode_policy(
+            tools,
+            drop_capabilities=frozenset({"fs_write"}),
+            always_allow_tools=frozenset({"some_write_tool"}),
+        )
+        names = [t["function"]["name"] for t in out]
+        # whitelisted write tool survives despite the blocked capability.
+        assert "some_write_tool" in names
+        # the other write tool, not whitelisted, is dropped.
+        assert "other_write_tool" not in names
+        # the input list is not mutated.
+        assert len(tools) == 2
 
 
 # ---------------------------------------------------------------------------

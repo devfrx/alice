@@ -15,6 +15,11 @@ denying calls after the model has already decided to make them:
 
 Keeping the whole tier → behaviour mapping in one small, pure, dependency-light
 module means the steering for every tier can be reviewed and tuned in one place.
+
+``always_allow_tools`` guarantees the planning meta-tools survive the
+capability-blocking pass even if they were ever to gain a blocked capability —
+the tier owns its offered toolset, so a planning tool can never be withheld out
+from under it.
 """
 
 from __future__ import annotations
@@ -37,6 +42,18 @@ _READ_ONLY_BLOCKED_CAPABILITIES: frozenset[str] = frozenset(
 # present — in ``plan`` mode so the model leads with planning.
 _PLANNING_PLUGINS: tuple[str, ...] = ("agent",)
 
+# Namespaced planning meta-tool names that must survive the capability-blocking
+# pass in ``plan`` mode.  The tier owns its toolset: these are always offered
+# even if one of them were ever to declare a blocked capability.
+_PLANNING_TOOLS: frozenset[str] = frozenset(
+    {
+        "agent_update_tasks",
+        "agent_write_plan",
+        "agent_spawn_subagent",
+        "agent_ask_user",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ModePolicy:
@@ -46,6 +63,9 @@ class ModePolicy:
         mode: The tier this policy is for.
         blocked_capabilities: Capability tags whose tools are withheld from the
             offered toolset (empty ⇒ withhold nothing).
+        always_allow_tools: Namespaced tool names that must survive the
+            capability-blocking pass even if they declare a blocked capability
+            (empty ⇒ no exceptions).  Lets the tier guarantee its own meta-tools.
         priority_plugins: Plugins whose tools are guaranteed present and floated
             to the front of the toolset (empty ⇒ no reordering).
         guidance: A system-prompt block (markdown body, no header) steering the
@@ -54,6 +74,7 @@ class ModePolicy:
 
     mode: PermissionMode
     blocked_capabilities: frozenset[str]
+    always_allow_tools: frozenset[str]
     priority_plugins: tuple[str, ...]
     guidance: str
 
@@ -91,29 +112,39 @@ _GUIDANCE: dict[PermissionMode, str] = {
 }
 
 
-def policy_for(mode: PermissionMode) -> ModePolicy:
+def policy_for(
+    mode: PermissionMode,
+    *,
+    custom_guidance: dict[PermissionMode, str] | None = None,
+) -> ModePolicy:
     """Return the :class:`ModePolicy` that shapes the agent for *mode*.
 
     ``plan`` is the only tier that reshapes the toolset (read-only ⇒ withhold
-    write/exec tools, lead with the planning tools); every tier contributes a
-    behavioural ``guidance`` block.
+    write/exec tools, lead with — and always allow — the planning tools); every
+    tier contributes a behavioural ``guidance`` block.
 
     Args:
         mode: The conversation's permission tier.
+        custom_guidance: Optional per-tier guidance overrides.  When a tier is
+            present (and non-empty), its text replaces the built-in default;
+            tiers absent from the mapping fall back to ``_GUIDANCE``.
 
     Returns:
         The behavioural policy for *mode*.
     """
+    overrides = custom_guidance or {}
     if mode is PermissionMode.PLAN:
         return ModePolicy(
             mode=mode,
             blocked_capabilities=_READ_ONLY_BLOCKED_CAPABILITIES,
+            always_allow_tools=_PLANNING_TOOLS,
             priority_plugins=_PLANNING_PLUGINS,
-            guidance=_GUIDANCE[mode],
+            guidance=overrides.get(mode) or _GUIDANCE[mode],
         )
     return ModePolicy(
         mode=mode,
         blocked_capabilities=frozenset(),
+        always_allow_tools=frozenset(),
         priority_plugins=(),
-        guidance=_GUIDANCE.get(mode, ""),
+        guidance=overrides.get(mode) or _GUIDANCE.get(mode, ""),
     )

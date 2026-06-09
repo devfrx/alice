@@ -20,10 +20,11 @@
  * ## Emits from TldrawCanvas
  * `change` (snapshot) — forwarded to the whiteboard store for persistence.
  */
-import { computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { computed, watch, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import ModuleSelectorBar from '../ModuleSelectorBar.vue'
 import { useWhiteboardStore } from '../../../stores/whiteboard'
+import { useChatStore } from '../../../stores/chat'
 import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
 import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
 import type { WhiteboardListItem } from '../../../types/whiteboard'
@@ -35,6 +36,7 @@ const props = defineProps<{
 }>()
 
 const store = useWhiteboardStore()
+const chatStore = useChatStore()
 
 const { currentId, select } = useModuleItemSelection<WhiteboardListItem>({
   items: () => store.boards,
@@ -74,12 +76,18 @@ function onSnapshotChange(snap: Record<string, unknown>): void {
   store.saveSnapshot(id, snap)
 }
 
-/** Ensure the board list is loaded so the selector + fallback can populate. */
-onMounted(async () => {
-  if (!store.hasBoards && store.boards.length === 0 && !store.loading) {
-    await store.loadBoards()
-  }
-})
+/**
+ * Keep the board list scoped to the active conversation: reset stale boards
+ * then reload boards for the current conversation whenever it changes.
+ */
+watch(
+  () => chatStore.currentConversation?.id,
+  (id) => {
+    store.reset()
+    if (id) void store.loadBoards(id)
+  },
+  { immediate: true },
+)
 
 /** If boardId changes to a value not yet in currentBoard, load its snapshot. */
 watch(

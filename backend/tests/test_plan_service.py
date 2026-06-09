@@ -13,7 +13,7 @@ from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.db.models import Conversation, ConversationPlan
-from backend.services.plan_service import PlanService, render_plan_steps
+from backend.services.plan_service import PlanService, render_task_steps
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -145,7 +145,7 @@ async def test_set_plan_emits_event_once(
     await service.set_plan(conversation_id, steps)
     assert captured_events == [
         {
-            "type": "plan.updated",
+            "type": "tasks.updated",
             "conversation_id": str(conversation_id),
             "steps": steps,
         }
@@ -194,35 +194,35 @@ async def test_delete_conversation_cascades_plan(
 
 
 # ---------------------------------------------------------------------------
-# render_plan_steps (pure re-injection rendering)
+# render_task_steps (pure re-injection rendering)
 # ---------------------------------------------------------------------------
 
 
-def test_render_plan_steps_empty_returns_empty_string():
+def test_render_task_steps_empty_returns_empty_string():
     # No steps ⇒ no context block (caller guards on this too).
-    assert render_plan_steps([]) == ""
+    assert render_task_steps([]) == ""
 
 
-def test_render_plan_steps_includes_each_step_and_status():
+def test_render_task_steps_includes_each_step_and_status():
     steps = [
         {"step": "Research the API", "status": "completed"},
         {"step": "Write the client", "status": "in_progress"},
         {"step": "Add tests", "status": "pending"},
     ]
-    rendered = render_plan_steps(steps)
+    rendered = render_task_steps(steps)
 
     assert isinstance(rendered, str)
     # Every step's text and status surfaces in the block.
     for step in steps:
         assert step["step"] in rendered
         assert step["status"] in rendered
-    # Carries a "continue, don't restart" instruction referencing update_plan.
-    assert "update_plan" in rendered
+    # Carries a "continue, don't restart" instruction referencing update_tasks.
+    assert "update_tasks" in rendered
     assert "Continue" in rendered
 
 
-def test_render_plan_steps_reads_keys_defensively():
+def test_render_task_steps_reads_keys_defensively():
     # Missing keys must not raise; status defaults to "pending".
-    rendered = render_plan_steps([{}])
+    rendered = render_task_steps([{}])
     assert isinstance(rendered, str)
     assert "[pending]" in rendered

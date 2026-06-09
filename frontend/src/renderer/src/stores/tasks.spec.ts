@@ -1,89 +1,89 @@
 /**
- * Unit tests for stores/plan.ts
+ * Unit tests for stores/tasks.ts
  *
  * Pure Pinia store tests (vitest node env, no DOM required). A fresh Pinia is
- * installed per test. The store keys plan steps by conversation id, folding
- * the `plan.updated` events-WS frame (full step list) via applyPlanUpdated and
+ * installed per test. The store keys task steps by conversation id, folding
+ * the `tasks.updated` events-WS frame (full step list) via applyTasksUpdated and
  * fetching the REST snapshot once per conversation via ensureForConversation.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
-import { usePlanStore } from './plan'
+import { useTasksStore } from './tasks'
 import { api } from '../services/api'
-import type { PlanStep } from '../types/plan'
+import type { TaskStep } from '../types/tasks'
 
-// The store imports `{ api }` from services/api; stub just the getPlan method
+// The store imports `{ api }` from services/api; stub just the getTasks method
 // so ensureForConversation/fetch resolve without reaching a backend.
 vi.mock('../services/api', () => ({
   api: {
-    getPlan: vi.fn(),
+    getTasks: vi.fn(),
   },
 }))
 
-const getPlanMock = vi.mocked(api.getPlan)
+const getTasksMock = vi.mocked(api.getTasks)
 
-function step(text: string, status = 'pending'): PlanStep {
+function step(text: string, status = 'pending'): TaskStep {
   return { step: text, status }
 }
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  getPlanMock.mockReset()
+  getTasksMock.mockReset()
 })
 
 // ---------------------------------------------------------------------------
-// applyPlanUpdated (live fold)
+// applyTasksUpdated (live fold)
 // ---------------------------------------------------------------------------
 
-describe('applyPlanUpdated', () => {
-  it('folds the pushed steps into planFor(id)', () => {
-    const s = usePlanStore()
-    expect(s.planFor('c1')).toEqual([])
+describe('applyTasksUpdated', () => {
+  it('folds the pushed steps into tasksFor(id)', () => {
+    const s = useTasksStore()
+    expect(s.tasksFor('c1')).toEqual([])
 
-    s.applyPlanUpdated({
+    s.applyTasksUpdated({
       conversation_id: 'c1',
       steps: [step('research', 'in_progress'), step('write')],
     })
 
-    expect(s.planFor('c1')).toEqual([
+    expect(s.tasksFor('c1')).toEqual([
       { step: 'research', status: 'in_progress' },
       { step: 'write', status: 'pending' },
     ])
   })
 
   it('replaces the prior steps on a second update', () => {
-    const s = usePlanStore()
-    s.applyPlanUpdated({ conversation_id: 'c1', steps: [step('a')] })
-    s.applyPlanUpdated({
+    const s = useTasksStore()
+    s.applyTasksUpdated({ conversation_id: 'c1', steps: [step('a')] })
+    s.applyTasksUpdated({
       conversation_id: 'c1',
       steps: [step('x', 'completed'), step('y', 'in_progress')],
     })
 
-    expect(s.planFor('c1')).toEqual([
+    expect(s.tasksFor('c1')).toEqual([
       { step: 'x', status: 'completed' },
       { step: 'y', status: 'in_progress' },
     ])
   })
 
   it('keeps conversations independent', () => {
-    const s = usePlanStore()
-    s.applyPlanUpdated({ conversation_id: 'c1', steps: [step('a')] })
-    s.applyPlanUpdated({ conversation_id: 'c2', steps: [step('b', 'completed')] })
+    const s = useTasksStore()
+    s.applyTasksUpdated({ conversation_id: 'c1', steps: [step('a')] })
+    s.applyTasksUpdated({ conversation_id: 'c2', steps: [step('b', 'completed')] })
 
-    expect(s.planFor('c1')).toEqual([{ step: 'a', status: 'pending' }])
-    expect(s.planFor('c2')).toEqual([{ step: 'b', status: 'completed' }])
+    expect(s.tasksFor('c1')).toEqual([{ step: 'a', status: 'pending' }])
+    expect(s.tasksFor('c2')).toEqual([{ step: 'b', status: 'completed' }])
   })
 })
 
 // ---------------------------------------------------------------------------
-// planFor
+// tasksFor
 // ---------------------------------------------------------------------------
 
-describe('planFor', () => {
+describe('tasksFor', () => {
   it('returns an empty array for an unknown conversation id', () => {
-    const s = usePlanStore()
-    expect(s.planFor('nope')).toEqual([])
+    const s = useTasksStore()
+    expect(s.tasksFor('nope')).toEqual([])
   })
 })
 
@@ -92,36 +92,36 @@ describe('planFor', () => {
 // ---------------------------------------------------------------------------
 
 describe('ensureForConversation', () => {
-  it('calls api.getPlan once and dedupes on the second call', async () => {
-    getPlanMock.mockResolvedValue({
+  it('calls api.getTasks once and dedupes on the second call', async () => {
+    getTasksMock.mockResolvedValue({
       conversation_id: 'c1',
       steps: [step('a', 'completed')],
     })
-    const s = usePlanStore()
+    const s = useTasksStore()
 
     await s.ensureForConversation('c1')
-    expect(getPlanMock).toHaveBeenCalledTimes(1)
-    expect(getPlanMock).toHaveBeenCalledWith('c1')
-    expect(s.planFor('c1')).toEqual([{ step: 'a', status: 'completed' }])
+    expect(getTasksMock).toHaveBeenCalledTimes(1)
+    expect(getTasksMock).toHaveBeenCalledWith('c1')
+    expect(s.tasksFor('c1')).toEqual([{ step: 'a', status: 'completed' }])
 
     await s.ensureForConversation('c1')
-    expect(getPlanMock).toHaveBeenCalledTimes(1) // deduped — no second fetch
+    expect(getTasksMock).toHaveBeenCalledTimes(1) // deduped — no second fetch
   })
 
   it('rolls back the dedup guard on failure so a retry re-fetches', async () => {
-    getPlanMock.mockRejectedValueOnce(new Error('boom'))
-    const s = usePlanStore()
+    getTasksMock.mockRejectedValueOnce(new Error('boom'))
+    const s = useTasksStore()
 
     await expect(s.ensureForConversation('c1')).rejects.toThrow('boom')
-    expect(getPlanMock).toHaveBeenCalledTimes(1)
+    expect(getTasksMock).toHaveBeenCalledTimes(1)
 
-    getPlanMock.mockResolvedValueOnce({
+    getTasksMock.mockResolvedValueOnce({
       conversation_id: 'c1',
       steps: [step('a')],
     })
     await s.ensureForConversation('c1')
-    expect(getPlanMock).toHaveBeenCalledTimes(2)
-    expect(s.planFor('c1')).toEqual([{ step: 'a', status: 'pending' }])
+    expect(getTasksMock).toHaveBeenCalledTimes(2)
+    expect(s.tasksFor('c1')).toEqual([{ step: 'a', status: 'pending' }])
   })
 })
 
@@ -130,17 +130,17 @@ describe('ensureForConversation', () => {
 // ---------------------------------------------------------------------------
 
 describe('reset', () => {
-  it('clears all cached plans and the fetched-once guard', async () => {
-    getPlanMock.mockResolvedValue({ conversation_id: 'c1', steps: [step('a')] })
-    const s = usePlanStore()
+  it('clears all cached task lists and the fetched-once guard', async () => {
+    getTasksMock.mockResolvedValue({ conversation_id: 'c1', steps: [step('a')] })
+    const s = useTasksStore()
     await s.ensureForConversation('c1')
-    expect(s.planFor('c1')).toHaveLength(1)
+    expect(s.tasksFor('c1')).toHaveLength(1)
 
     s.reset()
-    expect(s.planFor('c1')).toEqual([])
+    expect(s.tasksFor('c1')).toEqual([])
 
     // Guard cleared too: ensureForConversation fetches again after reset.
     await s.ensureForConversation('c1')
-    expect(getPlanMock).toHaveBeenCalledTimes(2)
+    expect(getTasksMock).toHaveBeenCalledTimes(2)
   })
 })

@@ -12,8 +12,8 @@ import { useEmailStore } from '../stores/email'
 import { useMcpStore } from '../stores/mcp'
 import { useArtifactsStore } from '../stores/artifacts'
 import { useServicesStore } from '../stores/services'
-import { usePlanStore } from '../stores/plan'
-import type { WsPlanUpdatedMessage } from '../types/plan'
+import { useTasksStore } from '../stores/tasks'
+import type { WsTasksUpdatedMessage } from '../types/tasks'
 import { useScopeStore } from '../stores/scope'
 import type { WsScopeUpdatedMessage } from '../types/scope'
 import { usePermissionModeStore } from '../stores/permissionMode'
@@ -64,7 +64,7 @@ export function useEventsWebSocket(): {
   const mcpStore = useMcpStore()
   const artifactsStore = useArtifactsStore()
   const servicesStore = useServicesStore()
-  const planStore = usePlanStore()
+  const tasksStore = useTasksStore()
   const scopeStore = useScopeStore()
   const permissionModeStore = usePermissionModeStore()
   const terminalStore = useTerminalSessionsStore()
@@ -142,9 +142,9 @@ export function useEventsWebSocket(): {
           servicesStore.onKnowledgeStatus(data)
         }
 
-        // Handle plan updates: fold the full pushed step list into the store.
-        if (data.type === 'plan.updated' && typeof data.conversation_id === 'string') {
-          planStore.applyPlanUpdated(data as WsPlanUpdatedMessage)
+        // Handle task updates: fold the full pushed step list into the store.
+        if (data.type === 'tasks.updated' && typeof data.conversation_id === 'string') {
+          tasksStore.applyTasksUpdated(data as WsTasksUpdatedMessage)
         }
 
         // Handle scope updates: fold the full pushed folder list into the store.

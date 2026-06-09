@@ -8,8 +8,8 @@
  *
  * ## Data flow
  * On mount and whenever the conversation changes, the plan is fetched once via
- * {@link usePlanStore.ensureForConversation}. Live updates arrive out-of-band
- * through the `plan.updated` events-WS frame (folded by the plan store), so no
+ * {@link useTasksStore.ensureForConversation}. Live updates arrive out-of-band
+ * through the `tasks.updated` events-WS frame (folded by the tasks store), so no
  * polling is needed here.
  *
  * ## Fallback
@@ -20,24 +20,24 @@ import { computed, onMounted, watch } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import PlanStepList from './PlanStepList.vue'
 import { useChatStore } from '../../../stores/chat'
-import { usePlanStore } from '../../../stores/plan'
+import { useTasksStore } from '../../../stores/tasks'
 
 defineProps<{
   params?: Record<string, unknown>
 }>()
 
 const chatStore = useChatStore()
-const planStore = usePlanStore()
+const tasksStore = useTasksStore()
 
 /** Active conversation id, or null when none is open. */
 const conversationId = computed<string | null>(() => chatStore.currentConversation?.id ?? null)
 
 /** Plan steps for the active conversation (empty when none). */
-const steps = computed(() => (conversationId.value ? planStore.planFor(conversationId.value) : []))
+const steps = computed(() => (conversationId.value ? tasksStore.tasksFor(conversationId.value) : []))
 
 /** Fetch-once the plan for a given conversation id. */
 function load(id: string | null): void {
-  if (id) void planStore.ensureForConversation(id)
+  if (id) void tasksStore.ensureForConversation(id)
 }
 
 onMounted(() => load(conversationId.value))

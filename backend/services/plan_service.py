@@ -1,8 +1,8 @@
 """AL\\CE — Conversation-plan persistence service (Fase 5).
 
-Persists the model-owned todo-list (``update_plan``) as a single
+Persists the model-owned todo-list (``update_tasks``) as a single
 :class:`~backend.db.models.ConversationPlan` row per conversation so the
-plan survives reloads and can be re-injected into the next turn.  Mirrors
+task list survives reloads and can be re-injected into the next turn.  Mirrors
 :class:`~backend.services.artifacts.registry.ArtifactRegistry`: it owns a
 session factory for DB access and an optional event callback for broadcast.
 """
@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.db.models import ConversationPlan
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None]]
-"""Awaitable callback invoked after a plan is updated."""
+"""Awaitable callback invoked after the task list is updated."""
 
 
 def _utcnow() -> datetime:
@@ -33,15 +33,15 @@ def _to_uuid(value: uuid.UUID | str) -> uuid.UUID:
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 
-def render_plan_steps(steps: list[dict[str, Any]]) -> str:
-    """Render a persisted plan as a context block for re-injection.
+def render_task_steps(steps: list[dict[str, Any]]) -> str:
+    """Render a persisted task list as a context block for re-injection.
 
     Produces a compact, model-readable block (empty string when there are no
-    steps) so the model can CONTINUE an in-progress plan across turns instead
-    of re-planning.  Each step shows its status.
+    steps) so the model can CONTINUE an in-progress task list across turns
+    instead of re-planning.  Each step shows its status.
 
     Args:
-        steps: The persisted plan as an ordered list of
+        steps: The persisted task list as an ordered list of
             ``{"step": str, "status": str}`` dicts (the shape returned by
             :meth:`PlanService.get_plan`).  Keys are read defensively.
 
@@ -51,10 +51,10 @@ def render_plan_steps(steps: list[dict[str, Any]]) -> str:
     if not steps:
         return ""
     lines = [
-        "# Current plan",
+        "# Current tasks",
         (
-            "You are partway through this plan. Continue executing it and "
-            "call update_plan to update step statuses. Do not restart it."
+            "You are partway through this task list. Continue executing it and "
+            "call update_tasks to update step statuses. Do not restart it."
         ),
     ]
     for index, step in enumerate(steps, start=1):
@@ -70,8 +70,8 @@ class PlanService:
     There is exactly one :class:`ConversationPlan` row per conversation
     (the conversation id is the primary key), so :meth:`set_plan` performs
     an idempotent UPSERT.  The service is the single integration point used
-    by the ``agent`` plugin's ``update_plan`` meta-tool and by the turn
-    engine's plan re-injection.
+    by the ``agent`` plugin's ``update_tasks`` meta-tool and by the turn
+    engine's task re-injection.
     """
 
     def __init__(
@@ -101,7 +101,7 @@ class PlanService:
         The payload is a JSON dict::
 
             {
-                "type": "plan.updated",
+                "type": "tasks.updated",
                 "conversation_id": str,
                 "steps": list[dict],
             }
@@ -149,7 +149,7 @@ class PlanService:
         )
 
         await self._emit_event({
-            "type": "plan.updated",
+            "type": "tasks.updated",
             "conversation_id": str(conversation_id),
             "steps": steps,
         })

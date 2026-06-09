@@ -71,6 +71,8 @@ class AliceEvent(StrEnum):
     EMAIL_SENT = "email.sent"
     # -- Service Orchestrator (Phase 1 finalisation) --
     SERVICE_STATUS = "service.status"
+    # -- Agent tasks (model-owned todo-list) --
+    TASKS_UPDATED = "tasks.updated"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

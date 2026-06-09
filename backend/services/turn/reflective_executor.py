@@ -4,7 +4,7 @@ This wraps the model-driven default path with a single, **non-blocking**
 reflection pass over the final answer.
 
 The model-driven path needs no bespoke control flow: the agentic behaviour
-comes from the ``agent`` plugin's meta-tools (``update_plan`` /
+comes from the ``agent`` plugin's meta-tools (``update_tasks`` /
 ``spawn_subagent``), which already live in the tool registry and run inside
 the normal :func:`run_tool_loop`.  So the engine is just the wrapped
 :class:`~backend.services.turn.direct_executor.DirectTurnExecutor`; this

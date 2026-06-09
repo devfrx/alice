@@ -1,4 +1,4 @@
-"""AL\\CE — unit tests for the ``GET /api/plans/{conversation_id}`` handler.
+"""AL\\CE — unit tests for the ``GET /api/tasks/{conversation_id}`` handler.
 
 These exercise the route handler in isolation rather than through the full
 :func:`backend.core.app.create_app` fixture used by ``test_artifacts_route``:
@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from backend.api.routes.plans import PlanResponse, get_conversation_plan
+from backend.api.routes.tasks import TasksResponse, get_conversation_plan
 
 
 def _make_request(ctx: object) -> SimpleNamespace:
@@ -39,7 +39,7 @@ async def test_returns_persisted_steps() -> None:
 
     result = await get_conversation_plan(str(conv_id), request)  # type: ignore[arg-type]
 
-    assert isinstance(result, PlanResponse)
+    assert isinstance(result, TasksResponse)
     assert result.conversation_id == str(conv_id)
     assert result.steps == steps
     plan_service.get_plan.assert_awaited_once()
@@ -47,7 +47,7 @@ async def test_returns_persisted_steps() -> None:
 
 @pytest.mark.asyncio
 async def test_unset_plan_service_returns_empty() -> None:
-    """A ``None`` plan service yields an empty plan instead of erroring."""
+    """A ``None`` plan service yields an empty task list instead of erroring."""
     conv_id = uuid.uuid4()
     request = _make_request(SimpleNamespace(plan_service=None))
 

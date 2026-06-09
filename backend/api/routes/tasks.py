@@ -1,13 +1,13 @@
-"""AL\\CE — Conversation-plan REST API.
+"""AL\\CE — Conversation-tasks REST API.
 
-Endpoints (mounted under ``/api/plans``):
+Endpoints (mounted under ``/api/tasks``):
 
-* ``GET /{conversation_id}`` — fetch the persisted plan for a conversation.
+* ``GET /{conversation_id}`` — fetch the persisted task list for a conversation.
 
-The plan is the model-owned todo-list maintained through the ``update_plan``
-meta-tool and persisted per conversation by
+The task list is the model-owned todo-list maintained through the
+``update_tasks`` meta-tool and persisted per conversation by
 :class:`~backend.services.plan_service.PlanService`.  This read-only endpoint
-lets the frontend render the live plan for a conversation.  It mirrors
+lets the frontend render the live task list for a conversation.  It mirrors
 :mod:`backend.api.routes.artifacts`: the
 :class:`~backend.core.context.AppContext` is read off ``request.app.state``
 and a path UUID is validated with the same 400-on-bad-id helper.
@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from backend.services.plan_service import PlanService
 
-router = APIRouter(prefix="/plans", tags=["plans"])
+router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 # ---------------------------------------------------------------------------
@@ -31,8 +31,8 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 # ---------------------------------------------------------------------------
 
 
-class PlanResponse(BaseModel):
-    """The persisted plan for a single conversation.
+class TasksResponse(BaseModel):
+    """The persisted task list for a single conversation.
 
     Attributes:
         conversation_id: The owning conversation id (string form).
@@ -64,7 +64,7 @@ def _get_plan_service(request: Request) -> PlanService | None:
 
     Defensive by design: the service is always wired in production, but a
     missing context or unset service yields ``None`` so the caller can return
-    an empty plan instead of erroring.
+    an empty task list instead of erroring.
     """
     ctx = getattr(request.app.state, "context", None)
     service: PlanService | None = (
@@ -80,16 +80,16 @@ def _get_plan_service(request: Request) -> PlanService | None:
 
 @router.get(
     "/{conversation_id}",
-    response_model=PlanResponse,
-    summary="Get a conversation's persisted plan",
+    response_model=TasksResponse,
+    summary="Get a conversation's persisted task list",
 )
 async def get_conversation_plan(
     conversation_id: str, request: Request,
-) -> PlanResponse:
-    """Return the persisted plan steps for *conversation_id*.
+) -> TasksResponse:
+    """Return the persisted task steps for *conversation_id*.
 
-    The plan is the model-owned todo-list (``update_plan``) stored per
-    conversation.  An unknown conversation (no plan row) yields an empty
+    The task list is the model-owned todo-list (``update_tasks``) stored per
+    conversation.  An unknown conversation (no task row) yields an empty
     ``steps`` list, and an unwired plan service is treated the same way
     rather than raising.
 
@@ -98,7 +98,7 @@ async def get_conversation_plan(
         request: The incoming request (carries ``app.state.context``).
 
     Returns:
-        A :class:`PlanResponse` carrying the conversation id and the ordered
+        A :class:`TasksResponse` carrying the conversation id and the ordered
         ``{"step", "status"}`` step dicts (possibly empty).
 
     Raises:
@@ -107,6 +107,6 @@ async def get_conversation_plan(
     conv_uuid = _to_uuid(conversation_id)
     plan_service = _get_plan_service(request)
     if plan_service is None:
-        return PlanResponse(conversation_id=str(conversation_id), steps=[])
+        return TasksResponse(conversation_id=str(conversation_id), steps=[])
     steps = await plan_service.get_plan(conv_uuid)
-    return PlanResponse(conversation_id=str(conversation_id), steps=steps)
+    return TasksResponse(conversation_id=str(conversation_id), steps=steps)

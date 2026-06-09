@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 #: Tools a sub-agent may never call (prevents unbounded recursion).
 BLOCKED_TOOL_NAMES: frozenset[str] = frozenset(
-    {"agent_spawn_subagent", "agent_update_plan"},
+    {"agent_spawn_subagent", "agent_update_tasks"},
 )
 
 _SUBAGENT_SYSTEM_PROMPT = (

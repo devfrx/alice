@@ -1084,7 +1084,7 @@ class AgentConfig(BaseSettings):
     """Configuration for the (only) model-driven agentic chat path.
 
     The model itself decides step-by-step what to do, with the
-    ``update_plan`` and ``spawn_subagent`` meta-tools for structure and an
+    ``update_tasks`` and ``spawn_subagent`` meta-tools for structure and an
     optional, non-blocking reflection pass on the final answer. There is no
     separate ``enabled`` switch and no legacy structured pipeline: the engine
     is always :class:`DirectTurnExecutor`, optionally wrapped by
@@ -1094,7 +1094,7 @@ class AgentConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
 
     planning: bool = True
-    """Expose the ``update_plan`` todo-list tool in the model-driven loop."""
+    """Expose the ``update_tasks`` todo-list tool in the model-driven loop."""
 
     delegation: bool = True
     """Expose the ``spawn_subagent`` delegation tool in the model-driven loop."""

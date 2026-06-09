@@ -3,8 +3,8 @@
 Exposes two Claude/GPT-style agentic meta-tools that sit *on top of* the
 existing tool loop, giving the model first-class planning and delegation:
 
-* ``update_plan`` — maintain a visible, mutable todo-list for the current
-  conversation.  Calling it replaces the whole plan, so the model always
+* ``update_tasks`` — maintain a visible, mutable todo-list for the current
+  conversation.  Calling it replaces the whole list, so the model always
   owns the source of truth.  Costs no extra inference: it is just a tool
   the model calls inside its normal loop.
 * ``spawn_subagent`` — delegate ONE self-contained task to an
@@ -31,7 +31,7 @@ from backend.core.plugin_models import (
     ToolResult,
 )
 
-from ._plan import PlanStore, parse_steps, render_plan
+from ._plan import TaskStore, parse_steps, render_tasks
 from ._subagent import run_subagent
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ class AgentPlugin(BasePlugin):
     plugin_name: str = "agent"
     plugin_version: str = "1.0.0"
     plugin_description: str = (
-        "Agentic meta-tools: a mutable todo-list (update_plan) and "
+        "Agentic meta-tools: a mutable todo-list (update_tasks) and "
         "isolated-context task delegation (spawn_subagent)."
     )
     plugin_dependencies: list[str] = []
@@ -52,7 +52,7 @@ class AgentPlugin(BasePlugin):
 
     def __init__(self) -> None:
         super().__init__()
-        self._plans = PlanStore()
+        self._plans = TaskStore()
 
     # -- Lifecycle ---------------------------------------------------------
 
@@ -78,20 +78,20 @@ class AgentPlugin(BasePlugin):
         if cfg is None or cfg.planning:
             tools.append(
                 ToolDefinition(
-                    name="update_plan",
+                    name="update_tasks",
                     description=(
                         "Create or update your working todo-list for a "
                         "complex, multi-step task. Call this to break the "
                         "task into steps, then call it again to mark steps "
                         "in_progress/completed as you go. Each call REPLACES "
-                        "the whole plan. Use it for non-trivial work so the "
-                        "user can follow your progress; skip it for simple "
+                        "the whole task list. Use it for non-trivial work so "
+                        "the user can follow your progress; skip it for simple "
                         "one-shot answers."
                     ),
                     parameters={
                         "type": "object",
                         "properties": {
-                            "plan": {
+                            "tasks": {
                                 "type": "array",
                                 "description": (
                                     "Ordered list of steps. Each item is an "
@@ -115,7 +115,7 @@ class AgentPlugin(BasePlugin):
                                 },
                             },
                         },
-                        "required": ["plan"],
+                        "required": ["tasks"],
                     },
                     result_type="json",
                     risk_level="safe",
@@ -261,7 +261,7 @@ class AgentPlugin(BasePlugin):
         """Dispatch to the requested agent meta-tool.
 
         Args:
-            tool_name: ``"update_plan"``, ``"spawn_subagent"``, or
+            tool_name: ``"update_tasks"``, ``"spawn_subagent"``, or
                 ``"ask_user"`` (the last is handled defensively — it is
                 normally intercepted by the interaction channel).
             args: Caller-supplied arguments.
@@ -271,8 +271,8 @@ class AgentPlugin(BasePlugin):
             A ``ToolResult`` with the payload or an error.
         """
         try:
-            if tool_name == "update_plan":
-                return await self._update_plan(args, context)
+            if tool_name == "update_tasks":
+                return await self._update_tasks(args, context)
             if tool_name == "spawn_subagent":
                 return await self._spawn_subagent(args, context)
             if tool_name == "ask_user":
@@ -287,13 +287,13 @@ class AgentPlugin(BasePlugin):
 
     # -- Tool implementations ---------------------------------------------
 
-    async def _update_plan(
+    async def _update_tasks(
         self, args: dict[str, Any], context: ExecutionContext,
     ) -> ToolResult:
         """Replace the conversation's todo-list with the supplied steps."""
         start = time.perf_counter()
         try:
-            steps = parse_steps(args.get("plan"))
+            steps = parse_steps(args.get("tasks"))
         except ValueError as exc:
             return ToolResult.error(str(exc))
 
@@ -310,8 +310,8 @@ class AgentPlugin(BasePlugin):
                 "ok": True,
                 "total_steps": len(steps),
                 "completed_steps": completed,
-                "plan": [s.to_dict() for s in steps],
-                "rendered": render_plan(steps),
+                "tasks": [s.to_dict() for s in steps],
+                "rendered": render_tasks(steps),
             },
             content_type="application/json",
             execution_time_ms=elapsed,

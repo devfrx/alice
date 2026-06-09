@@ -80,8 +80,8 @@ class TestApplyModePolicy:
             "file_search_find": ToolDefinition(
                 name="find", description="f", capabilities=("fs_read",),
             ),
-            "agent_update_plan": ToolDefinition(
-                name="update_plan", description="p",
+            "agent_update_tasks": ToolDefinition(
+                name="update_tasks", description="p",
             ),
             "web_search_search": ToolDefinition(
                 name="search", description="s",
@@ -91,7 +91,7 @@ class TestApplyModePolicy:
             "pc_automation_write_file": "pc_automation",
             "terminal_run": "terminal",
             "file_search_find": "file_search",
-            "agent_update_plan": "agent",
+            "agent_update_tasks": "agent",
             "web_search_search": "web_search",
         }
         return tools, plugins
@@ -104,7 +104,7 @@ class TestApplyModePolicy:
                 "pc_automation_write_file",
                 "terminal_run",
                 "file_search_find",
-                "agent_update_plan",
+                "agent_update_tasks",
                 "web_search_search",
             )
         ]
@@ -120,7 +120,7 @@ class TestApplyModePolicy:
         assert "pc_automation_write_file" not in names
         assert "terminal_run" not in names
         # planning floated to the very front.
-        assert names[0] == "agent_update_plan"
+        assert names[0] == "agent_update_tasks"
         # reads and other safe tools survive.
         assert "file_search_find" in names
         assert "web_search_search" in names

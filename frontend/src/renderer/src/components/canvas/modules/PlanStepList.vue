@@ -2,7 +2,7 @@
 /**
  * PlanStepList — Pure presentational checklist of plan steps.
  *
- * Renders an ordered list of {@link PlanStep}s with a status-aware leading
+ * Renders an ordered list of {@link TaskStep}s with a status-aware leading
  * mark: a check for `completed`, a pulsing dot for `in_progress`, and a plain
  * muted dot for `pending`. Visual language mirrors the inline plan-checklist
  * style used elsewhere in the chat.
@@ -11,11 +11,11 @@
  * the caller decides whether to show this component or an empty state instead.
  */
 import AppIcon from '../../ui/AppIcon.vue'
-import type { PlanStep } from '../../../types/plan'
+import type { TaskStep } from '../../../types/tasks'
 
 defineProps<{
   /** Ordered plan steps to render. */
-  steps: PlanStep[]
+  steps: TaskStep[]
 }>()
 </script>
 

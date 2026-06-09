@@ -57,7 +57,7 @@ import type {
   ArtifactKind,
   ArtifactListResponse,
 } from '../types/artifacts'
-import type { PlanResponse } from '../types/plan'
+import type { TasksResponse } from '../types/tasks'
 import type { ScopeResponse } from '../types/scope'
 import type {
   PermissionMode,
@@ -850,11 +850,11 @@ export const api = {
     )
   },
 
-  // -- Plan -----------------------------------------------------------------
+  // -- Tasks ----------------------------------------------------------------
 
-  /** Fetch the persisted plan (todo-list) for a conversation. */
-  getPlan: (conversationId: string): Promise<PlanResponse> =>
-    request<PlanResponse>(`/plans/${encodeURIComponent(conversationId)}`),
+  /** Fetch the persisted task list (todo-list) for a conversation. */
+  getTasks: (conversationId: string): Promise<TasksResponse> =>
+    request<TasksResponse>(`/tasks/${encodeURIComponent(conversationId)}`),
 
   // -- Scope ----------------------------------------------------------------
 

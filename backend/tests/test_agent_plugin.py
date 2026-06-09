@@ -25,10 +25,10 @@ from backend.core.plugin_models import (
 from backend.db.models import Conversation
 from backend.plugins.agent._plan import (
     MAX_STEPS,
-    PlanStep,
-    PlanStore,
+    TaskStep,
+    TaskStore,
     parse_steps,
-    render_plan,
+    render_tasks,
 )
 from backend.plugins.agent._subagent import (
     BLOCKED_TOOL_NAMES,
@@ -69,7 +69,7 @@ async def _aiter(events: list[dict[str, Any]]):
 
 
 # ===========================================================================
-# 1.  Plan model (_plan.py)
+# 1.  Tasks model (_plan.py)
 # ===========================================================================
 
 
@@ -112,16 +112,16 @@ class TestParseSteps:
             parse_steps(["x"] * (MAX_STEPS + 1))
 
 
-class TestRenderPlan:
+class TestRenderTasks:
     def test_render_empty(self):
-        assert render_plan([]) == "(empty plan)"
+        assert render_tasks([]) == "(empty plan)"
 
     def test_render_marks(self):
-        out = render_plan(
+        out = render_tasks(
             [
-                PlanStep("done", "completed"),
-                PlanStep("now", "in_progress"),
-                PlanStep("later", "pending"),
+                TaskStep("done", "completed"),
+                TaskStep("now", "in_progress"),
+                TaskStep("later", "pending"),
             ],
         )
         assert "[x] done" in out
@@ -129,11 +129,11 @@ class TestRenderPlan:
         assert "[ ] later" in out
 
 
-class TestPlanStore:
+class TestTaskStore:
     @pytest.mark.asyncio
     async def test_set_get_clear(self):
-        store = PlanStore()
-        await store.set_plan("c1", [PlanStep("a")])
+        store = TaskStore()
+        await store.set_plan("c1", [TaskStep("a")])
         assert len(await store.get_plan("c1")) == 1
         # Isolation between conversations.
         assert await store.get_plan("c2") == []
@@ -142,9 +142,9 @@ class TestPlanStore:
 
     @pytest.mark.asyncio
     async def test_set_replaces(self):
-        store = PlanStore()
-        await store.set_plan("c1", [PlanStep("a"), PlanStep("b")])
-        await store.set_plan("c1", [PlanStep("c")])
+        store = TaskStore()
+        await store.set_plan("c1", [TaskStep("a"), TaskStep("b")])
+        await store.set_plan("c1", [TaskStep("c")])
         plan = await store.get_plan("c1")
         assert [s.description for s in plan] == ["c"]
 
@@ -165,7 +165,7 @@ class TestAgentPluginTools:
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"update_plan", "spawn_subagent", "ask_user"}
+        assert names == {"update_tasks", "spawn_subagent", "ask_user"}
         assert all(isinstance(t, ToolDefinition) for t in plugin.get_tools())
 
     @pytest.mark.asyncio
@@ -184,7 +184,7 @@ class TestAgentPluginTools:
         ctx.config.agent.delegation = False
         await plugin.initialize(ctx)
         names = {t.name for t in plugin.get_tools()}
-        assert names == {"update_plan", "ask_user"}
+        assert names == {"update_tasks", "ask_user"}
 
     @pytest.mark.asyncio
     async def test_ask_user_tool_exposed_by_default(self):
@@ -211,7 +211,7 @@ class TestAgentPluginTools:
         names = {t.name for t in plugin.get_tools()}
         assert "ask_user" not in names
         # Planning / delegation remain governed by their own flags.
-        assert names == {"update_plan", "spawn_subagent"}
+        assert names == {"update_tasks", "spawn_subagent"}
 
     @pytest.mark.asyncio
     async def test_ask_user_execute_is_defensive(self):
@@ -235,41 +235,41 @@ class TestAgentPluginTools:
 
 
 # ===========================================================================
-# 3.  update_plan tool
+# 3.  update_tasks tool
 # ===========================================================================
 
 
-class TestUpdatePlanTool:
+class TestUpdateTasksTool:
     @pytest.mark.asyncio
-    async def test_update_plan_success(self):
+    async def test_update_tasks_success(self):
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         result = await plugin.execute_tool(
-            "update_plan",
-            {"plan": [{"step": "do X", "status": "in_progress"}, "do Y"]},
+            "update_tasks",
+            {"tasks": [{"step": "do X", "status": "in_progress"}, "do Y"]},
             _make_exec_ctx(),
         )
         assert result.success
         assert result.content["total_steps"] == 2
         assert result.content["completed_steps"] == 0
-        assert result.content["plan"][0]["status"] == "in_progress"
+        assert result.content["tasks"][0]["status"] == "in_progress"
 
     @pytest.mark.asyncio
-    async def test_update_plan_invalid_returns_error(self):
+    async def test_update_tasks_invalid_returns_error(self):
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         result = await plugin.execute_tool(
-            "update_plan", {"plan": []}, _make_exec_ctx(),
+            "update_tasks", {"tasks": []}, _make_exec_ctx(),
         )
         assert not result.success
 
     @pytest.mark.asyncio
-    async def test_update_plan_persists_in_store(self):
+    async def test_update_tasks_persists_in_store(self):
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         ctx = _make_exec_ctx("conv-42")
         await plugin.execute_tool(
-            "update_plan", {"plan": ["a", "b", "c"]}, ctx,
+            "update_tasks", {"tasks": ["a", "b", "c"]}, ctx,
         )
         plan = await plugin._plans.get_plan("conv-42")
         assert len(plan) == 3
@@ -457,7 +457,7 @@ class TestSpawnSubagent:
             ],
             tools=[
                 _tool_entry("agent_spawn_subagent"),
-                _tool_entry("agent_update_plan"),
+                _tool_entry("agent_update_tasks"),
                 _tool_entry("web_search_search"),
             ],
         )
@@ -517,7 +517,7 @@ class TestSpawnSubagent:
 
 
 # ===========================================================================
-# 5.  update_plan persistence via a wired PlanService
+# 5.  update_tasks persistence via a wired PlanService
 # ===========================================================================
 
 
@@ -549,11 +549,11 @@ async def plan_session_factory():
     await engine.dispose()
 
 
-class TestUpdatePlanPersistence:
-    """``update_plan`` persists via ``ctx.plan_service`` when one is wired."""
+class TestUpdateTasksPersistence:
+    """``update_tasks`` persists via ``ctx.plan_service`` when one is wired."""
 
     @pytest.mark.asyncio
-    async def test_update_plan_persists_and_broadcasts(
+    async def test_update_tasks_persists_and_broadcasts(
         self, plan_session_factory,
     ):
         # Parent conversation row (FK target for ConversationPlan).
@@ -583,8 +583,8 @@ class TestUpdatePlanPersistence:
             {"step": "write", "status": "pending"},
         ]
         result = await plugin.execute_tool(
-            "update_plan",
-            {"plan": [{"step": "research", "status": "in_progress"}, "write"]},
+            "update_tasks",
+            {"tasks": [{"step": "research", "status": "in_progress"}, "write"]},
             _make_exec_ctx(str(conv_id)),
         )
         assert result.success
@@ -594,10 +594,10 @@ class TestUpdatePlanPersistence:
         # The in-memory fallback store was NOT written to.
         assert await plugin._plans.get_plan(str(conv_id)) == []
 
-        # The plan.updated broadcast fired once with the canonical payload.
+        # The tasks.updated broadcast fired once with the canonical payload.
         assert captured == [
             {
-                "type": "plan.updated",
+                "type": "tasks.updated",
                 "conversation_id": str(conv_id),
                 "steps": expected_steps,
             }

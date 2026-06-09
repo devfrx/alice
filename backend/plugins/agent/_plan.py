@@ -1,7 +1,7 @@
-"""AL\\CE — Agent plugin: per-conversation plan (todo-list) store.
+"""AL\\CE — Agent plugin: per-conversation tasks (todo-list) store.
 
-The plan is a model-driven, mutable checklist (Claude/GPT ``TodoWrite``
-style).  Each call to the ``update_plan`` tool *replaces* the whole plan
+The task list is a model-driven, mutable checklist (Claude/GPT ``TodoWrite``
+style).  Each call to the ``update_tasks`` tool *replaces* the whole list
 for the active conversation, so the model always owns the source of truth.
 
 State is intentionally in-memory and process-local: a plan tracks the work
@@ -29,7 +29,7 @@ MAX_STEPS: int = 30
 
 
 @dataclass(slots=True)
-class PlanStep:
+class TaskStep:
     """A single todo-list entry.
 
     Attributes:
@@ -46,52 +46,52 @@ class PlanStep:
 
 
 @dataclass(slots=True)
-class PlanStore:
+class TaskStore:
     """Thread-safe, per-conversation store of the active todo-list."""
 
-    _plans: dict[str, list[PlanStep]] = field(default_factory=dict)
+    _plans: dict[str, list[TaskStep]] = field(default_factory=dict)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     async def set_plan(
-        self, conversation_id: str, steps: list[PlanStep],
-    ) -> list[PlanStep]:
-        """Replace the plan for *conversation_id* and return a copy."""
+        self, conversation_id: str, steps: list[TaskStep],
+    ) -> list[TaskStep]:
+        """Replace the task list for *conversation_id* and return a copy."""
         async with self._lock:
             self._plans[conversation_id] = list(steps)
             return list(steps)
 
-    async def get_plan(self, conversation_id: str) -> list[PlanStep]:
-        """Return a copy of the current plan (empty list if none)."""
+    async def get_plan(self, conversation_id: str) -> list[TaskStep]:
+        """Return a copy of the current task list (empty list if none)."""
         async with self._lock:
             return list(self._plans.get(conversation_id, []))
 
     async def clear(self, conversation_id: str) -> None:
-        """Drop the plan for *conversation_id* (no-op if absent)."""
+        """Drop the task list for *conversation_id* (no-op if absent)."""
         async with self._lock:
             self._plans.pop(conversation_id, None)
 
 
-def parse_steps(raw: object) -> list[PlanStep]:
-    """Validate and coerce raw ``update_plan`` arguments into steps.
+def parse_steps(raw: object) -> list[TaskStep]:
+    """Validate and coerce raw ``update_tasks`` arguments into steps.
 
     Accepts either a list of strings (each becomes a ``pending`` step) or a
     list of objects with ``step``/``description`` and optional ``status``.
 
     Args:
-        raw: The value supplied for the ``plan`` argument.
+        raw: The value supplied for the ``tasks`` argument.
 
     Returns:
-        A validated, non-empty list of :class:`PlanStep`.
+        A validated, non-empty list of :class:`TaskStep`.
 
     Raises:
         ValueError: If the payload is malformed or a status is invalid.
     """
     if not isinstance(raw, list) or not raw:
-        raise ValueError("'plan' must be a non-empty array of steps")
+        raise ValueError("'tasks' must be a non-empty array of steps")
     if len(raw) > MAX_STEPS:
-        raise ValueError(f"'plan' must contain at most {MAX_STEPS} steps")
+        raise ValueError(f"'tasks' must contain at most {MAX_STEPS} steps")
 
-    steps: list[PlanStep] = []
+    steps: list[TaskStep] = []
     for index, item in enumerate(raw):
         if isinstance(item, str):
             description, status = item, "pending"
@@ -113,12 +113,12 @@ def parse_steps(raw: object) -> list[PlanStep]:
                 f"step {index}: invalid status '{status}' "
                 f"(allowed: {', '.join(VALID_STATUSES)})",
             )
-        steps.append(PlanStep(description=description, status=status))
+        steps.append(TaskStep(description=description, status=status))
 
     return steps
 
 
-def render_plan(steps: list[PlanStep]) -> str:
+def render_tasks(steps: list[TaskStep]) -> str:
     """Render *steps* as a compact checklist string."""
     if not steps:
         return "(empty plan)"

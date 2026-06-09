@@ -32,7 +32,7 @@ _READ_ONLY_BLOCKED_CAPABILITIES: frozenset[str] = frozenset(
     {"fs_write", "process_exec"}
 )
 
-# Plugin whose tools are the *planning* meta-tools (``update_plan`` /
+# Plugin whose tools are the *planning* meta-tools (``update_tasks`` /
 # ``spawn_subagent`` / ``ask_user``).  Floated to the front — and guaranteed
 # present — in ``plan`` mode so the model leads with planning.
 _PLANNING_PLUGINS: tuple[str, ...] = ("agent",)
@@ -76,7 +76,7 @@ _GUIDANCE: dict[PermissionMode, str] = {
     PermissionMode.PLAN: (
         "Stai operando in modalità **plan** (sola lettura). **Non puoi scrivere "
         "file né eseguire comandi**: questi strumenti non ti sono stati forniti "
-        "apposta. Il tuo compito è capire e pianificare: usa `update_plan` per "
+        "apposta. Il tuo compito è capire e pianificare: usa `update_tasks` per "
         "costruire un piano passo-passo, leggi e ispeziona ciò che ti serve, e "
         "descrivi con precisione le azioni che eseguirai. Quando il piano è "
         "pronto, invita l'utente a passare a una modalità operativa "
@@ -86,7 +86,7 @@ _GUIDANCE: dict[PermissionMode, str] = {
         "Stai operando in modalità **autopilot**. Hai piena autonomia e **non "
         "verrà chiesta alcuna conferma**: procedi end-to-end fino a completare "
         "l'obiettivo, restando sempre dentro l'ambito di lavoro. Per un lavoro "
-        "non banale usa `update_plan` per tracciare i passi mentre li esegui."
+        "non banale usa `update_tasks` per tracciare i passi mentre li esegui."
     ),
 }
 

@@ -136,8 +136,8 @@ class AppContext:
 
     Typed as :class:`Any` to avoid a ``core`` → ``services`` import cycle; the
     concrete type is :class:`backend.services.plan_service.PlanService`. Wired
-    in the lifespan. Used by the ``agent`` plugin's ``update_plan`` and the
-    turn engine's plan re-inject."""
+    in the lifespan. Used by the ``agent`` plugin's ``update_tasks`` and the
+    turn engine's task re-inject."""
 
     scope_service: Any = None
     """Per-conversation workspace folder scope (Fase 6).

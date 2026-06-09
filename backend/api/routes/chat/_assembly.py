@@ -35,7 +35,7 @@ from backend.services.context_manager import CompressionResult, ContextUsage
 from backend.services.llm_service import LLMService
 from backend.services.permission_mode_policy import ModePolicy, policy_for
 from backend.services.permission_mode_service import PermissionMode
-from backend.services.plan_service import render_plan_steps
+from backend.services.plan_service import render_task_steps
 from backend.services.turn import TurnInput
 
 from ._helpers import (
@@ -443,7 +443,7 @@ class TurnAssembler:
         if ctx.plan_service is not None:
             plan_steps = await ctx.plan_service.get_plan(conv_id)
             if plan_steps:
-                plan_ctx = render_plan_steps(plan_steps)
+                plan_ctx = render_task_steps(plan_steps)
                 if plan_ctx:
                     memory_context = (
                         f"{memory_context}\n\n{plan_ctx}"

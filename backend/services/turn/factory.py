@@ -2,7 +2,7 @@
 
 The model-driven loop is the **only** execution path: the engine is always
 :class:`DirectTurnExecutor`, whose agentic behaviour comes from the ``agent``
-plugin's meta-tools (``update_plan`` / ``spawn_subagent``) already in the
+plugin's meta-tools (``update_tasks`` / ``spawn_subagent``) already in the
 tool registry and driven inside the normal :func:`run_tool_loop`.
 
 There are exactly two outcomes:

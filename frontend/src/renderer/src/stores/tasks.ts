@@ -1,13 +1,13 @@
 /**
- * plan.ts — Pinia setup-store for per-conversation plans (todo-lists).
+ * tasks.ts — Pinia setup-store for per-conversation task lists (todo-lists).
  *
- * A plan is the ordered {@link PlanStep} list the model-driven turn engine
+ * A task list is the ordered {@link TaskStep} list the model-driven turn engine
  * maintains via the `update_plan` meta-tool. It is kept in sync two ways:
  *
  * - On-demand REST snapshot via {@link ensureForConversation} (fetch-once per
- *   conversation), backed by `GET /api/plans/{conversation_id}`.
- * - Live push: the events WebSocket folds each `plan.updated` frame through
- *   {@link applyPlanUpdated}. The frame carries the FULL step list, so it is
+ *   conversation), backed by `GET /api/tasks/{conversation_id}`.
+ * - Live push: the events WebSocket folds each `tasks.updated` frame through
+ *   {@link applyTasksUpdated}. The frame carries the FULL step list, so it is
  *   applied directly with no re-fetch.
  *
  * State is keyed by conversation id in a plain record; reactivity is preserved
@@ -18,28 +18,28 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { api } from '../services/api'
-import type { PlanStep } from '../types/plan'
+import type { TaskStep } from '../types/tasks'
 
-export const usePlanStore = defineStore('plan', () => {
+export const useTasksStore = defineStore('tasks', () => {
   // -----------------------------------------------------------------------
   // State
   // -----------------------------------------------------------------------
 
-  /** Plan steps known to the client, keyed by conversation id. */
-  const byConversation = ref<Record<string, PlanStep[]>>({})
+  /** Task steps known to the client, keyed by conversation id. */
+  const byConversation = ref<Record<string, TaskStep[]>>({})
 
   /** Whether a fetch is currently in flight. */
   const loading = ref(false)
 
-  /** Conversation ids whose plan has been fetched at least once. */
+  /** Conversation ids whose task list has been fetched at least once. */
   const fetched = ref<Set<string>>(new Set())
 
   // -----------------------------------------------------------------------
   // Getters
   // -----------------------------------------------------------------------
 
-  /** Lookup helper: the plan steps for a conversation (empty when unknown). */
-  function planFor(conversationId: string): PlanStep[] {
+  /** Lookup helper: the task steps for a conversation (empty when unknown). */
+  function tasksFor(conversationId: string): TaskStep[] {
     return byConversation.value[conversationId] ?? []
   }
 
@@ -48,13 +48,13 @@ export const usePlanStore = defineStore('plan', () => {
   // -----------------------------------------------------------------------
 
   /**
-   * Fetch the plan snapshot for a conversation, replacing any cached steps.
+   * Fetch the task snapshot for a conversation, replacing any cached steps.
    * Records the conversation as fetched on success.
    */
   async function fetch(conversationId: string): Promise<void> {
     loading.value = true
     try {
-      const res = await api.getPlan(conversationId)
+      const res = await api.getTasks(conversationId)
       byConversation.value = { ...byConversation.value, [conversationId]: res.steps }
       fetched.value.add(conversationId)
     } finally {
@@ -62,7 +62,7 @@ export const usePlanStore = defineStore('plan', () => {
     }
   }
 
-  /** Fetch a conversation's plan only once per session. */
+  /** Fetch a conversation's task list only once per session. */
   async function ensureForConversation(conversationId: string): Promise<void> {
     if (fetched.value.has(conversationId)) return
     fetched.value.add(conversationId) // mark optimistically to dedupe
@@ -75,14 +75,14 @@ export const usePlanStore = defineStore('plan', () => {
   }
 
   /**
-   * `plan.updated` → replace the conversation's steps with the pushed list.
-   * The frame carries the full plan, so this is a direct fold (no re-fetch).
+   * `tasks.updated` → replace the conversation's steps with the pushed list.
+   * The frame carries the full task list, so this is a direct fold (no re-fetch).
    */
-  function applyPlanUpdated(msg: { conversation_id: string; steps: PlanStep[] }): void {
+  function applyTasksUpdated(msg: { conversation_id: string; steps: TaskStep[] }): void {
     byConversation.value = { ...byConversation.value, [msg.conversation_id]: msg.steps }
   }
 
-  /** Clear all cached plans and the fetched-once guard. */
+  /** Clear all cached task lists and the fetched-once guard. */
   function reset(): void {
     byConversation.value = {}
     fetched.value = new Set()
@@ -94,11 +94,11 @@ export const usePlanStore = defineStore('plan', () => {
     loading,
     fetched,
     // getters
-    planFor,
+    tasksFor,
     // actions
     fetch,
     ensureForConversation,
-    applyPlanUpdated,
+    applyTasksUpdated,
     reset,
   }
 })

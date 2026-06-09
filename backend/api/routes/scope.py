@@ -19,7 +19,7 @@ This module never broadcasts itself: a successful ``set_scope`` / ``clear_scope`
 emits the ``scope.updated`` event through
 :class:`~backend.services.scope_service.ScopeService`'s own event callback
 (wired to the events WebSocket in the app lifespan).  It mirrors
-:mod:`backend.api.routes.plans`: the :class:`~backend.core.context.AppContext`
+:mod:`backend.api.routes.tasks`: the :class:`~backend.core.context.AppContext`
 is read off ``request.app.state`` and a path UUID is validated with the same
 400-on-bad-id helper.
 """

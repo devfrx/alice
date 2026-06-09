@@ -649,16 +649,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     artifact_registry.set_event_callback(_broadcast_artifact_event)
     ctx.artifact_registry = artifact_registry
 
-    # -- Plan service (persisted per-conversation todo-list) ------------
+    # -- Plan service (persisted per-conversation task list) ------------
     from backend.services.plan_service import PlanService
 
     plan_service = PlanService(session_factory=session_factory)
 
-    async def _broadcast_plan_event(event: dict) -> None:
+    async def _broadcast_tasks_event(event: dict) -> None:
         if ctx.ws_connection_manager:
             await ctx.ws_connection_manager.broadcast(event)
 
-    plan_service.set_event_callback(_broadcast_plan_event)
+    plan_service.set_event_callback(_broadcast_tasks_event)
     ctx.plan_service = plan_service
 
     # -- Scope service (per-conversation workspace folder scope) --------

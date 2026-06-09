@@ -478,7 +478,7 @@ class AgentRun(SQLModel, table=True):
 class ConversationPlan(SQLModel, table=True):
     """The model-owned todo-list for a conversation (one row per conversation).
 
-    Persisted by ``update_plan`` (via :class:`PlanService`) so the plan
+    Persisted by ``update_tasks`` (via :class:`PlanService`) so the task list
     survives reloads and is re-injected into the next turn. ``steps`` is an
     ordered JSON list of ``{"step": str, "status": str}`` items.
     """

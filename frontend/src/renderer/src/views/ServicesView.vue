@@ -22,14 +22,13 @@ import UiEmptyState from '../components/ui/UiEmptyState.vue'
 import ServiceCard from '../components/services/ServiceCard.vue'
 import TrellisConfigCard from '../components/services/TrellisConfigCard.vue'
 import TrellisSetupGuideModal from '../components/services/TrellisSetupGuideModal.vue'
+import { useModal } from '../composables/useModal'
 
 const store = useServicesStore()
-const showGuide = ref(false)
-const guideService = ref<TrellisGuideService>('trellis2')
+const { openCustom } = useModal()
 
-function openGuide(svc: TrellisGuideService): void {
-  guideService.value = svc
-  showGuide.value = true
+async function openGuide(svc: TrellisGuideService): Promise<void> {
+  await openCustom({ component: TrellisSetupGuideModal, props: { service: svc }, width: '720px' })
 }
 
 function openGuideForService(name: string): void {
@@ -37,7 +36,7 @@ function openGuideForService(name: string): void {
   // services have a markdown guide; classic ``trellis`` (text-to-3D)
   // doesn't surface this button.
   if (name === 'trellis2' || name === 'trellis2multiview') {
-    openGuide(name)
+    void openGuide(name)
   }
 }
 const refreshing = ref(false)
@@ -260,11 +259,6 @@ async function refreshAll(): Promise<void> {
       </section>
     </div>
 
-    <TrellisSetupGuideModal
-      v-if="showGuide"
-      :service="guideService"
-      @close="showGuide = false"
-    />
   </main>
 </template>
 

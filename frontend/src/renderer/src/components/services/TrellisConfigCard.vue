@@ -19,6 +19,7 @@ import {
   type ServiceSnapshot,
 } from '../../stores/services'
 import AppIcon from '../ui/AppIcon.vue'
+import UiToggle from '../ui/UiToggle.vue'
 
 const props = defineProps<{ service: ServiceSnapshot }>()
 const emit = defineEmits<{
@@ -201,23 +202,8 @@ async function stopService(): Promise<void> {
         </span>
       </label>
 
-      <label class="trellis-card__toggle">
-        <input
-          v-model="enabled"
-          type="checkbox"
-          class="trellis-card__checkbox"
-          :disabled="loading"
-        />
-        <span class="trellis-card__toggle-track" aria-hidden="true">
-          <span class="trellis-card__toggle-knob" />
-        </span>
-        <span class="trellis-card__toggle-label">
-          <span class="trellis-card__toggle-title">Abilita servizio</span>
-          <span class="trellis-card__toggle-desc">
-            Quando attivo, AL\CE può avviare automaticamente il processo.
-          </span>
-        </span>
-      </label>
+      <UiToggle v-model="enabled" :disabled="loading" label="Abilita servizio"
+          hint="Quando attivo, AL\CE può avviare automaticamente il processo." />
     </div>
 
     <div v-if="saveError" class="trellis-card__alert trellis-card__alert--error">
@@ -432,70 +418,6 @@ async function stopService(): Promise<void> {
   background: var(--surface-2);
 }
 .trellis-card__input:disabled { opacity: 0.6; }
-
-/* ── Toggle ──────────────────────────────────────────────────── */
-.trellis-card__toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-2-5) var(--space-3);
-  background: var(--surface-0);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 120ms ease;
-}
-.trellis-card__toggle:hover { border-color: var(--border-hover); }
-.trellis-card__checkbox {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.trellis-card__toggle-track {
-  position: relative;
-  flex: 0 0 auto;
-  width: 30px;
-  height: 18px;
-  background: var(--surface-3);
-  border-radius: var(--radius-pill);
-  transition: background 160ms ease;
-  margin-top: 2px;
-}
-.trellis-card__toggle-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  background: var(--text-secondary);
-  border-radius: var(--radius-full);
-  transition: transform 160ms ease, background 160ms ease;
-}
-.trellis-card__checkbox:checked + .trellis-card__toggle-track {
-  background: var(--accent-medium);
-}
-.trellis-card__checkbox:checked + .trellis-card__toggle-track .trellis-card__toggle-knob {
-  transform: translateX(12px);
-  background: var(--accent);
-}
-.trellis-card__checkbox:focus-visible + .trellis-card__toggle-track {
-  box-shadow: 0 0 0 2px var(--accent-border);
-}
-.trellis-card__toggle-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.trellis-card__toggle-title {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--text-primary);
-}
-.trellis-card__toggle-desc {
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
-  line-height: var(--leading-snug);
-}
 
 /* ── Alerts ──────────────────────────────────────────────────── */
 .trellis-card__alert {

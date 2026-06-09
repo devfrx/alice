@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import base64
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -23,6 +23,8 @@ from backend.core.plugin_models import (
 )
 from backend.plugins.pc_automation.executor import (
     check_dependencies as check_executor_deps,
+)
+from backend.plugins.pc_automation.executor import (
     exec_click,
     exec_close_app,
     exec_command,
@@ -35,6 +37,7 @@ from backend.plugins.pc_automation.executor import (
     exec_type_text,
     get_lockout,
 )
+from backend.plugins.pc_automation.security import command_paths_within_workspace
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -101,6 +104,7 @@ class PcAutomationPlugin(BasePlugin):
                 risk_level="safe",
                 requires_confirmation=False,
                 timeout_ms=15000,
+                capabilities=("process_exec",),
             ),
             ToolDefinition(
                 name="close_application",
@@ -236,6 +240,7 @@ class PcAutomationPlugin(BasePlugin):
                 risk_level="dangerous",
                 requires_confirmation=True,
                 timeout_ms=30000,
+                capabilities=("process_exec",),
             ),
             ToolDefinition(
                 name="move_mouse",
@@ -317,7 +322,7 @@ class PcAutomationPlugin(BasePlugin):
                 app_name = args.get("app_name")
                 if not app_name:
                     return ToolResult.error("Missing required parameter: app_name")
-                result = await exec_open_app(app_name)
+                result = await exec_open_app(app_name, cwd=context.workspace_root)
             elif tool_name == "close_application":
                 app_name = args.get("app_name")
                 if not app_name:
@@ -356,7 +361,15 @@ class PcAutomationPlugin(BasePlugin):
                 command = args.get("command")
                 if not command:
                     return ToolResult.error("Missing required parameter: command")
-                result = await exec_command(command)
+                # Confine execution to the active workspace: reject any
+                # absolute path in the command that escapes the sandbox, and
+                # run with cwd=workspace so relative paths resolve inside it.
+                within, reason = command_paths_within_workspace(
+                    command, context.workspace_root,
+                )
+                if not within:
+                    return ToolResult.error(reason)
+                result = await exec_command(command, cwd=context.workspace_root)
             elif tool_name == "move_mouse":
                 x = args.get("x")
                 y = args.get("y")

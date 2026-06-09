@@ -264,12 +264,19 @@ class PermissionMiddleware:
 class ConfirmationMiddleware:
     """Gate confirmation-requiring tools behind a user round-trip.
 
-    Mirrors the legacy behaviour exactly: a tool opts in via
-    ``requires_confirmation``; when the runtime toggle
-    ``permissions.confirmations_enabled`` is on, the user is asked over the
-    :class:`~backend.services.turn.channel.InteractionChannel`; when off, the
-    call is auto-approved. Either way an audit decision is recorded for the
-    engine to persist. A rejection short-circuits.
+    **The tier is authoritative.** When ``PermissionMiddleware`` stamped a
+    ``NEEDS_CONFIRMATION`` verdict (``call.gate_decision``), the user is *always*
+    asked over the :class:`~backend.services.turn.channel.InteractionChannel` —
+    the legacy global ``permissions.confirmations_enabled`` toggle can no longer
+    override the chosen tier. ``AUTOPILOT`` is the explicit "never ask" tier (it
+    yields ALLOW, so it never reaches this middleware needing confirmation).
+
+    The legacy flag survives only as a fallback for the *no-gate-decision* path:
+    when this middleware is driven in isolation (a unit test without the upstream
+    permission stage, ``gate_decision is None``), the call falls back to the
+    ``requires_confirmation`` flag and the toggle then decides ask-vs-auto-approve.
+    Either way an audit decision is recorded for the engine to persist, and a
+    rejection short-circuits.
     """
 
     def __init__(
@@ -321,7 +328,10 @@ class ConfirmationMiddleware:
             tool_name=call.tool_name,
         ))
 
-        if self._confirmations_enabled:
+        # Tier authoritative: a NEEDS_CONFIRMATION verdict ALWAYS prompts. The legacy
+        # global toggle only governs the no-gate-decision fallback (unit-test isolation).
+        tier_mandated = gd is not None and gd.action is GateAction.NEEDS_CONFIRMATION
+        if tier_mandated or self._confirmations_enabled:
             confirmation = await _request_confirmation(
                 self._channel, call.tool_name, call.args, call.exec_id,
                 self._timeout_s,
@@ -334,7 +344,7 @@ class ConfirmationMiddleware:
             remember = confirmation.remember
         else:
             logger.info(
-                "Confirmations disabled — auto-approving '{}' (exec_id={})",
+                "No tier verdict and confirmations disabled — auto-approving '{}' (exec_id={})",
                 call.tool_name, call.exec_id,
             )
             approved = True
@@ -734,27 +744,44 @@ async def _execute_user_interaction(
     timeout_s: float,
     cancel_event: asyncio.Event | None = None,
 ) -> ToolResult:
-    """Ask the human a question and return their answer as a tool result.
+    """Ask the user one or more questions (sequential wizard) and await answers.
 
     Issues an ``ask_user`` round-trip on the InteractionChannel (emitting an
     ``ask_user_required`` frame) and blocks until the correlated
     ``ask_user_response`` arrives. Used for tools flagged
-    ``ToolDefinition.user_interaction`` (the ``ask_user`` meta-tool). The
-    answer text becomes the tool result fed back into the LLM loop.
+    ``ToolDefinition.user_interaction`` (the ``ask_user`` meta-tool).
+
+    The request payload carries ``{"questions": [...]}`` — each question has an
+    ``id``, ``text``, ``type`` (``"radio"`` | ``"checkbox"``), ``options`` and
+    ``allow_free_text``. The response carries ``{"answers": [...]}`` with each
+    answer correlated by ``question_id`` (``selected`` list + optional
+    ``free_text``). The answers are flattened into a labelled ``Q:``/``A:``
+    transcript fed back into the LLM loop.
 
     Returns:
-        A successful :class:`ToolResult` carrying the user's answer, or an
-        error result on cancellation / timeout.
+        A successful :class:`ToolResult` carrying the labelled answers, or an
+        error result on empty input / cancellation / timeout.
 
     Raises:
         WebSocketDisconnect: If the socket dropped while awaiting the answer.
     """
-    question = str(args.get("question", "")).strip()
-    payload: dict[str, Any] = {"question": question}
-    options = args.get("options")
-    if isinstance(options, list):
-        payload["options"] = [str(o) for o in options]
+    raw_questions = args.get("questions")
+    questions: list[dict[str, Any]] = []
+    if isinstance(raw_questions, list):
+        for i, q in enumerate(raw_questions):
+            if not isinstance(q, dict):
+                continue
+            questions.append({
+                "id": str(q.get("id") or f"q{i + 1}"),
+                "text": str(q.get("text", "")).strip(),
+                "type": "checkbox" if q.get("type") == "checkbox" else "radio",
+                "options": [str(o) for o in q.get("options", []) if o is not None],
+                "allow_free_text": bool(q.get("allow_free_text", False)),
+            })
+    if not questions:
+        return ToolResult.error("ask_user called with no questions")
 
+    payload: dict[str, Any] = {"questions": questions}
     msg = await channel.request(
         "ask_user", payload,
         execution_id=execution_id, timeout_s=timeout_s, cancel_event=cancel_event,
@@ -773,8 +800,18 @@ async def _execute_user_interaction(
         )
         return ToolResult.error(f"No answer received (timed out after {timeout_s}s).")
 
-    answer = msg.get("answer")
-    return ToolResult.ok(
-        str(answer) if answer is not None else "",
-        content_type="text/plain",
-    )
+    answers = msg.get("answers") if isinstance(msg, dict) else None
+    if not isinstance(answers, list):
+        return ToolResult.ok("(no answer provided)", content_type="text/plain")
+
+    by_id = {str(a.get("question_id")): a for a in answers if isinstance(a, dict)}
+    lines: list[str] = []
+    for q in questions:
+        a = by_id.get(q["id"], {})
+        selected = a.get("selected") if isinstance(a.get("selected"), list) else []
+        free = str(a.get("free_text", "")).strip()
+        parts = [str(s) for s in selected]
+        if free:
+            parts.append(free)
+        lines.append(f"Q: {q['text']}\nA: {', '.join(parts) if parts else '(no answer)'}")
+    return ToolResult.ok("\n\n".join(lines), content_type="text/plain")

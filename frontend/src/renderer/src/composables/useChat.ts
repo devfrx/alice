@@ -26,6 +26,7 @@ import { useAgentRunStore } from '../stores/agentRun'
 import { useChatStore } from '../stores/chat'
 import { useSettingsStore } from '../stores/settings'
 import type {
+  AskUserAnswer,
   FileAttachment,
   WsAskUserRequiredMessage,
   WsAskUserResponsePayload,
@@ -73,8 +74,8 @@ export interface UseChatReturn {
   stopGeneration: () => void
   /** Respond to a tool confirmation request. */
   respondToConfirmation: (executionId: string, approved: boolean) => void
-  /** Answer an inline `ask_user` prompt with free-form text. */
-  answerAskUser: (executionId: string, answer: string) => void
+  /** Answer an inline `ask_user` prompt with the user's structured answers. */
+  answerAskUser: (executionId: string, answers: AskUserAnswer[]) => void
   /** Reactive flag — `true` while the socket is open. */
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
@@ -225,8 +226,7 @@ export function useChat(): UseChatReturn {
     // ask_user always needs human input — there is no auto-approve path.
     store.addPendingAskUser({
       executionId: msg.execution_id,
-      question: msg.question,
-      options: msg.options
+      questions: msg.questions
     })
   }
 
@@ -634,13 +634,16 @@ export function useChat(): UseChatReturn {
   }
 
   /**
-   * Answer an inline `ask_user` prompt with the user's free-form text.
+   * Answer an inline `ask_user` prompt with the user's structured answers.
+   *
+   * One `executionId` per interaction; each answer is correlated back to its
+   * question by `question_id`.
    */
-  function answerAskUser(executionId: string, answer: string): void {
+  function answerAskUser(executionId: string, answers: AskUserAnswer[]): void {
     const payload: WsAskUserResponsePayload = {
       type: 'ask_user_response',
       execution_id: executionId,
-      answer
+      answers
     }
     wsManager.send(payload)
     store.removePendingAskUser(executionId)

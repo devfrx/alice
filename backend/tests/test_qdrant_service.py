@@ -171,3 +171,16 @@ class TestConstants:
 
     def test_project_ns(self):
         assert isinstance(PROJECT_NS, uuid.UUID)
+
+
+@pytest.mark.asyncio
+async def test_try_clear_stale_lock_removes_orphan_lockfile(tmp_path):
+    cfg = QdrantConfig(mode="embedded", path=str(tmp_path / "qd"))
+    svc = QdrantService(cfg)
+    # Simulate an orphan RocksDB lock with no holder.
+    lock_dir = tmp_path / "qd"
+    lock_dir.mkdir(parents=True)
+    (lock_dir / ".lock").write_text("")
+    removed = svc.try_clear_stale_lock()
+    assert removed is True
+    assert not (lock_dir / ".lock").exists()

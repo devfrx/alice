@@ -1,8 +1,10 @@
-"""Tests for the confirmations_enabled security toggle in the turn engine.
+"""Tests for tier-authoritative confirmations in the turn engine.
 
-Verifies that `ctx.config.permissions.confirmations_enabled` correctly
-controls whether dangerous tools require interactive user confirmation
-or are auto-approved, while ensuring FORBIDDEN tools remain blocked.
+The permission TIER is authoritative: a ``NEEDS_CONFIRMATION`` verdict always
+prompts, regardless of the legacy global ``permissions.confirmations_enabled``
+flag. ``AUTOPILOT`` is the explicit "never ask" tier (it yields ALLOW), and
+``FORBIDDEN`` tools stay blocked in every tier. The legacy flag now only governs
+the no-gate-decision fallback used by isolated unit tests.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import pytest
 
 from backend.services.turn.tool_loop import run_tool_loop
 from backend.services.turn.pipeline import ConfirmationOutcome
+from backend.services.permission_mode_service import PermissionMode, PermissionModeService
 from backend.core.plugin_models import ToolDefinition, ToolResult
 from backend.db.models import ToolConfirmationAudit
 
@@ -49,8 +52,13 @@ def _make_tool_def(
     )
 
 
-def _build_mocks(*, confirmations_enabled: bool = True):
-    """Return (ctx, ws, session, llm) mocks wired for run_tool_loop."""
+def _build_mocks(*, confirmations_enabled: bool = True, mode: str = "strict"):
+    """Return (ctx, ws, session, llm) mocks wired for run_tool_loop.
+
+    ``mode`` selects the conversation's permission tier. A
+    ``MagicMock(spec=PermissionModeService)`` passes the ``isinstance`` check the
+    tool loop uses, so the gate consults this mode for every tool-call.
+    """
     # --- Config ---
     permissions_cfg = MagicMock()
     permissions_cfg.confirmations_enabled = confirmations_enabled
@@ -102,6 +110,13 @@ def _build_mocks(*, confirmations_enabled: bool = True):
 
     llm.chat = MagicMock(side_effect=_final_answer)
     llm.build_continuation_messages = MagicMock(return_value=[])
+
+    # --- Permission-mode service (tier the gate consults per tool-call) ---
+    # A spec'd MagicMock satisfies the tool loop's
+    # ``isinstance(ctx.permission_mode_service, PermissionModeService)`` check.
+    mode_service = MagicMock(spec=PermissionModeService)
+    mode_service.get_mode.return_value = PermissionMode(mode)
+    ctx.permission_mode_service = mode_service
 
     return ctx, ws, session, llm
 
@@ -156,41 +171,44 @@ async def test_confirmations_enabled_requests_approval():
 
 
 @pytest.mark.asyncio
-async def test_confirmations_disabled_auto_approves():
-    """With confirmations_enabled=False, dangerous tools are auto-approved
-    without calling _request_confirmation."""
-    ctx, ws, session, llm = _build_mocks(confirmations_enabled=False)
+async def test_strict_tier_always_prompts_even_with_global_flag_off():
+    """Tier authoritative: a NEEDS_CONFIRMATION verdict prompts regardless of the legacy flag."""
+    ctx, ws, session, llm = _build_mocks(confirmations_enabled=False, mode="strict")
     ctx.tool_registry.get_tool_definition.return_value = _make_tool_def(
         "dangerous_tool", requires_confirmation=True, risk_level="dangerous",
     )
-
     tool_calls = [_make_tool_call("dangerous_tool")]
     conv_id = uuid.uuid4()
-
     with patch(
         "backend.services.turn.pipeline._request_confirmation",
-        new_callable=AsyncMock,
-        return_value=ConfirmationOutcome(approved=True),
+        new_callable=AsyncMock, return_value=ConfirmationOutcome(approved=True),
     ) as mock_confirm:
         await run_tool_loop(
-            channel=ws,
-            sink=ws,
-            ctx=ctx,
-            session=session,
-            conv_id=conv_id,
-            llm=llm,
-            tool_calls_from_llm=tool_calls,
-            full_content="",
-            thinking_content="",
-            max_iterations=1,
-            confirmation_timeout_s=30,
-            client_ip="127.0.0.1",
-            sync_fn=None,
+            channel=ws, sink=ws, ctx=ctx, session=session, conv_id=conv_id, llm=llm,
+            tool_calls_from_llm=tool_calls, full_content="", thinking_content="",
+            max_iterations=1, confirmation_timeout_s=30, client_ip="127.0.0.1", sync_fn=None,
         )
+        mock_confirm.assert_called_once()  # NO LONGER silently auto-approved
 
+
+@pytest.mark.asyncio
+async def test_autopilot_tier_does_not_prompt():
+    """AUTOPILOT is the explicit 'never ask' tier."""
+    ctx, ws, session, llm = _build_mocks(confirmations_enabled=True, mode="autopilot")
+    ctx.tool_registry.get_tool_definition.return_value = _make_tool_def(
+        "dangerous_tool", requires_confirmation=True, risk_level="dangerous",
+    )
+    tool_calls = [_make_tool_call("dangerous_tool")]
+    conv_id = uuid.uuid4()
+    with patch(
+        "backend.services.turn.pipeline._request_confirmation", new_callable=AsyncMock,
+    ) as mock_confirm:
+        await run_tool_loop(
+            channel=ws, sink=ws, ctx=ctx, session=session, conv_id=conv_id, llm=llm,
+            tool_calls_from_llm=tool_calls, full_content="", thinking_content="",
+            max_iterations=1, confirmation_timeout_s=30, client_ip="127.0.0.1", sync_fn=None,
+        )
         mock_confirm.assert_not_called()
-
-    # Tool should still have been executed
     ctx.tool_registry.execute_tool.assert_called_once()
 
 
@@ -233,10 +251,16 @@ async def test_forbidden_blocked_even_when_confirmations_disabled():
 
 
 @pytest.mark.asyncio
-async def test_audit_logged_when_auto_approved():
-    """Auto-approved tools (confirmations disabled) still produce an audit entry
-    with user_approved=True."""
-    ctx, ws, session, llm = _build_mocks(confirmations_enabled=False)
+async def test_audit_logged_when_confirmation_approved():
+    """An approved confirmation writes an audit row with user_approved=True.
+
+    Re-grounded for the tier-authoritative model: a NEEDS_CONFIRMATION tool in
+    STRICT prompts even with the global flag off (it is no longer silently
+    auto-approved). On approval, the audit row still records user_approved=True.
+    (AUTOPILOT can't stand in here: it yields ALLOW, which never reaches the
+    ConfirmationMiddleware and so writes no audit row.)
+    """
+    ctx, ws, session, llm = _build_mocks(confirmations_enabled=False, mode="strict")
     ctx.tool_registry.get_tool_definition.return_value = _make_tool_def(
         "medium_tool", requires_confirmation=True, risk_level="medium",
     )
@@ -244,21 +268,27 @@ async def test_audit_logged_when_auto_approved():
     tool_calls = [_make_tool_call("medium_tool")]
     conv_id = uuid.uuid4()
 
-    await run_tool_loop(
-        channel=ws,
-        sink=ws,
-        ctx=ctx,
-        session=session,
-        conv_id=conv_id,
-        llm=llm,
-        tool_calls_from_llm=tool_calls,
-        full_content="",
-        thinking_content="some reasoning",
-        max_iterations=1,
-        confirmation_timeout_s=30,
-        client_ip="127.0.0.1",
-        sync_fn=None,
-    )
+    with patch(
+        "backend.services.turn.pipeline._request_confirmation",
+        new_callable=AsyncMock,
+        return_value=ConfirmationOutcome(approved=True),
+    ) as mock_confirm:
+        await run_tool_loop(
+            channel=ws,
+            sink=ws,
+            ctx=ctx,
+            session=session,
+            conv_id=conv_id,
+            llm=llm,
+            tool_calls_from_llm=tool_calls,
+            full_content="",
+            thinking_content="some reasoning",
+            max_iterations=1,
+            confirmation_timeout_s=30,
+            client_ip="127.0.0.1",
+            sync_fn=None,
+        )
+        mock_confirm.assert_called_once()
 
     audits = _get_audit_entries(session)
     assert len(audits) == 1

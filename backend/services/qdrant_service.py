@@ -7,7 +7,9 @@ Does NOT handle embedding — callers provide pre-computed vectors.
 from __future__ import annotations
 
 import asyncio
+import shutil
 import uuid
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -117,6 +119,58 @@ class QdrantService:
             self._client = None
             _log.info("Qdrant client closed")
 
+    def try_clear_stale_lock(self) -> bool:
+        """Best-effort remove an orphan embedded-mode lock file.
+
+        Returns True if at least one lock file was removed. Only touches the
+        configured embedded path and never raises. A lock held by a live process
+        cannot be removed on Windows (the unlink fails) — in that case this
+        returns False and the caller keeps the in-memory fallback.
+
+        Returns:
+            True if at least one ``.lock`` file was removed.
+        """
+        if self._config.mode != "embedded":
+            return False
+        removed = False
+        root = Path(self._config.path)
+        for lock in root.rglob(".lock"):
+            try:
+                lock.unlink()
+                removed = True
+            except OSError:
+                pass
+        return removed
+
+    async def reinitialize(self) -> None:
+        """Close and re-run :meth:`initialize` (used after a stale-lock clear)."""
+        await self.close()
+        self._in_memory = False
+        await self.initialize()
+
+    def clear_embedded_data(self) -> bool:
+        """Delete the embedded vector-store directory (destructive).
+
+        Backs the user-triggered "repair" action: when the on-disk data was
+        written by an incompatible ``qdrant-client`` version (so the client
+        can no longer open it), removing the directory lets a fresh store be
+        created on the next :meth:`initialize`.  Only touches the configured
+        embedded path and never raises.
+
+        Returns:
+            True if the directory is gone afterwards (removed or already
+            absent); False in server mode or if removal failed.
+        """
+        if self._config.mode != "embedded":
+            return False
+        root = Path(self._config.path)
+        try:
+            if root.exists():
+                shutil.rmtree(root, ignore_errors=True)
+            return not root.exists()
+        except OSError:
+            return False
+
     # ------------------------------------------------------------------
     # Collection management
     # ------------------------------------------------------------------
@@ -161,17 +215,13 @@ class QdrantService:
                 name, vector_size, distance.value,
             )
 
-    async def get_collection_dim(self, name: str) -> int:
-        """Return the vector size of an existing collection, or 0 if absent."""
+    async def get_collection_dim(self, name: str) -> int | None:
+        """Return the vector dimensionality of *name*, or None if it is missing."""
         assert self._client is not None, "QdrantService not initialized"
-        try:
-            exists = await self._client.collection_exists(name)
-            if not exists:
-                return 0
-            info = await self._client.get_collection(name)
-            return info.config.params.vectors.size  # type: ignore[union-attr]
-        except Exception:
-            return 0
+        if not await self._client.collection_exists(name):
+            return None
+        info = await self._client.get_collection(name)
+        return int(info.config.params.vectors.size)  # type: ignore[union-attr]
 
     async def upsert(
         self,
@@ -322,9 +372,11 @@ class QdrantService:
             query_filter: Optional filter.
 
         Returns:
-            Number of matching points.
+            Number of matching points (0 if the collection is missing).
         """
         assert self._client is not None, "QdrantService not initialized"
+        if not await self._client.collection_exists(collection):
+            return 0
         if query_filter:
             result = await self._client.count(
                 collection_name=collection,

@@ -158,6 +158,16 @@ class LLMService:
         # avoid a wasted round-trip on every classifier/planner/critic
         # call.
         self._supports_response_format: bool | None = None
+        # Non-blocking cache for the active model's context window. Read on the
+        # chat turn-start / conversation-open hot paths; refreshed in the
+        # background so those paths never await an LM Studio round-trip.
+        self._ctx_window_cache: int | None = None
+        self._ctx_window_expires: float = 0.0
+        self._ctx_window_ttl: float = 300.0
+        self._ctx_window_ttl_failure: float = 20.0
+        self._default_ctx_window: int = 32768
+        self._ctx_window_refreshing: bool = False
+        self._refresh_task: asyncio.Task[None] | None = None
 
     # ------------------------------------------------------------------
     # Model resolution helpers
@@ -1575,20 +1585,46 @@ class LLMService:
             logger.warning("Non-streaming completion failed: {}", exc)
             return ""
 
-    async def get_active_context_window(
-        self, lmstudio_manager: Any = None,
-    ) -> int:
-        """Return the context window of the currently loaded model.
+    def get_cached_context_window(self, lmstudio_manager: Any = None) -> int:
+        """Return the active model's context window WITHOUT blocking.
 
-        Queries the LM Studio v1 API for loaded model metadata.
-        Falls back to 32768 if unavailable.
+        Serves the cached value (or the default) immediately. When the cache is
+        empty or stale it schedules a background refresh so the *next* call is
+        warm — the hot path (turn-start, conversation-open) never awaits LM Studio.
 
         Args:
-            lmstudio_manager: Optional LMStudioManager for v1 API calls.
+            lmstudio_manager: Optional LMStudioManager used by the background
+                refresh to query loaded-model metadata.
 
         Returns:
-            Context window size in tokens.
+            Context window size in tokens (cached, last-known, or the default).
         """
+        now = time.monotonic()
+        if self._ctx_window_cache is not None and now < self._ctx_window_expires:
+            return self._ctx_window_cache
+        if lmstudio_manager is not None and not self._ctx_window_refreshing:
+            self._ctx_window_refreshing = True
+            try:
+                loop = asyncio.get_running_loop()
+                self._refresh_task = loop.create_task(
+                    self._refresh_context_window(lmstudio_manager)
+                )
+                self._refresh_task.add_done_callback(
+                    lambda _t: setattr(self, "_ctx_window_refreshing", False)
+                )
+            except RuntimeError:
+                # No running loop (sync test context) — drop the refresh flag.
+                self._ctx_window_refreshing = False
+        return (
+            self._ctx_window_cache
+            if self._ctx_window_cache is not None
+            else self._default_ctx_window
+        )
+
+    async def _refresh_context_window(self, lmstudio_manager: Any = None) -> None:
+        """Refresh the cached context window from LM Studio (never raises)."""
+        value = self._ctx_window_cache
+        got_value = False
         try:
             if lmstudio_manager is not None:
                 data = await lmstudio_manager.list_models()
@@ -1597,14 +1633,33 @@ class LLMService:
                         continue
                     instances = model.get("loaded_instances", [])
                     if instances:
-                        ctx_len = instances[0].get("config", {}).get(
-                            "context_length", 0,
-                        )
+                        ctx_len = instances[0].get("config", {}).get("context_length", 0)
                         if ctx_len > 0:
-                            return ctx_len
+                            value = ctx_len
+                            got_value = True
+                            break
         except Exception as exc:
-            logger.debug("Failed to query context window: {}", exc)
-        return 32768
+            logger.debug("Failed to refresh context window: {}", exc)
+        if value is None:
+            value = self._default_ctx_window
+        self._ctx_window_cache = value
+        # Fix 4 (minor): when the probe didn't yield a real value (LM Studio down or
+        # no model loaded), expire sooner so recovery is fast instead of stuck 5 min.
+        ttl = self._ctx_window_ttl if got_value else self._ctx_window_ttl_failure
+        self._ctx_window_expires = time.monotonic() + ttl
+
+    def invalidate_context_window_cache(self) -> None:
+        """Drop the cached context window (call on model switch / config change)."""
+        self._ctx_window_cache = None
+        self._ctx_window_expires = 0.0
+        self._ctx_window_refreshing = False
+
+    async def get_active_context_window(self, lmstudio_manager: Any = None) -> int:
+        """Back-compat async accessor: refresh if needed, then return the cache."""
+        now = time.monotonic()
+        if self._ctx_window_cache is None or now >= self._ctx_window_expires:
+            await self._refresh_context_window(lmstudio_manager)
+        return self.get_cached_context_window(lmstudio_manager)
 
     # ------------------------------------------------------------------
     # Lifecycle

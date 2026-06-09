@@ -9,11 +9,14 @@ for persistence (a session factory plus an optional event callback) and adds
 the in-memory dict for the sync read path.
 
 ``scope_roots`` returns the *explicit* folders only (``None`` when none are
-set).  The sandbox / disabled fallback for an unset scope is deliberately
-**not** applied here — it belongs to the terminal plugin (a later task).
-Keeping ``scope_roots`` explicit-only is exactly what makes wiring it into the
-permission layer behaviour-preserving: no scope set ⇒ ``None`` ⇒ no
-confinement.
+set) and is still consumed directly by the human interactive terminal.  The
+hard-sandbox fallback for an unset scope lives in the sibling
+:meth:`ScopeService.effective_roots`, which is what the turn engine's
+:class:`~backend.services.permission_service.PermissionService` now uses as its
+``scope_provider``: the explicit scope when set, else a per-conversation
+ephemeral sandbox dir under :attr:`WorkspaceScopeConfig.sandbox_root`.  So the
+model's filesystem/exec tools are *confined* to that sandbox (never the OS home)
+rather than denied outright when no explicit scope is set.
 """
 
 from __future__ import annotations
@@ -169,6 +172,30 @@ class ScopeService:
         if not roots:
             return None
         return list(roots)
+
+    def sandbox_root_for(self, conversation_id: str) -> Path:
+        """Return (creating if needed) the per-conversation ephemeral sandbox dir.
+
+        This is the hard-sandbox fallback used when a conversation has no explicit
+        workspace scope set: the model still gets exactly one safe place to write,
+        under ``WorkspaceScopeConfig.sandbox_root`` — never the OS home or a system
+        root.
+        """
+        root = Path(self._config.sandbox_root).resolve() / str(conversation_id)
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+
+    def effective_roots(self, conversation_id: str) -> list[Path]:
+        """Explicit scope if set, else the per-conversation hard-sandbox dir.
+
+        Wired into :class:`PermissionService` as the ``scope_provider`` so the gate
+        confines filesystem tools to the sandbox when no explicit scope is set,
+        rather than denying them outright.
+        """
+        explicit = self.scope_roots(conversation_id)
+        if explicit:
+            return explicit
+        return [self.sandbox_root_for(conversation_id)]
 
     async def get_scope(self, conversation_id: uuid.UUID | str) -> list[str]:
         """Return the conversation's scope folders as strings (for the REST API).

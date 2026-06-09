@@ -76,7 +76,7 @@ async def list_whiteboards(
         offset=offset,
         conversation_id=conversation_id,
     )
-    total = await store.count()
+    total = await store.count(conversation_id=conversation_id)
 
     # Resolve conversation titles for all board items.
     conv_ids = {

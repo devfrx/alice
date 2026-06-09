@@ -36,11 +36,7 @@
               <span class="sv__row-label">System Prompt</span>
               <span class="sv__row-hint">Invia il system prompt al modello LLM</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.systemPromptEnabled }" role="switch"
-              :aria-checked="settingsStore.systemPromptEnabled"
-              @click="settingsStore.systemPromptEnabled = !settingsStore.systemPromptEnabled">
-              <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="settingsStore.systemPromptEnabled" aria-label="System Prompt" />
           </div>
           <Transition name="sv-warn">
             <div v-if="!settingsStore.systemPromptEnabled" class="sv__warn">
@@ -56,11 +52,7 @@
               <span class="sv__row-label">Strumenti (Tool Calling)</span>
               <span class="sv__row-hint">Invia le definizioni degli strumenti al modello LLM</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.toolsEnabled }" role="switch"
-              :aria-checked="settingsStore.toolsEnabled"
-              @click="settingsStore.toolsEnabled = !settingsStore.toolsEnabled">
-              <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="settingsStore.toolsEnabled" aria-label="Strumenti (Tool Calling)" />
           </div>
           <Transition name="sv-warn">
             <div v-if="!settingsStore.toolsEnabled" class="sv__warn">
@@ -142,11 +134,7 @@
               <span class="sv__row-label">Conferme strumenti</span>
               <span class="sv__row-hint">Richiedi conferma prima di eseguire strumenti</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.toolConfirmations }" role="switch"
-              :aria-checked="settingsStore.toolConfirmations"
-              @click="settingsStore.toolConfirmations = !settingsStore.toolConfirmations">
-              <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="settingsStore.toolConfirmations" aria-label="Conferma esecuzione strumenti" />
           </div>
           <Transition name="sv-warn">
             <div v-if="!settingsStore.toolConfirmations" class="sv__warn">
@@ -205,6 +193,7 @@ import VectorStoreManager from '../components/settings/VectorStoreManager.vue'
 import PermissionRulesManager from '../components/settings/PermissionRulesManager.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../components/ui/UiSelect.vue'
+import UiToggle from '../components/ui/UiToggle.vue'
 import type { AppIconName } from '../assets/icons'
 import { useSettingsStore } from '../stores/settings'
 
@@ -485,41 +474,6 @@ onUnmounted(() => {
   background: var(--border);
 }
 
-/* ── Toggle switch ────────────────────────────────────────── */
-.sv__toggle {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: var(--surface-3);
-  cursor: pointer;
-  transition: background var(--duration-fast) ease;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.sv__toggle--on {
-  background: var(--accent);
-}
-
-.sv__toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--text-primary);
-  transition:
-    transform var(--duration-fast) ease,
-    background var(--duration-fast) ease;
-}
-
-.sv__toggle--on .sv__toggle-thumb {
-  transform: translateX(16px);
-}
-
 /* ── Warning banner ───────────────────────────────────────── */
 .sv__warn {
   display: flex;
@@ -625,8 +579,6 @@ onUnmounted(() => {
 
   .sv__nav-item,
   .sv__nav-icon,
-  .sv__toggle,
-  .sv__toggle-thumb,
   .sv__input,
   .sv-warn-enter-active,
   .sv-warn-leave-active {

@@ -1,208 +1,209 @@
 <script setup lang="ts">
 /**
- * AskUserPrompt.vue — Inline prompt for the `ask_user` meta-tool.
+ * AskUserPrompt.vue — Inline sequential wizard for the `ask_user` meta-tool.
  *
  * Unlike ToolConfirmationDialog (a centered modal), this renders inline in the
  * message flow and always requires human input — there is no auto-approve path.
- * The user can either click one of the suggested `options` or type a free-form
- * answer. Both paths emit `answer` with the trimmed text; empty input is ignored.
+ * It walks the user through one question per step (radio or checkbox, with an
+ * optional free-text field), then emits a single `answer` carrying every
+ * answer keyed by `question_id`.
  */
-import { nextTick, onMounted, ref } from 'vue'
+import { ref, computed } from 'vue'
 
-import type { AskUserRequest } from '../../types/chat'
+import type { AskUserRequest, AskUserAnswer } from '../../types/chat'
 
-const props = defineProps<{
-    /** The pending ask_user request to display. */
-    request: AskUserRequest
-}>()
+const props = defineProps<{ request: AskUserRequest }>()
+const emit = defineEmits<{ answer: [executionId: string, answers: AskUserAnswer[]] }>()
 
-const emit = defineEmits<{
-    answer: [executionId: string, answer: string]
-}>()
+const step = ref(0)
+const total = computed(() => props.request.questions.length)
+const current = computed(() => props.request.questions[step.value])
 
-const inputRef = ref<HTMLInputElement | null>(null)
-const text = ref('')
+const selected = ref<Record<string, string[]>>({})
+const freeText = ref<Record<string, string>>({})
 
-/** Submit the free-form text answer (ignores empty/whitespace-only). */
-function submitText(): void {
-    const trimmed = text.value.trim()
-    if (!trimmed) return
-    emit('answer', props.request.executionId, trimmed)
-    text.value = ''
+/** Toggle an option for a question; replaces (radio) or accumulates (checkbox). */
+function toggle(qid: string, option: string, multi: boolean): void {
+  const cur = selected.value[qid] ?? []
+  if (multi) {
+    selected.value[qid] = cur.includes(option) ? cur.filter((o) => o !== option) : [...cur, option]
+  } else {
+    selected.value[qid] = [option]
+  }
 }
 
-/** Answer immediately with a clicked option. */
-function chooseOption(option: string): void {
-    emit('answer', props.request.executionId, option)
-}
-
-onMounted(() => {
-    nextTick(() => inputRef.value?.focus())
+/** Whether the current question has enough input to move on. */
+const canAdvance = computed(() => {
+  const q = current.value
+  if (!q) return false
+  const hasSel = (selected.value[q.id]?.length ?? 0) > 0
+  const hasFree = (freeText.value[q.id]?.trim().length ?? 0) > 0
+  return hasSel || (q.allow_free_text ? hasFree : false) || (q.options?.length ?? 0) === 0
 })
+
+function next(): void {
+  if (step.value < total.value - 1) step.value += 1
+  else submit()
+}
+
+function back(): void {
+  if (step.value > 0) step.value -= 1
+}
+
+function submit(): void {
+  const answers: AskUserAnswer[] = props.request.questions.map((q) => ({
+    question_id: q.id,
+    selected: selected.value[q.id] ?? [],
+    free_text: freeText.value[q.id]?.trim() || undefined
+  }))
+  emit('answer', props.request.executionId, answers)
+}
 </script>
 
 <template>
-    <div class="ask-card" role="group" aria-label="Domanda dall'assistente">
-        <div class="ask-card__header">
-            <span class="ask-card__icon" aria-hidden="true">?</span>
-            <h3 class="ask-card__title">Domanda</h3>
-        </div>
+  <div v-if="current" class="ask-card" role="group" aria-label="Domanda dall'assistente">
+    <div class="ask-card__progress">{{ step + 1 }} / {{ total }}</div>
+    <p class="ask-card__question">{{ current.text }}</p>
 
-        <p class="ask-card__question">{{ request.question }}</p>
-
-        <div v-if="request.options?.length" class="ask-card__options">
-            <button v-for="option in request.options" :key="option" type="button" class="ask-card__option"
-                @click="chooseOption(option)">
-                {{ option }}
-            </button>
-        </div>
-
-        <form class="ask-card__form" @submit.prevent="submitText">
-            <input ref="inputRef" v-model="text" type="text" class="ask-card__input"
-                placeholder="Scrivi una risposta…" />
-            <button type="submit" class="ask-card__submit" :disabled="!text.trim()">
-                Invia
-            </button>
-        </form>
+    <div v-if="current.options?.length" class="ask-card__options">
+      <button
+        v-for="option in current.options"
+        :key="option"
+        type="button"
+        class="ask-card__option"
+        :class="{ 'ask-card__option--on': (selected[current.id] ?? []).includes(option) }"
+        @click="toggle(current.id, option, current.type === 'checkbox')"
+      >
+        <span class="ask-card__marker" :class="current.type" />
+        {{ option }}
+      </button>
     </div>
+
+    <input
+      v-if="current.allow_free_text"
+      v-model="freeText[current.id]"
+      class="ask-card__free"
+      type="text"
+      placeholder="Oppure scrivi una risposta…"
+    />
+
+    <div class="ask-card__nav">
+      <button type="button" class="ask-card__btn" :disabled="step === 0" @click="back">
+        Indietro
+      </button>
+      <button
+        type="button"
+        class="ask-card__btn ask-card__btn--primary"
+        :disabled="!canAdvance"
+        @click="next"
+      >
+        {{ step < total - 1 ? 'Avanti' : 'Invia' }}
+      </button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-/* AskUserPrompt — inline variant of the Supabase confirmation card. */
-
 .ask-card {
-    width: 100%;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-    box-shadow: var(--shadow-sm);
-    animation: askCardIn 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
 }
 
-.ask-card__header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
-}
-
-.ask-card__icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-3);
-    border: 1px solid var(--border);
-    color: var(--accent);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    flex-shrink: 0;
-}
-
-.ask-card__title {
-    margin: 0;
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
+.ask-card__progress {
+  font-size: 11px;
+  opacity: 0.6;
 }
 
 .ask-card__question {
-    margin: 0 0 var(--space-3);
-    font-size: var(--text-base);
-    color: var(--text-secondary);
-    line-height: var(--leading-snug);
-    white-space: pre-wrap;
+  margin: 0;
+  font-weight: 600;
 }
 
 .ask-card__options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .ask-card__option {
-    padding: var(--space-1-5) var(--space-3);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--text-primary);
-    background: var(--surface-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background var(--transition-fast), border-color var(--transition-fast),
-        color var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
-.ask-card__option:hover {
-    background: var(--surface-4);
-    border-color: var(--border-hover);
-    color: var(--accent);
+.ask-card__option--on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
 }
 
-.ask-card__form {
-    display: flex;
-    gap: var(--space-2);
-    align-items: stretch;
+.ask-card__marker {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
 }
 
-.ask-card__input {
-    flex: 1;
-    min-width: 0;
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--text-sm);
-    font-family: inherit;
-    color: var(--text-primary);
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    transition: border-color var(--transition-fast);
+.ask-card__marker.radio {
+  border-radius: 50%;
 }
 
-.ask-card__input::placeholder {
-    color: var(--text-muted);
+.ask-card__marker.checkbox {
+  border-radius: 3px;
 }
 
-.ask-card__input:focus {
-    outline: none;
-    border-color: var(--accent);
+.ask-card__option--on .ask-card__marker {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
-.ask-card__submit {
-    padding: var(--space-2) var(--space-5);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--surface-0);
-    background: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background var(--transition-fast), border-color var(--transition-fast),
-        opacity var(--transition-fast);
+.ask-card__free {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: inherit;
+  font-family: inherit;
 }
 
-.ask-card__submit:hover:not(:disabled) {
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
+.ask-card__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
 }
 
-.ask-card__submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.ask-card__btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: inherit;
+  cursor: pointer;
 }
 
-@keyframes askCardIn {
-    from {
-        opacity: 0;
-        transform: translateY(6px);
-    }
+.ask-card__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.ask-card__btn--primary {
+  background: var(--accent);
+  color: var(--surface-0);
+  border-color: var(--accent);
 }
 </style>

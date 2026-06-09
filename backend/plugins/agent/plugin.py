@@ -180,37 +180,68 @@ class AgentPlugin(BasePlugin):
                 ToolDefinition(
                     name="ask_user",
                     description=(
-                        "Ask the user a clarifying question and WAIT for their "
-                        "answer before continuing. Use this only when you "
-                        "genuinely need information that only the user can "
+                        "Ask the user one or more clarifying questions and WAIT "
+                        "for their answers before continuing. The user steps "
+                        "through the questions in a sequential wizard and submits "
+                        "once. Each question is either 'radio' (pick one) or "
+                        "'checkbox' (pick many), with its own options, and can "
+                        "optionally allow an extra free-text answer. Use this only "
+                        "when you genuinely need information that only the user can "
                         "provide — a missing detail, a choice between concrete "
                         "options, or confirmation of intent — and cannot "
-                        "reasonably proceed without it. Provide 'options' for a "
-                        "multiple-choice question, or omit it for a free-form "
-                        "answer. Do not overuse it: for trivial gaps, make a "
-                        "reasonable assumption and proceed."
+                        "reasonably proceed without it. Do not overuse it: for "
+                        "trivial gaps, make a reasonable assumption and proceed."
                     ),
                     parameters={
                         "type": "object",
                         "properties": {
-                            "question": {
-                                "type": "string",
-                                "description": (
-                                    "The question to ask the user, phrased "
-                                    "clearly and concisely."
-                                ),
-                            },
-                            "options": {
+                            "questions": {
                                 "type": "array",
-                                "items": {"type": "string"},
+                                "minItems": 1,
                                 "description": (
-                                    "Optional list of suggested answers the "
-                                    "user can pick from (they may also answer "
-                                    "freely)."
+                                    "One or more questions to ask the user in "
+                                    "sequence. The user steps through them in a "
+                                    "wizard and submits once. Use this only when you "
+                                    "genuinely need information only the user can "
+                                    "provide."
                                 ),
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "description": "Stable id to correlate the answer.",
+                                        },
+                                        "text": {
+                                            "type": "string",
+                                            "description": (
+                                                "The question, phrased clearly "
+                                                "and concisely."
+                                            ),
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": ["radio", "checkbox"],
+                                            "description": (
+                                                "radio = pick one; checkbox = "
+                                                "pick many."
+                                            ),
+                                        },
+                                        "options": {
+                                            "type": "array",
+                                            "items": {"type": "string"},
+                                            "description": "Choices for this question.",
+                                        },
+                                        "allow_free_text": {
+                                            "type": "boolean",
+                                            "description": "Allow an additional free-text answer.",
+                                        },
+                                    },
+                                    "required": ["id", "text", "type"],
+                                },
                             },
                         },
-                        "required": ["question"],
+                        "required": ["questions"],
                     },
                     result_type="string",
                     risk_level="safe",

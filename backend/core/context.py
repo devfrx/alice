@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
@@ -32,6 +32,9 @@ from backend.core.protocols import (
     VRAMMonitorProtocol,
     WSConnectionManagerProtocol,
 )
+
+if TYPE_CHECKING:
+    from backend.services.rag_readiness import RagReadiness
 
 
 @dataclass
@@ -85,6 +88,15 @@ class AppContext:
 
     embedding_client: EmbeddingClientProtocol | None = None
     """Shared embedding client for all vector operations."""
+
+    rag_readiness: RagReadiness | None = None
+    """All-or-nothing RAG readiness verdict (functionality-fixes #3).
+
+    Set in the lifespan after memory/qdrant/tool-registry init (``None`` until
+    computed). Gates memory-search + tool-RAG in chat assembly so the stack
+    runs fully or not at all, never degraded. ``TYPE_CHECKING`` import +
+    ``from __future__ import annotations`` avoid a ``core`` → ``services``
+    (qdrant_service) import cycle."""
 
     ws_connection_manager: WSConnectionManagerProtocol | None = None
     """Persistent event WebSocket connection manager."""

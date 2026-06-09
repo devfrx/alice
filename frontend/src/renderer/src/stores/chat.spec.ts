@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useChatStore } from './chat'
+import { api } from '../services/api'
 import type { AskUserRequest, ConversationDetail } from '../types/chat'
 
 // finalizeStream() fires loadConversations()/loadConversation() as
@@ -32,8 +33,8 @@ vi.mock('../services/api', () => ({
   resolveBackendUrl: (u: string) => u,
 }))
 
-function askReq(executionId: string, question = 'Which file?', options?: string[]): AskUserRequest {
-  return { executionId, question, options }
+function askReq(executionId: string, text = 'Which file?', options?: string[]): AskUserRequest {
+  return { executionId, questions: [{ id: 'q1', text, type: 'radio', options }] }
 }
 
 beforeEach(() => {
@@ -54,9 +55,18 @@ describe('pendingAskUser add/remove', () => {
     expect(Object.keys(s.pendingAskUser)).toEqual(['e1'])
     expect(s.pendingAskUser['e1']).toMatchObject({
       executionId: 'e1',
-      question: 'Pick one',
-      options: ['a', 'b'],
+      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }],
     })
+  })
+
+  it('addPendingAskUser stores a multi-question request', () => {
+    const store = useChatStore()
+    store.addPendingAskUser({
+      executionId: 'e1',
+      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }],
+    })
+    const pending = store.pendingAskUser['e1']
+    expect(pending.questions[0].id).toBe('q1')
   })
 
   it('removePendingAskUser clears only the matching entry', () => {
@@ -115,5 +125,34 @@ describe('pendingAskUser cleanup', () => {
     s.completeToolExecution('e1', 'answered', true)
 
     expect(s.pendingAskUser['e1']).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// loadConversation race (latest selection wins)
+// ---------------------------------------------------------------------------
+
+describe('loadConversation race guard', () => {
+  it('discards a stale loadConversation result (latest selection wins)', async () => {
+    const store = useChatStore()
+    // Do NOT pre-seed `conversations` with A/B (or seed with message_count > 0) so the
+    // API path is taken rather than the local-empty short-circuit.
+    const resolvers: Record<string, (v: unknown) => void> = {}
+    vi.spyOn(api, 'getConversation').mockImplementation(
+      (id: string) =>
+        new Promise((res) => {
+          resolvers[id] = res
+        }) as never
+    )
+
+    const pA = store.loadConversation('A')
+    const pB = store.loadConversation('B')
+    // B resolves first, then the stale A resolves later.
+    resolvers['B']({ id: 'B', title: 'B', created_at: '', updated_at: '', messages: [] })
+    await pB
+    resolvers['A']({ id: 'A', title: 'A', created_at: '', updated_at: '', messages: [] })
+    await pA
+
+    expect(store.currentConversation?.id).toBe('B')
   })
 })

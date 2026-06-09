@@ -224,3 +224,93 @@ def validate_path(path: str) -> tuple[bool, str]:
             return False, f"Path '{path}' is in a protected system directory"
 
     return True, "Path is valid"
+
+
+def _is_within(candidate: Path, root: Path) -> bool:
+    """Return ``True`` when *candidate* is *root* itself or nested under it.
+
+    Args:
+        candidate: An already-resolved absolute path.
+        root: The resolved workspace root.
+
+    Returns:
+        ``True`` if *candidate* does not escape *root*.
+    """
+    try:
+        candidate.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def command_paths_within_workspace(
+    command: str, workspace_root: str | None
+) -> tuple[bool, str]:
+    """Confine every path token in a command to the workspace sandbox.
+
+    The command is tokenised exactly as
+    :func:`~backend.plugins.pc_automation.executor.exec_command` tokenises it
+    (after backslash normalisation) so the paths validated here are the same
+    ones the subprocess will receive. For **each** argument token (the command
+    verb and ``/``- or ``-``-prefixed flags are skipped) the path it will
+    actually resolve to when run with ``cwd=workspace_root`` is computed and
+    required to stay inside ``workspace_root``:
+
+    * A relative token (``subdir``, ``..\\..\\PWNED``) is joined onto the
+      workspace root, so ``..`` traversal that climbs above the sandbox lands
+      outside it and is rejected.
+    * A fully-anchored token — drive absolute ``X:\\...``, UNC ``\\\\...`` or
+      drive-relative ``D:foo`` — carries its own anchor, so the
+      :class:`~pathlib.Path` join *replaces* the workspace anchor and the
+      candidate resolves to the token's own location, outside the sandbox, and
+      is likewise rejected.
+
+    This single resolve-and-contain check closes both the ``..`` traversal and
+    the drive-relative escapes; it does not depend on first classifying a token
+    as "absolute".
+
+    Confinement is skipped (returns ``(True, "")``) when ``workspace_root`` is
+    falsy, so unit/edge cases without a workspace keep working. Production
+    always supplies one via :class:`ExecutionContext`.
+
+    Args:
+        command: The raw command string supplied to ``execute_command``.
+        workspace_root: Absolute path of the active workspace sandbox, or
+            ``None``/empty when no workspace is known.
+
+    Returns:
+        Tuple of ``(is_within, reason)``. ``reason`` is empty on success and
+        names the offending token on failure.
+    """
+    if not workspace_root:
+        return True, ""
+
+    # Reuse the executor's tokeniser/normaliser so we validate exactly the
+    # tokens the subprocess will run. Imported lazily to avoid a circular
+    # import (executor imports validators from this module at load time).
+    from backend.plugins.pc_automation.executor import (
+        _normalize_backslashes,
+        _tokenize_command,
+    )
+
+    try:
+        ws_root = Path(workspace_root).resolve()
+    except (OSError, ValueError) as exc:
+        return False, f"Invalid workspace root: {exc}"
+
+    tokens = _tokenize_command(_normalize_backslashes(command))
+    for token in tokens[1:]:  # skip the command verb (tokens[0])
+        if not token or token.startswith(("/", "-")):
+            continue  # cmd flag / switch, not a path
+        # Resolve where the token actually lands when run with cwd=ws_root.
+        # A token carrying its own drive/anchor replaces ws_root (so it falls
+        # outside and is rejected); a relative ``..`` token climbs above
+        # ws_root and is rejected too.
+        try:
+            candidate = (ws_root / token).resolve()
+        except (OSError, ValueError):
+            return False, f"'{token}' is not a valid path inside the workspace"
+        if not _is_within(candidate, ws_root):
+            return False, f"'{token}' is outside the workspace"
+
+    return True, ""

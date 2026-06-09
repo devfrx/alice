@@ -13,6 +13,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { BACKEND_HOST } from '../services/api'
+import type { RagReadinessStatus } from '../types/settings'
 
 const API = `${BACKEND_HOST}/api`
 
@@ -67,6 +68,13 @@ export const useServicesStore = defineStore('services', () => {
 
   /** Active download progress, keyed by `${service}:${model_id}`. */
   const downloads = ref<Record<string, DownloadProgress>>({})
+
+  /**
+   * Live knowledge/RAG readiness, updated via the `knowledge.status`
+   * events-WS frame (e.g. after a vector-store repair). `null` until the
+   * first frame / stats fetch seeds it.
+   */
+  const knowledge = ref<RagReadinessStatus | null>(null)
 
   // ----- Computed --------------------------------------------------------
 
@@ -236,6 +244,15 @@ export const useServicesStore = defineStore('services', () => {
     }
   }
 
+  function onKnowledgeStatus(payload: Partial<RagReadinessStatus>): void {
+    knowledge.value = {
+      ready: !!payload.ready,
+      reason: payload.reason ?? '',
+      memory_enabled: !!payload.memory_enabled,
+      tool_rag_enabled: !!payload.tool_rag_enabled,
+    }
+  }
+
   function onDownloadProgress(payload: DownloadProgress): void {
     const key = `${payload.service}:${payload.model_id}`
     downloads.value = { ...downloads.value, [key]: payload }
@@ -244,11 +261,43 @@ export const useServicesStore = defineStore('services', () => {
     }
   }
 
+  // ----- Poll back-off (for a down service-status) -----------------------
+  //
+  // When a polled service (e.g. LM Studio) is down we progressively widen
+  // the poll interval so a dead service isn't hammered every few seconds.
+  // The cadence snaps back to the base interval as soon as it recovers.
+
+  const _down = ref(false)
+  const _backoff = ref(1)
+
+  /**
+   * Record the latest status of a polled service to drive poll back-off.
+   *
+   * A `down`/`error` status doubles the back-off multiplier (capped at 8);
+   * an `up`/`ready` status clears it so polling resumes at the base cadence.
+   * Other statuses (e.g. `degraded`/`starting`) leave the cadence untouched.
+   */
+  function noteStatus(_service: string, status: string): void {
+    if (status === 'down' || status === 'error') {
+      _down.value = true
+      _backoff.value = Math.min(_backoff.value * 2, 8)
+    } else if (status === 'up' || status === 'ready') {
+      _down.value = false
+      _backoff.value = 1
+    }
+  }
+
+  /** Next poll delay: `base` while healthy, backed-off (<=30 s) while down. */
+  function nextPollDelay(base: number): number {
+    return _down.value ? Math.min(base * _backoff.value, 30000) : base
+  }
+
   return {
     // state
     services,
     catalogs,
     downloads,
+    knowledge,
     isLoading,
     error,
     // getters
@@ -265,5 +314,9 @@ export const useServicesStore = defineStore('services', () => {
     loadTrellisGuide,
     onServiceStatus,
     onDownloadProgress,
+    onKnowledgeStatus,
+    // poll back-off
+    noteStatus,
+    nextPollDelay,
   }
 })

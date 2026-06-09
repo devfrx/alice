@@ -103,6 +103,14 @@ export const useWhiteboardStore = defineStore('whiteboard', () => {
     currentBoard.value = null
   }
 
+  /** Reset all board state (used on conversation switch). */
+  function reset(): void {
+    boards.value = []
+    total.value = 0
+    currentBoard.value = null
+    error.value = null
+  }
+
   return {
     boards,
     total,
@@ -115,6 +123,7 @@ export const useWhiteboardStore = defineStore('whiteboard', () => {
     loadBoard,
     saveSnapshot,
     deleteBoard,
-    clearCurrent
+    clearCurrent,
+    reset
   }
 })

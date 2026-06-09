@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -102,6 +102,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     async def _refresh_ctx_config(**_kwargs: object) -> None:
         ctx.config = config_service.get_resolved()
+        # A config change may switch the active model, which changes the
+        # context window; drop the cached value so the next probe refreshes it.
+        if getattr(ctx, "llm_service", None) is not None:
+            ctx.llm_service.invalidate_context_window_cache()
 
     ctx.event_bus.subscribe("config.changed", _refresh_ctx_config)
 
@@ -191,6 +195,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         api_token=config.llm.api_token,
     )
     ctx.lmstudio_manager = lmstudio_manager
+
+    # Drop the cached LLM context window whenever the loaded-model set changes
+    # (load/unload paths call invalidate_models_cache), so the next probe
+    # re-reads the window for the now-active model.
+    lmstudio_manager.add_models_changed_listener(
+        llm_service.invalidate_context_window_cache
+    )
 
     # Register LM Studio with the orchestrator (health-only, never auto-start).
     try:
@@ -494,6 +505,24 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.error("Tool registry refresh failed: {}", exc)
     ctx.tool_registry = tool_registry
 
+    # -- All-or-nothing RAG readiness gate (functionality-fixes #3) ---------
+    # Runs after memory/qdrant/tool-registry init AND tool-embedding refresh,
+    # so the verdict reflects the fully-wired stack. Disables memory + tool-RAG
+    # entirely (in chat assembly) rather than running degraded. Never raises.
+    from backend.services.rag_readiness import check_rag_readiness
+
+    ctx.rag_readiness = await check_rag_readiness(ctx)
+    if not ctx.rag_readiness.ready:
+        logger.warning("Knowledge/RAG disabled: {}", ctx.rag_readiness.reason)
+    with suppress(Exception):
+        await ctx.event_bus.emit(
+            "knowledge.status",
+            ready=ctx.rag_readiness.ready,
+            reason=ctx.rag_readiness.reason,
+            memory_enabled=ctx.rag_readiness.memory_enabled,
+            tool_rag_enabled=ctx.rag_readiness.tool_rag_enabled,
+        )
+
     # -- WebSocket connection manager (Phase 10) ----------------------------
     from backend.services.ws_connection_manager import WSConnectionManager
 
@@ -593,6 +622,21 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         AliceEvent.SERVICE_STATUS, _forward_service_status,
     )
 
+    # -- Bridge knowledge/RAG readiness changes to the events WS --------
+    # Lets the UI reflect, live, when memory + tool-RAG are (re)enabled —
+    # e.g. after the user triggers the vector-store "repair" CTA.
+    async def _forward_knowledge_status(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "knowledge.status",
+                "ready": kwargs.get("ready"),
+                "reason": kwargs.get("reason"),
+                "memory_enabled": kwargs.get("memory_enabled"),
+                "tool_rag_enabled": kwargs.get("tool_rag_enabled"),
+            })
+
+    ctx.event_bus.subscribe("knowledge.status", _forward_knowledge_status)
+
     # -- Artifact registry (unified tool-output store) ------------------
     from backend.services.artifacts import ArtifactRegistry
 
@@ -661,13 +705,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # -- Permission service (central tool risk / scope / tier authority) -
     # Fase 6: ScopeService supplies the per-conversation scope provider, so a
-    # tool tagged fs_read/fs_write is confined by construction once a scope is
-    # set. Fase 7: PermissionRuleService supplies persistent allow/ask/deny
-    # rules. No scope set ⇒ filesystem tools are blocked (even in autopilot).
+    # tool tagged fs_read/fs_write is confined by construction. Fase 7:
+    # PermissionRuleService supplies persistent allow/ask/deny rules. Hard
+    # sandbox: ``effective_roots`` returns the explicit scope when set, else the
+    # per-conversation ephemeral sandbox dir — so no scope set ⇒ filesystem
+    # tools are confined to that sandbox (never the OS home/system root), not
+    # denied outright.
     from backend.services.permission_service import PermissionService
 
     ctx.permission_service = PermissionService(
-        scope_provider=scope_service.scope_roots,
+        scope_provider=scope_service.effective_roots,
         rule_provider=rule_service.match,
         forbidden_paths=ctx.config.scope.forbidden_paths,
     )

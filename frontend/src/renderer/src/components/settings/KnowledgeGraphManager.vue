@@ -35,11 +35,11 @@
                         @click="onSearch">Cerca</button>
                 </div>
                 <div class="kg-actions">
-                    <button class="kg-btn kg-btn--accent" @click="showCreateEntity = true">
+                    <button class="kg-btn kg-btn--accent" @click="openCreateEntity">
                         + Entità
                     </button>
                     <button class="kg-btn kg-btn--accent" :disabled="store.entityCount < 2"
-                        @click="showCreateRelation = true">
+                        @click="openCreateRelation">
                         + Relazione
                     </button>
                     <button class="kg-btn kg-btn--secondary" :disabled="store.loading" @click="onRefresh">
@@ -93,117 +93,26 @@
                 </div>
             </div>
 
-            <!-- Create Entity dialog -->
-            <Teleport to="body">
-                <div v-if="showCreateEntity" class="kg-overlay" @click.self="showCreateEntity = false">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <h4 class="kg-dialog__title">Nuova entità</h4>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Nome</span>
-                            <input v-model="newEntity.name" type="text" class="kg-input"
-                                placeholder="es. Mario Rossi" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Tipo</span>
-                            <input v-model="newEntity.entityType" type="text" class="kg-input"
-                                placeholder="es. persona, luogo, concetto" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Osservazioni (una per riga)</span>
-                            <textarea v-model="newEntity.observationsText" class="kg-textarea" rows="3"
-                                placeholder="es. Lavora come ingegnere&#10;Vive a Milano" />
-                        </label>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary" @click="showCreateEntity = false">Annulla</button>
-                            <button class="kg-btn kg-btn--accent"
-                                :disabled="!newEntity.name.trim() || !newEntity.entityType.trim()"
-                                @click="onCreate">Crea</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
-            <!-- Create Relation dialog -->
-            <Teleport to="body">
-                <div v-if="showCreateRelation" class="kg-overlay" @click.self="showCreateRelation = false">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <h4 class="kg-dialog__title">Nuova relazione</h4>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Da (entità)</span>
-                            <UiSelect :model-value="newRelation.from" :options="entityOptions" size="md"
-                                placeholder="Seleziona…" aria-label="Entità di partenza"
-                                @update:model-value="(v) => (newRelation.from = String(v))" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Tipo relazione</span>
-                            <input v-model="newRelation.relationType" type="text" class="kg-input"
-                                placeholder="es. conosce, lavora_con, si_trova_a" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">A (entità)</span>
-                            <UiSelect :model-value="newRelation.to" :options="entityOptions" size="md"
-                                placeholder="Seleziona…" aria-label="Entità di destinazione"
-                                @update:model-value="(v) => (newRelation.to = String(v))" />
-                        </label>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary"
-                                @click="showCreateRelation = false">Annulla</button>
-                            <button class="kg-btn kg-btn--accent"
-                                :disabled="!newRelation.from || !newRelation.to || !newRelation.relationType.trim()"
-                                @click="onCreateRelation">Crea</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
-            <!-- Add Observation dialog -->
-            <Teleport to="body">
-                <div v-if="showAddObservation" class="kg-overlay" @click.self="showAddObservation = false">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <h4 class="kg-dialog__title">Aggiungi osservazione a "{{ observationTarget }}"</h4>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Nuove osservazioni (una per riga)</span>
-                            <textarea v-model="newObservationText" class="kg-textarea" rows="3"
-                                placeholder="es. Ha un cane di nome Rex" />
-                        </label>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary"
-                                @click="showAddObservation = false">Annulla</button>
-                            <button class="kg-btn kg-btn--accent" :disabled="!newObservationText.trim()"
-                                @click="onAddObservation">Aggiungi</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
-            <!-- Confirm dialog -->
-            <Teleport to="body">
-                <div v-if="confirmAction" class="kg-overlay" @click.self="cancelConfirm">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <p class="kg-dialog__message">{{ confirmMessage }}</p>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary" @click="cancelConfirm">Annulla</button>
-                            <button class="kg-btn kg-btn--danger" @click="executeConfirm">Conferma</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
         </template>
     </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
 import { useMcpStore } from '../../stores/mcp'
 import type { KGRelation } from '../../types/mcpMemory'
 import EntityCard from './EntityCard.vue'
 import AppIcon from '../ui/AppIcon.vue'
-import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import { type UiSelectOption } from '../ui/UiSelect.vue'
+import { useModal } from '../../composables/useModal'
+import KgCreateEntityDialog from './KgCreateEntityDialog.vue'
+import KgCreateRelationDialog from './KgCreateRelationDialog.vue'
+import KgAddObservationDialog from './KgAddObservationDialog.vue'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
+const { confirm, openCustom } = useModal()
 
 /** Whether the MCP memory server is connected. */
 const memoryConnected = computed(() => {
@@ -230,92 +139,74 @@ function relationsFor(entityName: string, relations: KGRelation[]): KGRelation[]
 }
 
 // ── Create Entity ─────────────────────────────────────────────────────────
-const showCreateEntity = ref(false)
-const newEntity = reactive({ name: '', entityType: '', observationsText: '' })
 
-async function onCreate(): Promise<void> {
-    const observations = newEntity.observationsText
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-    await store.createEntities([
-        { name: newEntity.name.trim(), entityType: newEntity.entityType.trim(), observations },
-    ])
-    newEntity.name = ''
-    newEntity.entityType = ''
-    newEntity.observationsText = ''
-    showCreateEntity.value = false
+async function openCreateEntity(): Promise<void> {
+    // The store action reloads the graph on success, so no extra refresh here.
+    await openCustom({ component: KgCreateEntityDialog, title: 'Nuova entità', width: '480px' })
 }
 
 // ── Create Relation ───────────────────────────────────────────────────────
-const showCreateRelation = ref(false)
-const newRelation = reactive({ from: '', to: '', relationType: '' })
 
 /** Entity options for the relation endpoints, labelled with their type. */
 const entityOptions = computed<UiSelectOption[]>(() =>
     store.entities.map((e) => ({ value: e.name, label: `${e.name} (${e.entityType})` })),
 )
 
-async function onCreateRelation(): Promise<void> {
-    await store.createRelations([
-        { from: newRelation.from, to: newRelation.to, relationType: newRelation.relationType.trim() },
-    ])
-    newRelation.from = ''
-    newRelation.to = ''
-    newRelation.relationType = ''
-    showCreateRelation.value = false
+async function openCreateRelation(): Promise<void> {
+    // The store action reloads the graph on success, so no extra refresh here.
+    await openCustom({
+        component: KgCreateRelationDialog,
+        props: { entities: entityOptions.value },
+        title: 'Nuova relazione',
+        width: '480px',
+    })
 }
 
 // ── Add Observation ───────────────────────────────────────────────────────
-const showAddObservation = ref(false)
-const observationTarget = ref('')
-const newObservationText = ref('')
 
-function openAddObservation(entityName: string): void {
-    observationTarget.value = entityName
-    newObservationText.value = ''
-    showAddObservation.value = true
-}
-
-async function onAddObservation(): Promise<void> {
-    const contents = newObservationText.value
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-    if (contents.length > 0) {
-        await store.addObservations(observationTarget.value, contents)
-    }
-    showAddObservation.value = false
+async function openAddObservation(entityName: string): Promise<void> {
+    // The store action reloads the graph on success, so no extra refresh here.
+    await openCustom({
+        component: KgAddObservationDialog,
+        props: { entityName },
+        title: `Aggiungi osservazione · ${entityName}`,
+        width: '480px',
+    })
 }
 
 // ── Confirmation dialog ───────────────────────────────────────────────────
-const confirmAction = ref<(() => Promise<void>) | null>(null)
-const confirmMessage = ref('')
 
-function confirmDeleteEntity(name: string): void {
-    confirmMessage.value = `Eliminare l'entità "${name}" e tutte le sue relazioni?`
-    confirmAction.value = () => store.deleteEntities([name])
+async function confirmDeleteEntity(name: string): Promise<void> {
+    const ok = await confirm({
+        title: 'Elimina entità',
+        message: `Eliminare l'entità "${name}" e tutte le sue relazioni?`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteEntities([name])
 }
 
-function confirmDeleteObservation(entityName: string, observation: string): void {
-    confirmMessage.value = `Rimuovere questa osservazione da "${entityName}"?\n\n"${observation.slice(0, 100)}…"`
-    confirmAction.value = () => store.deleteObservations(entityName, [observation])
+async function confirmDeleteObservation(entityName: string, observation: string): Promise<void> {
+    const ok = await confirm({
+        title: 'Rimuovi osservazione',
+        message: `Rimuovere questa osservazione da "${entityName}"?\n\n"${observation.slice(0, 100)}…"`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteObservations(entityName, [observation])
 }
 
-function confirmDeleteRelation(rel: KGRelation): void {
-    confirmMessage.value = `Eliminare la relazione "${rel.from}" → ${rel.relationType} → "${rel.to}"?`
-    confirmAction.value = () => store.deleteRelations([rel])
-}
-
-async function executeConfirm(): Promise<void> {
-    if (confirmAction.value) await confirmAction.value()
-    confirmAction.value = null
-    confirmMessage.value = ''
-}
-
-function cancelConfirm(): void {
-    confirmAction.value = null
-    confirmMessage.value = ''
+async function confirmDeleteRelation(rel: KGRelation): Promise<void> {
+    const ok = await confirm({
+        title: 'Elimina relazione',
+        message: `Eliminare la relazione "${rel.from}" → ${rel.relationType} → "${rel.to}"?`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteRelations([rel])
 }
 
 // ── Search / Refresh ──────────────────────────────────────────────────────
@@ -634,93 +525,5 @@ watch(memoryConnected, (connected) => {
     background: var(--border-hover);
 }
 
-/* ── Dialog overlay ────────────────────────────────────── */
-.kg-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-modal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--black-heavy);
-}
 
-.kg-dialog {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--space-6);
-    max-width: 440px;
-    width: 90%;
-    box-shadow: var(--shadow-floating);
-}
-
-.kg-dialog__title {
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
-    margin: 0 0 var(--space-4);
-}
-
-.kg-dialog__message {
-    font-size: var(--text-sm);
-    color: var(--text-primary);
-    line-height: var(--leading-normal);
-    margin: 0 0 var(--space-4);
-    white-space: pre-line;
-}
-
-.kg-dialog__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
-}
-
-/* ── Form fields ───────────────────────────────────────── */
-.kg-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    margin-bottom: var(--space-3);
-}
-
-.kg-field__label {
-    font-size: var(--text-xs);
-    color: var(--text-secondary);
-    font-weight: var(--weight-medium);
-}
-
-.kg-input {
-    padding: var(--space-1) var(--space-2);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    font-family: inherit;
-    outline: none;
-    transition: border-color var(--transition-fast);
-}
-
-.kg-input:focus {
-    border-color: var(--accent-border);
-}
-
-.kg-textarea {
-    padding: var(--space-2);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    font-family: inherit;
-    outline: none;
-    resize: vertical;
-    transition: border-color var(--transition-fast);
-}
-
-.kg-textarea:focus {
-    border-color: var(--accent-border);
-}
 </style>

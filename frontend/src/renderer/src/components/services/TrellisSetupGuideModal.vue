@@ -8,7 +8,7 @@
  * The ``service`` prop selects between ``trellis2`` (single-image,
  * default) and ``trellis2multiview`` (multi-image fork).
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useServicesStore } from '../../stores/services'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import AppIcon from '../ui/AppIcon.vue'
@@ -17,7 +17,7 @@ const props = withDefaults(
   defineProps<{ service?: 'trellis2' | 'trellis2multiview' }>(),
   { service: 'trellis2' },
 )
-const emit = defineEmits<{ (e: 'close'): void }>()
+const emit = defineEmits<{ close: [result: boolean] }>()
 
 const store = useServicesStore()
 const html = ref('')
@@ -43,92 +43,62 @@ async function load(): Promise<void> {
   }
 }
 
-function onKey(ev: KeyboardEvent): void {
-  if (ev.key === 'Escape') emit('close')
-}
-
 onMounted(() => {
   void load()
-  window.addEventListener('keydown', onKey)
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <div
-    class="guide-modal"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="trellis-guide-title"
-    @click.self="emit('close')"
-  >
-    <section class="guide-modal__panel">
-      <header class="guide-modal__head">
-        <div class="guide-modal__head-left">
-          <span class="guide-modal__icon-wrap">
-            <AppIcon name="box-3d" :size="16" />
+  <section class="guide-modal__panel">
+    <header class="guide-modal__head">
+      <div class="guide-modal__head-left">
+        <span class="guide-modal__icon-wrap">
+          <AppIcon name="box-3d" :size="16" />
+        </span>
+        <div class="guide-modal__title-block">
+          <h2 id="trellis-guide-title" class="guide-modal__title">
+            {{ variantTitle }}
+          </h2>
+          <span class="guide-modal__subtitle">
+            Guida passo-passo alla compilazione locale
           </span>
-          <div class="guide-modal__title-block">
-            <h2 id="trellis-guide-title" class="guide-modal__title">
-              {{ variantTitle }}
-            </h2>
-            <span class="guide-modal__subtitle">
-              Guida passo-passo alla compilazione locale
-            </span>
-          </div>
         </div>
-        <button
-          class="guide-modal__close"
-          type="button"
-          aria-label="Chiudi"
-          @click="emit('close')"
-        >
-          <AppIcon name="x" :size="16" />
-        </button>
-      </header>
-
-      <div class="guide-modal__body">
-        <div v-if="loading" class="guide-modal__state">
-          <AppIcon name="refresh-cw" :size="16" class="is-spinning" />
-          <span>Carico la guida…</span>
-        </div>
-        <div
-          v-else-if="error"
-          class="guide-modal__state guide-modal__state--error"
-        >
-          <AppIcon name="alert-triangle" :size="16" />
-          <div class="guide-modal__state-body">
-            <strong>Impossibile caricare la guida</strong>
-            <span>{{ error }}</span>
-          </div>
-        </div>
-        <article
-          v-else
-          class="guide-modal__markdown"
-          v-html="html"
-        />
       </div>
-    </section>
-  </div>
+      <button
+        class="guide-modal__close"
+        type="button"
+        aria-label="Chiudi"
+        @click="emit('close', false)"
+      >
+        <AppIcon name="x" :size="16" />
+      </button>
+    </header>
+
+    <div class="guide-modal__body">
+      <div v-if="loading" class="guide-modal__state">
+        <AppIcon name="refresh-cw" :size="16" class="is-spinning" />
+        <span>Carico la guida…</span>
+      </div>
+      <div
+        v-else-if="error"
+        class="guide-modal__state guide-modal__state--error"
+      >
+        <AppIcon name="alert-triangle" :size="16" />
+        <div class="guide-modal__state-body">
+          <strong>Impossibile caricare la guida</strong>
+          <span>{{ error }}</span>
+        </div>
+      </div>
+      <article
+        v-else
+        class="guide-modal__markdown"
+        v-html="html"
+      />
+    </div>
+  </section>
 </template>
 
 <style scoped>
-/* ── Backdrop + container ────────────────────────────────────── */
-.guide-modal {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-overlay);
-  background: var(--black-heavy);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
-  animation: guide-fade 160ms ease;
-}
-@keyframes guide-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 .guide-modal__panel {
   background: var(--surface-2);
   border: 1px solid var(--border);

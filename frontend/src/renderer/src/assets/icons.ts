@@ -64,6 +64,12 @@ const _ICONS = {
     viewBox: '0 0 24 24',
   },
 
+  /** Minus / indeterminate */
+  'minus': {
+    inner: `<line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
+    viewBox: '0 0 24 24',
+  },
+
   /** Magnifying glass (search) */
   'search': { icon: 'solar:magnifer-bold' },
 

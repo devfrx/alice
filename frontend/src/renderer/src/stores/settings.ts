@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '../services/api'
 import type { DownloadStatusResponse, LMStudioModel, ModelOperationResponse, ToolCatalogPlugin } from '../types/settings'
 import { useChatStore } from './chat'
+import { useServicesStore } from './services'
 
 export interface AliceSettings {
   llm: {
@@ -655,23 +656,33 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Interval ID for periodic LM Studio connection checks. */
   let _connectionPollTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** Base cadence for the healthy LM Studio connection probe (ms). */
+  const BASE_CONNECTION_PROBE_MS = 15000
+
   /**
    * Schedule the next LM Studio connection probe.
    *
    * When the connection is healthy we poll at a relaxed cadence (15 s) so
    * the backend doesn't have to forward `GET /api/v1/models` to LM Studio
-   * too often.  When the previous probe failed we back off further (30 s)
-   * to avoid generating a stream of `ReadTimeout` warnings while LM Studio
-   * is offline or busy.  Probing is also skipped while a model operation
-   * is in flight or the chat is actively streaming, since both paths
-   * already keep the backend talking to LM Studio.
+   * too often.  When the previous probe failed we back off exponentially
+   * (via the services store's shared back-off, capped at 30 s) to avoid
+   * generating a stream of `ReadTimeout` warnings while LM Studio is
+   * offline or busy; the cadence resets to the base on recovery.  Probing
+   * is also skipped while a model operation is in flight or the chat is
+   * actively streaming, since both paths already keep the backend talking
+   * to LM Studio.
    */
   function scheduleNextConnectionProbe(): void {
     if (_connectionPollTimer !== null) {
       clearTimeout(_connectionPollTimer)
       _connectionPollTimer = null
     }
-    const delay = lmStudioConnected.value ? 15000 : 30000
+    // Route the cadence through the services store's shared back-off so a
+    // down LM Studio is probed progressively less often and snaps back to
+    // the base interval on recovery.
+    const servicesStore = useServicesStore()
+    servicesStore.noteStatus('lmstudio', lmStudioConnected.value ? 'up' : 'down')
+    const delay = servicesStore.nextPollDelay(BASE_CONNECTION_PROBE_MS)
     _connectionPollTimer = setTimeout(async () => {
       _connectionPollTimer = null
       const chatStore = useChatStore()

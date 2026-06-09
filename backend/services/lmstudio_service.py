@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 import httpx
@@ -71,6 +73,10 @@ class LMStudioManager:
         self._models_cache_lock = asyncio.Lock()
         self._models_cache_ttl: float = 5.0
         self._models_cache_ttl_failure: float = 20.0
+        # Callbacks fired whenever the loaded-model set changes (i.e. when
+        # ``invalidate_models_cache`` runs after a load/unload). Used to drop
+        # caches keyed on the active model, e.g. the LLM context window.
+        self._on_models_changed: list[Callable[[], None]] = []
 
     # -- Operation tracking -------------------------------------------------
 
@@ -153,6 +159,13 @@ class LMStudioManager:
         """
         self._models_cache = None
         self._models_cache_expires = 0.0
+        for callback in self._on_models_changed:
+            with contextlib.suppress(Exception):
+                callback()
+
+    def add_models_changed_listener(self, callback: Callable[[], None]) -> None:
+        """Register a callback fired whenever the loaded-model set changes."""
+        self._on_models_changed.append(callback)
 
     async def load_model(
         self,

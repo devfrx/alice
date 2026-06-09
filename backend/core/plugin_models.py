@@ -211,12 +211,22 @@ class ExecutionContext:
         conversation_id: Current conversation identifier.
         execution_id: Unique UUID for tracking and audit.
         user_id: Reserved for Phase 8 JWT multi-user support.
+        workspace_root: Absolute path the tool MUST use as its working
+            directory (hard sandbox). Resolved from the conversation's explicit
+            scope, or the per-conversation ephemeral sandbox when no scope is
+            set. ``None`` when no scope service is wired.
     """
 
     session_id: str
     conversation_id: str
     execution_id: str
     user_id: str | None = None
+    workspace_root: str | None = None
+    """Absolute path the tool MUST use as its working directory (hard sandbox).
+
+    Resolved from the conversation's explicit scope, or the per-conversation
+    ephemeral sandbox when no scope is set. Never the OS home or a system root.
+    """
 
 
 @dataclass(frozen=True, slots=True)

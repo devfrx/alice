@@ -100,18 +100,6 @@
             </div>
         </div>
 
-        <!-- Confirm dialog -->
-        <Teleport to="body">
-            <div v-if="confirmAction" class="mem-confirm-overlay" @click.self="cancelConfirm">
-                <div class="mem-confirm" role="dialog" aria-modal="true">
-                    <p class="mem-confirm__message">{{ confirmMessage }}</p>
-                    <div class="mem-confirm__actions">
-                        <button class="mem-btn mem-btn--secondary" @click="cancelConfirm">Annulla</button>
-                        <button class="mem-btn mem-btn--danger" @click="executeConfirm">Conferma</button>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
     </section>
 </template>
 
@@ -121,8 +109,10 @@ import { useMemoryStore } from '../../stores/memory'
 import type { MemoryEntry } from '../../types/memory'
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import { useModal } from '../../composables/useModal'
 
 const store = useMemoryStore()
+const { confirm } = useModal()
 
 // ── Filter state ──────────────────────────────────────────────────────────
 const scopeFilter = ref<string>('')
@@ -150,44 +140,41 @@ const categoryOptions = computed<UiSelectOption[]>(() => [
 ])
 
 // ── Confirmation dialog ───────────────────────────────────────────────────
-const confirmAction = ref<(() => Promise<void>) | null>(null)
-const confirmMessage = ref('')
 
-function confirmDelete(entry: MemoryEntry): void {
-    confirmMessage.value = `Eliminare questa memoria?\n\n"${entry.content.slice(0, 80)}…"`
-    confirmAction.value = async () => {
-        await store.deleteMemory(entry.id)
-        await store.loadStats()
-    }
+async function confirmDelete(entry: MemoryEntry): Promise<void> {
+    const ok = await confirm({
+        title: 'Elimina memoria',
+        message: `Eliminare questa memoria?\n\n"${entry.content.slice(0, 80)}…"`,
+        type: 'danger',
+        confirmText: 'Elimina',
+    })
+    if (!ok) return
+    await store.deleteMemory(entry.id)
+    await store.loadStats()
 }
 
-function confirmClearSession(): void {
-    confirmMessage.value = 'Cancellare tutte le memorie di sessione? Questa azione è irreversibile.'
-    confirmAction.value = async () => {
-        await store.clearSessionMemory()
-        await store.loadStats()
-    }
+async function confirmClearSession(): Promise<void> {
+    const ok = await confirm({
+        title: 'Cancella memoria di sessione',
+        message: 'Cancellare tutte le memorie di sessione? Questa azione è irreversibile.',
+        type: 'danger',
+        confirmText: 'Cancella',
+    })
+    if (!ok) return
+    await store.clearSessionMemory()
+    await store.loadStats()
 }
 
-function confirmClearAll(): void {
-    confirmMessage.value = 'Cancellare TUTTA la memoria (sessione e lungo termine)? Questa azione è irreversibile.'
-    confirmAction.value = async () => {
-        await store.clearAllMemory()
-        await store.loadStats()
-    }
-}
-
-async function executeConfirm(): Promise<void> {
-    if (confirmAction.value) {
-        await confirmAction.value()
-    }
-    confirmAction.value = null
-    confirmMessage.value = ''
-}
-
-function cancelConfirm(): void {
-    confirmAction.value = null
-    confirmMessage.value = ''
+async function confirmClearAll(): Promise<void> {
+    const ok = await confirm({
+        title: 'Cancella tutta la memoria',
+        message: 'Cancellare TUTTA la memoria (sessione e lungo termine)? Questa azione è irreversibile.',
+        type: 'danger',
+        confirmText: 'Cancella',
+    })
+    if (!ok) return
+    await store.clearAllMemory()
+    await store.loadStats()
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────
@@ -550,38 +537,5 @@ onMounted(() => {
     color: var(--danger);
 }
 
-/* ── Confirm dialog overlay ────────────────────────────────── */
-.mem-confirm-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-modal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--black-heavy);
-}
 
-.mem-confirm {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--space-6);
-    max-width: 400px;
-    width: 90%;
-    box-shadow: var(--shadow-floating);
-}
-
-.mem-confirm__message {
-    font-size: var(--text-sm);
-    color: var(--text-primary);
-    line-height: var(--leading-normal);
-    margin: 0 0 var(--space-4);
-    white-space: pre-line;
-}
-
-.mem-confirm__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-}
 </style>

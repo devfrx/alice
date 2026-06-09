@@ -275,8 +275,8 @@ export const api = {
     request<{ path: string }>(`/chat/conversations/${encodeURIComponent(id)}/file-path`),
 
   /** Fetch a single conversation with its full message list. */
-  getConversation: (id: string): Promise<ConversationDetail> =>
-    request<ConversationDetail>(`/chat/conversations/${encodeURIComponent(id)}`),
+  getConversation: (id: string, signal?: AbortSignal): Promise<ConversationDetail> =>
+    request<ConversationDetail>(`/chat/conversations/${encodeURIComponent(id)}`, { signal }),
 
   /** Delete a conversation and all its messages. */
   deleteConversation: (id: string): Promise<DeleteConversationResponse> =>
@@ -799,6 +799,13 @@ export const api = {
   /** Trigger re-embedding of all registered tools. */
   reembedTools: (): Promise<{ status: string }> =>
     request<{ status: string }>('/vector-store/reembed-tools', { method: 'POST' }),
+
+  /**
+   * Reset the embedded vector store and re-wire the RAG stack (manual repair).
+   * Destructive: clears persisted embedded vectors. Returns refreshed stats.
+   */
+  repairVectorStore: (): Promise<VectorStoreStats> =>
+    request<VectorStoreStats>('/vector-store/repair', { method: 'POST' }),
 
   // -- Artifacts ------------------------------------------------------------
 

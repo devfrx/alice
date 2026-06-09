@@ -54,7 +54,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/workspace'
+      redirect: '/home'
     },
     {
       path: '/home',

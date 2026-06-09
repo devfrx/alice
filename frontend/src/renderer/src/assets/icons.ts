@@ -171,6 +171,9 @@ const _ICONS = {
 
   // ── Layout / navigation ───────────────────────────────────────────────────
 
+  /** Home / dashboard landing */
+  'home': { icon: 'solar:home-smile-bold' },
+
   /** Split panel layout */
   'hybrid-panel': { icon: 'solar:sidebar-code-bold' },
 

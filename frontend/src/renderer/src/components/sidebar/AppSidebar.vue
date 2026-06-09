@@ -201,6 +201,14 @@ async function onOpenFile(id: string): Promise<void> {
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
+          <router-link to="/home" class="sidebar__link" active-class="sidebar__link--active" title="Home"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <AppIcon name="home" :size="15" />
+            </span>
+            <span class="sidebar__link-label">Home</span>
+          </router-link>
+
           <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">

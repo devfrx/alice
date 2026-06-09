@@ -33,8 +33,8 @@ vi.mock('../services/api', () => ({
   resolveBackendUrl: (u: string) => u,
 }))
 
-function askReq(executionId: string, question = 'Which file?', options?: string[]): AskUserRequest {
-  return { executionId, question, options }
+function askReq(executionId: string, text = 'Which file?', options?: string[]): AskUserRequest {
+  return { executionId, questions: [{ id: 'q1', text, type: 'radio', options }] }
 }
 
 beforeEach(() => {
@@ -55,9 +55,18 @@ describe('pendingAskUser add/remove', () => {
     expect(Object.keys(s.pendingAskUser)).toEqual(['e1'])
     expect(s.pendingAskUser['e1']).toMatchObject({
       executionId: 'e1',
-      question: 'Pick one',
-      options: ['a', 'b'],
+      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }],
     })
+  })
+
+  it('addPendingAskUser stores a multi-question request', () => {
+    const store = useChatStore()
+    store.addPendingAskUser({
+      executionId: 'e1',
+      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }],
+    })
+    const pending = store.pendingAskUser['e1']
+    expect(pending.questions[0].id).toBe('q1')
   })
 
   it('removePendingAskUser clears only the matching entry', () => {

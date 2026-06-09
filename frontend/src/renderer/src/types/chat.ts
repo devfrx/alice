@@ -235,23 +235,48 @@ export interface WsToolConfirmationResponsePayload {
 }
 
 /**
- * Server requests free-form input from the user before a tool can proceed
+ * A single question within an `ask_user` interaction. Each question is
+ * answered independently and correlated back to its answer by `id`.
+ *
+ * - `radio` — single choice among `options`.
+ * - `checkbox` — multiple choices among `options`.
+ *
+ * When `allow_free_text` is set the user may type an answer in addition to (or
+ * instead of) picking options; `options` is omitted when the tool passed no
+ * suggested choices.
+ */
+export interface AskUserQuestion {
+  id: string
+  text: string
+  type: 'radio' | 'checkbox'
+  options?: string[]
+  allow_free_text?: boolean
+}
+
+/**
+ * Server requests structured input from the user before a tool can proceed
  * (the `ask_user` meta-tool). Unlike a tool confirmation this always needs
- * human input — there is no auto-approve path. `options` is omitted when the
- * tool passed no suggested choices.
+ * human input — there is no auto-approve path. Carries one or more questions
+ * answered together as a short sequential wizard.
  */
 export interface WsAskUserRequiredMessage {
   type: 'ask_user_required'
   execution_id: string
-  question: string
-  options?: string[]
+  questions: AskUserQuestion[]
 }
 
-/** Payload the client sends back with the user's answer to an `ask_user`. */
+/** A single answer within an `ask_user_response`, keyed by `question_id`. */
+export interface AskUserAnswer {
+  question_id: string
+  selected: string[]
+  free_text?: string
+}
+
+/** Payload the client sends back with the user's answers to an `ask_user`. */
 export interface WsAskUserResponsePayload {
   type: 'ask_user_response'
   execution_id: string
-  answer: string
+  answers: AskUserAnswer[]
 }
 
 /** Server signals it is re-querying the LLM after tool execution. */
@@ -432,12 +457,10 @@ export interface ConfirmationRequest {
   allowRemember?: boolean
 }
 
-/** A pending `ask_user` request awaiting the user's free-form answer. */
+/** A pending `ask_user` request awaiting the user's answers (client-side). */
 export interface AskUserRequest {
   executionId: string
-  question: string
-  /** Optional suggested choices the user can click instead of typing. */
-  options?: string[]
+  questions: AskUserQuestion[]
 }
 
 /** Snapshot of context window utilization (camelCase, from WS snake_case). */

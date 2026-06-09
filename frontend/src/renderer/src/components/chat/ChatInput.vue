@@ -35,12 +35,9 @@ const isOnWorkspace = computed(() => route.path.startsWith('/workspace'))
 /** Destination view the toggle points to (the OTHER surface). */
 const modeTarget = computed(() => (isOnWorkspace.value ? 'assistant' : 'workspace'))
 
-/** Label/icon for the toggle chip — reflects the destination view. */
-const modeLabel = computed(() => (isOnWorkspace.value ? 'Assistente' : 'Workspace'))
+/** Icon for the mode ghost button — reflects the destination view. */
 const modeIcon = computed(() => (isOnWorkspace.value ? 'orb' : 'hybrid-panel'))
-const modeTitle = computed(() =>
-  isOnWorkspace.value ? "Vai all'assistente" : 'Vai al workspace'
-)
+const modeTitle = computed(() => (isOnWorkspace.value ? "Vai all'assistente" : 'Vai al workspace'))
 
 /** Switch between the two primary surfaces (Workspace ↔ Assistant). */
 function toggleMode(): void {
@@ -267,17 +264,26 @@ defineExpose({
   pendingFiles,
   clearPendingFiles(): void {
     clearAllFiles()
-  },
+  }
 })
 </script>
 
 <template>
-  <div class="ci" :class="{ 'ci--drag': isDragOver }" @dragenter="handleDragEnter" @dragover="handleDragOver"
-    @dragleave="handleDragLeave" @drop="handleDrop">
-
+  <div
+    class="ci"
+    :class="{ 'ci--drag': isDragOver }"
+    @dragenter="handleDragEnter"
+    @dragover="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop="handleDrop"
+  >
     <!-- Thumbnail strip (only when files are pending) -->
     <div v-if="pendingFiles.length > 0" class="ci__thumbs">
-      <div v-for="file in pendingFiles" :key="file.name + file.size + file.lastModified" class="ci__thumb">
+      <div
+        v-for="file in pendingFiles"
+        :key="file.name + file.size + file.lastModified"
+        class="ci__thumb"
+      >
         <img :src="getThumbnail(file)" :alt="file.name" :title="file.name" />
         <button class="ci__thumb-rm" aria-label="Rimuovi allegato" @click="removeFile(file)">
           <AppIcon name="x" :size="10" :stroke-width="2.5" />
@@ -287,78 +293,114 @@ defineExpose({
 
     <!-- Textarea: top of the field card, transparent & borderless -->
     <!-- Hidden file input (no layout impact) -->
-    <input ref="fileInputRef" type="file" accept="image/*" multiple class="ci__file-input"
-      @change="handleFileSelect" />
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept="image/*"
+      multiple
+      class="ci__file-input"
+      @change="handleFileSelect"
+    />
 
-    <textarea ref="textareaRef" v-model="text" class="ci__textarea" placeholder="Scrivi un messaggio..." rows="1"
-      :disabled="disabled" aria-label="Scrivi un messaggio" @keydown="handleKeydown" @input="autoResize"
-      @paste="handlePaste" />
+    <textarea
+      ref="textareaRef"
+      v-model="text"
+      class="ci__textarea"
+      placeholder="Scrivi un messaggio..."
+      rows="1"
+      :disabled="disabled"
+      aria-label="Scrivi un messaggio"
+      @keydown="handleKeydown"
+      @input="autoResize"
+      @paste="handlePaste"
+    />
 
     <!-- Bottom control row: left config group / right actions group -->
     <div class="ci__controls">
-
-      <!-- Left cluster: attach, then config chips (model, embedding, tools, workspace) -->
       <div class="ci__controls-left">
-        <!-- Attach button -->
-        <button class="ci__attach" :disabled="disabled || !supportsVision"
-          :aria-label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
+        <button
+          class="ci__ghost"
+          :disabled="disabled || !supportsVision"
+          :aria-label="
+            supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'
+          "
           :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
-          @click="openFilePicker">
+          @click="openFilePicker"
+        >
           <AppIcon name="paperclip" :size="14" />
         </button>
 
-        <!-- Divider -->
         <div class="ci__divider" />
 
-        <!-- Model selector chips -->
-        <div class="ci__selectors">
-          <ModelSelector model-type="embedding" />
+        <span class="ci__glabel">Modelli</span>
+        <div class="ci__seg ci__seg--models">
           <ModelSelector model-type="llm" />
+          <ModelSelector model-type="embedding" class="ci__embedding" />
         </div>
 
-        <!-- Agent mode + tool selector pills -->
-        <ChatToolControls />
-
-        <!-- Permission tier selector (Fase 7) — user-only authorization tier -->
-        <PermissionTierSelector />
-
-        <!-- View toggle chip — reflects the destination surface -->
-        <button class="ci__mode-toggle" :aria-label="modeTitle" :title="modeTitle" @click="toggleMode">
-          <AppIcon :name="modeIcon" :size="11" />
-          <span>{{ modeLabel }}</span>
-        </button>
+        <span class="ci__glabel ci__glabel--agent">Agente</span>
+        <div class="ci__seg ci__seg--agent">
+          <ChatToolControls />
+          <PermissionTierSelector />
+        </div>
       </div>
 
-      <!-- Right cluster: context, connection dot, mic, send/stop -->
       <div class="ci__controls-right">
-        <!-- Context ring (subtle status) -->
-        <ContextBar :context-info="chatStore.contextInfo" :is-compressing="chatStore.isCompressingContext" />
+        <ContextBar
+          :context-info="chatStore.contextInfo"
+          :is-compressing="chatStore.isCompressingContext"
+        />
 
-        <!-- Connection status dot -->
-        <div class="ci__dot" :class="isConnected ? 'dot--ok' : 'dot--err'"
-          :title="isConnected ? 'Connesso' : 'Non connesso'" />
+        <button
+          class="ci__ghost ci__mode"
+          :aria-label="modeTitle"
+          :title="modeTitle"
+          @click="toggleMode"
+        >
+          <AppIcon :name="modeIcon" :size="13" />
+        </button>
 
-        <!-- Microphone button -->
-        <MicrophoneButton v-if="voiceStore.isReady" :available="voiceStore.sttAvailable"
-          :connected="voiceStore.connected" :audio-devices="audioDevices ?? []"
-          :selected-device-id="selectedDeviceId ?? ''" @start-recording="$emit('voice-start')"
-          @stop-recording="$emit('voice-stop')" @cancel-processing="$emit('voice-cancel-processing')"
-          @refresh-devices="$emit('refresh-devices')" @select-device="(id) => $emit('select-device', id)" />
+        <div
+          class="ci__dot"
+          :class="isConnected ? 'dot--ok' : 'dot--err'"
+          :title="isConnected ? 'Connesso' : 'Non connesso'"
+        />
 
-        <!-- Send / Stop toggle — sole accent CTA -->
+        <MicrophoneButton
+          v-if="voiceStore.isReady"
+          :available="voiceStore.sttAvailable"
+          :connected="voiceStore.connected"
+          :audio-devices="audioDevices ?? []"
+          :selected-device-id="selectedDeviceId ?? ''"
+          @start-recording="$emit('voice-start')"
+          @stop-recording="$emit('voice-stop')"
+          @cancel-processing="$emit('voice-cancel-processing')"
+          @refresh-devices="$emit('refresh-devices')"
+          @select-device="(id) => $emit('select-device', id)"
+        />
+
         <Transition name="btn-swap" mode="out-in">
-          <button v-if="isStreaming" key="stop" class="ci__stop" aria-label="Interrompi generazione"
-            @click="emit('stop')">
+          <button
+            v-if="isStreaming"
+            key="stop"
+            class="ci__stop"
+            aria-label="Interrompi generazione"
+            @click="emit('stop')"
+          >
             <AppIcon name="stop" :size="14" />
           </button>
-          <button v-else key="send" class="ci__send"
-            :disabled="(!text.trim() && pendingFiles.length === 0) || disabled" aria-label="Invia messaggio"
-            @click="submit">
+          <button
+            v-else
+            key="send"
+            class="ci__send"
+            :disabled="(!text.trim() && pendingFiles.length === 0) || disabled"
+            aria-label="Invia messaggio"
+            @click="submit"
+          >
             <AppIcon name="send" :size="14" />
           </button>
         </Transition>
       </div>
-
     </div>
   </div>
 </template>
@@ -386,7 +428,9 @@ defineExpose({
 
 .ci:focus-within {
   border-color: var(--accent-border);
-  box-shadow: var(--shadow-elevated), 0 0 0 1px var(--accent-border);
+  box-shadow:
+    var(--shadow-elevated),
+    0 0 0 1px var(--accent-border);
 }
 
 /* Drag-over: accent glow on the entire field */
@@ -419,7 +463,9 @@ defineExpose({
   overflow: hidden;
   border: 1px solid var(--border-hover);
   box-shadow: var(--shadow-md);
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .ci__thumb:hover {
@@ -450,7 +496,9 @@ defineExpose({
   cursor: pointer;
   padding: 0;
   opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
 }
 
 .ci__thumb:hover .ci__thumb-rm {
@@ -548,8 +596,15 @@ defineExpose({
 }
 
 @keyframes dot-pulse {
-  0%, 100% { box-shadow: 0 0 5px var(--success-glow); }
-  50% { box-shadow: 0 0 10px var(--success-glow), 0 0 3px var(--success); }
+  0%,
+  100% {
+    box-shadow: 0 0 5px var(--success-glow);
+  }
+  50% {
+    box-shadow:
+      0 0 10px var(--success-glow),
+      0 0 3px var(--success);
+  }
 }
 
 .dot--err {
@@ -559,8 +614,13 @@ defineExpose({
 }
 
 @keyframes dot-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 /* ============================================================
@@ -575,72 +635,85 @@ defineExpose({
 }
 
 /* ============================================================
-   Attach button
+   Ghost icon utilities (attach, mode)
    ============================================================ */
-.ci__attach {
+.ci__ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-sm);
   border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
+  transition:
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
-
-.ci__attach:hover:not(:disabled) {
+.ci__ghost:hover:not(:disabled) {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
-
-.ci__attach:disabled {
+.ci__ghost:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
 /* ============================================================
-   Model selector chips wrapper
+   Group micro-label
    ============================================================ */
-.ci__selectors {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
+.ci__glabel {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
   flex-shrink: 0;
+  user-select: none;
+}
+.ci__glabel--agent {
+  margin-left: var(--space-1);
 }
 
 /* ============================================================
-   Workspace shortcut chip — unified chip spec
+   Segmented group container — children read as one unit
    ============================================================ */
-.ci__mode-toggle {
+.ci__seg {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
+  gap: 2px;
+  padding: 2px;
   border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: var(--surface-2);
-  color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  white-space: nowrap;
   flex-shrink: 0;
-  transition:
-    color var(--duration-fast) ease,
-    border-color var(--duration-fast) ease,
-    background var(--duration-fast) ease;
+  min-width: 0;
 }
 
-.ci__mode-toggle:hover {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
+/* Make the child chips bare inside a segment (hero = the llm model gets a subtle ring) */
+.ci__seg :deep(.ms__trigger),
+.ci__seg :deep(.ctc__chip),
+.ci__seg :deep(.tier-chip) {
+  background: transparent;
+  border-color: transparent;
+  height: 24px;
+}
+.ci__seg :deep(.ms__trigger:hover),
+.ci__seg :deep(.ctc__chip:hover:not(:disabled)),
+.ci__seg :deep(.tier-chip:hover:not(:disabled)) {
   background: var(--surface-3);
+}
+/* LLM model is the hero — keep a faint ring */
+.ci__seg--models :deep(.ms__trigger:not(.ms__trigger--embedding)) {
+  border-color: var(--border-hover, var(--border));
+  background: var(--surface-3);
+}
+
+.ci__mode {
+  color: var(--text-secondary);
 }
 
 /* ============================================================
@@ -696,7 +769,9 @@ defineExpose({
   color: var(--danger);
   cursor: pointer;
   animation: stop-ring 1.5s ease-out infinite;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .ci__stop:hover {
@@ -705,9 +780,15 @@ defineExpose({
 }
 
 @keyframes stop-ring {
-  0%   { box-shadow: 0 0 0 0 var(--danger-glow); }
-  70%  { box-shadow: 0 0 0 5px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0% {
+    box-shadow: 0 0 0 0 var(--danger-glow);
+  }
+  70% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 /* ============================================================
@@ -715,7 +796,9 @@ defineExpose({
    ============================================================ */
 .btn-swap-enter-active,
 .btn-swap-leave-active {
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
 }
 
 .btn-swap-enter-from {
@@ -746,26 +829,32 @@ defineExpose({
 /* ============================================================
    Responsive: narrow containers
    ============================================================ */
-@container chat-input (max-width: 420px) {
-  .ci {
-    padding: var(--space-2) var(--space-2) var(--space-2);
-    margin-inline: var(--space-2);
-  }
 
-  .ci__selectors {
+/* Medium: drop labels, embedding text, mode ghost, status dot */
+@container chat-input (max-width: 620px) {
+  .ci__glabel {
     display: none;
   }
-
-  .ci__mode-toggle {
+  .ci__mode {
     display: none;
   }
-
-  .ci__divider {
+  .ci__dot {
+    display: none;
+  }
+  .ci__embedding :deep(.ms__label) {
     display: none;
   }
 }
 
-@container chat-input (max-width: 300px) {
+/* Narrow: drop embedding entirely; model -> short; agente icons-only */
+@container chat-input (max-width: 440px) {
+  .ci__embedding {
+    display: none;
+  }
+  .ci__seg--agent :deep(.ctc__chip-label),
+  .ci__seg--agent :deep(.tier-chip__label) {
+    display: none;
+  }
   .ci__controls-left {
     gap: var(--space-1);
   }

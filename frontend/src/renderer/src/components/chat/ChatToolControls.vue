@@ -57,60 +57,94 @@ function isPluginEnabled(plugin: string): boolean {
 <template>
   <div class="ctc">
     <!-- Tool selector chip -->
-    <button ref="triggerRef" class="ctc__chip"
+    <button
+      ref="triggerRef"
+      class="ctc__chip"
       :class="{ 'ctc__chip--open': isOpen, 'ctc__chip--muted': !available }"
-      :disabled="!available" :title="available ? 'Seleziona gli strumenti attivi' : disabledReason"
-      aria-haspopup="true" :aria-expanded="isOpen" @click="toggleOpen">
+      :disabled="!available"
+      :title="available ? 'Seleziona gli strumenti attivi' : disabledReason"
+      aria-haspopup="true"
+      :aria-expanded="isOpen"
+      @click="toggleOpen"
+    >
       <AppIcon name="sliders" :size="11" />
-      <span>Strumenti</span>
+      <span class="ctc__chip-label">Strumenti</span>
       <span v-if="available && disabledCount > 0" class="ctc__badge">-{{ disabledCount }}</span>
     </button>
 
     <!-- Popover — opens upward from the input bar, chrome from UiPopover -->
-    <UiPopover :open="isOpen" :anchor-el="triggerRef" placement="top" align="start" width="320px"
-      aria-label="Strumenti attivi" panel-class="ctc__pop" @update:open="isOpen = $event">
+    <UiPopover
+      :open="isOpen"
+      :anchor-el="triggerRef"
+      placement="top"
+      align="start"
+      width="320px"
+      aria-label="Strumenti attivi"
+      panel-class="ctc__pop"
+      @update:open="isOpen = $event"
+    >
       <div class="ctc__pop-head">
-          <span class="ctc__pop-title">Strumenti attivi</span>
-          <button v-if="disabledCount > 0" class="ctc__reset" @click="settingsStore.resetToolSelection()">
-            Ripristina tutti
-          </button>
-        </div>
+        <span class="ctc__pop-title">Strumenti attivi</span>
+        <button
+          v-if="disabledCount > 0"
+          class="ctc__reset"
+          @click="settingsStore.resetToolSelection()"
+        >
+          Ripristina tutti
+        </button>
+      </div>
 
-        <div v-if="settingsStore.toolCatalog.length === 0" class="ctc__empty">
-          Nessuno strumento disponibile.
-        </div>
+      <div v-if="settingsStore.toolCatalog.length === 0" class="ctc__empty">
+        Nessuno strumento disponibile.
+      </div>
 
-        <ul v-else class="ctc__list">
-          <li v-for="group in settingsStore.toolCatalog" :key="group.plugin" class="ctc__group">
-            <div class="ctc__group-head">
-              <button class="ctc__expand" :aria-label="expanded.has(group.plugin) ? 'Comprimi' : 'Espandi'"
-                @click="toggleExpand(group.plugin)">
-                <AppIcon :name="expanded.has(group.plugin) ? 'chevron-down' : 'chevron-right'" :size="12" />
-              </button>
-              <span class="ctc__plugin-name">{{ group.plugin }}</span>
-              <span class="ctc__plugin-count">{{ group.tools.length }}</span>
-              <button class="ctc__sw" :class="{ 'ctc__sw--on': isPluginEnabled(group.plugin) }" role="switch"
-                :aria-checked="isPluginEnabled(group.plugin)"
-                @click="settingsStore.setPluginEnabled(group.plugin, !isPluginEnabled(group.plugin))">
+      <ul v-else class="ctc__list">
+        <li v-for="group in settingsStore.toolCatalog" :key="group.plugin" class="ctc__group">
+          <div class="ctc__group-head">
+            <button
+              class="ctc__expand"
+              :aria-label="expanded.has(group.plugin) ? 'Comprimi' : 'Espandi'"
+              @click="toggleExpand(group.plugin)"
+            >
+              <AppIcon
+                :name="expanded.has(group.plugin) ? 'chevron-down' : 'chevron-right'"
+                :size="12"
+              />
+            </button>
+            <span class="ctc__plugin-name">{{ group.plugin }}</span>
+            <span class="ctc__plugin-count">{{ group.tools.length }}</span>
+            <button
+              class="ctc__sw"
+              :class="{ 'ctc__sw--on': isPluginEnabled(group.plugin) }"
+              role="switch"
+              :aria-checked="isPluginEnabled(group.plugin)"
+              @click="settingsStore.setPluginEnabled(group.plugin, !isPluginEnabled(group.plugin))"
+            >
+              <span class="ctc__sw-thumb" />
+            </button>
+          </div>
+
+          <ul v-if="expanded.has(group.plugin)" class="ctc__tools">
+            <li v-for="tool in group.tools" :key="tool.name" class="ctc__tool">
+              <div class="ctc__tool-text">
+                <span class="ctc__tool-name">{{ tool.label }}</span>
+                <span class="ctc__tool-desc">{{ tool.description }}</span>
+              </div>
+              <button
+                class="ctc__sw"
+                :class="{ 'ctc__sw--on': settingsStore.isToolEnabled(tool.name) }"
+                role="switch"
+                :aria-checked="settingsStore.isToolEnabled(tool.name)"
+                @click="
+                  settingsStore.setToolEnabled(tool.name, !settingsStore.isToolEnabled(tool.name))
+                "
+              >
                 <span class="ctc__sw-thumb" />
               </button>
-            </div>
-
-            <ul v-if="expanded.has(group.plugin)" class="ctc__tools">
-              <li v-for="tool in group.tools" :key="tool.name" class="ctc__tool">
-                <div class="ctc__tool-text">
-                  <span class="ctc__tool-name">{{ tool.label }}</span>
-                  <span class="ctc__tool-desc">{{ tool.description }}</span>
-                </div>
-                <button class="ctc__sw" :class="{ 'ctc__sw--on': settingsStore.isToolEnabled(tool.name) }"
-                  role="switch" :aria-checked="settingsStore.isToolEnabled(tool.name)"
-                  @click="settingsStore.setToolEnabled(tool.name, !settingsStore.isToolEnabled(tool.name))">
-                  <span class="ctc__sw-thumb" />
-                </button>
-              </li>
-            </ul>
-          </li>
-        </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
     </UiPopover>
   </div>
 </template>
@@ -164,6 +198,10 @@ function isPluginEnabled(plugin: string): boolean {
   cursor: not-allowed;
 }
 
+.ctc__chip-label {
+  display: inline;
+}
+
 /* Disabled count badge */
 .ctc__badge {
   padding: 0 4px;
@@ -174,7 +212,6 @@ function isPluginEnabled(plugin: string): boolean {
   font-weight: var(--weight-bold);
   line-height: 14px;
 }
-
 </style>
 
 <!-- Popover content styles are NOT scoped (slot is teleported with UiPopover) -->

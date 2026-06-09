@@ -224,3 +224,88 @@ def validate_path(path: str) -> tuple[bool, str]:
             return False, f"Path '{path}' is in a protected system directory"
 
     return True, "Path is valid"
+
+
+def _is_absolute_fs_path(token: str) -> bool:
+    """Return ``True`` when *token* is an absolute Windows or UNC path.
+
+    Only paths that escape the current working directory are flagged:
+
+    * UNC / device paths — ``\\\\server\\share`` or ``//server/share``.
+    * Drive-letter absolutes — ``X:\\...`` or ``X:/...`` (a separator must
+      follow the colon).
+
+    Drive-relative references like ``C:`` / ``C:foo`` (no separator) and
+    single-``/``-leading tokens (which collide with cmd flags such as
+    ``/E``) are intentionally **not** treated as absolute.
+
+    Args:
+        token: A single command token (quotes already stripped).
+
+    Returns:
+        ``True`` if the token denotes an absolute filesystem location.
+    """
+    if not token:
+        return False
+    if token.startswith("\\\\") or token.startswith("//"):
+        return True
+    return (
+        len(token) >= 3
+        and token[0].isalpha()
+        and token[1] == ":"
+        and token[2] in ("\\", "/")
+    )
+
+
+def command_paths_within_workspace(
+    command: str, workspace_root: str | None
+) -> tuple[bool, str]:
+    """Check every absolute path in a command stays inside the workspace.
+
+    The command is tokenised exactly as :func:`~backend.plugins.pc_automation.executor.exec_command`
+    tokenises it (after backslash normalisation) so the paths validated here
+    are the same ones the subprocess will receive. Each token that is an
+    *absolute* filesystem path (Windows drive ``X:\\...`` / ``X:/...`` or UNC
+    ``\\\\...``) must resolve to a location within ``workspace_root``. Relative
+    tokens are fine — they resolve under ``cwd=workspace_root``.
+
+    Confinement is skipped (returns ``(True, "")``) when ``workspace_root`` is
+    falsy, so unit/edge cases without a workspace keep working. Production
+    always supplies one via :class:`ExecutionContext`.
+
+    Args:
+        command: The raw command string supplied to ``execute_command``.
+        workspace_root: Absolute path of the active workspace sandbox, or
+            ``None``/empty when no workspace is known.
+
+    Returns:
+        Tuple of ``(is_within, reason)``. ``reason`` is empty on success and
+        names the offending path on failure.
+    """
+    if not workspace_root:
+        return True, ""
+
+    # Reuse the executor's tokeniser/normaliser so we validate exactly the
+    # tokens the subprocess will run. Imported lazily to avoid a circular
+    # import (executor imports validators from this module at load time).
+    from backend.plugins.pc_automation.executor import (
+        _normalize_backslashes,
+        _tokenize_command,
+    )
+
+    try:
+        ws_root = Path(workspace_root).resolve()
+    except (OSError, ValueError) as exc:
+        return False, f"Invalid workspace root: {exc}"
+
+    for token in _tokenize_command(_normalize_backslashes(command)):
+        if not _is_absolute_fs_path(token):
+            continue
+        try:
+            resolved = Path(token).resolve()
+        except (OSError, ValueError):
+            return False, f"'{token}' is not a valid path inside the workspace"
+        if not resolved.is_relative_to(ws_root):
+            return False, f"'{token}' is outside the workspace"
+
+    return True, ""

@@ -215,12 +215,17 @@ def _find_executable(candidates: list[str]) -> str | None:
     return None
 
 
-async def exec_open_app(app_name: str) -> str:
+async def exec_open_app(app_name: str, cwd: str | None = None) -> str:
     """Open an application by name (must be in whitelist).
 
     Validates against ALLOWED_APPS whitelist, resolves the executable via
     PATH / registry / common install directories, then launches it.
     URI-style entries (e.g. ``ms-settings:``) are opened via ``os.startfile``.
+
+    Args:
+        app_name: Whitelisted application name.
+        cwd: Working directory for the launched process (the active workspace
+            sandbox). ``None`` inherits the backend process cwd.
     """
     valid, msg, primary_exe = validate_app_name(app_name)
     if not valid:
@@ -251,6 +256,7 @@ async def exec_open_app(app_name: str) -> str:
                     [resolved],
                     shell=False,
                     close_fds=True,
+                    cwd=cwd,
                 )
             except OSError as exc:
                 # WinError 740: app requires elevation — re-launch via ShellExecuteEx
@@ -463,10 +469,16 @@ async def exec_get_running_apps() -> list[dict[str, str]]:
     return apps
 
 
-async def exec_command(command: str) -> str:
+async def exec_command(command: str, cwd: str | None = None) -> str:
     """Execute a whitelisted command safely.
 
     Checks the screenshot lockout before execution.
+
+    Args:
+        command: The whitelisted command string to execute.
+        cwd: Working directory for the subprocess (the active workspace
+            sandbox). ``None`` inherits the backend process cwd. Relative
+            paths in the command resolve against this directory.
     """
     if _lockout.is_locked("execute_command"):
         remaining = _lockout.get_remaining_s()
@@ -493,10 +505,10 @@ async def exec_command(command: str) -> str:
         # CMD built-in commands must run through cmd.exe /c.
         # Pass tokens as a proper argument list so subprocess does not
         # re-quote already-stripped paths.
-        return await safe_subprocess("cmd.exe", ["/c"] + tokens)
+        return await safe_subprocess("cmd.exe", ["/c"] + tokens, cwd=cwd)
 
     # External executables: split into command + args
-    return await safe_subprocess(tokens[0], tokens[1:])
+    return await safe_subprocess(tokens[0], tokens[1:], cwd=cwd)
 
 
 async def exec_move_mouse(x: int, y: int) -> str:

@@ -65,6 +65,18 @@ def _dedup_hash(tool_name: str, args: dict[str, Any]) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def _resolve_workspace_root(ctx: object, conversation_id: str) -> str | None:
+    """Resolve the active workspace dir (explicit scope or per-conversation sandbox)."""
+    scope_service = getattr(ctx, "scope_service", None)
+    if scope_service is None:
+        return None
+    try:
+        roots = scope_service.effective_roots(conversation_id)
+    except Exception:
+        return None
+    return str(roots[0]) if roots else None
+
+
 async def run_tool_loop(
     *,
     channel: InteractionChannel,
@@ -377,6 +389,7 @@ async def run_tool_loop(
                     session_id=client_ip,
                     conversation_id=str(conv_id),
                     execution_id=exec_id,
+                    workspace_root=_resolve_workspace_root(ctx, str(conv_id)),
                 ),
                 dedup_key=_dedup_hash(tool_name, args),
                 is_client=bool(tool_def and tool_def.client_execution),

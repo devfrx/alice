@@ -170,6 +170,30 @@ class ScopeService:
             return None
         return list(roots)
 
+    def sandbox_root_for(self, conversation_id: str) -> Path:
+        """Return (creating if needed) the per-conversation ephemeral sandbox dir.
+
+        This is the hard-sandbox fallback used when a conversation has no explicit
+        workspace scope set: the model still gets exactly one safe place to write,
+        under ``WorkspaceScopeConfig.sandbox_root`` — never the OS home or a system
+        root.
+        """
+        root = Path(self._config.sandbox_root).resolve() / str(conversation_id)
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+
+    def effective_roots(self, conversation_id: str) -> list[Path]:
+        """Explicit scope if set, else the per-conversation hard-sandbox dir.
+
+        Wired into :class:`PermissionService` as the ``scope_provider`` so the gate
+        confines filesystem tools to the sandbox when no explicit scope is set,
+        rather than denying them outright.
+        """
+        explicit = self.scope_roots(conversation_id)
+        if explicit:
+            return explicit
+        return [self.sandbox_root_for(conversation_id)]
+
     async def get_scope(self, conversation_id: uuid.UUID | str) -> list[str]:
         """Return the conversation's scope folders as strings (for the REST API).
 

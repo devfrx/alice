@@ -690,13 +690,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # -- Permission service (central tool risk / scope / tier authority) -
     # Fase 6: ScopeService supplies the per-conversation scope provider, so a
-    # tool tagged fs_read/fs_write is confined by construction once a scope is
-    # set. Fase 7: PermissionRuleService supplies persistent allow/ask/deny
-    # rules. No scope set ⇒ filesystem tools are blocked (even in autopilot).
+    # tool tagged fs_read/fs_write is confined by construction. Fase 7:
+    # PermissionRuleService supplies persistent allow/ask/deny rules. Hard
+    # sandbox: ``effective_roots`` returns the explicit scope when set, else the
+    # per-conversation ephemeral sandbox dir — so no scope set ⇒ filesystem
+    # tools are confined to that sandbox (never the OS home/system root), not
+    # denied outright.
     from backend.services.permission_service import PermissionService
 
     ctx.permission_service = PermissionService(
-        scope_provider=scope_service.scope_roots,
+        scope_provider=scope_service.effective_roots,
         rule_provider=rule_service.match,
         forbidden_paths=ctx.config.scope.forbidden_paths,
     )

@@ -21,6 +21,7 @@ import ChatInput from '../components/chat/ChatInput.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import AskUserPrompt from '../components/chat/AskUserPrompt.vue'
 import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
+import { useModal } from '../composables/useModal'
 import { ChatApiKey } from '../composables/useChat'
 import { useResizablePane } from '../composables/useResizablePane'
 import { useVoice } from '../composables/useVoice'
@@ -46,6 +47,7 @@ const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
 const artifactsStore = useArtifactsStore()
 const { cadGenerationInProgress } = useGenerationState()
+const { openCustom } = useModal()
 const chatApi = inject(ChatApiKey, null)
 const _router = useRouter()
 if (!chatApi) {
@@ -81,28 +83,23 @@ const historyDrawerOpen = ref(false)
 /** True while tool executions tied to the current turn are in flight. */
 const hasAgentProcessing = computed<boolean>(() => chatStore.activeToolExecutions.length > 0)
 
-/* ── Message editing state ── */
-const editingMessageId = ref<string | null>(null)
-const editingContent = ref('')
+/* ── Message editing ── */
 
-function startEdit(messageId: string): void {
+async function startEdit(messageId: string): Promise<void> {
   if (chatStore.isStreamingCurrentConversation) return
   const msg = chatStore.messages.find((m) => m.id === messageId)
   if (!msg || msg.role !== 'user') return
-  editingMessageId.value = messageId
-  editingContent.value = msg.content
-}
-
-function submitEdit(newContent: string): void {
-  const msgId = editingMessageId.value
-  editingMessageId.value = null
-  editingContent.value = ''
-  if (msgId) editMessage(msgId, newContent)
-}
-
-function cancelEdit(): void {
-  editingMessageId.value = null
-  editingContent.value = ''
+  await openCustom({
+    component: MessageEditDialog,
+    props: {
+      originalContent: msg.content,
+      onSubmit: async (newContent: string) => {
+        await editMessage(messageId, newContent)
+      },
+    },
+    title: 'Modifica messaggio',
+    width: '560px',
+  })
 }
 
 function handleVersionSwitch(versionGroupId: string, versionIndex: number): void {
@@ -870,13 +867,6 @@ onMounted(() => {
       @edit="startEdit"
       @switch-version="handleVersionSwitch"
       @branch="handleBranch"
-    />
-
-    <MessageEditDialog
-      v-if="editingMessageId"
-      :original-content="editingContent"
-      @submit="submitEdit"
-      @cancel="cancelEdit"
     />
 
     <ToolConfirmationDialog

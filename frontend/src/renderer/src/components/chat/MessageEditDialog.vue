@@ -2,9 +2,12 @@
 /**
  * MessageEditDialog.vue — Inline dialog for editing a sent message.
  *
- * Appears as a modal overlay with a textarea pre-filled with the
- * original message content.  Supports Ctrl+Enter to submit and
- * Escape to cancel.
+ * Rendered inside the UiModal shell via `useModal().openCustom()`.
+ * Emits `'close'` with `true` (submitted) or `false` (cancelled).
+ * The edited string is delivered via the `onSubmit` callback prop
+ * because `openCustom` resolves only a boolean.
+ *
+ * Supports Ctrl/Cmd+Enter to submit.  Escape is handled by ModalContainer.
  */
 import { ref, onMounted, nextTick } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
@@ -12,12 +15,11 @@ import AppIcon from '../ui/AppIcon.vue'
 const props = defineProps<{
     /** Original message content to edit. */
     originalContent: string
+    /** Called with the edited string before `emit('close', true)`. */
+    onSubmit: (content: string) => void | Promise<void>
 }>()
 
-const emit = defineEmits<{
-    submit: [content: string]
-    cancel: []
-}>()
+const emit = defineEmits<{ close: [result: boolean] }>()
 
 const content = ref(props.originalContent)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -30,21 +32,20 @@ function autoResize(): void {
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`
 }
 
-function handleSubmit(): void {
+async function handleSubmit(): Promise<void> {
     const trimmed = content.value.trim()
     if (trimmed && trimmed !== props.originalContent) {
-        emit('submit', trimmed)
+        await props.onSubmit(trimmed)
+        emit('close', true)
     } else {
-        emit('cancel')
+        emit('close', false)
     }
 }
 
 function handleKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') {
-        emit('cancel')
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
-        handleSubmit()
+        void handleSubmit()
     }
 }
 
@@ -60,59 +61,35 @@ onMounted(async () => {
 </script>
 
 <template>
-    <Teleport to="body">
-        <div class="edit-overlay" @click.self="emit('cancel')" @keydown="handleKeydown">
-            <div class="edit-dialog">
-                <div class="edit-dialog__header">
-                    <span class="edit-dialog__title">Modifica messaggio</span>
-                    <button class="edit-dialog__close" aria-label="Annulla" @click="emit('cancel')">
-                        <AppIcon name="x" :size="16" />
-                    </button>
-                </div>
-                <textarea ref="textareaRef" v-model="content" class="edit-dialog__textarea" rows="3"
-                    placeholder="Scrivi il messaggio modificato…" @input="autoResize" />
-                <div class="edit-dialog__actions">
-                    <span class="edit-dialog__hint">Ctrl+Invio per inviare</span>
-                    <div class="edit-dialog__buttons">
-                        <button class="edit-dialog__btn edit-dialog__btn--cancel" @click="emit('cancel')">
-                            Annulla
-                        </button>
-                        <button class="edit-dialog__btn edit-dialog__btn--submit"
-                            :disabled="!content.trim() || content.trim() === originalContent" @click="handleSubmit">
-                            Invia modifica
-                        </button>
-                    </div>
-                </div>
+    <div class="edit-dialog" @keydown="handleKeydown">
+        <div class="edit-dialog__header">
+            <span class="edit-dialog__title">Modifica messaggio</span>
+            <button class="edit-dialog__close" aria-label="Annulla" @click="emit('close', false)">
+                <AppIcon name="x" :size="16" />
+            </button>
+        </div>
+        <textarea ref="textareaRef" v-model="content" class="edit-dialog__textarea" rows="3"
+            placeholder="Scrivi il messaggio modificato…" @input="autoResize" />
+        <div class="edit-dialog__actions">
+            <span class="edit-dialog__hint">Ctrl+Invio per inviare</span>
+            <div class="edit-dialog__buttons">
+                <button class="edit-dialog__btn edit-dialog__btn--cancel" @click="emit('close', false)">
+                    Annulla
+                </button>
+                <button class="edit-dialog__btn edit-dialog__btn--submit"
+                    :disabled="!content.trim() || content.trim() === originalContent" @click="handleSubmit">
+                    Invia modifica
+                </button>
             </div>
         </div>
-    </Teleport>
+    </div>
 </template>
 
 <style scoped>
-.edit-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-modal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--black-heavy);
-    backdrop-filter: blur(var(--blur-sm));
-    -webkit-backdrop-filter: blur(var(--blur-sm));
-    animation: modalOverlayIn 200ms ease both;
-}
-
 .edit-dialog {
-    width: min(560px, 90vw);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    box-shadow: var(--shadow-floating);
-    animation: modalCardIn 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .edit-dialog__header {
@@ -221,25 +198,5 @@ onMounted(async () => {
     cursor: default;
 }
 
-@keyframes modalOverlayIn {
-    from {
-        opacity: 0;
-    }
 
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes modalCardIn {
-    from {
-        opacity: 0;
-        transform: scale(0.97) translateY(-6px);
-    }
-
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
 </style>

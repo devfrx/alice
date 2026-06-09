@@ -24,6 +24,7 @@ import MessageEditDialog from '../chat/MessageEditDialog.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import ModuleLauncher from './ModuleLauncher.vue'
 import { ChatApiKey } from '../../composables/useChat'
+import { useModal } from '../../composables/useModal'
 import { useVoice } from '../../composables/useVoice'
 import { useChatStore } from '../../stores/chat'
 
@@ -40,6 +41,7 @@ const props = defineProps<{
 
 const chatStore = useChatStore()
 const chatApi = inject(ChatApiKey, null)
+const { openCustom } = useModal()
 
 // Graceful no-ops if the injection is unavailable (keeps the panel renderable
 // in isolation / tests without crashing).
@@ -64,27 +66,22 @@ const {
 const messagesContainer = ref<HTMLElement | null>(null)
 
 // ── Edit dialog ─────────────────────────────────────────────────────────────
-const editingMessageId = ref<string | null>(null)
-const editingContent = ref('')
 
-function startEdit(messageId: string): void {
+async function startEdit(messageId: string): Promise<void> {
   if (chatStore.isStreamingCurrentConversation) return
   const msg = chatStore.messages.find((m) => m.id === messageId)
   if (!msg || msg.role !== 'user') return
-  editingMessageId.value = messageId
-  editingContent.value = msg.content
-}
-
-function submitEdit(newContent: string): void {
-  const msgId = editingMessageId.value
-  editingMessageId.value = null
-  editingContent.value = ''
-  if (msgId) editMessage(msgId, newContent)
-}
-
-function cancelEdit(): void {
-  editingMessageId.value = null
-  editingContent.value = ''
+  await openCustom({
+    component: MessageEditDialog,
+    props: {
+      originalContent: msg.content,
+      onSubmit: async (newContent: string) => {
+        await editMessage(messageId, newContent)
+      },
+    },
+    title: 'Modifica messaggio',
+    width: '560px',
+  })
 }
 
 function handleVersionSwitch(versionGroupId: string, versionIndex: number): void {
@@ -212,12 +209,6 @@ const conversationTitle = computed<string>(() => {
       @respond="respondToConfirmation"
     />
 
-    <MessageEditDialog
-      v-if="editingMessageId"
-      :original-content="editingContent"
-      @submit="submitEdit"
-      @cancel="cancelEdit"
-    />
   </div>
 </template>
 

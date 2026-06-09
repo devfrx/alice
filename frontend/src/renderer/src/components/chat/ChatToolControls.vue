@@ -1,76 +1,94 @@
 <script setup lang="ts">
 /**
- * ChatToolControls.vue — In-chat tool selector.
+ * ChatToolControls.vue — In-chat tool reflection.
  *
- * Tools chip — opens a popover to pick which plugins / individual
- * tools are offered to the LLM. The selection is persisted and
- * sticky until changed. It is gated off when tools are globally
- * disabled or when Tool RAG is active (auto-selection), since
- * manual choice would have no effect in those cases.
+ * Tools chip — opens a popover that is a READ-ONLY reflection of the active
+ * permission tier. The tier (a per-conversation authorization mode) now governs
+ * the offered toolset via a sovereign whitelist, so this control no longer edits
+ * a manual selection — the editable global master switches live in Settings.
+ *
+ * Only the ``plan`` tier restricts: it withholds write/exec tools (except the
+ * always-allowed planning tools). Every other tier offers everything. When Tool
+ * RAG is on, tools are auto-selected per message *within* the tier's limits — we
+ * surface a note but still render the full reflection.
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
+import { useChatStore } from '../../stores/chat'
+import { usePermissionModeStore } from '../../stores/permissionMode'
+import type { PermissionMode } from '../../types/permission'
 import AppIcon from '../ui/AppIcon.vue'
 import UiPopover from '../ui/UiPopover.vue'
-import UiToggle from '../ui/UiToggle.vue'
+import { tierToolView, tierSummary } from './toolTierView'
 
 const settingsStore = useSettingsStore()
+const chatStore = useChatStore()
+const permissionModeStore = usePermissionModeStore()
 
 const isOpen = ref(false)
 /** Trigger chip ("Strumenti") — anchor for the teleported popover. */
 const triggerRef = ref<HTMLElement | null>(null)
-/** Plugin names whose tool list is expanded in the popover. */
-const expanded = ref<Set<string>>(new Set())
 
-/** Whether manual tool selection has any effect right now. */
-const available = computed(() => settingsStore.toolSelectionAvailable)
+/** Human-readable Italian label per tier (for the chip + blocked hint). */
+const TIER_LABELS: Record<PermissionMode, string> = {
+  strict: 'Rigorosa',
+  auto_edits: 'Modifiche automatiche',
+  plan: 'Pianificazione',
+  autopilot: 'Autopilota',
+}
 
-/** Reason the tool picker is disabled, for the tooltip. */
-const disabledReason = computed(() => {
-  if (!settingsStore.toolsEnabled) return 'Gli strumenti sono disattivati'
-  if (settingsStore.settings.llm.toolRagEnabled)
-    return 'Tool RAG attivo: gli strumenti sono selezionati automaticamente'
-  return ''
-})
+/** The active conversation's permission tier (defaults to ``strict``). */
+const activeTier = computed<PermissionMode>(() =>
+  permissionModeStore.modeFor(chatStore.currentConversation?.id ?? ''),
+)
 
-const disabledCount = computed(() => settingsStore.disabledToolCount)
+/** Readable label of the active tier. */
+const tierLabel = computed<string>(() => TIER_LABELS[activeTier.value] ?? activeTier.value)
+
+/** One-line summary of what the active tier offers. */
+const summary = computed<string>(() => tierSummary(activeTier.value))
+
+/** The tool catalog projected through the active tier (allowed/planning flags). */
+const groups = computed(() => tierToolView(activeTier.value, settingsStore.toolCatalog))
+
+/** Whether Tool RAG auto-selects tools within the tier's limits. */
+const ragActive = computed<boolean>(() => settingsStore.settings.llm.toolRagEnabled)
+
+/** Number of tools withheld by the active tier (chip hint; non-zero only in plan). */
+const blockedCount = computed<number>(() =>
+  groups.value.reduce((n, g) => n + g.tools.filter((t) => !t.allowed).length, 0),
+)
 
 function toggleOpen(): void {
-  if (!available.value) return
   isOpen.value = !isOpen.value
 }
 
-function toggleExpand(plugin: string): void {
-  const next = new Set(expanded.value)
-  if (next.has(plugin)) next.delete(plugin)
-  else next.add(plugin)
-  expanded.value = next
+/** Fetch-once the permission tier for the active conversation. */
+function ensureTier(id: string | undefined): void {
+  if (id) void permissionModeStore.ensureForConversation(id)
 }
 
-/** Whether every tool of a plugin is currently enabled. */
-function isPluginEnabled(plugin: string): boolean {
-  const group = settingsStore.toolCatalog.find((p) => p.plugin === plugin)
-  if (!group) return true
-  return group.tools.every((t) => settingsStore.isToolEnabled(t.name))
-}
+onMounted(() => ensureTier(chatStore.currentConversation?.id))
+watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
 </script>
 
 <template>
   <div class="ctc">
-    <!-- Tool selector chip -->
+    <!-- Tool reflection chip — always opens the read-only tier view -->
     <button
       ref="triggerRef"
       class="ctc__chip"
-      :class="{ 'ctc__chip--open': isOpen, 'ctc__chip--muted': !available }"
-      :disabled="!available"
-      :title="available ? 'Seleziona gli strumenti attivi' : disabledReason"
+      :class="{ 'ctc__chip--open': isOpen }"
+      :title="`Strumenti disponibili nella modalità ${tierLabel}`"
       aria-haspopup="true"
       :aria-expanded="isOpen"
       @click="toggleOpen"
     >
       <AppIcon name="sliders" :size="11" />
       <span class="ctc__chip-label">Strumenti</span>
-      <span v-if="available && disabledCount > 0" class="ctc__badge">-{{ disabledCount }}</span>
+      <span v-if="blockedCount > 0" class="ctc__badge" :title="`${blockedCount} strumenti bloccati dalla modalità`">
+        <AppIcon name="lock" :size="9" />{{ blockedCount }}
+      </span>
     </button>
 
     <!-- Popover — opens upward from the input bar, chrome from UiPopover -->
@@ -80,52 +98,58 @@ function isPluginEnabled(plugin: string): boolean {
       placement="top"
       align="start"
       width="320px"
-      aria-label="Strumenti attivi"
+      aria-label="Strumenti della modalità attiva"
       panel-class="ctc__pop"
       @update:open="isOpen = $event"
     >
       <div class="ctc__pop-head">
-        <span class="ctc__pop-title">Strumenti attivi</span>
-        <button
-          v-if="disabledCount > 0"
-          class="ctc__reset"
-          @click="settingsStore.resetToolSelection()"
-        >
-          Ripristina tutti
-        </button>
+        <span class="ctc__pop-title">Strumenti</span>
+        <span class="ctc__pop-tier">{{ tierLabel }}</span>
       </div>
 
-      <div v-if="settingsStore.toolCatalog.length === 0" class="ctc__empty">
+      <p class="ctc__summary">{{ summary }}</p>
+
+      <p v-if="ragActive" class="ctc__rag-note">
+        <AppIcon name="auto-rotate" :size="11" />
+        Selezione automatica (RAG) entro i limiti della modalità.
+      </p>
+
+      <div v-if="groups.length === 0" class="ctc__empty">
         Nessuno strumento disponibile.
       </div>
 
       <ul v-else class="ctc__list">
-        <li v-for="group in settingsStore.toolCatalog" :key="group.plugin" class="ctc__group">
+        <li v-for="group in groups" :key="group.plugin" class="ctc__group">
           <div class="ctc__group-head">
-            <button
-              class="ctc__expand"
-              :aria-label="expanded.has(group.plugin) ? 'Comprimi' : 'Espandi'"
-              @click="toggleExpand(group.plugin)"
-            >
-              <AppIcon
-                :name="expanded.has(group.plugin) ? 'chevron-down' : 'chevron-right'"
-                :size="12"
-              />
-            </button>
             <span class="ctc__plugin-name">{{ group.plugin }}</span>
             <span class="ctc__plugin-count">{{ group.tools.length }}</span>
-            <UiToggle size="sm" :model-value="isPluginEnabled(group.plugin)" :aria-label="`Attiva ${group.plugin}`"
-                @update:model-value="(v) => settingsStore.setPluginEnabled(group.plugin, v)" />
           </div>
 
-          <ul v-if="expanded.has(group.plugin)" class="ctc__tools">
-            <li v-for="tool in group.tools" :key="tool.name" class="ctc__tool">
+          <ul class="ctc__tools">
+            <li
+              v-for="tool in group.tools"
+              :key="tool.name"
+              class="ctc__tool"
+              :class="{
+                'ctc__tool--blocked': !tool.allowed,
+                'ctc__tool--planning': tool.planning,
+              }"
+            >
+              <span class="ctc__tool-state" aria-hidden="true">
+                <AppIcon
+                  :name="tool.allowed ? (tool.planning ? 'lightbulb' : 'check') : 'lock'"
+                  :size="12"
+                />
+              </span>
               <div class="ctc__tool-text">
                 <span class="ctc__tool-name">{{ tool.label }}</span>
-                <span class="ctc__tool-desc">{{ tool.description }}</span>
+                <span v-if="!tool.allowed" class="ctc__tool-hint">
+                  bloccato dalla modalità {{ tierLabel }}
+                </span>
+                <span v-else-if="tool.planning" class="ctc__tool-hint ctc__tool-hint--ok">
+                  pianificazione
+                </span>
               </div>
-              <UiToggle size="sm" :model-value="settingsStore.isToolEnabled(tool.name)" :aria-label="`Attiva ${tool.label}`"
-                  @update:model-value="(v) => settingsStore.setToolEnabled(tool.name, v)" />
             </li>
           </ul>
         </li>
@@ -187,12 +211,15 @@ function isPluginEnabled(plugin: string): boolean {
   display: inline;
 }
 
-/* Disabled count badge */
+/* Blocked-by-tier count badge (lock + count) */
 .ctc__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
   padding: 0 4px;
   border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--text-on-accent);
+  background: var(--surface-4, var(--surface-3));
+  color: var(--text-secondary);
   font-size: 9px;
   font-weight: var(--weight-bold);
   line-height: 14px;
@@ -212,7 +239,7 @@ function isPluginEnabled(plugin: string): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-1) var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1);
 }
 
 .ctc__pop-title {
@@ -222,17 +249,38 @@ function isPluginEnabled(plugin: string): boolean {
   color: var(--text-primary);
 }
 
-.ctc__reset {
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: var(--text-xs);
-  cursor: pointer;
-  padding: 0;
+/* Active-tier pill in the header */
+.ctc__pop-tier {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
 }
 
-.ctc__reset:hover {
-  text-decoration: underline;
+/* Tier summary line */
+.ctc__summary {
+  margin: 0;
+  padding: 0 var(--space-1) var(--space-1-5);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+/* RAG auto-selection note */
+.ctc__rag-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 var(--space-1) var(--space-1-5);
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  line-height: 1.35;
 }
 
 .ctc__empty {
@@ -261,16 +309,7 @@ function isPluginEnabled(plugin: string): boolean {
   display: flex;
   align-items: center;
   gap: var(--space-1-5);
-  padding: var(--space-1-5) var(--space-1);
-}
-
-.ctc__expand {
-  display: inline-flex;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 2px;
+  padding: var(--space-1-5) var(--space-1) var(--space-1);
 }
 
 .ctc__plugin-name {
@@ -286,14 +325,27 @@ function isPluginEnabled(plugin: string): boolean {
 }
 
 .ctc__tools {
-  padding: 0 var(--space-1) var(--space-1-5) 26px;
+  padding: 0 var(--space-1) var(--space-1-5);
 }
 
+/* Non-interactive tool row — read-only reflection of the tier */
 .ctc__tool {
   display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.ctc__tool-state {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--success, var(--accent));
 }
 
 .ctc__tool-text {
@@ -307,13 +359,34 @@ function isPluginEnabled(plugin: string): boolean {
   color: var(--text-primary);
 }
 
-.ctc__tool-desc {
+.ctc__tool-hint {
   display: block;
   font-size: var(--text-2xs);
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.ctc__tool-hint--ok {
+  color: var(--accent);
+}
+
+/* Planning tools — highlighted as in-evidence under the plan tier */
+.ctc__tool--planning .ctc__tool-state {
+  color: var(--accent);
+}
+
+/* Blocked tools — dimmed, lock state */
+.ctc__tool--blocked {
+  opacity: var(--opacity-disabled, 0.5);
+}
+
+.ctc__tool--blocked .ctc__tool-state {
+  color: var(--text-muted);
+}
+
+.ctc__tool--blocked .ctc__tool-name {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
 }
 
 </style>

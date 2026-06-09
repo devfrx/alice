@@ -97,6 +97,14 @@ class LLMServiceProtocol(Protocol):
         """Release the underlying HTTP client."""
         ...
 
+    def invalidate_model_cache(self) -> None:
+        """Invalidate the cached auto-resolved model ID."""
+        ...
+
+    def invalidate_system_prompt_cache(self) -> None:
+        """Clear the cached system prompt so it is reloaded on next access."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Context Manager

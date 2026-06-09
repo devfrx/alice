@@ -73,6 +73,8 @@ class AliceEvent(StrEnum):
     SERVICE_STATUS = "service.status"
     # -- Agent tasks (model-owned todo-list) --
     TASKS_UPDATED = "tasks.updated"
+    # -- Agent plan document (free-form markdown plan) --
+    PLAN_DOCUMENT_UPDATED = "plan_document.updated"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

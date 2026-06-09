@@ -528,6 +528,41 @@ class ConversationScope(SQLModel, table=True):
 
 
 # ---------------------------------------------------------------------------
+# Conversation Plan Document (free-form markdown plan, Task T2)
+# ---------------------------------------------------------------------------
+
+
+class ConversationPlanDocument(SQLModel, table=True):
+    """The free-form markdown plan document for a conversation (one row each).
+
+    A single editable markdown document per conversation (the conversation id
+    is the primary key), persisted by
+    :class:`~backend.services.plan_document_service.PlanDocumentService` so the
+    plan write-up survives reloads and can be re-injected into the next turn.
+    ``body`` holds the markdown text; ``title`` is an optional short heading.
+    """
+
+    __tablename__ = "conversation_plan_documents"
+
+    conversation_id: uuid.UUID = Field(
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("conversations.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+    )
+    title: str = Field(
+        default="",
+        sa_column=sa.Column(sa.Text, nullable=False),
+    )
+    body: str = Field(
+        default="",
+        sa_column=sa.Column(sa.Text, nullable=False),
+    )
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+# ---------------------------------------------------------------------------
 # Conversation Permission Mode (tiered authorization, Fase 7)
 # ---------------------------------------------------------------------------
 

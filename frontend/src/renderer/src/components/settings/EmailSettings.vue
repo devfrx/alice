@@ -10,10 +10,7 @@
                 <span class="sv__row-label">Email Assistant</span>
                 <span class="sv__row-hint">Abilita lettura e invio email locali tramite plugin</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': email.enabled }" role="switch"
-                :aria-checked="email.enabled" @click="email.enabled = !email.enabled">
-                <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="email.enabled" aria-label="Abilita email" />
         </div>
 
         <div class="sv__divider" />
@@ -98,10 +95,7 @@
                 <span class="sv__row-label">IMAP SSL</span>
                 <span class="sv__row-hint">Usa TLS diretto per la connessione IMAP</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': email.imapSsl }" role="switch"
-                :aria-checked="email.imapSsl" @click="email.imapSsl = !email.imapSsl">
-                <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="email.imapSsl" aria-label="IMAP SSL/TLS" />
         </div>
         <div class="sv__divider" />
         <div class="sv__row">
@@ -109,10 +103,7 @@
                 <span class="sv__row-label">SMTP SSL</span>
                 <span class="sv__row-hint">Usa TLS diretto per SMTP; disattivo usa STARTTLS</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': email.smtpSsl }" role="switch"
-                :aria-checked="email.smtpSsl" @click="email.smtpSsl = !email.smtpSsl">
-                <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="email.smtpSsl" aria-label="SMTP SSL/TLS" />
         </div>
         <div class="sv__divider" />
         <div class="sv__row">
@@ -120,10 +111,7 @@
                 <span class="sv__row-label">IMAP IDLE</span>
                 <span class="sv__row-hint">Mantiene una connessione in ascolto per nuove email</span>
             </div>
-            <button class="sv__toggle" :class="{ 'sv__toggle--on': email.imapIdleEnabled }" role="switch"
-                :aria-checked="email.imapIdleEnabled" @click="email.imapIdleEnabled = !email.imapIdleEnabled">
-                <span class="sv__toggle-thumb" />
-            </button>
+            <UiToggle v-model="email.imapIdleEnabled" aria-label="IMAP IDLE" />
         </div>
     </div>
 </template>
@@ -131,6 +119,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
+import UiToggle from '../ui/UiToggle.vue'
 
 const settingsStore = useSettingsStore()
 const email = computed(() => settingsStore.settings.email)

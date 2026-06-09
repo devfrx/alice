@@ -58,38 +58,6 @@
   background: var(--border);
 }
 
-.sv__toggle {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: var(--surface-3);
-  cursor: pointer;
-  transition: background var(--duration-fast) ease;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.sv__toggle--on {
-  background: var(--accent);
-}
-
-.sv__toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--text-primary);
-  transition: transform var(--duration-fast) ease;
-}
-
-.sv__toggle--on .sv__toggle-thumb {
-  transform: translateX(16px);
-}
-
 .sv__readonly-pill {
   flex-shrink: 0;
   padding: 2px 8px;
@@ -153,8 +121,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sv__toggle,
-  .sv__toggle-thumb,
   .sv__input {
     transition: none;
   }

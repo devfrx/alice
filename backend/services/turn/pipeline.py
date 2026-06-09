@@ -264,12 +264,19 @@ class PermissionMiddleware:
 class ConfirmationMiddleware:
     """Gate confirmation-requiring tools behind a user round-trip.
 
-    Mirrors the legacy behaviour exactly: a tool opts in via
-    ``requires_confirmation``; when the runtime toggle
-    ``permissions.confirmations_enabled`` is on, the user is asked over the
-    :class:`~backend.services.turn.channel.InteractionChannel`; when off, the
-    call is auto-approved. Either way an audit decision is recorded for the
-    engine to persist. A rejection short-circuits.
+    **The tier is authoritative.** When ``PermissionMiddleware`` stamped a
+    ``NEEDS_CONFIRMATION`` verdict (``call.gate_decision``), the user is *always*
+    asked over the :class:`~backend.services.turn.channel.InteractionChannel` —
+    the legacy global ``permissions.confirmations_enabled`` toggle can no longer
+    override the chosen tier. ``AUTOPILOT`` is the explicit "never ask" tier (it
+    yields ALLOW, so it never reaches this middleware needing confirmation).
+
+    The legacy flag survives only as a fallback for the *no-gate-decision* path:
+    when this middleware is driven in isolation (a unit test without the upstream
+    permission stage, ``gate_decision is None``), the call falls back to the
+    ``requires_confirmation`` flag and the toggle then decides ask-vs-auto-approve.
+    Either way an audit decision is recorded for the engine to persist, and a
+    rejection short-circuits.
     """
 
     def __init__(
@@ -321,7 +328,10 @@ class ConfirmationMiddleware:
             tool_name=call.tool_name,
         ))
 
-        if self._confirmations_enabled:
+        # Tier authoritative: a NEEDS_CONFIRMATION verdict ALWAYS prompts. The legacy
+        # global toggle only governs the no-gate-decision fallback (unit-test isolation).
+        tier_mandated = gd is not None and gd.action is GateAction.NEEDS_CONFIRMATION
+        if tier_mandated or self._confirmations_enabled:
             confirmation = await _request_confirmation(
                 self._channel, call.tool_name, call.args, call.exec_id,
                 self._timeout_s,
@@ -334,7 +344,7 @@ class ConfirmationMiddleware:
             remember = confirmation.remember
         else:
             logger.info(
-                "Confirmations disabled — auto-approving '{}' (exec_id={})",
+                "No tier verdict and confirmations disabled — auto-approving '{}' (exec_id={})",
                 call.tool_name, call.exec_id,
             )
             approved = True

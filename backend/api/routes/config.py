@@ -473,6 +473,17 @@ async def update_config(request: Request) -> dict[str, Any]:
             if not (1 <= trk <= 100):
                 raise HTTPException(400, "tool_rag_top_k must be between 1 and 100")
             object.__setattr__(cfg.llm, "tool_rag_top_k", trk)
+        if "user_preferred_name" in llm_updates:
+            raw_name = llm_updates["user_preferred_name"]
+            name = "" if raw_name is None else str(raw_name).strip()
+            if len(name) > 80:
+                raise HTTPException(
+                    400, "user_preferred_name must be at most 80 characters",
+                )
+            object.__setattr__(cfg.llm, "user_preferred_name", name)
+            # Drop the cached prompt so the next turn rebuilds it with the name.
+            if ctx.llm_service is not None:
+                ctx.llm_service.invalidate_system_prompt_cache()
 
     if "ui" in body:
         ui_updates = body["ui"]

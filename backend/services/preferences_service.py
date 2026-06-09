@@ -38,6 +38,7 @@ PERSISTABLE_LLM_KEYS: frozenset[str] = frozenset({
     "tool_rag_enabled",
     "tool_rag_top_k",
     "disabled_tools",
+    "user_preferred_name",
 })
 
 

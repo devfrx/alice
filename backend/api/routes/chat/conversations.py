@@ -157,7 +157,7 @@ async def get_conversation(
             cw = 0
             if ctx.llm_service and ctx.lmstudio_manager:
                 with contextlib.suppress(Exception):
-                    cw = await ctx.llm_service.get_active_context_window(
+                    cw = ctx.llm_service.get_cached_context_window(
                         ctx.lmstudio_manager,
                     )
             if cw <= 0:

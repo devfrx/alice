@@ -429,9 +429,7 @@ class TurnAssembler:
         _tool_tokens = 0
 
         if ctx.context_manager is not None:
-            context_window = await llm.get_active_context_window(
-                ctx.lmstudio_manager,
-            )
+            context_window = llm.get_cached_context_window(ctx.lmstudio_manager)
 
         if context_window > 0 and ctx.context_manager is not None:
             # Compute tool tokens for compression regardless

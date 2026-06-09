@@ -102,6 +102,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     async def _refresh_ctx_config(**_kwargs: object) -> None:
         ctx.config = config_service.get_resolved()
+        # A config change may switch the active model, which changes the
+        # context window; drop the cached value so the next probe refreshes it.
+        if getattr(ctx, "llm_service", None) is not None:
+            ctx.llm_service.invalidate_context_window_cache()
 
     ctx.event_bus.subscribe("config.changed", _refresh_ctx_config)
 
@@ -191,6 +195,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         api_token=config.llm.api_token,
     )
     ctx.lmstudio_manager = lmstudio_manager
+
+    # Drop the cached LLM context window whenever the loaded-model set changes
+    # (load/unload paths call invalidate_models_cache), so the next probe
+    # re-reads the window for the now-active model.
+    lmstudio_manager.add_models_changed_listener(
+        llm_service.invalidate_context_window_cache
+    )
 
     # Register LM Studio with the orchestrator (health-only, never auto-start).
     try:

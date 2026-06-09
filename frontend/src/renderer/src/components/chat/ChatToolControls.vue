@@ -12,6 +12,7 @@ import { computed, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import AppIcon from '../ui/AppIcon.vue'
 import UiPopover from '../ui/UiPopover.vue'
+import UiToggle from '../ui/UiToggle.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -113,15 +114,8 @@ function isPluginEnabled(plugin: string): boolean {
             </button>
             <span class="ctc__plugin-name">{{ group.plugin }}</span>
             <span class="ctc__plugin-count">{{ group.tools.length }}</span>
-            <button
-              class="ctc__sw"
-              :class="{ 'ctc__sw--on': isPluginEnabled(group.plugin) }"
-              role="switch"
-              :aria-checked="isPluginEnabled(group.plugin)"
-              @click="settingsStore.setPluginEnabled(group.plugin, !isPluginEnabled(group.plugin))"
-            >
-              <span class="ctc__sw-thumb" />
-            </button>
+            <UiToggle size="sm" :model-value="isPluginEnabled(group.plugin)" :aria-label="`Attiva ${group.plugin}`"
+                @update:model-value="(v) => settingsStore.setPluginEnabled(group.plugin, v)" />
           </div>
 
           <ul v-if="expanded.has(group.plugin)" class="ctc__tools">
@@ -130,17 +124,8 @@ function isPluginEnabled(plugin: string): boolean {
                 <span class="ctc__tool-name">{{ tool.label }}</span>
                 <span class="ctc__tool-desc">{{ tool.description }}</span>
               </div>
-              <button
-                class="ctc__sw"
-                :class="{ 'ctc__sw--on': settingsStore.isToolEnabled(tool.name) }"
-                role="switch"
-                :aria-checked="settingsStore.isToolEnabled(tool.name)"
-                @click="
-                  settingsStore.setToolEnabled(tool.name, !settingsStore.isToolEnabled(tool.name))
-                "
-              >
-                <span class="ctc__sw-thumb" />
-              </button>
+              <UiToggle size="sm" :model-value="settingsStore.isToolEnabled(tool.name)" :aria-label="`Attiva ${tool.label}`"
+                  @update:model-value="(v) => settingsStore.setToolEnabled(tool.name, v)" />
             </li>
           </ul>
         </li>
@@ -331,35 +316,4 @@ function isPluginEnabled(plugin: string): boolean {
   text-overflow: ellipsis;
 }
 
-/* ── Toggle switch ── */
-.ctc__pop .ctc__sw {
-  position: relative;
-  flex-shrink: 0;
-  width: 30px;
-  height: 16px;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--surface-3);
-  cursor: pointer;
-  transition: background var(--duration-fast) ease;
-}
-
-.ctc__pop .ctc__sw--on {
-  background: var(--accent);
-}
-
-.ctc__pop .ctc__sw-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--text-on-accent);
-  transition: transform var(--duration-fast) ease;
-}
-
-.ctc__pop .ctc__sw--on .ctc__sw-thumb {
-  transform: translateX(14px);
-}
 </style>

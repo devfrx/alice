@@ -30,6 +30,26 @@ import type {
   WsTurnUsageMessage,
 } from '../types/turn'
 
+/**
+ * Stable frozen sentinel used by {@link currentRun} while `pendingTurn` is
+ * active — covers the gap between the user hitting send and `turn.started`
+ * arriving so the reasoning thread shows a clean "starting" state instead of
+ * the previous finished run.
+ */
+const PENDING_RUN: AgentRun = Object.freeze({
+  turnId: '__pending__',
+  conversationId: '',
+  status: 'running',
+  step: 0,
+  maxSteps: 0,
+  tools: [],
+  interactions: [],
+  inputTokens: 0,
+  outputTokens: 0,
+  toolCalls: 0,
+  finishReason: null,
+}) as AgentRun
+
 export const useAgentRunStore = defineStore('agentRun', () => {
   // -----------------------------------------------------------------------
   // State
@@ -41,14 +61,22 @@ export const useAgentRunStore = defineStore('agentRun', () => {
   /** Turn id of the most recently started run (drives {@link currentRun}). */
   const currentTurnId = ref<string | null>(null)
 
+  /**
+   * When true, {@link currentRun} returns {@link PENDING_RUN} — a fresh
+   * zero-state "running" sentinel that covers the send → `turn.started` gap.
+   * Cleared on the first `turn.started` that arrives.
+   */
+  const pendingTurn = ref(false)
+
   // -----------------------------------------------------------------------
   // Getters
   // -----------------------------------------------------------------------
 
   /** The run for {@link currentTurnId}, or null when none is active. */
-  const currentRun = computed<AgentRun | null>(() =>
-    currentTurnId.value ? runs.value[currentTurnId.value] ?? null : null,
-  )
+  const currentRun = computed<AgentRun | null>(() => {
+    if (pendingTurn.value) return PENDING_RUN
+    return currentTurnId.value ? runs.value[currentTurnId.value] ?? null : null
+  })
 
   /** Lookup helper: the run for a given turn id, if known. */
   function runByTurnId(id: string): AgentRun | null {
@@ -92,6 +120,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
 
   /** `turn.started` → create/replace the run and mark it current. */
   function applyTurnStarted(msg: WsTurnStartedMessage): void {
+    pendingTurn.value = false
     const run: AgentRun = {
       turnId: msg.turn_id,
       conversationId: msg.conversation_id,
@@ -124,6 +153,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       toolName: msg.tool_name,
       args: msg.args,
       status: 'running',
+      seq: run.tools.length + run.interactions.length,
     }
     run.tools = [...run.tools, activity]
   }
@@ -142,6 +172,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         result: msg.result,
         contentType: msg.content_type,
         artifactId: msg.artifact_id,
+        seq: run.tools.length + run.interactions.length,
       }
       run.tools = [...run.tools, activity]
       return
@@ -170,6 +201,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       kind: msg.kind,
       toolName: msg.tool_name,
       status: 'pending',
+      seq: run.tools.length + run.interactions.length,
     }
     run.interactions = [...run.interactions, activity]
   }
@@ -188,6 +220,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         kind: msg.kind,
         status: 'resolved',
         outcome: msg.outcome,
+        seq: run.tools.length + run.interactions.length,
       }
       run.interactions = [...run.interactions, activity]
       return
@@ -224,16 +257,29 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     run.step = msg.steps
   }
 
+  /**
+   * Show a fresh "starting" sentinel run during the send → `turn.started` gap.
+   *
+   * Call this immediately when the user submits a message so the reasoning
+   * thread renders a clean zero-state instead of the previous finished run.
+   * Automatically cleared by the next {@link applyTurnStarted}.
+   */
+  function beginPendingTurn(): void {
+    pendingTurn.value = true
+  }
+
   /** Clear all runs and the current-turn pointer. */
   function reset(): void {
     runs.value = {}
     currentTurnId.value = null
+    pendingTurn.value = false
   }
 
   return {
     // state
     runs,
     currentTurnId,
+    pendingTurn,
     // getters
     currentRun,
     runByTurnId,
@@ -246,6 +292,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     applyInteractionResolved,
     applyTurnUsage,
     applyTurnFinished,
+    beginPendingTurn,
     reset,
   }
 })

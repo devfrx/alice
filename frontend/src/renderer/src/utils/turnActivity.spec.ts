@@ -11,7 +11,7 @@ import type { ToolActivity } from '../types/turn'
 
 /** Build a minimal ToolActivity carrying the given status. */
 function activity(executionId: string, status: ToolActivity['status']): ToolActivity {
-  return { executionId, toolName: 'web_search', args: {}, status }
+  return { executionId, toolName: 'web_search', args: {}, status, seq: 0 }
 }
 
 describe('summarizeTools', () => {

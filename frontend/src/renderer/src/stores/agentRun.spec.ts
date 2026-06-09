@@ -233,7 +233,7 @@ describe('interaction handling', () => {
     s.applyTurnStarted(started('t1'))
     s.applyInteractionRequested(interactionRequested('t1', 'x1'))
     expect(s.currentRun!.interactions).toHaveLength(1)
-    expect(s.currentRun!.interactions[0]).toEqual({
+    expect(s.currentRun!.interactions[0]).toMatchObject({
       executionId: 'x1',
       kind: 'tool_confirmation',
       toolName: 'run_terminal_command',
@@ -341,5 +341,50 @@ describe('multiple turns', () => {
     expect(t1!.tools).toHaveLength(1)
     expect(t1!.tools[0].executionId).toBe('e1')
     expect(s.runByTurnId('t2')!.tools[0].executionId).toBe('e2')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// seq — monotonic insertion order across tools + interactions
+// ---------------------------------------------------------------------------
+
+describe('seq', () => {
+  it('assigns monotonic seq across interleaved tools and interactions', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyToolCall({ type: 'tool.call', turn_id: 't1', execution_id: 'e1', tool_name: 'web_search', args: {} })
+    s.applyInteractionRequested({ type: 'interaction.requested', turn_id: 't1', execution_id: 'e2', kind: 'tool_confirmation', tool_name: 'write_file' })
+    s.applyToolCall({ type: 'tool.call', turn_id: 't1', execution_id: 'e3', tool_name: 'read_file', args: {} })
+    const run = s.runByTurnId('t1')!
+    expect(run.tools.find((t) => t.executionId === 'e1')!.seq).toBe(0)
+    expect(run.interactions.find((i) => i.executionId === 'e2')!.seq).toBe(1)
+    expect(run.tools.find((t) => t.executionId === 'e3')!.seq).toBe(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// beginPendingTurn — optimistic "sending" state
+// ---------------------------------------------------------------------------
+
+describe('beginPendingTurn', () => {
+  it('beginPendingTurn shows a fresh pending run, not the prior finished one', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyTurnFinished({ type: 'turn.finished', turn_id: 't1', finish_reason: 'stop', input_tokens: 10, output_tokens: 5, steps: 1 })
+    expect(s.currentRun!.status).toBe('finished')
+    s.beginPendingTurn()
+    expect(s.currentRun!.status).toBe('running')
+    expect(s.currentRun!.step).toBe(0)
+    expect(s.currentRun!.tools).toEqual([])
+    expect(s.currentRun!.finishReason).toBeNull()
+  })
+
+  it('applyTurnStarted clears the pending flag', () => {
+    const s = useAgentRunStore()
+    s.beginPendingTurn()
+    expect(s.currentRun!.status).toBe('running')
+    s.applyTurnStarted(started('t2'))
+    expect(s.currentTurnId).toBe('t2')
+    expect(s.currentRun!.turnId).toBe('t2')
   })
 })

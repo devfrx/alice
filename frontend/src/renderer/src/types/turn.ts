@@ -137,6 +137,8 @@ export interface ToolActivity {
   contentType?: string
   /** UUID of the artifact registered for this tool result, when any. */
   artifactId?: string
+  /** Monotonic insertion order within the run (interleaves tools + interactions). */
+  seq: number
 }
 
 /** Tracks the lifecycle of a single mid-turn user interaction within a run. */
@@ -147,6 +149,8 @@ export interface InteractionActivity {
   toolName?: string
   status: 'pending' | 'resolved'
   outcome?: InteractionOutcome
+  /** Monotonic insertion order within the run (interleaves tools + interactions). */
+  seq: number
 }
 
 /** Per-turn "agent run" view-model folded from the canonical event stream. */

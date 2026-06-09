@@ -470,6 +470,11 @@ class LLMService:
             f"- **Home**: {home}\n"
             f"- **Desktop**: {desktop}\n"
         )
+        if self._config.user_preferred_name:
+            env_block += (
+                f"- **Come preferisci essere chiamato/a**: "
+                f"{self._config.user_preferred_name}\n"
+            )
 
         self._system_prompt = base + env_block
         logger.debug("Loaded system prompt from {}", path)

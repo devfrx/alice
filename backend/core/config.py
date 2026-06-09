@@ -129,6 +129,9 @@ class LLMConfig(BaseSettings):
     system_prompt_file: str = "config/system_prompt.md"
     system_prompt_enabled: bool = True
     """Whether to include the system prompt in LLM requests."""
+    user_preferred_name: str = ""
+    """How the user wants the assistant to address them. Injected into the
+    system prompt's environment block so the model uses it. Empty = unset."""
     tools_enabled: bool = True
     """Whether to send tool definitions to the LLM for function calling."""
     supports_thinking: bool = False

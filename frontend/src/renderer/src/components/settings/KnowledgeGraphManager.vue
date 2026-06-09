@@ -141,8 +141,8 @@ function relationsFor(entityName: string, relations: KGRelation[]): KGRelation[]
 // ── Create Entity ─────────────────────────────────────────────────────────
 
 async function openCreateEntity(): Promise<void> {
-    const result = await openCustom({ component: KgCreateEntityDialog, title: 'Nuova entità', width: '480px' })
-    if (result) await store.loadGraph()
+    // The store action reloads the graph on success, so no extra refresh here.
+    await openCustom({ component: KgCreateEntityDialog, title: 'Nuova entità', width: '480px' })
 }
 
 // ── Create Relation ───────────────────────────────────────────────────────
@@ -153,25 +153,25 @@ const entityOptions = computed<UiSelectOption[]>(() =>
 )
 
 async function openCreateRelation(): Promise<void> {
-    const result = await openCustom({
+    // The store action reloads the graph on success, so no extra refresh here.
+    await openCustom({
         component: KgCreateRelationDialog,
         props: { entities: entityOptions.value },
         title: 'Nuova relazione',
         width: '480px',
     })
-    if (result) await store.loadGraph()
 }
 
 // ── Add Observation ───────────────────────────────────────────────────────
 
 async function openAddObservation(entityName: string): Promise<void> {
-    const result = await openCustom({
+    // The store action reloads the graph on success, so no extra refresh here.
+    await openCustom({
         component: KgAddObservationDialog,
         props: { entityName },
         title: `Aggiungi osservazione · ${entityName}`,
         width: '480px',
     })
-    if (result) await store.loadGraph()
 }
 
 // ── Confirmation dialog ───────────────────────────────────────────────────

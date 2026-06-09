@@ -97,7 +97,6 @@ async function startEdit(messageId: string): Promise<void> {
         await editMessage(messageId, newContent)
       },
     },
-    title: 'Modifica messaggio',
     width: '560px',
   })
 }

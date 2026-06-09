@@ -143,6 +143,8 @@ export interface ToolCatalogTool {
   description: string
   /** Whether this tool is currently offered to the LLM. */
   enabled: boolean
+  /** Capability tags (e.g. fs_write, process_exec) the active tier may withhold. */
+  capabilities: string[]
 }
 
 /** Tools grouped under their owning plugin. */

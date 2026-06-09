@@ -576,6 +576,9 @@ class ToolRegistry:
           :attr:`LLMConfig.disabled_tools`).
         * ``label``: bare tool name for display.
         * ``description``: human-readable tool description.
+        * ``capabilities``: the tool's capability tags (e.g. ``fs_write``,
+          ``process_exec``) so the UI can reflect what a permission tier
+          withholds.
 
         Returns:
             One descriptor dict per registered tool.
@@ -588,6 +591,7 @@ class ToolRegistry:
                     "name": ns_name,
                     "label": tool_def.name,
                     "description": tool_def.description,
+                    "capabilities": list(tool_def.capabilities),
                 }
             )
         return catalog

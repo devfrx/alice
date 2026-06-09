@@ -183,6 +183,9 @@ class ToolCatalogTool(BaseModel):
     """Human-readable tool description."""
     enabled: bool
     """Whether this tool is currently offered to the LLM."""
+    capabilities: list[str] = []
+    """Capability tags (e.g. ``fs_write``, ``process_exec``) so the UI can
+    reflect what the active permission tier withholds."""
 
 
 class ToolCatalogPlugin(BaseModel):
@@ -219,6 +222,7 @@ def _build_tool_catalog(ctx: AppContext) -> ToolCatalogResponse:
                     label=entry["label"],
                     description=entry["description"],
                     enabled=entry["name"] not in disabled,
+                    capabilities=list(entry.get("capabilities", [])),
                 )
             )
     plugins = [

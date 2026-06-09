@@ -334,6 +334,19 @@ class ToolRegistryProtocol(Protocol):
         max_tools: int,
         priority_plugins: list[str] | None = None,
     ) -> list[dict[str, Any]]: ...
+    async def get_tools_for_plugins(
+        self, plugin_names: set[str],
+    ) -> list[dict[str, Any]]: ...
+    def exclude_disabled(
+        self, tools: list[dict[str, Any]], disabled_names: set[str],
+    ) -> list[dict[str, Any]]: ...
+    def apply_mode_policy(
+        self,
+        tools: list[dict[str, Any]],
+        *,
+        drop_capabilities: frozenset[str] | set[str] = ...,
+        priority_plugins: tuple[str, ...] | list[str] = ...,
+    ) -> list[dict[str, Any]]: ...
     async def embed_tools(self) -> None: ...
     async def get_relevant_tools(
         self, query: str, k: int,

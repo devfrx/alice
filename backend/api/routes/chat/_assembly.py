@@ -33,12 +33,15 @@ from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
 from backend.services.context_manager import CompressionResult, ContextUsage
 from backend.services.llm_service import LLMService
+from backend.services.permission_mode_policy import ModePolicy, policy_for
+from backend.services.permission_mode_service import PermissionMode
 from backend.services.plan_service import render_plan_steps
 from backend.services.turn import TurnInput
 
 from ._helpers import (
     _archive_messages_in_db,
     _build_mcp_context,
+    _build_permission_context,
     _build_tool_rag_query,
     _build_whiteboard_context,
     _compute_context_breakdown,
@@ -313,6 +316,20 @@ class TurnAssembler:
         memory_ok = rr is None or rr.memory_enabled
         tool_rag_ok = rr is not None and rr.tool_rag_enabled
 
+        # --- resolve the conversation's permission tier -----------
+        # The tier shapes BOTH the offered toolset (below) and the system-prompt
+        # steering (further down), so the user's choice actually changes the
+        # agent's behaviour — not only the per-call gate. Resolved defensively:
+        # a missing/odd service degrades to the default tier rather than raising.
+        mode: PermissionMode | None = None
+        policy: ModePolicy | None = None
+        mode_service = getattr(ctx, "permission_mode_service", None)
+        if mode_service is not None:
+            mode = PermissionMode.coerce(
+                mode_service.get_mode(conv_id), PermissionMode.STRICT,
+            )
+            policy = policy_for(mode)
+
         # --- fetch available tools for LLM ------------------------
         tools: list[dict[str, Any]] | None = None
         if ctx.tool_registry and ctx.config.llm.tools_enabled:
@@ -351,6 +368,27 @@ class TurnAssembler:
                         max_tools=ctx.config.llm.max_tools,
                         priority_plugins=ctx.config.llm.priority_plugins,
                     )
+
+            # Align the offered toolset with the active permission tier: in the
+            # read-only (plan) tier, withhold write/exec tools the gate would
+            # block anyway and lead with the planning tools — guaranteeing they
+            # are present even if tool RAG didn't surface them. Skipped for the
+            # Continuum-scoped agent, which owns its own fixed toolset.
+            if tools and policy is not None and not continuum_scope:
+                if policy.priority_plugins:
+                    have = {t["function"]["name"] for t in tools}
+                    extra = await ctx.tool_registry.get_tools_for_plugins(
+                        set(policy.priority_plugins),
+                    )
+                    tools.extend(
+                        e for e in extra if e["function"]["name"] not in have
+                    )
+                tools = ctx.tool_registry.apply_mode_policy(
+                    tools,
+                    drop_capabilities=policy.blocked_capabilities,
+                    priority_plugins=policy.priority_plugins,
+                )
+
             if not tools:
                 tools = None  # empty list confuses some LLMs
 
@@ -412,6 +450,20 @@ class TurnAssembler:
                         if memory_context
                         else plan_ctx
                     )
+
+        # --- inject workspace scope + permission-tier steering ----
+        # Prepended so it LEADS the dynamic context: the model must know which
+        # folders it may touch (else it defaults to the OS home from the env
+        # block and every write lands out of scope) and what its tier permits.
+        # Skipped for the Continuum-scoped agent (its own persona/toolset).
+        if not continuum_scope:
+            perm_ctx = _build_permission_context(ctx, str(conv_id), mode, policy)
+            if perm_ctx:
+                memory_context = (
+                    f"{perm_ctx}\n\n{memory_context}"
+                    if memory_context
+                    else perm_ctx
+                )
 
         # --- call LLM (streaming) ---------------------------------
         # Build system prompt once for the entire request — reused

@@ -619,6 +619,67 @@ class ToolRegistry:
             if entry["function"]["name"] not in disabled_names
         ]
 
+    def apply_mode_policy(
+        self,
+        tools: list[dict[str, Any]],
+        *,
+        drop_capabilities: frozenset[str] | set[str] = frozenset(),
+        priority_plugins: tuple[str, ...] | list[str] = (),
+    ) -> list[dict[str, Any]]:
+        """Reshape *tools* to match the active permission tier.
+
+        Two capability-/plugin-driven transforms, applied in order:
+
+        * **drop** — remove every tool whose definition declares any capability
+          in *drop_capabilities* (e.g. ``fs_write`` / ``process_exec`` in the
+          read-only ``plan`` tier).  Withholding the tools the gate would deny
+          anyway keeps the model from leading with an action it cannot take.
+        * **prioritise** — float tools owned by *priority_plugins* to the front
+          (stable within each group) so the model reaches for them first (e.g.
+          the planning meta-tools in ``plan`` mode).
+
+        The input list is never mutated; a new list is returned (or the input
+        unchanged when both transforms are no-ops).  A tool whose definition
+        cannot be resolved is treated as capability-less — never dropped.
+
+        Args:
+            tools: OpenAI-format tool dicts (e.g. from the selection branch).
+            drop_capabilities: Capability tags whose tools are removed.
+            priority_plugins: Owning-plugin names floated to the front.
+
+        Returns:
+            The reshaped tool list.
+        """
+        if not tools:
+            return tools
+
+        result = tools
+        if drop_capabilities:
+            drop = frozenset(drop_capabilities)
+            kept: list[dict[str, Any]] = []
+            for entry in result:
+                ns_name = entry.get("function", {}).get("name", "")
+                tool_def = self._tools.get(ns_name)
+                caps = set(tool_def.capabilities) if tool_def is not None else set()
+                if caps & drop:
+                    continue
+                kept.append(entry)
+            result = kept
+
+        prio = set(priority_plugins or ())
+        if prio:
+            front: list[dict[str, Any]] = []
+            rest: list[dict[str, Any]] = []
+            for entry in result:
+                ns_name = entry.get("function", {}).get("name", "")
+                if self._tool_to_plugin.get(ns_name) in prio:
+                    front.append(entry)
+                else:
+                    rest.append(entry)
+            result = front + rest
+
+        return result
+
     # ------------------------------------------------------------------
     # Tool RAG — embed & retrieve
     # ------------------------------------------------------------------

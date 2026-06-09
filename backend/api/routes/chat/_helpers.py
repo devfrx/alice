@@ -20,6 +20,8 @@ from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
 from backend.services.context_manager import ContextManager
 from backend.services.conversation_file_manager import ConversationFileManager
+from backend.services.permission_mode_policy import ModePolicy
+from backend.services.permission_mode_service import PermissionMode
 
 from ._shared import _attachment_url
 
@@ -447,6 +449,80 @@ async def _build_whiteboard_context(
         )
     lines.append("[/LAVAGNE ASSOCIATE]")
     return "\n".join(lines)
+
+
+def _build_permission_context(
+    ctx: AppContext,
+    conversation_id: str,
+    mode: PermissionMode | None,
+    policy: ModePolicy | None,
+) -> str | None:
+    """Build the workspace-scope + permission-tier block for the system prompt.
+
+    Two sub-blocks the model needs to behave coherently with the permissions it
+    has actually been given (Fase 7 extension):
+
+    * ``[AMBITO DI LAVORO]`` — the conversation's workspace scope.  Without it
+      the model defaults to the OS home from the environment block (e.g.
+      proposing ``C:\\Users\\<name>``) and every write lands outside the scope
+      and is bounced.  Naming the scoped folders steers it to operate there.
+    * ``[MODALITÀ OPERATIVA]`` — the active tier's behavioural guidance, so the
+      model leads with what it may do (and avoids what it may not) instead of
+      discovering the boundary only when the gate denies a call.
+
+    Args:
+        ctx: Application context (reads ``scope_service``).
+        conversation_id: The current conversation id (str).
+        mode: The resolved permission tier, or ``None`` when unavailable.
+        policy: The tier's behavioural policy, or ``None`` when unavailable.
+
+    Returns:
+        A markdown block, or ``None`` when there is nothing to inject.
+    """
+    parts: list[str] = []
+
+    scope_service = getattr(ctx, "scope_service", None)
+    if scope_service is not None:
+        try:
+            explicit = scope_service.scope_roots(conversation_id)
+        except Exception as exc:  # noqa: BLE001 — never block a turn on this
+            logger.warning("Scope context fetch failed for conv={}: {}", conversation_id, exc)
+            explicit = None
+        if explicit:
+            folders = "\n".join(f"- {p}" for p in explicit)
+            parts.append(
+                "[AMBITO DI LAVORO]\n"
+                "In questa conversazione puoi accedere e scrivere SOLO in "
+                "queste cartelle (e nelle loro sottocartelle):\n"
+                f"{folders}\n"
+                "Crea e salva i file QUI per impostazione predefinita. NON "
+                "proporre percorsi fuori da questo ambito: la Home e il Desktop "
+                "indicati nell'ambiente utente sono solo riferimenti di sistema, "
+                "e qualsiasi accesso fuori dalle cartelle elencate verrà "
+                "bloccato.\n"
+                "[/AMBITO DI LAVORO]"
+            )
+        else:
+            parts.append(
+                "[AMBITO DI LAVORO]\n"
+                "Nessuna cartella è stata assegnata a questa conversazione. Per "
+                "creare o modificare file reali devi prima chiedere all'utente "
+                "di assegnare una cartella allo scope della conversazione: senza "
+                "un ambito, gli strumenti su file e terminale non possono "
+                "operare su percorsi reali.\n"
+                "[/AMBITO DI LAVORO]"
+            )
+
+    if policy is not None and policy.guidance:
+        parts.append(
+            "[MODALITÀ OPERATIVA]\n"
+            f"{policy.guidance}\n"
+            "[/MODALITÀ OPERATIVA]"
+        )
+
+    if not parts:
+        return None
+    return "\n\n".join(parts)
 
 
 def _compute_context_breakdown(

@@ -304,6 +304,15 @@ class TurnAssembler:
             raw_history, av_map,
         )
 
+        # --- RAG readiness gate (functionality-fixes #3) ----------
+        # When the vector/embedding stack isn't 100% healthy the lifespan
+        # gate disables memory-search + tool-RAG. ``rr is None`` (gate not
+        # yet computed) keeps memory enabled but forces full-tools for
+        # tool-RAG (safe default).
+        rr = getattr(ctx, "rag_readiness", None)
+        memory_ok = rr is None or rr.memory_enabled
+        tool_rag_ok = rr is not None and rr.tool_rag_enabled
+
         # --- fetch available tools for LLM ------------------------
         tools: list[dict[str, Any]] | None = None
         if ctx.tool_registry and ctx.config.llm.tools_enabled:
@@ -316,6 +325,7 @@ class TurnAssembler:
                 )
             elif (
                 ctx.config.llm.tool_rag_enabled
+                and tool_rag_ok
                 and ctx.qdrant_service is not None
             ):
                 tool_query = _build_tool_rag_query(
@@ -355,6 +365,7 @@ class TurnAssembler:
         if (
             ctx.memory_service
             and ctx.config.memory.inject_in_context
+            and memory_ok
         ):
             try:
                 relevant = await ctx.memory_service.search(

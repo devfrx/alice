@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -504,6 +504,24 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:
         logger.error("Tool registry refresh failed: {}", exc)
     ctx.tool_registry = tool_registry
+
+    # -- All-or-nothing RAG readiness gate (functionality-fixes #3) ---------
+    # Runs after memory/qdrant/tool-registry init AND tool-embedding refresh,
+    # so the verdict reflects the fully-wired stack. Disables memory + tool-RAG
+    # entirely (in chat assembly) rather than running degraded. Never raises.
+    from backend.services.rag_readiness import check_rag_readiness
+
+    ctx.rag_readiness = await check_rag_readiness(ctx)
+    if not ctx.rag_readiness.ready:
+        logger.warning("Knowledge/RAG disabled: {}", ctx.rag_readiness.reason)
+    with suppress(Exception):
+        await ctx.event_bus.emit(
+            "knowledge.status",
+            ready=ctx.rag_readiness.ready,
+            reason=ctx.rag_readiness.reason,
+            memory_enabled=ctx.rag_readiness.memory_enabled,
+            tool_rag_enabled=ctx.rag_readiness.tool_rag_enabled,
+        )
 
     # -- WebSocket connection manager (Phase 10) ----------------------------
     from backend.services.ws_connection_manager import WSConnectionManager

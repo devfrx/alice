@@ -94,6 +94,11 @@
         </div>
       </section>
 
+      <!-- Agent / Persona -->
+      <section :ref="(el) => setSectionRef('persona', el)" id="section-persona" class="sv__section">
+        <AgentPersonaSettings />
+      </section>
+
       <!-- Voice -->
       <section :ref="(el) => setSectionRef('voice', el)" id="section-voice" class="sv__section">
         <VoiceSettings />
@@ -190,6 +195,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import ModelManager from '../components/settings/ModelManager.vue'
+import AgentPersonaSettings from '../components/settings/AgentPersonaSettings.vue'
 import EmailSettings from '../components/settings/EmailSettings.vue'
 import VoiceSettings from '../components/voice/VoiceSettings.vue'
 import PluginManagement from '../components/settings/PluginManagement.vue'
@@ -213,11 +219,12 @@ const themeOptions: UiSelectOption[] = [
 ]
 
 /* ── Navigation ─────────────────────────────────────────────── */
-type SectionId = 'model' | 'llm' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'security' | 'ui'
+type SectionId = 'model' | 'llm' | 'persona' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'security' | 'ui'
 
 const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'model', label: 'Modello', iconName: 'package' },
   { id: 'llm', label: 'Parametri LLM', iconName: 'sliders' },
+  { id: 'persona', label: 'Agente / Persona', iconName: 'user' },
   { id: 'voice', label: 'Voce', iconName: 'mic' },
   { id: 'plugins', label: 'Plugin', iconName: 'cpu' },
   { id: 'email', label: 'Email', iconName: 'mail' },
@@ -232,7 +239,7 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
 const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
-  model: null, llm: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, security: null, ui: null,
+  model: null, llm: null, persona: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, security: null, ui: null,
 })
 
 function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null): void {

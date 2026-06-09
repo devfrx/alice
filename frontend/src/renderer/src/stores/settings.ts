@@ -1,7 +1,15 @@
 import { defineStore } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '../services/api'
-import type { DownloadStatusResponse, LMStudioModel, ModelOperationResponse, ToolCatalogPlugin } from '../types/settings'
+import type {
+  AgentPrompts,
+  AgentTier,
+  DownloadStatusResponse,
+  LMStudioModel,
+  ModelOperationResponse,
+  ToolCatalogPlugin,
+} from '../types/settings'
+import { emptyTierGuidance, normaliseTierGuidance, pruneTierGuidance } from '../utils/agentPrompts'
 import { useChatStore } from './chat'
 import { useServicesStore } from './services'
 
@@ -225,6 +233,67 @@ export const useSettingsStore = defineStore('settings', () => {
   async function resetToolSelection(): Promise<void> {
     disabledTools.value = new Set()
     await _persistDisabledTools()
+  }
+
+  /* ── Agent persona / per-tier guidance ────────────────────────── */
+
+  /**
+   * User-customisable agent prompt overrides (backend `agent.prompts`).
+   *
+   * Held outside the deep-watched `settings` ref because it persists through
+   * the layered-config endpoints (`GET /config/resolved` + `PATCH /config`),
+   * not the curated PUT `/config` body that `saveSettings()` builds.
+   */
+  const agentPrompts = ref<AgentPrompts>({
+    persona: '',
+    tier_guidance: emptyTierGuidance(),
+  })
+
+  /** Load persona + per-tier guidance from the resolved backend config. */
+  async function loadAgentPrompts(): Promise<void> {
+    try {
+      const cfg = await api.getResolvedConfig()
+      const agent = (cfg.agent ?? {}) as Record<string, unknown>
+      const prompts = (agent.prompts ?? {}) as Record<string, unknown>
+      agentPrompts.value = {
+        persona: typeof prompts.persona === 'string' ? prompts.persona : '',
+        tier_guidance: normaliseTierGuidance(
+          prompts.tier_guidance as Record<string, unknown> | null | undefined,
+        ),
+      }
+    } catch (err) {
+      console.warn('[settings store] loadAgentPrompts failed:', err)
+    }
+  }
+
+  /** Persist the global persona override (empty clears it). */
+  async function saveAgentPersona(): Promise<void> {
+    try {
+      await api.patchConfig('agent.prompts.persona', agentPrompts.value.persona)
+    } catch (err) {
+      console.warn('[settings store] saveAgentPersona failed:', err)
+    }
+  }
+
+  /**
+   * Persist the per-tier guidance map. Blank overrides are pruned so the
+   * backend falls back to its built-in default text for those tiers.
+   */
+  async function saveAgentTierGuidance(): Promise<void> {
+    try {
+      await api.patchConfig(
+        'agent.prompts.tier_guidance',
+        pruneTierGuidance(agentPrompts.value.tier_guidance),
+      )
+    } catch (err) {
+      console.warn('[settings store] saveAgentTierGuidance failed:', err)
+    }
+  }
+
+  /** Reset one tier's guidance to its built-in default (clears the override). */
+  async function resetAgentTier(tier: AgentTier): Promise<void> {
+    agentPrompts.value.tier_guidance[tier] = ''
+    await saveAgentTierGuidance()
   }
 
   /** Load settings from the backend into the reactive store. */
@@ -730,7 +799,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * Loads persisted toggles, settings, and starts connection polling.
    */
   async function initialize(): Promise<void> {
-    await Promise.all([loadToggles(), loadSettings(), loadToolCatalog()])
+    await Promise.all([loadToggles(), loadSettings(), loadToolCatalog(), loadAgentPrompts()])
     startConnectionPolling()
   }
 
@@ -758,6 +827,11 @@ export const useSettingsStore = defineStore('settings', () => {
     setToolEnabled,
     setPluginEnabled,
     resetToolSelection,
+    agentPrompts,
+    loadAgentPrompts,
+    saveAgentPersona,
+    saveAgentTierGuidance,
+    resetAgentTier,
     models,
     isLoadingModels,
     isLoadingModel,

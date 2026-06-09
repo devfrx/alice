@@ -396,6 +396,36 @@ export const api = {
       body: JSON.stringify(config)
     }),
 
+  /**
+   * Retrieve the full merged-and-validated configuration (secrets redacted).
+   *
+   * Unlike {@link getConfig} (a curated subset), this returns the entire
+   * resolved config tree — used to read sections the curated `/config`
+   * endpoint does not expose, e.g. `agent.prompts`.
+   */
+  getResolvedConfig: (): Promise<Record<string, unknown>> =>
+    request<Record<string, unknown>>('/config/resolved'),
+
+  /**
+   * Set a single dotted-path config value in a layer, validate and persist.
+   *
+   * Mirrors the backend layered-config `PATCH /config` endpoint. Used for
+   * config keys outside the curated PUT `/config` body (e.g.
+   * `agent.prompts.persona`, `agent.prompts.tier_guidance`).
+   *
+   * @param path  - Dotted path, e.g. `"agent.prompts.persona"`.
+   * @param value - Any JSON-serialisable value.
+   * @param layer - Target layer (`user` default, persisted to user.yaml).
+   * @returns The full resolved config after the change.
+   */
+  patchConfig: (
+    path: string, value: unknown, layer: string = 'user',
+  ): Promise<Record<string, unknown>> =>
+    request<Record<string, unknown>>('/config', {
+      method: 'PATCH',
+      body: JSON.stringify({ path, value, layer })
+    }),
+
   // -- File uploads ---------------------------------------------------------
 
   /**

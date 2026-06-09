@@ -164,3 +164,21 @@ export interface ToolCatalogResponse {
   /** Available tools grouped by plugin. */
   plugins: ToolCatalogPlugin[]
 }
+
+/* ── Agent persona / per-tier guidance (backend `agent.prompts`) ─────────── */
+
+/** Permission-tier keys for per-tier agent guidance overrides. */
+export type AgentTier = 'strict' | 'auto_edits' | 'plan' | 'autopilot'
+
+/**
+ * User-customisable agent prompt overrides — mirrors the backend
+ * `agent.prompts` config tree.
+ *
+ * - `persona` is appended globally to the base system prompt (every turn).
+ * - `tier_guidance` maps a permission-tier key to bespoke guidance text; a
+ *   blank value means the backend uses its built-in default for that tier.
+ */
+export interface AgentPrompts {
+  persona: string
+  tier_guidance: Record<AgentTier, string>
+}

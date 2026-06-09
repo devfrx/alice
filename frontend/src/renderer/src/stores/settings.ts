@@ -16,6 +16,7 @@ export interface AliceSettings {
     contextCompressionReserve: number
     toolRagEnabled: boolean
     toolRagTopK: number
+    userPreferredName: string
   }
   stt: {
     language: string
@@ -60,7 +61,8 @@ export const useSettingsStore = defineStore('settings', () => {
       contextCompressionThreshold: 0.75,
       contextCompressionReserve: 4096,
       toolRagEnabled: true,
-      toolRagTopK: 15
+      toolRagTopK: 15,
+      userPreferredName: ''
     },
     stt: {
       language: '',
@@ -246,6 +248,8 @@ export const useSettingsStore = defineStore('settings', () => {
           (llm.tool_rag_enabled as boolean) ?? settings.value.llm.toolRagEnabled
         settings.value.llm.toolRagTopK =
           (llm.tool_rag_top_k as number) ?? settings.value.llm.toolRagTopK
+        settings.value.llm.userPreferredName =
+          (llm.user_preferred_name as string) ?? settings.value.llm.userPreferredName
       }
       if (config.stt) {
         const stt = config.stt as Record<string, unknown>
@@ -305,7 +309,8 @@ export const useSettingsStore = defineStore('settings', () => {
           context_compression_threshold: settings.value.llm.contextCompressionThreshold,
           context_compression_reserve: settings.value.llm.contextCompressionReserve,
           tool_rag_enabled: settings.value.llm.toolRagEnabled,
-          tool_rag_top_k: settings.value.llm.toolRagTopK
+          tool_rag_top_k: settings.value.llm.toolRagTopK,
+          user_preferred_name: settings.value.llm.userPreferredName
         },
         stt: {
           ...(settings.value.stt.language ? { language: settings.value.stt.language } : {}),

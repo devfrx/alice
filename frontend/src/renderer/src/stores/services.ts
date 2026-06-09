@@ -244,6 +244,37 @@ export const useServicesStore = defineStore('services', () => {
     }
   }
 
+  // ----- Poll back-off (for a down service-status) -----------------------
+  //
+  // When a polled service (e.g. LM Studio) is down we progressively widen
+  // the poll interval so a dead service isn't hammered every few seconds.
+  // The cadence snaps back to the base interval as soon as it recovers.
+
+  const _down = ref(false)
+  const _backoff = ref(1)
+
+  /**
+   * Record the latest status of a polled service to drive poll back-off.
+   *
+   * A `down`/`error` status doubles the back-off multiplier (capped at 8);
+   * an `up`/`ready` status clears it so polling resumes at the base cadence.
+   * Other statuses (e.g. `degraded`/`starting`) leave the cadence untouched.
+   */
+  function noteStatus(_service: string, status: string): void {
+    if (status === 'down' || status === 'error') {
+      _down.value = true
+      _backoff.value = Math.min(_backoff.value * 2, 8)
+    } else if (status === 'up' || status === 'ready') {
+      _down.value = false
+      _backoff.value = 1
+    }
+  }
+
+  /** Next poll delay: `base` while healthy, backed-off (<=30 s) while down. */
+  function nextPollDelay(base: number): number {
+    return _down.value ? Math.min(base * _backoff.value, 30000) : base
+  }
+
   return {
     // state
     services,
@@ -265,5 +296,8 @@ export const useServicesStore = defineStore('services', () => {
     loadTrellisGuide,
     onServiceStatus,
     onDownloadProgress,
+    // poll back-off
+    noteStatus,
+    nextPollDelay,
   }
 })

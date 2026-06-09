@@ -11,17 +11,15 @@ from backend.services.llm_service import LLMService
 
 
 def _llm() -> LLMService:
-    cfg = MagicMock()
-    cfg.connect_timeout = 1.0
-    cfg.timeout = 10.0
-    # Avoid real network client construction details by patching after init if needed.
     svc = LLMService.__new__(LLMService)
     # Initialise only the cache fields the methods under test touch.
     svc._ctx_window_cache = None
     svc._ctx_window_expires = 0.0
     svc._ctx_window_ttl = 300.0
+    svc._ctx_window_ttl_failure = 20.0
     svc._default_ctx_window = 32768
     svc._ctx_window_refreshing = False
+    svc._refresh_task = None
     return svc
 
 
@@ -72,6 +70,9 @@ async def test_invalidate_forces_refresh():
     await svc._refresh_context_window(mgr)
     assert svc.get_cached_context_window(mgr) == 4096
     svc.invalidate_context_window_cache()
+    # Prove invalidation dropped the cache: with no manager the getter can't refresh,
+    # so it must fall back to the default (would still be 4096 if invalidate were a no-op).
+    assert svc.get_cached_context_window() == 32768
     mgr.list_models = AsyncMock(
         return_value={
             "models": [

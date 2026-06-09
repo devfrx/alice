@@ -383,12 +383,13 @@ class WorkspaceScopeConfig(BaseSettings):
     """Roots always out of scope even when a workspace scope is set."""
 
     fallback_mode: Literal["sandbox", "disabled"] = "disabled"
-    """When no explicit scope is set: 'disabled' (the default, Fase 7) ⇒ scoped
-    filesystem tools refuse to run until the user sets a workspace folder;
-    'sandbox' ⇒ an ephemeral per-conversation working dir is allowed (reserved
-    for the human interactive terminal). The central no-scope breaker in
-    :class:`~backend.services.permission_service.PermissionService` already
-    blocks the *model's* filesystem tools when no scope is set, in every tier."""
+    """When no explicit scope is set, governs the **human interactive terminal**:
+    'disabled' (the default) ⇒ the terminal refuses to run until the user sets a
+    workspace folder; 'sandbox' ⇒ an ephemeral per-conversation working dir is
+    allowed. NOTE: the *model's* permission gate no longer depends on this — it
+    consumes :meth:`ScopeService.effective_roots`, which always confines the
+    model's filesystem/exec tools to the explicit scope or a per-conversation
+    sandbox dir (never the OS home), in every tier."""
 
     sandbox_root: str = "data/workspaces"
     """Project-relative root for ephemeral per-conversation sandboxes."""

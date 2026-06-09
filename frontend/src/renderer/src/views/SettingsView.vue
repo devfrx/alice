@@ -64,6 +64,13 @@
 
         <div class="sv__fields">
           <label class="sv__field">
+            <span class="sv__field-label">Come Alice deve chiamarti</span>
+            <div class="sv__input-wrap">
+              <input v-model="settingsStore.settings.llm.userPreferredName" type="text" class="sv__input"
+                maxlength="80" placeholder="es. Marco" />
+            </div>
+          </label>
+          <label class="sv__field">
             <span class="sv__field-label">Temperatura</span>
             <div class="sv__input-wrap">
               <input v-model.number="settingsStore.settings.llm.temperature" type="number" class="sv__input" min="0"

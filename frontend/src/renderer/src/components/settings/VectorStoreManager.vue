@@ -35,6 +35,13 @@
             Qdrant non disponibile. Verifica la configurazione del backend.
         </div>
 
+        <!-- RAG readiness feedback -->
+        <div v-if="rag && !rag.ready" class="vs-rag-warn">
+            <strong>RAG non disponibile.</strong>
+            Memory e Tool RAG sono disattivati: {{ rag.reason }}.
+            Premi <em>Ripara / Reset</em> per ricreare il vector store.
+        </div>
+
         <!-- Tool RAG settings -->
         <div class="vs-section">
             <div class="vs-section__header">Tool RAG</div>
@@ -44,11 +51,7 @@
                     <span class="vs-row__label">Abilita Tool RAG</span>
                     <span class="vs-row__hint">Seleziona strumenti rilevanti tramite ricerca vettoriale</span>
                 </div>
-                <button class="sv__toggle" :class="{ 'sv__toggle--on': settingsStore.settings.llm.toolRagEnabled }"
-                    role="switch" :aria-checked="settingsStore.settings.llm.toolRagEnabled"
-                    @click="settingsStore.settings.llm.toolRagEnabled = !settingsStore.settings.llm.toolRagEnabled">
-                    <span class="sv__toggle-thumb" />
-                </button>
+                <UiToggle v-model="settingsStore.settings.llm.toolRagEnabled" aria-label="Tool RAG" />
             </div>
 
             <div class="vs-row">
@@ -71,6 +74,10 @@
             <button class="vs-btn vs-btn--accent" :disabled="loading || reembedding" @click="onReembed">
                 {{ reembedding ? 'Reindicizzazione…' : 'Reindicizza strumenti' }}
             </button>
+            <button class="vs-btn vs-btn--danger" :disabled="loading || repairing" @click="onRepair"
+                title="Cancella e ricrea il vector store embedded (operazione manuale, distruttiva)">
+                {{ repairing ? 'Riparazione…' : 'Ripara / Reset' }}
+            </button>
         </div>
 
         <!-- Loading / Error -->
@@ -80,23 +87,34 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../../services/api'
 import { useSettingsStore } from '../../stores/settings'
+import { useServicesStore } from '../../stores/services'
 import type { VectorStoreStats } from '../../types/settings'
+import UiToggle from '../ui/UiToggle.vue'
+import { useModal } from '../../composables/useModal'
 
 const settingsStore = useSettingsStore()
+const servicesStore = useServicesStore()
+const { confirm } = useModal()
 
 const stats = ref<VectorStoreStats | null>(null)
 const loading = ref(false)
 const reembedding = ref(false)
+const repairing = ref(false)
 const error = ref<string | null>(null)
+
+// Effective RAG readiness: prefer the WS-updated store value (live after a
+// repair), falling back to the value embedded in the last stats fetch.
+const rag = computed(() => servicesStore.knowledge ?? stats.value?.rag ?? null)
 
 async function refreshStats(): Promise<void> {
     loading.value = true
     error.value = null
     try {
         stats.value = await api.getVectorStoreStats()
+        servicesStore.onKnowledgeStatus(stats.value.rag)
     } catch (err) {
         error.value = err instanceof Error ? err.message : 'Errore nel caricamento statistiche'
     } finally {
@@ -117,6 +135,28 @@ async function onReembed(): Promise<void> {
         error.value = err instanceof Error ? err.message : 'Errore nella reindicizzazione'
     } finally {
         reembedding.value = false
+    }
+}
+
+async function onRepair(): Promise<void> {
+    const ok = await confirm({
+        title: 'Ripristina vector store',
+        message:
+            `Ripristinare il vector store? I dati embedded salvati (memorie/fatti) ` +
+            `verranno cancellati e ricreati da zero. L'operazione non è reversibile.`,
+        type: 'danger',
+        confirmText: 'Ripristina',
+    })
+    if (!ok) return
+    repairing.value = true
+    error.value = null
+    try {
+        stats.value = await api.repairVectorStore()
+        servicesStore.onKnowledgeStatus(stats.value.rag)
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : 'Errore durante la riparazione'
+    } finally {
+        repairing.value = false
     }
 }
 
@@ -332,9 +372,41 @@ onMounted(() => {
     border-color: var(--accent);
 }
 
+.vs-btn--danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.vs-btn--danger:hover:not(:disabled) {
+    background: var(--danger-faint);
+}
+
 .vs-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+/* ── RAG readiness warning ─────────────────────────────────── */
+.vs-rag-warn {
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    background: var(--danger-faint);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+}
+
+.vs-rag-warn strong {
+    color: var(--danger);
+}
+
+.vs-rag-warn em {
+    color: var(--text-primary);
+    font-style: normal;
+    font-weight: var(--weight-medium);
 }
 
 /* ── Empty / Loading / Error ───────────────────────────────── */
@@ -360,37 +432,4 @@ onMounted(() => {
     margin-bottom: var(--space-2);
 }
 
-/* ── Reuse SettingsView toggle styles ──────────────────────── */
-.sv__toggle {
-    position: relative;
-    width: 36px;
-    height: 20px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    background: var(--surface-3);
-    cursor: pointer;
-    transition: background var(--transition-fast), border-color var(--transition-fast);
-    flex-shrink: 0;
-}
-
-.sv__toggle--on {
-    background: var(--accent-dim);
-    border-color: var(--accent-border);
-}
-
-.sv__toggle-thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 14px;
-    height: 14px;
-    border-radius: var(--radius-full);
-    background: var(--text-muted);
-    transition: transform var(--transition-fast), background var(--transition-fast);
-}
-
-.sv__toggle--on .sv__toggle-thumb {
-    transform: translateX(16px);
-    background: var(--accent);
-}
 </style>

@@ -12,6 +12,7 @@ import { computed, nextTick, ref, onMounted, onBeforeUnmount } from 'vue'
 
 import type { ConversationSummary } from '../../types/chat'
 import AppIcon from '../ui/AppIcon.vue'
+import { formatRelativeTime } from '../../utils/relativeTime'
 
 const props = defineProps<{
   /** Conversation summaries to display. */
@@ -189,21 +190,8 @@ function scrollToIndex(index: number): void {
 // Helpers
 // -----------------------------------------------------------------------
 
-/**
- * Compute a human-readable "time ago" string from an ISO timestamp.
- */
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'adesso'
-  if (mins < 60) return `${mins} min fa`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h fa`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return 'ieri'
-  if (days < 30) return `${days}g fa`
-  return new Date(iso).toLocaleDateString()
-}
+/** Human-readable "time ago" — delegates to the shared util. */
+const timeAgo = (iso: string): string => formatRelativeTime(iso)
 </script>
 
 <template>

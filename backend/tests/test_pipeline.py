@@ -437,25 +437,65 @@ class TestInteraction:
 # ---------------------------------------------------------------------------
 
 
+def _ask_args(*, text: str = "q?", options: list[str] | None = None) -> dict:
+    """A minimal valid ``ask_user`` args payload (one radio question).
+
+    Reaching ``channel.request`` requires a non-empty ``questions`` list — an
+    empty/missing one short-circuits in ``_execute_user_interaction`` before the
+    round-trip, so the timeout/cancel/disconnect paths need this.
+    """
+    return {
+        "questions": [
+            {
+                "id": "q1",
+                "text": text,
+                "type": "radio",
+                "options": options or [],
+                "allow_free_text": False,
+            },
+        ],
+    }
+
+
 class TestUserInteraction:
     @pytest.mark.asyncio
     async def test_ask_user_round_trips_answer_as_result(self) -> None:
         """``ask_user`` round-trips the human; the answer becomes the result."""
         sink, seen = _FakeSink(), set()
-        ch = _FakeChannel(ask_user_reply={"answer": "blue"})
+        ch = _FakeChannel(
+            ask_user_reply={
+                "answers": [
+                    {"question_id": "q1", "selected": ["blue"], "free_text": ""},
+                ],
+            },
+        )
         call = _call(
             tool_def=_tool(user_interaction=True),
-            args={"question": "fav colour?"},
+            args={
+                "questions": [
+                    {
+                        "id": "q1",
+                        "text": "fav colour?",
+                        "type": "radio",
+                        "options": ["blue", "red"],
+                        "allow_free_text": False,
+                    },
+                ],
+            },
         )
         outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         # Reuses CLIENT_EXECUTED so the engine persists/feeds it like a client tool.
         assert outcome.disposition is Disposition.CLIENT_EXECUTED
         assert outcome.result is not None and outcome.result.success is True
-        assert outcome.result.content == "blue"
+        # The result is now a labelled Q:/A: transcript carrying the answer.
+        assert "blue" in outcome.result.content
+        assert "fav colour?" in outcome.result.content
         assert outcome.result.content_type == "text/plain"
-        # Round-trip used the ask_user kind; payload carries the question.
+        # Round-trip used the ask_user kind; the SENT payload carries the questions.
         assert ch.requests and ch.requests[0][0] == "ask_user"
-        assert ch.requests[0][1] == {"question": "fav colour?"}
+        sent = ch.requests[0][1]
+        assert sent["questions"][0]["id"] == "q1"
+        assert sent["questions"][0]["text"] == "fav colour?"
         # start emitted before the round-trip; call marked seen.
         assert sink.sent[0]["type"] == "tool_execution_start"
         assert "k" in seen
@@ -463,16 +503,33 @@ class TestUserInteraction:
     @pytest.mark.asyncio
     async def test_ask_user_payload_includes_options(self) -> None:
         sink, seen = _FakeSink(), set()
-        ch = _FakeChannel(ask_user_reply={"answer": "red"})
+        ch = _FakeChannel(
+            ask_user_reply={
+                "answers": [
+                    {"question_id": "q1", "selected": ["red"], "free_text": ""},
+                ],
+            },
+        )
         call = _call(
             tool_def=_tool(user_interaction=True),
-            args={"question": "pick", "options": ["red", "blue"]},
+            args={
+                "questions": [
+                    {
+                        "id": "q1",
+                        "text": "pick",
+                        "type": "radio",
+                        "options": ["red", "blue"],
+                        "allow_free_text": False,
+                    },
+                ],
+            },
         )
         outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert outcome.disposition is Disposition.CLIENT_EXECUTED
+        # The SENT payload now carries the options inside questions[0].
         payload = ch.requests[0][1]
-        assert payload["question"] == "pick"
-        assert payload["options"] == ["red", "blue"]
+        assert payload["questions"][0]["text"] == "pick"
+        assert payload["questions"][0]["options"] == ["red", "blue"]
 
     @pytest.mark.asyncio
     async def test_two_identical_ask_user_calls_both_reach_channel(self) -> None:
@@ -482,14 +539,26 @@ class TestUserInteraction:
         repeated server call is collapsed, but re-asking the human is not.
         """
         sink, seen = _FakeSink(), set()
-        ch = _FakeChannel(ask_user_reply={"answer": "ok"})
+        ch = _FakeChannel(
+            ask_user_reply={
+                "answers": [
+                    {"question_id": "q1", "selected": ["ok"], "free_text": ""},
+                ],
+            },
+        )
         pipe = ToolPipeline(
             [DedupMiddleware(seen), _interaction_mw(sink, ch, seen)],
             ExecuteMiddleware(tool_registry=_FakeRegistry(), sink=sink),
         )
         td = _tool(user_interaction=True)
-        o1 = await pipe.gate(_call(tool_def=td, args={"question": "again?"}))
-        o2 = await pipe.gate(_call(tool_def=td, args={"question": "again?"}))
+        ask_args = {
+            "questions": [
+                {"id": "q1", "text": "again?", "type": "radio",
+                 "options": [], "allow_free_text": False},
+            ],
+        }
+        o1 = await pipe.gate(_call(tool_def=td, args=ask_args))
+        o2 = await pipe.gate(_call(tool_def=td, args=ask_args))
         assert o1.disposition is Disposition.CLIENT_EXECUTED
         assert o2.disposition is Disposition.CLIENT_EXECUTED
         assert [r[0] for r in ch.requests] == ["ask_user", "ask_user"]  # neither deduped
@@ -499,7 +568,7 @@ class TestUserInteraction:
         """No answer while still connected ⇒ error result (timeout)."""
         sink, seen = _FakeSink(), set()
         ch = _FakeChannel(ask_user_reply=None)  # request returns None
-        call = _call(tool_def=_tool(user_interaction=True))
+        call = _call(tool_def=_tool(user_interaction=True), args=_ask_args())
         outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert outcome.disposition is Disposition.CLIENT_EXECUTED
         assert outcome.result is not None and outcome.result.success is False
@@ -509,7 +578,7 @@ class TestUserInteraction:
     async def test_ask_user_cancelled_is_error_result(self) -> None:
         sink, seen = _FakeSink(), set()
         ch = _FakeChannel(ask_user_reply=None, cancelled=True)
-        call = _call(tool_def=_tool(user_interaction=True))
+        call = _call(tool_def=_tool(user_interaction=True), args=_ask_args())
         outcome = await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert outcome.disposition is Disposition.CLIENT_EXECUTED
         assert outcome.result is not None and outcome.result.success is False
@@ -519,7 +588,7 @@ class TestUserInteraction:
     async def test_ask_user_disconnect_raises(self) -> None:
         sink, seen = _FakeSink(), set()
         ch = _FakeChannel(ask_user_reply=None, connected=False)
-        call = _call(tool_def=_tool(user_interaction=True))
+        call = _call(tool_def=_tool(user_interaction=True), args=_ask_args())
         with pytest.raises(WebSocketDisconnect):
             await _interaction_mw(sink, ch, seen).handle(call, _proceed)
 
@@ -527,9 +596,16 @@ class TestUserInteraction:
     async def test_ask_user_brackets_with_interaction_answered(self) -> None:
         """A genuine answer brackets the round-trip and resolves "answered"."""
         sink, seen = _FakeSink(), set()
-        ch = _FakeChannel(ask_user_reply={"answer": "blue"})
+        ch = _FakeChannel(
+            ask_user_reply={
+                "answers": [
+                    {"question_id": "q1", "selected": ["blue"], "free_text": ""},
+                ],
+            },
+        )
         call = _call(
-            tool_def=_tool(user_interaction=True), args={"question": "fav?"},
+            tool_def=_tool(user_interaction=True),
+            args=_ask_args(text="fav?", options=["blue", "red"]),
         )
         await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         canon = _canonical(sink)
@@ -549,7 +625,7 @@ class TestUserInteraction:
         """No answer while still connected ⇒ resolved outcome "timeout"."""
         sink, seen = _FakeSink(), set()
         ch = _FakeChannel(ask_user_reply=None)  # connected, not cancelled
-        call = _call(tool_def=_tool(user_interaction=True))
+        call = _call(tool_def=_tool(user_interaction=True), args=_ask_args())
         await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert _canonical(sink)[-1]["outcome"] == "timeout"
 
@@ -557,7 +633,7 @@ class TestUserInteraction:
     async def test_ask_user_cancelled_resolves_cancelled(self) -> None:
         sink, seen = _FakeSink(), set()
         ch = _FakeChannel(ask_user_reply=None, cancelled=True)
-        call = _call(tool_def=_tool(user_interaction=True))
+        call = _call(tool_def=_tool(user_interaction=True), args=_ask_args())
         await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         assert _canonical(sink)[-1]["outcome"] == "cancelled"
 
@@ -566,7 +642,7 @@ class TestUserInteraction:
         """A disconnect raises mid-round-trip: requested fires, resolved does not."""
         sink, seen = _FakeSink(), set()
         ch = _FakeChannel(ask_user_reply=None, connected=False)
-        call = _call(tool_def=_tool(user_interaction=True))
+        call = _call(tool_def=_tool(user_interaction=True), args=_ask_args())
         with pytest.raises(WebSocketDisconnect):
             await _interaction_mw(sink, ch, seen).handle(call, _proceed)
         canon = _canonical(sink)

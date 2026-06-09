@@ -194,7 +194,13 @@ class TestAgentPluginTools:
         assert tool.user_interaction is True
         assert tool.risk_level == "safe"
         assert tool.requires_confirmation is False
-        assert "question" in tool.parameters["required"]
+        # Multi-question contract: a required ``questions`` array whose items
+        # carry id/text/type (radio|checkbox).
+        assert "questions" in tool.parameters["required"]
+        questions = tool.parameters["properties"]["questions"]
+        assert questions["type"] == "array"
+        item_props = questions["items"]["properties"]
+        assert {"id", "text", "type"} <= set(item_props)
 
     @pytest.mark.asyncio
     async def test_ask_user_tool_can_be_disabled(self):

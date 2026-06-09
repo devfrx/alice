@@ -528,22 +528,37 @@ class LLMService:
         return self._temporal_block() + base
 
     def get_system_prompt(
-        self, memory_context: str | None = None,
+        self,
+        memory_context: str | None = None,
+        *,
+        persona: str | None = None,
     ) -> str:
-        """Build the full system prompt with optional memory context.
+        """Build the full system prompt with optional persona + memory context.
 
         Use this to build the prompt once per request and pass it to
         both ``build_messages`` and ``build_continuation_messages``
         via the ``system_prompt`` parameter to avoid redundant work.
 
+        The assembly order is: temporal block + base prompt (+ env block),
+        then the optional global persona block, then the optional memory
+        context. The persona text is supplied by the caller (it lives under
+        the agent config, not the LLM config) so this service stays agnostic
+        of the agent tree.
+
         Args:
             memory_context: Optional block of relevant memories/MCP
-                context to append.
+                context to append last.
+            persona: Optional free-text persona/instructions appended
+                globally as a ``## Istruzioni personalizzate`` block between
+                the base prompt and ``memory_context``. Falsy values
+                (``None`` / empty) add nothing and reproduce the prior output.
 
         Returns:
             The complete system prompt string.
         """
         base = self._get_dynamic_system_prompt()
+        if persona and base:
+            base = f"{base}\n\n## Istruzioni personalizzate\n\n{persona}"
         if memory_context and base:
             return f"{base}\n\n{memory_context}"
         if memory_context:

@@ -1080,6 +1080,39 @@ class AgentSubagentConfig(BaseSettings):
     """Maximum number of tools exposed to a sub-agent (after filtering)."""
 
 
+class AgentPromptsConfig(BaseSettings):
+    """User-customisable prompt overrides for the agentic chat path.
+
+    Holds free-text that is layered onto the model's instructions:
+
+    - :attr:`persona` is appended **globally** to every system prompt
+      (after the base prompt, before any memory/MCP context), so the user
+      can set a stable tone or set of standing instructions.
+    - :attr:`tier_guidance` maps a permission-tier name to bespoke guidance
+      text; an empty mapping means the hardcoded per-tier defaults are used
+      elsewhere.
+
+    Both default to empty, so an untouched install behaves exactly as before.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__PROMPTS__")
+
+    persona: str = ""
+    """Free-text persona/instructions appended globally to the system prompt.
+
+    Empty (the default) adds nothing. When set, the text is inserted as a
+    ``## Istruzioni personalizzate`` block after the base prompt and before
+    any memory context."""
+
+    tier_guidance: dict[str, str] = Field(default_factory=dict)
+    """Per-tier guidance overrides keyed by tier name.
+
+    Keys are permission-tier strings (``"strict"``, ``"auto_edits"``,
+    ``"plan"``, ``"autopilot"``); values are the guidance text shown for
+    that tier. An empty mapping (the default) means the hardcoded per-tier
+    defaults are used elsewhere."""
+
+
 class AgentConfig(BaseSettings):
     """Configuration for the (only) model-driven agentic chat path.
 
@@ -1112,6 +1145,9 @@ class AgentConfig(BaseSettings):
 
     voice: AgentVoiceConfig = Field(default_factory=AgentVoiceConfig)
     """Voice-turn tuning (e.g. tool cap for latency)."""
+
+    prompts: AgentPromptsConfig = Field(default_factory=AgentPromptsConfig)
+    """User-customisable prompt overrides (global persona + per-tier guidance)."""
 
 
 # ---------------------------------------------------------------------------

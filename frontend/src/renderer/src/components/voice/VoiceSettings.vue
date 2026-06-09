@@ -10,6 +10,7 @@ import { api } from '../../services/api'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiToggle from '../ui/UiToggle.vue'
 
 const settingsStore = useSettingsStore()
 const voiceStore = useVoiceStore()
@@ -280,10 +281,8 @@ async function save(): Promise<void> {
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Abilita STT</span>
             <span class="settings-field__hint">Riconoscimento vocale tramite Whisper</span>
-            <button class="settings-toggle" :class="{ 'settings-toggle--on': sttEnabled }" role="switch"
-              :aria-checked="sttEnabled" :disabled="!sttLibAvailable" @click="sttEnabled = !sttEnabled; save()">
-              <span class="settings-toggle__thumb" />
-            </button>
+            <UiToggle :model-value="sttEnabled" :disabled="!sttLibAvailable" aria-label="Abilita STT"
+                @update:model-value="(v) => { sttEnabled = v; save() }" />
           </label>
           <template v-if="sttEnabled && sttLibAvailable">
             <label class="settings-field">
@@ -311,10 +310,8 @@ async function save(): Promise<void> {
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Abilita TTS</span>
             <span class="settings-field__hint">Sintesi vocale delle risposte</span>
-            <button class="settings-toggle" :class="{ 'settings-toggle--on': ttsEnabled }" role="switch"
-              :aria-checked="ttsEnabled" :disabled="ttsEngines.length === 0" @click="ttsEnabled = !ttsEnabled; save()">
-              <span class="settings-toggle__thumb" />
-            </button>
+            <UiToggle :model-value="ttsEnabled" :disabled="ttsEngines.length === 0" aria-label="Abilita TTS"
+                @update:model-value="(v) => { ttsEnabled = v; save() }" />
           </label>
           <template v-if="ttsEnabled && ttsEngines.length > 0">
             <label class="settings-field">
@@ -350,10 +347,8 @@ async function save(): Promise<void> {
             <label class="settings-field settings-field--toggle">
               <span class="settings-field__label">Rispondi automaticamente a voce</span>
               <span class="settings-field__hint">L'assistente legge automaticamente le risposte</span>
-              <button class="settings-toggle" :class="{ 'settings-toggle--on': autoTtsResponse }" role="switch"
-                :aria-checked="autoTtsResponse" @click="autoTtsResponse = !autoTtsResponse; save()">
-                <span class="settings-toggle__thumb" />
-              </button>
+              <UiToggle :model-value="autoTtsResponse" aria-label="Rispondi automaticamente a voce"
+                  @update:model-value="(v) => { autoTtsResponse = v; save() }" />
             </label>
           </template>
         </div>
@@ -366,20 +361,12 @@ async function save(): Promise<void> {
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Conferma invio trascrizione</span>
             <span class="settings-field__hint">Mostra Invia/Annulla dopo la trascrizione vocale</span>
-            <button class="settings-toggle" :class="{ 'settings-toggle--on': voiceStore.confirmTranscript }"
-              role="switch" :aria-checked="voiceStore.confirmTranscript"
-              @click="voiceStore.confirmTranscript = !voiceStore.confirmTranscript">
-              <span class="settings-toggle__thumb" />
-            </button>
+            <UiToggle v-model="voiceStore.confirmTranscript" aria-label="Conferma trascrizione" />
           </label>
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Includi allegati con invio vocale</span>
             <span class="settings-field__hint">Invia anche gli allegati presenti in chat</span>
-            <button class="settings-toggle" :class="{ 'settings-toggle--on': voiceStore.sttIncludeAttachments }"
-              role="switch" :aria-checked="voiceStore.sttIncludeAttachments"
-              @click="voiceStore.sttIncludeAttachments = !voiceStore.sttIncludeAttachments">
-              <span class="settings-toggle__thumb" />
-            </button>
+            <UiToggle v-model="voiceStore.sttIncludeAttachments" aria-label="Includi allegati STT" />
           </label>
         </div>
       </section>
@@ -572,37 +559,4 @@ async function save(): Promise<void> {
   flex: 1;
 }
 
-.settings-toggle {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  border-radius: 11px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.settings-toggle--on {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-}
-
-.settings-toggle__thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-full);
-  background: var(--text-muted);
-  transition: transform var(--transition-fast), background var(--transition-fast);
-}
-
-.settings-toggle--on .settings-toggle__thumb {
-  transform: translateX(18px);
-  background: var(--accent);
-}
 </style>

@@ -39,7 +39,7 @@
                         + Entità
                     </button>
                     <button class="kg-btn kg-btn--accent" :disabled="store.entityCount < 2"
-                        @click="showCreateRelation = true">
+                        @click="openCreateRelation">
                         + Relazione
                     </button>
                     <button class="kg-btn kg-btn--secondary" :disabled="store.loading" @click="onRefresh">
@@ -93,39 +93,6 @@
                 </div>
             </div>
 
-            <!-- Create Relation dialog -->
-            <Teleport to="body">
-                <div v-if="showCreateRelation" class="kg-overlay" @click.self="showCreateRelation = false">
-                    <div class="kg-dialog" role="dialog" aria-modal="true">
-                        <h4 class="kg-dialog__title">Nuova relazione</h4>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Da (entità)</span>
-                            <UiSelect :model-value="newRelation.from" :options="entityOptions" size="md"
-                                placeholder="Seleziona…" aria-label="Entità di partenza"
-                                @update:model-value="(v) => (newRelation.from = String(v))" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">Tipo relazione</span>
-                            <input v-model="newRelation.relationType" type="text" class="kg-input"
-                                placeholder="es. conosce, lavora_con, si_trova_a" />
-                        </label>
-                        <label class="kg-field">
-                            <span class="kg-field__label">A (entità)</span>
-                            <UiSelect :model-value="newRelation.to" :options="entityOptions" size="md"
-                                placeholder="Seleziona…" aria-label="Entità di destinazione"
-                                @update:model-value="(v) => (newRelation.to = String(v))" />
-                        </label>
-                        <div class="kg-dialog__actions">
-                            <button class="kg-btn kg-btn--secondary"
-                                @click="showCreateRelation = false">Annulla</button>
-                            <button class="kg-btn kg-btn--accent"
-                                :disabled="!newRelation.from || !newRelation.to || !newRelation.relationType.trim()"
-                                @click="onCreateRelation">Crea</button>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
-
             <!-- Add Observation dialog -->
             <Teleport to="body">
                 <div v-if="showAddObservation" class="kg-overlay" @click.self="showAddObservation = false">
@@ -151,15 +118,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
 import { useMcpStore } from '../../stores/mcp'
 import type { KGRelation } from '../../types/mcpMemory'
 import EntityCard from './EntityCard.vue'
 import AppIcon from '../ui/AppIcon.vue'
-import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import { type UiSelectOption } from '../ui/UiSelect.vue'
 import { useModal } from '../../composables/useModal'
 import KgCreateEntityDialog from './KgCreateEntityDialog.vue'
+import KgCreateRelationDialog from './KgCreateRelationDialog.vue'
 
 const store = useMcpMemoryStore()
 const mcpStore = useMcpStore()
@@ -197,22 +165,20 @@ async function openCreateEntity(): Promise<void> {
 }
 
 // ── Create Relation ───────────────────────────────────────────────────────
-const showCreateRelation = ref(false)
-const newRelation = reactive({ from: '', to: '', relationType: '' })
 
 /** Entity options for the relation endpoints, labelled with their type. */
 const entityOptions = computed<UiSelectOption[]>(() =>
     store.entities.map((e) => ({ value: e.name, label: `${e.name} (${e.entityType})` })),
 )
 
-async function onCreateRelation(): Promise<void> {
-    await store.createRelations([
-        { from: newRelation.from, to: newRelation.to, relationType: newRelation.relationType.trim() },
-    ])
-    newRelation.from = ''
-    newRelation.to = ''
-    newRelation.relationType = ''
-    showCreateRelation.value = false
+async function openCreateRelation(): Promise<void> {
+    const result = await openCustom({
+        component: KgCreateRelationDialog,
+        props: { entities: entityOptions.value },
+        title: 'Nuova relazione',
+        width: '480px',
+    })
+    if (result) await store.loadGraph()
 }
 
 // ── Add Observation ───────────────────────────────────────────────────────

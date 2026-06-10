@@ -16,6 +16,18 @@ export interface HorizonArtifact {
   board?: WhiteboardPayload
 }
 
+/** Mono shelf caption per artifact kind (editorial Italian). */
+export function artifactLabel(kind: HorizonArtifactKind): string {
+  switch (kind) {
+    case '3d':
+      return 'MODELLO'
+    case 'chart':
+      return 'GRAFICO'
+    case 'whiteboard':
+      return 'LAVAGNA'
+  }
+}
+
 /** Minimal message shape needed for extraction (store-agnostic). */
 export interface ArtifactSourceMessage {
   role: string

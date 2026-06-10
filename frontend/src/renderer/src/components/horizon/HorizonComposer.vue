@@ -17,10 +17,24 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [text: string]
+  paste: [event: ClipboardEvent]
 }>()
 
 const text = ref('')
 const inputRef = ref<HTMLTextAreaElement | null>(null)
+const multiline = ref(false)
+
+/** Grow with content up to ~5 lines, then scroll; left-align once wrapped. */
+function autoResize(): void {
+  const el = inputRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  const lineH = parseFloat(getComputedStyle(el).lineHeight) || 33
+  el.style.height = `${Math.min(el.scrollHeight, lineH * 5)}px`
+  multiline.value = el.scrollHeight > lineH * 1.5
+}
+
+watch(text, () => nextTick(autoResize))
 
 watch(
   () => props.active,
@@ -28,8 +42,10 @@ watch(
     if (active) {
       await nextTick()
       inputRef.value?.focus()
+      autoResize()
     } else {
       text.value = ''
+      multiline.value = false
     }
   }
 )
@@ -37,10 +53,22 @@ watch(
 /** Seed the first character captured by the view's global keydown. */
 function seed(ch: string): void {
   text.value += ch
-  void nextTick(() => inputRef.value?.focus())
+  void nextTick(() => {
+    inputRef.value?.focus()
+    autoResize()
+  })
 }
 
-defineExpose({ seed })
+/** Programmatic send (cockpit send button). */
+function submit(): void {
+  const t = text.value.trim()
+  if (t && !props.disabled) {
+    emit('send', t)
+    text.value = ''
+  }
+}
+
+defineExpose({ seed, submit })
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.isComposing) return
@@ -65,10 +93,13 @@ function onKeydown(e: KeyboardEvent): void {
       ref="inputRef"
       v-model="text"
       class="hz-composer__input"
+      :class="{ 'hz-composer__input--multi': multiline }"
       rows="1"
       aria-label="Scrivi ad AL\CE"
       placeholder=""
       @keydown="onKeydown"
+      @input="autoResize"
+      @paste="(e) => emit('paste', e)"
     />
   </div>
 </template>
@@ -96,6 +127,8 @@ function onKeydown(e: KeyboardEvent): void {
   border: none;
   outline: none;
   resize: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
   text-align: center;
   font-family: var(--hz-serif);
   font-weight: 300;
@@ -103,5 +136,10 @@ function onKeydown(e: KeyboardEvent): void {
   line-height: 1.5;
   color: var(--hz-ink);
   caret-color: var(--hz-gold);
+}
+
+/* Wrapped content reads better ragged-right than centered. */
+.hz-composer__input--multi {
+  text-align: left;
 }
 </style>

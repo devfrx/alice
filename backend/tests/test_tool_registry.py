@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import re
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -787,6 +788,7 @@ class TestAlwaysOffered:
         limited = registry.limit_tools(all_tools, max_tools=2)
         names = {t["function"]["name"] for t in limited}
         assert "agent_ask" in names
+        assert len(limited) == 2  # the cap still cuts
 
     @pytest.mark.asyncio
     async def test_apply_mode_policy_drop_exempts_always_offered(
@@ -808,6 +810,58 @@ class TestAlwaysOffered:
             all_tools, drop_capabilities={"fs_write"},
         )
         assert {t["function"]["name"] for t in kept} == {"agent_ask"}
+
+    @pytest.mark.asyncio
+    async def test_get_relevant_tools_includes_always_offered_non_hit(
+        self,
+        event_bus: EventBus,
+        mock_qdrant_service: AsyncMock,
+        mock_embedding_client: AsyncMock,
+    ) -> None:
+        """An always-offered tool is returned even when RAG hits exclude it."""
+        meta = MockPlugin(tools=[_make_meta_tool("ask")], name="agent")
+        other = MockPlugin(tools=[_make_tool("search")], name="plug")
+        pm: Any = MockPluginManager({"plug": other, "agent": meta})
+        registry = ToolRegistry(
+            pm, event_bus,
+            qdrant_service=mock_qdrant_service,
+            embedding_client=mock_embedding_client,
+        )
+        await registry.refresh()
+
+        # RAG returns only the other plugin's tool as a hit.
+        hit = MagicMock()
+        hit.payload = {"tool_name": "plug_search"}
+        mock_qdrant_service.search.return_value = [hit]
+
+        result = await registry.get_relevant_tools("query", k=5)
+        names = {t["function"]["name"] for t in result}
+        assert "plug_search" in names
+        assert "agent_ask" in names  # not a hit, not priority — still offered
+
+    @pytest.mark.asyncio
+    async def test_refresh_schema_fallback_preserves_fields(
+        self, make_registry: Any,
+    ) -> None:
+        """The parameters-schema fallback keeps every other definition field."""
+        tool = ToolDefinition(
+            name="meta_bad_params",
+            description="A meta tool",
+            parameters={"invalid": True},  # missing "type" key
+            always_offered=True,
+            usage_guidance="X",
+            capabilities=("planning",),
+        )
+        plugin = MockPlugin(tools=[tool], name="agent")
+        registry = make_registry({"agent": plugin})
+        await registry.refresh()
+
+        stored = registry.get_tool_definition("agent_meta_bad_params")
+        assert stored is not None
+        assert stored.parameters.get("type") == "object"  # fallback applied
+        assert stored.always_offered is True
+        assert stored.usage_guidance == "X"
+        assert stored.capabilities == ("planning",)
 
     @pytest.mark.asyncio
     async def test_exclude_disabled_still_wins(self, make_registry):

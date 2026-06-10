@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import json
 import re
 import time
@@ -272,21 +273,8 @@ class ToolRegistry:
                             plugin_name,
                             tool_def.name,
                         )
-                        tool_def = ToolDefinition(
-                            name=tool_def.name,
-                            description=tool_def.description,
-                            parameters=params,
-                            result_type=tool_def.result_type,
-                            supports_cancellation=(
-                                tool_def.supports_cancellation
-                            ),
-                            timeout_ms=tool_def.timeout_ms,
-                            requires_confirmation=(
-                                tool_def.requires_confirmation
-                            ),
-                            risk_level=tool_def.risk_level,
-                            sanitise_output=tool_def.sanitise_output,
-                            max_result_chars=tool_def.max_result_chars,
+                        tool_def = dataclasses.replace(
+                            tool_def, parameters=params,
                         )
 
                     # --- namespacing ---
@@ -877,6 +865,7 @@ class ToolRegistry:
         async with self._lock:
             cache_snapshot = list(self._openai_cache)
             plugin_map = dict(self._tool_to_plugin)
+            tools_snapshot = dict(self._tools)
 
         # Add priority plugin tools
         priority_plugins = set()
@@ -895,7 +884,7 @@ class ToolRegistry:
             plugin_name = plugin_map.get(ns_name)
             if plugin_name is None:
                 continue
-            tool_def = self._tools.get(ns_name)
+            tool_def = tools_snapshot.get(ns_name)
             is_always = tool_def is not None and tool_def.always_offered
             if ns_name in hit_names or plugin_name in priority_plugins or is_always:
                 candidates.add(plugin_name)
@@ -910,7 +899,7 @@ class ToolRegistry:
 
             is_hit = ns_name in hit_names
             is_priority = plugin_name in priority_plugins
-            tool_def = self._tools.get(ns_name)
+            tool_def = tools_snapshot.get(ns_name)
             is_always = tool_def is not None and tool_def.always_offered
             if not is_hit and not is_priority and not is_always:
                 continue

@@ -85,6 +85,9 @@ const sceneDimmed = computed(
 /* ── ANCHOR: interactions ── */
 /** Clicking empty scene space toggles voice (mirrors the old orb click). */
 function handleSceneClick(event: MouseEvent): void {
+  // A pending dialog dims the scene (pointer-events: none) and retargets
+  // every click to this wrapper — never treat those as voice toggles.
+  if (sceneDimmed.value) return
   const tgt = event.target as HTMLElement | null
   if (tgt?.closest('button, a, input, textarea, [contenteditable], .hz-stage, .hz-history')) return
   if (voiceStore.isSpeaking) {
@@ -117,9 +120,9 @@ watch(
 onMounted(() => {
   connectVoice()
   chatStore.restoreConversation().catch(console.error)
-  calendarStore.refresh().catch(() => {
-    /* colophon degrades to date · time */
-  })
+  // Polling (not a one-shot refresh): the quiet scene is an ambient,
+  // always-on surface — the colophon's next event must not go stale.
+  calendarStore.startPolling()
   const id = chatStore.currentConversation?.id
   if (id) {
     tasksStore.ensureForConversation(id).catch(() => {
@@ -128,12 +131,15 @@ onMounted(() => {
   }
 })
 
+onBeforeUnmount(() => {
+  calendarStore.stopPolling()
+})
+
 // Suppress unused-variable warnings for vars wired in later tasks (7, 11).
 void respondToConfirmation
 void answerAskUser
 void speak
 void transcript
-void onBeforeUnmount
 </script>
 
 <template>

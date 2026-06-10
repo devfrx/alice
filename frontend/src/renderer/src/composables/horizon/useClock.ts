@@ -1,6 +1,7 @@
 /**
  * useClock — a Date ref that ticks on an interval (default 30 s).
- * Shared by the greeting and the colophon so they agree on "now".
+ * Each caller gets its own independent ref + interval (greeting and
+ * colophon may tick up to one interval apart — acceptable at 30 s).
  */
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 

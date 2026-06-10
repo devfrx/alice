@@ -106,6 +106,9 @@ children communicate via props/events.
 views/HorizonView.vue          route 'assistant' — orchestration only: stores → scene props
 composables/useHorizonScene.ts pure derivation: (voice, chat, tasks, artifacts, connection)
                                → { state, ...per-state data }. Testable without DOM.
+                               Artifact extraction (CAD/chart/whiteboard payloads from tool
+                               messages) is lifted from the current AssistantView computeds
+                               before that file is deleted.
 composables/useSentencePacer.ts streaming tokens → committed sentences at reading rhythm.
 
 components/horizon/
@@ -182,8 +185,9 @@ grep for every removed name with zero hits.
 ## 9. Delivery phases (each leaves the app working)
 
 1. **Foundations** — `horizon.css` tokens, bundled fonts, `HorizonLine` + `HorizonScene`
-   with quiet/listening states; new view behind the existing route (old view still default
-   until phase 5).
+   with quiet/listening states. During phases 1–4 the new view is reachable at a temporary
+   dev route `'/horizon'`; the `'assistant'` route keeps serving the old view until the
+   flip in phase 5.
 2. **Conversation** — composer, sentence pacer, response + magazine fallback.
 3. **Mission-control** — plan on the line, tool annotations, working state.
 4. **Stage** — artifacts, navigation, captions.

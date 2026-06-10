@@ -116,17 +116,21 @@ function truncateContent(text: string, max = 200): string {
 </template>
 
 <style scoped>
+/* Floating card, matching the app's panel idiom (cfr. AppSidebar). */
 .hz-history {
   position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
+  top: calc(var(--titlebar-height, 38px) + 8px);
+  left: 12px;
+  bottom: 8px;
   width: min(420px, 86vw);
   display: flex;
   flex-direction: column;
   background: var(--surface-1);
-  border-right: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--panel-shadow, var(--shadow-md));
   z-index: var(--z-overlay);
+  overflow: hidden;
 }
 
 .hz-history__head {
@@ -222,13 +226,17 @@ function truncateContent(text: string, max = 200): string {
   font-size: 0.8em;
 }
 
+/* Short slide + fade: a full -100% slide fights the floating-card look. */
 .hz-drawer-enter-active,
 .hz-drawer-leave-active {
-  transition: transform var(--hz-fade) var(--ease-out-expo);
+  transition:
+    transform var(--hz-fade) var(--ease-out-expo),
+    opacity var(--hz-fade) ease;
 }
 
 .hz-drawer-enter-from,
 .hz-drawer-leave-to {
-  transform: translateX(-100%);
+  transform: translateX(-24px);
+  opacity: 0;
 }
 </style>

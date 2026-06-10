@@ -12,6 +12,7 @@ import HorizonLine from '../components/horizon/HorizonLine.vue'
 import HorizonMasthead from '../components/horizon/HorizonMasthead.vue'
 import HorizonQuiet from '../components/horizon/HorizonQuiet.vue'
 import HorizonColophon from '../components/horizon/HorizonColophon.vue'
+import HorizonCockpit from '../components/horizon/HorizonCockpit.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
 import HorizonShelf from '../components/horizon/HorizonShelf.vue'
@@ -61,7 +62,10 @@ const {
   connect: connectVoice,
   transcript,
   speak,
-  cancelSpeak
+  cancelSpeak,
+  audioDevices,
+  selectedDeviceId,
+  refreshDevices
 } = useVoice()
 
 const { cadGenerationInProgress } = useGenerationState()
@@ -76,6 +80,7 @@ const stageIndex = ref(0)
 /** Plan kept visible outside the working state (shelf PIANO toggle). */
 const planPinned = ref(false)
 const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
+const cockpitRef = ref<InstanceType<typeof HorizonCockpit> | null>(null)
 
 const magazine = ref(false)
 
@@ -249,10 +254,17 @@ function handleSceneClick(event: MouseEvent): void {
   }
 }
 
-/** Sends typed text; collapses the composer. */
+/** Sends typed text (+ pending cockpit attachments); collapses the composer. */
 async function handleComposerSend(content: string): Promise<void> {
+  const files = cockpitRef.value ? [...cockpitRef.value.pendingFiles] : []
+  cockpitRef.value?.clearAllFiles()
   composerActive.value = false
-  await send(content).catch(console.error)
+  await send(content, undefined, files.length > 0 ? files : undefined).catch(console.error)
+}
+
+/** Composer paste lands in the cockpit's attachment pipeline (images). */
+function handleComposerPaste(e: ClipboardEvent): void {
+  cockpitRef.value?.handlePaste(e)
 }
 
 /**
@@ -434,7 +446,24 @@ onBeforeUnmount(() => {
           :transcript="transcript"
           :disabled="chatStore.isStreamingCurrentConversation"
           @send="handleComposerSend"
+          @paste="handleComposerPaste"
         />
+        <Transition name="hz-soft">
+          <HorizonCockpit
+            v-if="composerActive"
+            ref="cockpitRef"
+            :is-streaming="chatStore.isStreamingCurrentConversation"
+            :audio-devices="audioDevices"
+            :selected-device-id="selectedDeviceId"
+            @send="composerRef?.submit()"
+            @stop="stopGeneration"
+            @voice-start="startListening"
+            @voice-stop="stopListening"
+            @voice-cancel-processing="cancelProcessing"
+            @refresh-devices="refreshDevices"
+            @select-device="(id) => (selectedDeviceId = id)"
+          />
+        </Transition>
         <HorizonResponse
           v-if="showResponse && !magazine"
           v-model:magazine="magazine"

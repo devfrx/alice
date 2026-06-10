@@ -753,3 +753,115 @@ class TestToolRAG:
         result = await registry.get_relevant_tools("test query")
         available = await registry.get_available_tools()
         assert result == available
+
+
+# ---------------------------------------------------------------------------
+# always_offered & usage guidance (agentic prompt contract)
+# ---------------------------------------------------------------------------
+
+
+def _make_meta_tool(name: str, guidance: str | None = "Regola.") -> ToolDefinition:
+    return ToolDefinition(
+        name=name,
+        description="A meta tool",
+        always_offered=True,
+        usage_guidance=guidance,
+        capabilities=("planning",),
+    )
+
+
+class TestAlwaysOffered:
+
+    @pytest.mark.asyncio
+    async def test_limit_tools_never_cuts_always_offered(self, make_registry):
+        """A tight cap keeps the always-offered tool."""
+        meta = MockPlugin(tools=[_make_meta_tool("ask")], name="agent")
+        others = MockPlugin(
+            tools=[_make_tool(f"t{i}") for i in range(5)], name="plug",
+        )
+        # "plug" first so the meta tool sits past the cap without the feature.
+        registry = make_registry({"plug": others, "agent": meta})
+        await registry.refresh()
+
+        all_tools = registry.get_all_tools()
+        limited = registry.limit_tools(all_tools, max_tools=2)
+        names = {t["function"]["name"] for t in limited}
+        assert "agent_ask" in names
+
+    @pytest.mark.asyncio
+    async def test_apply_mode_policy_drop_exempts_always_offered(
+        self, make_registry,
+    ):
+        """Capability drop never removes an always-offered tool."""
+        meta = ToolDefinition(
+            name="ask",
+            description="A meta tool",
+            always_offered=True,
+            capabilities=("fs_write",),  # would normally be dropped
+        )
+        plugin = MockPlugin(tools=[meta], name="agent")
+        registry = make_registry({"agent": plugin})
+        await registry.refresh()
+
+        all_tools = registry.get_all_tools()
+        kept = registry.apply_mode_policy(
+            all_tools, drop_capabilities={"fs_write"},
+        )
+        assert {t["function"]["name"] for t in kept} == {"agent_ask"}
+
+    @pytest.mark.asyncio
+    async def test_exclude_disabled_still_wins(self, make_registry):
+        """The user's explicit opt-out removes even always-offered tools."""
+        meta = MockPlugin(tools=[_make_meta_tool("ask")], name="agent")
+        registry = make_registry({"agent": meta})
+        await registry.refresh()
+
+        all_tools = registry.get_all_tools()
+        assert registry.exclude_disabled(all_tools, {"agent_ask"}) == []
+
+
+class TestUsageGuidanceFor:
+
+    @pytest.mark.asyncio
+    async def test_collects_in_toolset_order_skipping_blanks(
+        self, make_registry,
+    ):
+        p = MockPlugin(
+            tools=[
+                _make_meta_tool("a", guidance="Prima regola."),
+                _make_tool("plain"),
+                _make_meta_tool("b", guidance="  Seconda regola.  "),
+                _make_meta_tool("c", guidance="   "),
+            ],
+            name="agent",
+        )
+        registry = make_registry({"agent": p})
+        await registry.refresh()
+
+        tools = registry.get_all_tools()
+        assert registry.usage_guidance_for(tools) == [
+            "Prima regola.",
+            "Seconda regola.",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_identical_fragments(self, make_registry):
+        p = MockPlugin(
+            tools=[
+                _make_meta_tool("a", guidance="Stessa regola."),
+                _make_meta_tool("b", guidance="Stessa regola."),
+            ],
+            name="agent",
+        )
+        registry = make_registry({"agent": p})
+        await registry.refresh()
+
+        tools = registry.get_all_tools()
+        assert registry.usage_guidance_for(tools) == ["Stessa regola."]
+
+    @pytest.mark.asyncio
+    async def test_unknown_tools_ignored(self, make_registry):
+        registry = make_registry({})
+        await registry.refresh()
+        ghost = [{"type": "function", "function": {"name": "ghost", "parameters": {}}}]
+        assert registry.usage_guidance_for(ghost) == []

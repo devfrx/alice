@@ -344,6 +344,9 @@ class ToolRegistryProtocol(Protocol):
     def exclude_disabled(
         self, tools: list[dict[str, Any]], disabled_names: set[str],
     ) -> list[dict[str, Any]]: ...
+    def usage_guidance_for(
+        self, tools: list[dict[str, Any]],
+    ) -> list[str]: ...
     def apply_mode_policy(
         self,
         tools: list[dict[str, Any]],

@@ -502,8 +502,10 @@ class ToolRegistry:
     ) -> list[dict[str, Any]]:
         """Cap *tools* to *max_tools*, prioritising certain plugins.
 
-        Tools from *priority_plugins* are always included first.
-        Remaining slots are filled in the order the other tools appear.
+        Tools from *priority_plugins* are always included first. Tools
+        whose definition declares ``always_offered`` are treated as
+        priority and never cut. Remaining slots are filled in the order
+        the other tools appear.
 
         Args:
             tools: Full list of available tools (OpenAI format).
@@ -523,7 +525,9 @@ class ToolRegistry:
         for entry in tools:
             ns_name: str = entry["function"]["name"]
             plugin_name = self._tool_to_plugin.get(ns_name)
-            if plugin_name in prio:
+            tool_def = self._tools.get(ns_name)
+            is_always = tool_def is not None and tool_def.always_offered
+            if plugin_name in prio or is_always:
                 priority.append(entry)
             else:
                 rest.append(entry)
@@ -623,6 +627,36 @@ class ToolRegistry:
             if entry["function"]["name"] not in disabled_names
         ]
 
+    def usage_guidance_for(self, tools: list[dict[str, Any]]) -> list[str]:
+        """Collect usage-guidance fragments for an offered toolset.
+
+        Given the FINAL OpenAI-format toolset of a turn (after tool RAG,
+        limiting, mode policy and the user's opt-out), return the
+        non-empty ``usage_guidance`` fragments of those tools, in toolset
+        order, de-duplicated. The prompt composer renders these into the
+        ``[ORCHESTRAZIONE]`` system-prompt block — so the prompt only
+        ever teaches tools the model can actually call this turn.
+
+        Args:
+            tools: OpenAI-format tool dicts offered to the LLM.
+
+        Returns:
+            Ordered, de-duplicated guidance fragments (possibly empty).
+        """
+        fragments: list[str] = []
+        seen: set[str] = set()
+        for entry in tools:
+            ns_name = entry.get("function", {}).get("name", "")
+            tool_def = self._tools.get(ns_name)
+            if tool_def is None or not tool_def.usage_guidance:
+                continue
+            text = tool_def.usage_guidance.strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            fragments.append(text)
+        return fragments
+
     def apply_mode_policy(
         self,
         tools: list[dict[str, Any]],
@@ -639,9 +673,10 @@ class ToolRegistry:
           in *drop_capabilities* (e.g. ``fs_write`` / ``process_exec`` in the
           read-only ``plan`` tier).  Withholding the tools the gate would deny
           anyway keeps the model from leading with an action it cannot take.  A
-          tool whose namespaced name is in *always_allow_tools* is exempt — it
-          survives even when its capabilities intersect *drop_capabilities*, so
-          the tier can guarantee its own meta-tools.
+          tool whose namespaced name is in *always_allow_tools* — or whose
+          definition declares ``always_offered`` — is exempt: it survives even
+          when its capabilities intersect *drop_capabilities*, so the tier can
+          guarantee its own meta-tools.
         * **prioritise** — float tools owned by *priority_plugins* to the front
           (stable within each group) so the model reaches for them first (e.g.
           the planning meta-tools in ``plan`` mode).
@@ -672,6 +707,9 @@ class ToolRegistry:
                     kept.append(entry)
                     continue
                 tool_def = self._tools.get(ns_name)
+                if tool_def is not None and tool_def.always_offered:
+                    kept.append(entry)
+                    continue
                 caps = set(tool_def.capabilities) if tool_def is not None else set()
                 if caps & drop:
                     continue
@@ -789,7 +827,8 @@ class ToolRegistry:
         """Retrieve the most relevant tools for a query via semantic search.
 
         Falls back to get_available_tools() if Qdrant is unavailable.
-        Always includes tools from priority plugins.
+        Always includes tools from priority plugins and tools declaring
+        ``always_offered``.
 
         Args:
             query: User message to match tools against.
@@ -856,7 +895,9 @@ class ToolRegistry:
             plugin_name = plugin_map.get(ns_name)
             if plugin_name is None:
                 continue
-            if ns_name in hit_names or plugin_name in priority_plugins:
+            tool_def = self._tools.get(ns_name)
+            is_always = tool_def is not None and tool_def.always_offered
+            if ns_name in hit_names or plugin_name in priority_plugins or is_always:
                 candidates.add(plugin_name)
         statuses = await self._resolve_plugin_statuses(candidates)
 
@@ -869,7 +910,9 @@ class ToolRegistry:
 
             is_hit = ns_name in hit_names
             is_priority = plugin_name in priority_plugins
-            if not is_hit and not is_priority:
+            tool_def = self._tools.get(ns_name)
+            is_always = tool_def is not None and tool_def.always_offered
+            if not is_hit and not is_priority and not is_always:
                 continue
 
             if statuses.get(plugin_name) not in (

@@ -14,6 +14,7 @@ import HorizonQuiet from '../components/horizon/HorizonQuiet.vue'
 import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
+import HorizonShelf from '../components/horizon/HorizonShelf.vue'
 import HorizonStage from '../components/horizon/HorizonStage.vue'
 import { RouterLink } from 'vue-router'
 import HorizonHistory from '../components/horizon/HorizonHistory.vue'
@@ -72,6 +73,8 @@ const composerActive = ref(false)
 const historyOpen = ref(false)
 const stageOpen = ref(false)
 const stageIndex = ref(0)
+/** Plan kept visible outside the working state (shelf PIANO toggle). */
+const planPinned = ref(false)
 const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
 
 const magazine = ref(false)
@@ -201,6 +204,12 @@ async function handleBranch(messageId: string): Promise<void> {
   await chatStore.branchConversation(messageId)
 }
 
+/** Shelf medallion → summon the stage on that artifact. */
+function openArtifact(i: number): void {
+  stageIndex.value = i
+  stageOpen.value = true
+}
+
 /** Clicking empty scene space toggles voice (mirrors the old orb click). */
 function handleSceneClick(event: MouseEvent): void {
   // A pending dialog dims the scene (pointer-events: none) and retargets
@@ -249,6 +258,7 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     else if (chatStore.isStreamingCurrentConversation) stopGeneration()
     else if (stageOpen.value) stageOpen.value = false
     else if (historyOpen.value) historyOpen.value = false
+    else if (planPinned.value) planPinned.value = false
     else composerActive.value = false
     return
   }
@@ -303,6 +313,7 @@ watch(
     magazine.value = false
     stageOpen.value = false
     stageIndex.value = 0
+    planPinned.value = false
     if (id)
       tasksStore.ensureForConversation(id).catch(() => {
         /* timeline stays empty */
@@ -428,7 +439,7 @@ onBeforeUnmount(() => {
         <HorizonLine
           :mode="lineMode"
           :audio-level="voiceStore.audioLevel"
-          :notch-count="sceneState === 'working' ? planSteps.length : 0"
+          :notch-count="sceneState === 'working' || planPinned ? planSteps.length : 0"
           :active-index="plan.activeIndex"
           :dimmed="!isConnected"
         />
@@ -436,15 +447,26 @@ onBeforeUnmount(() => {
 
       <template #lower>
         <!-- ANCHOR: lower-zone -->
-        <HorizonStage
-          v-if="sceneState === 'presenting'"
-          v-model:active-index="stageIndex"
+        <HorizonShelf
           :artifacts="artifacts"
-          :cad-generation="cadGenerationInProgress"
-          @close="stageOpen = false"
+          :plan-total="planSteps.length"
+          :plan-completed="plan.completed"
+          :active-artifact-index="sceneState === 'presenting' ? stageIndex : null"
+          :plan-pinned="planPinned"
+          @open-artifact="openArtifact"
+          @toggle-plan="planPinned = !planPinned"
         />
+        <Transition name="hz-rise">
+          <HorizonStage
+            v-if="sceneState === 'presenting'"
+            v-model:active-index="stageIndex"
+            :artifacts="artifacts"
+            :cad-generation="cadGenerationInProgress"
+            @close="stageOpen = false"
+          />
+        </Transition>
         <HorizonPlan
-          v-if="sceneState === 'working' && planSteps.length > 0"
+          v-if="(sceneState === 'working' || planPinned) && planSteps.length > 0"
           :steps="planSteps"
           :active-index="plan.activeIndex"
           :completed="plan.completed"
@@ -544,6 +566,20 @@ onBeforeUnmount(() => {
 
 .hz-soft-enter-from,
 .hz-soft-leave-to {
+  opacity: 0;
+}
+
+/* The stage rises from below the horizon and sinks back on close. */
+.hz-rise-enter-active,
+.hz-rise-leave-active {
+  transition:
+    transform var(--hz-morph) var(--ease-out-expo),
+    opacity var(--hz-morph) ease;
+}
+
+.hz-rise-enter-from,
+.hz-rise-leave-to {
+  transform: translateY(48px);
   opacity: 0;
 }
 

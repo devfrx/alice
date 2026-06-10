@@ -15,6 +15,11 @@ import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
 import HorizonStage from '../components/horizon/HorizonStage.vue'
+import { RouterLink } from 'vue-router'
+import HorizonHistory from '../components/horizon/HorizonHistory.vue'
+import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
+import AskUserPrompt from '../components/chat/AskUserPrompt.vue'
+import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useSentencePacer } from '../composables/horizon/useSentencePacer'
 import { useVoice } from '../composables/useVoice'
@@ -45,6 +50,7 @@ const send = chatApi?.sendMessage ?? _asyncNoop
 const stopGeneration = chatApi?.stopGeneration ?? _noop
 const respondToConfirmation = chatApi?.respondToConfirmation ?? _noop
 const answerAskUser = chatApi?.answerAskUser ?? _noop
+const editMessage = chatApi?.editMessage ?? _asyncNoop
 const isConnected = chatApi?.isConnected ?? ref(false)
 
 const {
@@ -59,10 +65,11 @@ const {
 
 const { cadGenerationInProgress } = useGenerationState()
 
-const { state: modalState } = useModal()
+const { state: modalState, openCustom } = useModal()
 
 /* ── ANCHOR: local-state ── */
 const composerActive = ref(false)
+const historyOpen = ref(false)
 const stageOpen = ref(false)
 const stageIndex = ref(0)
 const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
@@ -169,6 +176,31 @@ const sceneDimmed = computed(
 )
 
 /* ── ANCHOR: interactions ── */
+async function startEdit(messageId: string): Promise<void> {
+  if (chatStore.isStreamingCurrentConversation) return
+  const msg = chatStore.messages.find((m) => m.id === messageId)
+  if (!msg || msg.role !== 'user') return
+  await openCustom({
+    component: MessageEditDialog,
+    props: {
+      originalContent: msg.content,
+      onSubmit: async (newContent: string) => {
+        await editMessage(messageId, newContent)
+      }
+    },
+    width: '560px'
+  })
+}
+
+function handleVersionSwitch(versionGroupId: string, versionIndex: number): void {
+  chatStore.switchVersion(versionGroupId, versionIndex)
+}
+
+async function handleBranch(messageId: string): Promise<void> {
+  if (chatStore.isStreamingCurrentConversation) return
+  await chatStore.branchConversation(messageId)
+}
+
 /** Clicking empty scene space toggles voice (mirrors the old orb click). */
 function handleSceneClick(event: MouseEvent): void {
   // A pending dialog dims the scene (pointer-events: none) and retargets
@@ -213,6 +245,7 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     if (voiceStore.isSpeaking) cancelSpeak()
     else if (chatStore.isStreamingCurrentConversation) stopGeneration()
     else if (stageOpen.value) stageOpen.value = false
+    else if (historyOpen.value) historyOpen.value = false
     else composerActive.value = false
     return
   }
@@ -343,10 +376,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
   if (annotationTimer) clearTimeout(annotationTimer)
 })
-
-// Suppress unused-variable warnings for vars wired in later tasks (11).
-void respondToConfirmation
-void answerAskUser
 </script>
 
 <template>
@@ -419,6 +448,12 @@ void answerAskUser
         <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
           {{ lastUserQuery }}
         </p>
+        <AskUserPrompt
+          v-for="r in pendingAskUserList"
+          :key="r.executionId"
+          :request="r"
+          @answer="answerAskUser"
+        />
         <HorizonColophon
           v-if="sceneState !== 'presenting'"
           :next-event="calendarStore.nextEvent"
@@ -428,6 +463,32 @@ void answerAskUser
     </HorizonScene>
 
     <!-- ANCHOR: overlays -->
+    <nav class="horizon-view__corner" aria-label="Navigazione">
+      <button class="horizon-view__affordance" @click="historyOpen = !historyOpen">STORIA</button>
+      <RouterLink class="horizon-view__affordance" :to="{ name: 'workspace' }">
+        WORKSPACE
+      </RouterLink>
+    </nav>
+
+    <HorizonHistory
+      :open="historyOpen"
+      :messages="chatStore.messages"
+      :is-streaming="chatStore.isStreamingCurrentConversation"
+      :branch-disabled="chatStore.isStreamingCurrentConversation"
+      :get-version-count="chatStore.getVersionCount"
+      :get-active-version-index="chatStore.getActiveVersionIndex"
+      @close="historyOpen = false"
+      @edit="startEdit"
+      @switch-version="handleVersionSwitch"
+      @branch="handleBranch"
+    />
+
+    <ToolConfirmationDialog
+      v-if="pendingConfirmationsList.length > 0"
+      :key="pendingConfirmationsList[0].executionId"
+      :confirmation="pendingConfirmationsList[0]"
+      @respond="respondToConfirmation"
+    />
   </div>
 </template>
 
@@ -472,5 +533,31 @@ void answerAskUser
   font-size: clamp(17px, 2.4vmin, 24px);
   color: var(--hz-ink);
   text-align: center;
+}
+
+.horizon-view__corner {
+  position: absolute;
+  right: clamp(16px, 3vw, 32px);
+  bottom: clamp(14px, 3vh, 28px);
+  display: flex;
+  gap: var(--space-4);
+  z-index: var(--z-sticky);
+}
+
+.horizon-view__affordance {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  color: var(--hz-ink-faint);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--hz-fade) ease;
+}
+
+.horizon-view__affordance:hover {
+  color: var(--hz-ink);
 }
 </style>

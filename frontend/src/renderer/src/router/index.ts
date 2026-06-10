@@ -77,6 +77,14 @@ const router = createRouter({
       meta: { title: 'Assistente', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
+      // TEMPORARY dev route for the Horizon rebuild — removed when the
+      // 'assistant' route flips to HorizonView (see the Horizon plan, Task 12).
+      path: '/horizon',
+      name: 'horizon-dev',
+      component: () => import('../views/HorizonView.vue'),
+      meta: { title: 'Orizzonte (dev)', transition: DEFAULT_PAGE_TRANSITION }
+    },
+    {
       // HybridView retired — redirect to Workspace (the new primary surface).
       path: '/hybrid',
       redirect: '/workspace'

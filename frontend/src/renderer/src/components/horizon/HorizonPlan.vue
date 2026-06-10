@@ -18,22 +18,16 @@ const props = defineProps<{
 }>()
 
 const positions = computed(() => notchPositions(props.steps.length))
-
-/** Short label per notch (first 2 words, ellipsized). */
-function shortLabel(step: TaskStep): string {
-  const words = step.step.split(/\s+/)
-  return words.length <= 2 ? step.step : `${words.slice(0, 2).join(' ')}…`
-}
 </script>
 
 <template>
   <div class="hz-plan">
     <div class="hz-plan__labels">
-      <!-- Past 6 steps the labels would collide: show only the active one
-           (the canvas notches still mark every step; :title keeps full text). -->
+      <!-- Only the ACTIVE step carries text (full, ellipsized at ~40ch);
+           the others are dot markers — the canvas notches mark every step
+           and :title keeps the full text on hover. -->
       <span
         v-for="(s, i) in steps"
-        v-show="steps.length <= 6 || i === activeIndex"
         :key="i"
         class="hz-plan__label"
         :class="{
@@ -43,7 +37,7 @@ function shortLabel(step: TaskStep): string {
         :style="{ left: `${positions[i] * 100}%` }"
         :title="s.step"
       >
-        {{ shortLabel(s) }}
+        {{ i === activeIndex ? s.step : '·' }}
       </span>
     </div>
     <p class="hz-plan__counter">{{ completed }} DI {{ steps.length }}</p>
@@ -62,8 +56,8 @@ function shortLabel(step: TaskStep): string {
 /* Labels share the canvas geometry: same 6% horizontal margin. */
 .hz-plan__labels {
   position: relative;
-  height: 18px;
-  margin: 6px 6% 0;
+  height: 22px;
+  margin: 8px 6% 0;
 }
 
 .hz-plan__label {
@@ -80,6 +74,10 @@ function shortLabel(step: TaskStep): string {
 
 .hz-plan__label--active {
   color: var(--hz-gold);
+  font-size: 10px;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hz-plan__label--done {

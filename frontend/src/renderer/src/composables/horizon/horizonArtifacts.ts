@@ -1,8 +1,8 @@
 /**
  * horizonArtifacts.ts — Pure extraction of presentable artifacts (3D models,
  * charts, whiteboards) from conversation tool messages. Lifted from the
- * legacy AssistantView computeds into one chronological flat list that
- * drives the Horizon stage carousel.
+ * retired orb-era assistant view computeds into one chronological flat list
+ * that drives the Horizon stage carousel.
  */
 import type { CadModelPayload, ChartPayload, WhiteboardPayload } from '../../types/chat'
 import { isWhiteboardPayload } from '../../types/chat'

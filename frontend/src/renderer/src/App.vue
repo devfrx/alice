@@ -7,7 +7,6 @@ import TitleBar from './components/TitleBar.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import DockedSidebar from './components/canvas/DockedSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
-// ModeSwitcher is managed inside AssistantFab for assistant mode
 import { UiToast, AliceLoader } from './components/ui'
 import { useChat, ChatApiKey } from './composables/useChat'
 import { useEventsWebSocket } from './composables/useEventsWebSocket'

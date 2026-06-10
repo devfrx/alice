@@ -28,11 +28,9 @@
   --surface-selected: rgba(232, 220, 200, 0.08);/* Selected item background */
   --surface-inset: rgba(0, 0, 0, 0.2);         /* Inset surfaces (well, trough) */
 
-  /* Chat edge fades (used by ChatPanel + AssistantView message columns) */
+  /* Chat edge fades (used by ChatPanel message columns) */
   --chat-edge-fade-top: 20px;
   --chat-edge-fade-bottom: 28px;
-  /* Faint glow behind the assistant orb (state colour mixed at low alpha) */
-  --orb-glow-alpha: 14%;
 }
 
 /* ── Typography ────────────────────────────────────────────── */
@@ -483,7 +481,8 @@ textarea:focus:not(:focus-visible) {
  * triggering on Windows when any accessibility visual-effect setting was
  * set to "Custom", causing ALL CSS animations (spinners, loaders, pulses)
  * to freeze — even though the user had no explicit "reduce motion" intent.
- * The AliceOrb was unaffected because it uses Canvas/rAF, not CSS.
+ * Canvas/rAF renderers (e.g. the Horizon line) are unaffected, as they
+ * do not use CSS animations.
  * Individual components that contain decorative-only animations add their
  * own targeted @media (prefers-reduced-motion: reduce) blocks where needed.
  */

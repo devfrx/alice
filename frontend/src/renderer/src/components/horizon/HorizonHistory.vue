@@ -2,8 +2,8 @@
 /**
  * HorizonHistory — the conversation record as an editorial dossier: a left
  * drawer with role rubrics in mono, serif bodies, hairline rules. Mirrors
- * the legacy ConversationDrawer contract (same props/emits) so the view
- * wiring is a drop-in.
+ * the props/emits contract of the retired orb-era history drawer so the
+ * view wiring is a drop-in.
  */
 import { nextTick, ref, watch } from 'vue'
 

@@ -14,6 +14,7 @@ import HorizonQuiet from '../components/horizon/HorizonQuiet.vue'
 import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
+import HorizonStage from '../components/horizon/HorizonStage.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useSentencePacer } from '../composables/horizon/useSentencePacer'
 import { useVoice } from '../composables/useVoice'
@@ -24,6 +25,8 @@ import {
   planView,
   type HorizonSceneInputs
 } from '../composables/horizon/horizonScene'
+import { extractArtifacts } from '../composables/horizon/horizonArtifacts'
+import { useGenerationState } from '../composables/useGenerationState'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
 import { useTasksStore } from '../stores/tasks'
@@ -54,11 +57,14 @@ const {
   cancelSpeak
 } = useVoice()
 
+const { cadGenerationInProgress } = useGenerationState()
+
 const { state: modalState } = useModal()
 
 /* ── ANCHOR: local-state ── */
 const composerActive = ref(false)
 const stageOpen = ref(false)
+const stageIndex = ref(0)
 const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
 
 const magazine = ref(false)
@@ -73,8 +79,10 @@ const planSteps = computed(() => {
   return id ? tasksStore.tasksFor(id) : []
 })
 
-/** Replaced by the artifact extraction in the Stage task. */
-const artifactCount = computed(() => 0)
+const artifacts = computed(() => extractArtifacts(chatStore.messages))
+const artifactCount = computed(
+  () => artifacts.value.length + (cadGenerationInProgress.value ? 1 : 0)
+)
 
 const sceneInputs = computed<HorizonSceneInputs>(() => ({
   isListening: voiceStore.isListening,
@@ -284,6 +292,24 @@ watch(
   }
 )
 
+// Auto-open the stage on a new artifact; jump to it.
+watch(
+  () => artifacts.value.length,
+  (len, was) => {
+    if (len > (was ?? 0)) {
+      stageOpen.value = true
+      stageIndex.value = len - 1
+    } else if (stageIndex.value >= len) {
+      stageIndex.value = Math.max(0, len - 1)
+    }
+  }
+)
+
+// CAD generation surfaces the stage immediately (placeholder).
+watch(cadGenerationInProgress, (info) => {
+  if (info) stageOpen.value = true
+})
+
 /* ── ANCHOR: lifecycle ── */
 onMounted(() => {
   connectVoice()
@@ -357,6 +383,13 @@ void answerAskUser
 
       <template #lower>
         <!-- ANCHOR: lower-zone -->
+        <HorizonStage
+          v-if="sceneState === 'presenting'"
+          v-model:active-index="stageIndex"
+          :artifacts="artifacts"
+          :cad-generation="cadGenerationInProgress"
+          @close="stageOpen = false"
+        />
         <HorizonPlan
           v-if="sceneState === 'working' && planSteps.length > 0"
           :steps="planSteps"

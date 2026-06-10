@@ -698,6 +698,7 @@ defineExpose({
 /* Make the child chips bare inside a segment (hero = the llm model gets a subtle ring) */
 .ci__seg :deep(.ms__trigger),
 .ci__seg :deep(.ctc__chip),
+.ci__seg :deep(.scope-ind__chip),
 .ci__seg :deep(.tier-chip) {
   background: transparent;
   border-color: transparent;
@@ -705,6 +706,7 @@ defineExpose({
 }
 .ci__seg :deep(.ms__trigger:hover),
 .ci__seg :deep(.ctc__chip:hover:not(:disabled)),
+.ci__seg :deep(.scope-ind__chip:hover:not(:disabled)),
 .ci__seg :deep(.tier-chip:hover:not(:disabled)) {
   background: var(--surface-3);
 }
@@ -854,6 +856,7 @@ defineExpose({
     display: none;
   }
   .ci__seg--agent :deep(.ctc__chip-label),
+  .ci__seg--agent :deep(.scope-ind__chip-label),
   .ci__seg--agent :deep(.tier-chip__label) {
     display: none;
   }

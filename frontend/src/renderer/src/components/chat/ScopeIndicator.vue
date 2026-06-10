@@ -3,12 +3,11 @@
  * ScopeIndicator — compact input-bar chip + inline management popover for a
  * conversation's workspace scope.
  *
- * The *scope* is the set of filesystem folders the scoped Terminal plugin is
- * confined to. This is the condensed, in-composer sibling of the standalone
- * {@link ../canvas/ScopeManager.vue} panel: the chip surfaces the current scope
- * at a glance (basename + count, amber when empty), and clicking it opens a
- * popover to add (native directory picker), remove, or clear folders without
- * leaving the chat.
+ * The *scope* is the set of filesystem folders the agent's filesystem/terminal
+ * tools are confined to. It is the sole, in-composer surface for scope: the chip
+ * shows the current scope at a glance (basename + count, amber when empty), and
+ * clicking it opens a popover to add (native directory picker), remove, or clear
+ * folders without leaving the chat.
  *
  * ## Data flow
  * On mount and whenever `conversationId` changes, the scope is fetched once via

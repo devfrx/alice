@@ -5,12 +5,14 @@
  * the legacy ConversationDrawer contract (same props/emits) so the view
  * wiring is a drop-in.
  */
+import { nextTick, ref, watch } from 'vue'
+
 import { renderMarkdown } from '../../composables/useMarkdown'
 import MessageVersionNav from '../chat/MessageVersionNav.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import type { ChatMessage } from '../../types/chat'
 
-defineProps<{
+const props = defineProps<{
   open: boolean
   messages: ChatMessage[]
   isStreaming: boolean
@@ -32,6 +34,24 @@ const ROLE_LABELS: Record<string, string> = {
   tool: 'STRUMENTO',
   system: 'SISTEMA'
 }
+
+const scrollRef = ref<HTMLElement | null>(null)
+
+// Open lands on the newest entry (the conversation reads bottom-up, like
+// the legacy drawer).
+watch(
+  () => props.open,
+  async (open) => {
+    if (!open) return
+    await nextTick()
+    if (scrollRef.value) scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+  }
+)
+
+/** Tool dumps are capped like the legacy drawer — the dossier is a record, not a log. */
+function truncateContent(text: string, max = 200): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text
+}
 </script>
 
 <template>
@@ -44,7 +64,7 @@ const ROLE_LABELS: Record<string, string> = {
         </button>
       </header>
 
-      <div class="hz-history__scroll">
+      <div ref="scrollRef" class="hz-history__scroll">
         <article v-for="msg in messages" :key="msg.id" class="hz-history__entry">
           <div class="hz-history__rubric">
             <span class="hz-history__role">{{ ROLE_LABELS[msg.role] ?? msg.role }}</span>
@@ -69,7 +89,7 @@ const ROLE_LABELS: Record<string, string> = {
           </div>
 
           <div v-if="msg.role === 'tool'" class="hz-history__body hz-history__body--tool">
-            {{ msg.content }}
+            {{ truncateContent(msg.content) }}
           </div>
           <!-- eslint-disable-next-line vue/no-v-html -->
           <div

@@ -62,6 +62,8 @@ function reject(): void {
 function handleKeydown(e: KeyboardEvent): void {
     if (e.key === 'Escape') {
         e.preventDefault()
+        // The dialog owns this Esc — global interrupt chains must not also run.
+        e.stopPropagation()
         reject()
     }
 }

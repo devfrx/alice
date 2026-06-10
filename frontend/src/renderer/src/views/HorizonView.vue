@@ -241,6 +241,9 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   if (e.isComposing) return
   // A global modal owns the keyboard — never steal keystrokes or walk the chain.
   if (modalState.visible) return
+  // A pending confirmation / ask_user owns the keyboard too: Esc must mean
+  // "reject the tool", never "abort the whole turn" (mirrors the click guard).
+  if (sceneDimmed.value) return
   if (e.key === 'Escape') {
     if (voiceStore.isSpeaking) cancelSpeak()
     else if (chatStore.isStreamingCurrentConversation) stopGeneration()

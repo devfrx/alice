@@ -173,9 +173,11 @@ class TestAgentPluginTools:
 
     @pytest.mark.asyncio
     async def test_planning_tools_carry_planning_capability(self):
-        # The tier whitelist (plan mode) exempts ``planning``-tagged tools from
-        # the capability-blocking pass, so every planning meta-tool must carry
-        # the ("planning",) capability.
+        # Mode policies exempt meta-tools from the capability-blocking pass
+        # via ``always_offered`` on the definition (the old tier whitelist
+        # keyed on the ``planning`` tag was retired); the ("planning",)
+        # capability remains as classifying metadata every meta-tool must
+        # still declare.
         plugin = AgentPlugin()
         await plugin.initialize(_make_app_context())
         by_name = {t.name: t for t in plugin.get_tools()}

@@ -69,8 +69,11 @@ class TestPolicyFor:
     def test_no_tier_guidance_teaches_tool_usage(self) -> None:
         # The *how to plan* lives in the [ORCHESTRAZIONE] block colocated
         # with the agent meta-tools; tiers keep permission semantics only.
+        meta_tools = ("update_tasks", "write_plan", "spawn_subagent", "ask_user")
         for mode in PermissionMode:
-            assert "update_tasks" not in policy_for(mode).guidance
+            guidance = policy_for(mode).guidance
+            for tool_name in meta_tools:
+                assert tool_name not in guidance, (mode, tool_name)
 
     def test_custom_guidance_overrides_for_plan_and_falls_back(self) -> None:
         custom = {PermissionMode.PLAN: "X"}

@@ -642,16 +642,26 @@
         "title": "OpenNodesRequest",
         "type": "object"
       },
+      "PermissionMode": {
+        "description": "The authorization tier governing a conversation's tool-calls.",
+        "enum": [
+          "strict",
+          "auto_edits",
+          "plan",
+          "autopilot"
+        ],
+        "title": "PermissionMode",
+        "type": "string"
+      },
       "PermissionModeResponse": {
-        "description": "The permission tier for a single conversation.\n\nAttributes:\n    conversation_id: The owning conversation id (canonical string form).\n    mode: The tier — ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.",
+        "description": "The permission tier for a single conversation.\n\nAttributes:\n    conversation_id: The owning conversation id (canonical string form).\n    mode: The authorization tier (:class:`PermissionMode`):\n        ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.",
         "properties": {
           "conversation_id": {
             "title": "Conversation Id",
             "type": "string"
           },
           "mode": {
-            "title": "Mode",
-            "type": "string"
+            "$ref": "#/components/schemas/PermissionMode"
           }
         },
         "required": [

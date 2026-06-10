@@ -2674,18 +2674,24 @@ export interface components {
             names: string[];
         };
         /**
+         * PermissionMode
+         * @description The authorization tier governing a conversation's tool-calls.
+         * @enum {string}
+         */
+        PermissionMode: "strict" | "auto_edits" | "plan" | "autopilot";
+        /**
          * PermissionModeResponse
          * @description The permission tier for a single conversation.
          *
          *     Attributes:
          *         conversation_id: The owning conversation id (canonical string form).
-         *         mode: The tier — ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.
+         *         mode: The authorization tier (:class:`PermissionMode`):
+         *             ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.
          */
         PermissionModeResponse: {
             /** Conversation Id */
             conversation_id: string;
-            /** Mode */
-            mode: string;
+            mode: components["schemas"]["PermissionMode"];
         };
         /**
          * PermissionModeUpdateRequest

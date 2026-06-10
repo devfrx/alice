@@ -28,7 +28,11 @@ const sentenceCount = computed(() => (props.text.match(/[.!?…]+(\s|$)/g) ?? []
 watch(
   sentenceCount,
   (n) => {
-    if (n > MAGAZINE_THRESHOLD && !props.magazine) emit('update:magazine', true)
+    // Never flip while compact (presenting): the stage owns the lower zone
+    // and a magazine column there would squeeze it to half height.
+    if (n > MAGAZINE_THRESHOLD && !props.magazine && !props.compact) {
+      emit('update:magazine', true)
+    }
   },
   { immediate: true }
 )

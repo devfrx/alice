@@ -253,6 +253,9 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     return
   }
   if (composerActive.value) return
+  // The open history drawer owns typing focus — don't materialize the
+  // composer invisibly behind it.
+  if (historyOpen.value) return
   const tgt = e.target as HTMLElement | null
   if (tgt?.closest('input, textarea, select, button, [contenteditable="true"], [role="dialog"]'))
     return
@@ -264,14 +267,20 @@ function onGlobalKeydown(e: KeyboardEvent): void {
 }
 
 /* ── ANCHOR: voice-wiring ── */
-// Auto-send the STT transcript when confirmation is disabled.
+// STT transcript: auto-send by default; with "Conferma trascrizione" on, the
+// transcript lands in the composer instead — editable serif line, Enter sends.
 watch(
   () => voiceStore.transcript,
   (text) => {
-    if (!text.trim() || voiceStore.confirmTranscript) return
-    const toSend = text.trim()
+    if (!text.trim()) return
+    const spoken = text.trim()
     voiceStore.clearTranscript()
-    send(toSend).catch(console.error)
+    if (voiceStore.confirmTranscript) {
+      composerActive.value = true
+      composerRef.value?.seed(spoken)
+    } else {
+      send(spoken).catch(console.error)
+    }
   }
 )
 
@@ -451,12 +460,6 @@ onBeforeUnmount(() => {
         <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
           {{ lastUserQuery }}
         </p>
-        <AskUserPrompt
-          v-for="r in pendingAskUserList"
-          :key="r.executionId"
-          :request="r"
-          @answer="answerAskUser"
-        />
         <HorizonColophon
           v-if="sceneState !== 'presenting'"
           :next-event="calendarStore.nextEvent"
@@ -492,6 +495,18 @@ onBeforeUnmount(() => {
       :confirmation="pendingConfirmationsList[0]"
       @respond="respondToConfirmation"
     />
+
+    <!-- ask_user must sit ABOVE the dimmed scene (spec §3.6): the scene gets
+         pointer-events: none while a prompt is pending, so an in-scene render
+         would be unclickable. -->
+    <div v-if="pendingAskUserList.length > 0" class="horizon-view__ask">
+      <AskUserPrompt
+        v-for="r in pendingAskUserList"
+        :key="r.executionId"
+        :request="r"
+        @answer="answerAskUser"
+      />
+    </div>
   </div>
 </template>
 
@@ -501,6 +516,24 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   overflow: hidden;
+}
+
+/* ask_user overlay — centered above the dimmed scene, scrolls if tall. */
+.horizon-view__ask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  overflow-y: auto;
+  z-index: var(--z-overlay);
+}
+
+.horizon-view__ask > * {
+  width: min(640px, 92%);
 }
 
 /* Shared soft fade for scene content swaps. */

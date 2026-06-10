@@ -421,15 +421,15 @@ class TurnAssembler:
 
             # Align the offered toolset with the active permission tier.
             # Presence of the meta-tools is guaranteed by ``always_offered``
-            # on every selection path; this call only RESHAPES the toolset —
-            # drops capabilities the tier blocks and floats the priority
-            # plugins to the front. Skipped for the Continuum-scoped agent,
-            # which owns its own fixed toolset.
+            # on every selection path (the user's explicit opt-out still
+            # wins); this call only RESHAPES the toolset — drops capabilities
+            # the tier blocks and floats the priority plugins to the front.
+            # Skipped for the Continuum-scoped agent, which owns its own
+            # fixed toolset.
             if tools and policy is not None and not continuum_scope:
                 tools = ctx.tool_registry.apply_mode_policy(
                     tools,
                     drop_capabilities=policy.blocked_capabilities,
-                    always_allow_tools=policy.always_allow_tools,
                     priority_plugins=policy.priority_plugins,
                 )
 

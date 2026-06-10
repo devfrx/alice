@@ -352,7 +352,6 @@ class ToolRegistryProtocol(Protocol):
         tools: list[dict[str, Any]],
         *,
         drop_capabilities: frozenset[str] | set[str] = ...,
-        always_allow_tools: frozenset[str] = ...,
         priority_plugins: tuple[str, ...] | list[str] = ...,
     ) -> list[dict[str, Any]]: ...
     async def embed_tools(self) -> None: ...

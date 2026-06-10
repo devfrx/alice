@@ -650,7 +650,6 @@ class ToolRegistry:
         tools: list[dict[str, Any]],
         *,
         drop_capabilities: frozenset[str] | set[str] = frozenset(),
-        always_allow_tools: frozenset[str] = frozenset(),
         priority_plugins: tuple[str, ...] | list[str] = (),
     ) -> list[dict[str, Any]]:
         """Reshape *tools* to match the active permission tier.
@@ -661,10 +660,9 @@ class ToolRegistry:
           in *drop_capabilities* (e.g. ``fs_write`` / ``process_exec`` in the
           read-only ``plan`` tier).  Withholding the tools the gate would deny
           anyway keeps the model from leading with an action it cannot take.  A
-          tool whose namespaced name is in *always_allow_tools* — or whose
-          definition declares ``always_offered`` — is exempt: it survives even
-          when its capabilities intersect *drop_capabilities*, so the tier can
-          guarantee its own meta-tools.
+          tool whose definition declares ``always_offered`` is exempt: it
+          survives even when its capabilities intersect *drop_capabilities*,
+          so the meta-tools can never be withheld.
         * **prioritise** — float tools owned by *priority_plugins* to the front
           (stable within each group) so the model reaches for them first (e.g.
           the planning meta-tools in ``plan`` mode).
@@ -676,7 +674,6 @@ class ToolRegistry:
         Args:
             tools: OpenAI-format tool dicts (e.g. from the selection branch).
             drop_capabilities: Capability tags whose tools are removed.
-            always_allow_tools: Namespaced tool names exempt from dropping.
             priority_plugins: Owning-plugin names floated to the front.
 
         Returns:
@@ -691,9 +688,6 @@ class ToolRegistry:
             kept: list[dict[str, Any]] = []
             for entry in result:
                 ns_name = entry.get("function", {}).get("name", "")
-                if ns_name in always_allow_tools:
-                    kept.append(entry)
-                    continue
                 tool_def = self._tools.get(ns_name)
                 if tool_def is not None and tool_def.always_offered:
                     kept.append(entry)

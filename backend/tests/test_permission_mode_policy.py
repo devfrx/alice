@@ -60,13 +60,17 @@ class TestPolicyFor:
             policy = policy_for(mode)
             assert policy.blocked_capabilities == frozenset()
             assert policy.priority_plugins == ()
-            assert policy.always_allow_tools == frozenset()
             assert policy.guidance  # every tier contributes guidance
 
-    def test_plan_always_allows_planning_metatools(self) -> None:
+    def test_plan_guidance_is_read_only_permission_semantics(self) -> None:
         policy = policy_for(PermissionMode.PLAN)
-        assert "agent_update_tasks" in policy.always_allow_tools
-        assert "agent_write_plan" in policy.always_allow_tools
+        assert "sola lettura" in policy.guidance
+
+    def test_no_tier_guidance_teaches_tool_usage(self) -> None:
+        # The *how to plan* lives in the [ORCHESTRAZIONE] block colocated
+        # with the agent meta-tools; tiers keep permission semantics only.
+        for mode in PermissionMode:
+            assert "update_tasks" not in policy_for(mode).guidance
 
     def test_custom_guidance_overrides_for_plan_and_falls_back(self) -> None:
         custom = {PermissionMode.PLAN: "X"}
@@ -159,10 +163,11 @@ class TestApplyModePolicy:
         )
         assert [t["function"]["name"] for t in out] == ["mystery_tool"]
 
-    def test_always_allow_survives_capability_block(self) -> None:
+    def test_always_offered_survives_capability_block(self) -> None:
         tools_defs = {
             "some_write_tool": ToolDefinition(
-                name="some_write_tool", description="w", capabilities=("fs_write",),
+                name="some_write_tool", description="w",
+                capabilities=("fs_write",), always_offered=True,
             ),
             "other_write_tool": ToolDefinition(
                 name="other_write_tool", description="w", capabilities=("fs_write",),
@@ -177,12 +182,11 @@ class TestApplyModePolicy:
         out = reg.apply_mode_policy(
             tools,
             drop_capabilities=frozenset({"fs_write"}),
-            always_allow_tools=frozenset({"some_write_tool"}),
         )
         names = [t["function"]["name"] for t in out]
-        # whitelisted write tool survives despite the blocked capability.
+        # the always-offered write tool survives despite the blocked capability.
         assert "some_write_tool" in names
-        # the other write tool, not whitelisted, is dropped.
+        # the other write tool, not always-offered, is dropped.
         assert "other_write_tool" not in names
         # the input list is not mutated.
         assert len(tools) == 2

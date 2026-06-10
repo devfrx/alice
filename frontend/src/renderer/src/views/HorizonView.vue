@@ -14,10 +14,11 @@ import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
+import { useModal } from '../composables/useModal'
 import {
   deriveSceneState,
   deriveLineMode,
-  type HorizonSceneInputs,
+  type HorizonSceneInputs
 } from '../composables/horizon/horizonScene'
 import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
@@ -46,8 +47,10 @@ const {
   connect: connectVoice,
   transcript,
   speak,
-  cancelSpeak,
+  cancelSpeak
 } = useVoice()
+
+const { state: modalState } = useModal()
 
 /* ── ANCHOR: local-state ── */
 const composerActive = ref(false)
@@ -72,7 +75,7 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
   planSteps: planSteps.value,
   stageOpen: stageOpen.value,
   artifactCount: artifactCount.value,
-  composerActive: composerActive.value,
+  composerActive: composerActive.value
 }))
 
 const sceneState = computed(() => deriveSceneState(sceneInputs.value))
@@ -81,7 +84,7 @@ const lineMode = computed(() => deriveLineMode(sceneState.value, sceneInputs.val
 const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
 const pendingAskUserList = computed(() => Object.values(chatStore.pendingAskUser))
 const sceneDimmed = computed(
-  () => pendingConfirmationsList.value.length > 0 || pendingAskUserList.value.length > 0,
+  () => pendingConfirmationsList.value.length > 0 || pendingAskUserList.value.length > 0
 )
 
 /* ── ANCHOR: interactions ── */
@@ -101,7 +104,7 @@ function handleSceneClick(event: MouseEvent): void {
     stopListening()
   } else if (voiceStore.isProcessing) {
     cancelProcessing()
-  } else {
+  } else if (!composerActive.value) {
     startListening()
   }
 }
@@ -117,6 +120,9 @@ async function handleComposerSend(content: string): Promise<void> {
  * character materializes the composer (Jarvis entry — no visible input box).
  */
 function onGlobalKeydown(e: KeyboardEvent): void {
+  if (e.isComposing) return
+  // A global modal owns the keyboard — never steal keystrokes or walk the chain.
+  if (modalState.visible) return
   if (e.key === 'Escape') {
     if (voiceStore.isSpeaking) cancelSpeak()
     else if (chatStore.isStreamingCurrentConversation) stopGeneration()
@@ -126,7 +132,7 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   }
   if (composerActive.value) return
   const tgt = e.target as HTMLElement | null
-  if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable))
+  if (tgt?.closest('input, textarea, select, button, [contenteditable="true"], [role="dialog"]'))
     return
   if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault()
@@ -144,7 +150,7 @@ watch(
     const toSend = text.trim()
     voiceStore.clearTranscript()
     send(toSend).catch(console.error)
-  },
+  }
 )
 
 /* ── ANCHOR: lifecycle ── */
@@ -194,7 +200,6 @@ void speak
           :transcript="transcript"
           :disabled="chatStore.isStreamingCurrentConversation"
           @send="handleComposerSend"
-          @close="composerActive = false"
         />
       </template>
 

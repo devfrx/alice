@@ -17,7 +17,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [text: string]
-  close: []
 }>()
 
 const text = ref('')
@@ -32,7 +31,7 @@ watch(
     } else {
       text.value = ''
     }
-  },
+  }
 )
 
 /** Seed the first character captured by the view's global keydown. */
@@ -44,6 +43,7 @@ function seed(ch: string): void {
 defineExpose({ seed })
 
 function onKeydown(e: KeyboardEvent): void {
+  if (e.isComposing) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     const t = text.value.trim()
@@ -51,15 +51,13 @@ function onKeydown(e: KeyboardEvent): void {
       emit('send', t)
       text.value = ''
     }
-  } else if (e.key === 'Escape') {
-    emit('close')
   }
 }
 </script>
 
 <template>
   <div v-if="active || listening || sttProcessing" class="hz-composer">
-    <p v-if="listening || sttProcessing" class="hz-composer__transcript">
+    <p v-if="listening || sttProcessing" class="hz-composer__transcript" aria-live="polite">
       <em>{{ transcript || (listening ? 'Ti ascolto…' : 'Elaboro…') }}</em>
     </p>
     <textarea
@@ -68,7 +66,6 @@ function onKeydown(e: KeyboardEvent): void {
       v-model="text"
       class="hz-composer__input"
       rows="1"
-      :disabled="disabled"
       aria-label="Scrivi ad AL\CE"
       placeholder=""
       @keydown="onKeydown"

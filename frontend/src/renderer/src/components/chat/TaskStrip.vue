@@ -143,14 +143,9 @@ watch(
 
 <template>
   <div class="task-strip" :class="`task-strip--${viewState}`">
-    <!-- EMPTY -->
-    <div v-if="viewState === 'empty'" class="task-strip__placeholder">
-      Nessuna attività pianificata
-    </div>
-
-    <!-- COLLAPSED: ticker -->
+    <!-- COLLAPSED: ticker (EMPTY renders nothing; the root is hidden) -->
     <button
-      v-else-if="viewState === 'collapsed'"
+      v-if="viewState === 'collapsed'"
       type="button"
       class="task-strip__ticker"
       :aria-label="`Espandi attività — ${completed} di ${total} completate`"
@@ -166,7 +161,7 @@ watch(
     </button>
 
     <!-- EXPANDED: panel -->
-    <div v-else class="task-strip__panel">
+    <div v-else-if="viewState === 'expanded'" class="task-strip__panel">
       <button
         type="button"
         class="task-strip__header"
@@ -182,29 +177,23 @@ watch(
         <span class="task-strip__progress-fill" :style="{ width: `${progressPct}%` }" />
       </div>
 
-      <TaskStepList :steps="steps" />
+      <div class="task-strip__scroll">
+        <TaskStepList :steps="steps" />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .task-strip {
-  width: 100%;
   box-sizing: border-box;
   font-family: var(--font-sans);
 }
 
-/* ----- EMPTY placeholder ----- */
-.task-strip__placeholder {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  letter-spacing: 0.01em;
+/* No tasks → the strip removes itself from the layout entirely, so the
+   composer sits clean with nothing hovering above it. */
+.task-strip--empty {
+  display: none;
 }
 
 /* ----- COLLAPSED ticker ----- */
@@ -218,7 +207,7 @@ watch(
   margin: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-2);
+  background: var(--surface-1);
   color: var(--text-secondary);
   font-family: inherit;
   font-size: var(--text-sm);
@@ -228,7 +217,7 @@ watch(
 }
 
 .task-strip__ticker:hover {
-  background: var(--surface-3);
+  background: var(--surface-2);
 }
 
 .task-strip__label {
@@ -281,7 +270,29 @@ watch(
   padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  background: var(--surface-1);
+}
+
+/* The step list scrolls internally so a long plan never shoves the composer
+   down — the header + progress bar stay pinned above it. */
+.task-strip__scroll {
+  min-height: 0;
+  max-height: min(46vh, 320px);
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.task-strip__scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.task-strip__scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-strip__scroll::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--radius-xs);
 }
 
 .task-strip__header {

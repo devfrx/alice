@@ -349,6 +349,15 @@ const conversationTitle = computed<string>(() => {
   margin-top: var(--space-2);
 }
 
+/* Task strip sits just above the composer. It is inset to the same edges as
+   the ChatInput card (matching margin-inline) with a small gap below, so the
+   two read as an aligned set rather than one fused block. The strip removes
+   itself from the layout entirely when there are no tasks. */
+.chat-panel__tasks {
+  flex-shrink: 0;
+  margin: 0 var(--space-4) var(--space-2);
+}
+
 .chat-panel__input {
   flex-shrink: 0;
 }

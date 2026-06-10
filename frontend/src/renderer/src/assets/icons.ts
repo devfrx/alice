@@ -334,6 +334,9 @@ const _ICONS = {
   /** Shield / security */
   'shield': { icon: 'solar:shield-bold' },
 
+  /** Lock / restricted by the active mode */
+  'lock': { icon: 'solar:lock-keyhole-minimalistic-bold' },
+
   /** Chip / hardware */
   'chip': { icon: 'solar:cpu-bold' },
 

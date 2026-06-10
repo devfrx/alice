@@ -350,7 +350,8 @@ describe('TaskStrip.vue source structure', () => {
   })
 
   it('renders the three documented states', () => {
-    expect(src).toContain('Nessuna attività pianificata') // EMPTY placeholder
+    // EMPTY removes the strip from the layout entirely (no placeholder box).
+    expect(src).toMatch(/task-strip--empty\s*\{\s*display:\s*none/)
     expect(src).toContain('task-strip__ticker') // COLLAPSED
     expect(src).toContain('task-strip__panel') // EXPANDED
     expect(src).toContain('Attività') // panel header label

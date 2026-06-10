@@ -87,7 +87,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
       <AppIcon name="sliders" :size="11" />
       <span class="ctc__chip-label">Strumenti</span>
       <span v-if="blockedCount > 0" class="ctc__badge" :title="`${blockedCount} strumenti bloccati dalla modalità`">
-        <AppIcon name="minus" :size="9" />{{ blockedCount }}
+        <AppIcon name="lock" :size="9" />{{ blockedCount }}
       </span>
     </button>
 
@@ -134,22 +134,15 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
                 'ctc__tool--blocked': !tool.allowed,
                 'ctc__tool--planning': tool.planning,
               }"
+              :title="!tool.allowed ? `Bloccato dalla modalità ${tierLabel}` : undefined"
             >
               <span class="ctc__tool-state" aria-hidden="true">
                 <AppIcon
-                  :name="tool.allowed ? (tool.planning ? 'lightbulb' : 'check') : 'minus'"
+                  :name="tool.allowed ? (tool.planning ? 'lightbulb' : 'check') : 'lock'"
                   :size="12"
                 />
               </span>
-              <div class="ctc__tool-text">
-                <span class="ctc__tool-name">{{ tool.label }}</span>
-                <span v-if="!tool.allowed" class="ctc__tool-hint">
-                  bloccato dalla modalità {{ tierLabel }}
-                </span>
-                <span v-else-if="tool.planning" class="ctc__tool-hint ctc__tool-hint--ok">
-                  pianificazione
-                </span>
-              </div>
+              <span class="ctc__tool-name">{{ tool.label }}</span>
             </li>
           </ul>
         </li>
@@ -217,7 +210,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
   align-items: center;
   gap: 1px;
   padding: 0 4px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: var(--surface-4, var(--surface-3));
   color: var(--text-secondary);
   font-size: 9px;
@@ -231,7 +224,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
 /* ── Popover content ── chrome (surface/border/radius/shadow/width) comes
    from UiPopover; only scroll constraints are owned here. */
 .ctc__pop {
-  max-height: 360px;
+  max-height: min(58vh, 380px);
   overflow-y: auto;
 }
 
@@ -253,7 +246,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
 .ctc__pop-tier {
   padding: 1px 6px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: var(--surface-3);
   color: var(--text-secondary);
   font-size: var(--text-2xs);
@@ -331,7 +324,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
 /* Non-interactive tool row — read-only reflection of the tier */
 .ctc__tool {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-1-5);
   padding: var(--space-1) var(--space-1);
   border-radius: var(--radius-sm);
@@ -344,29 +337,14 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  margin-top: 1px;
   color: var(--success, var(--accent));
 }
 
-.ctc__tool-text {
+.ctc__tool-name {
   flex: 1;
   min-width: 0;
-}
-
-.ctc__tool-name {
-  display: block;
   font-size: var(--text-xs);
   color: var(--text-primary);
-}
-
-.ctc__tool-hint {
-  display: block;
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
-}
-
-.ctc__tool-hint--ok {
-  color: var(--accent);
 }
 
 /* Planning tools — highlighted as in-evidence under the plan tier */

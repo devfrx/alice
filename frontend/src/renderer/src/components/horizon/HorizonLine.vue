@@ -29,7 +29,7 @@ const props = withDefaults(
     /** Dim the line (disconnected / dialog open behind). */
     dimmed?: boolean
   }>(),
-  { audioLevel: 0, notchCount: 0, activeIndex: -1, dimmed: false },
+  { audioLevel: 0, notchCount: 0, activeIndex: -1, dimmed: false }
 )
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -43,6 +43,8 @@ let height = 0
 let levelSmooth = 0
 /** Spark position as a fraction of the span (eases toward the active notch). */
 let sparkX = 0.5
+/** Mode rendered on the previous frame (detects timeline entry). */
+let lastMode: HorizonLineMode | null = null
 /** "r, g, b" triplet resolved from --hz-line-rgb. */
 let lineRgb = '232, 220, 200'
 let resizeObserver: ResizeObserver | null = null
@@ -80,7 +82,10 @@ function draw(now: number): void {
   const span = width - margin * 2
   const alpha = props.dimmed ? 0.35 : 1
 
-  const targetLevel = props.mode === 'tense' ? Math.max(props.audioLevel, 0.06) : 0
+  // Clamp to [0.06, 1]: a NaN or out-of-range level would poison the
+  // exponential smoother permanently (NaN never decays back).
+  const safeLevel = Number.isFinite(props.audioLevel) ? props.audioLevel : 0
+  const targetLevel = props.mode === 'tense' ? Math.min(1, Math.max(safeLevel, 0.06)) : 0
   levelSmooth += (targetLevel - levelSmooth) * 0.18
 
   /* ── the line ── */
@@ -110,7 +115,9 @@ function draw(now: number): void {
       } else if (props.mode === 'tense') {
         y =
           cy +
-          env * levelSmooth * 18 *
+          env *
+            levelSmooth *
+            18 *
             (Math.sin(f * 26 + t * 9) * 0.6 + Math.sin(f * 53 - t * 13) * 0.4)
       } else if (props.mode === 'pulse') {
         y = cy + Math.sin(t * 2.2 + f * Math.PI * 2) * 1.2 * env
@@ -167,6 +174,9 @@ function draw(now: number): void {
     })
     const clamped = Math.max(0, Math.min(props.activeIndex, fractions.length - 1))
     const target = fractions[clamped] ?? 0.5
+    // Entering timeline (a NEW plan): snap to the active step — easing is
+    // for within-plan motion, not for gliding from a previous plan's notch.
+    if (lastMode !== 'timeline') sparkX = target
     sparkX += (target - sparkX) * (reducedMotion ? 1 : 0.06)
     const sx = margin + sparkX * span
     const breathe = reducedMotion ? 1 : 0.75 + Math.sin(t * 3) * 0.25
@@ -177,8 +187,12 @@ function draw(now: number): void {
     ctx.fillRect(sx - 9, cy - 9, 18, 18)
     ctx.restore()
   }
+
+  lastMode = props.mode
 }
 
+/* TODO(spec §6): suspend the rAF loop once the breathe mode has settled
+   (on-demand redraw, zero idle work) — tracked for the final-review pass. */
 function loop(now: number): void {
   if (!running) return
   draw(now)
@@ -218,7 +232,7 @@ onMounted(() => {
     })
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme'],
+      attributeFilter: ['data-theme']
     })
   }
   document.addEventListener('visibilitychange', onVisibility)
@@ -238,7 +252,7 @@ watch(
   () => [props.mode, props.audioLevel, props.notchCount, props.activeIndex, props.dimmed],
   () => {
     if (reducedMotion) draw(performance.now())
-  },
+  }
 )
 </script>
 

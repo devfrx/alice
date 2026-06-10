@@ -26,7 +26,7 @@
 - Create: `backend/api/openapi_export.py`
 - Test: `backend/tests/contracts/test_openapi_export.py`
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 Creare `backend/tests/contracts/test_openapi_export.py` (creare anche la directory `backend/tests/contracts/`, senza `__init__.py`, coerente con `tests/`):
 
@@ -59,12 +59,12 @@ def test_main_writes_deterministic_json(tmp_path: Path) -> None:
     assert "/api/health" in parsed["paths"]
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run (da `backend/`): `pytest tests/contracts/test_openapi_export.py -v`
 Expected: FAIL/ERROR con `ModuleNotFoundError: No module named 'backend.api.openapi_export'`
 
-- [ ] **Step 3: Implementare il modulo**
+- [x] **Step 3: Implementare il modulo**
 
 Creare `backend/api/openapi_export.py`:
 
@@ -126,17 +126,17 @@ if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
 ```
 
-- [ ] **Step 4: Eseguire il test e verificare che passi**
+- [x] **Step 4: Eseguire il test e verificare che passi**
 
 Run (da `backend/`): `pytest tests/contracts/test_openapi_export.py -v`
 Expected: 2 PASS
 
-- [ ] **Step 5: Lint e typecheck dei file nuovi**
+- [x] **Step 5: Lint e typecheck dei file nuovi**
 
 Run (da `backend/`): `ruff check api/openapi_export.py tests/contracts/; mypy api/openapi_export.py`
 Expected: nessun errore (eventuali errori mypy/ruff vanno corretti prima di proseguire)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/api/openapi_export.py backend/tests/contracts/test_openapi_export.py
@@ -151,7 +151,7 @@ git commit -m "feat(contracts): offline OpenAPI export module (no server needed)
 - Test: `backend/tests/contracts/test_response_models.py`
 - Create (generato dal test stesso): `backend/tests/contracts/response_model_baseline.txt`
 
-- [ ] **Step 1: Scrivere il test (fallisce finché non esiste la baseline)**
+- [x] **Step 1: Scrivere il test (fallisce finché non esiste la baseline)**
 
 Creare `backend/tests/contracts/test_response_models.py`:
 
@@ -266,12 +266,12 @@ def test_response_model_ratchet() -> None:
     )
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run (da `backend/`): `pytest tests/contracts/test_response_models.py -v`
 Expected: FAIL con `FileNotFoundError` su `response_model_baseline.txt` (la baseline non esiste ancora)
 
-- [ ] **Step 3: Generare la baseline meccanicamente**
+- [x] **Step 3: Generare la baseline meccanicamente**
 
 Run (da `backend/`):
 
@@ -283,17 +283,17 @@ Remove-Item Env:\ALICE_REGEN_CONTRACT_BASELINE
 
 Expected: FAIL INTENZIONALE con "Baseline regenerated. Inspect the diff, then rerun WITHOUT the env var." — il file `backend/tests/contracts/response_model_baseline.txt` ora esiste (LF, ~70-90 righe ordinate `GET /api/...`). Il numero esatto è quello calcolato — NON va aggiustato a mano.
 
-- [ ] **Step 4: Eseguire di nuovo il test senza la variabile e verificare che passi**
+- [x] **Step 4: Eseguire di nuovo il test senza la variabile e verificare che passi**
 
 Run (da `backend/`): `pytest tests/contracts/test_response_models.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Lint e typecheck**
+- [x] **Step 5: Lint e typecheck**
 
 Run (da `backend/`): `ruff check tests/contracts/; mypy tests/contracts/test_response_models.py`
 Expected: nessun errore
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/tests/contracts/test_response_models.py backend/tests/contracts/response_model_baseline.txt
@@ -313,12 +313,12 @@ git commit -m "test(contracts): response_model ratchet with frozen baseline"
 - Create (generati): `frontend/src/renderer/src/types/generated/openapi.json`, `frontend/src/renderer/src/types/generated/api.d.ts`
 - Create: `frontend/src/renderer/src/types/generated/index.ts`
 
-- [ ] **Step 1: Installare openapi-typescript**
+- [x] **Step 1: Installare openapi-typescript**
 
 Run (da `frontend/`): `npm install --save-dev openapi-typescript`
 Expected: exit 0; `package.json` e `package-lock.json` aggiornati con `openapi-typescript` in devDependencies (v7.x)
 
-- [ ] **Step 2: Aggiungere lo script npm**
+- [x] **Step 2: Aggiungere lo script npm**
 
 In `frontend/package.json`, nel blocco `"scripts"`, aggiungere dopo la riga `"build:installer"`:
 
@@ -328,7 +328,7 @@ In `frontend/package.json`, nel blocco `"scripts"`, aggiungere dopo la riga `"bu
 
 (attenzione alla virgola sulla riga precedente)
 
-- [ ] **Step 3: Escludere i generati da eslint e prettier**
+- [x] **Step 3: Escludere i generati da eslint e prettier**
 
 In `frontend/eslint.config.mjs` riga 8, sostituire:
 
@@ -351,7 +351,7 @@ src/renderer/src/types/generated/api.d.ts
 
 (Nota: `index.ts` è il file scritto a mano e deve restare sotto lint e prettier.)
 
-- [ ] **Step 4: Creare lo script di rigenerazione**
+- [x] **Step 4: Creare lo script di rigenerazione**
 
 Creare `scripts/gen-contracts.ps1`:
 
@@ -385,7 +385,7 @@ try {
 Write-Host "Contracts regenerated." -ForegroundColor Green
 ```
 
-- [ ] **Step 5: Creare lo script di verifica staleness**
+- [x] **Step 5: Creare lo script di verifica staleness**
 
 Creare `scripts/check-contracts.ps1`:
 
@@ -417,12 +417,12 @@ try {
 Write-Host "Contracts are up to date." -ForegroundColor Green
 ```
 
-- [ ] **Step 6: Prima generazione**
+- [x] **Step 6: Prima generazione**
 
 Run (da qualunque cwd): `.\scripts\gen-contracts.ps1`
 Expected: `Contracts regenerated.`; esistono `frontend/src/renderer/src/types/generated/openapi.json` (JSON, contiene `"/api/health"`) e `api.d.ts` (inizia con il commento di auto-generazione di openapi-typescript ed esporta `paths` e `components`)
 
-- [ ] **Step 7: Creare il modulo alias sui tipi generati**
+- [x] **Step 7: Creare il modulo alias sui tipi generati**
 
 Creare `frontend/src/renderer/src/types/generated/index.ts`:
 
@@ -440,17 +440,17 @@ import type { components } from './api'
 export type ApiSchema<K extends keyof components['schemas']> = components['schemas'][K]
 ```
 
-- [ ] **Step 8: Typecheck**
+- [x] **Step 8: Typecheck**
 
 Run (da `frontend/`): `npm run typecheck`
 Expected: exit 0 (il file generato compila; nessun consumatore è ancora cambiato)
 
-- [ ] **Step 9: Verifica del gate di staleness**
+- [x] **Step 9: Verifica del gate di staleness**
 
 Run: `.\scripts\check-contracts.ps1`
 Expected: `Contracts are up to date.` — ATTENZIONE: il check passa solo DOPO il commit dello Step 10 (i file appena creati risultano untracked e quindi "dirty"). Eseguire questo step DOPO il commit, oppure aspettarsi il fallimento qui e rieseguire dopo il commit.
 
-- [ ] **Step 10: Commit (poi rieseguire lo Step 9)**
+- [x] **Step 10: Commit (poi rieseguire lo Step 9)**
 
 ```powershell
 git add frontend/package.json frontend/package-lock.json frontend/eslint.config.mjs frontend/.prettierignore scripts/gen-contracts.ps1 scripts/check-contracts.ps1 frontend/src/renderer/src/types/generated
@@ -472,7 +472,7 @@ Dimostra il loop completo: miglioramento del contratto backend → rigenerazione
 - Modify: `frontend/src/renderer/src/types/scope.ts` (re-export di `ScopeResponse`)
 - Regenerate: `frontend/src/renderer/src/types/generated/*`
 
-- [ ] **Step 1: Tipizzare l'enum nel response model backend**
+- [x] **Step 1: Tipizzare l'enum nel response model backend**
 
 In `backend/api/routes/permission_mode.py`, classe `PermissionModeResponse` (righe 41-50), sostituire:
 
@@ -495,17 +495,17 @@ Poi aggiornare i tre punti di costruzione della risposta:
 
 (Il JSON sul filo non cambia: l'enum è una `StrEnum` e serializza al suo valore. Aggiornare la docstring del campo se cita "stringa".)
 
-- [ ] **Step 2: Verificare che i test backend restino verdi**
+- [x] **Step 2: Verificare che i test backend restino verdi**
 
 Run (da `backend/`): `pytest tests/ -v`
 Expected: tutti PASS (nessun cambiamento di formato sul filo). Se un test asserisce esplicitamente il tipo `str` del campo, aggiornarlo all'enum value — il JSON resta identico.
 
-- [ ] **Step 3: Rigenerare i contratti**
+- [x] **Step 3: Rigenerare i contratti**
 
 Run: `.\scripts\gen-contracts.ps1`
 Expected: `Contracts regenerated.`; in `api.d.ts` il componente `PermissionMode` è ora un'unione di letterali `'strict' | 'auto_edits' | 'plan' | 'autopilot'`
 
-- [ ] **Step 4: Far consumare i tipi generati al frontend**
+- [x] **Step 4: Far consumare i tipi generati al frontend**
 
 In `frontend/src/renderer/src/types/permission.ts`: eliminare le definizioni locali di `PermissionMode` e `PermissionModeResponse` e sostituirle con:
 
@@ -530,12 +530,12 @@ export type ScopeResponse = ApiSchema<'ScopeResponse'>
 
 (`WsScopeUpdatedMessage` resta invariato.)
 
-- [ ] **Step 5: Typecheck e lint frontend**
+- [x] **Step 5: Typecheck e lint frontend**
 
 Run (da `frontend/`): `npm run typecheck; if ($?) { npm run lint }`
 Expected: entrambi exit 0. Se il typecheck segnala consumatori incompatibili (es. confronti con letterali non previsti), sono veri drift trovati dal compilatore: allineare il consumatore al contratto generato, non viceversa.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/api/routes/permission_mode.py frontend/src/renderer/src/types/permission.ts frontend/src/renderer/src/types/scope.ts frontend/src/renderer/src/types/generated
@@ -550,7 +550,7 @@ git commit -m "feat(contracts): permission-mode enum in contract; FE consumes ge
 - Modify: `CLAUDE.md` (sezioni Commands e Conventions)
 - Create: `backend/tests/contracts/test_permission_mode_route.py`
 
-- [ ] **Step 1: Documentare i comandi in CLAUDE.md**
+- [x] **Step 1: Documentare i comandi in CLAUDE.md**
 
 In `CLAUDE.md`, nella sezione `## Commands`, aggiungere dopo il blocco "One-shot setup / dev":
 
@@ -568,19 +568,19 @@ Nella sezione `## Conventions`, aggiungere il bullet:
 - **Contracts are generated**: new/changed REST endpoints must declare a Pydantic `response_model` (ratchet test in `backend/tests/contracts/`) and require regenerating contracts (`.\scripts\gen-contracts.ps1`). Files in `frontend/src/renderer/src/types/generated/` are build artifacts — never edit them by hand (except `index.ts`).
 ```
 
-- [ ] **Step 2: Verifica finale completa**
+- [x] **Step 2: Verifica finale completa**
 
 Nota: la suite backend completa non è eseguibile in tempi pratici per un difetto pre-esistente (fixture app ~25s di setup per test, tracciato come task separato); la verifica usa i test mirati.
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/contracts/ -v   # Expected: tutti PASS
-cd backend; ..\.venv\Scripts\python.exe -m ruff check api/ tests/contracts/
+cd backend; ..\.venv\Scripts\python.exe -m ruff check api/openapi_export.py api/routes/permission_mode.py tests/contracts/   # (api/ intero ha 56 errori ruff pre-esistenti, fuori scope)
 cd backend; ..\.venv\Scripts\python.exe -m mypy api/openapi_export.py api/routes/permission_mode.py tests/contracts/
 .\scripts\check-contracts.ps1         # Expected: "Contracts are up to date."
 cd frontend; npm run typecheck        # Expected: exit 0
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add CLAUDE.md
@@ -591,7 +591,19 @@ git commit -m "docs: contract codegen commands and conventions"
 
 ## Criteri di uscita della fase (dalla spec §9)
 
-1. Tutti i test backend verdi, `npm run typecheck` verde.
+> **Stato: FASE COMPLETATA @ e638fec** (review finale: ready to merge). Verifica con test mirati
+> (contratti + permission, 5+42 verdi): la suite completa è impraticabile per il difetto
+> pre-esistente della fixture `app` (~25s di setup per test), tracciato come task separato.
+
+1. Test mirati backend verdi (contratti + domini toccati), `npm run typecheck` verde.
 2. `.\scripts\check-contracts.ps1` verde su working tree pulito.
 3. App avviabile (`.\scripts\start-dev.ps1`) e feature esemplare funzionante: cambiare il permission mode da Horizon e verificare che la UI rifletta il valore (il payload sul filo è invariato, quindi è una verifica di regressione).
 4. Enforcement consegnato: test ratchet + check-contracts (da agganciare a una futura CI; oggi non esistono workflow).
+
+## Backlog per le fasi successive (dalla review finale)
+
+- **CI minima presto (inizio 1b)**: workflow che esegue `pytest tests/contracts/`, `check-contracts.ps1` (runner windows) e `npm run typecheck` — i gate diventano reali solo in CI.
+- **Request-side enum**: `PermissionModeUpdateRequest.mode` è ancora `str` (la risposta ha l'enum, la richiesta no — scelta 400-vs-422 da decidere quando si ritocca l'endpoint).
+- **`AgentTier` duplicato a mano** in `frontend/src/renderer/src/types/settings.ts:171` — violazione pre-esistente del §4 della spec; sostituire con il tipo generato appena il dominio viene toccato.
+- **Baseline ratchet (94 voci)**: bruciarla dominio per dominio nelle fasi 2-6, insieme alla convenzione liste `{items, total}`.
+- **Pin esatto di `openapi-typescript`** (senza caret) o nota "codegen solo via `npm ci`".

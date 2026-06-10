@@ -2,9 +2,11 @@
 
 Extracts the heavy ``ws_chat`` preamble — conversation resolution, user
 message persistence (with edit-versioning / branch inheritance),
-attachment linking, history fetch + filtering, tool selection, auxiliary
-context (memory / MCP / whiteboards), system-prompt + message building,
-and pre-generation context compression — into a single cohesive
+attachment linking, history fetch + filtering, tool selection, dynamic
+system-prompt context (permission steering, orchestration contract,
+memory / MCP / whiteboards aux, plan document + task checklist — ordered
+by :mod:`backend.services.prompt_composer`), message building, and
+pre-generation context compression — into a single cohesive
 :class:`TurnAssembler`.
 
 The assembler returns an :class:`AssemblyResult` bundling the immutable
@@ -37,6 +39,10 @@ from backend.services.permission_mode_policy import ModePolicy, policy_for
 from backend.services.permission_mode_service import PermissionMode
 from backend.services.plan_document_service import render_plan_document
 from backend.services.plan_service import render_task_steps
+from backend.services.prompt_composer import (
+    build_orchestration_block,
+    compose_dynamic_context,
+)
 from backend.services.turn import TurnInput
 
 from ._helpers import (
@@ -413,20 +419,13 @@ class TurnAssembler:
                         priority_plugins=ctx.config.llm.priority_plugins,
                     )
 
-            # Align the offered toolset with the active permission tier: in the
-            # read-only (plan) tier, withhold write/exec tools the gate would
-            # block anyway and lead with the planning tools — guaranteeing they
-            # are present even if tool RAG didn't surface them. Skipped for the
-            # Continuum-scoped agent, which owns its own fixed toolset.
+            # Align the offered toolset with the active permission tier.
+            # Presence of the meta-tools is guaranteed by ``always_offered``
+            # on every selection path; this call only RESHAPES the toolset —
+            # drops capabilities the tier blocks and floats the priority
+            # plugins to the front. Skipped for the Continuum-scoped agent,
+            # which owns its own fixed toolset.
             if tools and policy is not None and not continuum_scope:
-                if policy.priority_plugins:
-                    have = {t["function"]["name"] for t in tools}
-                    extra = await ctx.tool_registry.get_tools_for_plugins(
-                        set(policy.priority_plugins),
-                    )
-                    tools.extend(
-                        e for e in extra if e["function"]["name"] not in have
-                    )
                 tools = ctx.tool_registry.apply_mode_policy(
                     tools,
                     drop_capabilities=policy.blocked_capabilities,
@@ -444,7 +443,7 @@ class TurnAssembler:
                 att["_bytes"] = await asyncio.to_thread(fp.read_bytes)
 
         # --- retrieve relevant memories (Phase 9) -----------------
-        memory_context: str | None = None
+        aux_parts: list[str] = []
         if (
             ctx.memory_service
             and ctx.config.memory.inject_in_context
@@ -457,74 +456,70 @@ class TurnAssembler:
                     filter={"scope": "long_term"},
                 )
                 if relevant:
-                    memory_context = _format_memory_context(
-                        relevant,
-                        ctx.config.memory.context_max_chars,
+                    aux_parts.append(
+                        _format_memory_context(
+                            relevant,
+                            ctx.config.memory.context_max_chars,
+                        )
                     )
             except Exception as exc:
                 logger.warning(
                     "Memory retrieval failed: {}", exc,
                 )
 
-        # --- inject active MCP server list (Phase 11) -------------
+        # --- active MCP server list (Phase 11) + whiteboards -------
         mcp_ctx = _build_mcp_context(ctx)
         if mcp_ctx:
-            memory_context = (
-                f"{memory_context}\n\n{mcp_ctx}"
-                if memory_context
-                else mcp_ctx
-            )
-
-        # --- inject whiteboards for current conversation ----------
+            aux_parts.append(mcp_ctx)
         wb_ctx = await _build_whiteboard_context(ctx, str(conv_id))
         if wb_ctx:
-            memory_context = (
-                f"{memory_context}\n\n{wb_ctx}"
-                if memory_context
-                else wb_ctx
-            )
+            aux_parts.append(wb_ctx)
 
-        # --- inject the living plan document so the model continues it ---
+        # --- living plan document + persisted task checklist -------
         # The free-form markdown strategy doc (distinct from the task
-        # checklist below). Placed after the permission block (prepended last,
-        # so it leads) and before the task steps. Skipped for the
+        # checklist below). The plan document is skipped for the
         # Continuum-scoped agent, which owns its own persona/context.
+        plan_doc_block: str | None = None
         if ctx.plan_document_service is not None and not continuum_scope:
             plan_doc = await ctx.plan_document_service.get_document(conv_id)
             if plan_doc:
-                plan_doc_ctx = render_plan_document(plan_doc)
-                if plan_doc_ctx:
-                    memory_context = (
-                        f"{memory_context}\n\n{plan_doc_ctx}"
-                        if memory_context
-                        else plan_doc_ctx
-                    )
+                plan_doc_block = render_plan_document(plan_doc) or None
 
-        # --- inject persisted plan so the model continues it (Fase 5) ---
+        task_steps_block: str | None = None
         if ctx.plan_service is not None:
             plan_steps = await ctx.plan_service.get_plan(conv_id)
             if plan_steps:
-                plan_ctx = render_task_steps(plan_steps)
-                if plan_ctx:
-                    memory_context = (
-                        f"{memory_context}\n\n{plan_ctx}"
-                        if memory_context
-                        else plan_ctx
-                    )
+                task_steps_block = render_task_steps(plan_steps) or None
 
-        # --- inject workspace scope + permission-tier steering ----
-        # Prepended so it LEADS the dynamic context: the model must know which
-        # folders it may touch (else it defaults to the OS home from the env
-        # block and every write lands out of scope) and what its tier permits.
+        # --- workspace scope + permission-tier steering ------------
+        # Leads the dynamic context: the model must know which folders it
+        # may touch (else it defaults to the OS home from the env block and
+        # every write lands out of scope) and what its tier permits.
         # Skipped for the Continuum-scoped agent (its own persona/toolset).
+        perm_block: str | None = None
         if not continuum_scope:
-            perm_ctx = _build_permission_context(ctx, str(conv_id), mode, policy)
-            if perm_ctx:
-                memory_context = (
-                    f"{perm_ctx}\n\n{memory_context}"
-                    if memory_context
-                    else perm_ctx
-                )
+            perm_block = _build_permission_context(
+                ctx, str(conv_id), mode, policy,
+            )
+
+        # --- orchestration contract (agentic prompt contract) ------
+        # Composed ONLY from the usage_guidance of tools actually offered
+        # this turn (post RAG / limiting / mode policy / user opt-out), so
+        # the prompt never teaches a tool the model can't call. Continuum
+        # tools carry no guidance ⇒ block absent there.
+        orchestration_block: str | None = None
+        if tools and ctx.tool_registry is not None:
+            orchestration_block = build_orchestration_block(
+                ctx.tool_registry.usage_guidance_for(tools),
+            )
+
+        memory_context = compose_dynamic_context(
+            permission_block=perm_block,
+            orchestration_block=orchestration_block,
+            aux_context="\n\n".join(aux_parts) if aux_parts else None,
+            plan_document_block=plan_doc_block,
+            task_steps_block=task_steps_block,
+        )
 
         # --- call LLM (streaming) ---------------------------------
         # Build system prompt once for the entire request — reused

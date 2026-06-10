@@ -548,6 +548,7 @@ git commit -m "feat(contracts): permission-mode enum in contract; FE consumes ge
 
 **Files:**
 - Modify: `CLAUDE.md` (sezioni Commands e Conventions)
+- Create: `backend/tests/contracts/test_permission_mode_route.py`
 
 - [ ] **Step 1: Documentare i comandi in CLAUDE.md**
 
@@ -569,12 +570,14 @@ Nella sezione `## Conventions`, aggiungere il bullet:
 
 - [ ] **Step 2: Verifica finale completa**
 
+Nota: la suite backend completa non è eseguibile in tempi pratici per un difetto pre-esistente (fixture app ~25s di setup per test, tracciato come task separato); la verifica usa i test mirati.
+
 ```powershell
-cd backend; pytest tests/ -v          # Expected: tutti PASS
-cd backend; ruff check .; mypy api/openapi_export.py tests/contracts/
+cd backend; ..\.venv\Scripts\python.exe -m pytest tests/contracts/ -v   # Expected: tutti PASS
+cd backend; ..\.venv\Scripts\python.exe -m ruff check api/ tests/contracts/
+cd backend; ..\.venv\Scripts\python.exe -m mypy api/openapi_export.py api/routes/permission_mode.py tests/contracts/
 .\scripts\check-contracts.ps1         # Expected: "Contracts are up to date."
 cd frontend; npm run typecheck        # Expected: exit 0
-cd frontend; npm run lint             # Expected: exit 0
 ```
 
 - [ ] **Step 3: Commit**

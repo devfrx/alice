@@ -339,14 +339,17 @@ In `frontend/eslint.config.mjs` riga 8, sostituire:
 con:
 
 ```js
-  { ignores: ['**/node_modules', '**/dist', '**/out', 'src/renderer/src/types/generated'] },
+  { ignores: ['**/node_modules', '**/dist', '**/out', 'src/renderer/src/types/generated/api.d.ts'] },
 ```
 
-In `frontend/.prettierignore` aggiungere in coda la riga:
+In `frontend/.prettierignore` aggiungere in coda le righe:
 
 ```
-src/renderer/src/types/generated
+src/renderer/src/types/generated/openapi.json
+src/renderer/src/types/generated/api.d.ts
 ```
+
+(Nota: `index.ts` è il file scritto a mano e deve restare sotto lint e prettier.)
 
 - [ ] **Step 4: Creare lo script di rigenerazione**
 
@@ -360,6 +363,7 @@ Creare `scripts/gen-contracts.ps1`:
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path $python)) { throw "venv python not found at $python - run scripts\setup.ps1 first" }
 $schemaPath = Join-Path $repoRoot "frontend\src\renderer\src\types\generated\openapi.json"
 
 Push-Location $repoRoot
@@ -388,6 +392,7 @@ Creare `scripts/check-contracts.ps1`:
 ```powershell
 # Fails when the committed contract artifacts are stale (i.e. regenerating
 # them produces a diff). Intended as a local/CI gate.
+# NOTE: never hand-merge the generated files on conflicts - regenerate instead.
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
@@ -395,9 +400,14 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 Push-Location $repoRoot
 try {
-    $dirty = git status --porcelain -- frontend/src/renderer/src/types/generated
+    $generated = @(
+        "frontend/src/renderer/src/types/generated/openapi.json",
+        "frontend/src/renderer/src/types/generated/api.d.ts"
+    )
+    $dirty = git status --porcelain -- $generated
+    if ($LASTEXITCODE -ne 0) { throw "git status failed (exit $LASTEXITCODE)" }
     if ($dirty) {
-        Write-Host $dirty
+        $dirty | Write-Host
         throw "Contract artifacts are stale: run scripts/gen-contracts.ps1 and commit the result."
     }
 } finally {

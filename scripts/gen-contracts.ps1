@@ -5,6 +5,7 @@
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path $python)) { throw "venv python not found at $python - run scripts\setup.ps1 first" }
 $schemaPath = Join-Path $repoRoot "frontend\src\renderer\src\types\generated\openapi.json"
 
 Push-Location $repoRoot

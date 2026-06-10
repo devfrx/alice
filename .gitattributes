@@ -1,1 +1,2 @@
-frontend/src/renderer/src/types/generated/** -text
+frontend/src/renderer/src/types/generated/openapi.json -text linguist-generated=true
+frontend/src/renderer/src/types/generated/api.d.ts -text linguist-generated=true

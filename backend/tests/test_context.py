@@ -57,7 +57,12 @@ def llm_config() -> LLMConfig:
 
 @pytest.fixture
 def cm(llm_config: LLMConfig) -> ContextManager:
-    return ContextManager(llm_config)
+    manager = ContextManager(llm_config)
+    # Pin the deterministic char÷4 fallback: the token arithmetic in these
+    # tests ("a" * 100 == 25, "x" * 400 ≈ 100 tokens) assumes the heuristic,
+    # while production prefers tiktoken when installed.
+    manager._enc = None
+    return manager
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +80,19 @@ def test_estimate_tokens_short_string(cm: ContextManager) -> None:
 
 def test_estimate_tokens_normal(cm: ContextManager) -> None:
     assert cm.estimate_tokens("a" * 100) == 25
+
+
+def test_estimate_tokens_uses_tiktoken_when_available(
+    llm_config: LLMConfig,
+) -> None:
+    """With tiktoken installed, counts come from the o200k_base encoder."""
+    tiktoken = pytest.importorskip("tiktoken")
+    manager = ContextManager(llm_config)
+    if manager._enc is None:
+        pytest.skip("o200k_base encoding unavailable")
+    text = "The quick brown fox jumps over the lazy dog."
+    expected = len(tiktoken.get_encoding("o200k_base").encode(text))
+    assert manager.estimate_tokens(text) == max(1, expected)
 
 
 # ---------------------------------------------------------------------------

@@ -18,12 +18,12 @@ const now = useClock()
 const parts = computed(() => {
   const list: string[] = [
     now.value.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }),
-    now.value.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+    now.value.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
   ]
   if (props.nextEvent) {
     const hm = new Date(props.nextEvent.start_time).toLocaleTimeString('it-IT', {
       hour: '2-digit',
-      minute: '2-digit',
+      minute: '2-digit'
     })
     list.push(`${props.nextEvent.title} alle ${hm}`)
   }

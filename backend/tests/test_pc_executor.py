@@ -194,6 +194,7 @@ class TestExecCommand:
             "cmd.exe",
             ["/c", "move", "C:\\Users\\Jays\\Desktop\\file.jpg",
              "C:\\Users\\Jays\\Desktop\\immagini"],
+            cwd=None,
         )
 
     @patch("backend.plugins.pc_automation.executor._lockout")
@@ -210,6 +211,7 @@ class TestExecCommand:
         mock_subprocess.assert_called_once_with(
             "cmd.exe",
             ["/c", "move", "C:\\Users\\Jays\\Desktop\\my file.jpg", "C:\\target"],
+            cwd=None,
         )
 
 

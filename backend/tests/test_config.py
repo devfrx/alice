@@ -83,7 +83,8 @@ def test_plugins_enabled_list(config: AliceConfig) -> None:
     assert "memory" in enabled
     assert "mcp_client" in enabled
     assert "agent" in enabled
-    assert len(enabled) == 19
+    assert "terminal" in enabled
+    assert len(enabled) == 20
 
 
 def test_stt_defaults(config: AliceConfig) -> None:

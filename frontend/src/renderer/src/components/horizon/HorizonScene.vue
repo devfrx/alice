@@ -15,7 +15,7 @@ const props = withDefaults(
     /** Dim the whole scene (a dialog is in front). */
     dimmed?: boolean
   }>(),
-  { magazine: false, dimmed: false },
+  { magazine: false, dimmed: false }
 )
 
 /** Line vertical quota per state (fraction of scene height). */
@@ -24,7 +24,7 @@ const QUOTAS: Record<HorizonState, number> = {
   listening: 0.6,
   responding: 0.64,
   working: 0.5,
-  presenting: 0.26,
+  presenting: 0.26
 }
 
 const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))

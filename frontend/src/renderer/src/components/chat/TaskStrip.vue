@@ -320,7 +320,7 @@ watch(
 .task-strip__progress {
   width: 100%;
   height: 3px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--surface-3);
   overflow: hidden;
 }

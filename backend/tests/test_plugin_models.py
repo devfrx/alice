@@ -205,6 +205,39 @@ class TestToolDefinition:
             td.description = "other"  # type: ignore[misc]
 
 
+class TestToolDefinitionOrchestrationFields:
+    """New declarative fields for the agentic prompt contract."""
+
+    def test_defaults(self) -> None:
+        """Plain tools are neither always-offered nor guidance-bearing."""
+        tool = ToolDefinition(name="plain_tool", description="A tool")
+        assert tool.always_offered is False
+        assert tool.usage_guidance is None
+
+    def test_fields_settable(self) -> None:
+        tool = ToolDefinition(
+            name="meta_tool",
+            description="A meta tool",
+            always_offered=True,
+            usage_guidance="Usalo sempre prima di iniziare.",
+        )
+        assert tool.always_offered is True
+        assert tool.usage_guidance == "Usalo sempre prima di iniziare."
+
+    def test_usage_guidance_not_in_openai_format(self) -> None:
+        """Guidance is prompt-side only — never serialised into the schema."""
+        tool = ToolDefinition(
+            name="meta_tool",
+            description="A meta tool",
+            always_offered=True,
+            usage_guidance="Regola vincolante.",
+        )
+        payload = tool.to_openai_format()
+        assert "usage_guidance" not in payload["function"]
+        assert "always_offered" not in payload["function"]
+        assert payload["function"]["name"] == "meta_tool"
+
+
 # ===================================================================
 # ToolResult
 # ===================================================================

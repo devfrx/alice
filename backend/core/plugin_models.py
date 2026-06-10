@@ -79,6 +79,19 @@ class ToolDefinition:
             paths (e.g. ``("path",)``, ``("cwd",)``). The permission layer
             resolves these against the active scope to decide allow/deny — so
             confinement is generic, not per-plugin.
+        always_offered: When ``True`` the tool survives every toolset
+            *selection* pass — it is included alongside tool-RAG hits,
+            never cut by ``limit_tools`` and exempt from the capability
+            drop of ``apply_mode_policy``. It is still subject to
+            connection-status filtering and to the user's explicit
+            per-chat opt-out (``exclude_disabled``). Meant for the agent
+            meta-tools, whose presence is part of the protocol surface
+            rather than a relevance question.
+        usage_guidance: Optional system-prompt fragment (markdown,
+            imperative, a few lines) teaching the model WHEN and HOW to
+            use this tool. Collected for the tools actually offered in a
+            turn and composed into the ``[ORCHESTRAZIONE]`` block — never
+            serialised into the OpenAI schema.
     """
 
     name: str
@@ -97,6 +110,8 @@ class ToolDefinition:
     user_interaction: bool = False
     capabilities: tuple[str, ...] = ()
     path_args: tuple[str, ...] = ()
+    always_offered: bool = False
+    usage_guidance: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.parameters, dict):

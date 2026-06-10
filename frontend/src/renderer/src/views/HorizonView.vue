@@ -6,6 +6,7 @@
  * scene markup beyond composition.
  */
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import HorizonPlan from '../components/horizon/HorizonPlan.vue'
 import HorizonScene from '../components/horizon/HorizonScene.vue'
 import HorizonLine from '../components/horizon/HorizonLine.vue'
 import HorizonMasthead from '../components/horizon/HorizonMasthead.vue'
@@ -20,6 +21,7 @@ import { useModal } from '../composables/useModal'
 import {
   deriveSceneState,
   deriveLineMode,
+  planView,
   type HorizonSceneInputs
 } from '../composables/horizon/horizonScene'
 import { useChatStore } from '../stores/chat'
@@ -133,6 +135,25 @@ const showResponse = computed(
       (sceneState.value === 'quiet' && !composerActive.value))
 )
 
+const plan = computed(() => planView(planSteps.value))
+
+/* Ephemeral tool annotation: latest active tool name, faded after 2.5 s. */
+const toolAnnotation = ref('')
+let annotationTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => chatStore.activeToolExecutions.map((t) => t.toolName).join(','),
+  () => {
+    const tools = chatStore.activeToolExecutions
+    const last = tools[tools.length - 1]
+    if (!last) return
+    toolAnnotation.value = last.toolName
+    if (annotationTimer) clearTimeout(annotationTimer)
+    annotationTimer = setTimeout(() => {
+      toolAnnotation.value = ''
+    }, 2500)
+  }
+)
+
 const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
 const pendingAskUserList = computed(() => Object.values(chatStore.pendingAskUser))
 const sceneDimmed = computed(
@@ -224,9 +245,13 @@ watch(
 // Conversation switch: pacing and layout never leak across conversations.
 watch(
   () => chatStore.currentConversation?.id,
-  () => {
+  (id) => {
     resetPacer()
     magazine.value = false
+    if (id)
+      tasksStore.ensureForConversation(id).catch(() => {
+        /* timeline stays empty */
+      })
   }
 )
 
@@ -278,6 +303,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   calendarStore.stopPolling()
   window.removeEventListener('keydown', onGlobalKeydown)
+  if (annotationTimer) clearTimeout(annotationTimer)
 })
 
 // Suppress unused-variable warnings for vars wired in later tasks (11).
@@ -313,15 +339,31 @@ void answerAskUser
           :user-query="lastUserQuery"
           :compact="sceneState === 'presenting'"
         />
+        <p v-if="sceneState === 'working' && plan.statusSentence" class="horizon-view__status">
+          <em>{{ plan.statusSentence }}</em>
+        </p>
       </template>
 
       <template #line>
         <!-- dimmed → "embers" when the chat socket is down (spec §3.6) -->
-        <HorizonLine :mode="lineMode" :audio-level="voiceStore.audioLevel" :dimmed="!isConnected" />
+        <HorizonLine
+          :mode="lineMode"
+          :audio-level="voiceStore.audioLevel"
+          :notch-count="sceneState === 'working' ? planSteps.length : 0"
+          :active-index="plan.activeIndex"
+          :dimmed="!isConnected"
+        />
       </template>
 
       <template #lower>
         <!-- ANCHOR: lower-zone -->
+        <HorizonPlan
+          v-if="sceneState === 'working' && planSteps.length > 0"
+          :steps="planSteps"
+          :active-index="plan.activeIndex"
+          :completed="plan.completed"
+          :annotation="toolAnnotation"
+        />
         <HorizonResponse
           v-if="showResponse && magazine"
           v-model:magazine="magazine"
@@ -374,5 +416,14 @@ void answerAskUser
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.horizon-view__status {
+  margin: 0 0 clamp(20px, 4vh, 48px);
+  font-family: var(--hz-serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(17px, 2.4vmin, 24px);
+  color: var(--hz-ink);
 }
 </style>

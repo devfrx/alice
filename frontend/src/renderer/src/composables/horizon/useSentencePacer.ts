@@ -5,19 +5,29 @@
  * (including any unterminated tail) is flushed at once.
  *
  * `immediate: true` (reduced motion) mirrors the source verbatim.
+ *
+ * Contract: `source` must only append within a turn, or reset to '' at a turn
+ * boundary.
  */
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 
 /** Split text into terminated sentences + the unterminated rest. */
-export function segmentSentences(text: string): { sentences: string[]; rest: string } {
+export function segmentSentences(text: string): {
+  sentences: string[]
+  rest: string
+  /** End offset (exclusive) of each sentence in the ORIGINAL string. */
+  ends: number[]
+} {
   const sentences: string[] = []
+  const ends: number[] = []
   const re = /[^.!?…]*[.!?…]+(?:\s+|$)/g
   let consumed = 0
   for (const m of text.matchAll(re)) {
     sentences.push(m[0].trim())
     consumed = (m.index ?? 0) + m[0].length
+    ends.push(consumed)
   }
-  return { sentences, rest: text.slice(consumed).trim() }
+  return { sentences, rest: text.slice(consumed).trim(), ends }
 }
 
 export interface SentencePacerOptions {
@@ -59,14 +69,19 @@ export function useSentencePacer(
   }
 
   function commitNext(): void {
-    const { sentences } = segmentSentences(source.value)
-    if (shown < sentences.length) {
+    const { ends } = segmentSentences(source.value)
+    if (shown < ends.length) {
       shown += 1
-      displayed.value = sentences.slice(0, shown).join(' ')
+      displayed.value = source.value.slice(0, ends[shown - 1]).trimEnd()
     }
     if (!streaming.value) flush()
   }
 
+  /**
+   * Starts the interval on first call; subsequent calls are no-ops.
+   * The first sentence appears after one full interval — an intentional
+   * reading "breath" before text materializes.
+   */
   function ensureTimer(): void {
     if (!timer) timer = setInterval(commitNext, intervalMs)
   }

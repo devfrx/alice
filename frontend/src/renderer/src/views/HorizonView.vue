@@ -12,7 +12,9 @@ import HorizonMasthead from '../components/horizon/HorizonMasthead.vue'
 import HorizonQuiet from '../components/horizon/HorizonQuiet.vue'
 import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
+import HorizonResponse from '../components/horizon/HorizonResponse.vue'
 import { ChatApiKey } from '../composables/useChat'
+import { useSentencePacer } from '../composables/horizon/useSentencePacer'
 import { useVoice } from '../composables/useVoice'
 import { useModal } from '../composables/useModal'
 import {
@@ -57,6 +59,12 @@ const composerActive = ref(false)
 const stageOpen = ref(false)
 const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
 
+const magazine = ref(false)
+
+const reducedMotion =
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+
 /* ── ANCHOR: derived ── */
 const planSteps = computed(() => {
   const id = chatStore.currentConversation?.id
@@ -80,6 +88,45 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
 
 const sceneState = computed(() => deriveSceneState(sceneInputs.value))
 const lineMode = computed(() => deriveLineMode(sceneState.value, sceneInputs.value))
+
+const { displayed: pacedStream, reset: resetPacer } = useSentencePacer(
+  computed(() => chatStore.currentStreamContent),
+  computed(() => chatStore.isStreamingCurrentConversation),
+  { immediate: reducedMotion }
+)
+
+/** Last completed assistant message (shown in quiet until a new turn). */
+const lastResponse = computed(() => {
+  const msgs = chatStore.messages
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'assistant' && msgs[i].content.trim()) return msgs[i].content
+  }
+  return ''
+})
+
+/** Last user message, echoed in small caps below the line. */
+const lastUserQuery = computed(() => {
+  const msgs = chatStore.messages
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'user' && msgs[i].content.trim()) return msgs[i].content
+  }
+  return ''
+})
+
+/** What the response component shows per state. */
+const responseText = computed(() => {
+  if (sceneState.value === 'responding') return pacedStream.value || lastResponse.value
+  if (sceneState.value === 'quiet' || sceneState.value === 'presenting') return lastResponse.value
+  return ''
+})
+
+const showResponse = computed(
+  () =>
+    responseText.value !== '' &&
+    (sceneState.value === 'responding' ||
+      sceneState.value === 'presenting' ||
+      (sceneState.value === 'quiet' && !composerActive.value))
+)
 
 const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
 const pendingAskUserList = computed(() => Object.values(chatStore.pendingAskUser))
@@ -153,6 +200,46 @@ watch(
   }
 )
 
+// New turn: reset pacing + magazine when a fresh stream starts.
+watch(
+  () => chatStore.isStreamingCurrentConversation,
+  (streaming, was) => {
+    if (streaming && !was) {
+      resetPacer()
+      magazine.value = false
+    }
+  }
+)
+
+// TTS auto-speak when streaming completes (lifted from the legacy view).
+let wasStreamingHere = false
+watch(
+  () => chatStore.isStreamingCurrentConversation,
+  (streaming) => {
+    if (streaming) {
+      wasStreamingHere = true
+      return
+    }
+    if (!wasStreamingHere) return
+    wasStreamingHere = false
+    if (!voiceStore.autoTtsResponse || !voiceStore.ttsAvailable || !voiceStore.connected) return
+    const msgs = chatStore.messages
+    let lastUserIdx = -1
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+    const allContent = msgs
+      .slice(lastUserIdx + 1)
+      .filter((m) => m.role === 'assistant' && m.content.trim())
+      .map((m) => m.content.trim())
+      .join('\n')
+    if (allContent) speak(allContent)
+  }
+)
+
 /* ── ANCHOR: lifecycle ── */
 onMounted(() => {
   connectVoice()
@@ -174,15 +261,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
 })
 
-// Suppress unused-variable warnings for vars wired in later tasks (7, 11).
+// Suppress unused-variable warnings for vars wired in later tasks (11).
 void respondToConfirmation
 void answerAskUser
-void speak
 </script>
 
 <template>
   <div class="horizon-view" aria-label="Assistente" @click="handleSceneClick">
-    <HorizonScene :state="sceneState" :dimmed="sceneDimmed">
+    <HorizonScene :state="sceneState" :magazine="magazine" :dimmed="sceneDimmed">
       <template #masthead>
         <HorizonMasthead :connected="isConnected" />
       </template>
@@ -190,7 +276,7 @@ void speak
       <template #upper>
         <!-- ANCHOR: upper-zone -->
         <Transition name="hz-soft">
-          <HorizonQuiet v-if="sceneState === 'quiet' && !composerActive" />
+          <HorizonQuiet v-if="sceneState === 'quiet' && !composerActive && !lastResponse" />
         </Transition>
         <HorizonComposer
           ref="composerRef"
@@ -201,6 +287,13 @@ void speak
           :disabled="chatStore.isStreamingCurrentConversation"
           @send="handleComposerSend"
         />
+        <HorizonResponse
+          v-if="showResponse"
+          v-model:magazine="magazine"
+          :text="responseText"
+          :user-query="lastUserQuery"
+          :compact="sceneState === 'presenting'"
+        />
       </template>
 
       <template #line>
@@ -210,6 +303,9 @@ void speak
 
       <template #lower>
         <!-- ANCHOR: lower-zone -->
+        <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
+          {{ lastUserQuery }}
+        </p>
         <HorizonColophon
           v-if="sceneState !== 'presenting'"
           :next-event="calendarStore.nextEvent"
@@ -239,5 +335,18 @@ void speak
 .hz-soft-enter-from,
 .hz-soft-leave-to {
   opacity: 0;
+}
+
+.horizon-view__echo {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--hz-ink-faint);
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

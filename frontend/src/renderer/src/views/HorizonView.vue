@@ -11,6 +11,7 @@ import HorizonLine from '../components/horizon/HorizonLine.vue'
 import HorizonMasthead from '../components/horizon/HorizonMasthead.vue'
 import HorizonQuiet from '../components/horizon/HorizonQuiet.vue'
 import HorizonColophon from '../components/horizon/HorizonColophon.vue'
+import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useVoice } from '../composables/useVoice'
 import {
@@ -51,6 +52,7 @@ const {
 /* ── ANCHOR: local-state ── */
 const composerActive = ref(false)
 const stageOpen = ref(false)
+const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
 
 /* ── ANCHOR: derived ── */
 const planSteps = computed(() => {
@@ -104,6 +106,35 @@ function handleSceneClick(event: MouseEvent): void {
   }
 }
 
+/** Sends typed text; collapses the composer. */
+async function handleComposerSend(content: string): Promise<void> {
+  composerActive.value = false
+  await send(content).catch(console.error)
+}
+
+/**
+ * Global key capture: Esc walks the interrupt chain; any printable first
+ * character materializes the composer (Jarvis entry — no visible input box).
+ */
+function onGlobalKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') {
+    if (voiceStore.isSpeaking) cancelSpeak()
+    else if (chatStore.isStreamingCurrentConversation) stopGeneration()
+    else if (stageOpen.value) stageOpen.value = false
+    else composerActive.value = false
+    return
+  }
+  if (composerActive.value) return
+  const tgt = e.target as HTMLElement | null
+  if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable))
+    return
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    composerActive.value = true
+    composerRef.value?.seed(e.key)
+  }
+}
+
 /* ── ANCHOR: voice-wiring ── */
 // Auto-send the STT transcript when confirmation is disabled.
 watch(
@@ -129,17 +160,18 @@ onMounted(() => {
       /* timeline simply stays empty */
     })
   }
+  window.addEventListener('keydown', onGlobalKeydown)
 })
 
 onBeforeUnmount(() => {
   calendarStore.stopPolling()
+  window.removeEventListener('keydown', onGlobalKeydown)
 })
 
 // Suppress unused-variable warnings for vars wired in later tasks (7, 11).
 void respondToConfirmation
 void answerAskUser
 void speak
-void transcript
 </script>
 
 <template>
@@ -152,8 +184,18 @@ void transcript
       <template #upper>
         <!-- ANCHOR: upper-zone -->
         <Transition name="hz-soft">
-          <HorizonQuiet v-if="sceneState === 'quiet'" />
+          <HorizonQuiet v-if="sceneState === 'quiet' && !composerActive" />
         </Transition>
+        <HorizonComposer
+          ref="composerRef"
+          :active="composerActive"
+          :listening="voiceStore.isListening"
+          :stt-processing="voiceStore.isProcessing"
+          :transcript="transcript"
+          :disabled="chatStore.isStreamingCurrentConversation"
+          @send="handleComposerSend"
+          @close="composerActive = false"
+        />
       </template>
 
       <template #line>

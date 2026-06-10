@@ -9,6 +9,7 @@
  */
 import { computed, watch } from 'vue'
 import { renderMarkdown } from '../../composables/useMarkdown'
+import { useCodeBlocks } from '../../composables/useCodeBlocks'
 
 const props = defineProps<{
   text: string
@@ -24,11 +25,17 @@ const MAGAZINE_THRESHOLD = 5
 
 const sentenceCount = computed(() => (props.text.match(/[.!?…]+(\s|$)/g) ?? []).length)
 
-watch(sentenceCount, (n) => {
-  if (n > MAGAZINE_THRESHOLD && !props.magazine) emit('update:magazine', true)
-})
+watch(
+  sentenceCount,
+  (n) => {
+    if (n > MAGAZINE_THRESHOLD && !props.magazine) emit('update:magazine', true)
+  },
+  { immediate: true }
+)
 
 const html = computed(() => renderMarkdown(props.text))
+
+const { handleCodeBlockClick } = useCodeBlocks()
 </script>
 
 <template>
@@ -37,7 +44,7 @@ const html = computed(() => renderMarkdown(props.text))
     :class="{ 'hz-response--magazine': magazine, 'hz-response--compact': compact }"
   >
     <!-- eslint-disable-next-line vue/no-v-html -->
-    <div class="hz-response__body" v-html="html" />
+    <div class="hz-response__body markdown-body" @click="handleCodeBlockClick" v-html="html" />
   </div>
 </template>
 
@@ -70,6 +77,7 @@ const html = computed(() => renderMarkdown(props.text))
 
 /* ── magazine: long answers become a reading column ── */
 .hz-response--magazine {
+  width: min(86%, 760px);
   flex: 1;
   min-height: 0;
   overflow-y: auto;

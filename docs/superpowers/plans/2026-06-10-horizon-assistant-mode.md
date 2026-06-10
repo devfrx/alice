@@ -1704,9 +1704,13 @@ const MAGAZINE_THRESHOLD = 5
 
 const sentenceCount = computed(() => (props.text.match(/[.!?…]+(\s|$)/g) ?? []).length)
 
-watch(sentenceCount, (n) => {
-  if (n > MAGAZINE_THRESHOLD && !props.magazine) emit('update:magazine', true)
-})
+watch(
+  sentenceCount,
+  (n) => {
+    if (n > MAGAZINE_THRESHOLD && !props.magazine) emit('update:magazine', true)
+  },
+  { immediate: true },
+)
 
 const html = computed(() => renderMarkdown(props.text))
 </script>
@@ -1836,7 +1840,12 @@ const lastUserQuery = computed(() => {
 
 /** What the response component shows per state. */
 const responseText = computed(() => {
-  if (sceneState.value === 'responding') return pacedStream.value || lastResponse.value
+  if (sceneState.value === 'responding') {
+    // While streaming: only the paced stream (the previous answer must not
+    // flash at turn start). Responding via TTS after the stream: the
+    // committed message is the source of truth.
+    return chatStore.isStreamingCurrentConversation ? pacedStream.value : lastResponse.value
+  }
   if (sceneState.value === 'quiet' || sceneState.value === 'presenting') return lastResponse.value
   return ''
 })
@@ -1861,6 +1870,15 @@ watch(
       resetPacer()
       magazine.value = false
     }
+  },
+)
+
+// Conversation switch: pacing and layout never leak across conversations.
+watch(
+  () => chatStore.currentConversation?.id,
+  () => {
+    resetPacer()
+    magazine.value = false
   },
 )
 
@@ -1894,11 +1912,11 @@ watch(
 )
 ```
 
-e) Template — in the upper zone, after the `HorizonComposer` element, add:
+e) Template — in the upper zone, after the `HorizonComposer` element, add the stage-layout instance (magazine flows below the line instead — see step f):
 
 ```vue
         <HorizonResponse
-          v-if="showResponse"
+          v-if="showResponse && !magazine"
           v-model:magazine="magazine"
           :text="responseText"
           :user-query="lastUserQuery"
@@ -1912,9 +1930,16 @@ Replace the `HorizonQuiet` condition so the greeting only shows on a virgin scen
           <HorizonQuiet v-if="sceneState === 'quiet' && !composerActive && !lastResponse" />
 ```
 
-f) Template — in the lower zone, before the colophon, add the query echo:
+f) Template — in the lower zone, the magazine instance first (long answers read below the risen line, filling the lower zone), then the query echo, before the colophon:
 
 ```vue
+        <HorizonResponse
+          v-if="showResponse && magazine"
+          v-model:magazine="magazine"
+          :text="responseText"
+          :user-query="lastUserQuery"
+          :compact="sceneState === 'presenting'"
+        />
         <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
           {{ lastUserQuery }}
         </p>

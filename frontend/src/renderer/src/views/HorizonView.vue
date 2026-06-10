@@ -115,7 +115,12 @@ const lastUserQuery = computed(() => {
 
 /** What the response component shows per state. */
 const responseText = computed(() => {
-  if (sceneState.value === 'responding') return pacedStream.value || lastResponse.value
+  if (sceneState.value === 'responding') {
+    // While streaming: only the paced stream (the previous answer must not
+    // flash at turn start). Responding via TTS after the stream: the
+    // committed message is the source of truth.
+    return chatStore.isStreamingCurrentConversation ? pacedStream.value : lastResponse.value
+  }
   if (sceneState.value === 'quiet' || sceneState.value === 'presenting') return lastResponse.value
   return ''
 })
@@ -141,7 +146,12 @@ function handleSceneClick(event: MouseEvent): void {
   // every click to this wrapper — never treat those as voice toggles.
   if (sceneDimmed.value) return
   const tgt = event.target as HTMLElement | null
-  if (tgt?.closest('button, a, input, textarea, [contenteditable], .hz-stage, .hz-history')) return
+  if (
+    tgt?.closest(
+      'button, a, input, textarea, [contenteditable], .hz-stage, .hz-history, .hz-response'
+    )
+  )
+    return
   if (voiceStore.isSpeaking) {
     cancelSpeak()
   } else if (chatStore.isStreamingCurrentConversation) {
@@ -208,6 +218,15 @@ watch(
       resetPacer()
       magazine.value = false
     }
+  }
+)
+
+// Conversation switch: pacing and layout never leak across conversations.
+watch(
+  () => chatStore.currentConversation?.id,
+  () => {
+    resetPacer()
+    magazine.value = false
   }
 )
 
@@ -288,7 +307,7 @@ void answerAskUser
           @send="handleComposerSend"
         />
         <HorizonResponse
-          v-if="showResponse"
+          v-if="showResponse && !magazine"
           v-model:magazine="magazine"
           :text="responseText"
           :user-query="lastUserQuery"
@@ -303,6 +322,13 @@ void answerAskUser
 
       <template #lower>
         <!-- ANCHOR: lower-zone -->
+        <HorizonResponse
+          v-if="showResponse && magazine"
+          v-model:magazine="magazine"
+          :text="responseText"
+          :user-query="lastUserQuery"
+          :compact="sceneState === 'presenting'"
+        />
         <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
           {{ lastUserQuery }}
         </p>

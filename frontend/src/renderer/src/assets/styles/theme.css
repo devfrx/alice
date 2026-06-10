@@ -44,7 +44,7 @@
 
 /* ── Accent — Warm Cream "Panna" ───────────────────────────── */
 :root {
-  --accent: #E8DCC8;                           /* Primary cream accent */
+  --accent: #E8DCC8;                           /* Primary cream accent — mirrored as --hz-line-rgb in horizon.css */
   --accent-hover: #F5EDE0;                     /* Lighter cream on hover */
   --accent-dim: rgba(232, 220, 200, 0.10);    /* Subtle cream fill */
   --accent-border: rgba(232, 220, 200, 0.20); /* Cream border */
@@ -541,7 +541,7 @@ h1, h2, h3, h4, h5, h6, .u-display {
   --text-muted: #9E9890;                       /* Warm gray */
 
   /* ── Accent — Taupe Mocha ────────────────────────────────── */
-  --accent: #8C6A4A;                           /* Taupe Mocha — rgb(140,106,74) */
+  --accent: #8C6A4A;                           /* Taupe Mocha — rgb(140,106,74); mirrored as --hz-line-rgb in horizon.css */
   --accent-hover: #73553A;                     /* Darker on hover */
   --accent-dim: rgba(140, 106, 74, 0.10);
   --accent-border: rgba(140, 106, 74, 0.25);

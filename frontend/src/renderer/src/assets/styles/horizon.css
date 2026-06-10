@@ -12,7 +12,7 @@
   src: url('../fonts/Fraunces-Variable.ttf') format('truetype-variations');
   font-weight: 100 900;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 @font-face {
@@ -20,7 +20,7 @@
   src: url('../fonts/Fraunces-Italic-Variable.ttf') format('truetype-variations');
   font-weight: 100 900;
   font-style: italic;
-  font-display: swap;
+  font-display: block;
 }
 
 :root {
@@ -42,7 +42,7 @@
   --hz-breath: 6s;
 }
 
-[data-theme='light'] {
+[data-theme="light"] {
   /* --accent (#8C6A4A) decomposed */
   --hz-line-rgb: 140, 106, 74;
 }

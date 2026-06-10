@@ -146,7 +146,7 @@ watch(
     const tools = chatStore.activeToolExecutions
     const last = tools[tools.length - 1]
     if (!last) return
-    toolAnnotation.value = last.toolName
+    toolAnnotation.value = last.toolName.replace(/_/g, ' ')
     if (annotationTimer) clearTimeout(annotationTimer)
     annotationTimer = setTimeout(() => {
       toolAnnotation.value = ''
@@ -420,10 +420,12 @@ void answerAskUser
 
 .horizon-view__status {
   margin: 0 0 clamp(20px, 4vh, 48px);
+  max-width: min(60ch, 80%);
   font-family: var(--hz-serif);
   font-style: italic;
   font-weight: 300;
   font-size: clamp(17px, 2.4vmin, 24px);
   color: var(--hz-ink);
+  text-align: center;
 }
 </style>

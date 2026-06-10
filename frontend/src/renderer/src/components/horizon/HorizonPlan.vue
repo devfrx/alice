@@ -29,8 +29,11 @@ function shortLabel(step: TaskStep): string {
 <template>
   <div class="hz-plan">
     <div class="hz-plan__labels">
+      <!-- Past 6 steps the labels would collide: show only the active one
+           (the canvas notches still mark every step; :title keeps full text). -->
       <span
         v-for="(s, i) in steps"
+        v-show="steps.length <= 6 || i === activeIndex"
         :key="i"
         class="hz-plan__label"
         :class="{

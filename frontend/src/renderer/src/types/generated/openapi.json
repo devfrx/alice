@@ -1,0 +1,6316 @@
+{
+  "components": {
+    "schemas": {
+      "ActiveToolsRequest": {
+        "description": "Body for updating the chat tool selection (opt-out list).",
+        "properties": {
+          "disabled_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disabled Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "disabled_tools"
+        ],
+        "title": "ActiveToolsRequest",
+        "type": "object"
+      },
+      "AddObservationsRequest": {
+        "description": "Request body for adding observations to existing entities.",
+        "properties": {
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationInput"
+            },
+            "title": "Observations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "observations"
+        ],
+        "title": "AddObservationsRequest",
+        "type": "object"
+      },
+      "ArtifactKind": {
+        "description": "Type of artifact produced by a tool.\n\nExtend with new members when adding new artifact-producing tools\n(e.g. ``IMAGE``, ``AUDIO``, ``CHART``, ``WHITEBOARD``).  The string\nvalue is what gets persisted in SQLite, so values must remain stable.",
+        "enum": [
+          "cad_3d_text",
+          "cad_3d_image"
+        ],
+        "title": "ArtifactKind",
+        "type": "string"
+      },
+      "ArtifactListResponse": {
+        "description": "Paginated list of artifacts.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ArtifactListResponse",
+        "type": "object"
+      },
+      "ArtifactPinUpdate": {
+        "description": "Body of ``PATCH /api/artifacts/{id}/pin``.",
+        "properties": {
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pinned"
+        ],
+        "title": "ArtifactPinUpdate",
+        "type": "object"
+      },
+      "ArtifactRead": {
+        "description": "Public representation of an :class:`Artifact` row.",
+        "properties": {
+          "artifact_metadata": {
+            "additionalProperties": true,
+            "title": "Artifact Metadata",
+            "type": "object"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "download_url": {
+            "description": "Convenience URL for the binary download endpoint.",
+            "readOnly": true,
+            "title": "Download Url",
+            "type": "string"
+          },
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ArtifactKind"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "mime": {
+            "title": "Mime",
+            "type": "string"
+          },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "file_path",
+          "mime",
+          "size_bytes",
+          "created_at",
+          "updated_at",
+          "download_url"
+        ],
+        "title": "ArtifactRead",
+        "type": "object"
+      },
+      "Body_upload_image_api_chat_upload_post": {
+        "properties": {
+          "conversation_id": {
+            "description": "Target conversation UUID",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Image file (jpg/png/gif/webp)",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "file"
+        ],
+        "title": "Body_upload_image_api_chat_upload_post",
+        "type": "object"
+      },
+      "BranchConversationRequest": {
+        "description": "Request body for branching a conversation.\n\nArgs:\n    from_message_id: UUID of the message to branch from (inclusive).\n        All messages up through this one are copied to the new conversation.\n    title: Optional title override for the new conversation.\n        Defaults to \"{original_title} (diramazione)\".",
+        "properties": {
+          "from_message_id": {
+            "title": "From Message Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "from_message_id"
+        ],
+        "title": "BranchConversationRequest",
+        "type": "object"
+      },
+      "BranchConversationResponse": {
+        "description": "Response from the branch-conversation endpoint.\n\nArgs:\n    id: UUID of the newly created conversation.\n    title: Title of the new conversation.\n    created_at: ISO 8601 timestamp of creation.\n    updated_at: ISO 8601 timestamp of last update.\n    message_count: Number of messages copied into the new conversation.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message_count": {
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "message_count"
+        ],
+        "title": "BranchConversationResponse",
+        "type": "object"
+      },
+      "CreateEntitiesRequest": {
+        "description": "Request body for creating entities.",
+        "properties": {
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityInput"
+            },
+            "title": "Entities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entities"
+        ],
+        "title": "CreateEntitiesRequest",
+        "type": "object"
+      },
+      "CreateEventRequest": {
+        "description": "Body for POST /calendar/events.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "end_time": {
+            "title": "End Time",
+            "type": "string"
+          },
+          "recurrence_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Rule"
+          },
+          "reminder_minutes": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Minutes"
+          },
+          "start_time": {
+            "title": "Start Time",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "start_time",
+          "end_time"
+        ],
+        "title": "CreateEventRequest",
+        "type": "object"
+      },
+      "CreateRelationsRequest": {
+        "description": "Request body for creating relations.",
+        "properties": {
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/RelationInput"
+            },
+            "title": "Relations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "title": "CreateRelationsRequest",
+        "type": "object"
+      },
+      "DeleteEntitiesRequest": {
+        "description": "Request body for deleting entities.",
+        "properties": {
+          "entityNames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entitynames",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entityNames"
+        ],
+        "title": "DeleteEntitiesRequest",
+        "type": "object"
+      },
+      "DeleteObservationItem": {
+        "description": "Observations to remove from an entity.",
+        "properties": {
+          "entityName": {
+            "title": "Entityname",
+            "type": "string"
+          },
+          "observations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Observations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entityName",
+          "observations"
+        ],
+        "title": "DeleteObservationItem",
+        "type": "object"
+      },
+      "DeleteObservationsRequest": {
+        "description": "Request body for deleting observations.",
+        "properties": {
+          "deletions": {
+            "items": {
+              "$ref": "#/components/schemas/DeleteObservationItem"
+            },
+            "title": "Deletions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deletions"
+        ],
+        "title": "DeleteObservationsRequest",
+        "type": "object"
+      },
+      "DeleteRelationsRequest": {
+        "description": "Request body for deleting relations.",
+        "properties": {
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/RelationInput"
+            },
+            "title": "Relations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "title": "DeleteRelationsRequest",
+        "type": "object"
+      },
+      "DownloadModelRequest": {
+        "description": "Body for ``POST /models/download``.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "DownloadModelRequest",
+        "type": "object"
+      },
+      "EntityInput": {
+        "description": "Single entity to create.",
+        "properties": {
+          "entityType": {
+            "title": "Entitytype",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "observations": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Observations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "entityType"
+        ],
+        "title": "EntityInput",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoadModelRequest": {
+        "description": "Body for ``POST /models/load``.",
+        "properties": {
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          },
+          "eval_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Batch Size"
+          },
+          "flash_attention": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flash Attention"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "num_experts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Experts"
+          },
+          "offload_kv_cache_to_gpu": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offload Kv Cache To Gpu"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "LoadModelRequest",
+        "type": "object"
+      },
+      "ModelStatusResponse": {
+        "description": "Response for ``GET /models/status``.",
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "loaded_model_count": {
+            "default": 0,
+            "title": "Loaded Model Count",
+            "type": "integer"
+          },
+          "loaded_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Loaded Models",
+            "type": "array"
+          },
+          "total_model_count": {
+            "default": 0,
+            "title": "Total Model Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "ModelStatusResponse",
+        "type": "object"
+      },
+      "ObservationInput": {
+        "description": "Observations to add to an entity.",
+        "properties": {
+          "contents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contents",
+            "type": "array"
+          },
+          "entityName": {
+            "title": "Entityname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityName",
+          "contents"
+        ],
+        "title": "ObservationInput",
+        "type": "object"
+      },
+      "OpenNodesRequest": {
+        "description": "Request body for opening specific nodes.",
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "title": "OpenNodesRequest",
+        "type": "object"
+      },
+      "PermissionModeResponse": {
+        "description": "The permission tier for a single conversation.\n\nAttributes:\n    conversation_id: The owning conversation id (canonical string form).\n    mode: The tier — ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "mode"
+        ],
+        "title": "PermissionModeResponse",
+        "type": "object"
+      },
+      "PermissionModeUpdateRequest": {
+        "description": "Request body for ``PUT /permission-mode/{conversation_id}``.\n\nAttributes:\n    mode: The new tier (must be a valid :class:`PermissionMode` value).",
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "PermissionModeUpdateRequest",
+        "type": "object"
+      },
+      "PermissionRuleCreateRequest": {
+        "description": "Request body for ``POST /permission-rules/{conversation_id}``.\n\nAttributes:\n    tool_name: The namespaced tool the rule applies to (exact match).\n    effect: ``allow`` / ``ask`` / ``deny``.\n    scope: ``conversation`` (default) ties the rule to this conversation;\n        ``global`` applies it everywhere.",
+        "properties": {
+          "effect": {
+            "title": "Effect",
+            "type": "string"
+          },
+          "scope": {
+            "default": "conversation",
+            "title": "Scope",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_name",
+          "effect"
+        ],
+        "title": "PermissionRuleCreateRequest",
+        "type": "object"
+      },
+      "PermissionRuleOut": {
+        "description": "A persisted permission rule, as returned by the API.",
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "effect": {
+            "title": "Effect",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "tool_name",
+          "effect"
+        ],
+        "title": "PermissionRuleOut",
+        "type": "object"
+      },
+      "PlanDocumentResponse": {
+        "description": "The persisted plan document for a single conversation.\n\nAttributes:\n    conversation_id: The owning conversation id (string form).\n    title: The optional short heading (``\"\"`` when unset).\n    body: The markdown body text (``\"\"`` when unset).\n    updated_at: When the document was last written (``None`` when unset).",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "title",
+          "body",
+          "updated_at"
+        ],
+        "title": "PlanDocumentResponse",
+        "type": "object"
+      },
+      "RelationInput": {
+        "description": "Single relation between entities.",
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "relationType": {
+            "title": "Relationtype",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "relationType"
+        ],
+        "title": "RelationInput",
+        "type": "object"
+      },
+      "ScopeResponse": {
+        "description": "The workspace scope for a single conversation.\n\nAttributes:\n    conversation_id: The owning conversation id (canonical string form).\n    folders: The scope folders as absolute path strings (possibly empty).\n    is_idle: ``True`` when no turn is running for the conversation, i.e.\n        when the mutating verbs would be accepted rather than ``409``-ed.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "folders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Folders",
+            "type": "array"
+          },
+          "is_idle": {
+            "title": "Is Idle",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "folders",
+          "is_idle"
+        ],
+        "title": "ScopeResponse",
+        "type": "object"
+      },
+      "ScopeUpdateRequest": {
+        "description": "Request body for ``PUT /scope/{conversation_id}``.\n\nAttributes:\n    folders: The candidate absolute folder paths to confine tools to.  An\n        empty list clears the scope (equivalent to ``DELETE``).",
+        "properties": {
+          "folders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Folders",
+            "type": "array"
+          }
+        },
+        "title": "ScopeUpdateRequest",
+        "type": "object"
+      },
+      "SystemPromptRequest": {
+        "description": "Body for the system-prompt toggle.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SystemPromptRequest",
+        "type": "object"
+      },
+      "SystemPromptResponse": {
+        "description": "Response after updating system prompt setting.",
+        "properties": {
+          "system_prompt_enabled": {
+            "title": "System Prompt Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "system_prompt_enabled"
+        ],
+        "title": "SystemPromptResponse",
+        "type": "object"
+      },
+      "TasksResponse": {
+        "description": "The persisted task list for a single conversation.\n\nAttributes:\n    conversation_id: The owning conversation id (string form).\n    steps: Ordered ``{\"step\": str, \"status\": str}`` items (possibly empty).",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "steps"
+        ],
+        "title": "TasksResponse",
+        "type": "object"
+      },
+      "TerminalCreateRequest": {
+        "description": "Request body for ``POST /terminal/{conversation_id}``.",
+        "properties": {
+          "assign_to_agent": {
+            "default": false,
+            "title": "Assign To Agent",
+            "type": "boolean"
+          },
+          "cols": {
+            "default": 80,
+            "maximum": 512.0,
+            "minimum": 1.0,
+            "title": "Cols",
+            "type": "integer"
+          },
+          "cwd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwd"
+          },
+          "rows": {
+            "default": 24,
+            "maximum": 512.0,
+            "minimum": 1.0,
+            "title": "Rows",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "TerminalCreateRequest",
+        "type": "object"
+      },
+      "TerminalListResponse": {
+        "description": "The conversation's sessions plus the capability flag.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/TerminalSessionOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "sessions"
+        ],
+        "title": "TerminalListResponse",
+        "type": "object"
+      },
+      "TerminalSessionOut": {
+        "description": "A single live terminal session (mirrors ``TerminalSession.snapshot``).",
+        "properties": {
+          "agent_assigned": {
+            "title": "Agent Assigned",
+            "type": "boolean"
+          },
+          "alive": {
+            "title": "Alive",
+            "type": "boolean"
+          },
+          "cols": {
+            "title": "Cols",
+            "type": "integer"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "title",
+          "cwd",
+          "rows",
+          "cols",
+          "agent_assigned",
+          "created_at",
+          "pid",
+          "alive"
+        ],
+        "title": "TerminalSessionOut",
+        "type": "object"
+      },
+      "TerminalUpdateRequest": {
+        "description": "Request body for ``PATCH /terminal/{conversation_id}/{session_id}``.\n\nBoth fields are optional: set ``title`` to rename, set ``assign_to_agent``\nto ``true`` to make this the conversation's agent session.",
+        "properties": {
+          "assign_to_agent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assign To Agent"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "TerminalUpdateRequest",
+        "type": "object"
+      },
+      "TogglePluginRequest": {
+        "description": "Request body for toggling a plugin.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "TogglePluginRequest",
+        "type": "object"
+      },
+      "ToolCatalogPlugin": {
+        "description": "Tools grouped under their owning plugin.",
+        "properties": {
+          "plugin": {
+            "title": "Plugin",
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCatalogTool"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plugin",
+          "tools"
+        ],
+        "title": "ToolCatalogPlugin",
+        "type": "object"
+      },
+      "ToolCatalogResponse": {
+        "description": "Full catalog plus the gating flags the chat UI needs.",
+        "properties": {
+          "disabled_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disabled Tools",
+            "type": "array"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCatalogPlugin"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "tool_rag_enabled": {
+            "title": "Tool Rag Enabled",
+            "type": "boolean"
+          },
+          "tools_enabled": {
+            "title": "Tools Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tools_enabled",
+          "tool_rag_enabled",
+          "disabled_tools",
+          "plugins"
+        ],
+        "title": "ToolCatalogResponse",
+        "type": "object"
+      },
+      "ToolCatalogTool": {
+        "description": "A single tool entry in the chat tool-picker catalog.",
+        "properties": {
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "description",
+          "enabled"
+        ],
+        "title": "ToolCatalogTool",
+        "type": "object"
+      },
+      "ToolConfirmationsRequest": {
+        "description": "Body for the tool-confirmations toggle.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "ToolConfirmationsRequest",
+        "type": "object"
+      },
+      "ToolConfirmationsResponse": {
+        "description": "Response after updating tool confirmations.",
+        "properties": {
+          "confirmations_enabled": {
+            "title": "Confirmations Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirmations_enabled"
+        ],
+        "title": "ToolConfirmationsResponse",
+        "type": "object"
+      },
+      "ToolsRequest": {
+        "description": "Body for the tools toggle.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "ToolsRequest",
+        "type": "object"
+      },
+      "ToolsResponse": {
+        "description": "Response after updating tools setting.",
+        "properties": {
+          "tools_enabled": {
+            "title": "Tools Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tools_enabled"
+        ],
+        "title": "ToolsResponse",
+        "type": "object"
+      },
+      "UnloadModelRequest": {
+        "description": "Body for ``POST /models/unload``.",
+        "properties": {
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id"
+        ],
+        "title": "UnloadModelRequest",
+        "type": "object"
+      },
+      "UpdateEventRequest": {
+        "description": "Body for PUT /calendar/events/{event_id}.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "recurrence_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Rule"
+          },
+          "reminder_minutes": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Minutes"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateEventRequest",
+        "type": "object"
+      },
+      "UpdateSnapshotRequest": {
+        "description": "Payload for updating a whiteboard snapshot.",
+        "properties": {
+          "snapshot": {
+            "additionalProperties": true,
+            "title": "Snapshot",
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "title": "UpdateSnapshotRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "_ExecuteRequest": {
+        "description": "Body schema for ``POST /plugins/execute``.",
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "plugin": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Plugin",
+            "type": "string"
+          },
+          "tool": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin",
+          "tool"
+        ],
+        "title": "_ExecuteRequest",
+        "type": "object"
+      },
+      "backend__api__routes__email__SearchRequest": {
+        "description": "Payload for email search.",
+        "properties": {
+          "folder": {
+            "default": "INBOX",
+            "title": "Folder",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      },
+      "backend__api__routes__mcp_memory__SearchRequest": {
+        "description": "Request body for searching the knowledge graph.",
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      },
+      "backend__api__routes__memory__SearchRequest": {
+        "description": "Body for POST /memory/search.",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "AL\\CE",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/artifacts": {
+      "get": {
+        "description": "Return a paginated list of artifacts.",
+        "operationId": "list_artifacts_api_artifacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "conversation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ArtifactKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "When true, return only pinned artifacts.",
+            "in": "query",
+            "name": "pinned",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When true, return only pinned artifacts.",
+              "title": "Pinned"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List artifacts",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/artifacts/{artifact_id}": {
+      "delete": {
+        "description": "Delete an artifact and (optionally) its on-disk file.",
+        "operationId": "delete_artifact_api_artifacts__artifact_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "When true, also unlink the file on disk.",
+            "in": "query",
+            "name": "delete_file",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "When true, also unlink the file on disk.",
+              "title": "Delete File",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete an artifact",
+        "tags": [
+          "artifacts"
+        ]
+      },
+      "get": {
+        "description": "Return one artifact by id (404 when missing).",
+        "operationId": "get_artifact_api_artifacts__artifact_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a single artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/artifacts/{artifact_id}/download": {
+      "get": {
+        "description": "Stream the artifact file using its stored MIME type.",
+        "operationId": "download_artifact_api_artifacts__artifact_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download the binary for an artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/artifacts/{artifact_id}/pin": {
+      "patch": {
+        "description": "Toggle the ``pinned`` flag.",
+        "operationId": "pin_artifact_api_artifacts__artifact_id__pin_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactPinUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pin / unpin an artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/audit/confirmations": {
+      "get": {
+        "description": "List tool confirmation audit entries with optional filters.\n\nReturns paginated audit log entries ordered by creation time descending.",
+        "operationId": "list_confirmations_api_audit_confirmations_get",
+        "parameters": [
+          {
+            "description": "Filter by conversation",
+            "in": "query",
+            "name": "conversation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by conversation",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "description": "Filter by tool name",
+            "in": "query",
+            "name": "tool_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tool name",
+              "title": "Tool Name"
+            }
+          },
+          {
+            "description": "Filter by approval status",
+            "in": "query",
+            "name": "approved",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by approval status",
+              "title": "Approved"
+            }
+          },
+          {
+            "description": "Maximum results",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximum results",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Pagination offset",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Pagination offset",
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Confirmations Api Audit Confirmations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Confirmations",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/cad/health": {
+      "get": {
+        "description": "Proxy health check to the TRELLIS microservice.\n\nReturns:\n    ``{\"status\": \"ok\"}`` if reachable, ``{\"status\": \"unreachable\"}``\n    otherwise.",
+        "operationId": "health_api_cad_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Api Cad Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "cad"
+        ]
+      }
+    },
+    "/api/cad/models": {
+      "get": {
+        "description": "List all generated GLB models.\n\nReturns:\n    A dict with a ``models`` key listing available model names.",
+        "operationId": "list_models_api_cad_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Models Api Cad Models Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "cad"
+        ]
+      }
+    },
+    "/api/cad/models/{model_name}": {
+      "get": {
+        "description": "Serve a generated GLB file by name.\n\nArgs:\n    model_name: Alphanumeric model identifier (max 64 chars).\n    request: The incoming HTTP request.\n\nRaises:\n    HTTPException 400: If the model name is invalid.\n    HTTPException 404: If the GLB file does not exist.",
+        "operationId": "get_model_api_cad_models__model_name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_name",
+            "required": true,
+            "schema": {
+              "title": "Model Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model",
+        "tags": [
+          "cad"
+        ]
+      }
+    },
+    "/api/calendar/events": {
+      "get": {
+        "description": "List calendar events within a date range.\n\nArgs:\n    request: FastAPI request.\n    start_date: ISO date string (default: today).\n    end_date: ISO date string (default: 7 days from start).\n    max_results: Maximum events to return.",
+        "operationId": "list_events_api_calendar_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_results",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Max Results",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Events Api Calendar Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Events",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "post": {
+        "description": "Create a new calendar event.",
+        "operationId": "create_event_api_calendar_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Event Api Calendar Events Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Event",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/events/{event_id}": {
+      "delete": {
+        "description": "Delete a calendar event by UUID.",
+        "operationId": "delete_event_api_calendar_events__event_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Event Api Calendar Events  Event Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Event",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "put": {
+        "description": "Update an existing calendar event by UUID.",
+        "operationId": "update_event_api_calendar_events__event_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Event Api Calendar Events  Event Id  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Event",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/today": {
+      "get": {
+        "description": "Return today's events summary.",
+        "operationId": "today_summary_api_calendar_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Today Summary Api Calendar Today Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Today Summary",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/upcoming": {
+      "get": {
+        "description": "Return the next N upcoming events from now.\n\nArgs:\n    request: FastAPI request.\n    limit: Maximum number of events to return.",
+        "operationId": "upcoming_events_api_calendar_upcoming_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Upcoming Events Api Calendar Upcoming Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upcoming Events",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/charts": {
+      "get": {
+        "description": "Restituisce la lista paginata dei grafici, ordinata dal più recente.",
+        "operationId": "list_charts_api_charts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Charts Api Charts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lista grafici salvati",
+        "tags": [
+          "charts"
+        ]
+      }
+    },
+    "/api/charts/{chart_id}": {
+      "delete": {
+        "description": "Elimina il file JSON del grafico dal disco.",
+        "operationId": "delete_chart_api_charts__chart_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chart_id",
+            "required": true,
+            "schema": {
+              "title": "Chart Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Chart Api Charts  Chart Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Elimina un grafico",
+        "tags": [
+          "charts"
+        ]
+      },
+      "get": {
+        "description": "Restituisce il JSON completo della ChartSpec (inclusa echarts_option).",
+        "operationId": "get_chart_api_charts__chart_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chart_id",
+            "required": true,
+            "schema": {
+              "title": "Chart Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recupera la spec completa di un grafico",
+        "tags": [
+          "charts"
+        ]
+      }
+    },
+    "/api/chat/conversations": {
+      "delete": {
+        "description": "Delete ALL conversations, messages, attachments, and associated files.",
+        "operationId": "delete_all_conversations_api_chat_conversations_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete All Conversations Api Chat Conversations Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete All Conversations",
+        "tags": [
+          "chat"
+        ]
+      },
+      "get": {
+        "description": "List all conversations ordered by most recently updated.",
+        "operationId": "list_conversations_api_chat_conversations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Conversations Api Chat Conversations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Conversations",
+        "tags": [
+          "chat"
+        ]
+      },
+      "post": {
+        "description": "Create a new empty conversation and persist it immediately.\n\nAccepts an optional JSON body::\n\n    {\"id\": \"uuid\", \"title\": \"optional title\"}\n\nIf ``id`` is provided the frontend's UUID is used; otherwise a new one\nis generated server-side.\n\nReturns:\n    A ``ConversationSummary``-shaped dict.",
+        "operationId": "create_conversation_api_chat_conversations_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Conversation Api Chat Conversations Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/import": {
+      "post": {
+        "description": "Import a conversation from a JSON export.\n\nExpects the full conversation JSON (same schema as export) in the\nrequest body.  If a conversation with the same ``id`` already exists\nthe request is rejected with 409.\n\nReturns:\n    A ``ConversationSummary``-shaped dict for the imported conversation.",
+        "operationId": "import_conversation_api_chat_conversations_import_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Import Conversation Api Chat Conversations Import Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Import Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/{conversation_id}": {
+      "delete": {
+        "description": "Delete a conversation and all its messages.\n\nUses bulk SQL DELETE statements to avoid async lazy-loading issues\nwith SQLAlchemy ORM relationships.",
+        "operationId": "delete_conversation_api_chat_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Conversation Api Chat Conversations  Conversation Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Conversation",
+        "tags": [
+          "chat"
+        ]
+      },
+      "get": {
+        "description": "Get a single conversation with all its messages.",
+        "operationId": "get_conversation_api_chat_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Conversation Api Chat Conversations  Conversation Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/{conversation_id}/branch": {
+      "post": {
+        "description": "Create a new conversation by branching from a specific message.\n\nCopies all messages from the beginning of the source conversation\nup through ``from_message_id`` (following the active version branch)\ninto a new independent conversation.  File attachments are physically\ncopied under a new upload directory.\n\nArgs:\n    conversation_id: UUID of the source conversation.\n    body: Branch parameters — from_message_id and optional title.\n    request: FastAPI request (used to extract AppContext).\n\nReturns:\n    Metadata for the newly created conversation.\n\nRaises:\n    HTTPException 400: ``from_message_id`` is not a valid UUID.\n    HTTPException 404: Source conversation or target message not found.\n    HTTPException 422: Target message is not in the active version branch.",
+        "operationId": "branch_conversation_api_chat_conversations__conversation_id__branch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchConversationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Branch Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/{conversation_id}/export": {
+      "get": {
+        "description": "Export a full conversation with all messages and metadata.\n\nArgs:\n    conversation_id: UUID of the conversation to export.\n\nReturns:\n    The complete conversation JSON including messages and attachments.",
+        "operationId": "export_conversation_api_chat_conversations__conversation_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Conversation Api Chat Conversations  Conversation Id  Export Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/{conversation_id}/file-path": {
+      "get": {
+        "description": "Return the absolute filesystem path of the conversation JSON file.\n\nUsed by the Electron frontend to open the file in the system explorer.",
+        "operationId": "get_conversation_file_path_api_chat_conversations__conversation_id__file_path_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Conversation File Path Api Chat Conversations  Conversation Id  File Path Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Conversation File Path",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/{conversation_id}/switch-version": {
+      "post": {
+        "description": "Switch the active version for a message version group.\n\nBody::\n\n    {\"version_group_id\": \"uuid\", \"version_index\": 0}\n\nReturns:\n    Updated ``active_versions`` map and ``updated_at`` timestamp.",
+        "operationId": "switch_version_api_chat_conversations__conversation_id__switch_version_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Switch Version Api Chat Conversations  Conversation Id  Switch Version Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Switch Version",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/{conversation_id}/title": {
+      "post": {
+        "description": "Update the title of a conversation.\n\nBody: ``{\"title\": \"new title\"}``",
+        "operationId": "update_conversation_title_api_chat_conversations__conversation_id__title_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Conversation Title Api Chat Conversations  Conversation Id  Title Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Conversation Title",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/upload": {
+      "post": {
+        "description": "Upload an image for use with vision-capable models.\n\nSaves the file to ``data/uploads/{conversation_id}/`` and creates a\npending :class:`Attachment` record (``message_id`` is set later when the\nWebSocket message referencing this file is sent).\n\nReturns:\n    A dict with ``file_id``, ``url``, ``filename``, and ``content_type``.\n\nRaises:\n    HTTPException 400: If the file type is not an allowed image format.\n    HTTPException 413: If the file exceeds the configured size limit.",
+        "operationId": "upload_image_api_chat_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_image_api_chat_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Upload Image Api Chat Upload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Image",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/config": {
+      "get": {
+        "description": "Return the current server configuration as JSON.",
+        "operationId": "get_config_api_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Config Api Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Config",
+        "tags": [
+          "config"
+        ]
+      },
+      "patch": {
+        "description": "Set a single dotted-path value in the chosen layer.\n\nBody schema::\n\n    {\n        \"path\":  \"llm.temperature\",   # dotted path, required\n        \"value\": 0.9,                  # any JSON value\n        \"layer\": \"user\"                # optional, default \"user\"\n    }\n\nAllowed layers: ``user`` (default, persisted to user.yaml),\n``system`` (persisted to system.yaml — admin use), ``runtime``\n(in-memory, lost on restart).  ``defaults`` is read-only.",
+        "operationId": "patch_config_api_config_patch",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Config Api Config Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Patch Config",
+        "tags": [
+          "config"
+        ]
+      },
+      "put": {
+        "description": "Update configuration values at runtime.\n\nBody: a partial config dict with only the keys to change.\n\nIndependent preferences (TTS, STT, voice, UI, etc.) are automatically\npersisted to the database so they survive restarts.",
+        "operationId": "update_config_api_config_put",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Config Api Config Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Update Config",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/layers": {
+      "get": {
+        "description": "Return the raw per-layer dicts (defaults/system/user/runtime).\n\nUseful for diagnostics: shows exactly which layer contributes each\nvalue before the merge step.",
+        "operationId": "get_config_layers_api_config_layers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Config Layers Api Config Layers Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Config Layers",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/models": {
+      "get": {
+        "description": "Fetch locally available models and return enriched metadata.\n\nUses the LM Studio v1 API as primary source, falling back to\nOpenAI-compatible ``/v1/models`` or Ollama ``/api/tags``.",
+        "operationId": "list_models_api_config_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Models Api Config Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/reload": {
+      "post": {
+        "description": "Re-read disk layers (defaults/system/user) and revalidate.",
+        "operationId": "reload_config_api_config_reload_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reload Config Api Config Reload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reload Config",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/resolved": {
+      "get": {
+        "description": "Return the full merged-and-validated configuration (secrets redacted).",
+        "operationId": "get_resolved_config_api_config_resolved_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Resolved Config Api Config Resolved Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Resolved Config",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/sync-model": {
+      "post": {
+        "description": "Sync config with the model currently loaded in LM Studio.\n\nQueries LM Studio for loaded models.  If exactly one model is loaded\nand it differs from ``config.llm.model``, the config is updated\nautomatically (model name, supports_thinking, supports_vision).\n\nReturns:\n    ``{\"synced\": true, \"model\": \"...\"}`` on success, or\n    ``{\"synced\": false, \"reason\": \"...\"}`` when no sync is needed.",
+        "operationId": "sync_model_api_config_sync_model_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sync Model Api Config Sync Model Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync Model",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/email/folders": {
+      "get": {
+        "description": "Restituisce le cartelle IMAP disponibili.",
+        "operationId": "list_folders_api_email_folders_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Folders Api Email Folders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Lista cartelle IMAP",
+        "tags": [
+          "email"
+        ]
+      }
+    },
+    "/api/email/inbox": {
+      "get": {
+        "description": "Restituisce le intestazioni delle email più recenti.",
+        "operationId": "get_inbox_api_email_inbox_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "default": "INBOX",
+              "title": "Folder",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Inbox Api Email Inbox Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lista email recenti",
+        "tags": [
+          "email"
+        ]
+      }
+    },
+    "/api/email/search": {
+      "post": {
+        "description": "Cerca email con criteri IMAP standard.",
+        "operationId": "search_emails_api_email_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backend__api__routes__email__SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Search Emails Api Email Search Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cerca email (IMAP SEARCH)",
+        "tags": [
+          "email"
+        ]
+      }
+    },
+    "/api/email/{uid}": {
+      "get": {
+        "description": "Restituisce headers + body plain-text di una email.",
+        "operationId": "get_email_api_email__uid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "default": "INBOX",
+              "title": "Folder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Email Api Email  Uid  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leggi email completa",
+        "tags": [
+          "email"
+        ]
+      }
+    },
+    "/api/email/{uid}/archive": {
+      "put": {
+        "description": "Sposta l'email nella cartella di archivio configurata.",
+        "operationId": "archive_email_api_email__uid__archive_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_folder",
+            "required": false,
+            "schema": {
+              "default": "INBOX",
+              "title": "From Folder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Archive Email Api Email  Uid  Archive Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archivia email",
+        "tags": [
+          "email"
+        ]
+      }
+    },
+    "/api/email/{uid}/read": {
+      "put": {
+        "description": "Imposta o rimuove il flag \\Seen.",
+        "operationId": "mark_read_api_email__uid__read_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "default": "INBOX",
+              "title": "Folder",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "read",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Read",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Mark Read Api Email  Uid  Read Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Segna come letta/non letta",
+        "tags": [
+          "email"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "Liveness / readiness probe.",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Api Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/knowledge/readiness": {
+      "get": {
+        "description": "Return the current RAG readiness verdict (or a not-initialized default).",
+        "operationId": "readiness_api_knowledge_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Readiness Api Knowledge Readiness Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "RAG/knowledge readiness verdict",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/mcp/memory/entities": {
+      "delete": {
+        "description": "Delete entities and their associated relations.",
+        "operationId": "delete_entities_api_mcp_memory_entities_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteEntitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Entities Api Mcp Memory Entities Delete"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Entities",
+        "tags": [
+          "mcp-memory"
+        ]
+      },
+      "post": {
+        "description": "Create new entities in the knowledge graph.",
+        "operationId": "create_entities_api_mcp_memory_entities_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEntitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Create Entities Api Mcp Memory Entities Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Entities",
+        "tags": [
+          "mcp-memory"
+        ]
+      }
+    },
+    "/api/mcp/memory/graph": {
+      "get": {
+        "description": "Read the entire knowledge graph (entities + relations).",
+        "operationId": "read_graph_api_mcp_memory_graph_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Read Graph Api Mcp Memory Graph Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Graph",
+        "tags": [
+          "mcp-memory"
+        ]
+      }
+    },
+    "/api/mcp/memory/nodes": {
+      "post": {
+        "description": "Retrieve specific entities by name with their relations.",
+        "operationId": "open_nodes_api_mcp_memory_nodes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenNodesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Open Nodes Api Mcp Memory Nodes Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Nodes",
+        "tags": [
+          "mcp-memory"
+        ]
+      }
+    },
+    "/api/mcp/memory/observations": {
+      "delete": {
+        "description": "Remove specific observations from entities.",
+        "operationId": "delete_observations_api_mcp_memory_observations_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteObservationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Observations Api Mcp Memory Observations Delete"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Observations",
+        "tags": [
+          "mcp-memory"
+        ]
+      },
+      "post": {
+        "description": "Add observations to existing entities.",
+        "operationId": "add_observations_api_mcp_memory_observations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddObservationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Add Observations Api Mcp Memory Observations Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Observations",
+        "tags": [
+          "mcp-memory"
+        ]
+      }
+    },
+    "/api/mcp/memory/relations": {
+      "delete": {
+        "description": "Delete specific relations.",
+        "operationId": "delete_relations_api_mcp_memory_relations_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteRelationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Relations Api Mcp Memory Relations Delete"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Relations",
+        "tags": [
+          "mcp-memory"
+        ]
+      },
+      "post": {
+        "description": "Create new relations between entities.",
+        "operationId": "create_relations_api_mcp_memory_relations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRelationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Create Relations Api Mcp Memory Relations Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Relations",
+        "tags": [
+          "mcp-memory"
+        ]
+      }
+    },
+    "/api/mcp/memory/search": {
+      "post": {
+        "description": "Search entities by query across names, types, and observations.",
+        "operationId": "search_nodes_api_mcp_memory_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backend__api__routes__mcp_memory__SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Search Nodes Api Mcp Memory Search Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Nodes",
+        "tags": [
+          "mcp-memory"
+        ]
+      }
+    },
+    "/api/mcp/servers": {
+      "get": {
+        "description": "List configured MCP servers and their connection status.",
+        "operationId": "list_mcp_servers_api_mcp_servers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Mcp Servers Api Mcp Servers Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Mcp Servers",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/servers/{server_name}": {
+      "get": {
+        "description": "Get details for a specific MCP server.",
+        "operationId": "get_mcp_server_api_mcp_servers__server_name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_name",
+            "required": true,
+            "schema": {
+              "title": "Server Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Mcp Server Api Mcp Servers  Server Name  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Mcp Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/servers/{server_name}/reconnect": {
+      "post": {
+        "description": "Attempt to reconnect to a specific MCP server.",
+        "operationId": "reconnect_mcp_server_api_mcp_servers__server_name__reconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_name",
+            "required": true,
+            "schema": {
+              "title": "Server Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reconnect Mcp Server Api Mcp Servers  Server Name  Reconnect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reconnect Mcp Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/memory": {
+      "get": {
+        "description": "List memory entries with optional filters.\n\nReturns paginated entries ordered by creation time descending.",
+        "operationId": "list_memories_api_memory_get",
+        "parameters": [
+          {
+            "description": "Filter by scope",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by scope",
+              "title": "Scope"
+            }
+          },
+          {
+            "description": "Filter by category",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by category",
+              "title": "Category"
+            }
+          },
+          {
+            "description": "Maximum results",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximum results",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Pagination offset",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Pagination offset",
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Memories Api Memory Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Memories",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/all": {
+      "delete": {
+        "description": "Delete every memory entry (all scopes).",
+        "operationId": "delete_all_memory_api_memory_all_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Delete All Memory Api Memory All Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete All Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/search": {
+      "post": {
+        "description": "Semantic search over stored memories.",
+        "operationId": "search_memories_api_memory_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backend__api__routes__memory__SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Search Memories Api Memory Search Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Memories",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/session": {
+      "delete": {
+        "description": "Delete all session-scoped memories.",
+        "operationId": "delete_session_memory_api_memory_session_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Delete Session Memory Api Memory Session Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete Session Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/stats": {
+      "get": {
+        "description": "Return memory usage statistics.",
+        "operationId": "memory_stats_api_memory_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Memory Stats Api Memory Stats Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Memory Stats",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/{memory_id}": {
+      "delete": {
+        "description": "Delete a single memory entry by ID.",
+        "operationId": "delete_memory_api_memory__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Memory Api Memory  Memory Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/models": {
+      "get": {
+        "description": "List all models via LM Studio v1 API.",
+        "operationId": "list_models_api_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Models Api Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/capabilities": {
+      "get": {
+        "description": "Return the capability registry state for all known models.",
+        "operationId": "model_capabilities_api_models_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Model Capabilities Api Models Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Model Capabilities",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/download": {
+      "post": {
+        "description": "Start a model download on LM Studio.",
+        "operationId": "download_model_api_models_download_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Download Model Api Models Download Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/download/{job_id}": {
+      "get": {
+        "description": "Get the status of a download job.",
+        "operationId": "download_status_api_models_download__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Download Status Api Models Download  Job Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Status",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/load": {
+      "post": {
+        "description": "Load a model into LM Studio.",
+        "operationId": "load_model_api_models_load_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoadModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Load Model Api Models Load Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Load Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/operation": {
+      "get": {
+        "description": "Return the status of the current model operation.",
+        "operationId": "get_current_operation_api_models_operation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Current Operation Api Models Operation Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Current Operation",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/status": {
+      "get": {
+        "description": "Quick health-check + summary of loaded models.\n\nCached for a few seconds so concurrent renderer pollers do not\nhammer LM Studio with one ``GET /api/v1/models`` per call.  When\nthe previous probe failed the cache TTL is extended so a slow or\nunreachable LM Studio is not retried on every request.",
+        "operationId": "models_status_api_models_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Models Status",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/unload": {
+      "post": {
+        "description": "Unload a model from LM Studio.",
+        "operationId": "unload_model_api_models_unload_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnloadModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Unload Model Api Models Unload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unload Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/permission-mode/{conversation_id}": {
+      "get": {
+        "description": "Return the permission tier for *conversation_id*.\n\nRead-only and always succeeds for a valid id: an unknown conversation or an\nunwired service yields the default tier (never a 5xx).\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`PermissionModeResponse` with the canonical conversation id and\n    the resolved tier.\n\nRaises:\n    HTTPException: ``400`` when *conversation_id* is not a valid UUID.",
+        "operationId": "get_permission_mode_api_permission_mode__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionModeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a conversation's permission tier",
+        "tags": [
+          "permissions"
+        ]
+      },
+      "put": {
+        "description": "Set the permission tier for *conversation_id* (no idle guard).\n\nGuard order: an unwired service is reported first (``503``); then the tier\nstring is validated (``400`` on an unknown tier); then it is persisted and\nbroadcast by the service.  There is intentionally **no** idle guard — the\ntier is read per tool-call, so a mid-turn change is consistent.\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    body: The new tier.\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`PermissionModeResponse` echoing the persisted tier.\n\nRaises:\n    HTTPException: ``400`` for a bad UUID or an unknown tier, ``503`` when\n        the permission-mode service is unavailable.",
+        "operationId": "put_permission_mode_api_permission_mode__conversation_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionModeUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionModeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set a conversation's permission tier (any time)",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/api/permission-rules/{conversation_id}": {
+      "get": {
+        "description": "Return the conversation's own rules plus all global rules.\n\nAlways succeeds for a valid id: an unwired service yields an empty list.\n\nRaises:\n    HTTPException: ``400`` when *conversation_id* is not a valid UUID.",
+        "operationId": "list_permission_rules_api_permission_rules__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PermissionRuleOut"
+                  },
+                  "title": "Response List Permission Rules Api Permission Rules  Conversation Id  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List permission rules visible to a conversation",
+        "tags": [
+          "permissions"
+        ]
+      },
+      "post": {
+        "description": "UPSERT a rule for the conversation (``scope=conversation``) or globally.\n\nRaises:\n    HTTPException: ``400`` for a bad UUID / unknown effect / unknown scope,\n        ``503`` when the rule service is unavailable.",
+        "operationId": "create_permission_rule_api_permission_rules__conversation_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionRuleCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionRuleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add or update a permission rule",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/api/permission-rules/{conversation_id}/{rule_id}": {
+      "delete": {
+        "description": "Delete the rule *rule_id* (no-op if it does not exist).\n\nRaises:\n    HTTPException: ``400`` for a bad UUID, ``503`` when the rule service is\n        unavailable.",
+        "operationId": "delete_permission_rule_api_permission_rules__conversation_id___rule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete a permission rule by id",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/api/plan-document/{conversation_id}": {
+      "get": {
+        "description": "Return the persisted plan document for *conversation_id*.\n\nAn unknown conversation (no document row) yields an empty document\n(``title=\"\"``, ``body=\"\"``, ``updated_at=None``), and an unwired service is\ntreated the same way rather than raising.\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`PlanDocumentResponse` carrying the conversation id and the\n    stored document (empty when unset).\n\nRaises:\n    HTTPException: ``400`` when *conversation_id* is not a valid UUID.",
+        "operationId": "get_conversation_plan_document_api_plan_document__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a conversation's persisted plan document",
+        "tags": [
+          "plan-document"
+        ]
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "description": "Return all available plugins and their status.\n\nDiscovers every plugin under ``backend/plugins/`` (even those\nnot currently enabled) so the frontend can display toggles for\nall of them.",
+        "operationId": "list_plugins_api_plugins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Plugins Api Plugins Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Plugins",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/execute": {
+      "post": {
+        "description": "Execute a plugin tool directly via REST.\n\nBody: ``{\"plugin\": str, \"tool\": str, \"args\": dict}``\n\nReturns ``{\"success\": bool, \"content\": ..., \"error_message\": ...}``.",
+        "operationId": "execute_plugin_tool_api_plugins_execute_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/_ExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Execute Plugin Tool Api Plugins Execute Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Plugin Tool",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_name}": {
+      "patch": {
+        "description": "Enable or disable a plugin by name.\n\nBody: ``{\"enabled\": true|false}``\n\nActually loads or unloads the plugin via the PluginManager.",
+        "operationId": "toggle_plugin_api_plugins__plugin_name__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_name",
+            "required": true,
+            "schema": {
+              "title": "Plugin Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TogglePluginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Toggle Plugin Api Plugins  Plugin Name  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Toggle Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/scope/{conversation_id}": {
+      "delete": {
+        "description": "Clear the scope folders for *conversation_id* (rejected while busy).\n\nSame guard order as :func:`put_conversation_scope`: ``503`` when the\nservice is unwired, then ``409`` / ``scope_locked`` while a turn runs, then\nthe clear.  Clearing an already-empty scope is a no-op that still returns\n``200`` with an empty ``folders`` list; the ``scope.updated`` broadcast is\nemitted by :meth:`ScopeService.clear_scope` itself.\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`ScopeResponse` with an empty ``folders`` list and\n    ``is_idle=True``.\n\nRaises:\n    HTTPException: ``400`` for a bad UUID, ``409`` (``scope_locked``) while\n        a turn is in flight, ``503`` when the scope service is unavailable.",
+        "operationId": "delete_conversation_scope_api_scope__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear a conversation's workspace scope (idle only)",
+        "tags": [
+          "scope"
+        ]
+      },
+      "get": {
+        "description": "Return the scope folders for *conversation_id* plus an ``is_idle`` flag.\n\nRead-only and always succeeds for a valid id: an unknown conversation, an\nunwired scope service, or a missing app context all yield an empty\n``folders`` list (never a 5xx).  ``is_idle`` reflects the live busy\nregistry — ``False`` while a turn runs for the conversation.\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`ScopeResponse` with the canonical conversation id, the scope\n    folders (possibly empty), and the idle flag.\n\nRaises:\n    HTTPException: ``400`` when *conversation_id* is not a valid UUID.",
+        "operationId": "get_conversation_scope_api_scope__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a conversation's workspace scope",
+        "tags": [
+          "scope"
+        ]
+      },
+      "put": {
+        "description": "Replace the scope folders for *conversation_id* (rejected while busy).\n\nGuard order is deliberate: an unwired service is reported first (``503``)\nso a genuinely-missing service never masquerades as a transient ``409``;\nonly then is the idle guard applied (``409`` / ``scope_locked`` while a\nturn runs); finally the folders are validated and persisted by the service\n(a bad folder surfaces as ``400``).  The ``scope.updated`` broadcast is\nemitted by :meth:`ScopeService.set_scope` itself, not here.\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    body: The new scope folders.\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`ScopeResponse` echoing the persisted folders with\n    ``is_idle=True`` (the conversation was idle for the mutation to apply).\n\nRaises:\n    HTTPException: ``400`` for a bad UUID or a folder that fails\n        validation, ``409`` (``scope_locked``) while a turn is in flight,\n        ``503`` when the scope service is unavailable.",
+        "operationId": "put_conversation_scope_api_scope__conversation_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopeUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace a conversation's workspace scope (idle only)",
+        "tags": [
+          "scope"
+        ]
+      }
+    },
+    "/api/services": {
+      "get": {
+        "description": "Return a snapshot of every registered managed service.",
+        "operationId": "list_services_api_services_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Services Api Services Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Services",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/trellis2/setup-guide": {
+      "get": {
+        "description": "Return the in-app setup walkthrough for TRELLIS.2.",
+        "operationId": "trellis_setup_guide_api_services_trellis2_setup_guide_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Trellis Setup Guide Api Services Trellis2 Setup Guide Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Trellis Setup Guide",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/trellis2multiview/setup-guide": {
+      "get": {
+        "description": "Return the in-app setup walkthrough for TRELLIS.2 multi-view.",
+        "operationId": "trellis2_multiview_setup_guide_api_services_trellis2multiview_setup_guide_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Trellis2 Multiview Setup Guide Api Services Trellis2Multiview Setup Guide Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Trellis2 Multiview Setup Guide",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/config": {
+      "get": {
+        "description": "Return the current ``trellis`` or ``trellis2`` config snapshot.\n\nUsed by the configure card to prefill its form on mount instead of\nparsing the free-form ``health.detail`` string.",
+        "operationId": "get_trellis_config_api_services__name__config_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Trellis Config Api Services  Name  Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Trellis Config",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/configure": {
+      "post": {
+        "description": "Persist Trellis / Trellis2 configuration into the user layer.\n\nBody (all optional, keys depend on service variant)::\n\n    # trellis (v1)\n    {\"enabled\": true, \"trellis_dir\": \"...\", \"trellis_model\": \"...\",\n     \"service_url\": \"http://localhost:8090\"}\n\n    # trellis2 (v2)\n    {\"enabled\": true, \"trellis2_dir\": \"...\", \"trellis2_model\": \"...\",\n     \"service_url\": \"http://localhost:8091\"}\n\nUnknown keys are ignored silently to keep the API forward-compatible.",
+        "operationId": "configure_trellis_api_services__name__configure_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Configure Trellis Api Services  Name  Configure Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Configure Trellis",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/health": {
+      "get": {
+        "description": "Return the cached health snapshot for *name*.",
+        "operationId": "get_service_health_api_services__name__health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Service Health Api Services  Name  Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Service Health",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/models": {
+      "get": {
+        "description": "Return the downloadable model catalog for a service.\n\nEach entry includes ``installed: bool`` so the UI can mark models that\nare already on disk.\n\nArgs:\n    name: Service name (currently ``\"stt\"`` or ``\"tts\"``).",
+        "operationId": "list_service_models_api_services__name__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Service Models Api Services  Name  Models Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Service Models",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/models/installed": {
+      "get": {
+        "description": "Return the catalog entries that are present on disk.",
+        "operationId": "list_installed_models_api_services__name__models_installed_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Installed Models Api Services  Name  Models Installed Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Installed Models",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/models/{model_id}/download": {
+      "post": {
+        "description": "Schedule a model download.\n\nReturns ``202 Accepted`` immediately; progress is broadcast on the\n``/api/events/ws`` WebSocket as\n``service.model_download_progress`` events.",
+        "operationId": "download_service_model_api_services__name__models__model_id__download_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Service Model",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/restart": {
+      "post": {
+        "description": "Schedule a restart for *name* and return ``202 Accepted``.",
+        "operationId": "restart_service_api_services__name__restart_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restart Service",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/services/{name}/stop": {
+      "post": {
+        "description": "Stop *name* and return ``202 Accepted``.",
+        "operationId": "stop_service_api_services__name__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Service",
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/api/settings/active-tools": {
+      "put": {
+        "description": "Update the per-chat tool selection (opt-out list) at runtime.\n\nStores the namespaced names of tools the user turned off in\n``ctx.config.llm.disabled_tools`` and persists them so the choice\nsurvives restarts.",
+        "operationId": "set_active_tools_api_settings_active_tools_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActiveToolsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Active Tools",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/preferences": {
+      "delete": {
+        "description": "Reset all persisted user preferences to defaults.\n\nThe next restart will use only YAML defaults.",
+        "operationId": "reset_preferences_api_settings_preferences_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reset Preferences Api Settings Preferences Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset Preferences",
+        "tags": [
+          "settings"
+        ]
+      },
+      "get": {
+        "description": "Return all persisted user preferences.",
+        "operationId": "get_preferences_api_settings_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Preferences Api Settings Preferences Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Preferences",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/system-prompt": {
+      "get": {
+        "description": "Read the current system prompt enabled state.",
+        "operationId": "get_system_prompt_api_settings_system_prompt_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemPromptResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Prompt",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Toggle system prompt on/off at runtime.",
+        "operationId": "set_system_prompt_api_settings_system_prompt_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemPromptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemPromptResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set System Prompt",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/tool-catalog": {
+      "get": {
+        "description": "Return all registered tools grouped by plugin for the chat picker.\n\nIncludes ``tools_enabled`` and ``tool_rag_enabled`` so the frontend\ncan disable the selection UI when manual choice has no effect.",
+        "operationId": "get_tool_catalog_api_settings_tool_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tool Catalog",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/tool-confirmations": {
+      "get": {
+        "description": "Read the current tool confirmations state.",
+        "operationId": "get_tool_confirmations_api_settings_tool_confirmations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConfirmationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tool Confirmations",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Toggle tool confirmations at runtime.\n\nUpdates ``ctx.config.permissions.confirmations_enabled`` so that\nthe frontend can sync its toggle with the backend state. (The flag was\npromoted out of ``pc_automation`` to the neutral ``permissions`` block in\nFase 2; the API field name is unchanged.)",
+        "operationId": "set_tool_confirmations_api_settings_tool_confirmations_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolConfirmationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConfirmationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Tool Confirmations",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/tools": {
+      "get": {
+        "description": "Read the current tools enabled state.",
+        "operationId": "get_tools_api_settings_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tools",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Toggle tool definitions on/off at runtime.",
+        "operationId": "set_tools_api_settings_tools_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Tools",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/voice/available-engines": {
+      "get": {
+        "description": "Probe which TTS and STT engine libraries are actually installed.\n\nUses ``importlib.util.find_spec`` — no import side-effects.  The\nfrontend uses this to hide engine options that cannot be used.\n\nReturns::\n\n    {\n        \"tts\": {\"piper\": true, \"kokoro\": false, \"xtts\": false},\n        \"stt\": {\"faster_whisper\": true}\n    }",
+        "operationId": "get_available_voice_engines_api_settings_voice_available_engines_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Available Voice Engines Api Settings Voice Available Engines Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Available Voice Engines",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/tasks/{conversation_id}": {
+      "get": {
+        "description": "Return the persisted task steps for *conversation_id*.\n\nThe task list is the model-owned todo-list (``update_tasks``) stored per\nconversation.  An unknown conversation (no task row) yields an empty\n``steps`` list, and an unwired plan service is treated the same way\nrather than raising.\n\nArgs:\n    conversation_id: The owning conversation id (a UUID string).\n    request: The incoming request (carries ``app.state.context``).\n\nReturns:\n    A :class:`TasksResponse` carrying the conversation id and the ordered\n    ``{\"step\", \"status\"}`` step dicts (possibly empty).\n\nRaises:\n    HTTPException: ``400`` when *conversation_id* is not a valid UUID.",
+        "operationId": "get_conversation_plan_api_tasks__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TasksResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a conversation's persisted task list",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/terminal/{conversation_id}": {
+      "get": {
+        "description": "Return the live sessions for *conversation_id* plus the enabled flag.\n\nRead-only and always succeeds for a valid id: an unwired manager or a\ndisabled terminal both yield an empty list (with ``enabled`` reflecting\nconfig).\n\nRaises:\n    HTTPException: ``400`` when *conversation_id* is not a valid UUID.",
+        "operationId": "list_terminals_api_terminal__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List a conversation's interactive terminal sessions",
+        "tags": [
+          "terminal"
+        ]
+      },
+      "post": {
+        "description": "Spawn a PTY session confined to the conversation's workspace scope.\n\nRaises:\n    HTTPException: ``400`` for a bad UUID / no scope set / out-of-scope cwd /\n        session cap reached, ``403`` (``terminal_disabled``) when off,\n        ``503`` when the manager is unwired or the PTY backend is missing.",
+        "operationId": "create_terminal_api_terminal__conversation_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open a new interactive terminal session (scope-confined)",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/api/terminal/{conversation_id}/{session_id}": {
+      "delete": {
+        "description": "Terminate a session and its process tree.\n\nNot idle-guarded by design — killing a runaway process is the terminal's\njob, during a turn as much as after it.\n\nRaises:\n    HTTPException: ``400`` for a bad UUID, ``403`` when disabled, ``404``\n        when the session is unknown, ``503`` when unwired.",
+        "operationId": "delete_terminal_api_terminal__conversation_id___session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kill a terminal session (its whole process tree)",
+        "tags": [
+          "terminal"
+        ]
+      },
+      "patch": {
+        "description": "Rename and/or (re)assign a session; returns the updated snapshot.\n\nRaises:\n    HTTPException: ``400`` for a bad UUID, ``403`` when disabled, ``404``\n        when the session is unknown, ``503`` when unwired.",
+        "operationId": "update_terminal_api_terminal__conversation_id___session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename and/or assign a terminal session to the agent",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/api/vector-store/reembed-tools": {
+      "post": {
+        "description": "Trigger re-embedding of all registered tools.",
+        "operationId": "reembed_tools_api_vector_store_reembed_tools_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Reembed Tools Api Vector Store Reembed Tools Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reembed Tools",
+        "tags": [
+          "vector-store"
+        ]
+      }
+    },
+    "/api/vector-store/repair": {
+      "post": {
+        "description": "Reset the embedded vector store and re-wire the RAG stack.\n\nManual, user-triggered recovery (the \"Ripara/Reset\" CTA): clears the\npersisted embedded data (destructive — regenerable memories/facts) and\nre-initialises Qdrant + memory + tool-RAG in place, then returns the\nrefreshed status so the UI reflects the new state immediately.",
+        "operationId": "repair_api_vector_store_repair_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Repair Api Vector Store Repair Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Repair",
+        "tags": [
+          "vector-store"
+        ]
+      }
+    },
+    "/api/vector-store/stats": {
+      "get": {
+        "description": "Return Qdrant vector store statistics + RAG readiness.",
+        "operationId": "get_stats_api_vector_store_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Stats Api Vector Store Stats Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Stats",
+        "tags": [
+          "vector-store"
+        ]
+      }
+    },
+    "/api/voice/status": {
+      "get": {
+        "description": "Return availability of STT/TTS services and active connection count.",
+        "operationId": "voice_status_api_voice_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Voice Status Api Voice Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Voice Status",
+        "tags": [
+          "voice"
+        ]
+      }
+    },
+    "/api/whiteboards": {
+      "get": {
+        "description": "Restituisce la lista paginata delle lavagne, con filtro opzionale.\n\nOgni item include ``conversation_title`` (risolto dal DB) quando la\nlavagna è associata a una conversazione.",
+        "operationId": "list_whiteboards_api_whiteboards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "conversation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Whiteboards Api Whiteboards Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lista lavagne salvate",
+        "tags": [
+          "whiteboards"
+        ]
+      }
+    },
+    "/api/whiteboards/{board_id}": {
+      "delete": {
+        "description": "Elimina il file JSON della lavagna dal disco.",
+        "operationId": "delete_whiteboard_api_whiteboards__board_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Whiteboard Api Whiteboards  Board Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Elimina una lavagna",
+        "tags": [
+          "whiteboards"
+        ]
+      },
+      "get": {
+        "description": "Restituisce il JSON completo della WhiteboardSpec (incluso snapshot).",
+        "operationId": "get_whiteboard_api_whiteboards__board_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recupera la spec completa di una lavagna",
+        "tags": [
+          "whiteboards"
+        ]
+      }
+    },
+    "/api/whiteboards/{board_id}/snapshot": {
+      "patch": {
+        "description": "Aggiorna lo snapshot tldraw (chiamato dal frontend dopo editing).",
+        "operationId": "update_snapshot_api_whiteboards__board_id__snapshot_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSnapshotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Snapshot Api Whiteboards  Board Id  Snapshot Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Aggiorna lo snapshot tldraw di una lavagna",
+        "tags": [
+          "whiteboards"
+        ]
+      }
+    }
+  }
+}

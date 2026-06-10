@@ -21,7 +21,8 @@
     "build:win": "npm run build && electron-builder --win nsis",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "build:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/build-installer.ps1"
+    "build:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/build-installer.ps1",
+    "gen:api:types": "openapi-typescript src/renderer/src/types/generated/openapi.json -o src/renderer/src/types/generated/api.d.ts"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
@@ -63,6 +64,7 @@
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.1",
     "eslint-plugin-vue": "^10.6.2",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3",
     "vite": "^7.2.6",

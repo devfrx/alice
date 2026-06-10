@@ -71,6 +71,10 @@ describe('deriveSceneState', () => {
   it('stage open without artifacts does NOT present', () => {
     expect(deriveSceneState(inputs({ stageOpen: true }))).toBe('quiet')
   })
+
+  it('responding wins over listening (hot mic while the model streams)', () => {
+    expect(deriveSceneState(inputs({ isStreaming: true, isListening: true }))).toBe('responding')
+  })
 })
 
 describe('deriveLineMode', () => {
@@ -111,5 +115,9 @@ describe('toRoman', () => {
     expect(toRoman(4)).toBe('IV')
     expect(toRoman(9)).toBe('IX')
     expect(toRoman(14)).toBe('XIV')
+  })
+
+  it('degrades to an empty string below 1', () => {
+    expect(toRoman(0)).toBe('')
   })
 })

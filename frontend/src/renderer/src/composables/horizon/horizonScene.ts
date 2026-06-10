@@ -72,6 +72,7 @@ export function notchPositions(count: number): number[] {
 export interface HorizonPlanView {
   total: number
   completed: number
+  /** Index of the step the spark points at; `-1` for an empty plan. */
   activeIndex: number
   statusSentence: string
 }

@@ -120,6 +120,16 @@ class AgentPlugin(BasePlugin):
                     result_type="json",
                     risk_level="safe",
                     capabilities=("planning",),
+                    always_offered=True,
+                    usage_guidance=(
+                        "Per qualsiasi lavoro non banale (più passi o più "
+                        "strumenti), chiama `update_tasks` PRIMA di iniziare "
+                        "per creare la checklist, poi richiamalo man mano: un "
+                        "passo diventa `in_progress` quando lo inizi e "
+                        "`completed` appena finito. La checklist è mostrata "
+                        "in un pannello dedicato: non duplicarla come elenco "
+                        "nel testo della chat."
+                    ),
                     timeout_ms=5000,
                 ),
             )
@@ -160,6 +170,15 @@ class AgentPlugin(BasePlugin):
                     result_type="json",
                     risk_level="safe",
                     capabilities=("planning",),
+                    always_offered=True,
+                    usage_guidance=(
+                        "Se il lavoro richiede una strategia, o il risultato "
+                        "richiesto È un piano/documento/strategia, scrivilo "
+                        "con `write_plan` (compare in un pannello dedicato) e "
+                        "tienilo aggiornato man mano che procedi. NON "
+                        "scaricare il piano come testo in chat: nella "
+                        "risposta riporta solo una sintesi di 1-2 frasi."
+                    ),
                     timeout_ms=5000,
                 ),
             )
@@ -213,6 +232,14 @@ class AgentPlugin(BasePlugin):
                     result_type="json",
                     risk_level="safe",
                     capabilities=("planning",),
+                    always_offered=True,
+                    usage_guidance=(
+                        "Usa `spawn_subagent` per delegare una sotto-ricerca "
+                        "autocontenuta che ingombrerebbe il contesto "
+                        "(esplorazioni, raccolte di informazioni). Fornisci "
+                        "un'istruzione completa: il sub-agente non vede la "
+                        "conversazione."
+                    ),
                     timeout_ms=300_000,
                 ),
             )
@@ -288,6 +315,15 @@ class AgentPlugin(BasePlugin):
                     result_type="string",
                     risk_level="safe",
                     capabilities=("planning",),
+                    always_offered=True,
+                    usage_guidance=(
+                        "Qualsiasi domanda all'utente passa da `ask_user` — "
+                        "MAI domande in testo libero nella risposta. Raccogli "
+                        "TUTTE le domande in un'unica chiamata (l'utente le "
+                        "vede come wizard) e falla subito, prima di iniziare "
+                        "il lavoro: massimo un giro di domande. Non chiedere "
+                        "ciò che puoi ragionevolmente assumere."
+                    ),
                     user_interaction=True,
                     timeout_ms=300_000,
                 ),

@@ -759,3 +759,23 @@ class TestWritePlanPersistence:
         assert captured[0]["conversation_id"] == str(conv_id)
         assert captured[0]["title"] == "Release"
         assert captured[0]["body"] == body
+
+
+# ===========================================================================
+# 7.  Orchestration contract (always_offered + usage_guidance)
+# ===========================================================================
+
+
+class TestOrchestrationContract:
+    """The four meta-tools are always offered and carry usage guidance."""
+
+    def test_meta_tools_always_offered_with_guidance(self):
+        plugin = AgentPlugin()
+        tools = {t.name: t for t in plugin.get_tools()}
+        assert set(tools) == {
+            "update_tasks", "write_plan", "spawn_subagent", "ask_user",
+        }
+        for name, tool in tools.items():
+            assert tool.always_offered is True, name
+            assert tool.usage_guidance, name
+            assert f"`{name}`" in tool.usage_guidance, name

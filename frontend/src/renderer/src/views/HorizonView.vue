@@ -250,12 +250,14 @@ watch(
   }
 )
 
-// Conversation switch: pacing and layout never leak across conversations.
+// Conversation switch: pacing, layout and stage never leak across conversations.
 watch(
   () => chatStore.currentConversation?.id,
   (id) => {
     resetPacer()
     magazine.value = false
+    stageOpen.value = false
+    stageIndex.value = 0
     if (id)
       tasksStore.ensureForConversation(id).catch(() => {
         /* timeline stays empty */
@@ -292,23 +294,33 @@ watch(
   }
 )
 
-// Auto-open the stage on a new artifact; jump to it.
+// Auto-open the stage when a new artifact ARRIVES in a live turn (spec §3.5).
+// The streaming gate keeps restored conversations (messages loading async on
+// mount) and conversation switches from phantom-opening the stage.
 watch(
   () => artifacts.value.length,
   (len, was) => {
-    if (len > (was ?? 0)) {
+    if (len > (was ?? 0) && chatStore.isStreamingCurrentConversation) {
       stageOpen.value = true
       stageIndex.value = len - 1
+      // A long answer in the same turn must not squeeze the stage to half
+      // height: the stage owns the lower zone, prose stays compact above.
+      magazine.value = false
     } else if (stageIndex.value >= len) {
       stageIndex.value = Math.max(0, len - 1)
     }
   }
 )
 
-// CAD generation surfaces the stage immediately (placeholder).
-watch(cadGenerationInProgress, (info) => {
-  if (info) stageOpen.value = true
-})
+// CAD generation surfaces the stage once per generation. Watch the stable
+// executionId: the progress computed returns a fresh object every tick, and
+// re-opening on each tick would defeat the user's Esc/✕ mid-generation.
+watch(
+  () => cadGenerationInProgress.value?.executionId,
+  (id, old) => {
+    if (id && id !== old) stageOpen.value = true
+  }
+)
 
 /* ── ANCHOR: lifecycle ── */
 onMounted(() => {

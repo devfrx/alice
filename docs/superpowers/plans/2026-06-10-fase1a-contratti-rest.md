@@ -163,10 +163,17 @@ The baseline file freezes today's violations. The test fails when:
 * a NEW untyped endpoint appears (fix it: declare ``response_model``), or
 * a baseline entry becomes typed (good: delete that line from the baseline).
 
-Endpoints whose ``response_class`` is a ``FileResponse`` are exempt (no JSON
-contract to declare). WebSocket routes are not ``APIRoute`` and are skipped.
+Policy: only a named Pydantic model (or ``list[Model]``) counts as typed.
+Schema-producing generics (``Model | None``, unions, ``dict[str, Model]``) are
+deliberately rejected: the generated TS contract is built from named
+components. Endpoints declaring ``response_class=FileResponse`` in the route
+decorator are exempt (no JSON contract to declare); endpoints that merely
+*return* a ``FileResponse`` from the body stay in the baseline until their
+decorator is fixed. WebSocket routes are not ``APIRoute`` and are skipped.
 
-Regenerate the baseline ONLY when intentionally shrinking it (PowerShell)::
+Regenerating the baseline (ONLY when intentionally shrinking it) rewrites the
+file and then FAILS on purpose so a leaked env var can never turn the
+guardrail green — inspect the diff and rerun WITHOUT the env var (PowerShell)::
 
     $env:ALICE_REGEN_CONTRACT_BASELINE = "1"
     pytest tests/contracts/test_response_models.py
@@ -179,12 +186,12 @@ import os
 import typing
 from pathlib import Path
 
+import pytest
+from backend.core.app import create_app
 from fastapi.datastructures import DefaultPlaceholder
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.responses import FileResponse
-
-from backend.core.app import create_app
 
 BASELINE = Path(__file__).parent / "response_model_baseline.txt"
 
@@ -192,8 +199,8 @@ BASELINE = Path(__file__).parent / "response_model_baseline.txt"
 def _is_typed(route: APIRoute) -> bool:
     """True when the route declares a Pydantic response contract.
 
-    Accepts a ``BaseModel`` subclass or ``list[BaseModel]``; plain ``dict``
-    annotations do NOT count (they produce an empty OpenAPI schema).
+    Accepts a ``BaseModel`` subclass or ``list[BaseModel]``; anything else
+    (including ``dict`` annotations and unions) does NOT count.
     """
     model = route.response_model
     if model is None:
@@ -205,7 +212,7 @@ def _is_typed(route: APIRoute) -> bool:
 
 
 def _is_exempt(route: APIRoute) -> bool:
-    """File/stream endpoints have no JSON contract to declare."""
+    """File/stream endpoints (decorator-declared ``response_class``) are exempt."""
     response_class: object = route.response_class
     if isinstance(response_class, DefaultPlaceholder):
         response_class = response_class.value
@@ -226,11 +233,25 @@ def _violations() -> set[str]:
     return found
 
 
+def test_all_api_routes_under_prefix() -> None:
+    """Every APIRoute lives under /api — anything else would escape the ratchet."""
+    app = create_app(testing=True)
+    escaped = [
+        route.path
+        for route in app.routes
+        if isinstance(route, APIRoute) and not route.path.startswith("/api")
+    ]
+    assert not escaped, f"APIRoutes outside /api escape the contract ratchet: {escaped}"
+
+
 def test_response_model_ratchet() -> None:
     """No new untyped endpoints; baseline entries must be removed once fixed."""
     current = _violations()
     if os.environ.get("ALICE_REGEN_CONTRACT_BASELINE") == "1":
-        BASELINE.write_text("\n".join(sorted(current)) + "\n", encoding="utf-8")
+        BASELINE.write_text(
+            "\n".join(sorted(current)) + "\n", encoding="utf-8", newline="\n",
+        )
+        pytest.fail("Baseline regenerated. Inspect the diff, then rerun WITHOUT the env var.")
     baseline = {
         line.strip()
         for line in BASELINE.read_text(encoding="utf-8").splitlines()
@@ -260,7 +281,7 @@ pytest tests/contracts/test_response_models.py -v
 Remove-Item Env:\ALICE_REGEN_CONTRACT_BASELINE
 ```
 
-Expected: PASS, e il file `backend/tests/contracts/response_model_baseline.txt` ora esiste con ~70-90 righe ordinate del formato `GET /api/email/inbox`. Il numero esatto è quello calcolato — NON va aggiustato a mano. Ispezionare il file: deve contenere SOLO righe `METODO /api/...`.
+Expected: FAIL INTENZIONALE con "Baseline regenerated. Inspect the diff, then rerun WITHOUT the env var." — il file `backend/tests/contracts/response_model_baseline.txt` ora esiste (LF, ~70-90 righe ordinate `GET /api/...`). Il numero esatto è quello calcolato — NON va aggiustato a mano.
 
 - [ ] **Step 4: Eseguire di nuovo il test senza la variabile e verificare che passi**
 

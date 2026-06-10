@@ -117,6 +117,7 @@ def main(argv: list[str]) -> int:
     out.write_text(
         json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     return 0
 

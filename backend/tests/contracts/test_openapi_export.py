@@ -20,6 +20,7 @@ def test_main_writes_deterministic_json(tmp_path: Path) -> None:
     out = tmp_path / "openapi.json"
     assert main([str(out)]) == 0
     first = out.read_text(encoding="utf-8")
+    assert b"\r" not in out.read_bytes()
     assert main([str(out)]) == 0
     assert out.read_text(encoding="utf-8") == first
     parsed = json.loads(first)

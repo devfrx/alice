@@ -155,6 +155,19 @@ const showResponse = computed(
 
 const plan = computed(() => planView(planSteps.value))
 
+/** Mono state microlabel at the line's right end (quiet stays mute). */
+const lineLabel = computed(() => {
+  if (voiceStore.isListening) return 'ASCOLTO'
+  if (voiceStore.isProcessing) return 'ELABORO'
+  if (sceneState.value === 'working')
+    return planSteps.value.length > 0
+      ? `LAVORO ${plan.value.activeIndex + 1} DI ${plan.value.total}`
+      : 'LAVORO'
+  if (sceneState.value === 'responding') return 'RISPONDO'
+  if (sceneState.value === 'presenting') return 'OPERE'
+  return ''
+})
+
 /* Ephemeral tool annotation: latest active tool name, faded after 2.5 s. */
 const toolAnnotation = ref('')
 let annotationTimer: ReturnType<typeof setTimeout> | null = null
@@ -441,7 +454,10 @@ onBeforeUnmount(() => {
           :audio-level="voiceStore.audioLevel"
           :notch-count="sceneState === 'working' || planPinned ? planSteps.length : 0"
           :active-index="plan.activeIndex"
+          :completed-count="plan.completed"
           :dimmed="!isConnected"
+          :label="lineLabel"
+          :attenuated="sceneState === 'presenting'"
         />
       </template>
 

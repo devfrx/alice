@@ -25,8 +25,6 @@ GET /api/charts
 GET /api/charts/{chart_id}
 GET /api/chat/conversations
 GET /api/chat/conversations/{conversation_id}
-GET /api/chat/conversations/{conversation_id}/export
-GET /api/chat/conversations/{conversation_id}/file-path
 GET /api/config
 GET /api/config/layers
 GET /api/config/models

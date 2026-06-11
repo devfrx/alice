@@ -1,8 +1,8 @@
-"""AL\\CE — Chat file I/O endpoints (export / import / upload).
+"""AL\\CE — Chat file I/O endpoints (export / import / backup / upload).
 
-Conversation export and import (JSON), the conversation file-path lookup
-used by the Electron shell, and the vision image upload endpoint with
-magic-byte validation.
+Conversation export and import (JSON), the explicit backup endpoint
+(replaces the removed automatic JSON mirror), and the vision image
+upload endpoint with magic-byte validation.
 """
 
 from __future__ import annotations
@@ -10,17 +10,21 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import File, Form, HTTPException, Request, UploadFile
 from loguru import logger
+from pydantic import BaseModel
 
 from backend.core.config import PROJECT_ROOT
 from backend.db.models import Attachment, Conversation, Message
-from backend.services.conversation_export import build_conversation_export
-from backend.services.conversation_file_manager import ConversationFileManager
+from backend.services.conversation_export import (
+    ConversationExport,
+    build_conversation_export,
+    export_conversations_to_dir,
+)
 
-from ._helpers import _sync_conversation_to_file
 from ._shared import _ctx, _utcnow, router
 
 # Magic byte signatures for allowed image types.
@@ -87,7 +91,10 @@ def _verify_magic_bytes(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/chat/conversations/{conversation_id}/export")
+@router.get(
+    "/chat/conversations/{conversation_id}/export",
+    response_model=ConversationExport,
+)
 async def export_conversation(
     conversation_id: uuid.UUID, request: Request,
 ) -> dict[str, Any]:
@@ -108,33 +115,6 @@ async def export_conversation(
             )
         return data
 
-
-@router.get("/chat/conversations/{conversation_id}/file-path")
-async def get_conversation_file_path(
-    conversation_id: uuid.UUID, request: Request,
-) -> dict[str, str]:
-    """Return the absolute filesystem path of the conversation JSON file.
-
-    Used by the Electron frontend to open the file in the system explorer.
-    """
-    ctx = _ctx(request)
-    fm: ConversationFileManager | None = ctx.conversation_file_manager
-    if fm is None:
-        raise HTTPException(
-            status_code=503,
-            detail="File manager not available",
-        )
-
-    # Verify the conversation actually exists \u2014 otherwise the frontend
-    # would open a non-existent path in the system explorer.
-    async with ctx.db() as session:
-        if await session.get(Conversation, conversation_id) is None:
-            raise HTTPException(
-                status_code=404, detail="Conversation not found",
-            )
-
-    file_path = fm.base_dir / f"{conversation_id}.json"
-    return {"path": str(file_path)}
 
 
 @router.post("/chat/conversations/import")
@@ -286,11 +266,6 @@ async def import_conversation(request: Request) -> dict[str, Any]:
 
         await session.commit()
 
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conv_id, ctx.conversation_file_manager,
-            )
-
         return {
             "id": str(conv.id),
             "title": conv.title,
@@ -298,6 +273,59 @@ async def import_conversation(request: Request) -> dict[str, Any]:
             "updated_at": conv.updated_at.isoformat(),
             "message_count": msg_count,
         }
+
+
+# ---------------------------------------------------------------------------
+# REST — explicit conversation backup
+# ---------------------------------------------------------------------------
+
+
+class BackupRequest(BaseModel):
+    """Request body for the explicit conversation backup command."""
+
+    dest_dir: str | None = None
+    conversation_ids: list[uuid.UUID] | None = None
+
+
+class BackupResult(BaseModel):
+    """Outcome of an explicit conversation backup."""
+
+    exported: int
+    path: str
+
+
+@router.post("/chat/conversations/backup", response_model=BackupResult)
+async def backup_conversations(
+    body: BackupRequest, request: Request,
+) -> BackupResult:
+    """Export conversations as JSON files to an explicit destination.
+
+    This is the user-facing replacement of the removed automatic JSON
+    mirror (spec §5.2): SQLite is the single source of truth and backups
+    happen only on explicit command (UI entry or agent tool).
+    """
+    ctx = _ctx(request)
+
+    if body.dest_dir:
+        dest = Path(body.dest_dir)
+        if not dest.is_absolute():
+            raise HTTPException(
+                status_code=400, detail="dest_dir must be an absolute path",
+            )
+    else:
+        stamp = _utcnow().strftime("%Y%m%d-%H%M%S")
+        dest = PROJECT_ROOT / "data" / "backups" / f"conversations-{stamp}"
+
+    try:
+        exported = await export_conversations_to_dir(
+            ctx.db, dest, body.conversation_ids,
+        )
+    except OSError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Cannot write to destination: {exc}",
+        ) from None
+
+    return BackupResult(exported=exported, path=str(dest))
 
 
 # ---------------------------------------------------------------------------

@@ -180,7 +180,7 @@ git commit -m "refactor(ws)!: rename calendar_changed to calendar.changed (domin
 - Create: `backend/api/ws_schema/events.py`
 - Test: `backend/tests/contracts/test_ws_schema_events.py`
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 Creare `backend/tests/contracts/test_ws_schema_events.py`:
 
@@ -255,7 +255,7 @@ REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
         "service": "qdrant",
         "status": "ready",
         "detail": None,
-        "timestamp": 1718000000.0,
+        "timestamp": "2026-06-11T00:00:00",
     },
     {
         "type": "service.model_download_progress",
@@ -357,14 +357,23 @@ def test_extra_field_is_rejected() -> None:
     """extra='forbid' makes silent payload drift loud."""
     with pytest.raises(ValidationError):
         validate_events_server({"type": "pong", "surprise": 1})
+
+
+def test_model_download_progress_allows_extra_fields() -> None:
+    """The one intentional extra='allow' escape hatch must keep working."""
+    validate_events_server({
+        "type": "service.model_download_progress",
+        "service": "stt",
+        "new_dynamic_field": 1,
+    })
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run (da `backend/`): `pytest tests/contracts/test_ws_schema_events.py -v`
 Expected: ERROR con `ModuleNotFoundError: No module named 'backend.api.ws_schema'`
 
-- [ ] **Step 3: Implementare l'envelope**
+- [x] **Step 3: Implementare l'envelope**
 
 Creare `backend/api/ws_schema/_base.py`:
 
@@ -422,7 +431,7 @@ class ClientFrame(WsFrame):
     origin: Origin = "user"
 ```
 
-- [ ] **Step 4: Implementare i modelli del canale events**
+- [x] **Step 4: Implementare i modelli del canale events**
 
 Creare `backend/api/ws_schema/events.py`:
 
@@ -739,7 +748,7 @@ EventsClientMessage = Annotated[
 ]
 ```
 
-- [ ] **Step 5: Implementare `__init__.py` con unioni, vocabolari e validatori**
+- [x] **Step 5: Implementare `__init__.py` con unioni, vocabolari e validatori**
 
 Creare `backend/api/ws_schema/__init__.py`:
 
@@ -772,7 +781,7 @@ def _union_member_types(union: Any) -> frozenset[str]:
     found: set[str] = set()
     for member in members:
         literal = member.model_fields["type"].annotation
-        found.add(typing.get_args(literal)[0])
+        found.update(typing.get_args(literal))
     return frozenset(found)
 
 
@@ -811,12 +820,12 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 6: Eseguire il test e verificare che passi**
+- [x] **Step 6: Eseguire il test e verificare che passi**
 
 Run (da `backend/`): `pytest tests/contracts/test_ws_schema_events.py -v`
 Expected: tutti PASS. Se un frame rappresentativo non valida, NON piegare il test: ricontrollare il sito di emissione citato nel contesto e correggere il modello (o, se l'emettitore è buggato, fermarsi e segnalarlo).
 
-- [ ] **Step 7: Test di coerenza Literal/enum per il permission mode**
+- [x] **Step 7: Test di coerenza Literal/enum per il permission mode**
 
 Aggiungere in coda a `backend/tests/contracts/test_ws_schema_events.py`:
 
@@ -835,12 +844,12 @@ def test_mode_literal_matches_enum() -> None:
 Run (da `backend/`): `pytest tests/contracts/test_ws_schema_events.py -v`
 Expected: tutti PASS.
 
-- [ ] **Step 8: Lint e typecheck**
+- [x] **Step 8: Lint e typecheck**
 
 Run (da `backend/`): `ruff check api/ws_schema/ tests/contracts/test_ws_schema_events.py; mypy api/ws_schema/ tests/contracts/test_ws_schema_events.py`
 Expected: nessun errore.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add backend/api/ws_schema backend/tests/contracts/test_ws_schema_events.py

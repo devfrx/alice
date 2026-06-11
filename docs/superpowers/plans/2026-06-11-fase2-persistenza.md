@@ -489,7 +489,7 @@ git commit -m "feat(persistence): conversation_export service - single serializa
 - Modify: `backend/tests/contracts/response_model_baseline.txt`
 - Test: `backend/tests/test_conversation_backup_api.py` (create)
 
-- [ ] **Step 1: Scrivi i test che falliscono**
+- [x] **Step 1: Scrivi i test che falliscono**
 
 Crea `backend/tests/test_conversation_backup_api.py`. Usa le fixture `client`/`app` di `conftest.py` (httpx `AsyncClient` con lifespan eseguito; funzioni `async def` SENZA marker — asyncio mode auto, stesso stile di `test_app.py`). ATTENZIONE: la fixture `app` costa ~25s/test (gotcha noto) — tieni i test a 3:
 
@@ -542,14 +542,14 @@ async def test_file_path_endpoint_removed(client: AsyncClient) -> None:
     assert resp.status_code == 404
 ```
 
-- [ ] **Step 2: Esegui i test e verifica che falliscano**
+- [x] **Step 2: Esegui i test e verifica che falliscano**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_backup_api.py -v
 ```
 Atteso: FAIL — `/backup` risponde 404 (endpoint inesistente); `file-path` risponde 200/503 (endpoint ancora vivo).
 
-- [ ] **Step 3: Modifica `io.py`**
+- [x] **Step 3: Modifica `io.py`**
 
 (a) Aggiorna gli import: rimuovi `from backend.services.conversation_file_manager import ConversationFileManager`; aggiungi `from pydantic import BaseModel` e completa l'import dal servizio:
 
@@ -638,7 +638,7 @@ async def backup_conversations(
 
 Aggiungi `from pathlib import Path` agli import di `io.py` se assente.
 
-- [ ] **Step 4: Aggiorna la baseline ratchet**
+- [x] **Step 4: Aggiorna la baseline ratchet**
 
 Da `backend/tests/contracts/response_model_baseline.txt` elimina le DUE righe:
 
@@ -647,7 +647,7 @@ GET /api/chat/conversations/{conversation_id}/export
 GET /api/chat/conversations/{conversation_id}/file-path
 ```
 
-- [ ] **Step 5: Esegui i test e verifica che passino**
+- [x] **Step 5: Esegui i test e verifica che passino**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_backup_api.py tests/contracts/ -v
@@ -655,12 +655,14 @@ cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_backup
 ```
 Atteso: PASS (il ratchet conferma che `/backup` è tipizzato e che le 2 voci rimosse non sono più violazioni).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/api/routes/chat/io.py backend/tests/test_conversation_backup_api.py backend/tests/contracts/response_model_baseline.txt
 git commit -m "feat(persistence): explicit POST /chat/conversations/backup; typed export; drop file-path endpoint" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+> **Esito (2026-06-12):** COMPLETATO — commit `aaad49b`. Spec review ✅ (route ordering verificato, baseline −2 esatta). Quality review «With fixes»: il test di rimozione file-path era vacuo (404 anche sul vecchio endpoint per conversazione inesistente — la predizione «200/503» dello Step 2 era errata, il test app costruisce ancora il file manager fino al Task 5). Fix in `36bc877`: assert sul body `{"detail": "Not Found"}` (404 di route, discriminante), `dest_dir is not None` (rifiuta stringa vuota), `logger.warning` prima del raise OSError, blank line residua. Gate: 3/3 API test + 85 contracts, ruff pulito. Nota per Task 7: mostrare `exported` nella UI (un subset con id inesistenti risponde 200 con exported=0).
 
 ---
 

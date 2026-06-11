@@ -836,7 +836,7 @@ git commit -m "refactor(persistence): conversations routes - drop JSON mirror, t
 - Modify: `backend/api/routes/chat/ws.py`, `backend/api/routes/chat/_persist.py`, `backend/api/routes/chat/_assembly.py`, `backend/api/routes/chat/_helpers.py`
 - Modify: `backend/tests/test_confirmation_toggle.py`, `backend/tests/test_tool_loop.py`, `backend/tests/test_turn_lifecycle_events.py`
 
-- [ ] **Step 1: `tool_loop.py`**
+- [x] **Step 1: `tool_loop.py`**
 
 - Elimina l'alias e il commento (righe 42-43): `SyncFn = Callable[..., Coroutine[Any, Any, None]]` (poi verifica con ruff se `Callable`/`Coroutine` restano usati nel file; se no, rimuovili dall'import).
 - `run_tool_loop`: rimuovi il parametro `sync_fn: SyncFn | None,` (riga 94) e la riga di docstring «sync_fn: Async callback…» (126).
@@ -871,13 +871,13 @@ e il blocco in `_persist_client_tool_result` (righe ~1295-1296).
 - `_persist_client_tool_result` (riga 1251): rimuovi il parametro `sync_fn: SyncFn | None,`.
 - Verifica che `WebSocketDisconnect` resti usato altrove nel file (sì, nel pump); se ruff lo segnala orfano, rimuovi l'import.
 
-- [ ] **Step 2: `direct_executor.py` e `factory.py`**
+- [x] **Step 2: `direct_executor.py` e `factory.py`**
 
 `direct_executor.py`: elimina alias+commento (righe 46-49), il param `sync_fn` dal costruttore (67) e `self._sync_fn = sync_fn` (71), la riga `sync_fn=self._sync_fn,` nella chiamata a `run_tool_loop` (251), le righe di docstring che lo citano (58-60). Verifica import `Callable`/`Coroutine`.
 
 `factory.py`: elimina alias (28), param `sync_fn` (34) e relativa docstring (41-42), e la chiamata diventa `direct = DirectTurnExecutor(ctx, llm)` (49). Elimina `from collections.abc import Callable, Coroutine` se orfano.
 
-- [ ] **Step 3: Route chat**
+- [x] **Step 3: Route chat**
 
 `ws.py`: elimina `from ._helpers import _sync_conversation_to_file` (riga 31); la creazione executor (162-164) diventa `executor = create_turn_executor(ctx, llm)`; elimina il blocco recovery (215-220):
 
@@ -898,13 +898,13 @@ e il blocco in `_persist_client_tool_result` (righe ~1295-1296).
 
 `_helpers.py`: elimina DEL TUTTO la funzione `_sync_conversation_to_file` e gli import ora orfani (`ConversationFileManager` da services, e `build_conversation_export` se non usato da altro nel modulo). Aggiorna la docstring di modulo (riga 3-6) togliendo «DB archival»→il riferimento alla serializzazione JSON.
 
-- [ ] **Step 4: Aggiorna i test del turn engine**
+- [x] **Step 4: Aggiorna i test del turn engine**
 
 - `tests/test_confirmation_toggle.py`: elimina la riga 85 (`ctx.conversation_file_manager = None`) e TUTTI i kwarg `sync_fn=None` (righe ~167, 189, 209, 239, 289, 331, 372).
 - `tests/test_tool_loop.py`: elimina la riga 243 (`self.conversation_file_manager = None` nel fake ctx) e il kwarg `sync_fn=None` (riga ~290).
 - `tests/test_turn_lifecycle_events.py`: elimina il kwarg `sync_fn=None` (riga ~160).
 
-- [ ] **Step 5: Esegui i test**
+- [x] **Step 5: Esegui i test**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_tool_loop.py tests/test_confirmation_toggle.py tests/test_turn_lifecycle_events.py tests/test_interaction_channel.py tests/contracts/ -v
@@ -912,12 +912,14 @@ cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_tool_loop.py tests/
 ```
 Atteso: PASS; ruff senza errori NUOVI.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/services/turn/ backend/api/routes/chat/ backend/tests/test_confirmation_toggle.py backend/tests/test_tool_loop.py backend/tests/test_turn_lifecycle_events.py
 git commit -m "refactor(persistence): remove sync_fn JSON-mirror threading from the turn engine and chat routes" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+> **Esito (2026-06-12):** COMPLETATO — commit `3cbd583` (net −91 righe). Spec review ✅ (catena disconnect verificata: run_tool_loop raise → direct_executor cattura → finish_reason=disconnected → ws.py recovery, semantica identica; tutti i commit adiacenti intatti). Quality review «With fixes»: invariante verificato (le sync erano SEMPRE side-effect post-commit; lo stato transitorio pre-Task5 è benigno perché rebuild_from_files salta le conversazioni già nel DB). Fix in `3da4fa6`: 4 righe vuote residue nei test (1 W293 nuova) + docstring stale «sync to file» in _persist.py. Migliorie drive-by accettate: factory return type tipizzato, UP035 Callable. Gate: 120/120 + contracts, ruff senza errori nuovi, grep sync_fn=0.
 
 ---
 

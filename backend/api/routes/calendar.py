@@ -343,7 +343,7 @@ async def create_event(
     result = _event_to_dict(event, tz)
     if ctx.ws_connection_manager:
         await ctx.ws_connection_manager.broadcast({
-            "type": "calendar_changed",
+            "type": "calendar.changed",
             "action": "created",
             "event_id": str(event.id),
         })
@@ -405,7 +405,7 @@ async def update_event(
     result = _event_to_dict(event, tz)
     if ctx.ws_connection_manager:
         await ctx.ws_connection_manager.broadcast({
-            "type": "calendar_changed",
+            "type": "calendar.changed",
             "action": "updated",
             "event_id": event_id,
         })
@@ -435,7 +435,7 @@ async def delete_event(request: Request, event_id: str) -> dict:
     logger.info("DELETE /calendar/events/{}", event_id)
     if ctx.ws_connection_manager:
         await ctx.ws_connection_manager.broadcast({
-            "type": "calendar_changed",
+            "type": "calendar.changed",
             "action": "deleted",
             "event_id": event_id,
         })

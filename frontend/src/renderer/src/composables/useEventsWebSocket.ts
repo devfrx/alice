@@ -110,7 +110,7 @@ export function useEventsWebSocket(): {
         }
 
         // Forward calendar change events to the store
-        if (data.type === 'calendar_changed') {
+        if (data.type === 'calendar.changed') {
           void calendarStore.refresh()
         }
 

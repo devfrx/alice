@@ -131,7 +131,8 @@ event bus. Interventi:
   `npm run gen:api`.
 - **WS**: restano **due canali con ruoli netti** — `chat` (streaming del turno: token, thinking,
   tool call) ed `events` (asincrono di background). **Envelope unico per entrambi fin dal giorno
-  1**: `{type, origin, correlation_id?, payload}` con `origin ∈ {user, agent, system}`.
+  1**: piatto — `{type, origin, correlation_id?, ...campi}` con `origin ∈ {user, agent, system}`
+  (deciso in 1b: nessun wrapper `payload`, stessa garanzia e zero migrazione doppia).
   Ogni messaggio è un modello Pydantic in `backend/api/ws_schema/`; da lì JSON Schema → tipi TS
   come **unione discriminata su `type`**. Naming eventi migrato alla convenzione unica
   `dominio.azione`.

@@ -2415,6 +2415,7 @@ git commit -m "docs: WS contract conventions (ws_schema, exhaustive dispatcher, 
 ## Fuori scope / backlog per le fasi successive
 
 - **Emissione di `origin` sul filo**: i modelli lo dichiarano (default), gli emettitori non lo mandano ancora; la compilazione degli emettitori sui modelli (costruire `WsX(...)` invece di dict) è burn-down delle fasi 2-6, dominio per dominio.
+- **I nomi legacy dei frame chat** (`token`, `done`, `tool_execution_*`, ecc.) restano fuori dalla convenzione `dominio.azione` fino al rework del canale chat (Fase 6): rinominarli ora sarebbe churn di filo senza consumatori nuovi.
 - **`services/ws.ts` (canale chat FE)** resta un emitter string-keyed: il dispatcher tipizzato del canale chat ha senso insieme al rework Horizon (Fase 6).
 - **`correlation_id`** è riservato al Command Layer (Fase 7); nessun consumo in 1b.
 - Docstring drift pre-esistente in `services/turn/events.py:200-205`: elenca l'outcome `"disconnected"` (mai emesso) e omette `"failed"` (emesso, `pipeline.py:469`) — allineare quando si tocca il modulo.

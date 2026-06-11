@@ -20,7 +20,6 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.core.context import AppContext
-from backend.services.conversation_export import _attachment_url  # noqa: F401
 from backend.services.turn import is_websocket_closed_runtime_error
 
 router = APIRouter(tags=["chat"])

@@ -75,7 +75,7 @@ class ConversationExport(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _attachment_url(file_path: str) -> str:
+def attachment_url(file_path: str) -> str:
     """Build a safe ``/uploads/…`` URL from an attachment's file_path.
 
     Uses :meth:`pathlib.Path.relative_to` instead of string splitting
@@ -128,7 +128,7 @@ async def build_conversation_export(
         )
         att_results = await session.exec(att_stmt)
         for att in att_results.all():
-            url = _attachment_url(att.file_path)
+            url = attachment_url(att.file_path)
             att_map.setdefault(att.message_id, []).append(
                 {
                     "file_id": str(att.id),

@@ -26,6 +26,7 @@ from backend.services.conversation_export import (
 )
 
 from ._shared import _ctx, _utcnow, router
+from .conversations import ConversationSummaryResponse
 
 # Magic byte signatures for allowed image types.
 # Each value is a list of (offset, signature) tuples that must all match.
@@ -116,7 +117,7 @@ async def export_conversation(
         return data
 
 
-@router.post("/chat/conversations/import")
+@router.post("/chat/conversations/import", response_model=ConversationSummaryResponse)
 async def import_conversation(request: Request) -> dict[str, Any]:
     """Import a conversation from a JSON export.
 

@@ -87,7 +87,7 @@ async def _persist_final_turn(
     * Normal path: save assistant ``Message`` (when content or no tool
       calls), emit real ``context_info`` (v2-6), update
       ``Conversation.title``/``updated_at``/``context_snapshot`` (v2-5),
-      commit, sync to file, optionally trigger post-stream compression
+      commit, optionally trigger post-stream compression
       (v2-1), then emit the WS ``done`` event.
 
     Args:

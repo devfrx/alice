@@ -163,7 +163,6 @@ async def test_confirmations_enabled_requests_approval():
             max_iterations=1,
             confirmation_timeout_s=30,
             client_ip="127.0.0.1",
-
         )
 
         mock_confirm.assert_called_once()
@@ -284,7 +283,6 @@ async def test_audit_logged_when_confirmation_approved():
             max_iterations=1,
             confirmation_timeout_s=30,
             client_ip="127.0.0.1",
-
         )
         mock_confirm.assert_called_once()
 
@@ -326,7 +324,6 @@ async def test_safe_tool_no_confirmation_regardless_of_toggle():
                 max_iterations=1,
                 confirmation_timeout_s=30,
                 client_ip="127.0.0.1",
-    
             )
 
             mock_confirm.assert_not_called()
@@ -367,7 +364,6 @@ async def test_confirmations_enabled_rejected_by_user():
             max_iterations=1,
             confirmation_timeout_s=30,
             client_ip="127.0.0.1",
-
         )
 
     ctx.tool_registry.execute_tool.assert_not_called()

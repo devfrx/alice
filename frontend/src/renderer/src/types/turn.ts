@@ -1,11 +1,12 @@
 /**
  * Canonical turn-event types aligned with the AL\CE backend.
  *
- * These mirror the additive canonical turn-event stream emitted by the
- * model-driven turn engine — see `backend/services/turn/events.py`. Each
- * server→client frame carries a snake_case shape with a dotted `type`
- * discriminant (e.g. `"turn.started"`); the camelCase view-models below are
- * the client-side projection folded by the `agentRun` Pinia store.
+ * WebSocket frame types (WsTurnStarted, WsTurnFinished, etc.) are re-exported
+ * from the generated contract (`./generated`, regenerated via
+ * `scripts/gen-contracts.ps1`); the source of truth is
+ * `backend/api/ws_schema/` → `backend/services/turn/events.py`.
+ * The camelCase view-models below (AgentRun, ToolActivity, etc.) are
+ * hand-written client-side projections folded by the `agentRun` Pinia store.
  */
 
 import type { ApiSchema } from './generated'

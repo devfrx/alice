@@ -63,7 +63,8 @@ def build_schema() -> dict[str, Any]:
     """Build the OpenAPI schema without starting any service.
 
     Returns:
-        The OpenAPI document as a plain dict, exactly as FastAPI generates it.
+        The OpenAPI document as a plain dict, with the WS channel unions injected as
+        named components.
     """
     from backend.core.app import create_app
 

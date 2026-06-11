@@ -1,9 +1,10 @@
 ﻿/**
  * Chat-related types aligned with the AL\CE backend API.
  *
- * Every interface here mirrors the JSON shapes returned by
- * `backend/api/routes/chat.py` so the frontend can consume
- * responses without transformation.
+ * WebSocket frame types (WsToken, WsDone, WsError, etc.) are re-exported from
+ * the generated contract (`./generated`, regenerated via `scripts/gen-contracts.ps1`).
+ * Only view-models and REST conversation types (ChatMessage, ConversationSummary,
+ * ConversationDetail, etc.) are hand-written here.
  */
 
 // ---------------------------------------------------------------------------

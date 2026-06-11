@@ -16,7 +16,7 @@
 Da scrivere con la skill `writing-plans` (brainstorming già fatto: la spec §6 È la decisione). Requisiti dalla spec:
 - Modelli Pydantic per OGNI messaggio dei due canali WS in `backend/api/ws_schema/`; envelope piatto con `type` (Literal discriminante), `origin` (`user|agent|system`), `correlation_id?` — il formato wire attuale è piatto: NON introdurre wrapping `payload` (deciso in fase di design: stessa garanzia, zero migrazione doppia).
 - Da Pydantic → JSON Schema → tipi TS come **unione discriminata su `type`** (pipeline analoga a `gen-contracts.ps1`; estendere lo script, non duplicarlo).
-- Rinomina eventi alla convenzione `dominio.azione` (oggi convivono `calendar_changed` e `mcp.server.connected`).
+- Rinomina eventi alla convenzione `dominio.azione` (convivevano `calendar_changed` e `mcp.server.connected`; `calendar_changed` rinominato in `calendar.changed` in 1b).
 - FE: `useEventsWebSocket.ts` diventa dispatcher tipizzato (mappa esaustiva `type → handler`).
 
 ### Recon WS già fatta (2026-06-10 — riverificare a campione i fatti load-bearing prima di scrivere il piano)
@@ -28,7 +28,7 @@ Da scrivere con la skill `writing-plans` (brainstorming già fatto: la spec §6 
 
 **Events WS** (`/api/events/ws`, `backend/api/routes/events.py`):
 - Client→server: `ping`, `terminal.input` (`conversation_id`, `session_id`, `data`), `terminal.resize` (+`rows`, `cols`).
-- Server→client: enum `AliceEvent` (37 membri, `core/event_bus.py:28`) bridgiati nel lifespan di `app.py` (~533-638: `mcp.server.*`, `email.*`, `note.*`, `service.status`, `knowledge.status`); eventi terminal da `services/terminal/manager.py` (`terminal.session_opened/renamed/assigned/closed/output`); ad-hoc da callback (`artifact.created`, `tasks.updated`, `plan_document.updated`, `scope.updated`, `permission_mode.updated`, `calendar_changed`, `service.model_download_progress`); `heartbeat`/`pong`.
+- Server→client: enum `AliceEvent` (37 membri, `core/event_bus.py:28`) bridgiati nel lifespan di `app.py` (~533-638: `mcp.server.*`, `email.*`, `note.*`, `service.status`, `knowledge.status`); eventi terminal da `services/terminal/manager.py` (`terminal.session_opened/renamed/assigned/closed/output`); ad-hoc da callback (`artifact.created`, `tasks.updated`, `plan_document.updated`, `scope.updated`, `permission_mode.updated`, `calendar.changed` (rinominato in 1b), `service.model_download_progress`); `heartbeat`/`pong`.
 - FE: `composables/useEventsWebSocket.ts` — catena if/else su ~18 tipi (righe ~105-179) che smista a 11 store; `sendEventsMessage` usato SOLO da `stores/terminalSessions.ts` (~206-224).
 - Tipi `Ws*Message` già a mano in `types/{tasks,planDocument,scope,permission,terminal}.ts` — in 1b diventano generati.
 

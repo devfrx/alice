@@ -1618,7 +1618,7 @@ Le unioni WS diventano components con nome nello stesso `openapi.json`; `openapi
 - Modify: `backend/api/openapi_export.py`
 - Test: `backend/tests/contracts/test_openapi_export.py` (estendere)
 
-- [ ] **Step 1: Estendere il test esistente (fallisce)**
+- [x] **Step 1: Estendere il test esistente (fallisce)**
 
 Aggiungere in coda a `backend/tests/contracts/test_openapi_export.py`:
 
@@ -1645,7 +1645,7 @@ def test_ws_contract_injected_as_components() -> None:
 Run (da `backend/`): `pytest tests/contracts/test_openapi_export.py -v`
 Expected: il nuovo test FAIL con `KeyError`/`AssertionError` (gli altri due restano PASS).
 
-- [ ] **Step 2: Implementare l'iniezione**
+- [x] **Step 2: Implementare l'iniezione**
 
 In `backend/api/openapi_export.py`:
 
@@ -1702,22 +1702,26 @@ con:
 
 3. Aggiornare la docstring di modulo: la frase sul contenuto deve menzionare che il documento contiene anche il contratto WS iniettato (una riga, es. aggiungere alla fine del primo paragrafo: `The exported document also carries the WS channel unions from backend/api/ws_schema as named components.`).
 
-- [ ] **Step 3: Eseguire i test e verificare che passino**
+- [x] **Step 3: Eseguire i test e verificare che passino**
 
 Run (da `backend/`): `pytest tests/contracts/ -v`
 Expected: tutti PASS (incluso il determinismo di `main` — l'iniezione è ordinata e `json.dumps(sort_keys=True)` la stabilizza).
 
-- [ ] **Step 4: Lint e typecheck**
+- [x] **Step 4: Lint e typecheck**
 
 Run (da `backend/`): `ruff check api/openapi_export.py tests/contracts/test_openapi_export.py; mypy api/openapi_export.py tests/contracts/test_openapi_export.py`
 Expected: nessun errore.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/api/openapi_export.py backend/tests/contracts/test_openapi_export.py
 git commit -m "feat(contracts): inject WS channel unions into the OpenAPI export"
 ```
+
+---
+
+> Eseguito @ c736b1c (review: compatibilita' openapi-typescript 7.13 PROVATA end-to-end su file temporanei; determinismo provato cross-process con PYTHONHASHSEED diversi; nessuna $ref pendente). Finding per il Task 6: `defaultNonNullable` (default true in v7) rende OBBLIGATORI nel TS i campi con default -> `origin`/`correlation_id` risulterebbero richiesti, contratto falso sul filo attuale. Decisione: lo script `gen:api:types` passa `--default-non-nullable false` (Step 0 del Task 6).
 
 ---
 
@@ -1736,6 +1740,22 @@ I file di tipi FE scritti a mano diventano re-export dei generati (stessa mossa 
 - Modify: `frontend/src/renderer/src/types/email.ts`
 - Modify: `frontend/src/renderer/src/types/turn.ts`
 - Modify: `frontend/src/renderer/src/types/chat.ts`
+
+- [ ] **Step 0: Disattivare defaultNonNullable nel codegen (decisione da review Task 5)**
+
+In `frontend/package.json`, sostituire lo script:
+
+```json
+    "gen:api:types": "openapi-typescript src/renderer/src/types/generated/openapi.json -o src/renderer/src/types/generated/api.d.ts"
+```
+
+con:
+
+```json
+    "gen:api:types": "openapi-typescript src/renderer/src/types/generated/openapi.json -o src/renderer/src/types/generated/api.d.ts --default-non-nullable false"
+```
+
+Rationale: senza il flag, openapi-typescript v7 marca come obbligatori i campi che hanno un default nello schema — `origin`/`correlation_id` diventerebbero richiesti nel TS mentre il filo attuale non li emette (contratto falso in ricezione, churn inutile in invio). Il flag tocca anche i tipi REST 1a: i campi con default nei REQUEST diventano opzionali (più corretto per i mittenti); i response model FastAPI hanno già tutti i campi in `required`, quindi invariati. Eventuali drift residui emergono al typecheck dello Step 6.
 
 - [ ] **Step 1: Rigenerare i contratti**
 
@@ -1908,7 +1928,7 @@ Expected: exit 0; vitest verde (gli spec di `agentRun` usano i tipi di `turn.ts`
 - [ ] **Step 8: Commit, poi gate di staleness**
 
 ```powershell
-git add frontend/src/renderer/src/types frontend/src/renderer/src/composables frontend/src/renderer/src/stores frontend/src/renderer/src/components
+git add frontend/package.json frontend/src/renderer/src/types frontend/src/renderer/src/composables frontend/src/renderer/src/stores frontend/src/renderer/src/components
 git commit -m "feat(contracts): FE consumes generated WS types (chat + events channels)"
 .\scripts\check-contracts.ps1
 ```
@@ -2296,6 +2316,10 @@ git commit -m "feat(contracts): runtime WS wire guard - DI-injected validators, 
 
 **Files:**
 - Modify: `CLAUDE.md` (sezione Conventions)
+
+- [ ] **Step -1: Fix docstring `build_schema`**
+
+In `backend/api/openapi_export.py`, la sezione Returns di `build_schema` dice ancora "exactly as FastAPI generates it" — non più vero dopo l'iniezione WS. Sostituire con: `The OpenAPI document as a plain dict, with the WS channel unions injected as named components.`
 
 - [ ] **Step 0: Aggiornare l'handoff stale**
 

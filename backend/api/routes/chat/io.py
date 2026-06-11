@@ -17,9 +17,10 @@ from loguru import logger
 
 from backend.core.config import PROJECT_ROOT
 from backend.db.models import Attachment, Conversation, Message
+from backend.services.conversation_export import build_conversation_export
 from backend.services.conversation_file_manager import ConversationFileManager
 
-from ._helpers import _build_conversation_data, _sync_conversation_to_file
+from ._helpers import _sync_conversation_to_file
 from ._shared import _ctx, _utcnow, router
 
 # Magic byte signatures for allowed image types.
@@ -100,7 +101,7 @@ async def export_conversation(
     """
     ctx = _ctx(request)
     async with ctx.db() as session:
-        data = await _build_conversation_data(session, conversation_id)
+        data = await build_conversation_export(session, conversation_id)
         if not data:
             raise HTTPException(
                 status_code=404, detail="Conversation not found",

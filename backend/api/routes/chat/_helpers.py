@@ -14,103 +14,21 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
-from sqlmodel import select
 
 from backend.core.context import AppContext
-from backend.db.models import Attachment, Conversation, Message
+from backend.db.models import Message
 from backend.services.context_manager import ContextManager
+from backend.services.conversation_export import build_conversation_export
 from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.permission_mode_policy import ModePolicy
 from backend.services.permission_mode_service import PermissionMode
-
-from ._shared import _attachment_url
-
-
-async def _build_conversation_data(
-    session: Any, conv_id: uuid.UUID,
-) -> dict[str, Any]:
-    """Build the full conversation dict (with messages + attachments) from DB.
-
-    The returned attachment dicts include **both** ``url`` (for API / frontend
-    consumption) and ``file_path`` (for file-level backup / recovery).
-
-    Args:
-        session: An active async DB session.
-        conv_id: The conversation UUID.
-
-    Returns:
-        A dict matching the JSON file schema.
-    """
-    conv = await session.get(Conversation, conv_id)
-    if conv is None:
-        return {}
-
-    msg_stmt = (
-        select(Message)
-        .where(Message.conversation_id == conv_id)
-        .order_by(Message.created_at, Message.id)
-    )
-    results = await session.exec(msg_stmt)
-    messages = results.all()
-
-    msg_ids = [m.id for m in messages]
-    att_map: dict[uuid.UUID, list[dict[str, str]]] = {}
-    if msg_ids:
-        att_stmt = select(Attachment).where(
-            Attachment.message_id.in_(msg_ids)  # type: ignore[union-attr]
-        )
-        att_results = await session.exec(att_stmt)
-        for att in att_results.all():
-            url = _attachment_url(att.file_path)
-            att_map.setdefault(att.message_id, []).append(
-                {
-                    "file_id": str(att.id),
-                    "url": url,
-                    "filename": att.filename,
-                    "content_type": att.content_type,
-                    "file_path": att.file_path,
-                }
-            )
-
-    return {
-        "id": str(conv.id),
-        "title": conv.title,
-        "created_at": conv.created_at.isoformat(),
-        "updated_at": conv.updated_at.isoformat(),
-        "active_versions": conv.active_versions or {},
-        "messages": [
-            {
-                "id": str(m.id),
-                "role": m.role,
-                "content": m.content,
-                "thinking_content": m.thinking_content,
-                "tool_calls": m.tool_calls,
-                "tool_call_id": m.tool_call_id,
-                "created_at": m.created_at.isoformat(),
-                "attachments": att_map.get(m.id) or None,
-                "version_group_id": str(m.version_group_id)
-                if m.version_group_id
-                else None,
-                "version_index": m.version_index,
-                "is_context_summary": getattr(m, "is_context_summary", False),
-                "context_excluded": getattr(m, "context_excluded", False),
-            }
-            for m in messages
-        ],
-    }
 
 
 async def _sync_conversation_to_file(
     session: Any, conv_id: uuid.UUID, file_manager: ConversationFileManager,
 ) -> None:
-    """Build the conversation data from DB and persist it to a JSON file.
-
-    Args:
-        session: An active async DB session (post-commit so data is flushed).
-        conv_id: The conversation UUID.
-        file_manager: The file manager instance.
-    """
-    data = await _build_conversation_data(session, conv_id)
+    """Build the conversation data from DB and persist it to a JSON file."""
+    data = await build_conversation_export(session, conv_id)
     if data:
         await file_manager.save(data)
 

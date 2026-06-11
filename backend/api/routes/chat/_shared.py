@@ -15,21 +15,15 @@ import contextlib
 from collections import defaultdict
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from loguru import logger
 
-from backend.core.config import PROJECT_ROOT
 from backend.core.context import AppContext
+from backend.services.conversation_export import _attachment_url  # noqa: F401
 from backend.services.turn import is_websocket_closed_runtime_error
 
 router = APIRouter(tags=["chat"])
-
-# Base path for uploaded files.
-_UPLOADS_BASE: Path = (PROJECT_ROOT / "data" / "uploads").resolve()
 
 # Active WebSocket connections per IP (for rate limiting).
 _ws_connections: dict[str, int] = defaultdict(int)
@@ -105,20 +99,3 @@ async def _receive_ws_text(websocket: WebSocket) -> str:
         if is_websocket_closed_runtime_error(exc):
             raise WebSocketDisconnect() from exc
         raise
-
-
-def _attachment_url(file_path: str) -> str:
-    """Build a safe ``/uploads/…`` URL from an attachment's file_path.
-
-    Uses :meth:`pathlib.Path.relative_to` instead of string splitting
-    to avoid path-traversal issues.  Components are percent-encoded.
-    """
-    try:
-        relative = Path(file_path).resolve().relative_to(_UPLOADS_BASE)
-        # Use POSIX-style separators so the URL works on Windows where
-        # ``Path.__str__`` would otherwise yield backslashes (which the
-        # static-file mount at ``/uploads`` does not match).
-        return f"/uploads/{quote(relative.as_posix(), safe='/')}"
-    except ValueError:
-        logger.warning("Attachment path outside uploads base: {}", file_path)
-        return ""

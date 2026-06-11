@@ -34,9 +34,9 @@ I gate diventano reali solo in CI (backlog 1a, punto 1). Workflow su runner Wind
 **Files:**
 - Create: `.github/workflows/contracts.yml`
 
-- [ ] **Step 1: Creare il workflow**
+- [x] **Step 1: Creare il workflow**
 
-Creare `.github/workflows/contracts.yml`:
+Creare `.github/workflows/contracts.yml` (gli exit-check per riga nello step pip sono un fix di review: sotto `shell: pwsh` GitHub propaga solo l'exit code dell'ULTIMO comando):
 
 ```yaml
 # FE<->BE contract gates (Fase 1 of the architecture remediation).
@@ -71,8 +71,11 @@ jobs:
       - name: Create venv and install backend
         run: |
           python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\.venv\Scripts\python.exe -m pip install -e "backend[dev,memory]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\.venv\Scripts\python.exe -m pip install sqlite-vec
 
       - name: Install frontend deps
@@ -93,19 +96,21 @@ jobs:
         run: npm run typecheck
 ```
 
-- [ ] **Step 2: Validare la sintassi YAML in locale**
+- [x] **Step 2: Validare la sintassi YAML in locale**
 
 Run (da repo root): `.\.venv\Scripts\python.exe -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('.github/workflows/contracts.yml').read_text(encoding='utf-8')); print('YAML OK')"`
 Expected: `YAML OK` (PyYAML è una dipendenza transitiva del backend nel venv; se mancasse, verificare l'indentazione a mano — non installare nulla solo per questo).
 
 Nota: il workflow non può essere eseguito end-to-end in locale; la verifica completa avverrà al primo push. Non è un criterio di uscita bloccante di questo task.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add .github/workflows/contracts.yml
 git commit -m "ci(contracts): minimal Windows workflow - contract tests, codegen freshness, FE typecheck"
 ```
+
+> Eseguito @ 677ae6d; fix di review (exit-check per riga) @ 2cc996c.
 
 ---
 
@@ -2320,3 +2325,4 @@ git commit -m "docs: WS contract conventions (ws_schema, exhaustive dispatcher, 
 - **`services/ws.ts` (canale chat FE)** resta un emitter string-keyed: il dispatcher tipizzato del canale chat ha senso insieme al rework Horizon (Fase 6).
 - **`correlation_id`** è riservato al Command Layer (Fase 7); nessun consumo in 1b.
 - Request-side enum su `PermissionModeUpdateRequest.mode`; `AgentTier` duplicato in `types/settings.ts:171`; burn-down baseline ratchet REST (94 voci) — invariati dal backlog 1a.
+- **Stabilità del gate di freshness vs dipendenze backend non pinnate** (finding review Task 1): `openapi.json` dipende dalle versioni di fastapi/pydantic risolte all'install (`>=`, nessun lockfile); un major upgrade può rendere "stale" gli artefatti su ogni PR. Valutare constraints file / parità di versione Python (CI 3.11 vs dev 3.13) quando il gate inizia a flappare.

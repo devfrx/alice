@@ -44,3 +44,6 @@ async def test_file_path_endpoint_removed(client: AsyncClient) -> None:
         f"/api/chat/conversations/{uuid.uuid4()}/file-path",
     )
     assert resp.status_code == 404
+    # Route-level 404 (unmatched path), NOT the old endpoint's
+    # "Conversation not found" — proves the route itself is gone.
+    assert resp.json() == {"detail": "Not Found"}

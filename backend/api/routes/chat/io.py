@@ -116,7 +116,6 @@ async def export_conversation(
         return data
 
 
-
 @router.post("/chat/conversations/import")
 async def import_conversation(request: Request) -> dict[str, Any]:
     """Import a conversation from a JSON export.
@@ -306,7 +305,7 @@ async def backup_conversations(
     """
     ctx = _ctx(request)
 
-    if body.dest_dir:
+    if body.dest_dir is not None:
         dest = Path(body.dest_dir)
         if not dest.is_absolute():
             raise HTTPException(
@@ -321,6 +320,7 @@ async def backup_conversations(
             ctx.db, dest, body.conversation_ids,
         )
     except OSError as exc:
+        logger.warning("Backup failed for {}: {}", dest, exc)
         raise HTTPException(
             status_code=400, detail=f"Cannot write to destination: {exc}",
         ) from None

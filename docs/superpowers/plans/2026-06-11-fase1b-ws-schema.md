@@ -1948,7 +1948,7 @@ Expected: commit creato; poi `Contracts are up to date.` (Aggiungere al commit o
 **Files:**
 - Modify: `frontend/src/renderer/src/composables/useEventsWebSocket.ts`
 
-- [ ] **Step 0a: Migrare `ArtifactCreatedEvent` al tipo generato (finding review Task 6)**
+- [x] **Step 0a: Migrare `ArtifactCreatedEvent` al tipo generato (finding review Task 6)**
 
 In `frontend/src/renderer/src/types/artifacts.ts`, sostituire l'interfaccia hand-written `ArtifactCreatedEvent` (righe ~60-66, ha `title: string` required e `kind: ArtifactKind` stretto — divergenti dal contratto: `title?: string | null`, `kind: string`) con:
 
@@ -1961,7 +1961,7 @@ export type ArtifactCreatedEvent = ApiSchema<'WsArtifactCreated'>
 
 (adattare i consumatori al typecheck, mai il contrario).
 
-- [ ] **Step 0b: Tipizzare il send path events (finding review Task 6)**
+- [x] **Step 0b: Tipizzare il send path events (finding review Task 6)**
 
 In `frontend/src/renderer/src/composables/useEventsWebSocket.ts`, la firma di `sendEventsMessage` passa da `Record<string, unknown>` a `EventsClientMessage`:
 
@@ -1971,7 +1971,7 @@ export function sendEventsMessage(frame: EventsClientMessage): boolean {
 
 I due costruttori di frame in `stores/terminalSessions.ts` (~207, ~218) devono compilare contro il tipo generato (sono `terminal.input`/`terminal.resize` — già conformi; il typecheck lo prova). Il ping interno al composable diventa anch'esso conforme (`{ type: 'ping' }` valida).
 
-- [ ] **Step 1: Tipizzare il modulo e costruire la mappa**
+- [x] **Step 1: Tipizzare il modulo e costruire la mappa**
 
 In `frontend/src/renderer/src/composables/useEventsWebSocket.ts`:
 
@@ -2053,24 +2053,28 @@ type EventsHandlerMap = {
 
 5. Rimuovere gli import dei tipi `Ws*Message` divenuti inutilizzati nel file (il dispatcher passa `msg` già narrowed; gli store tipizzano i parametri).
 
-- [ ] **Step 2: Verifica di esaustività (il typecheck è il test)**
+- [x] **Step 2: Verifica di esaustività (il typecheck è il test)**
 
 Run (da `frontend/`): `npm run typecheck`
 Expected: exit 0. Controprova dell'esaustività: commentare temporaneamente la riga `'email.sent': noop,` → `npm run typecheck` DEVE fallire con "Property 'email.sent' is missing"; ripristinare la riga e riverificare exit 0.
 
 Se gli handler degli store hanno firme incompatibili coi tipi generati (es. `onServiceStatus` si aspetta un tipo locale), aggiornare la firma dello store al tipo generato — mai cast `as` per zittire.
 
-- [ ] **Step 3: Lint sui file toccati**
+- [x] **Step 3: Lint sui file toccati**
 
 Run (da `frontend/`): `npx eslint src/renderer/src/composables/useEventsWebSocket.ts src/renderer/src/stores/`
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add frontend/src/renderer/src/composables/useEventsWebSocket.ts frontend/src/renderer/src/stores
 git commit -m "feat(fe): exhaustive typed dispatcher for the events WebSocket"
 ```
+
+---
+
+> Eseguito @ d5dd6f5 + a7a3cce (ping via sender tipizzato, fix di review). Controprova di esaustivita' riprodotta dal reviewer (TS2741 su chiave mancante). Nessuna regressione comportamentale rilevata; store `services.ts` adattato ai tipi generati con normalizzazione esplicita del payload loose di `model_download_progress`. Nota minor accettata: due narrowing `as` in services.ts:238,262 su union locali strette (contratto stringly-typed lato BE) - da rivedere se il dominio services viene tipizzato nelle fasi 2-6.
 
 ---
 

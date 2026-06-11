@@ -2094,7 +2094,7 @@ Limiti dichiarati (non nasconderli in review): molti emettitori del canale event
 - Modify: `backend/tests/conftest.py` (strict env)
 - Test: `backend/tests/contracts/test_ws_guard.py`
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 Creare `backend/tests/contracts/test_ws_guard.py`:
 
@@ -2141,7 +2141,7 @@ def test_lax_mode_only_warns(monkeypatch: pytest.MonkeyPatch) -> None:
 Run (da `backend/`): `pytest tests/contracts/test_ws_guard.py -v`
 Expected: ERROR con `ModuleNotFoundError` su `backend.api.ws_schema.guard`.
 
-- [ ] **Step 2: Implementare il guard**
+- [x] **Step 2: Implementare il guard**
 
 Creare `backend/api/ws_schema/guard.py`:
 
@@ -2206,12 +2206,12 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 3: Eseguire il test del guard**
+- [x] **Step 3: Eseguire il test del guard**
 
 Run (da `backend/`): `pytest tests/contracts/test_ws_guard.py -v`
 Expected: 4 PASS.
 
-- [ ] **Step 4: Punto di aggancio — WSConnectionManager (events)**
+- [x] **Step 4: Punto di aggancio — WSConnectionManager (events)**
 
 In `backend/services/ws_connection_manager.py`:
 
@@ -2252,7 +2252,7 @@ In `backend/services/ws_connection_manager.py`:
     ws_connection_manager.set_frame_validator(events_frame_validator)
 ```
 
-- [ ] **Step 5: Punto di aggancio — sink e channel (chat)**
+- [x] **Step 5: Punto di aggancio — sink e channel (chat)**
 
 In `backend/services/turn/sink.py`, classe `WebSocketEventSink`:
 
@@ -2313,7 +2313,7 @@ from backend.api.ws_schema.guard import chat_frame_validator
 6. Riga ~107: `channel = WebSocketInteractionChannel(websocket)` → `channel = WebSocketInteractionChannel(websocket, frame_validator=chat_frame_validator)`
 7. Riga ~164: `sink = WebSocketEventSink(websocket)` → `sink = WebSocketEventSink(websocket, frame_validator=chat_frame_validator)`
 
-- [ ] **Step 6: Strict mode nella suite**
+- [x] **Step 6: Strict mode nella suite**
 
 In `backend/tests/conftest.py`, aggiungere subito dopo gli import di modulo (prima di qualunque fixture):
 
@@ -2324,22 +2324,26 @@ os.environ.setdefault("ALICE_WS_STRICT_CONTRACTS", "1")
 
 (aggiungere `import os` se assente).
 
-- [ ] **Step 7: Test mirati dei moduli toccati**
+- [x] **Step 7: Test mirati dei moduli toccati**
 
 Run (da `backend/`): `pytest tests/contracts/ tests/test_interaction_channel.py tests/test_tool_loop.py -v`
 Expected: tutti PASS. Se un test fallisce per una violazione strict, è un frame reale fuori contratto: correggere il MODELLO se l'inventario era incompleto (aggiornando anche il vocabolario congelato e questo piano), oppure fermarsi e segnalare se l'emettitore è buggato.
 
-- [ ] **Step 8: Lint e typecheck**
+- [x] **Step 8: Lint e typecheck**
 
 Run (da `backend/`): `ruff check api/ws_schema/guard.py services/ws_connection_manager.py services/turn/sink.py services/turn/channel.py api/routes/chat/ws.py tests/contracts/test_ws_guard.py; mypy api/ws_schema/guard.py services/ws_connection_manager.py services/turn/sink.py services/turn/channel.py tests/contracts/test_ws_guard.py`
 Expected: nessun errore nuovo (eventuali errori pre-esistenti dei file `services/` vanno lasciati, non corretti qui: ruff/mypy scoped valgono per le RIGHE toccate).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add backend/api/ws_schema/guard.py backend/services/ws_connection_manager.py backend/services/turn/sink.py backend/services/turn/channel.py backend/api/routes/chat/ws.py backend/core/app.py backend/tests/conftest.py backend/tests/contracts/test_ws_guard.py
 git commit -m "feat(contracts): runtime WS wire guard - DI-injected validators, strict in tests"
 ```
+
+---
+
+> Eseguito @ ee96454 (review: verbatim, layering pulito - nessun import api da services, solo DI; 109 test mirati verdi). Nota di copertura onesta: nessun test attraversa OGGI un chokepoint di produzione col guard attivo (i test del channel costruiscono senza validator) - l'enforcement vivo sono test_ws_guard + i contract test 3-4, come previsto dai limiti dichiarati; il wiring verra' coperto dal primo test d'integrazione che attraversa ws_chat o il manager.
 
 ---
 

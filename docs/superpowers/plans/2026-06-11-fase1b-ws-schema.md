@@ -865,7 +865,7 @@ git commit -m "feat(contracts): typed ws_schema package - flat envelope + events
 - Modify: `backend/api/ws_schema/__init__.py`
 - Test: `backend/tests/contracts/test_ws_schema_chat.py`
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 Creare `backend/tests/contracts/test_ws_schema_chat.py`:
 
@@ -1131,12 +1131,12 @@ def test_unknown_chat_type_is_rejected() -> None:
 
 (L'ultimo test pinna un fatto verificato: il frame `usage` dell'LLM è consumato in `direct_executor.py:423` e NON è parte del contratto chat.)
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run (da `backend/`): `pytest tests/contracts/test_ws_schema_chat.py -v`
 Expected: ERROR con `ImportError` (manca `CHAT_SERVER_TYPES` / `backend.api.ws_schema.chat`).
 
-- [ ] **Step 3: Implementare i modelli del canale chat**
+- [x] **Step 3: Implementare i modelli del canale chat**
 
 Creare `backend/api/ws_schema/chat.py`:
 
@@ -1536,7 +1536,7 @@ ChatClientMessage = Annotated[
 ]
 ```
 
-- [ ] **Step 4: Estendere `__init__.py`**
+- [x] **Step 4: Estendere `__init__.py`**
 
 In `backend/api/ws_schema/__init__.py`:
 
@@ -1587,22 +1587,26 @@ def validate_chat_client(frame: dict[str, Any]) -> Any:
 
 5. Estendere `__all__` con: `"CHAT_CLIENT_TYPES"`, `"CHAT_SERVER_TYPES"`, `"ChatClientMessage"`, `"ChatServerMessage"`, `"WsUserMessage"`, `"validate_chat_client"`, `"validate_chat_server"` (mantenere l'ordinamento alfabetico).
 
-- [ ] **Step 5: Eseguire i test e verificare che passino**
+- [x] **Step 5: Eseguire i test e verificare che passino**
 
 Run (da `backend/`): `pytest tests/contracts/test_ws_schema_chat.py tests/contracts/test_ws_schema_events.py -v`
 Expected: tutti PASS.
 
-- [ ] **Step 6: Lint e typecheck**
+- [x] **Step 6: Lint e typecheck**
 
 Run (da `backend/`): `ruff check api/ws_schema/ tests/contracts/; mypy api/ws_schema/ tests/contracts/test_ws_schema_chat.py`
 Expected: nessun errore.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add backend/api/ws_schema backend/tests/contracts/test_ws_schema_chat.py
 git commit -m "feat(contracts): typed ws_schema for the chat channel (27 server + 4 client frames)"
 ```
+
+---
+
+> Eseguito @ 33596ea (review: contratto veritiero su tutti i siti di emissione reali, incl. `tool_execution_done.result` sempre str via `_result_to_str`; `usage`/`done` LLM mai sul filo. Note: outcome `"disconnected"` mai emesso (superset deliberato); round-trip `client_tool_call`/`client_tool_result` oggi senza implementazione FE viva — rilevante per il Task 6).
 
 ---
 
@@ -2339,6 +2343,7 @@ git commit -m "docs: WS contract conventions (ws_schema, exhaustive dispatcher, 
 - **Emissione di `origin` sul filo**: i modelli lo dichiarano (default), gli emettitori non lo mandano ancora; la compilazione degli emettitori sui modelli (costruire `WsX(...)` invece di dict) è burn-down delle fasi 2-6, dominio per dominio.
 - **`services/ws.ts` (canale chat FE)** resta un emitter string-keyed: il dispatcher tipizzato del canale chat ha senso insieme al rework Horizon (Fase 6).
 - **`correlation_id`** è riservato al Command Layer (Fase 7); nessun consumo in 1b.
+- Docstring drift pre-esistente in `services/turn/events.py:200-205`: elenca l'outcome `"disconnected"` (mai emesso) e omette `"failed"` (emesso, `pipeline.py:469`) — allineare quando si tocca il modulo.
 - Request-side enum su `PermissionModeUpdateRequest.mode`; `AgentTier` duplicato in `types/settings.ts:171`; burn-down baseline ratchet REST (94 voci) — invariati dal backlog 1a.
 - **Il plugin calendar non emette `calendar.changed`** (finding review Task 2, pre-esistente): i tool LLM `create_event`/`update_event`/`delete_event` del plugin mutano la stessa tabella delle route REST ma non broadcastano — le modifiche agent-driven arrivano alla UI solo via polling. Da chiudere quando si tocca il dominio calendar (principio §4: stessa implementazione per route e tool).
 - **Stabilità del gate di freshness vs dipendenze backend non pinnate** (finding review Task 1): `openapi.json` dipende dalle versioni di fastapi/pydantic risolte all'install (`>=`, nessun lockfile); un major upgrade può rendere "stale" gli artefatti su ogni PR. Valutare constraints file / parità di versione Python (CI 3.11 vs dev 3.13) quando il gate inizia a flappare.

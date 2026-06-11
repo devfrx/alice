@@ -22,7 +22,7 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
     "build:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/build-installer.ps1",
-    "gen:api:types": "openapi-typescript src/renderer/src/types/generated/openapi.json -o src/renderer/src/types/generated/api.d.ts"
+    "gen:api:types": "openapi-typescript src/renderer/src/types/generated/openapi.json -o src/renderer/src/types/generated/api.d.ts --default-non-nullable false"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",

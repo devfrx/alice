@@ -30,11 +30,7 @@ export interface PlanDocumentResponse {
   updated_at: string | null
 }
 
-/** Events-WS frame pushing the full, current plan document for a conversation. */
-export interface WsPlanDocumentUpdatedMessage {
-  type: 'plan_document.updated'
-  conversation_id: string
-  title: string
-  body: string
-  updated_at: string | null
-}
+import type { ApiSchema } from './generated'
+
+/** Generated from the backend WS contract — do not redefine locally. */
+export type WsPlanDocumentUpdatedMessage = ApiSchema<'WsPlanDocumentUpdated'>

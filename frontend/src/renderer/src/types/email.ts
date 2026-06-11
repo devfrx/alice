@@ -28,14 +28,8 @@ export interface EmailSearchRequest {
   limit?: number
 }
 
-/** WebSocket event emitted when a new email arrives via IMAP IDLE. */
-export interface WsEmailReceivedMessage {
-  type: 'email.received'
-  folder: string
-}
+import type { ApiSchema } from './generated'
 
-/** WebSocket event emitted after a successful send. */
-export interface WsEmailSentMessage {
-  type: 'email.sent'
-  message_id?: string
-}
+/** Generated from the backend WS contract — do not redefine locally. */
+export type WsEmailReceivedMessage = ApiSchema<'WsEmailReceived'>
+export type WsEmailSentMessage = ApiSchema<'WsEmailSent'>

@@ -12,23 +12,14 @@
  * A {@link TaskStep} mirrors the backend step dict `{ "step", "status" }`.
  */
 
-/** One ordered step of a conversation task list. */
-export interface TaskStep {
-  /** Human-readable description of the step. */
-  step: string
-  /** Lifecycle state: "pending" | "in_progress" | "completed". */
-  status: string
-}
+import type { ApiSchema } from './generated'
+
+/** Generated from the backend WS contract — do not redefine locally. */
+export type TaskStep = ApiSchema<'WsTaskStep'>
+export type WsTasksUpdatedMessage = ApiSchema<'WsTasksUpdated'>
 
 /** REST payload returned by `GET /api/tasks/{conversation_id}`. */
 export interface TasksResponse {
-  conversation_id: string
-  steps: TaskStep[]
-}
-
-/** Events-WS frame pushing the full, current task list for a conversation. */
-export interface WsTasksUpdatedMessage {
-  type: 'tasks.updated'
   conversation_id: string
   steps: TaskStep[]
 }

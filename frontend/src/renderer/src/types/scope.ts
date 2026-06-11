@@ -20,9 +20,5 @@ import type { ApiSchema } from './generated'
 /** Generated from the backend contract — do not redefine locally. */
 export type ScopeResponse = ApiSchema<'ScopeResponse'>
 
-/** Events-WS frame pushing the full, current folder scope for a conversation. */
-export interface WsScopeUpdatedMessage {
-  type: 'scope.updated'
-  conversation_id: string
-  folders: string[]
-}
+/** Generated from the backend WS contract — do not redefine locally. */
+export type WsScopeUpdatedMessage = ApiSchema<'WsScopeUpdated'>

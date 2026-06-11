@@ -12,19 +12,10 @@
  *   `terminal.resize` control frames.
  */
 
-/** A single live terminal session (mirrors the backend snapshot). */
-export interface TerminalSession {
-  id: string
-  conversation_id: string
-  title: string
-  cwd: string
-  rows: number
-  cols: number
-  agent_assigned: boolean
-  created_at: string
-  pid: number | null
-  alive: boolean
-}
+import type { ApiSchema } from './generated'
+
+/** Generated from the backend WS contract — do not redefine locally. */
+export type TerminalSession = ApiSchema<'WsTerminalSession'>
 
 /** Response of `GET /api/terminal/{conversation_id}`. */
 export interface TerminalListResponse {
@@ -49,53 +40,12 @@ export interface TerminalUpdateRequest {
 }
 
 // --- Events-WS frames (server → client) ------------------------------------
-
-export interface WsTerminalSessionOpenedMessage {
-  type: 'terminal.session_opened'
-  conversation_id: string
-  session: TerminalSession
-}
-
-export interface WsTerminalOutputMessage {
-  type: 'terminal.output'
-  conversation_id: string
-  session_id: string
-  data: string
-}
-
-export interface WsTerminalClosedMessage {
-  type: 'terminal.closed'
-  conversation_id: string
-  session_id: string
-  exit_code: number | null
-}
-
-export interface WsTerminalRenamedMessage {
-  type: 'terminal.renamed'
-  conversation_id: string
-  session_id: string
-  title: string
-}
-
-export interface WsTerminalAssignedMessage {
-  type: 'terminal.assigned'
-  conversation_id: string
-  session_id: string
-}
+export type WsTerminalSessionOpenedMessage = ApiSchema<'WsTerminalSessionOpened'>
+export type WsTerminalOutputMessage = ApiSchema<'WsTerminalOutput'>
+export type WsTerminalClosedMessage = ApiSchema<'WsTerminalClosed'>
+export type WsTerminalRenamedMessage = ApiSchema<'WsTerminalRenamed'>
+export type WsTerminalAssignedMessage = ApiSchema<'WsTerminalAssigned'>
 
 // --- Control frames (client → server, over the events WS) ------------------
-
-export interface WsTerminalInputFrame {
-  type: 'terminal.input'
-  conversation_id: string
-  session_id: string
-  data: string
-}
-
-export interface WsTerminalResizeFrame {
-  type: 'terminal.resize'
-  conversation_id: string
-  session_id: string
-  rows: number
-  cols: number
-}
+export type WsTerminalInputFrame = ApiSchema<'WsTerminalInput'>
+export type WsTerminalResizeFrame = ApiSchema<'WsTerminalResize'>

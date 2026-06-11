@@ -9,3 +9,9 @@ import type { components } from './api'
 
 /** Resolve a backend Pydantic model by its OpenAPI component name. */
 export type ApiSchema<K extends keyof components['schemas']> = components['schemas'][K]
+
+/** Discriminated unions of the two WS channels (generated from ws_schema). */
+export type ChatServerMessage = ApiSchema<'ChatServerMessage'>
+export type ChatClientMessage = ApiSchema<'ChatClientMessage'>
+export type EventsServerMessage = ApiSchema<'EventsServerMessage'>
+export type EventsClientMessage = ApiSchema<'EventsClientMessage'>

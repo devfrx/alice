@@ -122,7 +122,7 @@ Unico evento fuori convenzione `dominio.azione` (spec §6). Va fatto PRIMA dei m
 - Modify: `backend/api/routes/calendar.py:346,408,438`
 - Modify: `frontend/src/renderer/src/composables/useEventsWebSocket.ts:113`
 
-- [ ] **Step 1: Rinominare nel backend**
+- [x] **Step 1: Rinominare nel backend**
 
 In `backend/api/routes/calendar.py`, sostituire in TUTTE e tre le occorrenze (righe ~346, ~408, ~438):
 
@@ -136,7 +136,7 @@ con:
             "type": "calendar.changed",
 ```
 
-- [ ] **Step 2: Rinominare nel frontend**
+- [x] **Step 2: Rinominare nel frontend**
 
 In `frontend/src/renderer/src/composables/useEventsWebSocket.ts` riga ~113, sostituire:
 
@@ -150,23 +150,25 @@ con:
         if (data.type === 'calendar.changed') {
 ```
 
-- [ ] **Step 3: Verificare che non restino riferimenti**
+- [x] **Step 3: Verificare che non restino riferimenti**
 
 Run (da repo root): `git grep -n "calendar_changed" -- backend frontend/src`
 Expected: nessun risultato (exit code 1). Se compaiono altri riferimenti (test, store), aggiornarli allo stesso modo e annotarlo qui.
 
-- [ ] **Step 4: Lint e typecheck mirati**
+- [x] **Step 4: Lint e typecheck mirati**
 
 Run (da `backend/`): `ruff check api/routes/calendar.py`
 Run (da `frontend/`): `npx eslint src/renderer/src/composables/useEventsWebSocket.ts; npm run typecheck`
-Expected: tutti exit 0.
+Expected: typecheck exit 0. Nota a posteriori: `calendar.py` ha 11 errori ruff PRE-ESISTENTI (verificato sul commit parent: nessuno introdotto dal rename) — vale il gate "ruff scoped alle righe toccate".
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/api/routes/calendar.py frontend/src/renderer/src/composables/useEventsWebSocket.ts
 git commit -m "refactor(ws)!: rename calendar_changed to calendar.changed (dominio.azione convention)"
 ```
+
+> Eseguito @ 1ef6f4f (review: nessun consumatore nascosto del vecchio nome; unico emettitore confermato `api/routes/calendar.py`; nessun rischio replay — WS manager fire-and-forget).
 
 ---
 
@@ -2282,6 +2284,10 @@ git commit -m "feat(contracts): runtime WS wire guard - DI-injected validators, 
 **Files:**
 - Modify: `CLAUDE.md` (sezione Conventions)
 
+- [ ] **Step 0: Aggiornare l'handoff stale**
+
+In `docs/superpowers/handoffs/2026-06-11-risanamento-handoff.md`: la riga 19 ("oggi convivono `calendar_changed` e `mcp.server.connected`") e la riga 31 (inventario con `calendar_changed`) sono diventate false col Task 2 — aggiornare entrambe a `calendar.changed` con nota "(rinominato in 1b)".
+
 - [ ] **Step 1: Aggiornare la convenzione contratti in CLAUDE.md**
 
 In `CLAUDE.md`, sezione `## Conventions`, sostituire il bullet che inizia con `- **Contracts are generated**:` con:
@@ -2325,4 +2331,5 @@ git commit -m "docs: WS contract conventions (ws_schema, exhaustive dispatcher, 
 - **`services/ws.ts` (canale chat FE)** resta un emitter string-keyed: il dispatcher tipizzato del canale chat ha senso insieme al rework Horizon (Fase 6).
 - **`correlation_id`** è riservato al Command Layer (Fase 7); nessun consumo in 1b.
 - Request-side enum su `PermissionModeUpdateRequest.mode`; `AgentTier` duplicato in `types/settings.ts:171`; burn-down baseline ratchet REST (94 voci) — invariati dal backlog 1a.
+- **Il plugin calendar non emette `calendar.changed`** (finding review Task 2, pre-esistente): i tool LLM `create_event`/`update_event`/`delete_event` del plugin mutano la stessa tabella delle route REST ma non broadcastano — le modifiche agent-driven arrivano alla UI solo via polling. Da chiudere quando si tocca il dominio calendar (principio §4: stessa implementazione per route e tool).
 - **Stabilità del gate di freshness vs dipendenze backend non pinnate** (finding review Task 1): `openapi.json` dipende dalle versioni di fastapi/pydantic risolte all'install (`>=`, nessun lockfile); un major upgrade può rendere "stale" gli artefatti su ogni PR. Valutare constraints file / parità di versione Python (CI 3.11 vs dev 3.13) quando il gate inizia a flappare.

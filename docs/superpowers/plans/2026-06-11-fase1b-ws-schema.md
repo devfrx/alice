@@ -2352,19 +2352,19 @@ git commit -m "feat(contracts): runtime WS wire guard - DI-injected validators, 
 **Files:**
 - Modify: `CLAUDE.md` (sezione Conventions)
 
-- [ ] **Step -1: Fix docstring `build_schema`**
+- [x] **Step -1: Fix docstring `build_schema`**
 
 In `backend/api/openapi_export.py`, la sezione Returns di `build_schema` dice ancora "exactly as FastAPI generates it" — non più vero dopo l'iniezione WS. Sostituire con: `The OpenAPI document as a plain dict, with the WS channel unions injected as named components.`
 
-- [ ] **Step 0a: Header doc stale nei file di tipi**
+- [x] **Step 0a: Header doc stale nei file di tipi**
 
 `types/chat.ts:4-6` dice ancora "Every interface here mirrors the JSON shapes returned by backend/api/routes/chat.py" e `types/turn.ts:3-8` "These mirror the additive canonical turn-event stream" — entrambi i file ora RE-ESPORTANO tipi generati. Aggiornare i due header a una frase veritiera (es. "WS types are re-exported from the generated contract; only view-models are hand-written here."). Il canale voice (useVoice.ts, types/voice.ts) resta hand-typed: fuori scope 1b, citarlo nel backlog.
 
-- [ ] **Step 0: Aggiornare l'handoff stale**
+- [x] **Step 0: Aggiornare l'handoff stale**
 
 In `docs/superpowers/handoffs/2026-06-11-risanamento-handoff.md`: la riga 19 ("oggi convivono `calendar_changed` e `mcp.server.connected`") e la riga 31 (inventario con `calendar_changed`) sono diventate false col Task 2 — aggiornare entrambe a `calendar.changed` con nota "(rinominato in 1b)".
 
-- [ ] **Step 1: Aggiornare la convenzione contratti in CLAUDE.md**
+- [x] **Step 1: Aggiornare la convenzione contratti in CLAUDE.md**
 
 In `CLAUDE.md`, sezione `## Conventions`, sostituire il bullet che inizia con `- **Contracts are generated**:` con:
 
@@ -2372,7 +2372,7 @@ In `CLAUDE.md`, sezione `## Conventions`, sostituire il bullet che inizia con `-
 - **Contracts are generated**: new/changed REST endpoints must declare a Pydantic `response_model` (ratchet test in `backend/tests/contracts/`); every WebSocket frame on both channels is a Pydantic model in `backend/api/ws_schema/` (flat envelope: `type` discriminant + `origin` + `correlation_id?`; frozen vocabulary tests in `backend/tests/contracts/`). Any contract change requires regenerating (`.\scripts\gen-contracts.ps1`). Files in `frontend/src/renderer/src/types/generated/` are build artifacts — never edit them by hand (except `index.ts`) and never hand-merge them on conflicts: regenerate instead. The events-WS frontend dispatcher (`useEventsWebSocket.ts`) is an exhaustive `type → handler` map: adding a frame without handling it is a compile error. CI runs these gates in `.github/workflows/contracts.yml` (codegen pinned via `npm ci`).
 ```
 
-- [ ] **Step 2: Verifica finale completa**
+- [x] **Step 2: Verifica finale completa**
 
 Nota: la suite backend completa resta impraticabile (difetto pre-esistente della fixture `app`, ~25s di setup per test, tracciato come task separato); la verifica usa i test mirati.
 
@@ -2385,7 +2385,7 @@ cd frontend; npm run typecheck        # Expected: exit 0
 cd frontend; npm run test             # Expected: vitest verde
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add CLAUDE.md
@@ -2394,7 +2394,18 @@ git commit -m "docs: WS contract conventions (ws_schema, exhaustive dispatcher, 
 
 ---
 
+> Eseguito @ 82b8985 (verifica finale: 109 test mirati backend, ruff/mypy puliti su ws_schema+export+contracts, check-contracts verde, typecheck FE 0, vitest 259/259).
+
+---
+
 ## Criteri di uscita della fase (dalla spec §9)
+
+> **Stato: FASE COMPLETATA @ 82b8985** (9 task, review spec+quality per ognuno). Verifica con test
+> mirati (contracts 82 + interaction_channel + tool_loop = 109 verdi; typecheck FE e vitest 259/259
+> verdi; check-contracts verde). Criterio 3 (verifica end-to-end ad app avviata) NON eseguito in
+> questa sessione: il payload sul filo e' invariato per design (envelope additivo, rename
+> calendar.changed sincronizzato BE+FE) - da spuntare al primo avvio di sviluppo. La CI (Task 1)
+> diventa effettiva al primo push.
 
 1. Test mirati backend verdi (`tests/contracts/` + canali/domini toccati), `npm run typecheck` e `npm run test` verdi.
 2. `.\scripts\check-contracts.ps1` verde su working tree pulito.

@@ -26,7 +26,7 @@ def _union_member_types(union: Any) -> frozenset[str]:
     found: set[str] = set()
     for member in members:
         literal = member.model_fields["type"].annotation
-        found.add(typing.get_args(literal)[0])
+        found.update(typing.get_args(literal))
     return frozenset(found)
 
 

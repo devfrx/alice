@@ -68,7 +68,7 @@ REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
         "service": "qdrant",
         "status": "ready",
         "detail": None,
-        "timestamp": 1718000000.0,
+        "timestamp": "2026-06-11T00:00:00",
     },
     {
         "type": "service.model_download_progress",
@@ -176,6 +176,15 @@ def test_extra_field_is_rejected() -> None:
     """extra='forbid' makes silent payload drift loud."""
     with pytest.raises(ValidationError):
         validate_events_server({"type": "pong", "surprise": 1})
+
+
+def test_model_download_progress_allows_extra_fields() -> None:
+    """The one intentional extra='allow' escape hatch must keep working."""
+    validate_events_server({
+        "type": "service.model_download_progress",
+        "service": "stt",
+        "new_dynamic_field": 1,
+    })
 
 
 def test_mode_literal_matches_enum() -> None:

@@ -11,9 +11,9 @@ import contextlib
 import hashlib
 import json
 import uuid
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable
+from typing import Any
 
-from fastapi import WebSocketDisconnect
 from loguru import logger
 
 from backend.core.context import AppContext
@@ -38,9 +38,6 @@ from backend.services.turn.pipeline import (
     ToolPipeline,
 )
 from backend.services.turn.sink import WSEventSink
-
-# Type alias for the sync callback.
-SyncFn = Callable[..., Coroutine[Any, Any, None]]
 
 # Max retries when the LLM returns an empty response during re-query.
 # Local models occasionally produce empty completions after tool results;
@@ -91,7 +88,6 @@ async def run_tool_loop(
     max_iterations: int,
     confirmation_timeout_s: int,
     client_ip: str,
-    sync_fn: SyncFn | None,
     cancel_event: asyncio.Event | None = None,
     turn_progress: TurnProgress | None = None,
     memory_context: str | None = None,
@@ -123,7 +119,6 @@ async def run_tool_loop(
         max_iterations: Safety cap on loop iterations.
         confirmation_timeout_s: Seconds to wait for user confirmation.
         client_ip: Client IP used as session_id in ExecutionContext.
-        sync_fn: Async callback to sync conversation to JSON file.
         cancel_event: Optional event that, when set, signals the loop
             to stop early and return accumulated content.
         turn_progress: Optional mutable per-turn counters shared with the
@@ -436,7 +431,6 @@ async def run_tool_loop(
                     conv_id=conv_id,
                     mem_history=mem_history,
                     ver=_ver,
-                    sync_fn=sync_fn,
                     ctx=ctx,
                     turn_id=progress.turn_id,
                 )
@@ -444,8 +438,6 @@ async def run_tool_loop(
         # Release the SQLite write lock held by pending flush()es so that
         # plugin tools can write to the DB on their own connections.
         await session.commit()
-        if ctx.conversation_file_manager and sync_fn:
-            await sync_fn(session, conv_id, ctx.conversation_file_manager)
 
         # 3. Execute all tools in parallel (with timeout).
         coros = [
@@ -669,12 +661,7 @@ async def run_tool_loop(
             if artifact_id:
                 ws_payload["artifact_id"] = artifact_id
 
-            try:
-                await sink.send(ws_payload)
-            except WebSocketDisconnect:
-                if ctx.conversation_file_manager and sync_fn:
-                    await sync_fn(session, conv_id, ctx.conversation_file_manager)
-                raise
+            await sink.send(ws_payload)
 
             # Additive canonical frame mirrors the legacy done frame above
             # (same content / success / content_type / artifact_id).
@@ -696,11 +683,7 @@ async def run_tool_loop(
             logger.debug("Tool loop cancelled after tool execution")
             break
 
-        # 5. Sync conversation to JSON file.
-        if ctx.conversation_file_manager and sync_fn:
-            await sync_fn(session, conv_id, ctx.conversation_file_manager)
-
-        # 6. Build messages for re-query — use in-memory history when
+        # 5. Build messages for re-query — use in-memory history when
         #    available, otherwise fall back to a DB fetch (legacy path).
         if mem_history is not None:
             updated_history = mem_history
@@ -856,7 +839,7 @@ async def run_tool_loop(
                         {"type": "context_compression_failed"},
                     )
 
-        # 7. Re-stream LLM (with retry on empty responses).
+        # 6. Re-stream LLM (with retry on empty responses).
         # Local LLMs sometimes return completely empty completions
         # after tool execution.  Retry up to _EMPTY_REQUERY_RETRIES
         # times before accepting an empty result as "final answer".
@@ -1063,7 +1046,6 @@ async def _persist_gate_outcome(
     conv_id: uuid.UUID,
     mem_history: list[dict[str, Any]] | None,
     ver: dict[str, Any],
-    sync_fn: SyncFn | None,
     ctx: AppContext,
     turn_id: str,
 ) -> None:
@@ -1092,8 +1074,6 @@ async def _persist_gate_outcome(
             result=outcome.result,
             mem_history=mem_history,
             ver=ver,
-            sync_fn=sync_fn,
-            ctx=ctx,
             turn_id=turn_id,
         )
         return
@@ -1259,8 +1239,6 @@ async def _persist_client_tool_result(
     result: ToolResult,
     mem_history: list[dict[str, Any]] | None,
     ver: dict[str, Any],
-    sync_fn: SyncFn | None,
-    ctx: AppContext,
     turn_id: str,
 ) -> None:
     """Persist a client-executed tool result and notify the client.
@@ -1291,9 +1269,6 @@ async def _persist_client_tool_result(
             "content": content,
             "tool_call_id": tc_id,
         })
-
-    if ctx.conversation_file_manager and sync_fn:
-        await sync_fn(session, conv_id, ctx.conversation_file_manager)
 
     await sink.send({
         "type": "tool_execution_done",

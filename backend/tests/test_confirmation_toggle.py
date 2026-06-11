@@ -82,7 +82,6 @@ def _build_mocks(*, confirmations_enabled: bool = True, mode: str = "strict"):
     ctx = MagicMock()
     ctx.config = cfg
     ctx.tool_registry = tool_registry
-    ctx.conversation_file_manager = None
     ctx.event_bus = MagicMock()
     ctx.event_bus.emit = AsyncMock()
 
@@ -164,7 +163,7 @@ async def test_confirmations_enabled_requests_approval():
             max_iterations=1,
             confirmation_timeout_s=30,
             client_ip="127.0.0.1",
-            sync_fn=None,
+
         )
 
         mock_confirm.assert_called_once()
@@ -186,7 +185,7 @@ async def test_strict_tier_always_prompts_even_with_global_flag_off():
         await run_tool_loop(
             channel=ws, sink=ws, ctx=ctx, session=session, conv_id=conv_id, llm=llm,
             tool_calls_from_llm=tool_calls, full_content="", thinking_content="",
-            max_iterations=1, confirmation_timeout_s=30, client_ip="127.0.0.1", sync_fn=None,
+            max_iterations=1, confirmation_timeout_s=30, client_ip="127.0.0.1",
         )
         mock_confirm.assert_called_once()  # NO LONGER silently auto-approved
 
@@ -206,7 +205,7 @@ async def test_autopilot_tier_does_not_prompt():
         await run_tool_loop(
             channel=ws, sink=ws, ctx=ctx, session=session, conv_id=conv_id, llm=llm,
             tool_calls_from_llm=tool_calls, full_content="", thinking_content="",
-            max_iterations=1, confirmation_timeout_s=30, client_ip="127.0.0.1", sync_fn=None,
+            max_iterations=1, confirmation_timeout_s=30, client_ip="127.0.0.1",
         )
         mock_confirm.assert_not_called()
     ctx.tool_registry.execute_tool.assert_called_once()
@@ -236,7 +235,6 @@ async def test_forbidden_blocked_even_when_confirmations_disabled():
         max_iterations=1,
         confirmation_timeout_s=30,
         client_ip="127.0.0.1",
-        sync_fn=None,
     )
 
     # Tool must NOT have been executed
@@ -286,7 +284,7 @@ async def test_audit_logged_when_confirmation_approved():
             max_iterations=1,
             confirmation_timeout_s=30,
             client_ip="127.0.0.1",
-            sync_fn=None,
+
         )
         mock_confirm.assert_called_once()
 
@@ -328,7 +326,7 @@ async def test_safe_tool_no_confirmation_regardless_of_toggle():
                 max_iterations=1,
                 confirmation_timeout_s=30,
                 client_ip="127.0.0.1",
-                sync_fn=None,
+    
             )
 
             mock_confirm.assert_not_called()
@@ -369,7 +367,7 @@ async def test_confirmations_enabled_rejected_by_user():
             max_iterations=1,
             confirmation_timeout_s=30,
             client_ip="127.0.0.1",
-            sync_fn=None,
+
         )
 
     ctx.tool_registry.execute_tool.assert_not_called()

@@ -26,7 +26,6 @@ from ._helpers import (
     _compute_context_breakdown,
     _filter_history_for_llm,
     _msg_to_raw_dict,
-    _sync_conversation_to_file,
 )
 from ._shared import _utcnow
 
@@ -159,10 +158,6 @@ async def _persist_final_turn(
             if conv.title is None and user_content:
                 conv.title = user_content[:100]
             await session.commit()
-            if ctx.conversation_file_manager:
-                await _sync_conversation_to_file(
-                    session, conv_id, ctx.conversation_file_manager,
-                )
         await sink.send(_build_done_event(
             conv_id=conv_id,
             user_msg_id=user_msg_id,
@@ -237,11 +232,6 @@ async def _persist_final_turn(
             }
 
         await session.commit()
-
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conv_id, ctx.conversation_file_manager,
-            )
 
         # v2-1: post-stream compression (truncated output OR token usage
         # over threshold).  Triggers a fresh compression pass so the
@@ -380,11 +370,6 @@ async def _run_post_stream_compression(
         )
         session.add(post_sum_msg)
         await session.commit()
-
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conv_id, ctx.conversation_file_manager,
-            )
 
         await sink.send({
             "type": "context_compression_done",

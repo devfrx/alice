@@ -1,15 +1,14 @@
-"""AL\\CE — Chat internal helpers (serialization, history, context).
+"""AL\\CE — Chat internal helpers (history filtering, context).
 
 Pure-ish helpers extracted verbatim from the legacy ``chat.py`` module:
-conversation serialization, version/history filtering, tool-RAG query
-building, DB archival, and system-prompt context blocks (MCP, memory,
-whiteboards) plus the per-category token breakdown.
+version/history filtering, tool-RAG query building, DB archival,
+and system-prompt context blocks (MCP, memory, whiteboards) plus the
+per-category token breakdown.
 """
 
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -18,19 +17,8 @@ from loguru import logger
 from backend.core.context import AppContext
 from backend.db.models import Message
 from backend.services.context_manager import ContextManager
-from backend.services.conversation_export import build_conversation_export
-from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.permission_mode_policy import ModePolicy
 from backend.services.permission_mode_service import PermissionMode
-
-
-async def _sync_conversation_to_file(
-    session: Any, conv_id: uuid.UUID, file_manager: ConversationFileManager,
-) -> None:
-    """Build the conversation data from DB and persist it to a JSON file."""
-    data = await build_conversation_export(session, conv_id)
-    if data:
-        await file_manager.save(data)
 
 
 def _filter_messages_by_active_versions(

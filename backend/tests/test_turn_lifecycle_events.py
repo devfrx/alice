@@ -157,7 +157,6 @@ async def _run_loop(
         max_iterations=max_iterations,
         confirmation_timeout_s=2,
         client_ip="127.0.0.1",
-        sync_fn=None,
     )
     return ws
 

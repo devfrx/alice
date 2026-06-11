@@ -114,7 +114,7 @@ async function refreshStats(): Promise<void> {
     error.value = null
     try {
         stats.value = await api.getVectorStoreStats()
-        servicesStore.onKnowledgeStatus(stats.value.rag)
+        servicesStore.onKnowledgeStatus({ ...stats.value.rag, type: 'knowledge.status' as const })
     } catch (err) {
         error.value = err instanceof Error ? err.message : 'Errore nel caricamento statistiche'
     } finally {
@@ -152,7 +152,7 @@ async function onRepair(): Promise<void> {
     error.value = null
     try {
         stats.value = await api.repairVectorStore()
-        servicesStore.onKnowledgeStatus(stats.value.rag)
+        servicesStore.onKnowledgeStatus({ ...stats.value.rag, type: 'knowledge.status' as const })
     } catch (err) {
         error.value = err instanceof Error ? err.message : 'Errore durante la riparazione'
     } finally {

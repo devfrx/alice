@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 
+from backend.api.ws_schema.guard import chat_frame_validator
 from backend.db.models import Message
 from backend.services.llm_service import LLMService
 from backend.services.turn import (
@@ -104,7 +105,7 @@ async def ws_chat(websocket: WebSocket) -> None:
     # Single inbound read-pump: it owns ``receive`` for the whole connection
     # and demultiplexes interaction responses / cancel / user messages, so
     # there is never more than one concurrent reader on the socket.
-    channel = WebSocketInteractionChannel(websocket)
+    channel = WebSocketInteractionChannel(websocket, frame_validator=chat_frame_validator)
     channel.start()
 
     try:
@@ -161,7 +162,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                 executor = create_turn_executor(
                     ctx, llm, sync_fn=_sync_conversation_to_file,
                 )
-                sink = WebSocketEventSink(websocket)
+                sink = WebSocketEventSink(websocket, frame_validator=chat_frame_validator)
 
                 executor_task = asyncio.create_task(
                     executor.execute(

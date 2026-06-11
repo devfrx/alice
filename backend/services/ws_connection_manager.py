@@ -8,6 +8,7 @@ updates and other background events.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import WebSocket
@@ -20,6 +21,17 @@ class WSConnectionManager:
     def __init__(self) -> None:
         self._connections: dict[str, WebSocket] = {}
         self._lock = asyncio.Lock()
+        self._frame_validator: Callable[[dict[str, Any]], None] | None = None
+
+    def set_frame_validator(
+        self, validator: Callable[[dict[str, Any]], None] | None,
+    ) -> None:
+        """Install an outbound frame validator (injected by the app wiring).
+
+        The manager itself stays contract-agnostic: ``services`` must not
+        import ``backend.api.ws_schema`` (layering, spec §4).
+        """
+        self._frame_validator = validator
 
     async def connect(self, session_id: str, ws: WebSocket) -> None:
         """Accept and register a WebSocket connection.
@@ -53,6 +65,8 @@ class WSConnectionManager:
         Args:
             event: JSON-serializable event dict to broadcast.
         """
+        if self._frame_validator is not None:
+            self._frame_validator(event)
         async with self._lock:
             snapshot = list(self._connections.items())
 

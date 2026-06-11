@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import pytest
 from unittest.mock import AsyncMock
+
+# WS wire guard: violations raise inside the test suite (warn-only in prod).
+os.environ.setdefault("ALICE_WS_STRICT_CONTRACTS", "1")
 
 from httpx import ASGITransport, AsyncClient
 

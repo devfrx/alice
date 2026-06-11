@@ -17,6 +17,7 @@ See ``alice/agent_loop_plan.md`` §3.3 for the full contract.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from loguru import logger
@@ -75,11 +76,20 @@ class WebSocketEventSink:
 
     Args:
         ws: The accepted FastAPI ``WebSocket`` to forward events to.
+        frame_validator: Optional callable injected by the api layer to
+            validate outbound frames against the typed contract.  The
+            ``services`` layer must never import ``backend.api.ws_schema``
+            directly (spec §4).
     """
 
-    def __init__(self, ws: WebSocket) -> None:
+    def __init__(
+        self,
+        ws: WebSocket,
+        frame_validator: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
         self._ws = ws
         self._closed = False
+        self._validate = frame_validator
 
     async def send(self, event: dict[str, Any]) -> None:
         """Send ``event`` as JSON; swallow disconnect / runtime errors.
@@ -88,6 +98,8 @@ class WebSocketEventSink:
         signal) to decide whether to keep streaming after a failure, so
         this method never raises on transport-level issues.
         """
+        if self._validate is not None:
+            self._validate(event)
         # Lazy import keeps this module free of FastAPI at type-check time.
         from fastapi import WebSocketDisconnect
 

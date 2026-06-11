@@ -16,7 +16,6 @@ from backend.core.config import AliceConfig
 from backend.core.event_bus import EventBus
 from backend.core.protocols import (
     ContextManagerProtocol,
-    ConversationFileManagerProtocol,
     EmbeddingClientProtocol,
     EmailServiceProtocol,
     KnowledgeBackendProtocol,
@@ -56,7 +55,6 @@ class AppContext:
     llm_service: LLMServiceProtocol | None = None
     stt_service: STTServiceProtocol | None = None
     tts_service: TTSServiceProtocol | None = None
-    conversation_file_manager: ConversationFileManagerProtocol | None = None
     lmstudio_manager: LMStudioManagerProtocol | None = None
     vram_monitor: VRAMMonitorProtocol | None = None
 

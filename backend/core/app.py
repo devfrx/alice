@@ -27,7 +27,6 @@ from backend.core.managed_services import (
     resolve_trellis_launcher,
 )
 from backend.db.database import create_engine_and_session, init_db
-from backend.services.conversation_file_manager import ConversationFileManager
 from backend.services.llm_service import LLMService
 from backend.services.lmstudio_service import LMStudioManager
 from backend.services.model_capability_registry import ModelCapabilityRegistry
@@ -210,20 +209,6 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     except Exception as exc:
         logger.warning("Orchestrator: failed to attach LM Studio: {}", exc)
-
-    conversations_dir = PROJECT_ROOT / "data" / "conversations"
-    ctx.conversation_file_manager = ConversationFileManager(conversations_dir)
-
-    # Restore conversations from JSON files that are missing from the DB.
-    if not testing:
-        try:
-            restored = await ctx.conversation_file_manager.rebuild_from_files(
-                session_factory,
-            )
-            if restored:
-                logger.info("Restored {} conversations from JSON files", restored)
-        except Exception as exc:
-            logger.error("Failed to rebuild conversations from files: {}", exc)
 
     # -- Embedding client + Qdrant service (shared) -------------------------
     from backend.services.embedding_client import EmbeddingClient

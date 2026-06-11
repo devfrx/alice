@@ -12,7 +12,6 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from backend.core.plugin_models import (
@@ -402,55 +401,6 @@ class LMStudioManagerProtocol(Protocol):
 
     async def close(self) -> None:
         """Release the underlying HTTP client."""
-        ...
-
-
-# ---------------------------------------------------------------------------
-# Conversation file manager
-# ---------------------------------------------------------------------------
-
-
-@runtime_checkable
-class ConversationFileManagerProtocol(Protocol):
-    """Protocol for file-based conversation persistence."""
-
-    @property
-    def base_dir(self) -> Path:
-        """The directory where conversation JSON files are stored."""
-        ...
-
-    async def save(
-        self, conversation_data: dict[str, Any], user_id: str | None = None,
-    ) -> None:
-        """Persist a conversation dict to its JSON file."""
-        ...
-
-    async def delete(
-        self, conversation_id: str, user_id: str | None = None,
-    ) -> None:
-        """Remove the JSON file for a conversation."""
-        ...
-
-    async def delete_all(self, user_id: str | None = None) -> int:
-        """Remove all JSON conversation files."""
-        ...
-
-    async def load(
-        self, conversation_id: str, user_id: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Read a single conversation from its JSON file."""
-        ...
-
-    async def load_all(
-        self, user_id: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Read all conversation JSON files."""
-        ...
-
-    async def rebuild_from_files(
-        self, session_factory: Any,
-    ) -> int:
-        """Rebuild DB from saved JSON files."""
         ...
 
 

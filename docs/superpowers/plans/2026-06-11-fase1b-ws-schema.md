@@ -1741,7 +1741,7 @@ I file di tipi FE scritti a mano diventano re-export dei generati (stessa mossa 
 - Modify: `frontend/src/renderer/src/types/turn.ts`
 - Modify: `frontend/src/renderer/src/types/chat.ts`
 
-- [ ] **Step 0: Disattivare defaultNonNullable nel codegen (decisione da review Task 5)**
+- [x] **Step 0: Disattivare defaultNonNullable nel codegen (decisione da review Task 5)**
 
 In `frontend/package.json`, sostituire lo script:
 
@@ -1757,12 +1757,12 @@ con:
 
 Rationale: senza il flag, openapi-typescript v7 marca come obbligatori i campi che hanno un default nello schema — `origin`/`correlation_id` diventerebbero richiesti nel TS mentre il filo attuale non li emette (contratto falso in ricezione, churn inutile in invio). Il flag tocca anche i tipi REST 1a: i campi con default nei REQUEST diventano opzionali (più corretto per i mittenti); i response model FastAPI hanno già tutti i campi in `required`, quindi invariati. Eventuali drift residui emergono al typecheck dello Step 6.
 
-- [ ] **Step 1: Rigenerare i contratti**
+- [x] **Step 1: Rigenerare i contratti**
 
 Run: `.\scripts\gen-contracts.ps1`
 Expected: `Contracts regenerated.`; in `api.d.ts` esistono `EventsServerMessage`, `ChatServerMessage`, `WsToken`, `WsCalendarChanged` dentro `components['schemas']`.
 
-- [ ] **Step 2: Estendere l'alias module generato**
+- [x] **Step 2: Estendere l'alias module generato**
 
 In `frontend/src/renderer/src/types/generated/index.ts`, aggiungere in coda:
 
@@ -1774,7 +1774,7 @@ export type EventsServerMessage = ApiSchema<'EventsServerMessage'>
 export type EventsClientMessage = ApiSchema<'EventsClientMessage'>
 ```
 
-- [ ] **Step 3: Re-export nei file di dominio events**
+- [x] **Step 3: Re-export nei file di dominio events**
 
 In `frontend/src/renderer/src/types/tasks.ts` sostituire le interfacce `TaskStep` e `WsTasksUpdatedMessage` con:
 
@@ -1843,7 +1843,7 @@ export type WsEmailReceivedMessage = ApiSchema<'WsEmailReceived'>
 export type WsEmailSentMessage = ApiSchema<'WsEmailSent'>
 ```
 
-- [ ] **Step 4: Re-export dei tipi canonici di turno**
+- [x] **Step 4: Re-export dei tipi canonici di turno**
 
 In `frontend/src/renderer/src/types/turn.ts` sostituire le otto interfacce `Ws*Message` (e i tipi alias `InteractionKind`/`InteractionOutcome` se definiti localmente) con re-export; mantenere INVARIATI i view-model camelCase presenti nel file:
 
@@ -1864,7 +1864,7 @@ export type InteractionKind = WsInteractionRequestedMessage['kind']
 
 (Se il file definiva anche un tipo per l'outcome, ricavarlo allo stesso modo: `WsInteractionResolvedMessage['outcome']`.)
 
-- [ ] **Step 5: Re-export dei tipi chat**
+- [x] **Step 5: Re-export dei tipi chat**
 
 In `frontend/src/renderer/src/types/chat.ts`:
 
@@ -1915,17 +1915,17 @@ export type WsMessage = ChatServerMessage
 
 4. NON toccare i tipi non-WS del file (payload CAD/chart/whiteboard, `ToolExecution`, `ConfirmationRequest`, `AskUserRequest`, `ContextInfo`, export/import, ecc.).
 
-- [ ] **Step 6: Typecheck e fix dei drift**
+- [x] **Step 6: Typecheck e fix dei drift**
 
 Run (da `frontend/`): `npm run typecheck`
 Expected: probabili errori nei consumatori (es. campi ora `string | null` invece di `string | undefined`, `version_index` ora obbligatorio, accessi a campi su unioni più ampie). Sono drift veri trovati dal compilatore: **allineare i consumatori al contratto generato, non viceversa**. Tipici interventi: narrowing con `?? undefined`, guardie sul discriminante prima dell'accesso, aggiornare le firme degli store (`servicesStore.onServiceStatus` ecc.) ai tipi generati. Iterare fino a exit 0. Se un errore rivela un VERO disallineamento di contratto backend (campo che il BE non manda), fermarsi e segnalarlo.
 
-- [ ] **Step 7: Lint sui file toccati e test FE**
+- [x] **Step 7: Lint sui file toccati e test FE**
 
 Run (da `frontend/`): `npx eslint src/renderer/src/types/ src/renderer/src/composables/ src/renderer/src/stores/; npm run test`
 Expected: exit 0; vitest verde (gli spec di `agentRun` usano i tipi di `turn.ts`).
 
-- [ ] **Step 8: Commit, poi gate di staleness**
+- [x] **Step 8: Commit, poi gate di staleness**
 
 ```powershell
 git add frontend/package.json frontend/src/renderer/src/types frontend/src/renderer/src/composables frontend/src/renderer/src/stores frontend/src/renderer/src/components
@@ -1937,12 +1937,39 @@ Expected: commit creato; poi `Contracts are up to date.` (Aggiungere al commit o
 
 ---
 
+> Eseguito @ 4d28944 (typecheck 0, vitest 259/259, check-contracts verde). Review: narrowing veritiero (WsDone required-ness verificata su _build_done_event); sender chat tipizzati; coercizioni semantics-preserving. Finding spostati nel Task 7: (a) `sendEventsMessage` ancora `Record<string, unknown>` -> tipizzare su `EventsClientMessage`; (b) `ArtifactCreatedEvent` in `types/artifacts.ts:60-66` sfuggito alla migrazione (title/kind divergenti dal contratto) -> re-export generato. Minor per Task 9: header doc stale in `types/chat.ts:4-6` e `types/turn.ts:3-8`; canale voice fuori scope 1b.
+
+---
+
 ### Task 7: Dispatcher tipizzato esaustivo per il canale events
 
 `useEventsWebSocket.ts` passa dalla catena if/else a una mappa esaustiva `type → handler`: un tipo non gestito è un errore di compilazione (spec §6).
 
 **Files:**
 - Modify: `frontend/src/renderer/src/composables/useEventsWebSocket.ts`
+
+- [ ] **Step 0a: Migrare `ArtifactCreatedEvent` al tipo generato (finding review Task 6)**
+
+In `frontend/src/renderer/src/types/artifacts.ts`, sostituire l'interfaccia hand-written `ArtifactCreatedEvent` (righe ~60-66, ha `title: string` required e `kind: ArtifactKind` stretto — divergenti dal contratto: `title?: string | null`, `kind: string`) con:
+
+```typescript
+import type { ApiSchema } from './generated'
+
+/** Generated from the backend WS contract — do not redefine locally. */
+export type ArtifactCreatedEvent = ApiSchema<'WsArtifactCreated'>
+```
+
+(adattare i consumatori al typecheck, mai il contrario).
+
+- [ ] **Step 0b: Tipizzare il send path events (finding review Task 6)**
+
+In `frontend/src/renderer/src/composables/useEventsWebSocket.ts`, la firma di `sendEventsMessage` passa da `Record<string, unknown>` a `EventsClientMessage`:
+
+```typescript
+export function sendEventsMessage(frame: EventsClientMessage): boolean {
+```
+
+I due costruttori di frame in `stores/terminalSessions.ts` (~207, ~218) devono compilare contro il tipo generato (sono `terminal.input`/`terminal.resize` — già conformi; il typecheck lo prova). Il ping interno al composable diventa anch'esso conforme (`{ type: 'ping' }` valida).
 
 - [ ] **Step 1: Tipizzare il modulo e costruire la mappa**
 
@@ -2320,6 +2347,10 @@ git commit -m "feat(contracts): runtime WS wire guard - DI-injected validators, 
 - [ ] **Step -1: Fix docstring `build_schema`**
 
 In `backend/api/openapi_export.py`, la sezione Returns di `build_schema` dice ancora "exactly as FastAPI generates it" — non più vero dopo l'iniezione WS. Sostituire con: `The OpenAPI document as a plain dict, with the WS channel unions injected as named components.`
+
+- [ ] **Step 0a: Header doc stale nei file di tipi**
+
+`types/chat.ts:4-6` dice ancora "Every interface here mirrors the JSON shapes returned by backend/api/routes/chat.py" e `types/turn.ts:3-8` "These mirror the additive canonical turn-event stream" — entrambi i file ora RE-ESPORTANO tipi generati. Aggiornare i due header a una frase veritiera (es. "WS types are re-exported from the generated contract; only view-models are hand-written here."). Il canale voice (useVoice.ts, types/voice.ts) resta hand-typed: fuori scope 1b, citarlo nel backlog.
 
 - [ ] **Step 0: Aggiornare l'handoff stale**
 

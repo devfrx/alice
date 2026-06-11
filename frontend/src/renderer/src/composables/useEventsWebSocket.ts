@@ -124,9 +124,7 @@ export function useEventsWebSocket(): {
 
       // Send ping every 30s to keep connection alive
       pingInterval = setInterval(() => {
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }))
-        }
+        sendEventsMessage({ type: 'ping' })
       }, 30_000)
     }
 

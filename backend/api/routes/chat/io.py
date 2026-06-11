@@ -147,6 +147,10 @@ async def import_conversation(request: Request) -> dict[str, Any]:
             status_code=400, detail="Invalid conversation id",
         ) from None
 
+    title = body.get("title")
+    if title is not None and not isinstance(title, str):
+        raise HTTPException(status_code=400, detail="title must be a string")
+
     # Validate top-level timestamps if present.
     for ts_field in ("created_at", "updated_at"):
         if body.get(ts_field):
@@ -199,7 +203,7 @@ async def import_conversation(request: Request) -> dict[str, Any]:
 
         conv = Conversation(
             id=conv_id,
-            title=body.get("title"),
+            title=title,
             created_at=datetime.fromisoformat(body["created_at"])
             if body.get("created_at")
             else _utcnow(),

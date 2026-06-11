@@ -13,8 +13,6 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from starlette.testclient import TestClient
 
-from backend.services.llm_service import LLMService
-
 # ---------------------------------------------------------------------------
 # Mock LLM helpers (same as test_websocket.py)
 # ---------------------------------------------------------------------------

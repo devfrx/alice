@@ -197,6 +197,11 @@ async def export_conversations_to_dir(
 
     Returns:
         Number of conversations exported (unknown ids are skipped).
+
+    Raises:
+        OSError: On write failure the export aborts; files already
+            written to *dest_dir* are kept (each file write is atomic,
+            the run as a whole is not).
     """
     await asyncio.to_thread(dest_dir.mkdir, parents=True, exist_ok=True)
 
@@ -206,7 +211,7 @@ async def export_conversations_to_dir(
             results = await session.exec(select(Conversation.id))
             ids: list[uuid.UUID] = list(results.all())
         else:
-            ids = list(conversation_ids)
+            ids = list(dict.fromkeys(conversation_ids))
 
         for conv_id in ids:
             data = await build_conversation_export(session, conv_id)

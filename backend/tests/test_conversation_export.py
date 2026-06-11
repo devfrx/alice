@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
-from backend.db.models import Conversation, Message
+from backend.db.models import Attachment, Conversation, Message
 from backend.services.conversation_export import (
+    _UPLOADS_BASE,
     ConversationExport,
     build_conversation_export,
     export_conversations_to_dir,
@@ -79,6 +80,65 @@ class TestBuildConversationExport:
         async with session_factory() as session:
             data = await build_conversation_export(session, uuid.uuid4())
         assert data == {}
+
+    async def test_attachment_serialization(self, session_factory) -> None:
+        """Attachments round-trip with file_id, url and file_path."""
+        async with session_factory() as session:
+            conv = Conversation(title="Att")
+            session.add(conv)
+            await session.flush()
+            msg = Message(conversation_id=conv.id, role="user", content="img")
+            session.add(msg)
+            await session.flush()
+            att = Attachment(
+                message_id=msg.id,
+                filename="photo.png",
+                content_type="image/png",
+                file_path=str(_UPLOADS_BASE / str(conv.id) / "photo.png"),
+            )
+            session.add(att)
+            await session.commit()
+            conv_id, att_id = conv.id, att.id
+
+        async with session_factory() as session:
+            data = await build_conversation_export(session, conv_id)
+
+        atts = data["messages"][0]["attachments"]
+        assert atts is not None and len(atts) == 1
+        assert atts[0]["file_id"] == str(att_id)
+        assert atts[0]["url"] == f"/uploads/{conv_id}/photo.png"
+        assert atts[0]["file_path"].endswith("photo.png")
+        ConversationExport.model_validate(data)
+
+    async def test_attachment_outside_uploads_base_gets_empty_url(
+        self, session_factory, tmp_path: Path,
+    ) -> None:
+        """A file_path escaping the uploads base yields an empty url."""
+        async with session_factory() as session:
+            conv = Conversation(title="Evil")
+            session.add(conv)
+            await session.flush()
+            msg = Message(conversation_id=conv.id, role="user", content="x")
+            session.add(msg)
+            await session.flush()
+            session.add(
+                Attachment(
+                    message_id=msg.id,
+                    filename="evil.png",
+                    content_type="image/png",
+                    file_path=str(tmp_path / "evil.png"),
+                ),
+            )
+            await session.commit()
+            conv_id = conv.id
+
+        async with session_factory() as session:
+            data = await build_conversation_export(session, conv_id)
+
+        atts = data["messages"][0]["attachments"]
+        assert atts is not None
+        assert atts[0]["url"] == ""
+        ConversationExport.model_validate(data)
 
 
 class TestExportConversationsToDir:

@@ -674,7 +674,7 @@ git commit -m "feat(persistence): explicit POST /chat/conversations/backup; type
 - Modify: `backend/tests/contracts/response_model_baseline.txt`
 - Modify: `backend/tests/test_app.py`, `backend/tests/test_concurrent.py` (shape lista)
 
-- [ ] **Step 1: Modelli (sostituiscono `BranchConversationResponse`)**
+- [x] **Step 1: Modelli (sostituiscono `BranchConversationResponse`)**
 
 In `conversations.py`, sostituisci il blocco modelli (righe 43-72) con (mantieni `BranchConversationRequest` IDENTICO):
 
@@ -726,7 +726,7 @@ class DeleteAllConversationsResponse(BaseModel):
 
 `BranchConversationResponse` viene ELIMINATO; nel corpo di `branch_conversation` (riga 862) sostituisci `return BranchConversationResponse(` con `return ConversationSummaryResponse(` e aggiorna il `response_model`/annotazione di ritorno dell'endpoint branch di conseguenza.
 
-- [ ] **Step 2: Applica i `response_model` e la shape lista**
+- [x] **Step 2: Applica i `response_model` e la shape lista**
 
 - `GET /chat/conversations` (riga 80): decoratore → `@router.get("/chat/conversations", response_model=ConversationListResponse)`; il `return [ ... ]` (righe 101-110) diventa:
 
@@ -753,7 +753,7 @@ e l'annotazione della firma diventa `-> dict[str, Any]`.
 - `DELETE /chat/conversations` (all) → `response_model=DeleteAllConversationsResponse`; il return (riga 442) diventa `return {"status": "deleted"}` e il log a riga 441 diventa `logger.info("Deleted all conversations")`.
 - In `io.py`: `POST /chat/conversations/import` → `response_model=ConversationSummaryResponse` con `from .conversations import ConversationSummaryResponse`.
 
-- [ ] **Step 3: Rimuovi ogni traccia del mirror da `conversations.py`**
+- [x] **Step 3: Rimuovi ogni traccia del mirror da `conversations.py`**
 
 - Import: elimina riga 27 (`from backend.services.conversation_file_manager import ConversationFileManager`) e `_sync_conversation_to_file` dall'import `._helpers` (riga 34).
 - Elimina i 4 blocchi sync (con il commento `# Sync to JSON file.` dove presente):
@@ -781,7 +781,7 @@ e l'annotazione della firma diventa `-> dict[str, Any]`.
 
 - **Rename da review Task 1:** in `backend/services/conversation_export.py` rinomina `_attachment_url` → `attachment_url` (funzione ora consumata cross-package: il prefisso privato non è più onesto); in `conversations.py` sostituisci l'import da `._shared` con `from backend.services.conversation_export import attachment_url` e aggiorna i call-site; in `_shared.py` elimina la riga di re-export `from backend.services.conversation_export import _attachment_url  # noqa: F401`. Verifica con `git grep -n "_attachment_url"` che non restino riferimenti.
 
-- [ ] **Step 4: Baseline ratchet — elimina le righe ora tipizzate**
+- [x] **Step 4: Baseline ratchet — elimina le righe ora tipizzate**
 
 Da `response_model_baseline.txt` elimina:
 
@@ -795,7 +795,7 @@ POST /api/chat/conversations/{conversation_id}/switch-version
 POST /api/chat/conversations/{conversation_id}/title
 ```
 
-- [ ] **Step 5: Aggiorna i test che leggono la lista**
+- [x] **Step 5: Aggiorna i test che leggono la lista**
 
 In `tests/test_app.py`, `test_conversations_list_empty` (righe 32-37) diventa:
 
@@ -810,7 +810,7 @@ async def test_conversations_list_empty(client: AsyncClient) -> None:
 
 In `tests/test_concurrent.py` (righe ~255-319): ogni `resp.json()` di `GET /api/chat/conversations` ora è `{"items": [...], "total": n}` — apri il file e correggi TUTTI gli usi (`data["items"]` al posto di `data`); non lasciare asserzioni sulla vecchia shape. Se asserisce su `deleted_files` del delete-all, aggiorna a `{"status": "deleted"}`.
 
-- [ ] **Step 6: Esegui i test**
+- [x] **Step 6: Esegui i test**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/contracts/ tests/test_app.py tests/test_concurrent.py tests/test_conversation_backup_api.py -v
@@ -818,12 +818,14 @@ cd backend; ..\.venv\Scripts\python.exe -m pytest tests/contracts/ tests/test_ap
 ```
 Atteso: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add backend/api/routes/chat/conversations.py backend/api/routes/chat/io.py backend/tests/contracts/response_model_baseline.txt backend/tests/test_app.py backend/tests/test_concurrent.py
 git commit -m "refactor(persistence): conversations routes - drop JSON mirror, typed responses, {items,total} list" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+> **Esito (2026-06-12):** COMPLETATO — commit `895eb6e` (incluso rename `attachment_url`). Spec review ✅ (tutti i return path verificati contro i modelli; baseline esatta, il GET dettaglio resta in baseline). Quality review «Ready to merge: Yes», zero Critical/Important; verificato che `deleted_files` non aveva consumatori runtime. Fix minor in `f17fc5f`: validazione tipo `title` nell'import (prima: 500 post-commit su title non-stringa), rimosso F401 pre-esistente in test_concurrent. Minor lasciati a verbale: stile di ritorno misto (branch ritorna istanza, gli altri dict) e posizionamento di ConversationSummaryResponse in un modulo route (valutare un home neutrale se compare un terzo consumatore). Promemoria: contratti generati STALE fino al Task 7 (check-contracts rosso mid-branch, atteso).
 
 ---
 

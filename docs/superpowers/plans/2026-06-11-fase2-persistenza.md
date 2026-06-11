@@ -45,7 +45,7 @@ Ratchet baseline (`backend/tests/contracts/response_model_baseline.txt`) — voc
 - Modify: `backend/api/routes/chat/_helpers.py` (rimuovi `_build_conversation_data`, delega al servizio)
 - Modify: `backend/api/routes/chat/io.py` (solo la riga di import di `_build_conversation_data`)
 
-- [ ] **Step 1: Scrivi il test che fallisce**
+- [x] **Step 1: Scrivi il test che fallisce**
 
 Crea `backend/tests/test_conversation_export.py`:
 
@@ -177,14 +177,14 @@ class TestExportConversationsToDir:
         assert exported == 0
 ```
 
-- [ ] **Step 2: Esegui il test e verifica che fallisca**
+- [x] **Step 2: Esegui il test e verifica che fallisca**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_export.py -v
 ```
 Atteso: FAIL/ERROR con `ModuleNotFoundError: No module named 'backend.services.conversation_export'`.
 
-- [ ] **Step 3: Crea `backend/services/conversation_export.py`**
+- [x] **Step 3: Crea `backend/services/conversation_export.py`**
 
 Il corpo di `build_conversation_export` è `_build_conversation_data` spostato VERBATIM da `_helpers.py` (righe 29-100); `_attachment_url` e `_UPLOADS_BASE` sono spostati VERBATIM da `_shared.py` (righe 32, 110-124):
 
@@ -413,14 +413,14 @@ async def export_conversations_to_dir(
     return exported
 ```
 
-- [ ] **Step 4: Esegui il test e verifica che passi**
+- [x] **Step 4: Esegui il test e verifica che passi**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_export.py -v
 ```
 Atteso: tutti PASS.
 
-- [ ] **Step 5: Sposta i consumatori sulla nuova implementazione (no doppioni, §4.1)**
+- [x] **Step 5: Sposta i consumatori sulla nuova implementazione (no doppioni, §4.1)**
 
 In `backend/api/routes/chat/_shared.py`: elimina la funzione `_attachment_url` (righe 110-124), la costante `_UPLOADS_BASE` (riga 32) e gli import diventati orfani (`quote` da `urllib.parse`; verifica `Path` e `logger` con ruff — `Path` resta usato? se no, rimuovi). In testa al file aggiungi il re-export (gli altri moduli chat continuano a importare da `_shared`):
 
@@ -462,7 +462,7 @@ from ._helpers import _sync_conversation_to_file
 
 e nel corpo di `export_conversation` (riga 103) sostituisci `_build_conversation_data(session, conversation_id)` con `build_conversation_export(session, conversation_id)`.
 
-- [ ] **Step 6: Verifica regressione + lint**
+- [x] **Step 6: Verifica regressione + lint**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_export.py tests/contracts/ -v
@@ -471,12 +471,14 @@ cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_export
 ```
 Atteso: pytest PASS; ruff/mypy puliti sul file nuovo (sui file modificati: nessun errore NUOVO rispetto a `git stash`-baseline; errori pre-esistenti tollerati).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add backend/services/conversation_export.py backend/tests/test_conversation_export.py backend/api/routes/chat/_shared.py backend/api/routes/chat/_helpers.py backend/api/routes/chat/io.py
 git commit -m "feat(persistence): conversation_export service - single serialization + explicit dir export" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+> **Esito (2026-06-12):** COMPLETATO — commit `7b35ffc`. Spec review ✅; quality review «Ready to merge: Yes» con 1 Important (coverage attachment assente, gap pre-esistente) + minors. Fix post-review in `b022570`: 2 test attachment (round-trip url/file_id/file_path + fallback url vuota fuori base), dedup `conversation_ids` (`dict.fromkeys`), docstring con semantica partial-export. Gate: 7/7 test, ruff+mypy puliti. Recommendation registrata in Backlog (#5) e nel Task 3 (rename `_attachment_url`).
 
 ---
 
@@ -774,6 +776,8 @@ e l'annotazione della firma diventa `-> dict[str, Any]`.
         if file_manager:
             await file_manager.delete(str(conversation_id))
 ```
+
+- **Rename da review Task 1:** in `backend/services/conversation_export.py` rinomina `_attachment_url` → `attachment_url` (funzione ora consumata cross-package: il prefisso privato non è più onesto); in `conversations.py` sostituisci l'import da `._shared` con `from backend.services.conversation_export import attachment_url` e aggiorna i call-site; in `_shared.py` elimina la riga di re-export `from backend.services.conversation_export import _attachment_url  # noqa: F401`. Verifica con `git grep -n "_attachment_url"` che non restino riferimenti.
 
 - [ ] **Step 4: Baseline ratchet — elimina le righe ora tipizzate**
 
@@ -1423,3 +1427,4 @@ git commit -m "docs: fase2 persistenza - CLAUDE.md single-source-of-truth note; 
 2. La cartella legacy `data/conversations/` con i vecchi mirror resta su disco (dati azzerabili per decisione): nessuna pulizia automatica; eventualmente nota utente.
 3. `POST /chat/conversations/import` accetta ancora body non-Pydantic (validazione a mano): convertire la request a modello quando si tocca di nuovo il dominio.
 4. Ereditati da 1a/1b: `AgentTier` duplicato FE, calendar senza `calendar.changed`, canale voice hand-typed, narrowing `as` in `stores/services.ts`.
+5. (review Task 1) `build_conversation_export` costruisce un dict a mano che deve rispecchiare `ConversationExport`: quando il filo `_sync_conversation_to_file` sparisce (post-Task 4), valutare la costruzione VIA modello (`ConversationExport(...).model_dump()`) così anche i file di backup (che non passano da `response_model`) sono garantiti dallo schema.

@@ -17,6 +17,7 @@ import { useChatStore } from '../../stores/chat'
 import { useUIStore } from '../../stores/ui'
 import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
+import { useToast } from '../../composables/useToast'
 import { api } from '../../services/api'
 import BrandThemeToggle from '../branding/BrandThemeToggle.vue'
 import BrandWordmark from '../branding/BrandWordmark.vue'
@@ -40,6 +41,7 @@ const emailStore = useEmailStore()
 const router = useRouter()
 const route = useRoute()
 const { confirm } = useModal()
+const toast = useToast()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
 
@@ -214,9 +216,14 @@ async function onExportConversation(id: string): Promise<void> {
     const dir = await window.electron.fileOps.selectDirectory()
     if (!dir) return
     const res = await api.backupConversations(dir, [id])
+    if (res.exported === 0) {
+      toast.warning('Conversazione non trovata sul backend: nessun file esportato')
+      return
+    }
     window.electron.fileOps.showInFolder(`${res.path}/${id}.json`)
   } catch (err) {
     console.error(`[AppSidebar] Failed to export conversation ${id}:`, err)
+    toast.error("Esportazione fallita: impossibile completare l'export")
   }
 }
 
@@ -226,10 +233,15 @@ async function onBackupAll(): Promise<void> {
     const dir = await window.electron.fileOps.selectDirectory()
     if (!dir) return
     const res = await api.backupConversations(dir)
-    console.info(`[AppSidebar] Backup completato: ${res.exported} conversazioni in ${res.path}`)
+    if (res.exported === 0) {
+      toast.warning('Nessuna conversazione da esportare')
+      return
+    }
+    toast.success(`Esportate ${res.exported} conversazioni`)
     window.electron.fileOps.showInFolder(res.path)
   } catch (err) {
     console.error('[AppSidebar] Failed to backup conversations:', err)
+    toast.error('Backup fallito: impossibile completare l\'export')
   }
 }
 </script>

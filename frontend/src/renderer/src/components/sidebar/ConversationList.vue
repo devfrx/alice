@@ -204,7 +204,7 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
         <button class="conv-list__header-btn" aria-label="Nuova chat" title="Nuova chat" @click="emit('create')">
           <AppIcon name="plus" :size="12" />
         </button>
-        <button v-if="conversations.length > 0" class="conv-list__header-btn" aria-label="Esporta tutte le conversazioni"
+        <button v-if="conversations.length > 0" class="conv-list__header-btn" aria-label="Backup di tutte le conversazioni"
           title="Backup di tutte le conversazioni" @click="emit('backup-all')">
           <AppIcon name="folder" :size="11" />
         </button>

@@ -20,7 +20,7 @@ import type { AskUserRequest, ConversationDetail } from '../types/chat'
 // keeps the test free of stray network noise).
 vi.mock('../services/api', () => ({
   api: {
-    getConversations: vi.fn().mockResolvedValue([]),
+    getConversations: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     getConversation: vi.fn().mockResolvedValue({
       id: 'c1',
       title: null,

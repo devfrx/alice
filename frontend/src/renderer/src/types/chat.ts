@@ -119,17 +119,10 @@ export type DeleteAllConversationsResponse = ApiSchema<'DeleteAllConversationsRe
 export type BackupResult = ApiSchema<'BackupResult'>
 
 /** Response from `POST /api/chat/conversations/{id}/title`. */
-export interface RenameConversationResponse {
-  id: string
-  title: string
-  updated_at: string
-}
+export type RenameConversationResponse = ApiSchema<'TitleUpdateResponse'>
 
 /** Request body for `POST /api/chat/conversations/{id}/branch`. */
-export interface BranchConversationRequest {
-  from_message_id: string
-  title?: string
-}
+export type BranchConversationRequest = ApiSchema<'BranchConversationRequest'>
 
 // ---------------------------------------------------------------------------
 // WebSocket

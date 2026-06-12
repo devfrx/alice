@@ -236,3 +236,31 @@ async def test_delete_all_wipes_rows_and_files(registry, tmp_path) -> None:
     assert await registry.count_artifacts() == 0
     assert not (tmp_path / "chart" / f"{a1.id}.json").exists()
     assert not (tmp_path / "whiteboard" / f"{a2.id}.json").exists()
+
+
+async def test_update_json_artifact_patch_and_title_together(registry) -> None:
+    artifact = await registry.create_json_artifact(
+        kind=ArtifactKind.CHART, title="old",
+        content={"chart_id": "c", "echarts_option": {"series": []}},
+    )
+    updated = await registry.update_json_artifact(
+        artifact.id,
+        content_patch={"echarts_option": {"series": [1]}},
+        title="new",
+    )
+    assert updated is not None and updated.title == "new"
+    _row, content = await registry.read_json_content(artifact.id)
+    assert content["echarts_option"] == {"series": [1]}
+
+
+async def test_unreadable_blob_returns_none(registry, tmp_path) -> None:
+    artifact = await registry.create_json_artifact(
+        kind=ArtifactKind.CHART, title="c",
+        content={"chart_id": "c", "echarts_option": {}},
+    )
+    blob = tmp_path / "chart" / f"{artifact.id}.json"
+    blob.write_text("not json", encoding="utf-8")
+    assert await registry.read_json_content(artifact.id) is None
+    assert await registry.update_json_artifact(
+        artifact.id, content_patch={"x": 1},
+    ) is None

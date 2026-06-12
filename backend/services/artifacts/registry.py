@@ -224,6 +224,10 @@ class ArtifactRegistry:
                 output (hook wins on key collisions).
             artifact_id: Pre-generated id, so callers can embed it in
                 *content* before persisting.  Generated when omitted.
+
+        Note: the blob is written before the row commit; a commit
+        failure may leave an orphan blob on disk (acceptable for the
+        single-user local app).
         """
         aid = artifact_id or uuid.uuid4()
         path, size = await self._blob_store.write(kind, aid, content)
@@ -271,6 +275,8 @@ class ArtifactRegistry:
 
         ``None`` when the artifact is missing, is not JSON-mime, or the
         blob is unreadable.
+        Callers cannot distinguish the unreadable-blob case (data
+        corruption) from not-found.
         """
         artifact = await self.get_artifact(artifact_id)
         if artifact is None or artifact.mime != "application/json":
@@ -294,6 +300,8 @@ class ArtifactRegistry:
         metadata hooks re-run on the merged content.  Emits
         ``artifact.updated``.  Returns ``None`` when the artifact is
         missing or has no JSON content.
+        Note: the merged blob is rewritten before the row commit; a
+        commit failure may leave blob and row out of sync.
         """
         artifact = await self.get_artifact(artifact_id)
         if artifact is None or artifact.mime != "application/json":
@@ -483,7 +491,7 @@ class ArtifactRegistry:
             if unpinned:
                 await conn.execute(
                     sa.delete(Artifact).where(
-                        Artifact.id.in_(  # type: ignore[union-attr]
+                        Artifact.id.in_(  # type: ignore[attr-defined]
                             [aid for aid, _ in unpinned],
                         )
                     )

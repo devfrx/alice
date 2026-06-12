@@ -930,7 +930,7 @@ git commit -m "refactor(persistence): remove sync_fn JSON-mirror threading from 
 - Delete: `backend/tests/test_conversation_file_manager.py`, `backend/tests/test_conversation_migration.py`
 - Modify: `backend/core/app.py`, `backend/core/context.py`, `backend/core/protocols.py`
 
-- [ ] **Step 1: `core/app.py`**
+- [x] **Step 1: `core/app.py`**
 
 Elimina la riga 30 (`from backend.services.conversation_file_manager import ConversationFileManager`) e il blocco righe 214-226:
 
@@ -950,19 +950,19 @@ Elimina la riga 30 (`from backend.services.conversation_file_manager import Conv
             logger.error("Failed to rebuild conversations from files: {}", exc)
 ```
 
-- [ ] **Step 2: `core/context.py` e `core/protocols.py`**
+- [x] **Step 2: `core/context.py` e `core/protocols.py`**
 
 `context.py`: elimina il campo `conversation_file_manager: ConversationFileManagerProtocol | None = None` (riga 59) e `ConversationFileManagerProtocol` dall'import (riga 19).
 
 `protocols.py`: elimina il blocco `ConversationFileManagerProtocol` con la sua intestazione di sezione (righe 408-448). Verifica con ruff che `Path` resti usato da altri protocolli (se orfano, rimuovi l'import).
 
-- [ ] **Step 3: Elimina servizio e test del mirror**
+- [x] **Step 3: Elimina servizio e test del mirror**
 
 ```powershell
 git rm backend/services/conversation_file_manager.py backend/tests/test_conversation_file_manager.py backend/tests/test_conversation_migration.py
 ```
 
-- [ ] **Step 4: Verifica che non resti alcun riferimento**
+- [x] **Step 4: Verifica che non resti alcun riferimento**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m ruff check core/app.py core/context.py core/protocols.py
@@ -970,19 +970,21 @@ git grep -n -i "conversation_file_manager\|ConversationFileManager\|_sync_conver
 ```
 Atteso: ruff pulito (niente errori nuovi); il grep restituisce ZERO righe (eventuali hit residui vanno corretti ORA).
 
-- [ ] **Step 5: Esegui i test**
+- [x] **Step 5: Esegui i test**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/contracts/ tests/test_app.py tests/test_conversation_export.py tests/test_conversation_backup_api.py -v
 ```
 Atteso: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add -A backend/
 git commit -m "refactor(persistence)!: delete ConversationFileManager - SQLite is the single source of truth (spec 5.2)" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+> **Esito (2026-06-12):** COMPLETATO — commit `dbe05d3` (−1222 righe, 3 file eliminati, 3 modificati). Spec review ✅ (lifespan integro, Path orfano rimosso correttamente, 9 errori ruff identici a base = zero nuovi). Quality review «Ready to merge: Yes», zero issue bloccanti. Segnalazioni assorbite nel Task 8: i file istruzione `.github/copilot-instructions.md` e `.github/agents/{backend,backend-coherence,test}.agent.md` citano ancora il modulo eliminato (4 edit da fare nel sweep docs); grep finale di fase repo-wide (`conversation_file\|data/conversations`), non solo backend/; nota utente sulla dir `data/conversations/` ormai inerte.
 
 ---
 
@@ -1406,6 +1408,8 @@ Atteso: ZERO hit (esclusi i file generati che citano… nulla: anche i generati 
 - [ ] **Step 4: Aggiorna CLAUDE.md**
 
 Nella sezione «Data & external services», sostituisci la frase «Conversations are also mirrored to JSON in `data/conversations/` and rebuilt into the DB on startup.» con: «SQLite is the single source of truth for conversations; JSON export/backup is explicit only (`POST /api/chat/conversations/backup`, tool `backup_conversations`, sidebar UI).»
+
+Inoltre (da review Task 5): aggiorna i file istruzione che inventariano il modulo eliminato — `.github/copilot-instructions.md` (riga ~17), `.github/agents/backend.agent.md` (~22), `.github/agents/backend-coherence.agent.md` (~22), `.github/agents/test.agent.md` (~43, elenca i 2 file di test eliminati). Il grep dello Step 3 va esteso a TUTTO il repo (non solo backend/ e frontend/src/), esclusi docs/superpowers e i piani scratch di root (non autoritativi).
 
 - [ ] **Step 5: Verifica end-to-end ad app avviata (criterio di uscita 3)**
 

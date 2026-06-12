@@ -79,6 +79,7 @@ plugins:
     - calendar
     - weather
     - clipboard
+    - conversation_backup   # explicit JSON backup of conversations (spec §5.2)
     - notifications
     - media_control
     - file_search

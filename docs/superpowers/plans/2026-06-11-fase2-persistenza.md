@@ -1251,14 +1251,14 @@ git commit -m "feat(persistence): conversation_backup plugin - agent tool for ex
 - Modify: `frontend/src/renderer/src/components/sidebar/AppSidebar.vue`, `frontend/src/renderer/src/components/sidebar/ConversationList.vue`
 - Modify (se serve): `frontend/src/renderer/src/stores/chat.spec.ts` (mock lista)
 
-- [ ] **Step 1: Rigenera i contratti**
+- [x] **Step 1: Rigenera i contratti**
 
 ```powershell
 .\scripts\gen-contracts.ps1
 ```
 Atteso: exit 0; in `types/generated/api.d.ts` compaiono `ConversationExport`, `ConversationSummaryResponse`, `ConversationListResponse`, `BackupRequest`, `BackupResult` e sparisce l'operation `file-path`.
 
-- [ ] **Step 2: `types/chat.ts` — i tipi REST del dominio diventano re-export generati**
+- [x] **Step 2: `types/chat.ts` — i tipi REST del dominio diventano re-export generati**
 
 Sostituisci le interface hand-written con re-export (`ApiSchema` da `./generated`); aggiungi in testa al file (o estendi l'import esistente):
 
@@ -1277,7 +1277,7 @@ import type { ApiSchema } from './generated'
 
 NON toccare `ChatMessage`/`ConversationDetail` (il GET dettaglio resta hand-typed, vedi Backlog). `BranchConversationRequest` resta com'è.
 
-- [ ] **Step 3: `services/api.ts`**
+- [x] **Step 3: `services/api.ts`**
 
 - `getConversations` diventa:
 
@@ -1303,7 +1303,7 @@ NON toccare `ChatMessage`/`ConversationDetail` (il GET dettaglio resta hand-type
     }),
 ```
 
-- [ ] **Step 4: `stores/chat.ts`**
+- [x] **Step 4: `stores/chat.ts`**
 
 In `loadConversations` (riga ~218-219):
 
@@ -1314,7 +1314,7 @@ In `loadConversations` (riga ~218-219):
 
 (il resto della funzione resta identico — verifica che `remote` sia usato come array). Le action `exportConversation`/`importConversation` restano invariate.
 
-- [ ] **Step 5: UI — sostituisci «Apri nel file manager» con «Esporta» + backup totale**
+- [x] **Step 5: UI — sostituisci «Apri nel file manager» con «Esporta» + backup totale**
 
 `ConversationList.vue`:
 - nelle emit (righe 26-33): `'open-file': [id: string]` → `export: [id: string]`; aggiungi `'backup-all': []`.
@@ -1359,7 +1359,7 @@ async function onBackupAll(): Promise<void> {
 
 - nel template (riga ~298): `@open-file="onOpenFile"` → `@export="onExportConversation" @backup-all="onBackupAll"`.
 
-- [ ] **Step 6: Typecheck, lint scoped, vitest**
+- [x] **Step 6: Typecheck, lint scoped, vitest**
 
 ```powershell
 cd frontend
@@ -1369,7 +1369,7 @@ npm run test
 ```
 Atteso: typecheck exit 0; eslint senza ERRORI nuovi (warnings prettier pre-esistenti tollerati); vitest verde — se `stores/chat.spec.ts` mocka `api.getConversations`, aggiorna il mock a `{ items: [...], total: n }`.
 
-- [ ] **Step 7: check-contracts (DOPO il commit) e commit**
+- [x] **Step 7: check-contracts (DOPO il commit) e commit**
 
 ```powershell
 git add backend/api/ frontend/src/renderer/src/types/ frontend/src/renderer/src/services/api.ts frontend/src/renderer/src/stores/chat.ts frontend/src/renderer/src/components/sidebar/ scripts/
@@ -1377,6 +1377,8 @@ git commit -m "feat(persistence): FE export/backup UI on generated contracts; dr
 .\scripts\check-contracts.ps1
 ```
 Atteso: check-contracts exit 0 (artefatti freschi). Se fallisce: rigenera, `git add` + `git commit --amend` NO — fai un commit di fixup separato.
+
+> **Esito (2026-06-12):** COMPLETATO — commit `c58a8ca`. Spec review ✅ (diff vecchio/nuovo chat.ts verificato riga per riga, niente perso; compat strutturale ConversationSummary confermata). Quality review «With fixes»: (1) mock `getConversations` stale in chat.spec.ts → ogni test finalizeStream esercitava silenziosamente il path d'errore; (2) `console.info` ingiustificato: `useToast` esiste già montato in App.vue; (3) export di conversazione solo-locale rivelava un file inesistente. Fix in `8e7e815`: mock `{items,total}`, toast success/warning/error su entrambi i flussi con guard `exported===0`, label coerenti, `path.normalize` nell'handler show-in-folder, e completata la migrazione re-export (`RenameConversationResponse`→TitleUpdateResponse, `BranchConversationRequest` generato). Gate: typecheck 0, vitest 259/259, eslint 0 errori nuovi, check-contracts verde. Minor deferiti: narrowing `Literal["deleted"]` lato BE (quando si ritocca il dominio), busy-guard doppio click (benigno: scritture atomiche idempotenti).
 
 ---
 

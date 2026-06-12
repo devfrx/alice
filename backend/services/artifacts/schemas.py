@@ -53,3 +53,24 @@ class ArtifactPinUpdate(BaseModel):
     """Body of ``PATCH /api/artifacts/{id}/pin``."""
 
     pinned: bool
+
+
+class ArtifactContentResponse(BaseModel):
+    """JSON content of a JSON-kind artifact (chart spec, whiteboard spec)."""
+
+    artifact_id: uuid.UUID
+    kind: ArtifactKind
+    content: dict[str, Any]
+
+
+class ArtifactContentUpdate(BaseModel):
+    """Body of ``PATCH /api/artifacts/{id}/content`` (top-level merge)."""
+
+    content: dict[str, Any]
+
+
+class ArtifactContentUpdateResponse(BaseModel):
+    """Outcome of a content merge."""
+
+    artifact_id: uuid.UUID
+    updated_at: datetime

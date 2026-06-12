@@ -23,7 +23,7 @@ from sqlalchemy import func as sa_func
 from sqlmodel import select
 
 from backend.core.config import PROJECT_ROOT
-from backend.db.models import Artifact, Attachment, Conversation, Message
+from backend.db.models import Attachment, Conversation, Message
 from backend.services.conversation_export import attachment_url
 
 from ._helpers import (
@@ -415,39 +415,21 @@ async def get_conversation(
 async def delete_all_conversations(request: Request) -> dict[str, Any]:
     """Delete ALL conversations, messages, attachments, and associated files."""
     ctx = _ctx(request)
-    async with ctx.db() as session:
-        # Snapshot every artifact file path BEFORE wiping the table so we
-        # can unlink the on-disk blobs after commit (artifacts have
-        # ``ON DELETE SET NULL`` on conversation_id and would otherwise
-        # survive as orphan rows + dangling files).
-        art_paths_q = await session.exec(
-            select(Artifact.id, Artifact.file_path)
-        )
-        artifact_paths: list[tuple[uuid.UUID, str]] = list(art_paths_q.all())
 
+    # Artifacts first: rows + on-disk blobs die in one place (the
+    # unified registry — fase 3); pinned status is irrelevant because
+    # the user explicitly asked to delete EVERYTHING.
+    registry = getattr(ctx, "artifact_registry", None)
+    if registry is not None:
+        await registry.delete_all()
+
+    async with ctx.db() as session:
         # Use the underlying SA connection for DML (avoids SQLModel exec() warning).
         conn = await session.connection()
         await conn.execute(sa.delete(Attachment))
-        # Wipe all artifacts (rows) — pinned status is irrelevant here
-        # because the user explicitly asked to delete EVERYTHING.
-        await conn.execute(sa.delete(Artifact))
         await conn.execute(sa.delete(Message))
         await conn.execute(sa.delete(Conversation))
         await session.commit()
-
-    # Best-effort cleanup of artifact files (after commit so a transient
-    # FS failure cannot roll back the row deletion).
-    for _aid, file_path in artifact_paths:
-        try:
-            p = Path(file_path)
-            if not p.is_absolute():
-                p = PROJECT_ROOT / p
-            if p.exists() and p.is_file():
-                await asyncio.to_thread(p.unlink)
-        except Exception as exc:
-            logger.warning(
-                "Failed to unlink artifact file {}: {}", file_path, exc,
-            )
 
     # Remove all upload directories.
     uploads_base = PROJECT_ROOT / "data" / "uploads"
@@ -470,7 +452,8 @@ async def delete_conversation(
     """Delete a conversation and all its messages.
 
     Uses bulk SQL DELETE statements to avoid async lazy-loading issues
-    with SQLAlchemy ORM relationships.
+    with SQLAlchemy ORM relationships.  Artifact cleanup (detach pinned,
+    delete unpinned rows + blobs) is delegated to the unified registry.
     """
     ctx = _ctx(request)
     async with ctx.db() as session:
@@ -478,6 +461,12 @@ async def delete_conversation(
         if conv is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
+    # ── Artifacts (single implementation in the registry) ──────────────
+    registry = getattr(ctx, "artifact_registry", None)
+    if registry is not None:
+        await registry.delete_for_conversation(conversation_id)
+
+    async with ctx.db() as session:
         # Collect message IDs for attachment cleanup.
         msg_stmt = select(Message.id).where(
             Message.conversation_id == conversation_id
@@ -496,34 +485,6 @@ async def delete_conversation(
                 )
             )
 
-        # ── Artifacts ──────────────────────────────────────────────────
-        # Pinned artifacts must survive the conversation deletion: they
-        # are detached (conversation_id=NULL) so they remain visible on
-        # the board.  Unpinned artifacts are removed (row + on-disk file)
-        # to avoid orphaning binary blobs the user no longer cares about.
-        unpinned_paths_q = await session.exec(
-            select(Artifact.id, Artifact.file_path).where(
-                Artifact.conversation_id == conversation_id,
-                Artifact.pinned == False,  # noqa: E712 (SQL boolean)
-            )
-        )
-        unpinned: list[tuple[uuid.UUID, str]] = list(unpinned_paths_q.all())
-        unpinned_ids = [aid for aid, _ in unpinned]
-        if unpinned_ids:
-            await conn.execute(
-                sa.delete(Artifact).where(
-                    Artifact.id.in_(unpinned_ids)  # type: ignore[union-attr]
-                )
-            )
-        await conn.execute(
-            sa.update(Artifact)
-            .where(
-                Artifact.conversation_id == conversation_id,
-                Artifact.pinned == True,  # noqa: E712
-            )
-            .values(conversation_id=None)
-        )
-
         # Bulk-delete messages.
         await conn.execute(
             sa.delete(Message).where(
@@ -540,38 +501,24 @@ async def delete_conversation(
 
         await session.commit()
 
-        # Best-effort cleanup of orphaned artifact files (after commit
-        # so a transient FS failure does not roll back the deletion).
-        for _aid, file_path in unpinned:
-            try:
-                p = Path(file_path)
-                if not p.is_absolute():
-                    p = PROJECT_ROOT / p
-                if p.exists() and p.is_file():
-                    await asyncio.to_thread(p.unlink)
-            except Exception as exc:
-                logger.warning(
-                    "Failed to unlink artifact file {}: {}", file_path, exc,
-                )
+    # Clean up uploaded files for this conversation.
+    upload_dir = PROJECT_ROOT / "data" / "uploads" / str(conversation_id)
+    if upload_dir.exists():
+        await asyncio.to_thread(shutil.rmtree, upload_dir, True)
+        logger.debug("Removed upload dir {}", upload_dir)
 
-        # Clean up uploaded files for this conversation.
-        upload_dir = PROJECT_ROOT / "data" / "uploads" / str(conversation_id)
-        if upload_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, upload_dir, True)
-            logger.debug("Removed upload dir {}", upload_dir)
+    # Kill any live interactive terminal sessions (PTYs + process trees)
+    # for this conversation — they have no DB row to cascade-delete.
+    terminal_manager = getattr(ctx, "terminal_session_manager", None)
+    if terminal_manager is not None:
+        try:
+            await terminal_manager.cleanup_conversation(str(conversation_id))
+        except Exception as exc:
+            logger.warning(
+                "Terminal cleanup failed for {}: {}", conversation_id, exc,
+            )
 
-        # Kill any live interactive terminal sessions (PTYs + process trees)
-        # for this conversation — they have no DB row to cascade-delete.
-        terminal_manager = getattr(ctx, "terminal_session_manager", None)
-        if terminal_manager is not None:
-            try:
-                await terminal_manager.cleanup_conversation(str(conversation_id))
-            except Exception as exc:
-                logger.warning(
-                    "Terminal cleanup failed for {}: {}", conversation_id, exc,
-                )
-
-        return {"status": "deleted"}
+    return {"status": "deleted"}
 
 
 @router.post("/chat/conversations/{conversation_id}/title", response_model=TitleUpdateResponse)

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from backend.db.models import ArtifactKind, Conversation
+from backend.services.artifacts.blob_store import ArtifactBlobStore
 
 
 # ---------------------------------------------------------------------------
@@ -143,3 +144,54 @@ async def test_download_missing_file_returns_404(app, client, tmp_path):
     Path(artifact.file_path).unlink()
     resp = await client.get(f"/api/artifacts/{a_id}/download")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_content_roundtrip(app, client, tmp_path):
+    """GET/PATCH /content: blob JSON servito e aggiornato via merge."""
+    registry = app.state.context.artifact_registry
+    registry._blob_store = ArtifactBlobStore(tmp_path)
+    artifact = await registry.create_json_artifact(
+        kind=ArtifactKind.WHITEBOARD,
+        title="b",
+        content={
+            "board_id": "b1",
+            "snapshot": {"store": {}},
+            "updated_at": "2026-06-12T00:00:00+00:00",
+        },
+    )
+
+    r = await client.get(f"/api/artifacts/{artifact.id}/content")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "whiteboard"
+    assert body["content"]["board_id"] == "b1"
+
+    r2 = await client.patch(
+        f"/api/artifacts/{artifact.id}/content",
+        json={"content": {"snapshot": {"store": {"shape:s1": {"typeName": "shape"}}}}},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["artifact_id"] == str(artifact.id)
+
+    r3 = await client.get(f"/api/artifacts/{artifact.id}")
+    assert r3.json()["artifact_metadata"]["shape_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_content_404_for_binary_artifact(app, client, tmp_path):
+    """GET /content su un artifact binario (CAD) → 404."""
+    registry = app.state.context.artifact_registry
+    glb = tmp_path / "m.glb"
+    glb.write_bytes(b"glTF")
+    artifact = await registry.register_from_tool_result(
+        conversation_id=uuid.uuid4(),
+        message_id=None,
+        tool_call_id="tc1",
+        tool_name="cad_generate",
+        payload={"file_path": str(glb), "model_name": "m", "description": "d"},
+        content_type=None,
+    )
+    assert artifact is not None
+    r = await client.get(f"/api/artifacts/{artifact.id}/content")
+    assert r.status_code == 404

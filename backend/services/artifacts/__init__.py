@@ -15,6 +15,9 @@ from backend.services.artifacts.parsers import (
 )
 from backend.services.artifacts.registry import ArtifactRegistry
 from backend.services.artifacts.schemas import (
+    ArtifactContentResponse,
+    ArtifactContentUpdate,
+    ArtifactContentUpdateResponse,
     ArtifactListResponse,
     ArtifactPinUpdate,
     ArtifactRead,
@@ -22,6 +25,9 @@ from backend.services.artifacts.schemas import (
 
 __all__ = [
     "ArtifactBlobStore",
+    "ArtifactContentResponse",
+    "ArtifactContentUpdate",
+    "ArtifactContentUpdateResponse",
     "ArtifactDescriptor",
     "ArtifactListResponse",
     "ArtifactPinUpdate",

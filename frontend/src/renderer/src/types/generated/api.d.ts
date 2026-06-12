@@ -48,6 +48,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/artifacts/{artifact_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the JSON content of an artifact
+         * @description Return the JSON blob for chart/whiteboard artifacts (404 otherwise).
+         */
+        get: operations["get_artifact_content_api_artifacts__artifact_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Merge top-level keys into the JSON content of an artifact
+         * @description Top-level merge into the blob (used by the whiteboard editor).
+         */
+        patch: operations["update_artifact_content_api_artifacts__artifact_id__content_patch"];
+        trace?: never;
+    };
     "/api/artifacts/{artifact_id}/download": {
         parameters: {
             query?: never;
@@ -283,50 +307,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/charts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Lista grafici salvati
-         * @description Restituisce la lista paginata dei grafici, ordinata dal più recente.
-         */
-        get: operations["list_charts_api_charts_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/charts/{chart_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Recupera la spec completa di un grafico
-         * @description Restituisce il JSON completo della ChartSpec (inclusa echarts_option).
-         */
-        get: operations["get_chart_api_charts__chart_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Elimina un grafico
-         * @description Elimina il file JSON del grafico dal disco.
-         */
-        delete: operations["delete_chart_api_charts__chart_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/chat/conversations": {
         parameters: {
             query?: never;
@@ -435,7 +415,8 @@ export interface paths {
          * @description Delete a conversation and all its messages.
          *
          *     Uses bulk SQL DELETE statements to avoid async lazy-loading issues
-         *     with SQLAlchemy ORM relationships.
+         *     with SQLAlchemy ORM relationships.  Artifact cleanup (detach pinned,
+         *     delete unpinned rows + blobs) is delegated to the unified registry.
          */
         delete: operations["delete_conversation_api_chat_conversations__conversation_id__delete"];
         options?: never;
@@ -2304,73 +2285,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/whiteboards": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Lista lavagne salvate
-         * @description Restituisce la lista paginata delle lavagne, con filtro opzionale.
-         *
-         *     Ogni item include ``conversation_title`` (risolto dal DB) quando la
-         *     lavagna è associata a una conversazione.
-         */
-        get: operations["list_whiteboards_api_whiteboards_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/whiteboards/{board_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Recupera la spec completa di una lavagna
-         * @description Restituisce il JSON completo della WhiteboardSpec (incluso snapshot).
-         */
-        get: operations["get_whiteboard_api_whiteboards__board_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Elimina una lavagna
-         * @description Elimina il file JSON della lavagna dal disco.
-         */
-        delete: operations["delete_whiteboard_api_whiteboards__board_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/whiteboards/{board_id}/snapshot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Aggiorna lo snapshot tldraw di una lavagna
-         * @description Aggiorna lo snapshot tldraw (chiamato dal frontend dopo editing).
-         */
-        patch: operations["update_snapshot_api_whiteboards__board_id__snapshot_patch"];
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2392,6 +2306,48 @@ export interface components {
             observations: components["schemas"]["ObservationInput"][];
         };
         /**
+         * ArtifactContentResponse
+         * @description JSON content of a JSON-kind artifact (chart spec, whiteboard spec).
+         */
+        ArtifactContentResponse: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+            kind: components["schemas"]["ArtifactKind"];
+        };
+        /**
+         * ArtifactContentUpdate
+         * @description Body of ``PATCH /api/artifacts/{id}/content`` (top-level merge).
+         */
+        ArtifactContentUpdate: {
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ArtifactContentUpdateResponse
+         * @description Outcome of a content merge.
+         */
+        ArtifactContentUpdateResponse: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
          * ArtifactKind
          * @description Type of artifact produced by a tool.
          *
@@ -2400,7 +2356,7 @@ export interface components {
          *     value is what gets persisted in SQLite, so values must remain stable.
          * @enum {string}
          */
-        ArtifactKind: "cad_3d_text" | "cad_3d_image";
+        ArtifactKind: "cad_3d_text" | "cad_3d_image" | "chart" | "whiteboard";
         /**
          * ArtifactListResponse
          * @description Paginated list of artifacts.
@@ -3163,16 +3119,6 @@ export interface components {
             start_time?: string | null;
             /** Title */
             title?: string | null;
-        };
-        /**
-         * UpdateSnapshotRequest
-         * @description Payload for updating a whiteboard snapshot.
-         */
-        UpdateSnapshotRequest: {
-            /** Snapshot */
-            snapshot: {
-                [key: string]: unknown;
-            };
         };
         /** ValidationError */
         ValidationError: {
@@ -5333,6 +5279,72 @@ export interface operations {
             };
         };
     };
+    get_artifact_content_api_artifacts__artifact_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactContentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_artifact_content_api_artifacts__artifact_id__content_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactContentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactContentUpdateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     download_artifact_api_artifacts__artifact_id__download_get: {
         parameters: {
             query?: never;
@@ -5698,104 +5710,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_charts_api_charts_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_chart_api_charts__chart_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                chart_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_chart_api_charts__chart_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                chart_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
                 };
             };
             /** @description Validation Error */
@@ -8569,142 +8483,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    list_whiteboards_api_whiteboards_get: {
-        parameters: {
-            query?: {
-                conversation_id?: string | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_whiteboard_api_whiteboards__board_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                board_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_whiteboard_api_whiteboards__board_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                board_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_snapshot_api_whiteboards__board_id__snapshot_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                board_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateSnapshotRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

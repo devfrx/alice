@@ -53,7 +53,7 @@ function next(): void {
 }
 
 function saveBoard(boardId: string, snapshot: Record<string, unknown>): void {
-  api.saveWhiteboardSnapshot(boardId, snapshot).catch(() => {
+  api.updateArtifactContent(boardId, { snapshot }).catch(() => {
     /* best-effort, mirrors the legacy behaviour */
   })
 }

@@ -50,11 +50,6 @@ import type {
 } from '../types/mcpMemory'
 import type { EmailHeader, EmailDetail, EmailSearchRequest } from '../types/email'
 import type {
-  WhiteboardSpec,
-  WhiteboardListResponse,
-  WhiteboardSnapshotUpdateResponse
-} from '../types/whiteboard'
-import type {
   Artifact,
   ArtifactContentResponse,
   ArtifactContentUpdateResponse,
@@ -793,43 +788,6 @@ export const api = {
 
   /** List IMAP folders. */
   getEmailFolders: (): Promise<string[]> => request<string[]>('/email/folders'),
-
-  // -- Whiteboards (Phase 16) ---------------------------------------------
-
-  /** Fetch paginated whiteboard list, optionally filtered by conversation. */
-  getWhiteboards: (params?: {
-    conversation_id?: string
-    limit?: number
-    offset?: number
-  }): Promise<WhiteboardListResponse> => {
-    const qs = new URLSearchParams()
-    if (params?.conversation_id) qs.set('conversation_id', params.conversation_id)
-    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
-    if (params?.offset !== undefined) qs.set('offset', String(params.offset))
-    const q = qs.toString()
-    return request<WhiteboardListResponse>(`/whiteboards${q ? `?${q}` : ''}`)
-  },
-
-  /** Fetch a single whiteboard spec (including tldraw snapshot). */
-  getWhiteboard: (boardId: string): Promise<WhiteboardSpec> =>
-    request<WhiteboardSpec>(`/whiteboards/${encodeURIComponent(boardId)}`),
-
-  /** Delete a whiteboard by ID. */
-  deleteWhiteboard: (boardId: string): Promise<{ status: string; board_id: string }> =>
-    request<{ status: string; board_id: string }>(
-      `/whiteboards/${encodeURIComponent(boardId)}`,
-      { method: 'DELETE' }
-    ),
-
-  /** Save the tldraw snapshot for an existing whiteboard. */
-  saveWhiteboardSnapshot: (
-    boardId: string,
-    snapshot: Record<string, unknown>
-  ): Promise<WhiteboardSnapshotUpdateResponse> =>
-    request<WhiteboardSnapshotUpdateResponse>(
-      `/whiteboards/${encodeURIComponent(boardId)}/snapshot`,
-      { method: 'PATCH', body: JSON.stringify({ snapshot }) }
-    ),
 
   // -- Qdrant Vector Store --------------------------------------------------
 

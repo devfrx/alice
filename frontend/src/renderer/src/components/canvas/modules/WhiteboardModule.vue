@@ -11,23 +11,23 @@
  * When a conversation contains several whiteboards, a {@link ModuleSelectorBar}
  * lets the user switch between them. Selection is resolved by
  * {@link useModuleItemSelection}: manual pick → `boardId` param → most-recent
- * board. The list comes from the whiteboard store (`store.boards`).
- *
- * ## Fallback
- * If nothing resolves yet, the store's `currentBoard` is used; only when no
- * board is available at all is a UiEmptyState rendered.
+ * board. The list derives from the unified artifacts store via
+ * {@link useWhiteboardBoards}.
  *
  * ## Emits from TldrawCanvas
- * `change` (snapshot) — forwarded to the whiteboard store for persistence.
+ * `change` (snapshot) — persisted via the unified artifacts store.
  */
-import { computed, watch, defineAsyncComponent } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import ModuleSelectorBar from '../ModuleSelectorBar.vue'
-import { useWhiteboardStore } from '../../../stores/whiteboard'
+import { useArtifactsStore } from '../../../stores/artifacts'
 import { useChatStore } from '../../../stores/chat'
+import {
+  useWhiteboardBoards,
+  type WhiteboardBoardItem,
+} from '../../../composables/whiteboard/useWhiteboardBoards'
 import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
 import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
-import type { WhiteboardListItem } from '../../../types/whiteboard'
 
 const TldrawCanvas = defineAsyncComponent(() => import('../../whiteboard/TldrawCanvas.vue'))
 
@@ -35,69 +35,63 @@ const props = defineProps<{
   params?: Record<string, unknown>
 }>()
 
-const store = useWhiteboardStore()
+const artifactsStore = useArtifactsStore()
 const chatStore = useChatStore()
+const { boards, refresh } = useWhiteboardBoards(
+  () => chatStore.currentConversation?.id ?? null,
+)
 
-const { currentId, select } = useModuleItemSelection<WhiteboardListItem>({
-  items: () => store.boards,
-  getId: (b) => b.board_id,
+const { currentId, select } = useModuleItemSelection<WhiteboardBoardItem>({
+  items: () => boards.value,
+  getId: (b) => b.boardId,
   preferredId: () => {
     const id = props.params?.boardId
     return typeof id === 'string' && id.length > 0 ? id : null
   },
 })
 
-/** Effective board id: resolved selection > param > store.currentBoard. */
+/** Effective board id: resolved selection > param. */
 const boardId = computed((): string | null => {
   if (currentId.value) return currentId.value
   const fromParams = props.params?.boardId
   if (typeof fromParams === 'string' && fromParams.length > 0) return fromParams
-  if (store.currentBoard) return store.currentBoard.board_id
   return null
 })
 
-/** Snapshot: supplied by the store when the active board is already loaded. */
-const snapshot = computed((): Record<string, unknown> | null => {
-  if (store.currentBoard && boardId.value === store.currentBoard.board_id) {
-    return store.currentBoard.snapshot ?? null
-  }
-  return null
-})
+/** tldraw snapshot of the active board (from the artifact JSON content). */
+const snapshot = ref<Record<string, unknown> | null>(null)
 
-/** One selector option per board in the conversation. */
-const options = computed<UiSegmentedOption[]>(() =>
-  store.boards.map((b, i) => ({ value: b.board_id, label: b.title || `Lavagna ${i + 1}` })),
-)
-
-/** Persist snapshot changes via the store. */
-function onSnapshotChange(snap: Record<string, unknown>): void {
-  const id = boardId.value
-  if (!id) return
-  store.saveSnapshot(id, snap)
-}
-
-/**
- * Keep the board list scoped to the active conversation: reset stale boards
- * then reload boards for the current conversation whenever it changes.
- */
 watch(
-  () => chatStore.currentConversation?.id,
-  (id) => {
-    store.reset()
-    if (id) void store.loadBoards(id)
+  boardId,
+  async (id) => {
+    snapshot.value = null
+    if (!id) return
+    const content = await artifactsStore.fetchContent(id)
+    const snap = content?.snapshot
+    snapshot.value = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
   },
   { immediate: true },
 )
 
-/** If boardId changes to a value not yet in currentBoard, load its snapshot. */
+/** Persist snapshot changes via the unified store (top-level merge). */
+function onSnapshotChange(snap: Record<string, unknown>): void {
+  const id = boardId.value
+  if (!id) return
+  void artifactsStore.saveContent(id, { snapshot: snap })
+}
+
+/** One selector option per board in the conversation. */
+const options = computed<UiSegmentedOption[]>(() =>
+  boards.value.map((b, i) => ({ value: b.boardId, label: b.title || `Lavagna ${i + 1}` })),
+)
+
+/** Reload the board list when the active conversation changes. */
 watch(
-  boardId,
-  async (id) => {
-    if (id && store.currentBoard?.board_id !== id) {
-      await store.loadBoard(id)
-    }
+  () => chatStore.currentConversation?.id,
+  (id) => {
+    if (id) void refresh()
   },
-  { immediate: false },
+  { immediate: true },
 )
 </script>
 

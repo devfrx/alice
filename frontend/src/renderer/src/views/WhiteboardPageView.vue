@@ -4,8 +4,9 @@
  *
  * Layout: WhiteboardListSidebar (260px) | TldrawCanvas (flex)
  */
-import { onMounted, computed, defineAsyncComponent } from 'vue'
-import { useWhiteboardStore } from '../stores/whiteboard'
+import { onMounted, ref, computed, defineAsyncComponent } from 'vue'
+import { useArtifactsStore } from '../stores/artifacts'
+import { useWhiteboardBoards } from '../composables/whiteboard/useWhiteboardBoards'
 import WhiteboardListSidebar from '../components/whiteboard/WhiteboardListSidebar.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 
@@ -13,36 +14,52 @@ const TldrawCanvas = defineAsyncComponent(
   () => import('../components/whiteboard/TldrawCanvas.vue')
 )
 
-const store = useWhiteboardStore()
-const hasBoard = computed(() => store.currentBoard !== null)
-const boardId = computed(() => store.currentBoard?.board_id ?? '')
-const boardSnapshot = computed(() => store.currentBoard?.snapshot ?? null)
+const artifactsStore = useArtifactsStore()
+const { boards, loading, refresh } = useWhiteboardBoards()
+
+const currentBoardId = ref<string | null>(null)
+const currentSnapshot = ref<Record<string, unknown> | null>(null)
+const hasBoard = computed(() => currentBoardId.value !== null)
 
 onMounted(() => {
-  store.loadBoards()
+  void refresh()
 })
 
 async function onSelectBoard(id: string): Promise<void> {
-  await store.loadBoard(id)
+  currentBoardId.value = id
+  currentSnapshot.value = null
+  const content = await artifactsStore.fetchContent(id)
+  const snap = content?.snapshot
+  currentSnapshot.value = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
 }
 
 async function onDeleteBoard(id: string): Promise<void> {
-  await store.deleteBoard(id)
+  await artifactsStore.remove(id, true)
+  if (currentBoardId.value === id) {
+    currentBoardId.value = null
+    currentSnapshot.value = null
+  }
 }
 
 function onSnapshotChange(snapshot: Record<string, unknown>): void {
-  if (!store.currentBoard) return
-  store.saveSnapshot(store.currentBoard.board_id, snapshot)
+  if (!currentBoardId.value) return
+  void artifactsStore.saveContent(currentBoardId.value, { snapshot })
 }
 </script>
 
 <template>
   <div class="whiteboard-page" aria-label="Lavagna">
-    <WhiteboardListSidebar @select="onSelectBoard" @delete="onDeleteBoard" />
+    <WhiteboardListSidebar
+      :boards="boards"
+      :active-board-id="currentBoardId"
+      :loading="loading"
+      @select="onSelectBoard"
+      @delete="onDeleteBoard"
+    />
 
     <div class="whiteboard-page__canvas">
       <template v-if="hasBoard">
-        <TldrawCanvas :board-id="boardId" :snapshot="boardSnapshot" @change="onSnapshotChange" />
+        <TldrawCanvas :board-id="currentBoardId ?? ''" :snapshot="currentSnapshot" @change="onSnapshotChange" />
       </template>
       <template v-else>
         <div class="whiteboard-page__empty">

@@ -193,7 +193,7 @@ export interface ChartPayload {
 export interface WhiteboardPayload {
   board_id: string
   title: string
-  /** Relative URL: "/api/whiteboards/{board_id}" */
+  /** Relative URL: "/api/artifacts/{board_id}/content" */
   board_url: string
   conversation_id: string | null
   created_at: string

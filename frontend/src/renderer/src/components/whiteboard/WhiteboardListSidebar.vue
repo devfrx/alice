@@ -1,22 +1,23 @@
 <script setup lang="ts">
 /**
- * WhiteboardListSidebar — Left sidebar listing all saved whiteboards.
+ * WhiteboardListSidebar — Left sidebar listing whiteboards (artifact-backed).
  *
- * Shows board title, shape count, and date.
- * Clicking a board emits 'select', the delete button emits 'delete'.
+ * Pure presentational: receives the board view-models via props, emits
+ * 'select' / 'delete'. State lives in the artifacts store upstream.
  */
-import { computed } from 'vue'
-import { useWhiteboardStore } from '../../stores/whiteboard'
 import AppIcon from '../ui/AppIcon.vue'
+import type { WhiteboardBoardItem } from '../../composables/whiteboard/useWhiteboardBoards'
 
-const store = useWhiteboardStore()
+defineProps<{
+  boards: WhiteboardBoardItem[]
+  activeBoardId: string | null
+  loading?: boolean
+}>()
 
 const emit = defineEmits<{
   (e: 'select', boardId: string): void
   (e: 'delete', boardId: string): void
 }>()
-
-const activeBoardId = computed(() => store.currentBoard?.board_id ?? null)
 
 /** Format a date string to a short readable format. */
 function formatDate(iso: string): string {
@@ -34,32 +35,32 @@ function formatDate(iso: string): string {
   <aside class="wb-sidebar">
     <div class="wb-sidebar__header">
       <h2 class="wb-sidebar__title">Lavagne</h2>
-      <span class="wb-sidebar__count">{{ store.total }}</span>
+      <span class="wb-sidebar__count">{{ boards.length }}</span>
     </div>
 
-    <div v-if="store.loading" class="wb-sidebar__loading">Caricamento…</div>
+    <div v-if="loading" class="wb-sidebar__loading">Caricamento…</div>
 
-    <div v-else-if="!store.hasBoards" class="wb-sidebar__empty">
+    <div v-else-if="!(boards.length > 0)" class="wb-sidebar__empty">
       Nessuna lavagna. Chiedi ad AL\CE di creare una whiteboard!
     </div>
 
     <ul v-else class="wb-sidebar__list">
-      <li v-for="board in store.boards" :key="board.board_id" class="wb-sidebar__item"
-        :class="{ 'wb-sidebar__item--active': board.board_id === activeBoardId }"
-        @click="emit('select', board.board_id)">
+      <li v-for="board in boards" :key="board.boardId" class="wb-sidebar__item"
+        :class="{ 'wb-sidebar__item--active': board.boardId === activeBoardId }"
+        @click="emit('select', board.boardId)">
         <div class="wb-sidebar__item-top">
           <span class="wb-sidebar__item-title">{{ board.title }}</span>
-          <button class="wb-sidebar__item-delete" title="Elimina lavagna" @click.stop="emit('delete', board.board_id)">
+          <button class="wb-sidebar__item-delete" title="Elimina lavagna" @click.stop="emit('delete', board.boardId)">
             <AppIcon name="x" :size="12" />
           </button>
         </div>
-        <div v-if="board.conversation_title" class="wb-sidebar__item-conv">
+        <div v-if="board.conversationTitle" class="wb-sidebar__item-conv">
           <AppIcon name="message" :size="10" />
-          <span>{{ board.conversation_title }}</span>
+          <span>{{ board.conversationTitle }}</span>
         </div>
         <div class="wb-sidebar__item-meta">
-          <span>{{ board.shape_count }} forme</span>
-          <span>{{ formatDate(board.updated_at) }}</span>
+          <span>{{ board.shapeCount }} forme</span>
+          <span>{{ formatDate(board.updatedAt) }}</span>
         </div>
       </li>
     </ul>

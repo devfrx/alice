@@ -26,7 +26,7 @@ const board = (id: string, rev: number): Msg => ({
   content: JSON.stringify({
     board_id: id,
     title: `Board ${id}`,
-    board_url: `/api/whiteboards/${id}`,
+    board_url: `/api/artifacts/${id}/content`,
     conversation_id: null,
     created_at: '2024-01-01T00:00:00Z',
     rev

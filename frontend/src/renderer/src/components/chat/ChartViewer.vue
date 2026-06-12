@@ -8,7 +8,7 @@
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import { resolveBackendUrl } from '../../services/api'
+import { api } from '../../services/api'
 import type { ChartPayload } from '../../types/chat'
 
 const props = defineProps<{ payload: ChartPayload }>()
@@ -401,10 +401,9 @@ function sanitizeMarkData(series: Record<string, unknown>, key: string): void {
 
 async function loadAndRender(): Promise<void> {
     try {
-        const response = await fetch(resolveBackendUrl(props.payload.chart_url))
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const spec = await response.json()
-        fetchedOption = sanitizeOption(spec.echarts_option)
+        const res = await api.getArtifactContent(props.payload.chart_id)
+        const spec = res.content as { echarts_option?: Record<string, unknown> }
+        fetchedOption = sanitizeOption(spec.echarts_option ?? {})
 
         // Make the canvas div visible BEFORE echarts.init so it has real dimensions.
         ready.value = true

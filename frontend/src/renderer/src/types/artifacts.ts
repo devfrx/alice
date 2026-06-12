@@ -1,53 +1,28 @@
 /**
  * artifacts.ts — Frontend types for the AL\CE artifacts registry.
  *
- * Mirrors the Pydantic schemas in ``backend/services/artifacts/schemas.py``.
- * The registry persists generated tool outputs (3D models, …) and exposes
- * them via REST + a WebSocket ``artifact.created`` event.
+ * Re-exports of the GENERATED OpenAPI schemas (single source of truth:
+ * backend/services/artifacts/schemas.py). Fields with backend defaults
+ * (artifact_metadata, pinned, conversation_id, …) are OPTIONAL here —
+ * consumers must use `??` fallbacks.
  */
 
 import type { ApiSchema } from './generated'
 
-/**
- * Kinds of persisted artifacts. Currently limited to the two CAD pipelines
- * exposed by the backend; future kinds (image / audio / chart / whiteboard)
- * can extend this union without breaking consumers.
- */
-export type ArtifactKind = 'cad_3d_text' | 'cad_3d_image'
+/** Kinds of persisted artifacts (generated enum). */
+export type ArtifactKind = ApiSchema<'ArtifactKind'>
 
 /** Single persisted artifact row, as returned by the REST API. */
-export interface Artifact {
-  id: string
-  conversation_id: string
-  message_id: string | null
-  tool_call_id: string | null
-  kind: ArtifactKind
-  title: string
-  /** Path relative to ``PROJECT_ROOT`` — DO NOT use directly for URLs. */
-  file_path: string
-  /** MIME type (e.g. ``model/gltf-binary``). */
-  mime: string
-  size_bytes: number
-  /** Free-form metadata produced by the parser (e.g. ``export_url``). */
-  artifact_metadata: Record<string, unknown>
-  pinned: boolean
-  /** ISO 8601 datetime. */
-  created_at: string
-  /** ISO 8601 datetime. */
-  updated_at: string
-  /**
-   * Backend-relative download URL (``/api/artifacts/<id>/download``).
-   * Pass through ``resolveBackendUrl`` before assigning to ``<img>`` /
-   * ``<a href>``.
-   */
-  download_url: string
-}
+export type Artifact = ApiSchema<'ArtifactRead'>
 
 /** Paginated artifact list response. */
-export interface ArtifactListResponse {
-  items: Artifact[]
-  total: number
-}
+export type ArtifactListResponse = ApiSchema<'ArtifactListResponse'>
+
+/** JSON content envelope for chart/whiteboard artifacts. */
+export type ArtifactContentResponse = ApiSchema<'ArtifactContentResponse'>
+
+/** Outcome of a PATCH content merge. */
+export type ArtifactContentUpdateResponse = ApiSchema<'ArtifactContentUpdateResponse'>
 
 /** Query parameters accepted by ``GET /api/artifacts``. */
 export interface ArtifactListQuery {

@@ -56,6 +56,8 @@ import type {
 } from '../types/whiteboard'
 import type {
   Artifact,
+  ArtifactContentResponse,
+  ArtifactContentUpdateResponse,
   ArtifactKind,
   ArtifactListResponse,
 } from '../types/artifacts'
@@ -869,6 +871,20 @@ export const api = {
   /** Fetch a single artifact by id. */
   getArtifact: (id: string): Promise<Artifact> =>
     request<Artifact>(`/artifacts/${encodeURIComponent(id)}`),
+
+  /** Fetch the JSON content of a chart/whiteboard artifact. */
+  getArtifactContent: (id: string): Promise<ArtifactContentResponse> =>
+    request<ArtifactContentResponse>(`/artifacts/${encodeURIComponent(id)}/content`),
+
+  /** Merge top-level keys into the JSON content of an artifact. */
+  updateArtifactContent: (
+    id: string,
+    content: Record<string, unknown>,
+  ): Promise<ArtifactContentUpdateResponse> =>
+    request<ArtifactContentUpdateResponse>(
+      `/artifacts/${encodeURIComponent(id)}/content`,
+      { method: 'PATCH', body: JSON.stringify({ content }) },
+    ),
 
   /** Pin or unpin an artifact. */
   setArtifactPinned: (id: string, pinned: boolean): Promise<Artifact> =>

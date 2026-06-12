@@ -210,6 +210,35 @@ export function isWhiteboardPayload(obj: unknown): obj is WhiteboardPayload {
   )
 }
 
+/** Type guard: checks if a parsed tool result is a ChartPayload. */
+export function isChartPayload(p: unknown): p is ChartPayload {
+  if (typeof p !== 'object' || p === null || Array.isArray(p)) return false
+  const o = p as Record<string, unknown>
+  return (
+    typeof o.chart_id === 'string' &&
+    typeof o.chart_url === 'string' &&
+    typeof o.chart_type === 'string'
+  )
+}
+
+/**
+ * Extract every chart payload from a message list, in chronological order
+ * (oldest → newest). Non-tool / non-JSON / non-chart messages are skipped.
+ */
+export function extractCharts(messages: ChatMessage[]): ChartPayload[] {
+  const out: ChartPayload[] = []
+  for (const msg of messages) {
+    if (msg.role !== 'tool') continue
+    try {
+      const p = JSON.parse(msg.content) as unknown
+      if (isChartPayload(p)) out.push(p)
+    } catch {
+      // not JSON — skip
+    }
+  }
+  return out
+}
+
 // ---------------------------------------------------------------------------
 // Tool execution tracking (client-side)
 // ---------------------------------------------------------------------------

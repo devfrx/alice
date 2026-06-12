@@ -88,7 +88,7 @@ The backend is **plugin-based and dependency-injected**. Three concepts tie it t
 - **Layered config**: `LayeredConfigService` merges defaults / system / user / runtime layers and rebuilds `ctx.config` on every successful mutation (publishes `config.changed`). Config models are pydantic-settings in `core/config.py`; env overrides use the `ALICE_*` prefix.
 
 ### Data & external services
-- SQLite via SQLModel/aiosqlite (`backend/db/`, files under `data/*.db`). Conversations are also mirrored to JSON in `data/conversations/` and rebuilt into the DB on startup.
+- SQLite via SQLModel/aiosqlite (`backend/db/`, files under `data/*.db`). SQLite is the single source of truth for conversations; JSON export/backup is explicit only (`POST /api/chat/conversations/backup`, agent tool `backup_conversations`, sidebar UI).
 - **Qdrant** is the vector store for episodic memory/facts (`services/qdrant_service.py`, `services/memory_service.py`). Note knowledge is delegated to Continuum when enabled. Both sit behind the `KnowledgeBackend` abstraction (`services/knowledge/`) — `QdrantBackend` and `ContinuumBackend` composed by `CompositeKnowledgeBackend`. Consume the backend, not the underlying services.
 - LLM access goes through `services/llm_service.py` over LM Studio (default) or Ollama, OpenAI-compatible API.
 - The `terminal` plugin provides a **real interactive Windows ConPTY shell** (`pywinpty`; `backend/services/terminal/`, REST in `api/routes/terminal.py`, store `terminalSessions.ts`), gated by scope + permission mode and `config.terminal.*`.

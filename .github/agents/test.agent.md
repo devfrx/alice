@@ -40,7 +40,7 @@ test_organization:
   conftest: conftest.py — shared fixtures
   core_tests[5]: test_app.py,test_config.py,test_context.py,test_event_bus.py,test_plugin_lifecycle.py
   plugin_tests[9]: test_calendar_plugin.py,test_clipboard_plugin.py,test_file_search_plugin.py,test_media_control_plugin.py,test_news_plugin.py,test_notifications_plugin.py,test_pc_automation.py,test_pc_executor.py,test_pc_validators.py
-  other_tests[10]: test_models.py,test_plugin_models.py,test_settings.py,test_http_security.py,test_security_framework.py,test_concurrent.py,test_confirmation_audit.py,test_confirmation_toggle.py,test_conversation_file_manager.py,test_conversation_migration.py
+  other_tests[10]: test_models.py,test_plugin_models.py,test_settings.py,test_http_security.py,test_security_framework.py,test_concurrent.py,test_confirmation_audit.py,test_confirmation_toggle.py,test_conversation_export.py,test_conversation_backup_plugin.py
   extra_tests[3]: test_file_upload.py,test_screenshot.py,test_pc_executor.py
 
 commands:

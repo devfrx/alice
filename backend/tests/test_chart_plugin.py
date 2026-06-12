@@ -169,3 +169,78 @@ async def test_invalid_chart_id_is_clean_error(plugin) -> None:
     )
     assert not res.success
     assert "non trovato" in (res.error_message or "")
+
+
+async def test_disabled_plugin_exposes_no_tools_and_errors(registry) -> None:
+    p = ChartGeneratorPlugin()
+    stub = _StubCtx(registry)
+    stub.config.chart = ChartConfig(enabled=False)
+    p._ctx = stub
+    assert p.get_tools() == []
+    res = await p.execute_tool("generate_chart", {}, _exec_ctx())
+    assert not res.success
+
+
+async def test_unknown_tool_returns_error(plugin) -> None:
+    res = await plugin.execute_tool("nope", {}, _exec_ctx())
+    assert not res.success
+
+
+async def test_generate_chart_rejects_oversized_option(plugin) -> None:
+    big_option = {"series": [{"type": "bar", "data": ["x" * 20_000]}]}
+    res = await plugin.execute_tool(
+        "generate_chart",
+        {"title": "T", "chart_type": "bar", "echarts_option": big_option},
+        _exec_ctx(),
+    )
+    assert not res.success
+    assert "limite" in (res.error_message or "")
+
+
+async def test_generate_chart_respects_max_charts(plugin) -> None:
+    plugin.ctx.config.chart.max_charts = 1
+    gen1 = await plugin.execute_tool(
+        "generate_chart",
+        {"title": "T1", "chart_type": "bar", "echarts_option": _OPTION},
+        _exec_ctx(),
+    )
+    assert gen1.success
+    gen2 = await plugin.execute_tool(
+        "generate_chart",
+        {"title": "T2", "chart_type": "bar", "echarts_option": _OPTION},
+        _exec_ctx(),
+    )
+    assert not gen2.success
+    assert "Limite massimo" in (gen2.error_message or "")
+
+
+async def test_update_chart_unknown_uuid_is_clean_error(plugin) -> None:
+    res = await plugin.execute_tool(
+        "update_chart",
+        {"chart_id": str(uuid.uuid4()), "echarts_option": _OPTION},
+        _exec_ctx(),
+    )
+    assert not res.success
+    assert "non trovato" in (res.error_message or "")
+
+
+async def test_list_charts_empty(plugin) -> None:
+    res = await plugin.execute_tool("list_charts", {}, _exec_ctx())
+    assert res.success
+    payload = json.loads(res.content)
+    assert payload["total"] == 0
+    assert payload["charts"] == []
+
+
+async def test_get_chart_returns_spec(plugin) -> None:
+    gen = await plugin.execute_tool(
+        "generate_chart",
+        {"title": "T", "chart_type": "bar", "echarts_option": _OPTION},
+        _exec_ctx(),
+    )
+    aid = json.loads(gen.content)["chart_id"]
+    res = await plugin.execute_tool("get_chart", {"chart_id": aid}, _exec_ctx())
+    assert res.success
+    spec = json.loads(res.content)
+    assert spec["chart_id"] == aid
+    assert spec["echarts_option"]["series"][0]["type"] == "bar"

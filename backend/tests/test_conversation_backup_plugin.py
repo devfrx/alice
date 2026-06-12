@@ -56,9 +56,9 @@ async def test_tool_definition_registered(plugin) -> None:
 async def test_backup_all_writes_files(
     plugin, session_factory, tmp_path, monkeypatch,
 ) -> None:
-    import backend.plugins.conversation_backup.plugin as plugin_mod
+    import backend.services.conversation_export as export_mod
 
-    monkeypatch.setattr(plugin_mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(export_mod, "PROJECT_ROOT", tmp_path)
 
     async with session_factory() as session:
         conv = Conversation(title="T")
@@ -88,9 +88,9 @@ async def test_backup_invalid_conversation_id(plugin) -> None:
 async def test_backup_current_resolves_context_conversation(
     plugin, session_factory, tmp_path, monkeypatch,
 ) -> None:
-    import backend.plugins.conversation_backup.plugin as plugin_mod
+    import backend.services.conversation_export as export_mod
 
-    monkeypatch.setattr(plugin_mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(export_mod, "PROJECT_ROOT", tmp_path)
 
     async with session_factory() as session:
         conv = Conversation(title="Cur")
@@ -119,9 +119,9 @@ async def test_backup_unknown_id_reports_error(
 ) -> None:
     import uuid as uuid_mod
 
-    import backend.plugins.conversation_backup.plugin as plugin_mod
+    import backend.services.conversation_export as export_mod
 
-    monkeypatch.setattr(plugin_mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(export_mod, "PROJECT_ROOT", tmp_path)
 
     result = await plugin.execute_tool(
         "backup_conversations",

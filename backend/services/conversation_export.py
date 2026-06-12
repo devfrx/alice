@@ -12,6 +12,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -170,6 +171,16 @@ async def build_conversation_export(
 # ---------------------------------------------------------------------------
 # Explicit export / backup
 # ---------------------------------------------------------------------------
+
+
+def default_backup_dir() -> Path:
+    """Return a fresh timestamped destination under ``data/backups/``.
+
+    Single definition of the default-backup-destination policy shared by
+    the REST endpoint and the ``conversation_backup`` plugin tool.
+    """
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    return PROJECT_ROOT / "data" / "backups" / f"conversations-{stamp}"
 
 
 def _atomic_write(target: Path, payload: str) -> None:

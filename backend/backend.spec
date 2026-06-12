@@ -55,11 +55,15 @@ ENTRY = HERE / "__main__.py"
 # for a future plugin) and would emit a ``backend.plugins.home_automation.plugin``
 # "module not found" warning at PyInstaller analysis time — deliberately
 # excluded.  Re-add when the package gains a real ``Plugin`` class.
+# Kept in sync with the filesystem by ``tests/test_backend_spec.py``.
 PLUGIN_PACKAGES = [
+    "agent",
     "cad_generator",
     "calendar",
     "chart_generator",
     "clipboard",
+    "continuum",
+    "conversation_backup",
     "email_assistant",
     "file_search",
     "mcp_client",
@@ -67,10 +71,10 @@ PLUGIN_PACKAGES = [
     "memory",
     "network_probe",
     "news",
-    "notes",
     "notifications",
     "pc_automation",
     "system_info",
+    "terminal",
     "weather",
     "web_search",
     "whiteboard",

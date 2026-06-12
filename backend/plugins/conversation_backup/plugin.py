@@ -10,17 +10,18 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
-from backend.core.config import PROJECT_ROOT
 from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import (
     ExecutionContext,
     ToolDefinition,
     ToolResult,
 )
-from backend.services.conversation_export import export_conversations_to_dir
+from backend.services.conversation_export import (
+    default_backup_dir,
+    export_conversations_to_dir,
+)
 
 
 class ConversationBackupPlugin(BasePlugin):
@@ -87,8 +88,7 @@ class ConversationBackupPlugin(BasePlugin):
             except ValueError:
                 return ToolResult.error(f"Invalid conversation_id: {raw_id!r}")
 
-        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        dest = PROJECT_ROOT / "data" / "backups" / f"conversations-{stamp}"
+        dest = default_backup_dir()
 
         start = time.perf_counter()
         try:

@@ -22,6 +22,7 @@ from backend.db.models import Attachment, Conversation, Message
 from backend.services.conversation_export import (
     ConversationExport,
     build_conversation_export,
+    default_backup_dir,
     export_conversations_to_dir,
 )
 
@@ -317,8 +318,7 @@ async def backup_conversations(
                 status_code=400, detail="dest_dir must be an absolute path",
             )
     else:
-        stamp = _utcnow().strftime("%Y%m%d-%H%M%S")
-        dest = PROJECT_ROOT / "data" / "backups" / f"conversations-{stamp}"
+        dest = default_backup_dir()
 
     try:
         exported = await export_conversations_to_dir(

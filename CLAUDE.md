@@ -96,7 +96,7 @@ The backend is **plugin-based and dependency-injected**. Three concepts tie it t
 ## Frontend architecture
 
 - `src/main/` Electron main (window/IPC/CSP), `src/preload/` context bridge, `src/renderer/src/` the Vue 3 app.
-- State is **Pinia** stores (`renderer/src/stores/`: `chat`, `voice`, `settings`, `plugins`, `artifacts`, `memory`, `calendar`, `email`, `whiteboard`, `mcp`, `services`, `ui`, plus `agentRun`, `tasks`, `planDocument`, `scope`, `permissionMode`, `terminalSessions`, `workspace`, `charts`, `mcpMemory`). Backend comms are centralized in `renderer/src/services/api.ts` (REST) and `ws.ts` (WebSocket).
+- State is **Pinia** stores (`renderer/src/stores/`: `chat`, `voice`, `settings`, `plugins`, `artifacts`, `memory`, `calendar`, `email`, `mcp`, `services`, `ui`, plus `agentRun`, `tasks`, `planDocument`, `scope`, `permissionMode`, `terminalSessions`, `workspace`, `mcpMemory`). Charts and whiteboards are *kinds* of the unified `artifacts` store (JSON content via `/api/artifacts/{id}/content`; board view-model in `composables/whiteboard/useWhiteboardBoards.ts`). Backend comms are centralized in `renderer/src/services/api.ts` (REST) and `ws.ts` (WebSocket).
 - Logic lives in composables (`renderer/src/composables/`); views in `renderer/src/views/`.
 - **Horizon** is the primary assistant surface (`views/HorizonView.vue`, components under `components/horizon/`, composables under `composables/horizon/`, styles in `assets/styles/horizon.css`) — an editorial scene centered on the horizon line with plan, composer cockpit, stage, shelf, and response rendering. The older orb-era components are legacy; prefer Horizon when touching the assistant UI.
 

@@ -3024,7 +3024,23 @@ git commit -m "docs(plans): fase3 - tick task e criteri di uscita" -m "Co-Author
 - [x] App avviabile (health 200) e feature di riferimento del dominio funzionante e2e (lista artifacts, content GET/PATCH con ricalcolo `shape_count`).
 - [x] `grep` = 0 per: `ChartStore`, `WhiteboardStore`, `chart_output_dir`, `whiteboard_output_dir`, `api/whiteboards`, `stores/whiteboard`, `useChartsStore`, `useWhiteboardStore` (fuori da docs/).
 - [x] Ratchet baseline: −7 voci (3 charts + 4 whiteboards); nessuna voce nuova.
-- [ ] Review finale di fase (modello top, range intero `arch/fase2-persistenza..HEAD`, angolo = coerenza cross-task) con verdetto registrato in fondo a questo piano.
+- [x] Review finale di fase (modello top, range intero, angolo = coerenza cross-task) con verdetto registrato in fondo a questo piano.
+
+## Review finale di fase (2026-06-12, modello top, range b6ebaa4..HEAD)
+
+**Verdetto: Phase ready — With fixes (entrambi applicati subito dopo la review, commit successivo).**
+
+- 0 Critical. Catena dei contratti coerente end-to-end (eventi registry == frame ws_schema == handler FE);
+  i due plugin sono simmetrici (id handling identico byte-per-byte, errori, kind-check su delete); ciclo
+  blob/riga senza drift visibile ai consumatori; semantica di delete coerente su tutti i fronti (nessun
+  percorso utente orfana blob JSON); baseline ratchet netto -7 senza voci nuove; backlog onesto (nessun
+  item davvero bloccante mascherato da deferibile).
+- Important (FIXATO): CLAUDE.md:99 elencava ancora gli store Pinia `whiteboard` e `charts` eliminati ->
+  aggiornato con nota sul modello unificato.
+- Minor (FIXATO): commento stale su `ChartPayload.chart_url` in types/chat.ts:183 -> aggiornato.
+- Minor annotati per handoff (non fixati di proposito): `_parse_artifact_id` usato anche per conversation_id
+  (nome fuorviante, duplicazione identica nei due plugin — eventuale `_parse_uuid` condiviso in futuro);
+  `_get` whiteboard setta content_type esplicito mentre `_get_chart` no (asimmetria inconseguente).
 
 ## Backlog (fuori scope fase 3, da riportare nell'handoff)
 

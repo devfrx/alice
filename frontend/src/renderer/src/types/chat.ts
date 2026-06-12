@@ -180,7 +180,7 @@ export interface ChartPayload {
   chart_id: string
   title: string
   chart_type: string
-  /** Relative URL: "/api/charts/{chart_id}" */
+  /** Relative URL: "/api/artifacts/{chart_id}/content" */
   chart_url: string
   created_at: string
 }

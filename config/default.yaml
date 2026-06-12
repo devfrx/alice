@@ -279,7 +279,6 @@ qdrant:
 
 chart:
   enabled: true
-  chart_output_dir: "data/charts"
   max_option_chars: 10000
   max_charts: 1000
 

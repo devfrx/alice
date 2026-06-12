@@ -1,6 +1,5 @@
 DELETE /api/artifacts/{artifact_id}
 DELETE /api/calendar/events/{event_id}
-DELETE /api/charts/{chart_id}
 DELETE /api/mcp/memory/entities
 DELETE /api/mcp/memory/observations
 DELETE /api/mcp/memory/relations
@@ -19,8 +18,6 @@ GET /api/cad/models/{model_name}
 GET /api/calendar/events
 GET /api/calendar/today
 GET /api/calendar/upcoming
-GET /api/charts
-GET /api/charts/{chart_id}
 GET /api/chat/conversations/{conversation_id}
 GET /api/config
 GET /api/config/layers

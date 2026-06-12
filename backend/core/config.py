@@ -721,9 +721,6 @@ class ChartConfig(BaseSettings):
     enabled: bool = False
     """Abilita il plugin chart_generator (opt-in, come tutti i plugin AL\\CE)."""
 
-    chart_output_dir: str = "data/charts"
-    """Directory dove vengono salvati i chart spec JSON."""
-
     max_option_chars: int = 10_000
     """Dimensione massima della echarts_option serializzata (in caratteri)."""
 

@@ -54,6 +54,8 @@
 
 ### Task 1: Frame WS `artifact.updated`/`artifact.deleted` + dispatcher FE
 
+> **Esito (2026-06-12):** DONE. Spec review: conforme. Quality review (opus): Ready to merge, 0 critical/important; minor annotati: (a) `remove` puo' riusare `removeLocal` (DRY, da fare nel Task 6), (b) alias `ArtifactCreatedEvent` senza usi (pre-esistente), (c) commento su semantica eventually-consistent di `refreshById`. Gate: contracts 84 pass, typecheck 0, vitest 259, check-contracts verde. Commit 1c3c06c.
+
 **Files:**
 - Modify: `backend/api/ws_schema/events.py` (frame + union; `WsArtifactCreated.conversation_id` nullable)
 - Modify: `backend/tests/contracts/test_ws_schema_events.py` (vocabolario + frame rappresentativi)
@@ -61,7 +63,7 @@
 - Modify: `frontend/src/renderer/src/composables/useEventsWebSocket.ts` (2 handler)
 - Regen: `.\scripts\gen-contracts.ps1`
 
-- [ ] **Step 1: Aggiorna il vocabolario congelato (test first)**
+- [x] **Step 1: Aggiorna il vocabolario congelato (test first)**
 
 In `backend/tests/contracts/test_ws_schema_events.py`, dentro `EXPECTED_EVENTS_SERVER_TYPES` aggiungi dopo `"artifact.created",`:
 
@@ -77,7 +79,7 @@ e in `REPRESENTATIVE_SERVER_FRAMES`, subito dopo il frame `artifact.created` esi
     {"type": "artifact.deleted", "artifact_id": "a1"},
 ```
 
-- [ ] **Step 2: Esegui i test contracts per vederli fallire**
+- [x] **Step 2: Esegui i test contracts per vederli fallire**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\backend
@@ -86,7 +88,7 @@ Set-Location C:\Users\Jays\Desktop\alice\alice\backend
 
 Atteso: FAIL (vocabolario non corrisponde / frame non validano).
 
-- [ ] **Step 3: Aggiungi i modelli in `events.py`**
+- [x] **Step 3: Aggiungi i modelli in `events.py`**
 
 In `backend/api/ws_schema/events.py`, modifica `WsArtifactCreated` (riga 157-164): il campo `conversation_id: str` diventa
 
@@ -120,7 +122,7 @@ Nell'union dei server frame (riga ~363, voce `| WsArtifactCreated`) aggiungi sot
 
 Controlla anche `backend/api/ws_schema/__init__.py`: se i frame sono ri-esportati per nome, aggiungi i due nuovi simboli allo stesso modo di `WsArtifactCreated`.
 
-- [ ] **Step 4: Test verdi**
+- [x] **Step 4: Test verdi**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/contracts/ -v
@@ -128,7 +130,7 @@ Controlla anche `backend/api/ws_schema/__init__.py`: se i frame sono ri-esportat
 
 Atteso: PASS (tutti, incluso `test_ws_guard`).
 
-- [ ] **Step 5: Rigenera i contratti**
+- [x] **Step 5: Rigenera i contratti**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice
@@ -137,7 +139,7 @@ Set-Location C:\Users\Jays\Desktop\alice\alice
 
 Atteso: exit 0; `frontend/src/renderer/src/types/generated/` aggiornato (union eventi con i 2 nuovi type).
 
-- [ ] **Step 6: Azioni FE nello store artifacts**
+- [x] **Step 6: Azioni FE nello store artifacts**
 
 In `frontend/src/renderer/src/stores/artifacts.ts`, dopo la funzione `fetchById` aggiungi:
 
@@ -161,7 +163,7 @@ In `frontend/src/renderer/src/stores/artifacts.ts`, dopo la funzione `fetchById`
 
 e aggiungi `refreshById,` e `removeLocal,` al return dello store (sezione actions).
 
-- [ ] **Step 7: Handler nel dispatcher esaustivo**
+- [x] **Step 7: Handler nel dispatcher esaustivo**
 
 In `frontend/src/renderer/src/composables/useEventsWebSocket.ts`, nella mappa `type → handler`, dopo la riga `'artifact.created': ...` aggiungi:
 
@@ -170,7 +172,7 @@ In `frontend/src/renderer/src/composables/useEventsWebSocket.ts`, nella mappa `t
     'artifact.deleted': (msg) => artifactsStore.removeLocal(msg.artifact_id),
 ```
 
-- [ ] **Step 8: Gate FE**
+- [x] **Step 8: Gate FE**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\frontend
@@ -180,7 +182,7 @@ npx vitest run
 
 Atteso: typecheck exit 0; vitest tutti verdi.
 
-- [ ] **Step 9: Commit + check-contracts**
+- [x] **Step 9: Commit + check-contracts**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice

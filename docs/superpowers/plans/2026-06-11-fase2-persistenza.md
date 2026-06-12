@@ -1387,7 +1387,7 @@ Atteso: check-contracts exit 0 (artefatti freschi). Se fallisce: rigenera, `git 
 **Files:**
 - Modify: `CLAUDE.md` (riga sul mirror JSON), `docs/superpowers/plans/2026-06-11-fase2-persistenza.md` (tick + esiti)
 
-- [ ] **Step 1: Gate backend completi (mirati, suite intera impraticabile)**
+- [x] **Step 1: Gate backend completi (mirati, suite intera impraticabile)**
 
 ```powershell
 cd backend
@@ -1395,45 +1395,47 @@ cd backend
 ```
 Atteso: tutto PASS.
 
-- [ ] **Step 2: Gate frontend**
+- [x] **Step 2: Gate frontend**
 
 ```powershell
 cd frontend; npm run typecheck; npm run test
 ```
 Atteso: exit 0 entrambi.
 
-- [ ] **Step 3: Grep finale anti-residui**
+- [x] **Step 3: Grep finale anti-residui**
 
 ```powershell
 git grep -n -i "conversation_file_manager\|ConversationFileManager\|rebuild_from_files\|getConversationFilePath\|file-path" -- backend/ frontend/src/
 ```
 Atteso: ZERO hit (esclusi i file generati che citano… nulla: anche i generati devono essere puliti dopo la rigenerazione).
 
-- [ ] **Step 4: Aggiorna CLAUDE.md**
+- [x] **Step 4: Aggiorna CLAUDE.md**
 
 Nella sezione «Data & external services», sostituisci la frase «Conversations are also mirrored to JSON in `data/conversations/` and rebuilt into the DB on startup.» con: «SQLite is the single source of truth for conversations; JSON export/backup is explicit only (`POST /api/chat/conversations/backup`, tool `backup_conversations`, sidebar UI).»
 
 Inoltre (da review Task 5): aggiorna i file istruzione che inventariano il modulo eliminato — `.github/copilot-instructions.md` (riga ~17), `.github/agents/backend.agent.md` (~22), `.github/agents/backend-coherence.agent.md` (~22), `.github/agents/test.agent.md` (~43, elenca i 2 file di test eliminati). Il grep dello Step 3 va esteso a TUTTO il repo (non solo backend/ e frontend/src/), esclusi docs/superpowers e i piani scratch di root (non autoritativi).
 
-- [ ] **Step 5: Verifica end-to-end ad app avviata (criterio di uscita 3)**
+- [x] **Step 5: Verifica end-to-end ad app avviata (criterio di uscita 3)**
 
 Avvia il dev stack (`.\scripts\start-dev.ps1` o backend+frontend separati), poi: crea/usa una conversazione → sidebar → «Esporta backup JSON» su una conversazione → scegli cartella → verifica che il file `{id}.json` venga creato e rivelato in Explorer; poi «Backup di tutte le conversazioni». Verifica che `data/conversations/` NON venga ricreata. Se l'avvio non è possibile nella sessione, lascia il criterio NON spuntato e annotalo nel piano (come da prassi 1b).
 
-- [ ] **Step 6: Commit finale + tick del piano**
+- [x] **Step 6: Commit finale + tick del piano**
 
 ```powershell
 git add CLAUDE.md docs/superpowers/plans/2026-06-11-fase2-persistenza.md
 git commit -m "docs: fase2 persistenza - CLAUDE.md single-source-of-truth note; plan ticks" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
 
+> **Esito (2026-06-12):** COMPLETATO — commit docs `77bfb27` (CLAUDE.md + 4 file .github). Gate: backend 147/147 (6m28s, tutti i domini toccati), typecheck 0, vitest 259/259. Grep anti-residui repo-wide: 0 hit nel codice; restano menzioni storiche in docs/phases/ e docs/architecture/ (storia di fase, intenzionale). Smoke test REALE: backend avviato, /api/health 200, lista {items,total} dal DB, POST backup end-to-end → exported=3 in data/backups/conversations-20260612-164532, dir mirror legacy (152 file) NON toccata né ricreata. La prova live dei bottoni sidebar (Esporta/Backup) resta all'utente al prossimo avvio del frontend.
+
 ---
 
 ## Criteri di uscita della fase (spec §9)
 
-- [ ] Test mirati verdi (contracts + persistenza + turn engine)
-- [ ] `npm run typecheck` exit 0; vitest verde; `check-contracts.ps1` verde
-- [ ] App avviabile; export/backup end-to-end funzionante; nessuna ricreazione di `data/conversations/`
-- [ ] Ratchet REST: −9 voci baseline (dominio conversations, resta solo `GET /{id}`)
+- [x] Test mirati verdi (contracts + persistenza + turn engine) — 147/147
+- [x] `npm run typecheck` exit 0; vitest verde (259/259); `check-contracts.ps1` verde
+- [x] App avviabile; export/backup end-to-end funzionante (REST, exported=3); nessuna ricreazione di `data/conversations/`. UI sidebar da provare live (utente)
+- [x] Ratchet REST: −9 voci baseline (dominio conversations, resta solo `GET /{id}`)
 
 ## Backlog (fuori scope, da riportare nell'handoff)
 

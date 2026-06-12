@@ -2676,7 +2676,7 @@ export interface components {
             observations?: string[];
         };
         EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"];
-        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
+        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
         /**
          * ExportedAttachment
          * @description One attachment inside an exported message.
@@ -3259,8 +3259,11 @@ export interface components {
         WsArtifactCreated: {
             /** Artifact Id */
             artifact_id: string;
-            /** Conversation Id */
-            conversation_id: string;
+            /**
+             * Conversation Id
+             * @default null
+             */
+            conversation_id?: string | null;
             /**
              * Correlation Id
              * @default null
@@ -3284,6 +3287,54 @@ export interface components {
              * @enum {string}
              */
             type: "artifact.created";
+        };
+        /**
+         * WsArtifactDeleted
+         * @description An artifact row was deleted.
+         */
+        WsArtifactDeleted: {
+            /** Artifact Id */
+            artifact_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "artifact.deleted";
+        };
+        /**
+         * WsArtifactUpdated
+         * @description An existing artifact changed (row metadata or JSON content).
+         */
+        WsArtifactUpdated: {
+            /** Artifact Id */
+            artifact_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "artifact.updated";
         };
         /**
          * WsAskUserAnswer

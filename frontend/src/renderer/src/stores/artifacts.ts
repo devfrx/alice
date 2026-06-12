@@ -147,6 +147,22 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     }
   }
 
+  /** Force-refresh a single artifact row from the backend (upsert). */
+  async function refreshById(id: string): Promise<void> {
+    try {
+      const artifact = await api.getArtifact(id)
+      addArtifact(artifact)
+    } catch (err) {
+      console.warn('[artifacts] refreshById failed:', err)
+    }
+  }
+
+  /** Remove an artifact from local state (the server already deleted it). */
+  function removeLocal(id: string): void {
+    const idx = items.value.findIndex((a) => a.id === id)
+    if (idx !== -1) items.value.splice(idx, 1)
+  }
+
   /** Toggle the pin flag for an artifact and persist server-side. */
   async function togglePin(id: string): Promise<void> {
     const current = findById(id)
@@ -185,6 +201,8 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     fetch,
     ensureForConversation,
     fetchById,
+    refreshById,
+    removeLocal,
     togglePin,
     remove,
     addArtifact,

@@ -160,8 +160,22 @@ class WsArtifactCreated(EventsServerFrame):
     type: Literal["artifact.created"]
     artifact_id: str
     kind: str
-    conversation_id: str
+    conversation_id: str | None = None
     title: str | None = None
+
+
+class WsArtifactUpdated(EventsServerFrame):
+    """An existing artifact changed (row metadata or JSON content)."""
+
+    type: Literal["artifact.updated"]
+    artifact_id: str
+
+
+class WsArtifactDeleted(EventsServerFrame):
+    """An artifact row was deleted."""
+
+    type: Literal["artifact.deleted"]
+    artifact_id: str
 
 
 # ---------------------------------------------------------------------------
@@ -361,6 +375,8 @@ EventsServerMessage = Annotated[
     | WsKnowledgeStatus
     | WsModelDownloadProgress
     | WsArtifactCreated
+    | WsArtifactUpdated
+    | WsArtifactDeleted
     | WsTasksUpdated
     | WsPlanDocumentUpdated
     | WsScopeUpdated

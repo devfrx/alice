@@ -810,6 +810,8 @@
         "discriminator": {
           "mapping": {
             "artifact.created": "#/components/schemas/WsArtifactCreated",
+            "artifact.deleted": "#/components/schemas/WsArtifactDeleted",
+            "artifact.updated": "#/components/schemas/WsArtifactUpdated",
             "calendar.changed": "#/components/schemas/WsCalendarChanged",
             "config.changed": "#/components/schemas/WsConfigChanged",
             "email.received": "#/components/schemas/WsEmailReceived",
@@ -875,6 +877,12 @@
           },
           {
             "$ref": "#/components/schemas/WsArtifactCreated"
+          },
+          {
+            "$ref": "#/components/schemas/WsArtifactUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsArtifactDeleted"
           },
           {
             "$ref": "#/components/schemas/WsTasksUpdated"
@@ -2113,8 +2121,16 @@
             "type": "string"
           },
           "conversation_id": {
-            "title": "Conversation Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
           },
           "correlation_id": {
             "anyOf": [
@@ -2163,10 +2179,95 @@
         "required": [
           "type",
           "artifact_id",
-          "kind",
-          "conversation_id"
+          "kind"
         ],
         "title": "WsArtifactCreated",
+        "type": "object"
+      },
+      "WsArtifactDeleted": {
+        "additionalProperties": false,
+        "description": "An artifact row was deleted.",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id"
+        ],
+        "title": "WsArtifactDeleted",
+        "type": "object"
+      },
+      "WsArtifactUpdated": {
+        "additionalProperties": false,
+        "description": "An existing artifact changed (row metadata or JSON content).",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id"
+        ],
+        "title": "WsArtifactUpdated",
         "type": "object"
       },
       "WsAskUserAnswer": {

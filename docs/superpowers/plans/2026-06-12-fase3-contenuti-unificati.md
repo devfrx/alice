@@ -1924,6 +1924,8 @@ git commit -m "refactor(whiteboard): whiteboard plugin on unified artifact regis
 
 ### Task 5: Endpoint `GET/PATCH /api/artifacts/{id}/content` + pulizia conversazioni delegata al registry + regen contratti
 
+> **Esito (2026-06-12):** DONE. Spec review: conforme (endpoint/modelli/bodies verbatim, baseline invariata, openapi con content GET+PATCH, 11/11). Quality review (opus): Ready to merge; valutati e accettati: guard 400 dumps di fatto irraggiungibile (difensivo), guardia 5MiB sul body non sul blob risultante (commentato in b36fe09), delete non-atomica ma idempotente (commentato), merge top-level puo' toccare chiavi identity nel blob (inerte: l'identita' e' la riga). Follow-up b36fe09: +2 asserzioni (GET post-PATCH, PATCH 404 su binario). 9/9 route test. Commit 666b955 + b36fe09.
+
 **Files:**
 - Modify: `backend/services/artifacts/schemas.py` (3 modelli content)
 - Modify: `backend/services/artifacts/__init__.py` (export)
@@ -1932,7 +1934,7 @@ git commit -m "refactor(whiteboard): whiteboard plugin on unified artifact regis
 - Modify: `backend/tests/test_artifacts_route.py` (+2 test, fixture client lenta: NON di più)
 - Regen: `.\scripts\gen-contracts.ps1`
 
-- [ ] **Step 1: Scrivi i test che falliscono**
+- [x] **Step 1: Scrivi i test che falliscono**
 
 In `backend/tests/test_artifacts_route.py` aggiungi in coda (rispetta gli import esistenti del file; aggiungi `from backend.db.models import ArtifactKind` e `from backend.services.artifacts.blob_store import ArtifactBlobStore` se mancanti):
 
@@ -1988,7 +1990,7 @@ async def test_content_404_for_binary_artifact(app, client, tmp_path):
 
 NOTA: `register_from_tool_result` richiede una `Conversation` esistente? No — `conversation_id` non ha vincolo FK enforced su SQLite di default nei test esistenti; verifica come fanno i test esistenti del file (`test_full_pin_and_filter_flow`) a registrare artifact e replica ESATTAMENTE quel pattern (inclusa l'eventuale creazione della Conversation) se il vincolo è enforced.
 
-- [ ] **Step 2: Esegui per vederli fallire**
+- [x] **Step 2: Esegui per vederli fallire**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_artifacts_route.py -v
@@ -1996,7 +1998,7 @@ NOTA: `register_from_tool_result` richiede una `Conversation` esistente? No — 
 
 Atteso: i 2 test nuovi FAIL con 404/405 (endpoint inesistenti); i preesistenti PASS.
 
-- [ ] **Step 3: Modelli in `schemas.py`**
+- [x] **Step 3: Modelli in `schemas.py`**
 
 In `backend/services/artifacts/schemas.py` aggiungi in coda:
 
@@ -2024,7 +2026,7 @@ class ArtifactContentUpdateResponse(BaseModel):
 
 e in `services/artifacts/__init__.py` esporta `ArtifactContentResponse`, `ArtifactContentUpdate`, `ArtifactContentUpdateResponse` (import + `__all__`).
 
-- [ ] **Step 4: Endpoint in `routes/artifacts.py`**
+- [x] **Step 4: Endpoint in `routes/artifacts.py`**
 
 Aggiorna l'import da `backend.services.artifacts` aggiungendo i 3 modelli; aggiungi `import json` agli import. Dopo `pin_artifact` aggiungi:
 
@@ -2092,7 +2094,7 @@ async def update_artifact_content(
     )
 ```
 
-- [ ] **Step 5: `conversations.py` delega al registry**
+- [x] **Step 5: `conversations.py` delega al registry**
 
 5a. `delete_all_conversations` (righe 414-463): sostituisci l'INTERO corpo con
 
@@ -2218,7 +2220,7 @@ async def delete_conversation(
 
 e rimuovi SOLO gli import segnalati come unused (F401), niente altro.
 
-- [ ] **Step 6: Test verdi + regen + commit + check**
+- [x] **Step 6: Test verdi + regen + commit + check**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_artifacts_route.py tests/contracts/ -v

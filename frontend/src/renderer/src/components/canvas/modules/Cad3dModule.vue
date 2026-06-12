@@ -73,6 +73,11 @@ function artifactToModel(artifact: Artifact): CadModelPayload {
   }
 }
 
+/** Extract a non-empty model_name from artifact metadata, or ''. */
+function modelNameOf(meta: Record<string, unknown>): string {
+  return typeof meta.model_name === 'string' && meta.model_name.length > 0 ? meta.model_name : ''
+}
+
 /** Full model list handed to the canvas (kept stable so navigation works). */
 const models = computed<CadModelPayload[]>(() => cadArtifacts.value.map(artifactToModel))
 
@@ -87,7 +92,7 @@ const options = computed<UiSegmentedOption[]>(() =>
   cadArtifacts.value.map((a, i) => ({
     value: a.id,
     label:
-      ((meta) => typeof meta.model_name === 'string' && meta.model_name.length > 0 ? meta.model_name : '')(a.artifact_metadata ?? {}) ||
+      modelNameOf(a.artifact_metadata ?? {}) ||
       a.title ||
       `Modello ${i + 1}`,
   }))

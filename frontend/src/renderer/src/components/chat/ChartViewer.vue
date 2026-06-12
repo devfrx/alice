@@ -2,7 +2,7 @@
 /**
  * ChartViewer.vue — Visualizza un grafico Apache ECharts nella chat.
  *
- * Carica la ChartSpec completa dall'endpoint REST GET /api/charts/{chart_id},
+ * Carica la ChartSpec completa dall'endpoint REST GET /api/artifacts/{id}/content (api.getArtifactContent),
  * monta un'istanza echarts.init() sul div container e gestisce il resize.
  */
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'

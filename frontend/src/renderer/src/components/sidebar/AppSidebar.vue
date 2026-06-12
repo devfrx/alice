@@ -208,13 +208,28 @@ async function onRename(id: string, title: string): Promise<void> {
   await chatStore.renameConversation(id, title)
 }
 
-/** Open the conversation file in the system file manager. */
-async function onOpenFile(id: string): Promise<void> {
+/** Export a single conversation as JSON into a user-chosen directory. */
+async function onExportConversation(id: string): Promise<void> {
   try {
-    const { path } = await api.getConversationFilePath(id)
-    window.electron.fileOps.showInFolder(path)
+    const dir = await window.electron.fileOps.selectDirectory()
+    if (!dir) return
+    const res = await api.backupConversations(dir, [id])
+    window.electron.fileOps.showInFolder(`${res.path}/${id}.json`)
   } catch (err) {
-    console.error(`[AppSidebar] Failed to open file for conversation ${id}:`, err)
+    console.error(`[AppSidebar] Failed to export conversation ${id}:`, err)
+  }
+}
+
+/** Backup ALL conversations as JSON files into a user-chosen directory. */
+async function onBackupAll(): Promise<void> {
+  try {
+    const dir = await window.electron.fileOps.selectDirectory()
+    if (!dir) return
+    const res = await api.backupConversations(dir)
+    console.info(`[AppSidebar] Backup completato: ${res.exported} conversazioni in ${res.path}`)
+    window.electron.fileOps.showInFolder(res.path)
+  } catch (err) {
+    console.error('[AppSidebar] Failed to backup conversations:', err)
   }
 }
 </script>
@@ -295,7 +310,7 @@ async function onOpenFile(id: string): Promise<void> {
           <ConversationList :conversations="chatStore.conversations"
             :active-id="chatStore.currentConversation?.id ?? null" :streaming-id="chatStore.streamingConversationId"
             @select="onSelect" @create="onCreate" @delete="onDelete" @delete-all="onDeleteAll" @rename="onRename"
-            @open-file="onOpenFile" />
+            @export="onExportConversation" @backup-all="onBackupAll" />
         </div>
 
         <!-- Footer: settings -->

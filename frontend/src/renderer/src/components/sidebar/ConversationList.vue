@@ -29,7 +29,8 @@ const emit = defineEmits<{
   delete: [id: string]
   'delete-all': []
   rename: [id: string, title: string]
-  'open-file': [id: string]
+  export: [id: string]
+  'backup-all': []
 }>()
 
 // -----------------------------------------------------------------------
@@ -203,6 +204,10 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
         <button class="conv-list__header-btn" aria-label="Nuova chat" title="Nuova chat" @click="emit('create')">
           <AppIcon name="plus" :size="12" />
         </button>
+        <button v-if="conversations.length > 0" class="conv-list__header-btn" aria-label="Esporta tutte le conversazioni"
+          title="Backup di tutte le conversazioni" @click="emit('backup-all')">
+          <AppIcon name="folder" :size="11" />
+        </button>
         <button v-if="conversations.length > 0" class="conv-list__header-btn conv-list__header-btn--danger"
           aria-label="Elimina tutte le conversazioni" title="Elimina tutte" @click="emit('delete-all')">
           <AppIcon name="trash" :size="11" />
@@ -243,8 +248,8 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
 
           <!-- Action buttons (slide-in on hover) -->
           <div class="conv-item__actions" @click.stop>
-            <button v-if="renamingId !== conv.id" class="conv-item__action" aria-label="Apri cartella"
-              title="Apri nel file manager" @click="emit('open-file', conv.id)">
+            <button v-if="renamingId !== conv.id" class="conv-item__action" aria-label="Esporta conversazione"
+              title="Esporta backup JSON" @click="emit('export', conv.id)">
               <AppIcon name="folder" :size="11" />
             </button>
             <button v-if="renamingId !== conv.id" class="conv-item__action" aria-label="Rinomina conversazione"

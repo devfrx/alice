@@ -216,7 +216,7 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Fetch the conversation list from the backend. */
   async function loadConversations(): Promise<void> {
-    const remote = await api.getConversations()
+    const remote = (await api.getConversations()).items
 
     // Merge: keep any locally-created conversations that the backend
     // does not know about yet (created while backend was down).

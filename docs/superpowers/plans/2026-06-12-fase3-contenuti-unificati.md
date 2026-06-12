@@ -1354,6 +1354,8 @@ git commit -m "refactor(chart): chart_generator on unified artifact registry; dr
 
 ### Task 4: Plugin whiteboard sul registry; via `WhiteboardStore`, route `/api/whiteboards` e contesto system-prompt dal registry
 
+> **Esito (2026-06-12):** DONE. Spec review: conforme (handler, contesto registry-based con guardia tz-naive, -4 baseline, parity decisioni 6/7 verificate). Quality review (opus): Ready to merge; follow-up applicati in d034b0f: +5 test whiteboard (update, missing-board, disabled, unknown tool, max_boards), `_registry()` con cast in entrambi i plugin (via union-attr/no-any-return), commento edge schema-less merge. Amendment B variante: series type 'nonsense' con chart_type='bar' (il '' inciampa nella guardia missing-param). 23/23 test plugin. Commit c1883e4 + d034b0f.
+
 **Files:**
 - Modify: `backend/plugins/whiteboard/plugin.py`
 - Delete: `backend/plugins/whiteboard/store.py`
@@ -1366,7 +1368,7 @@ git commit -m "refactor(chart): chart_generator on unified artifact registry; dr
 - Delete: `backend/tests/test_whiteboard_route_scope.py`
 - Create: `backend/tests/test_whiteboard_plugin.py`
 
-- [ ] **Step 1: Scrivi i test che falliscono**
+- [x] **Step 1: Scrivi i test che falliscono**
 
 Crea `backend/tests/test_whiteboard_plugin.py` (stesse fixture `session_factory`/`conversation_id`/`registry` di `test_chart_plugin.py` — copiale verbatim, NON importarle cross-file):
 
@@ -1528,7 +1530,7 @@ async def test_delete_whiteboard_removes_row_and_blob(
     assert not (tmp_path / "whiteboard" / f"{aid}.json").exists()
 ```
 
-- [ ] **Step 2: Esegui i test per vederli fallire**
+- [x] **Step 2: Esegui i test per vederli fallire**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_whiteboard_plugin.py -v
@@ -1536,7 +1538,7 @@ async def test_delete_whiteboard_removes_row_and_blob(
 
 Atteso: FAIL.
 
-- [ ] **Step 3: Riscrivi `plugins/whiteboard/plugin.py`**
+- [x] **Step 3: Riscrivi `plugins/whiteboard/plugin.py`**
 
 Schema e `get_tools()` INVARIATI; `_extract_shapes_summary` e `shape_builder.py` restano.
 
@@ -1804,7 +1806,7 @@ NOTA su `_list`: `registry.list_artifacts` con `conversation_id=None` lista TUTT
 
 3e. ATTENZIONE al test `test_list_scoped_to_current_conversation`: la lavagna "Orphan" ha `conversation_id=None`, e `list` con conversazione corrente filtra per quella conversazione → total 1. Verifica che `list_artifacts` filtri correttamente (`where Artifact.conversation_id == conv` esclude i NULL: sì).
 
-- [ ] **Step 4: `_build_whiteboard_context` dal registry**
+- [x] **Step 4: `_build_whiteboard_context` dal registry**
 
 In `backend/api/routes/chat/_helpers.py` sostituisci il corpo di `_build_whiteboard_context` (righe 305-357) con:
 
@@ -1870,7 +1872,7 @@ async def _build_whiteboard_context(
 
 Aggiungi `from backend.db.models import ArtifactKind` agli import del file (verifica prima che non importi già da `backend.db.models`: in tal caso estendi quella riga).
 
-- [ ] **Step 5: Route, config, baseline**
+- [x] **Step 5: Route, config, baseline**
 
 - Elimina `backend/api/routes/whiteboards.py`; in `routes/__init__.py` togli `whiteboards` dall'import e `router.include_router(whiteboards.router)` (riga 27).
 - In `backend/core/config.py` rimuovi da `WhiteboardConfig`:
@@ -1893,7 +1895,7 @@ PATCH /api/whiteboards/{board_id}/snapshot
 (NOTA: sono 4 righe — il titolo del task dice "−3" per simmetria col chart ma le voci whiteboard in baseline sono QUATTRO, righe 13, 55, 56, 59: rimuovile tutte.)
 - Elimina `backend/tests/test_whiteboard_route_scope.py`.
 
-- [ ] **Step 6: Test verdi**
+- [x] **Step 6: Test verdi**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_whiteboard_plugin.py tests/contracts/test_response_models.py -v
@@ -1908,7 +1910,7 @@ git grep -n "WhiteboardStore"; git grep -n "ChartStore"; git grep -n "whiteboard
 
 Atteso: 0 risultati nel codice (ammessi solo in `docs/`).
 
-- [ ] **Step 7: Lint scoped + commit**
+- [x] **Step 7: Lint scoped + commit**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\backend

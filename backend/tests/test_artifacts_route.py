@@ -10,7 +10,6 @@ import pytest
 from backend.db.models import ArtifactKind, Conversation
 from backend.services.artifacts.blob_store import ArtifactBlobStore
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -174,6 +173,10 @@ async def test_content_roundtrip(app, client, tmp_path):
     assert r2.status_code == 200
     assert r2.json()["artifact_id"] == str(artifact.id)
 
+    r2b = await client.get(f"/api/artifacts/{artifact.id}/content")
+    assert r2b.status_code == 200
+    assert "shape:s1" in r2b.json()["content"]["snapshot"]["store"]
+
     r3 = await client.get(f"/api/artifacts/{artifact.id}")
     assert r3.json()["artifact_metadata"]["shape_count"] == 1
 
@@ -195,3 +198,9 @@ async def test_content_404_for_binary_artifact(app, client, tmp_path):
     assert artifact is not None
     r = await client.get(f"/api/artifacts/{artifact.id}/content")
     assert r.status_code == 404
+
+    r2 = await client.patch(
+        f"/api/artifacts/{artifact.id}/content",
+        json={"content": {"x": 1}},
+    )
+    assert r2.status_code == 404

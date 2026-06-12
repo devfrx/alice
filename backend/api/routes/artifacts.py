@@ -210,6 +210,7 @@ async def update_artifact_content(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Content non serializzabile: {exc}",
         ) from exc
+    # NOTE: this bounds the PATCH body, not the merged on-disk blob.
     if size > _MAX_CONTENT_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

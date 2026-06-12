@@ -462,6 +462,7 @@ async def delete_conversation(
             raise HTTPException(status_code=404, detail="Conversation not found")
 
     # ── Artifacts (single implementation in the registry) ──────────────
+    # Separate transaction: on partial failure re-issuing the delete is safe (idempotent).
     registry = getattr(ctx, "artifact_registry", None)
     if registry is not None:
         await registry.delete_for_conversation(conversation_id)

@@ -2892,11 +2892,13 @@ git commit -m "refactor(fe): whiteboards on unified artifacts store; drop whiteb
 
 ### Task 8: Gate di fine fase + smoke reale
 
+> **Esito (2026-06-12):** DONE. Gate: 143/143 backend mirati (json 12, registry 12, route 9, chart 13, whiteboard 10, contracts 84, backend_spec 3), typecheck 0, vitest 259/259, check-contracts verde. Smoke e2e reale: boot 12s, health 200, lista kind=whiteboard ok, content GET con shape:s1, PATCH +shape:s2 -> shape_count 1->2 ricalcolato dal hook, DELETE 204 con blob rimosso, _smoke_fase3.py eliminato. Dirs legacy intatte (data/charts 49 file, data/whiteboards 3 file, nessun file nuovo).
+
 **Files:**
 - Create (temporaneo, NON committare): `_smoke_fase3.py` alla radice
 - Modify: questo piano (tick + esiti)
 
-- [ ] **Step 1: Suite backend mirata completa**
+- [x] **Step 1: Suite backend mirata completa**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\backend
@@ -2905,7 +2907,7 @@ Set-Location C:\Users\Jays\Desktop\alice\alice\backend
 
 Atteso: tutti PASS (le run con fixture `client` sono lente ~25s/test: NON killare, timeout 600s).
 
-- [ ] **Step 2: Gate FE completo**
+- [x] **Step 2: Gate FE completo**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\frontend
@@ -2915,7 +2917,7 @@ npx vitest run
 
 Atteso: typecheck exit 0; vitest tutti verdi.
 
-- [ ] **Step 3: check-contracts (workspace pulito post-commit)**
+- [x] **Step 3: check-contracts (workspace pulito post-commit)**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice
@@ -2924,7 +2926,7 @@ Set-Location C:\Users\Jays\Desktop\alice\alice
 
 Atteso: verde.
 
-- [ ] **Step 4: Smoke reale end-to-end**
+- [x] **Step 4: Smoke reale end-to-end**
 
 4a. Crea `_smoke_fase3.py` alla radice (seed di una lavagna via registry, STESSO bootstrap di `backend/scripts/backfill_artifacts.py`):
 
@@ -2995,7 +2997,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/artifacts/$aid" | ConvertTo-Json -D
 
 Atteso: health 200; lista con l'artifact (kind whiteboard, shape_count 1 nei metadati); content col board; PATCH ok; rilettura con `artifact_metadata.shape_count == 2`. Spegni il server, elimina la riga smoke (facoltativo: `DELETE /api/artifacts/$aid?delete_file=true` prima di spegnere) ed ELIMINA `_smoke_fase3.py`.
 
-- [ ] **Step 5: Verifica anti-regressione dirs legacy**
+- [x] **Step 5: Verifica anti-regressione dirs legacy**
 
 ```powershell
 Get-ChildItem data\charts, data\whiteboards -ErrorAction SilentlyContinue | Measure-Object
@@ -3003,7 +3005,7 @@ Get-ChildItem data\charts, data\whiteboards -ErrorAction SilentlyContinue | Meas
 
 Atteso: le directory legacy (se esistono) sono INTATTE e nessun file nuovo vi è comparso durante lo smoke.
 
-- [ ] **Step 6: Tick del piano + commit finale**
+- [x] **Step 6: Tick del piano + commit finale**
 
 Spunta tutte le checkbox, annota gli esiti review per task (come da workflow fase 2), poi:
 
@@ -3016,12 +3018,12 @@ git commit -m "docs(plans): fase3 - tick task e criteri di uscita" -m "Co-Author
 
 ## Criteri di uscita della fase (spec §9)
 
-- [ ] Test mirati backend verdi (artifact json/registry/route, chart plugin, whiteboard plugin, contracts, backend_spec).
-- [ ] `npm run typecheck` exit 0; vitest tutti verdi; eslint senza errori nuovi sui file toccati.
-- [ ] `check-contracts.ps1` verde su workspace pulito.
-- [ ] App avviabile (health 200) e feature di riferimento del dominio funzionante e2e (lista artifacts, content GET/PATCH con ricalcolo `shape_count`).
-- [ ] `grep` = 0 per: `ChartStore`, `WhiteboardStore`, `chart_output_dir`, `whiteboard_output_dir`, `api/whiteboards`, `stores/whiteboard`, `useChartsStore`, `useWhiteboardStore` (fuori da docs/).
-- [ ] Ratchet baseline: −7 voci (3 charts + 4 whiteboards); nessuna voce nuova.
+- [x] Test mirati backend verdi (artifact json/registry/route, chart plugin, whiteboard plugin, contracts, backend_spec).
+- [x] `npm run typecheck` exit 0; vitest tutti verdi; eslint senza errori nuovi sui file toccati.
+- [x] `check-contracts.ps1` verde su workspace pulito.
+- [x] App avviabile (health 200) e feature di riferimento del dominio funzionante e2e (lista artifacts, content GET/PATCH con ricalcolo `shape_count`).
+- [x] `grep` = 0 per: `ChartStore`, `WhiteboardStore`, `chart_output_dir`, `whiteboard_output_dir`, `api/whiteboards`, `stores/whiteboard`, `useChartsStore`, `useWhiteboardStore` (fuori da docs/).
+- [x] Ratchet baseline: −7 voci (3 charts + 4 whiteboards); nessuna voce nuova.
 - [ ] Review finale di fase (modello top, range intero `arch/fase2-persistenza..HEAD`, angolo = coerenza cross-task) con verdetto registrato in fondo a questo piano.
 
 ## Backlog (fuori scope fase 3, da riportare nell'handoff)

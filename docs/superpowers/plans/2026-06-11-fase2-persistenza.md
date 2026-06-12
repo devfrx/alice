@@ -1437,6 +1437,19 @@ git commit -m "docs: fase2 persistenza - CLAUDE.md single-source-of-truth note; 
 - [x] App avviabile; export/backup end-to-end funzionante (REST, exported=3); nessuna ricreazione di `data/conversations/`. UI sidebar da provare live (utente)
 - [x] Ratchet REST: −9 voci baseline (dominio conversations, resta solo `GET /{id}`)
 
+## Review finale di fase (2026-06-12)
+
+**Verdetto: Phase ready — Yes** (reviewer top-model sull'intero range `f6b6a18..55f147e`). Gate riprodotti indipendentemente: 97 test mirati, typecheck 0, check-contracts verde, baseline esattamente −9. Record del piano spot-checked contro la history git: veritiero.
+
+Fix post-review finale:
+- `ac23c6b` — `conversation_backup` registrato in `PLUGIN_PACKAGES` (backend.spec) CON riconciliazione completa del manifest (aggiunti anche agent/continuum/terminal mancanti da prima, rimossa la voce fantasma `notes`); policy della destinazione default centralizzata in `default_backup_dir()` nel servizio (era duplicata in io.py e plugin.py, §4.1); test del plugin aggiornati a monkeypatchare il modulo servizio.
+- `357953b` — `tests/test_backend_spec.py`: guardia anti-drift PLUGIN_PACKAGES ↔ filesystem (3 test, via AST).
+
+Note da portare nell'handoff per le fasi successive:
+1. (Fase 7, anti-escalation) `POST /chat/conversations/backup` accetta dest_dir assoluta arbitraria — corretto per la UI locale (picker Electron), ma l'endpoint deve restare strutturalmente FUORI dalla superficie agent-callable del Command Layer; il tool agente è già confinato a `data/backups/`.
+2. (Fase 6) Semantica `exported=0` deliberatamente diversa per fronte: REST → 200 con count (la UI mostra warning toast); tool → errore esplicito. Non "uniformare" alla cieca.
+3. (Fase 3) La pulizia artifact inline in `delete_conversation`/`delete_all_conversations` (conversations.py ~414-574) è esattamente ciò che il servizio artifact unificato dovrà assorbire — non duplicarla.
+
 ## Backlog (fuori scope, da riportare nell'handoff)
 
 1. `GET /api/chat/conversations/{conversation_id}` (dettaglio) resta in baseline: il modello (messages + context_usage) è pesante — tipizzarlo in Fase 6 (frontend) quando si rifà il client per dominio.

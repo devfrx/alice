@@ -873,6 +873,8 @@ git commit -m "feat(artifacts): chart/whiteboard kinds, JSON blob store, registr
 
 ### Task 3: Plugin chart_generator sul registry; via `ChartStore` e route `/api/charts`
 
+> **Esito (2026-06-12):** DONE. Deviazioni accettate: (1) i test asserzionano `error_message` (typo del piano: `ToolResult.error()` non riempie `content`); (2) eliminato anche il pre-esistente `test_chart_generator_plugin.py` (usava `chart_output_dir`), copertura ripristinata con +7 test (limiti, disabled, edge) in 711b276. Spec review: conforme. Quality review (opus): Ready to merge; minor rinviati al Task 4: narrowing `_registry()` (raise invece di `| None`) da applicare a entrambi i plugin + 1 test integrazione plugin-validator. 12/12 test plugin, ratchet -3 verde. Commit bb1c115 + 711b276.
+
 **Files:**
 - Modify: `backend/plugins/chart_generator/plugin.py`
 - Delete: `backend/plugins/chart_generator/chart_store.py`
@@ -884,7 +886,7 @@ git commit -m "feat(artifacts): chart/whiteboard kinds, JSON blob store, registr
 - Delete: `backend/tests/test_chart_store.py`
 - Create: `backend/tests/test_chart_plugin.py`
 
-- [ ] **Step 1: Scrivi i test che falliscono**
+- [x] **Step 1: Scrivi i test che falliscono**
 
 Crea `backend/tests/test_chart_plugin.py`:
 
@@ -1062,7 +1064,7 @@ async def test_invalid_chart_id_is_clean_error(plugin) -> None:
     assert "non trovato" in res.content
 ```
 
-- [ ] **Step 2: Esegui i test per vederli fallire**
+- [x] **Step 2: Esegui i test per vederli fallire**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_chart_plugin.py -v
@@ -1070,7 +1072,7 @@ async def test_invalid_chart_id_is_clean_error(plugin) -> None:
 
 Atteso: FAIL (il plugin usa ancora ChartStore; `chart_url` punta a `/api/charts/`).
 
-- [ ] **Step 3: Riscrivi `plugins/chart_generator/plugin.py`**
+- [x] **Step 3: Riscrivi `plugins/chart_generator/plugin.py`**
 
 Modifiche (gli SCHEMA `_GENERATE_SCHEMA`… e `get_tools()` restano INVARIATI):
 
@@ -1309,7 +1311,7 @@ e cambia la dispatch in `return await handler(args, context)`.
 
 3f. Elimina `backend/plugins/chart_generator/chart_store.py`.
 
-- [ ] **Step 4: Elimina la route e la config**
+- [x] **Step 4: Elimina la route e la config**
 
 - Elimina `backend/api/routes/charts.py`.
 - In `backend/api/routes/__init__.py`: togli `charts` dall'import (riga 7) e la riga `router.include_router(charts.router)` (riga 26).
@@ -1331,7 +1333,7 @@ GET /api/charts/{chart_id}
 
 - Elimina `backend/tests/test_chart_store.py`.
 
-- [ ] **Step 5: Test verdi**
+- [x] **Step 5: Test verdi**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_chart_plugin.py tests/contracts/test_response_models.py -v
@@ -1339,7 +1341,7 @@ GET /api/charts/{chart_id}
 
 Atteso: PASS (la ratchet vede 3 route in meno e 3 voci baseline in meno).
 
-- [ ] **Step 6: Lint scoped + commit**
+- [x] **Step 6: Lint scoped + commit**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m ruff check plugins/chart_generator/ tests/test_chart_plugin.py

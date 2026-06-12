@@ -289,7 +289,6 @@ chart:
 
 whiteboard:
   enabled: true
-  whiteboard_output_dir: "data/whiteboards"
   max_boards: 500
 
 

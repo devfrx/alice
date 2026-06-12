@@ -147,8 +147,11 @@ class ChartGeneratorPlugin(BasePlugin):
     plugin_dependencies: list[str] = []
     plugin_priority: int = 25
 
-    def _registry(self) -> ArtifactRegistry | None:
-        return getattr(self.ctx, "artifact_registry", None)
+    def _registry(self) -> "ArtifactRegistry":
+        registry = getattr(self.ctx, "artifact_registry", None)
+        if registry is None:
+            raise RuntimeError("Artifact registry non inizializzato.")
+        return registry
 
     async def initialize(self, ctx: "AppContext") -> None:
         await super().initialize(ctx)
@@ -238,8 +241,10 @@ class ChartGeneratorPlugin(BasePlugin):
         if not self.ctx.config.chart.enabled:
             return ToolResult.error("Plugin chart_generator non abilitato.")
 
-        if self._registry() is None:
-            return ToolResult.error("Artifact registry non inizializzato.")
+        try:
+            self._registry()
+        except RuntimeError as exc:
+            return ToolResult.error(str(exc))
 
         handlers = {
             "generate_chart": self._generate_chart,

@@ -5,18 +5,18 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from backend.core.config import PROJECT_ROOT
 from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
+from backend.db.models import ArtifactKind
 
 from .models import SimpleShape, WhiteboardPayload, WhiteboardSpec
 from .shape_builder import build_snapshot, merge_shapes_into_snapshot
-from .store import WhiteboardStore
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
+    from backend.services.artifacts import ArtifactRegistry
 
 
 # -- Helpers ----------------------------------------------------------------
@@ -55,6 +55,14 @@ def _extract_shapes_summary(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 info["to_id"] = end["boundShapeId"]
         shapes.append(info)
     return shapes
+
+
+def _parse_artifact_id(value: str) -> UUID | None:
+    """Parse *value* as an artifact UUID; ``None`` when malformed."""
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return None
 
 
 # -- JSON Schema per i tool ------------------------------------------------
@@ -257,27 +265,20 @@ class WhiteboardPlugin(BasePlugin):
     plugin_dependencies: list[str] = []
     plugin_priority: int = 20
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._store: WhiteboardStore | None = None
-
-    @property
-    def store(self) -> WhiteboardStore | None:
-        """Accesso pubblico al whiteboard store."""
-        return self._store
+    def _registry(self) -> "ArtifactRegistry":
+        registry = getattr(self.ctx, "artifact_registry", None)
+        if registry is None:
+            raise RuntimeError("Artifact registry non inizializzato.")
+        return registry
 
     async def initialize(self, ctx: "AppContext") -> None:
         await super().initialize(ctx)
-        cfg = ctx.config.whiteboard
-        if not cfg.enabled:
+        if not ctx.config.whiteboard.enabled:
             self.logger.info("Plugin whiteboard disabilitato dalla configurazione.")
             return
-        board_dir = PROJECT_ROOT / cfg.whiteboard_output_dir
-        self._store = WhiteboardStore(board_dir)
-        self.logger.info(f"WhiteboardPlugin inizializzato (dir={board_dir})")
+        self.logger.info("WhiteboardPlugin inizializzato (registry-backed)")
 
     async def cleanup(self) -> None:
-        self._store = None
         await super().cleanup()
 
     def get_tools(self) -> list[ToolDefinition]:
@@ -371,8 +372,10 @@ class WhiteboardPlugin(BasePlugin):
         if not self.ctx.config.whiteboard.enabled:
             return ToolResult.error("Plugin whiteboard non abilitato.")
 
-        if self._store is None:
-            return ToolResult.error("Whiteboard store not initialized.")
+        try:
+            self._registry()
+        except RuntimeError as exc:
+            return ToolResult.error(str(exc))
 
         handlers = {
             "create": self._create,
@@ -390,7 +393,7 @@ class WhiteboardPlugin(BasePlugin):
     # -- Tool handlers ------------------------------------------------------
 
     async def _create(
-        self, args: dict[str, Any], context: ExecutionContext
+        self, args: dict[str, Any], context: ExecutionContext,
     ) -> ToolResult:
         """Crea una nuova lavagna, opzionalmente pre-popolata."""
         title = (args.get("title") or "").strip()
@@ -398,42 +401,51 @@ class WhiteboardPlugin(BasePlugin):
             return ToolResult.error("Missing required parameter: title")
 
         cfg = self.ctx.config.whiteboard
-        count = await self._store.count()
+        registry = self._registry()
+        count = await registry.count_artifacts(kind=ArtifactKind.WHITEBOARD)
         if count >= cfg.max_boards:
             return ToolResult.error(
                 f"Limite massimo di lavagne raggiunto ({cfg.max_boards}). "
                 "Usa `whiteboard_delete` per eliminare lavagne non più necessarie."
             )
 
-        board_id = str(uuid4())
+        aid = uuid4()
         now = datetime.now(timezone.utc)
 
-        # Parsing shapes opzionali
         raw_shapes = args.get("shapes", [])
         shapes = [SimpleShape(**s) for s in raw_shapes] if raw_shapes else []
-        snapshot = build_snapshot(shapes) if shapes else build_snapshot([])
+        snapshot = build_snapshot(shapes)
 
-        conversation_id = args.get("conversation_id") or context.conversation_id
+        conversation_id = _parse_artifact_id(
+            args.get("conversation_id") or context.conversation_id or "",
+        )
 
         spec = WhiteboardSpec(
-            board_id=board_id,
+            board_id=str(aid),
             title=title,
             description=args.get("description", ""),
-            conversation_id=conversation_id,
+            conversation_id=str(conversation_id) if conversation_id else None,
             snapshot=snapshot,
             created_at=now,
             updated_at=now,
         )
-        await self._store.save(spec)
+        await registry.create_json_artifact(
+            kind=ArtifactKind.WHITEBOARD,
+            title=title,
+            content=spec.model_dump(mode="json"),
+            conversation_id=conversation_id,
+            metadata={"description": spec.description},
+            artifact_id=aid,
+        )
         self.logger.info(
-            f"Whiteboard '{spec.title}' creata (id={board_id}, shapes={len(shapes)})"
+            f"Whiteboard '{title}' creata (id={aid}, shapes={len(shapes)})"
         )
 
         payload = WhiteboardPayload(
-            board_id=board_id,
-            title=spec.title,
-            board_url=f"/api/whiteboards/{board_id}",
-            conversation_id=conversation_id,
+            board_id=str(aid),
+            title=title,
+            board_url=f"/api/artifacts/{aid}/content",
+            conversation_id=str(conversation_id) if conversation_id else None,
             created_at=now,
         )
         return ToolResult.ok(
@@ -442,66 +454,77 @@ class WhiteboardPlugin(BasePlugin):
         )
 
     async def _get(
-        self, args: dict[str, Any], context: ExecutionContext
+        self, args: dict[str, Any], _context: ExecutionContext,
     ) -> ToolResult:
         """Recupera il contenuto completo di una lavagna in formato leggibile."""
         board_id = (args.get("board_id") or "").strip()
-        if not board_id:
-            return ToolResult.error("Missing required parameter: board_id")
-        spec = await self._store.load(board_id)
-        if spec is None:
+        aid = _parse_artifact_id(board_id)
+        if aid is None:
             return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        result = await self._registry().read_json_content(aid)
+        if result is None:
+            return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        artifact, content = result
 
-        # Extract shapes from the tldraw snapshot in a readable format
-        shapes_info = _extract_shapes_summary(spec.snapshot)
-
-        result = {
-            "board_id": spec.board_id,
-            "title": spec.title,
-            "description": spec.description,
-            "conversation_id": spec.conversation_id,
-            "created_at": spec.created_at.isoformat() if spec.created_at else None,
-            "updated_at": spec.updated_at.isoformat() if spec.updated_at else None,
+        snapshot = content.get("snapshot") or {}
+        shapes_info = _extract_shapes_summary(
+            snapshot if isinstance(snapshot, dict) else {},
+        )
+        out = {
+            "board_id": str(artifact.id),
+            "title": artifact.title,
+            "description": content.get("description", ""),
+            "conversation_id": (
+                str(artifact.conversation_id)
+                if artifact.conversation_id else None
+            ),
+            "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
+            "updated_at": artifact.updated_at.isoformat() if artifact.updated_at else None,
             "shapes": shapes_info,
             "shape_count": len(shapes_info),
         }
         return ToolResult.ok(
-            json.dumps(result, ensure_ascii=False, default=str),
+            json.dumps(out, ensure_ascii=False, default=str),
             content_type="application/json",
         )
 
     async def _add_shapes(
-        self, args: dict[str, Any], context: ExecutionContext
+        self, args: dict[str, Any], _context: ExecutionContext,
     ) -> ToolResult:
         """Aggiunge shapes a una lavagna esistente senza rimpiazzare."""
         board_id = (args.get("board_id") or "").strip()
-        if not board_id:
-            return ToolResult.error("Missing required parameter: board_id")
-        existing = await self._store.load(board_id)
-        if existing is None:
+        aid = _parse_artifact_id(board_id)
+        if aid is None:
             return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        registry = self._registry()
+        result = await registry.read_json_content(aid)
+        if result is None:
+            return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        artifact, content = result
 
         raw_shapes = args.get("shapes")
         if not raw_shapes or not isinstance(raw_shapes, list):
             return ToolResult.error("Missing required parameter: shapes")
         new_shapes = [SimpleShape(**s) for s in raw_shapes]
 
-        existing.snapshot = merge_shapes_into_snapshot(
-            existing.snapshot, new_shapes
+        snapshot = content.get("snapshot")
+        merged = merge_shapes_into_snapshot(
+            snapshot if isinstance(snapshot, dict) else {}, new_shapes,
         )
-        existing.updated_at = datetime.now(timezone.utc)
-        await self._store.update(board_id, existing)
-
+        await registry.update_json_artifact(aid, content_patch={"snapshot": merged})
         self.logger.info(
-            f"Whiteboard '{existing.title}' aggiornata: +{len(new_shapes)} shapes"
+            f"Whiteboard '{artifact.title}' aggiornata: +{len(new_shapes)} shapes"
         )
 
         payload = WhiteboardPayload(
-            board_id=board_id,
-            title=existing.title,
-            board_url=f"/api/whiteboards/{board_id}",
-            conversation_id=existing.conversation_id,
-            created_at=existing.created_at,
+            board_id=str(artifact.id),
+            title=artifact.title,
+            board_url=f"/api/artifacts/{artifact.id}/content",
+            conversation_id=(
+                str(artifact.conversation_id)
+                if artifact.conversation_id else None
+            ),
+            created_at=artifact.created_at,
         )
         return ToolResult.ok(
             payload.model_dump_json(),
@@ -509,35 +532,44 @@ class WhiteboardPlugin(BasePlugin):
         )
 
     async def _update(
-        self, args: dict[str, Any], context: ExecutionContext
+        self, args: dict[str, Any], _context: ExecutionContext,
     ) -> ToolResult:
         """Sovrascrive completamente il contenuto di una lavagna."""
         board_id = (args.get("board_id") or "").strip()
-        if not board_id:
-            return ToolResult.error("Missing required parameter: board_id")
-        existing = await self._store.load(board_id)
-        if existing is None:
+        aid = _parse_artifact_id(board_id)
+        if aid is None:
             return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        registry = self._registry()
+        result = await registry.read_json_content(aid)
+        if result is None:
+            return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        artifact, _content = result
 
         raw_shapes = args.get("shapes")
         if not raw_shapes or not isinstance(raw_shapes, list):
             return ToolResult.error("Missing required parameter: shapes")
         shapes = [SimpleShape(**s) for s in raw_shapes]
-        existing.snapshot = build_snapshot(shapes)
-        existing.updated_at = datetime.now(timezone.utc)
 
-        if "title" in args:
-            existing.title = args["title"]
-
-        await self._store.update(board_id, existing)
-        self.logger.info(f"Whiteboard '{existing.title}' sovrascritta (id={board_id})")
+        patch: dict[str, Any] = {"snapshot": build_snapshot(shapes)}
+        new_title = args.get("title") if "title" in args else None
+        if new_title is not None:
+            patch["title"] = new_title
+        updated = await registry.update_json_artifact(
+            aid, content_patch=patch, title=new_title,
+        )
+        if updated is None:
+            return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        self.logger.info(f"Whiteboard '{updated.title}' sovrascritta (id={aid})")
 
         payload = WhiteboardPayload(
-            board_id=board_id,
-            title=existing.title,
-            board_url=f"/api/whiteboards/{board_id}",
-            conversation_id=existing.conversation_id,
-            created_at=existing.created_at,
+            board_id=str(updated.id),
+            title=updated.title,
+            board_url=f"/api/artifacts/{updated.id}/content",
+            conversation_id=(
+                str(updated.conversation_id)
+                if updated.conversation_id else None
+            ),
+            created_at=artifact.created_at,
         )
         return ToolResult.ok(
             payload.model_dump_json(),
@@ -545,37 +577,58 @@ class WhiteboardPlugin(BasePlugin):
         )
 
     async def _list(
-        self, args: dict[str, Any], context: ExecutionContext
+        self, args: dict[str, Any], context: ExecutionContext,
     ) -> ToolResult:
-        """Elenca le lavagne con paginazione, con scope di default alla conversazione corrente."""
+        """Elenca le lavagne con paginazione, scope default = conversazione corrente."""
         limit = min(int(args.get("limit", 20)), 100)
         offset = max(int(args.get("offset", 0)), 0)
         # Default to current conversation to prevent cross-conversation leakage.
-        conversation_id = args.get("conversation_id", context.conversation_id)
-
-        items = await self._store.list(
-            limit=limit, offset=offset, conversation_id=conversation_id
+        conversation_id = _parse_artifact_id(
+            args.get("conversation_id", context.conversation_id) or "",
         )
-        total = await self._store.count(conversation_id=conversation_id)
 
+        registry = self._registry()
+        items, total = await registry.list_artifacts(
+            kind=ArtifactKind.WHITEBOARD,
+            conversation_id=conversation_id,
+            limit=limit,
+            offset=offset,
+        )
+        boards = [
+            {
+                "board_id": str(a.id),
+                "title": a.title,
+                "description": str(a.artifact_metadata.get("description") or ""),
+                "conversation_id": (
+                    str(a.conversation_id) if a.conversation_id else None
+                ),
+                "created_at": a.created_at,
+                "updated_at": a.updated_at,
+                "shape_count": int(a.artifact_metadata.get("shape_count") or 0),
+            }
+            for a in items
+        ]
         payload = {
-            "boards": [item.model_dump(mode="json") for item in items],
+            "boards": boards,
             "total": total,
             "limit": limit,
             "offset": offset,
         }
-        return ToolResult.ok(
-            json.dumps(payload, ensure_ascii=False, default=str),
-        )
+        return ToolResult.ok(json.dumps(payload, ensure_ascii=False, default=str))
 
     async def _delete(
-        self, args: dict[str, Any], context: ExecutionContext
+        self, args: dict[str, Any], _context: ExecutionContext,
     ) -> ToolResult:
-        """Elimina una lavagna dal disco."""
+        """Elimina una lavagna (riga + blob)."""
         board_id = (args.get("board_id") or "").strip()
-        if not board_id:
-            return ToolResult.error("Missing required parameter: board_id")
-        deleted = await self._store.delete(board_id)
+        aid = _parse_artifact_id(board_id)
+        if aid is None:
+            return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        registry = self._registry()
+        artifact = await registry.get_artifact(aid)
+        if artifact is None or artifact.kind is not ArtifactKind.WHITEBOARD:
+            return ToolResult.error(f"Lavagna non trovata: {board_id}")
+        deleted = await registry.delete_artifact(aid, delete_file=True)
         if not deleted:
             return ToolResult.error(f"Lavagna non trovata: {board_id}")
         return ToolResult.ok(f"Lavagna eliminata: {board_id}")

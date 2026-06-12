@@ -9,7 +9,6 @@ DELETE /api/memory/{memory_id}
 DELETE /api/permission-rules/{conversation_id}/{rule_id}
 DELETE /api/settings/preferences
 DELETE /api/terminal/{conversation_id}/{session_id}
-DELETE /api/whiteboards/{board_id}
 GET /api/artifacts/{artifact_id}/download
 GET /api/audit/confirmations
 GET /api/cad/health
@@ -49,11 +48,8 @@ GET /api/settings/preferences
 GET /api/settings/voice/available-engines
 GET /api/vector-store/stats
 GET /api/voice/status
-GET /api/whiteboards
-GET /api/whiteboards/{board_id}
 PATCH /api/config
 PATCH /api/plugins/{plugin_name}
-PATCH /api/whiteboards/{board_id}/snapshot
 POST /api/calendar/events
 POST /api/chat/upload
 POST /api/config/reload

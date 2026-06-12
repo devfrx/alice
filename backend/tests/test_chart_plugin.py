@@ -244,3 +244,14 @@ async def test_get_chart_returns_spec(plugin) -> None:
     spec = json.loads(res.content)
     assert spec["chart_id"] == aid
     assert spec["echarts_option"]["series"][0]["type"] == "bar"
+
+
+async def test_generate_chart_surfaces_validator_error(plugin) -> None:
+    bad_option = {"series": [{"type": "nonsense", "data": [1, 2]}]}
+    res = await plugin.execute_tool(
+        "generate_chart",
+        {"title": "T", "chart_type": "bar", "echarts_option": bad_option},
+        _exec_ctx(),
+    )
+    assert not res.success
+    assert res.error_message

@@ -736,9 +736,6 @@ class WhiteboardConfig(BaseSettings):
     enabled: bool = False
     """Abilita il plugin whiteboard (opt-in)."""
 
-    whiteboard_output_dir: str = "data/whiteboards"
-    """Directory dove vengono salvati i board spec JSON."""
-
     max_boards: int = 500
     """Numero massimo di lavagne persistite."""
 

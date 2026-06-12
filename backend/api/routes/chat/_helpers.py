@@ -15,7 +15,7 @@ from typing import Any
 from loguru import logger
 
 from backend.core.context import AppContext
-from backend.db.models import Message
+from backend.db.models import ArtifactKind, Message
 from backend.services.context_manager import ContextManager
 from backend.services.permission_mode_policy import ModePolicy
 from backend.services.permission_mode_service import PermissionMode
@@ -309,24 +309,23 @@ async def _build_whiteboard_context(
 
     Injected into the system prompt so the LLM knows which boards already
     exist and can reference or update them instead of creating duplicates.
+    Reads the unified artifact registry (kind=whiteboard) — no plugin
+    internals involved.
 
     Args:
-        ctx: Application context with plugin_manager.
+        ctx: Application context with the artifact registry.
         conversation_id: The current conversation's UUID as a string.
 
     Returns:
-        A markdown context block, or None if no whiteboards or plugin unavailable.
+        A markdown context block, or None if no whiteboards or registry unavailable.
     """
-    if not ctx.plugin_manager:
-        return None
-    wb_plugin = ctx.plugin_manager.get_plugin("whiteboard")
-    if not wb_plugin:
-        return None
-    store = getattr(wb_plugin, "store", None)
-    if not store:
+    registry = getattr(ctx, "artifact_registry", None)
+    if registry is None:
         return None
     try:
-        items = await store.list(conversation_id=conversation_id)
+        items, _total = await registry.list_artifacts(
+            kind=ArtifactKind.WHITEBOARD, conversation_id=conversation_id,
+        )
     except Exception as exc:
         logger.warning("Whiteboard context fetch failed for conv={}: {}", conversation_id, exc)
         return None
@@ -336,8 +335,12 @@ async def _build_whiteboard_context(
     now = datetime.now(UTC)
     lines = ["[LAVAGNE ASSOCIATE A QUESTA CONVERSAZIONE]"]
     for item in items:
-        if item.updated_at:
-            delta = now - item.updated_at
+        updated = item.updated_at
+        if updated is not None and updated.tzinfo is None:
+            # SQLite round-trip may strip tzinfo; registry writes UTC.
+            updated = updated.replace(tzinfo=UTC)
+        if updated:
+            delta = now - updated
             hours = int(delta.total_seconds() // 3600)
             if hours < 1:
                 age = "aggiornata poco fa"
@@ -348,10 +351,11 @@ async def _build_whiteboard_context(
                 age = f"aggiornata {days}g fa"
         else:
             age = ""
-        shape_info = f"{item.shape_count} shape" if item.shape_count else "vuota"
+        shape_count = int(item.artifact_metadata.get("shape_count") or 0)
+        shape_info = f"{shape_count} shape" if shape_count else "vuota"
         extra = f", {age}" if age else ""
         lines.append(
-            f'- "{item.title}" (id: {item.board_id}) — {shape_info}{extra}'
+            f'- "{item.title}" (id: {item.id}) — {shape_info}{extra}'
         )
     lines.append("[/LAVAGNE ASSOCIATE]")
     return "\n".join(lines)

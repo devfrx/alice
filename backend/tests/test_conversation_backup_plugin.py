@@ -83,3 +83,51 @@ async def test_backup_invalid_conversation_id(plugin) -> None:
         "backup_conversations", {"conversation_id": "not-a-uuid"}, _exec_ctx(),
     )
     assert not result.success
+
+
+async def test_backup_current_resolves_context_conversation(
+    plugin, session_factory, tmp_path, monkeypatch,
+) -> None:
+    import backend.plugins.conversation_backup.plugin as plugin_mod
+
+    monkeypatch.setattr(plugin_mod, "PROJECT_ROOT", tmp_path)
+
+    async with session_factory() as session:
+        conv = Conversation(title="Cur")
+        session.add(conv)
+        await session.flush()
+        session.add(Message(conversation_id=conv.id, role="user", content="x"))
+        await session.commit()
+        conv_id = conv.id
+
+    ctx = ExecutionContext(
+        session_id="s", conversation_id=str(conv_id), execution_id="e",
+    )
+    result = await plugin.execute_tool(
+        "backup_conversations", {"conversation_id": "current"}, ctx,
+    )
+
+    assert result.success
+    assert isinstance(result.content, dict)
+    assert result.content["exported"] == 1
+    matches = list((tmp_path / "data" / "backups").rglob(f"{conv_id}.json"))
+    assert len(matches) == 1
+
+
+async def test_backup_unknown_id_reports_error(
+    plugin, tmp_path, monkeypatch,
+) -> None:
+    import uuid as uuid_mod
+
+    import backend.plugins.conversation_backup.plugin as plugin_mod
+
+    monkeypatch.setattr(plugin_mod, "PROJECT_ROOT", tmp_path)
+
+    result = await plugin.execute_tool(
+        "backup_conversations",
+        {"conversation_id": str(uuid_mod.uuid4())},
+        _exec_ctx(),
+    )
+
+    assert not result.success
+    assert "not found" in (result.error_message or "")

@@ -42,9 +42,11 @@ class ConversationBackupPlugin(BasePlugin):
                 description=(
                     "Export conversations as JSON backup files into the "
                     "app-managed backups folder (data/backups). Pass "
-                    "conversation_id to export a single conversation; omit "
-                    "it to export all conversations. Returns the number of "
-                    "exported conversations and the destination path."
+                    "conversation_id (a UUID, or the literal string 'current' "
+                    "for the conversation this turn belongs to) to export a "
+                    "single conversation; omit it to export all conversations. "
+                    "Returns the number of exported conversations and the "
+                    "destination path."
                 ),
                 parameters={
                     "type": "object",
@@ -52,8 +54,9 @@ class ConversationBackupPlugin(BasePlugin):
                         "conversation_id": {
                             "type": "string",
                             "description": (
-                                "UUID of a single conversation to export. "
-                                "Omit to export all conversations."
+                                "UUID of a single conversation to export, or the literal "
+                                "string 'current' for the active conversation. Omit to "
+                                "export all conversations."
                             ),
                         },
                     },
@@ -76,6 +79,8 @@ class ConversationBackupPlugin(BasePlugin):
 
         conversation_ids: list[uuid.UUID] | None = None
         raw_id = args.get("conversation_id")
+        if raw_id == "current":
+            raw_id = context.conversation_id
         if raw_id:
             try:
                 conversation_ids = [uuid.UUID(str(raw_id))]
@@ -92,6 +97,14 @@ class ConversationBackupPlugin(BasePlugin):
             )
         except OSError as exc:
             return ToolResult.error(f"Backup failed: {exc}")
+        except Exception as exc:
+            self.logger.error("backup_conversations failed: {}", exc)
+            return ToolResult.error(f"Backup failed: {exc}")
+
+        if conversation_ids is not None and exported == 0:
+            return ToolResult.error(
+                f"Conversation {conversation_ids[0]} not found — nothing exported",
+            )
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         return ToolResult.ok(

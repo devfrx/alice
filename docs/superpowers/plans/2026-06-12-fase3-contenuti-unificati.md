@@ -2532,6 +2532,8 @@ git commit -m "refactor(fe): charts on unified artifacts store; generated artifa
 
 ### Task 7: FE — dominio whiteboard sullo store artifacts unificato
 
+> **Esito (2026-06-12):** DONE. Recon-miss del piano: 4 consumatori extra trovati e sistemati (HorizonStage save, TldrawCanvas fetch interno -> getArtifactContent, fixture spec horizon, JSDoc board_url); spec review li ha verificati uno a uno (parita' di comportamento). Follow-up 5b744da: HorizonStage instradato su artifactsStore.saveContent (coerenza cache). Quality review (opus): With fixes -> applicati in c408966: guard anti-race sulle resolution asincrone stantie (WhiteboardModule watcher + PageView.onSelectBoard) e fetchContent(force=true) allo switch (parita' freshness col legacy dopo edit agente; backlog #4 resta per il live-update), +fix JSDoc useModuleItemSelection. Non applicato (opzionale): test pinia sul filtro conversazione del composable (richiederebbe chat store in vitest). Typecheck 0, vitest 259, grep 0. Commit 9203291 + 5b744da + c408966.
+
 **Files:**
 - Create: `frontend/src/renderer/src/composables/whiteboard/useWhiteboardBoards.ts`
 - Create: `frontend/src/renderer/src/composables/whiteboard/useWhiteboardBoards.spec.ts`
@@ -2539,7 +2541,7 @@ git commit -m "refactor(fe): charts on unified artifacts store; generated artifa
 - Modify: `frontend/src/renderer/src/services/api.ts` (rimuovi i 4 metodi whiteboard + import tipi)
 - Modify: `components/canvas/modules/WhiteboardModule.vue`, `views/WhiteboardPageView.vue`, `components/whiteboard/WhiteboardListSidebar.vue`
 
-- [ ] **Step 1: Composable view-model + test**
+- [x] **Step 1: Composable view-model + test**
 
 Crea `composables/whiteboard/useWhiteboardBoards.ts`:
 
@@ -2665,7 +2667,7 @@ describe('toBoardItem', () => {
 })
 ```
 
-- [ ] **Step 2: Esegui il test nuovo**
+- [x] **Step 2: Esegui il test nuovo**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\frontend
@@ -2674,7 +2676,7 @@ npx vitest run src/renderer/src/composables/whiteboard/useWhiteboardBoards.spec.
 
 Atteso: PASS.
 
-- [ ] **Step 3: Riscrivi i tre componenti**
+- [x] **Step 3: Riscrivi i tre componenti**
 
 3a. `components/canvas/modules/WhiteboardModule.vue` — script sostituito (template: cambia solo i binding del selettore e di TldrawCanvas; lo stato vuoto resta):
 
@@ -2856,7 +2858,7 @@ function formatDate(iso: string): string {
 
 Template: sostituisci i riferimenti allo store (`store.total` → `boards.length`; `store.loading` → `loading`; `store.hasBoards` → `boards.length > 0`; `board.board_id` → `board.boardId`; `board.conversation_title` → `board.conversationTitle`; `board.shape_count` → `board.shapeCount`; `board.updated_at` → `board.updatedAt`; `activeBoardId` dalla prop).
 
-- [ ] **Step 4: Eliminazioni + API client**
+- [x] **Step 4: Eliminazioni + API client**
 
 - Elimina `stores/whiteboard.ts`, `stores/whiteboard.spec.ts`, `types/whiteboard.ts`.
 - In `services/api.ts`: rimuovi l'intera sezione `-- Whiteboards (Phase 16)` (i 4 metodi `getWhiteboards`/`getWhiteboard`/`deleteWhiteboard`/`saveWhiteboardSnapshot`) e l'import dei tipi da `'../types/whiteboard'`.
@@ -2869,7 +2871,7 @@ git grep -n "stores/whiteboard"; git grep -n "types/whiteboard"; git grep -n "us
 
 Atteso: 0 risultati nel codice FE (ammessi in docs/ e nei tipi generati storici no — `types/generated` è rigenerato e non deve più contenere `/api/whiteboards`).
 
-- [ ] **Step 5: Gate FE + commit**
+- [x] **Step 5: Gate FE + commit**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\frontend

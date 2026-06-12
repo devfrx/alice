@@ -66,7 +66,10 @@ watch(
   async (id) => {
     snapshot.value = null
     if (!id) return
-    const content = await artifactsStore.fetchContent(id)
+    // Force-refresh: the contents cache may be stale after agent-side edits
+    // (artifact.updated refreshes the row only — legacy parity, backlog #4).
+    const content = await artifactsStore.fetchContent(id, true)
+    if (boardId.value !== id) return // stale resolution after a board switch — drop it
     const snap = content?.snapshot
     snapshot.value = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
   },

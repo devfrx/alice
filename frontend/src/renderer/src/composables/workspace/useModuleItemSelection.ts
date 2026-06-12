@@ -15,7 +15,7 @@
  * most-recent item, mirroring the resilient fallback the CAD/whiteboard modules
  * already had. Returns plain computed refs so callers stay declarative.
  *
- * @typeParam T - The item shape (ChartPayload, WhiteboardListItem, Artifact, …).
+ * @typeParam T - The item shape (ChartPayload, WhiteboardBoardItem, Artifact, …).
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'
 

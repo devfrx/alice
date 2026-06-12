@@ -28,7 +28,8 @@ onMounted(() => {
 async function onSelectBoard(id: string): Promise<void> {
   currentBoardId.value = id
   currentSnapshot.value = null
-  const content = await artifactsStore.fetchContent(id)
+  const content = await artifactsStore.fetchContent(id, true)
+  if (currentBoardId.value !== id) return // a newer selection won — drop this resolution
   const snap = content?.snapshot
   currentSnapshot.value = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
 }

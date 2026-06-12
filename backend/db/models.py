@@ -302,6 +302,12 @@ class ArtifactKind(str, enum.Enum):
     CAD_3D_IMAGE = "cad_3d_image"
     """3D model generated from an image via TRELLIS.2 (cad_generate_from_image)."""
 
+    CHART = "chart"
+    """Interactive ECharts chart (chart_generator plugin) — JSON blob."""
+
+    WHITEBOARD = "whiteboard"
+    """tldraw whiteboard (whiteboard plugin) — JSON blob with snapshot."""
+
 
 class Artifact(SQLModel, table=True):
     """Persistent record of a file produced by a tool.

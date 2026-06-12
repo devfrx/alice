@@ -7,6 +7,7 @@ table and broadcasts a ``artifact.created`` event over the global
 WebSocket.
 """
 
+from backend.services.artifacts.blob_store import ArtifactBlobStore
 from backend.services.artifacts.parsers import (
     ArtifactDescriptor,
     parse_tool_payload,
@@ -20,6 +21,7 @@ from backend.services.artifacts.schemas import (
 )
 
 __all__ = [
+    "ArtifactBlobStore",
     "ArtifactDescriptor",
     "ArtifactListResponse",
     "ArtifactPinUpdate",

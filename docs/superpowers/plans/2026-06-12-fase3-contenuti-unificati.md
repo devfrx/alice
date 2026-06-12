@@ -2257,6 +2257,8 @@ Atteso: check-contracts verde.
 
 ### Task 6: FE — dominio chart sullo store artifacts unificato
 
+> **Esito (2026-06-12):** DONE. Spec review: conforme; consumatori extra emersi dal widening di ArtifactKind: ArtifactCard.vue (KIND_LABEL +Grafico/+Lavagna) e Cad3dModule (fallback metadata). Quality review (opus): With fixes (tutti minor) -> applicati in d04ffb6 (docstring ChartViewer, helper modelNameOf). Annotato: cache `contents` senza consumatori FINO al Task 7 (scaffolding intenzionale; ChartViewer legge via api diretta per design); ChartViewer non si ri-fetcha su artifact.updated (pre-esistente, backlog 4 gia' previsto). DRY remove->removeLocal deferito (scelta consapevole, non applicato). Typecheck 0, vitest 259, grep 0. Commit 54b6173 + d04ffb6.
+
 **Files:**
 - Modify: `frontend/src/renderer/src/types/artifacts.ts` (re-export `ApiSchema`)
 - Modify: `frontend/src/renderer/src/types/chat.ts` (sposta `isChartPayload`/`extractCharts`)
@@ -2266,7 +2268,7 @@ Atteso: check-contracts verde.
 - Create: `frontend/src/renderer/src/types/chat.spec.ts`
 - Modify: `frontend/src/renderer/src/components/chat/ChartViewer.vue`, `components/canvas/modules/ChartModule.vue`, `components/chat/MessageBubble.vue`, `composables/workspace/useArtifactAutoOpen.ts`
 
-- [ ] **Step 1: Tipi generati al posto dei duplicati a mano**
+- [x] **Step 1: Tipi generati al posto dei duplicati a mano**
 
 Sostituisci l'INTERO contenuto di `types/artifacts.ts` con:
 
@@ -2312,7 +2314,7 @@ export type ArtifactCreatedEvent = ApiSchema<'WsArtifactCreated'>
 
 Poi `npm run typecheck`: gli errori elencano i consumatori che assumevano campi NON opzionali (`artifact_metadata`, `pinned`, `conversation_id`). Correggili con fallback espliciti (`a.pinned ?? false`, `a.artifact_metadata ?? {}`, `a.conversation_id ?? null`) — NON reintrodurre tipi a mano. Punti noti: `stores/artifacts.ts` (`pinnedItems`, `byConversation`), `MessageBubble.vue`, `CADViewer.vue`, `Cad3dModule.vue`, `ArtifactBoardView.vue`, `useArtifactAutoOpen.ts`.
 
-- [ ] **Step 2: Helper chart puri in `types/chat.ts`**
+- [x] **Step 2: Helper chart puri in `types/chat.ts`**
 
 In `types/chat.ts`, dopo `isWhiteboardPayload` (riga ~211), aggiungi:
 
@@ -2349,11 +2351,11 @@ export function extractCharts(messages: ChatMessage[]): ChartPayload[] {
 
 (Se `ChatMessage` è definito più in basso nel file, sposta il blocco DOPO la sua definizione.)
 
-- [ ] **Step 3: Sposta i test puri**
+- [x] **Step 3: Sposta i test puri**
 
 Crea `frontend/src/renderer/src/types/chat.spec.ts` trasferendo da `stores/charts.spec.ts` i test di `isChartPayload`/`extractCharts` (aggiorna gli import a `./chat`; elimina i `describe` legati a `useChartsStore`/Pinia). Poi elimina `stores/charts.ts` e `stores/charts.spec.ts`.
 
-- [ ] **Step 4: API client + store**
+- [x] **Step 4: API client + store**
 
 4a. In `services/api.ts`, sezione `-- Artifacts`, aggiungi dopo `getArtifact`:
 
@@ -2434,7 +2436,7 @@ aggiornando l'import dei tipi artifacts in testa al file (`ArtifactContentRespon
 - in `removeLocal` aggiungi la riga `delete contents.value[id]` prima dello splice; in `remove` aggiungi `delete contents.value[id]` dopo lo splice. NOTA: `refreshById` NON tocca la cache contenuti (lo snapshot in editing non deve essere invalidato sotto le mani dell'utente — stessa staleness di oggi).
 - esporta `contents`, `fetchContent`, `saveContent` nel return.
 
-- [ ] **Step 5: ChartViewer + ChartModule + import fix**
+- [x] **Step 5: ChartViewer + ChartModule + import fix**
 
 5a. `components/chat/ChartViewer.vue`, in `loadAndRender` sostituisci
 
@@ -2509,7 +2511,7 @@ const options = computed<UiSegmentedOption[]>(() =>
 
 5d. `useArtifactAutoOpen.ts`: `import { extractCharts } from '../../stores/charts'` → `from '../../types/chat'` (mergiando con l'import esistente di `isWhiteboardPayload`).
 
-- [ ] **Step 6: Gate FE + commit**
+- [x] **Step 6: Gate FE + commit**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\frontend

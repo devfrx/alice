@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 from backend.core.plugin_base import BasePlugin
@@ -147,11 +147,11 @@ class ChartGeneratorPlugin(BasePlugin):
     plugin_dependencies: list[str] = []
     plugin_priority: int = 25
 
-    def _registry(self) -> "ArtifactRegistry":
+    def _registry(self) -> ArtifactRegistry:
         registry = getattr(self.ctx, "artifact_registry", None)
         if registry is None:
             raise RuntimeError("Artifact registry non inizializzato.")
-        return registry
+        return cast("ArtifactRegistry", registry)
 
     async def initialize(self, ctx: "AppContext") -> None:
         await super().initialize(ctx)

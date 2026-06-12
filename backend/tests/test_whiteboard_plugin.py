@@ -153,3 +153,63 @@ async def test_delete_whiteboard_removes_row_and_blob(
     assert res.success
     assert await registry.get_artifact(aid) is None
     assert not (tmp_path / "whiteboard" / f"{aid}.json").exists()
+
+
+async def test_update_replaces_content_and_title(
+    plugin, registry, conversation_id,
+) -> None:
+    created = await plugin.execute_tool(
+        "create", {"title": "B", "shapes": _SHAPES}, _exec_ctx(conversation_id),
+    )
+    aid = json.loads(created.content)["board_id"]
+    res = await plugin.execute_tool(
+        "update",
+        {
+            "board_id": aid,
+            "shapes": [{"type": "geo", "id": "x1", "text": "Only"}],
+            "title": "B2",
+        },
+        _exec_ctx(),
+    )
+    assert res.success, res.error_message
+    artifact = await registry.get_artifact(aid)
+    assert artifact is not None
+    assert artifact.title == "B2"
+    assert artifact.artifact_metadata["shape_count"] == 1
+
+
+async def test_missing_board_is_clean_error(plugin) -> None:
+    missing = str(uuid.uuid4())
+    for tool, args in (
+        ("get", {"board_id": missing}),
+        ("add_shapes", {"board_id": missing, "shapes": [{"type": "note", "text": "n"}]}),
+        ("update", {"board_id": missing, "shapes": [{"type": "note", "text": "n"}]}),
+        ("delete", {"board_id": missing}),
+    ):
+        res = await plugin.execute_tool(tool, args, _exec_ctx())
+        assert not res.success
+        assert "non trovata" in (res.error_message or "")
+
+
+async def test_disabled_plugin_exposes_no_tools_and_errors(registry) -> None:
+    p = WhiteboardPlugin()
+    stub = _StubCtx(registry)
+    stub.config.whiteboard = WhiteboardConfig(enabled=False)
+    p._ctx = stub
+    assert p.get_tools() == []
+    res = await p.execute_tool("create", {"title": "X"}, _exec_ctx())
+    assert not res.success
+
+
+async def test_unknown_tool_returns_error(plugin) -> None:
+    res = await plugin.execute_tool("nope", {}, _exec_ctx())
+    assert not res.success
+
+
+async def test_create_respects_max_boards(plugin) -> None:
+    plugin.ctx.config.whiteboard.max_boards = 1
+    first = await plugin.execute_tool("create", {"title": "B1"}, _exec_ctx())
+    assert first.success
+    second = await plugin.execute_tool("create", {"title": "B2"}, _exec_ctx())
+    assert not second.success
+    assert "Limite massimo" in (second.error_message or "")

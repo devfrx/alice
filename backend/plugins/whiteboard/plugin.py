@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 from backend.core.plugin_base import BasePlugin
@@ -265,11 +265,11 @@ class WhiteboardPlugin(BasePlugin):
     plugin_dependencies: list[str] = []
     plugin_priority: int = 20
 
-    def _registry(self) -> "ArtifactRegistry":
+    def _registry(self) -> ArtifactRegistry:
         registry = getattr(self.ctx, "artifact_registry", None)
         if registry is None:
             raise RuntimeError("Artifact registry non inizializzato.")
-        return registry
+        return cast("ArtifactRegistry", registry)
 
     async def initialize(self, ctx: "AppContext") -> None:
         await super().initialize(ctx)
@@ -508,6 +508,7 @@ class WhiteboardPlugin(BasePlugin):
         new_shapes = [SimpleShape(**s) for s in raw_shapes]
 
         snapshot = content.get("snapshot")
+        # A malformed blob degrades to a schema-less merge ({} snapshot) — acceptable edge.
         merged = merge_shapes_into_snapshot(
             snapshot if isinstance(snapshot, dict) else {}, new_shapes,
         )

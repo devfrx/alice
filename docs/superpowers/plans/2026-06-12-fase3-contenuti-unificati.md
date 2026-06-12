@@ -197,6 +197,8 @@ Atteso: commit ok; check-contracts verde.
 
 ### Task 2: Kind `chart`/`whiteboard` + `ArtifactBlobStore` + metodi JSON del registry
 
+> **Esito (2026-06-12):** DONE. Spec review: conforme (verifica riga-per-riga + run 22/22). Quality review (opus): With fixes -> applicati e verificati a diff: type-ignore corretto ([attr-defined]), note docstring su torn-state/corruzione, +2 test (patch+title insieme, blob illeggibile). 12/12 test json, mypy pulito sulla riga corretta. Decisi NO: normalizzazione difensiva conversation_id nel registry (il contratto resta nei plugin per piano, decisione 6), tmp-name unico per writer concorrenti (non-issue per app single-user). Commit ad17403 + 58b0c86.
+
 **Files:**
 - Modify: `backend/db/models.py` (2 kind nuovi)
 - Create: `backend/services/artifacts/blob_store.py`
@@ -204,7 +206,7 @@ Atteso: commit ok; check-contracts verde.
 - Modify: `backend/services/artifacts/__init__.py` (export)
 - Create: `backend/tests/test_artifact_json.py`
 
-- [ ] **Step 1: Scrivi i test che falliscono**
+- [x] **Step 1: Scrivi i test che falliscono**
 
 Crea `backend/tests/test_artifact_json.py` (newline `\n`):
 
@@ -442,7 +444,7 @@ async def test_delete_all_wipes_rows_and_files(registry, tmp_path) -> None:
     assert not (tmp_path / "whiteboard" / f"{a2.id}.json").exists()
 ```
 
-- [ ] **Step 2: Esegui i test per vederli fallire**
+- [x] **Step 2: Esegui i test per vederli fallire**
 
 ```powershell
 Set-Location C:\Users\Jays\Desktop\alice\alice\backend
@@ -451,7 +453,7 @@ Set-Location C:\Users\Jays\Desktop\alice\alice\backend
 
 Atteso: FAIL con `ModuleNotFoundError: backend.services.artifacts.blob_store` (o ImportError).
 
-- [ ] **Step 3: Aggiungi i kind in `db/models.py`**
+- [x] **Step 3: Aggiungi i kind in `db/models.py`**
 
 In `ArtifactKind` (riga ~299, dopo `CAD_3D_IMAGE`):
 
@@ -463,7 +465,7 @@ In `ArtifactKind` (riga ~299, dopo `CAD_3D_IMAGE`):
     """tldraw whiteboard (whiteboard plugin) — JSON blob with snapshot."""
 ```
 
-- [ ] **Step 4: Crea `backend/services/artifacts/blob_store.py`**
+- [x] **Step 4: Crea `backend/services/artifacts/blob_store.py`**
 
 ```python
 """AL\\CE — JSON blob store for artifact content.
@@ -544,7 +546,7 @@ class ArtifactBlobStore:
         return loaded if isinstance(loaded, dict) else None
 ```
 
-- [ ] **Step 5: Estendi `registry.py`**
+- [x] **Step 5: Estendi `registry.py`**
 
 In `backend/services/artifacts/registry.py`:
 
@@ -850,7 +852,7 @@ from backend.services.artifacts.blob_store import ArtifactBlobStore
 
 con `"ArtifactBlobStore",` in `__all__`.
 
-- [ ] **Step 6: Test verdi + regressione registry**
+- [x] **Step 6: Test verdi + regressione registry**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m pytest tests/test_artifact_json.py tests/test_artifact_registry.py -v
@@ -858,7 +860,7 @@ con `"ArtifactBlobStore",` in `__all__`.
 
 Atteso: PASS. Nota: se test esistenti di `test_artifact_registry.py` contano gli eventi emessi (pin/delete ora emettono `artifact.updated`/`artifact.deleted`), aggiornali ad asserire i nuovi eventi — il comportamento nuovo è quello voluto.
 
-- [ ] **Step 7: Lint scoped + commit**
+- [x] **Step 7: Lint scoped + commit**
 
 ```powershell
 ..\.venv\Scripts\python.exe -m ruff check services/artifacts/ tests/test_artifact_json.py

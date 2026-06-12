@@ -995,7 +995,7 @@ git commit -m "refactor(persistence)!: delete ConversationFileManager - SQLite i
 - Create: `backend/tests/test_conversation_backup_plugin.py`
 - Modify: `config/default.yaml` (plugins.enabled)
 
-- [ ] **Step 1: Scrivi il test che fallisce**
+- [x] **Step 1: Scrivi il test che fallisce**
 
 ```python
 """AL\\CE — Tests for the conversation_backup plugin tool."""
@@ -1085,14 +1085,14 @@ async def test_backup_invalid_conversation_id(plugin) -> None:
     assert not result.success
 ```
 
-- [ ] **Step 2: Esegui il test e verifica che fallisca**
+- [x] **Step 2: Esegui il test e verifica che fallisca**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_backup_plugin.py -v
 ```
 Atteso: ERROR `ModuleNotFoundError: No module named 'backend.plugins.conversation_backup'`.
 
-- [ ] **Step 3: Crea il plugin**
+- [x] **Step 3: Crea il plugin**
 
 `backend/plugins/conversation_backup/__init__.py`:
 
@@ -1215,7 +1215,7 @@ class ConversationBackupPlugin(BasePlugin):
         )
 ```
 
-- [ ] **Step 4: Abilita il plugin in config**
+- [x] **Step 4: Abilita il plugin in config**
 
 In `config/default.yaml`, nella lista `plugins.enabled` (riga ~74), aggiungi dopo `- clipboard`:
 
@@ -1223,7 +1223,7 @@ In `config/default.yaml`, nella lista `plugins.enabled` (riga ~74), aggiungi dop
     - conversation_backup   # explicit JSON backup of conversations (spec §5.2)
 ```
 
-- [ ] **Step 5: Esegui i test e verifica che passino**
+- [x] **Step 5: Esegui i test e verifica che passino**
 
 ```powershell
 cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_backup_plugin.py -v
@@ -1232,12 +1232,14 @@ cd backend; ..\.venv\Scripts\python.exe -m pytest tests/test_conversation_backup
 ```
 Atteso: PASS, ruff/mypy puliti (file nuovi).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/plugins/conversation_backup/ backend/tests/test_conversation_backup_plugin.py config/default.yaml
 git commit -m "feat(persistence): conversation_backup plugin - agent tool for explicit JSON backup" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+> **Esito (2026-06-12):** COMPLETATO — commit `5102835`. Spec review ✅ con analisi gating: capabilities omesse CORRETTAMENTE (dest hardcoded app-owned, niente path_args; aggiungere fs_write farebbe scattare DENY_NO_SCOPE a torto). Quality review «With fixes»: il path single-conversation era inutilizzabile dall'LLM (non conosce gli UUID) e un id valido-ma-inesistente dava success/exported=0 silenzioso. Fix in `311b8c6`: sentinella `'current'` risolta da `context.conversation_id` (precedente: whiteboard plugin), errore esplicito su exported=0 con id esplicito, broad except con log, descrizioni tool aggiornate, +2 test (5/5). Minor a verbale: collisione timestamp stesso-secondo (innocua, file atomici deterministici), override get_connection_status cosmetico (UNKNOWN non nasconde il tool né appare in UI).
 
 ---
 

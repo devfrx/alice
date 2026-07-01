@@ -262,54 +262,40 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("Memory service failed to start: {}", exc)
             await memory_service.close()
 
-    # -- Knowledge backend (Phase 1, Stream A) -----------------------------
-    # Thin :class:`KnowledgeBackend` adapter wrapping the existing memory
-    # service.  Plugins (memory) consume this backend instead of the
-    # underlying service directly. ``note`` knowledge is served by
-    # Continuum (below); Qdrant only handles ``memory``/``fact``.
-    from backend.services.knowledge import QdrantBackend
+    # -- Knowledge service (Fase 4) -----------------------------------------
+    # ONE entry point to the knowledge domain: KnowledgeService wraps the
+    # composable backend (composite with Continuum when enabled).  The
+    # ContinuumClient is instantiated HERE and only here; knowledge_init
+    # and the continuum plugin reuse ctx.continuum_client (no fallbacks).
+    from backend.services.knowledge.service import build_knowledge_service
 
-    qdrant_backend = QdrantBackend(
-        memory_service=ctx.memory_service,
-    )
-
-    # -- Continuum knowledge backend (Phase 3) -----------------------------
-    # When Continuum is enabled, ``note`` knowledge is delegated to the
-    # external Continuum server while ``memory``/``fact`` stay on Qdrant.
-    # The two are composed behind the single KnowledgeBackend interface so
-    # plugin code is unaffected.
     if config.continuum.enabled:
-        from backend.services.knowledge import (
-            CompositeKnowledgeBackend,
-            ContinuumBackend,
-            ContinuumClient,
-        )
+        from backend.services.knowledge import ContinuumClient
 
-        continuum_client = ContinuumClient(
+        ctx.continuum_client = ContinuumClient(
             base_url=config.continuum.base_url,
             api_token=config.continuum.api_token,
             timeout_s=config.continuum.timeout_s,
             folder_cache_ttl_s=config.continuum.folder_cache_ttl_s,
         )
-        ctx.knowledge_backend = CompositeKnowledgeBackend(
-            note_backend=ContinuumBackend(client=continuum_client),
-            memory_backend=qdrant_backend,
-        )
-        # Expose the same client so the ``continuum`` plugin reuses it
-        # instead of building a second one — a single instance keeps the
-        # folder path↔id cache coherent across note placement and plugin
-        # folder mutations.
-        ctx.continuum_client = continuum_client
         logger.info(
-            "Knowledge backend wired (notes=continuum @ {}, memory=qdrant)",
+            "Knowledge service wired (notes=continuum @ {}, memory={})",
             config.continuum.base_url,
-        )
-    else:
-        ctx.knowledge_backend = qdrant_backend
-        logger.info(
-            "Knowledge backend wired (memory={}, notes=disabled)",
             ctx.memory_service is not None,
         )
+    else:
+        logger.info(
+            "Knowledge service wired (memory={}, notes=disabled)",
+            ctx.memory_service is not None,
+        )
+    ctx.knowledge_service = build_knowledge_service(
+        continuum_enabled=config.continuum.enabled,
+        memory_service=ctx.memory_service,
+        continuum_client=ctx.continuum_client,
+    )
+    # Fase 4 transition alias for not-yet-migrated consumers
+    # (memory/continuum plugins).  Removed in Task 9.
+    ctx.knowledge_backend = ctx.knowledge_service.backend
 
     # -- Email service (Phase 15) ------------------------------------------
     if config.email.enabled:

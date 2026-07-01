@@ -523,6 +523,7 @@ class MemoryServiceProtocol(Protocol):
 # rest of the protocol surface.
 from backend.services.knowledge.protocol import (  # noqa: E402
     KnowledgeBackend as KnowledgeBackendProtocol,
+    KnowledgeServiceProtocol,
 )
 
 

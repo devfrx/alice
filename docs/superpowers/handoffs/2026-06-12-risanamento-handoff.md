@@ -61,19 +61,39 @@
 
 ## Prossimo lavoro: Fase 4 — Conoscenza (spec §5.2, terzo bullet)
 
-Da scrivere con `writing-plans` su branch `arch/fase4-conoscenza` (figlio di `arch/fase3-contenuti`).
+Da scrivere con `writing-plans` su branch `arch/fase4-conoscenza` (figlio di `arch/fase3-contenuti`,
+crearlo con `git checkout arch/fase3-contenuti` + `git checkout -b arch/fase4-conoscenza`).
 Requisiti spec: `KnowledgeService` unico punto d'accesso (sopra `CompositeKnowledgeBackend`); plugin memory
 = guscio sottile di tools; route memory deleganti allo stesso service; client Continuum istanziato una volta
 sola nel wiring. Da 6 strati a 3: *tools/route → KnowledgeService → backend componibili*.
 
-### Recon da fare PRIMA del piano 4 (non fatta, puntatori noti)
+Messaggio di kickoff della sessione (copiare tale e quale):
+«leggi specs, piano ed handoff della skill superpowers e continuiamo l'implementazione. /using-superpowers»
 
-- `services/memory_service.py`, `services/knowledge/` (QdrantBackend/ContinuumBackend/Composite),
-  `plugins/memory/`, `plugins/continuum/`, route `memory.py`/`knowledge.py`/`mcp_memory.py`/`vector_store.py`,
-  store FE `memory`/`mcpMemory`, dove viene istanziato il ContinuumClient (cercare doppie istanziazioni).
-- Censire i consumatori di `memory_service`/`knowledge_backend` su ctx (turn assembly inietta memorie nel
-  prompt — `_assembly.py`); verificare a mano i fatti load-bearing (gli audit dei subagent sbagliano i dettagli).
-- Burn-down ratchet del dominio memory/knowledge (voci in `response_model_baseline.txt`).
+### Recon fase 4 — puntatori VERIFICATI a mano (grep 2026-06-12) + cosa resta da censire
+
+Verificato sul repo (post-fase3):
+- `services/knowledge/` = `protocol.py`, `qdrant_backend.py`, `continuum_backend.py`,
+  `composite_backend.py`, `continuum_client.py`; il wiring vive in `services/knowledge_init.py`
+  (modulo dedicato: LEGGERLO PER PRIMO nella recon di dettaglio).
+- **`ContinuumClient` istanziato in TRE punti di produzione** (la duplicazione che la fase elimina):
+  `core/app.py:288`, `services/knowledge_init.py:111`, `plugins/continuum/plugin.py:94` — quest'ultimo è
+  `shared or ContinuumClient(...)`: esiste già un meccanismo di sharing, ma con fallback di costruzione.
+- Plugin: `plugins/memory/plugin.py`; `plugins/continuum/` (`plugin.py`, `definitions.py`, `note_tools.py`).
+- Route del dominio: `memory.py`, `knowledge.py`, `mcp_memory.py`, `vector_store.py`.
+  Store FE: `stores/memory.ts`, `stores/mcpMemory.ts`.
+- Consumatori di `memory_service`/`knowledge_backend`/`knowledge_service`: 168 occorrenze in 14 file; oltre
+  agli ovvi, `api/routes/chat/_assembly.py` (memorie nel system prompt), `services/rag_readiness.py`,
+  `core/context.py`. Test esistenti del dominio: `test_memory_service/api/plugin`,
+  `test_continuum_backend/notes`, `test_rag_readiness`.
+- **Ratchet: 19 voci del dominio in `response_model_baseline.txt`** (6 `/api/memory*`, 9 `/api/mcp/memory*`,
+  1 `/api/knowledge/readiness`, 3 `/api/vector-store*`) — il burn-down naturale della fase.
+
+Resta da censire nella recon di dettaglio (prima del piano): firme e perimetro di
+`services/memory_service.py`; cosa espone il protocollo `KnowledgeBackend` vs cosa serve davvero a route e
+tools; la superficie tool dei plugin memory/continuum; eventuali eventi WS del dominio oltre a
+`knowledge.status` (già tipizzato). Verificare a mano i fatti load-bearing (gli audit dei subagent
+sbagliano i dettagli — gotcha storico).
 
 ## Workflow collaudato (riusare così)
 

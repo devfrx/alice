@@ -466,3 +466,33 @@ class TestMemoryServiceUnavailable:
 
         assert result.success is False
         assert result.error_message is not None
+
+
+# ===================================================================
+# 8. Dependency / connection status
+# ===================================================================
+
+
+class TestDependencyReporting:
+    """check_dependencies / get_connection_status reflect the knowledge service."""
+
+    def test_dependencies_ok_when_available(self, plugin):
+        assert plugin.check_dependencies() == []
+
+    def test_dependencies_report_knowledge_service(self, plugin_no_service):
+        assert plugin_no_service.check_dependencies() == ["knowledge_service"]
+
+    async def test_execute_tool_errors_when_service_is_none(
+        self, mock_ctx, exec_context
+    ):
+        from backend.plugins.memory.plugin import MemoryPlugin
+
+        mock_ctx.knowledge_service = None
+        p = MemoryPlugin()
+        p._ctx = mock_ctx
+        p._initialized = True
+
+        result = await p.execute_tool("recall", {"query": "x"}, exec_context)
+
+        assert result.success is False
+        assert result.error_message is not None

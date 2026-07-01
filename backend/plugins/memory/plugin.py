@@ -20,6 +20,7 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
+from backend.core.protocols import KnowledgeServiceProtocol
 from backend.services.knowledge import (
     KnowledgeDocCreate,
 )
@@ -278,15 +279,15 @@ class MemoryPlugin(BasePlugin):
         start = time.perf_counter()
 
         if tool_name == "remember":
-            return await self._handle_remember(args, context, start)
+            return await self._handle_remember(svc, args, context, start)
         if tool_name == "recall":
-            return await self._handle_recall(args, start)
+            return await self._handle_recall(svc, args, start)
         if tool_name == "forget":
-            return await self._handle_forget(args, start)
+            return await self._handle_forget(svc, args, start)
         if tool_name == "list_memories":
-            return await self._handle_list(args, start)
+            return await self._handle_list(svc, args, start)
         if tool_name == "clear_session_memory":
-            return await self._handle_clear_session(start)
+            return await self._handle_clear_session(svc, start)
 
         return ToolResult.error(f"Unknown tool: {tool_name}")
 
@@ -328,6 +329,7 @@ class MemoryPlugin(BasePlugin):
 
     async def _handle_remember(
         self,
+        svc: KnowledgeServiceProtocol,
         args: dict[str, Any],
         context: ExecutionContext,
         start: float,
@@ -335,6 +337,7 @@ class MemoryPlugin(BasePlugin):
         """Store a new memory entry.
 
         Args:
+            svc: The knowledge service (guaranteed memory-available).
             args: Must contain ``content``; may contain ``category``,
                 ``scope``, ``expires_hours``.
             context: Execution metadata with conversation_id.
@@ -369,7 +372,7 @@ class MemoryPlugin(BasePlugin):
                 )
 
         try:
-            doc = await self._ctx.knowledge_service.create(
+            doc = await svc.create(
                 KnowledgeDocCreate(
                     kind="memory",
                     content=content,
@@ -394,12 +397,14 @@ class MemoryPlugin(BasePlugin):
 
     async def _handle_recall(
         self,
+        svc: KnowledgeServiceProtocol,
         args: dict[str, Any],
         start: float,
     ) -> ToolResult:
         """Search memories by semantic similarity.
 
         Args:
+            svc: The knowledge service (guaranteed memory-available).
             args: Must contain ``query``; may contain ``category``, ``limit``.
             start: ``time.perf_counter()`` timestamp for timing.
 
@@ -424,7 +429,7 @@ class MemoryPlugin(BasePlugin):
             search_filters = {"category": category}
 
         try:
-            hits = await self._ctx.knowledge_service.search(
+            hits = await svc.search(
                 query,
                 kind="memory",
                 k=limit,
@@ -459,12 +464,14 @@ class MemoryPlugin(BasePlugin):
 
     async def _handle_forget(
         self,
+        svc: KnowledgeServiceProtocol,
         args: dict[str, Any],
         start: float,
     ) -> ToolResult:
         """Delete a memory by UUID.
 
         Args:
+            svc: The knowledge service (guaranteed memory-available).
             args: Must contain ``memory_id``.
             start: ``time.perf_counter()`` timestamp for timing.
 
@@ -483,9 +490,7 @@ class MemoryPlugin(BasePlugin):
             )
 
         try:
-            deleted = await self._ctx.knowledge_service.delete(
-                memory_id, kind="memory",
-            )
+            deleted = await svc.delete(memory_id, kind="memory")
             elapsed_ms = (time.perf_counter() - start) * 1000
             if deleted:
                 return ToolResult.ok(
@@ -502,12 +507,14 @@ class MemoryPlugin(BasePlugin):
 
     async def _handle_list(
         self,
+        svc: KnowledgeServiceProtocol,
         args: dict[str, Any],
         start: float,
     ) -> ToolResult:
         """List memories with optional filters.
 
         Args:
+            svc: The knowledge service (guaranteed memory-available).
             args: May contain ``scope``, ``category``, ``limit``.
             start: ``time.perf_counter()`` timestamp for timing.
 
@@ -524,7 +531,7 @@ class MemoryPlugin(BasePlugin):
         limit = int(args.get("limit", 50) or 50)
 
         try:
-            docs, total = await self._ctx.knowledge_service.list(
+            docs, total = await svc.list(
                 kind="memory",
                 filters=list_filters if list_filters else None,
                 limit=limit,
@@ -555,19 +562,20 @@ class MemoryPlugin(BasePlugin):
             self.logger.error("list_memories failed: {}", exc)
             return ToolResult.error(f"Failed to list memories: {exc}")
 
-    async def _handle_clear_session(self, start: float) -> ToolResult:
+    async def _handle_clear_session(
+        self, svc: KnowledgeServiceProtocol, start: float
+    ) -> ToolResult:
         """Delete all session-scoped memories.
 
         Args:
+            svc: The knowledge service (guaranteed memory-available).
             start: ``time.perf_counter()`` timestamp for timing.
 
         Returns:
             ``ToolResult`` confirming deletion count or error.
         """
         try:
-            deleted_count = await self._ctx.knowledge_service.delete_by_filter(
-                kind="memory", filters={"scope": "session"},
-            )
+            deleted_count = await svc.delete_by_filter(kind="memory", filters={"scope": "session"})
             elapsed_ms = (time.perf_counter() - start) * 1000
             return ToolResult.ok(
                 content=(

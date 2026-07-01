@@ -6,7 +6,7 @@ Exposes every Continuum surface to the LLM as tools: note CRUD
 kinds, databases, graph) and the client-executed live-editor block tools.
 Note CRUD routes through the application's knowledge service, which
 delegates note storage to the Continuum server; the structured surfaces
-use the plugin's own :class:`ContinuumClient`.
+use the shared :class:`ContinuumClient`.
 
 The plugin reuses THE shared :class:`ContinuumClient` wired once in the
 lifespan (``ctx.continuum_client``) so the folder path↔id cache stays
@@ -134,7 +134,7 @@ class ContinuumPlugin(BasePlugin):
             # Note CRUD routes through the shared knowledge service (which
             # delegates note storage to Continuum), not the plugin's client.
             return await execute_note_tool(
-                self._ctx, tool_name, args, self.logger,
+                self.ctx, tool_name, args, self.logger,
             )
 
         start = time.perf_counter()

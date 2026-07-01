@@ -86,7 +86,7 @@ def plugin(mock_ctx):
     p._ctx = mock_ctx
     p._initialized = True
     # A non-None client passes the plugin's availability guard; note CRUD
-    # itself goes through the knowledge backend, not this client.
+    # itself goes through the knowledge service, not this client.
     p._client = AsyncMock()
     return p
 
@@ -484,13 +484,13 @@ class TestListNotes:
 
 
 # ===================================================================
-# 7. Backend unavailable
+# 7. Knowledge service unavailable
 # ===================================================================
 
 
 @pytest.mark.asyncio
-async def test_note_tool_without_knowledge_backend(plugin, mock_ctx):
-    """With no knowledge backend, note tools report unavailability."""
+async def test_note_tool_without_knowledge_service(plugin, mock_ctx):
+    """With no knowledge service, note tools report unavailability."""
     mock_ctx.knowledge_service = None
     result = await plugin.execute_tool(
         "list_notes", {}, _exec_ctx(),

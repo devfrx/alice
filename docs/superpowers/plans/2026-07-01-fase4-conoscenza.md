@@ -660,6 +660,8 @@ git commit -m "refactor(knowledge): wiring lifespan+repair via build_knowledge_s
 
 ### Task 3: Plugin memory = guscio sottile su `knowledge_service`
 
+> **Esito (2026-07-02):** DONE. Spec review: conforme (parità comportamentale verificata su tutti i percorsi: forget bool semantics, clear_session int, shape payload invariate, ToolDefinitions byte-identical; zero riferimenti residui a knowledge_backend/memory_service). Quality review (top): "Ready: Yes" + 1 Important applicato in `b538a95`: i 5 handler ora ricevono `svc: KnowledgeServiceProtocol` narrowed dalla guardia (mypy sul file: 10 union-attr pre-esistenti → 0) + 3 test su check_dependencies/get_connection_status/servizio-None. Questo pattern (svc passato ai handler) è il TEMPLATE per il Task 4. Gate: 27 test pass. Commit `fdc5bf9` + `b538a95`.
+
 **Files:**
 - Modify: `backend/plugins/memory/plugin.py`
 - Modify: `backend/tests/test_memory_plugin.py` (solo fixture)
@@ -808,6 +810,8 @@ git commit -m "refactor(memory): plugin guscio sottile su KnowledgeService" -m "
 ---
 
 ### Task 4: Continuum — note_tools su `knowledge_service`, plugin senza fallback client
+
+> **Esito (2026-07-02):** DONE. Spec review: conforme (parità byte-level dei corpi handler; early-return per config disabled INTATTO prima del warning; costruzione client solo in `core/app.py`). Quality review (top): "With fixes" — applicati dal controller: `self._ctx` → `self.ctx` nel dispatch note (ultimo errore mypy del plugin → mypy 0 su tutta plugins/continuum, fix verificato empiricamente dal reviewer), docstring "plugin's own client" → "shared client", 4 stringhe "knowledge backend" residue nel test rinominate. Finding fuori task → backlog: gate `self._client is None` copre anche i note tool; `initialize()` senza test diretto. mypy union-attr note_tools: 6 → 0 (pattern svc del Task 3). Gate: 47 test pass. Commit `8591964` + fix nel commit di esito.
 
 **Files:**
 - Modify: `backend/plugins/continuum/note_tools.py`
@@ -1933,6 +1937,7 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 ## Backlog emerso (fuori scope fase 4)
 
 - (review Task 2) `repair_vector_store` senza test diretto: pinnare l'invariante nuovo "continuum enabled ma `ctx.continuum_client=None` → stack memory-only + warning + `ctx.knowledge_service` coerente" (serve monkeypatch di QdrantService; valutare al Task 9 o in fase 5).
+- (review Task 4) `ContinuumPlugin.execute_tool` gate TUTTI i tool (note inclusi) su `self._client is None` prima del dispatch a `execute_note_tool`: se client e knowledge_service venissero mai disaccoppiati, i note tool fallirebbero col messaggio sbagliato pur essendo funzionanti. Valutare di anteporre il check `NOTE_TOOL_NAMES`. Inoltre `initialize()` è senza test diretto (le fixture iniettano `_client`).
 
 - `api/routes/mcp_memory.py` importa `McpClientPlugin` (TYPE_CHECKING) e pesca il plugin dal plugin_manager — violazione §4 "route ↛ plugin internals" da sanare in fase 5 con un service/protocol MCP.
 - `MemoryService.list` con offset fa scroll O(offset) su Qdrant (pre-esistente); valutare cursor-based nella UI se le memorie crescono.

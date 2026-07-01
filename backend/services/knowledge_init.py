@@ -8,10 +8,10 @@ clears the embedded store, re-initialises Qdrant + memory + the knowledge
 service, re-points tool-RAG at the fresh services, recomputes readiness and
 broadcasts ``knowledge.status``.
 
-Plugins read ``ctx.knowledge_service`` lazily on every
-call, so re-wiring the context is sufficient — no plugin re-initialisation is
-required.  Never raises: a failed repair returns a disabled
-:class:`RagReadiness` carrying the reason.
+Plugins read ``ctx.knowledge_service`` lazily on every call, so re-wiring
+the context is sufficient — no plugin re-initialisation is required.
+Never raises: a failed repair returns a disabled :class:`RagReadiness`
+carrying the reason.
 """
 
 from __future__ import annotations

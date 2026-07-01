@@ -266,7 +266,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ONE entry point to the knowledge domain: KnowledgeService wraps the
     # composable backend (composite with Continuum when enabled).  The
     # ContinuumClient is instantiated HERE and only here; knowledge_init
-    # and the continuum plugin reuse ctx.continuum_client (no fallbacks).
+    # and the continuum plugin reuse ctx.continuum_client.
     from backend.services.knowledge.service import build_knowledge_service
 
     if config.continuum.enabled:
@@ -278,6 +278,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             timeout_s=config.continuum.timeout_s,
             folder_cache_ttl_s=config.continuum.folder_cache_ttl_s,
         )
+    ctx.knowledge_service = build_knowledge_service(
+        continuum_enabled=config.continuum.enabled,
+        memory_service=ctx.memory_service,
+        continuum_client=ctx.continuum_client,
+    )
+    if config.continuum.enabled:
         logger.info(
             "Knowledge service wired (notes=continuum @ {}, memory={})",
             config.continuum.base_url,
@@ -288,11 +294,6 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             "Knowledge service wired (memory={}, notes=disabled)",
             ctx.memory_service is not None,
         )
-    ctx.knowledge_service = build_knowledge_service(
-        continuum_enabled=config.continuum.enabled,
-        memory_service=ctx.memory_service,
-        continuum_client=ctx.continuum_client,
-    )
     # Fase 4 transition alias for not-yet-migrated consumers
     # (memory/continuum plugins).  Removed in Task 9.
     ctx.knowledge_backend = ctx.knowledge_service.backend

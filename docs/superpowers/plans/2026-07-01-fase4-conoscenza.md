@@ -54,6 +54,8 @@
 
 ### Task 1: `KnowledgeService` + factory + Protocol + campo context
 
+> **Esito (2026-07-02):** DONE. Spec review: conforme (delega 1:1 verificata, diff = soli 5 file previsti). Quality review (top): "With fixes" — applicati in `bfd71d6`: annotazioni mypy-strict sui test + conformance check statico del Protocol, export di `KnowledgeService`/`build_knowledge_service`/`KnowledgeServiceProtocol` dal package `__init__`, re-export esplicito anti-F401 in `core/protocols.py`, messaggio `_require_memory` allineato a QdrantBackend (`memory_service is not available`), mock tipizzati (`KnowledgeDoc`/`BackendHealth`). Nota del reviewer per il Task 6 (già coperta dal piano): il 503 delle route va garantito dal pre-check `memory_available`, mai dal RuntimeError. Gate: 18 test pass, ruff/mypy puliti sui file nuovi. Commit `8b3d28d` + `bfd71d6`.
+
 **Files:**
 - Create: `backend/services/knowledge/service.py`
 - Modify: `backend/services/knowledge/protocol.py` (aggiungi `KnowledgeServiceProtocol`)
@@ -561,6 +563,8 @@ Nota ruff: il comando va lanciato dalla root `backend/` con path relativi al rep
 ---
 
 ### Task 2: Wiring — lifespan e repair via factory, client Continuum unico
+
+> **Esito (2026-07-02):** DONE. Spec review: conforme (2 file, 1 hunk ciascuno; ordering lifespan preservato; fallback client nel repair ELIMINATO; alias di transizione riassegnato anche nel repair — invariante chiave verificato). Quality review (top): "Ready to merge: Yes", 3 minor cosmetici — applicati dal controller in coda al task: log "wired" spostato DOPO la costruzione del service, commento "(no fallbacks)" ammorbidito (il fallback del plugin vive fino al Task 4), rewrap docstring knowledge_init. Raccomandazione registrata nel backlog: test dell'invariante di repair (enabled-but-no-client → memory-only + alias coerente). Commit `31e16ab` + fix cosmetici nel commit di esito.
 
 **Files:**
 - Modify: `backend/core/app.py:265-311` (blocco knowledge backend + continuum)
@@ -1927,6 +1931,8 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 - [ ] App avviabile; smoke e2e del dominio (readiness, stats, lista/search memoria) verificato.
 
 ## Backlog emerso (fuori scope fase 4)
+
+- (review Task 2) `repair_vector_store` senza test diretto: pinnare l'invariante nuovo "continuum enabled ma `ctx.continuum_client=None` → stack memory-only + warning + `ctx.knowledge_service` coerente" (serve monkeypatch di QdrantService; valutare al Task 9 o in fase 5).
 
 - `api/routes/mcp_memory.py` importa `McpClientPlugin` (TYPE_CHECKING) e pesca il plugin dal plugin_manager — violazione §4 "route ↛ plugin internals" da sanare in fase 5 con un service/protocol MCP.
 - `MemoryService.list` con offset fa scroll O(offset) su Qdrant (pre-esistente); valutare cursor-based nella UI se le memorie crescono.

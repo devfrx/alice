@@ -4,15 +4,15 @@ Exposes every Continuum surface to the LLM as tools: note CRUD
 (``create_note``/``read_note``/``update_note``/``delete_note``/
 ``search_notes``/``list_notes``) plus the structured surfaces (folders,
 kinds, databases, graph) and the client-executed live-editor block tools.
-Note CRUD routes through the application's knowledge backend, which
+Note CRUD routes through the application's knowledge service, which
 delegates note storage to the Continuum server; the structured surfaces
 use the plugin's own :class:`ContinuumClient`.
 
-The plugin owns its :class:`ContinuumClient` built from
-``config.continuum`` during :meth:`initialize`, reusing the instance the
-knowledge backend already wired so the folder path↔id cache stays
-coherent. Only ``delete_note`` is destructive and requires confirmation;
-every other server-side tool is read-oriented or additive.
+The plugin reuses THE shared :class:`ContinuumClient` wired once in the
+lifespan (``ctx.continuum_client``) so the folder path↔id cache stays
+coherent — it never builds its own (Fase 4). Only ``delete_note`` is
+destructive and requires confirmation; every other server-side tool is
+read-oriented or additive.
 """
 
 from __future__ import annotations
@@ -36,13 +36,11 @@ from backend.plugins.continuum.note_tools import (
     build_note_tool_definitions,
     execute_note_tool,
 )
-from backend.services.knowledge.continuum_client import (
-    ContinuumClient,
-    ContinuumError,
-)
+from backend.services.knowledge.continuum_client import ContinuumError
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
+    from backend.services.knowledge.continuum_client import ContinuumClient
 
 
 #: Names of tools that are executed on the connected client (the Continuum
@@ -76,7 +74,7 @@ class ContinuumPlugin(BasePlugin):
     # ------------------------------------------------------------------ #
 
     async def initialize(self, ctx: AppContext) -> None:
-        """Build the Continuum client from configuration."""
+        """Bind the shared Continuum client wired in the lifespan."""
         await super().initialize(ctx)
         cfg = ctx.config.continuum
         if not cfg.enabled:
@@ -85,18 +83,16 @@ class ContinuumPlugin(BasePlugin):
                 "(config.continuum.enabled=False) — tools will return errors"
             )
             return
-        # Reuse the client the knowledge backend already wired (so the
-        # folder path↔id cache stays coherent across note placement and
-        # the folder mutations this plugin performs). Fall back to a
-        # self-built client when none is shared (e.g. continuum enabled as
-        # a tool surface without the note backend).
-        shared = getattr(ctx, "continuum_client", None)
-        self._client = shared or ContinuumClient(
-            base_url=cfg.base_url,
-            api_token=cfg.api_token,
-            timeout_s=cfg.timeout_s,
-            folder_cache_ttl_s=cfg.folder_cache_ttl_s,
-        )
+        # Reuse THE shared client wired in the lifespan (core/app.py) so
+        # the folder path↔id cache stays coherent across note placement
+        # and the folder mutations this plugin performs.  There is no
+        # fallback construction: one client per process (Fase 4).
+        self._client = getattr(ctx, "continuum_client", None)
+        if self._client is None:
+            self.logger.warning(
+                "Continuum enabled but no shared client on the context — "
+                "tools will return errors (wiring bug?)"
+            )
 
     # ------------------------------------------------------------------ #
     # Tools
@@ -135,7 +131,7 @@ class ContinuumPlugin(BasePlugin):
             return ToolResult.error("Continuum integration is not available")
 
         if tool_name in NOTE_TOOL_NAMES:
-            # Note CRUD routes through the shared knowledge backend (which
+            # Note CRUD routes through the shared knowledge service (which
             # delegates note storage to Continuum), not the plugin's client.
             return await execute_note_tool(
                 self._ctx, tool_name, args, self.logger,

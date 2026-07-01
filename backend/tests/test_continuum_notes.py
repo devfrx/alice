@@ -68,9 +68,9 @@ def _make_doc(
 
 @pytest.fixture
 def mock_ctx():
-    """Mock AppContext with a mocked knowledge backend and event bus."""
+    """Mock AppContext with a mocked knowledge service and event bus."""
     ctx = MagicMock()
-    ctx.knowledge_backend = AsyncMock()
+    ctx.knowledge_service = AsyncMock()
     ctx.event_bus = AsyncMock()
     ctx.config = MagicMock()
     ctx.config.continuum.note_max_content_chars_llm = 50_000
@@ -139,7 +139,7 @@ class TestCreateNote:
 
     @pytest.mark.asyncio
     async def test_create_success(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.create = AsyncMock(return_value=_make_doc())
+        mock_ctx.knowledge_service.create = AsyncMock(return_value=_make_doc())
 
         result = await plugin.execute_tool(
             "create_note",
@@ -149,7 +149,7 @@ class TestCreateNote:
 
         assert result.success is True
         assert _NOTE_ID in result.content
-        payload = mock_ctx.knowledge_backend.create.call_args.args[0]
+        payload = mock_ctx.knowledge_service.create.call_args.args[0]
         assert payload.kind == "note"
         assert payload.title == "Test Note"
         # Markdown is rendered to editor-compatible HTML before storage.
@@ -158,7 +158,7 @@ class TestCreateNote:
 
     @pytest.mark.asyncio
     async def test_create_renders_markdown_to_html(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.create = AsyncMock(return_value=_make_doc())
+        mock_ctx.knowledge_service.create = AsyncMock(return_value=_make_doc())
 
         await plugin.execute_tool(
             "create_note",
@@ -172,7 +172,7 @@ class TestCreateNote:
             _exec_ctx(),
         )
 
-        html = mock_ctx.knowledge_backend.create.call_args.args[0].content
+        html = mock_ctx.knowledge_service.create.call_args.args[0].content
         assert "<h2>Section</h2>" in html
         assert "<strong>bold</strong>" in html
         assert "<code>code</code>" in html
@@ -209,7 +209,7 @@ class TestCreateNote:
 
     @pytest.mark.asyncio
     async def test_create_backend_exception(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.create = AsyncMock(
+        mock_ctx.knowledge_service.create = AsyncMock(
             side_effect=RuntimeError("db error"),
         )
         result = await plugin.execute_tool(
@@ -229,7 +229,7 @@ class TestReadNote:
 
     @pytest.mark.asyncio
     async def test_read_success(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.get = AsyncMock(return_value=_make_doc())
+        mock_ctx.knowledge_service.get = AsyncMock(return_value=_make_doc())
 
         result = await plugin.execute_tool(
             "read_note", {"note_id": _NOTE_ID}, _exec_ctx(),
@@ -238,14 +238,14 @@ class TestReadNote:
         assert result.success is True
         assert result.content["title"] == "Test Note"
         assert result.content["content"] == "<h1>Hello</h1>"
-        mock_ctx.knowledge_backend.get.assert_awaited_once_with(
+        mock_ctx.knowledge_service.get.assert_awaited_once_with(
             _NOTE_ID, kind="note",
         )
 
     @pytest.mark.asyncio
     async def test_read_truncates_long_content(self, plugin, mock_ctx):
         long = "a" * 60_000
-        mock_ctx.knowledge_backend.get = AsyncMock(
+        mock_ctx.knowledge_service.get = AsyncMock(
             return_value=_make_doc(content=long),
         )
         mock_ctx.config.continuum.note_max_content_chars_llm = 1_000
@@ -260,7 +260,7 @@ class TestReadNote:
 
     @pytest.mark.asyncio
     async def test_read_not_found(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.get = AsyncMock(return_value=None)
+        mock_ctx.knowledge_service.get = AsyncMock(return_value=None)
         result = await plugin.execute_tool(
             "read_note", {"note_id": _NOTE_ID}, _exec_ctx(),
         )
@@ -292,7 +292,7 @@ class TestUpdateNote:
 
     @pytest.mark.asyncio
     async def test_update_partial(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.update = AsyncMock(
+        mock_ctx.knowledge_service.update = AsyncMock(
             return_value=_make_doc(title="Updated"),
         )
 
@@ -303,7 +303,7 @@ class TestUpdateNote:
 
         assert result.success is True
         assert _NOTE_ID in result.content
-        call = mock_ctx.knowledge_backend.update.call_args
+        call = mock_ctx.knowledge_service.update.call_args
         assert call.args[0] == _NOTE_ID
         assert call.args[1].title == "Updated"
         assert call.kwargs["kind"] == "note"
@@ -311,18 +311,18 @@ class TestUpdateNote:
 
     @pytest.mark.asyncio
     async def test_update_renders_markdown(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.update = AsyncMock(return_value=_make_doc())
+        mock_ctx.knowledge_service.update = AsyncMock(return_value=_make_doc())
         await plugin.execute_tool(
             "update_note",
             {"note_id": _NOTE_ID, "content": "# Title"},
             _exec_ctx(),
         )
-        patch = mock_ctx.knowledge_backend.update.call_args.args[1]
+        patch = mock_ctx.knowledge_service.update.call_args.args[1]
         assert patch.content == "<h1>Title</h1>"
 
     @pytest.mark.asyncio
     async def test_update_not_found(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.update = AsyncMock(return_value=None)
+        mock_ctx.knowledge_service.update = AsyncMock(return_value=None)
         result = await plugin.execute_tool(
             "update_note", {"note_id": _NOTE_ID, "title": "X"}, _exec_ctx(),
         )
@@ -366,7 +366,7 @@ class TestDeleteNote:
 
     @pytest.mark.asyncio
     async def test_delete_success(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.delete = AsyncMock(return_value=True)
+        mock_ctx.knowledge_service.delete = AsyncMock(return_value=True)
 
         result = await plugin.execute_tool(
             "delete_note", {"note_id": _NOTE_ID}, _exec_ctx(),
@@ -374,14 +374,14 @@ class TestDeleteNote:
 
         assert result.success is True
         assert "deleted" in result.content.lower()
-        mock_ctx.knowledge_backend.delete.assert_awaited_once_with(
+        mock_ctx.knowledge_service.delete.assert_awaited_once_with(
             _NOTE_ID, kind="note",
         )
         mock_ctx.event_bus.emit.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_delete_not_found(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.delete = AsyncMock(return_value=False)
+        mock_ctx.knowledge_service.delete = AsyncMock(return_value=False)
         result = await plugin.execute_tool(
             "delete_note", {"note_id": _NOTE_ID}, _exec_ctx(),
         )
@@ -411,7 +411,7 @@ class TestSearchNotes:
             KnowledgeHit(doc=_make_doc(title="Recipe A"), score=0.95),
             KnowledgeHit(doc=_make_doc(title="Recipe B"), score=0.8),
         ]
-        mock_ctx.knowledge_backend.search = AsyncMock(return_value=hits)
+        mock_ctx.knowledge_service.search = AsyncMock(return_value=hits)
 
         result = await plugin.execute_tool(
             "search_notes", {"query": "recipe"}, _exec_ctx(),
@@ -420,11 +420,11 @@ class TestSearchNotes:
         assert result.success is True
         assert result.content["count"] == 2
         assert result.content["query"] == "recipe"
-        mock_ctx.knowledge_backend.search.assert_awaited_once()
+        mock_ctx.knowledge_service.search.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_search_empty_results(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.search = AsyncMock(return_value=[])
+        mock_ctx.knowledge_service.search = AsyncMock(return_value=[])
         result = await plugin.execute_tool(
             "search_notes", {"query": "nothing"}, _exec_ctx(),
         )
@@ -440,7 +440,7 @@ class TestSearchNotes:
 
     @pytest.mark.asyncio
     async def test_search_dates_are_strings(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.search = AsyncMock(
+        mock_ctx.knowledge_service.search = AsyncMock(
             return_value=[KnowledgeHit(doc=_make_doc(), score=1.0)],
         )
         result = await plugin.execute_tool(
@@ -451,13 +451,13 @@ class TestSearchNotes:
 
     @pytest.mark.asyncio
     async def test_search_passes_folder_and_tags(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.search = AsyncMock(return_value=[])
+        mock_ctx.knowledge_service.search = AsyncMock(return_value=[])
         await plugin.execute_tool(
             "search_notes",
             {"query": "q", "folder": "recipes", "tags": ["italian"]},
             _exec_ctx(),
         )
-        filters = mock_ctx.knowledge_backend.search.call_args.kwargs["filters"]
+        filters = mock_ctx.knowledge_service.search.call_args.kwargs["filters"]
         assert filters["folder"] == "recipes"
         assert filters["tags"] == ["italian"]
 
@@ -467,7 +467,7 @@ class TestListNotes:
 
     @pytest.mark.asyncio
     async def test_list_with_results(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.list = AsyncMock(
+        mock_ctx.knowledge_service.list = AsyncMock(
             return_value=([_make_doc(), _make_doc()], 2),
         )
         result = await plugin.execute_tool("list_notes", {}, _exec_ctx())
@@ -477,7 +477,7 @@ class TestListNotes:
 
     @pytest.mark.asyncio
     async def test_list_empty(self, plugin, mock_ctx):
-        mock_ctx.knowledge_backend.list = AsyncMock(return_value=([], 0))
+        mock_ctx.knowledge_service.list = AsyncMock(return_value=([], 0))
         result = await plugin.execute_tool("list_notes", {}, _exec_ctx())
         assert result.success is True
         assert result.content["count"] == 0
@@ -491,7 +491,7 @@ class TestListNotes:
 @pytest.mark.asyncio
 async def test_note_tool_without_knowledge_backend(plugin, mock_ctx):
     """With no knowledge backend, note tools report unavailability."""
-    mock_ctx.knowledge_backend = None
+    mock_ctx.knowledge_service = None
     result = await plugin.execute_tool(
         "list_notes", {}, _exec_ctx(),
     )

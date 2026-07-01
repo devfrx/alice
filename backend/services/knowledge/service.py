@@ -74,7 +74,7 @@ class KnowledgeService:
 
     def _require_memory(self) -> MemoryServiceProtocol:
         if self._memory is None:
-            raise RuntimeError("memory service is not available")
+            raise RuntimeError("memory_service is not available")
         return self._memory
 
     # ------------------------------------------------------------------

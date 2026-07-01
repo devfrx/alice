@@ -15,23 +15,28 @@ CompositeKnowledgeBackend`.
 
 from __future__ import annotations
 
+from backend.services.knowledge.composite_backend import (
+    CompositeKnowledgeBackend,
+)
+from backend.services.knowledge.continuum_backend import ContinuumBackend
+from backend.services.knowledge.continuum_client import (
+    ContinuumClient,
+    ContinuumError,
+)
 from backend.services.knowledge.protocol import (
+    BackendHealth,
     KnowledgeBackend,
     KnowledgeDoc,
     KnowledgeDocCreate,
     KnowledgeDocPatch,
     KnowledgeHit,
     KnowledgeKind,
-    BackendHealth,
+    KnowledgeServiceProtocol,
 )
 from backend.services.knowledge.qdrant_backend import QdrantBackend
-from backend.services.knowledge.continuum_backend import ContinuumBackend
-from backend.services.knowledge.continuum_client import (
-    ContinuumClient,
-    ContinuumError,
-)
-from backend.services.knowledge.composite_backend import (
-    CompositeKnowledgeBackend,
+from backend.services.knowledge.service import (
+    KnowledgeService,
+    build_knowledge_service,
 )
 
 __all__ = [
@@ -46,5 +51,8 @@ __all__ = [
     "KnowledgeDocPatch",
     "KnowledgeHit",
     "KnowledgeKind",
+    "KnowledgeService",
+    "KnowledgeServiceProtocol",
     "QdrantBackend",
+    "build_knowledge_service",
 ]

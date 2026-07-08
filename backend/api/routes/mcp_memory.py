@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from backend.core.context import AppContext
 
@@ -154,34 +154,77 @@ class OpenNodesRequest(BaseModel):
     names: list[str]
 
 
+# ── Response models ────────────────────────────────────────────────────────
+
+
+class KGEntityRead(BaseModel):
+    """Entity node as returned by the MCP memory server."""
+
+    name: str
+    entityType: str  # MCP server field name (camelCase, as in EntityInput)
+    observations: list[str]
+
+
+class KGRelationRead(BaseModel):
+    """Directed relation between two entities."""
+
+    from_entity: str = Field(alias="from")
+    to: str
+    relationType: str  # MCP server field name (camelCase, as in RelationInput)
+
+    model_config = {"populate_by_name": True}
+
+
+class KGGraphResponse(BaseModel):
+    """Knowledge-graph snapshot (entities + relations)."""
+
+    entities: list[KGEntityRead]
+    relations: list[KGRelationRead]
+
+
+class KGMutationResponse(BaseModel):
+    """Mutation acknowledgement (the client reloads the graph)."""
+
+    ok: bool = True
+
+
+def _graph(data: Any) -> KGGraphResponse:
+    """Normalise an MCP tool result to a graph (empty on unexpected shape)."""
+    try:
+        return KGGraphResponse.model_validate(data)
+    except ValidationError:
+        logger.warning("MCP memory returned an unexpected graph shape")
+        return KGGraphResponse(entities=[], relations=[])
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 
-@router.get("/graph")
-async def read_graph(request: Request) -> Any:
+@router.get("/graph", response_model=KGGraphResponse)
+async def read_graph(request: Request) -> KGGraphResponse:
     """Read the entire knowledge graph (entities + relations)."""
     session = _get_memory_session(request)
-    return await _call(session, "read_graph", {})
+    return _graph(await _call(session, "read_graph", {}))
 
 
-@router.post("/search")
-async def search_nodes(request: Request, body: SearchRequest) -> Any:
+@router.post("/search", response_model=KGGraphResponse)
+async def search_nodes(request: Request, body: SearchRequest) -> KGGraphResponse:
     """Search entities by query across names, types, and observations."""
     session = _get_memory_session(request)
-    return await _call(session, "search_nodes", {"query": body.query})
+    return _graph(await _call(session, "search_nodes", {"query": body.query}))
 
 
-@router.post("/nodes")
-async def open_nodes(request: Request, body: OpenNodesRequest) -> Any:
+@router.post("/nodes", response_model=KGGraphResponse)
+async def open_nodes(request: Request, body: OpenNodesRequest) -> KGGraphResponse:
     """Retrieve specific entities by name with their relations."""
     session = _get_memory_session(request)
-    return await _call(session, "open_nodes", {"names": body.names})
+    return _graph(await _call(session, "open_nodes", {"names": body.names}))
 
 
-@router.post("/entities")
+@router.post("/entities", response_model=KGMutationResponse)
 async def create_entities(
     request: Request, body: CreateEntitiesRequest,
-) -> Any:
+) -> KGMutationResponse:
     """Create new entities in the knowledge graph."""
     session = _get_memory_session(request)
     entities = [
@@ -192,71 +235,77 @@ async def create_entities(
         }
         for e in body.entities
     ]
-    return await _call(session, "create_entities", {"entities": entities})
+    await _call(session, "create_entities", {"entities": entities})
+    return KGMutationResponse()
 
 
-@router.delete("/entities")
+@router.delete("/entities", response_model=KGMutationResponse)
 async def delete_entities(
     request: Request, body: DeleteEntitiesRequest,
-) -> Any:
+) -> KGMutationResponse:
     """Delete entities and their associated relations."""
     session = _get_memory_session(request)
-    return await _call(
+    await _call(
         session, "delete_entities", {"entityNames": body.entityNames},
     )
+    return KGMutationResponse()
 
 
-@router.post("/relations")
+@router.post("/relations", response_model=KGMutationResponse)
 async def create_relations(
     request: Request, body: CreateRelationsRequest,
-) -> Any:
+) -> KGMutationResponse:
     """Create new relations between entities."""
     session = _get_memory_session(request)
     relations = [
         {"from": r.from_entity, "to": r.to, "relationType": r.relationType}
         for r in body.relations
     ]
-    return await _call(session, "create_relations", {"relations": relations})
+    await _call(session, "create_relations", {"relations": relations})
+    return KGMutationResponse()
 
 
-@router.delete("/relations")
+@router.delete("/relations", response_model=KGMutationResponse)
 async def delete_relations(
     request: Request, body: DeleteRelationsRequest,
-) -> Any:
+) -> KGMutationResponse:
     """Delete specific relations."""
     session = _get_memory_session(request)
     relations = [
         {"from": r.from_entity, "to": r.to, "relationType": r.relationType}
         for r in body.relations
     ]
-    return await _call(session, "delete_relations", {"relations": relations})
+    await _call(session, "delete_relations", {"relations": relations})
+    return KGMutationResponse()
 
 
-@router.post("/observations")
+@router.post("/observations", response_model=KGMutationResponse)
 async def add_observations(
     request: Request, body: AddObservationsRequest,
-) -> Any:
+) -> KGMutationResponse:
     """Add observations to existing entities."""
     session = _get_memory_session(request)
     observations = [
         {"entityName": o.entityName, "contents": o.contents}
         for o in body.observations
     ]
-    return await _call(
+    await _call(
         session, "add_observations", {"observations": observations},
     )
+    return KGMutationResponse()
 
 
-@router.delete("/observations")
+@router.delete("/observations", response_model=KGMutationResponse)
 async def delete_observations(
     request: Request, body: DeleteObservationsRequest,
-) -> Any:
+) -> KGMutationResponse:
     """Remove specific observations from entities."""
     session = _get_memory_session(request)
     deletions = [
         {"entityName": d.entityName, "observations": d.observations}
         for d in body.deletions
     ]
-    return await _call(
+    await _call(
         session, "delete_observations", {"deletions": deletions},
     )
+    return KGMutationResponse()

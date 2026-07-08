@@ -1,8 +1,5 @@
 DELETE /api/artifacts/{artifact_id}
 DELETE /api/calendar/events/{event_id}
-DELETE /api/mcp/memory/entities
-DELETE /api/mcp/memory/observations
-DELETE /api/mcp/memory/relations
 DELETE /api/permission-rules/{conversation_id}/{rule_id}
 DELETE /api/settings/preferences
 DELETE /api/terminal/{conversation_id}/{session_id}
@@ -23,7 +20,6 @@ GET /api/email/folders
 GET /api/email/inbox
 GET /api/email/{uid}
 GET /api/health
-GET /api/mcp/memory/graph
 GET /api/mcp/servers
 GET /api/mcp/servers/{server_name}
 GET /api/models
@@ -48,11 +44,6 @@ POST /api/chat/upload
 POST /api/config/reload
 POST /api/config/sync-model
 POST /api/email/search
-POST /api/mcp/memory/entities
-POST /api/mcp/memory/nodes
-POST /api/mcp/memory/observations
-POST /api/mcp/memory/relations
-POST /api/mcp/memory/search
 POST /api/mcp/servers/{server_name}/reconnect
 POST /api/models/download
 POST /api/models/load

@@ -18,7 +18,6 @@ from backend.core.protocols import (
     ContextManagerProtocol,
     EmbeddingClientProtocol,
     EmailServiceProtocol,
-    KnowledgeBackendProtocol,
     KnowledgeServiceProtocol,
     LLMServiceProtocol,
     LMStudioManagerProtocol,
@@ -67,11 +66,6 @@ class AppContext:
 
     memory_service: MemoryServiceProtocol | None = None
     """Persistent semantic memory service."""
-
-    knowledge_backend: KnowledgeBackendProtocol | None = None
-    """Unified knowledge store (Phase 1).  Wraps the memory service behind
-    a kind-dispatched protocol; ``note`` knowledge is delegated to
-    Continuum via :class:`CompositeKnowledgeBackend` when enabled."""
 
     knowledge_service: KnowledgeServiceProtocol | None = None
     """Single entry point to the knowledge domain (Fase 4): facade over

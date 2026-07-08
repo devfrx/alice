@@ -294,10 +294,6 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             "Knowledge service wired (memory={}, notes=disabled)",
             ctx.memory_service is not None,
         )
-    # Fase 4 transition alias for not-yet-migrated consumers
-    # (memory/continuum plugins).  Removed in Task 9.
-    ctx.knowledge_backend = ctx.knowledge_service.backend
-
     # -- Email service (Phase 15) ------------------------------------------
     if config.email.enabled:
         from backend.services.email_service import EmailService

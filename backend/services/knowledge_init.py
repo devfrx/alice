@@ -111,9 +111,6 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
         memory_service=ctx.memory_service,
         continuum_client=client,
     )
-    # Fase 4 transition alias (removed in Task 9).
-    ctx.knowledge_backend = ctx.knowledge_service.backend
-
     # 4. Point tool-RAG at the new backends and re-embed (best-effort).
     if ctx.tool_registry is not None:
         ctx.tool_registry.set_vector_backends(

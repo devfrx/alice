@@ -161,7 +161,7 @@ class KGEntityRead(BaseModel):
     """Entity node as returned by the MCP memory server."""
 
     name: str
-    entityType: str  # MCP server field name (camelCase, as in EntityInput)
+    entityType: str  # noqa: N815 — MCP server field name (camelCase, as in EntityInput)
     observations: list[str]
 
 
@@ -170,7 +170,7 @@ class KGRelationRead(BaseModel):
 
     from_entity: str = Field(alias="from")
     to: str
-    relationType: str  # MCP server field name (camelCase, as in RelationInput)
+    relationType: str  # noqa: N815 — MCP server field name (camelCase, as in RelationInput)
 
     model_config = {"populate_by_name": True}
 

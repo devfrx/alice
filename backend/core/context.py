@@ -14,7 +14,8 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.core.config import AliceConfig
 from backend.core.event_bus import EventBus
@@ -253,11 +254,11 @@ class AppContext:
     # ------------------------------------------------------------------
 
     @property
-    def db(self) -> async_sessionmaker[AsyncSession] | None:
+    def db(self) -> async_sessionmaker[SQLModelAsyncSession] | None:
         return self.conversation.db
 
     @db.setter
-    def db(self, value: async_sessionmaker[AsyncSession] | None) -> None:
+    def db(self, value: async_sessionmaker[SQLModelAsyncSession] | None) -> None:
         self.conversation.db = value
 
     @property

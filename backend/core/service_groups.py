@@ -21,7 +21,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.core.event_bus import EventBus
 from backend.core.protocols import (
@@ -98,7 +99,8 @@ class WorkspaceServices:
 class ConversationServices:
     """Conversation persistence and per-conversation artefacts."""
 
-    db: async_sessionmaker[AsyncSession] | None = None
+    db: async_sessionmaker[SQLModelAsyncSession] | None = None
+    """Session factory — SQLModel-aware sessions (``db/database.py``)."""
     engine: AsyncEngine | None = None
     context_manager: ContextManagerProtocol | None = None
     plan_service: Any = None

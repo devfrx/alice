@@ -7,11 +7,6 @@ the events WebSocket.
 
 from __future__ import annotations
 
-from typing import cast
-
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
-
 from backend.core.context import AppContext
 
 
@@ -51,14 +46,7 @@ async def stage_conversation(ctx: AppContext) -> None:
     # -- Plan document service (persisted per-conversation strategy doc) -
     from backend.services.plan_document_service import PlanDocumentService
 
-    # PlanDocumentService declares the SQLModel-aware session type (the
-    # actual runtime factory, per db/database.py); ``ctx.db`` is typed with
-    # SQLAlchemy's plain ``AsyncSession`` — cast reflects the real type.
-    plan_document_service = PlanDocumentService(
-        session_factory=cast(
-            "async_sessionmaker[SQLModelAsyncSession]", session_factory,
-        ),
-    )
+    plan_document_service = PlanDocumentService(session_factory=session_factory)
 
     async def _broadcast_plan_document_event(event: dict) -> None:
         if ctx.ws_connection_manager:

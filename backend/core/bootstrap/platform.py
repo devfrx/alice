@@ -43,7 +43,7 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     config_service = LayeredConfigService(event_bus=ctx.event_bus)
     ctx.config_service = config_service
     ctx.config = config_service.get_resolved()
-    config = ctx.config  # keep local alias in sync for the rest of lifespan
+    config = ctx.config  # keep local alias in sync for the rest of this stage
 
     async def _refresh_ctx_config(**_kwargs: object) -> None:
         ctx.config = config_service.get_resolved()

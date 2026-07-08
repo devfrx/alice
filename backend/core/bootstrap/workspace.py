@@ -8,11 +8,6 @@ manager.  Hard ordering: ``permission_service`` needs scope + rules;
 
 from __future__ import annotations
 
-from typing import cast
-
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
-
 from backend.core.context import AppContext
 
 
@@ -23,13 +18,7 @@ async def stage_workspace(ctx: AppContext) -> None:
         ctx: The application context being bootstrapped.
     """
     assert ctx.db is not None, "stage_database must run before stage_workspace"
-    # ``ctx.db`` is typed with SQLAlchemy's plain ``AsyncSession`` (the flat
-    # ``AppContext`` property type); the session factory is actually built
-    # with the SQLModel-aware subclass (``db/database.py``), which is what
-    # these services declare — cast reflects the real runtime type.
-    session_factory = cast(
-        "async_sessionmaker[SQLModelAsyncSession]", ctx.db,
-    )
+    session_factory = ctx.db
 
     # -- Scope service (per-conversation workspace folder scope) --------
     from backend.services.scope_service import ScopeService

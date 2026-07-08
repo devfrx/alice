@@ -30,5 +30,5 @@ async def stage_database(ctx: AppContext, *, testing: bool) -> None:
     engine, session_factory = create_engine_and_session(db_url)
     await init_db(engine)
 
-    ctx.db = session_factory  # type: ignore[assignment]
+    ctx.db = session_factory
     ctx.engine = engine

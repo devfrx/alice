@@ -1482,6 +1482,8 @@ git commit -m "refactor(knowledge): readiness e vector-store tipizzate (ratchet 
 
 ### Task 8: `/api/mcp/memory*` tipizzate (baseline −9)
 
+> **Esito (2026-07-08):** DONE. Spec review: conforme (`_graph` verificata robusta anche su None/list/str/int a runtime; baseline: ZERO voci del dominio conoscenza residue — burn-down 19/19 completo). Quality review (top): "Ready: Yes" — hardening applicato dal controller: warning di `_graph` con nome tool + conteggio errori di validazione, `observations` con default `[]` su `KGEntityRead` (parità col request model, tolleranza a server non-reference) + test dedicato. Verificato dal reviewer: discard dei body di mutazione sicuro (unico consumer = store FE che ricarica il grafo); fallback grafo-vuoto = parità col comportamento FE precedente MA con warning. Nit per il Task 10: correggere le firme `api.ts` `createKGEntities`/`createKGRelations` (`Promise<KGGraph>` → mutation ack). noqa N815 SOLO sui campi nuovi (debito scoped invariato: 6 pre-esistenti). Gate: 7 test pass, mypy 0. Commit `14ea87b` + `b2a6353` + hardening nel commit di esito.
+
 **Files:**
 - Modify: `backend/api/routes/mcp_memory.py`
 - Create: `backend/tests/test_mcp_memory_models.py`

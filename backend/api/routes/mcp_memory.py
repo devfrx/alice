@@ -162,7 +162,7 @@ class KGEntityRead(BaseModel):
 
     name: str
     entityType: str  # noqa: N815 — MCP server field name (camelCase, as in EntityInput)
-    observations: list[str]
+    observations: list[str] = []
 
 
 class KGRelationRead(BaseModel):
@@ -188,12 +188,16 @@ class KGMutationResponse(BaseModel):
     ok: bool = True
 
 
-def _graph(data: Any) -> KGGraphResponse:
+def _graph(data: Any, *, tool: str) -> KGGraphResponse:
     """Normalise an MCP tool result to a graph (empty on unexpected shape)."""
     try:
         return KGGraphResponse.model_validate(data)
-    except ValidationError:
-        logger.warning("MCP memory returned an unexpected graph shape")
+    except ValidationError as exc:
+        logger.warning(
+            "MCP memory tool '{}' returned an unexpected graph shape "
+            "({} validation errors)",
+            tool, exc.error_count(),
+        )
         return KGGraphResponse(entities=[], relations=[])
 
 
@@ -204,21 +208,27 @@ def _graph(data: Any) -> KGGraphResponse:
 async def read_graph(request: Request) -> KGGraphResponse:
     """Read the entire knowledge graph (entities + relations)."""
     session = _get_memory_session(request)
-    return _graph(await _call(session, "read_graph", {}))
+    return _graph(await _call(session, "read_graph", {}), tool="read_graph")
 
 
 @router.post("/search", response_model=KGGraphResponse)
 async def search_nodes(request: Request, body: SearchRequest) -> KGGraphResponse:
     """Search entities by query across names, types, and observations."""
     session = _get_memory_session(request)
-    return _graph(await _call(session, "search_nodes", {"query": body.query}))
+    return _graph(
+        await _call(session, "search_nodes", {"query": body.query}),
+        tool="search_nodes",
+    )
 
 
 @router.post("/nodes", response_model=KGGraphResponse)
 async def open_nodes(request: Request, body: OpenNodesRequest) -> KGGraphResponse:
     """Retrieve specific entities by name with their relations."""
     session = _get_memory_session(request)
-    return _graph(await _call(session, "open_nodes", {"names": body.names}))
+    return _graph(
+        await _call(session, "open_nodes", {"names": body.names}),
+        tool="open_nodes",
+    )
 
 
 @router.post("/entities", response_model=KGMutationResponse)

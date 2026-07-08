@@ -1737,6 +1737,8 @@ git commit -m "refactor(knowledge): rimozione ctx.knowledge_backend, KnowledgeSe
 
 ### Task 10: Regen contratti + migrazione FE + gate
 
+> **Esito (2026-07-08):** DONE. Spec review: conforme (9 file esatti; shape generati verificati: `items` required, `from` alias, `observations?` opzionale, grafo required; gate tutti riesesguiti verdi; convenzioni EOL verificate blob-per-blob — l'implementer ha intercettato da solo un flip CRLF su mcpMemory.ts e l'ha corretto pre-commit). Quality review (top): "Ready: Yes" — verificato che `Promise<unknown>` sulle mutazioni KG CORREGGE un tipo falso pre-esistente; guardie di opzionalità complete e mai gratuite (EntityCard unico consumer di observations); `generated/index.ts` correttamente non toccato (ApiSchema generico). Nice-to-have → backlog: `memory.spec.ts` (rename items coperto solo da typecheck + smoke), tipizzare le 6 mutazioni KG con `KGMutationResponse`, `v-if` sul badge source vuoto. Gate: contracts 84, typecheck 0, vitest 259/259, check-contracts verde post-commit. Commit `a20997a`.
+
 **Files:**
 - Regen: `.\scripts\gen-contracts.ps1` (openapi + `types/generated/`)
 - Rewrite: `frontend/src/renderer/src/types/memory.ts`
@@ -1952,6 +1954,7 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 - (review Task 4) `ContinuumPlugin.execute_tool` gate TUTTI i tool (note inclusi) su `self._client is None` prima del dispatch a `execute_note_tool`: se client e knowledge_service venissero mai disaccoppiati, i note tool fallirebbero col messaggio sbagliato pur essendo funzionanti. Valutare di anteporre il check `NOTE_TOOL_NAMES`. Inoltre `initialize()` è senza test diretto (le fixture iniettano `_client`).
 - (review Task 5, pre-esistente) `_format_memory_context`: se la prima riga eccede il budget la sezione viene iniettata header-only nel system prompt; il budget non conta header né separatori `\n` (`context_max_chars` non è un hard cap). Sistemare se/quando serve un cap rigoroso.
 - (review Task 7) Consolidare la costruzione duplicata di `RagReadinessResponse` (readiness route vs `_rag_status`) in un classmethod `from_readiness` e unificare le grafie "not initialized"/"not initialised" — DOPO il regen del Task 10 (tocca una stringa visibile in UI). mypy residuo su vector_store: `_get_ctx` Any-return + `QdrantServiceProtocol` senza `in_memory` (protocol gap, fase 5).
+- (review Task 10) `stores/memory.ts` senza spec vitest (rename `items` coperto solo da typecheck + smoke e2e): aggiungere `memory.spec.ts` (mock `api.getMemories`, pin del decremento di `clearSessionMemory`). Tipizzare le 6 mutazioni KG in `api.ts` con `ApiSchema<'KGMutationResponse'>` in un solo passaggio. `v-if` sul badge source vuoto in MemoryManager.
 
 - `api/routes/mcp_memory.py` importa `McpClientPlugin` (TYPE_CHECKING) e pesca il plugin dal plugin_manager — violazione §4 "route ↛ plugin internals" da sanare in fase 5 con un service/protocol MCP.
 - `MemoryService.list` con offset fa scroll O(offset) su Qdrant (pre-esistente); valutare cursor-based nella UI se le memorie crescono.

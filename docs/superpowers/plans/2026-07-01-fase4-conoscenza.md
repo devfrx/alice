@@ -1680,6 +1680,8 @@ git commit -m "refactor(mcp-memory): risposte tipizzate KGGraph/KGMutation (ratc
 
 ### Task 9: Eliminazione `ctx.knowledge_backend` + guardie grep
 
+> **Esito (2026-07-08):** DONE. Spec review: conforme (14 righe di sola rimozione; le 3 guardie grep VUOTE; alias `KnowledgeBackendProtocol` sparito ovunque, oltre il minimo richiesto; zero riferimenti residui anche nei test; ruff −1 F401 e mypy −1 attr-defined, zero nuovi). Quality review (top): "Ready: Yes", 3 minor applicati/registrati dal controller: docstring della property `backend` aggiornate a "factory-shape tests only" (il wiring non la usa più), riga vuota ripristinata in knowledge_init, e nota per il Task 11: CLAUDE.md va aggiornato in DUE punti (bullet AppContext riga ~73 che elenca `knowledge_backend` + bullet Qdrant/knowledge). Gate: 134/134 test dominio, app boot ok. Commit `51066a9` + fix nel commit di esito.
+
 **Files:**
 - Modify: `backend/core/context.py` (rimuovi campo + import)
 - Modify: `backend/core/app.py` (rimuovi alias di transizione)
@@ -1905,6 +1907,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/memory/search -ContentT
 Atteso: `{results: [...]}`. Chiudi il backend.
 
 - [ ] **Step 2: Aggiorna CLAUDE.md (doc drift)**
+
+ATTENZIONE (nota review Task 9): CLAUDE.md va aggiornato in DUE punti — oltre al bullet Qdrant/knowledge qui sotto, anche l'elenco dei campi di `AppContext` nel bullet su `core/context.py` (menziona ancora `knowledge_backend`: sostituire con `knowledge_service`).
 
 Nel bullet «**Qdrant** is the vector store…» sostituisci la frase `Both sit behind the ``KnowledgeBackend`` abstraction (``services/knowledge/``) — ``QdrantBackend`` and ``ContinuumBackend`` composed by ``CompositeKnowledgeBackend``. Consume the backend, not the underlying services.` con: `Both sit behind **``KnowledgeService``** (``services/knowledge/service.py``) — the single entry point to the knowledge domain, wrapping ``QdrantBackend``/``ContinuumBackend`` composed by ``CompositeKnowledgeBackend``. Consume ``ctx.knowledge_service``, never the backends or ``memory_service`` directly.`
 

@@ -226,7 +226,7 @@ class KnowledgeServiceProtocol(Protocol):
 
     @property
     def backend(self) -> KnowledgeBackend:
-        """The wrapped backend — wiring/tests only."""
+        """The wrapped backend — factory-shape tests only."""
         ...
 
     async def search(

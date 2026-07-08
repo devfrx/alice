@@ -69,7 +69,7 @@ class KnowledgeService:
 
     @property
     def backend(self) -> KnowledgeBackend:
-        """The wrapped backend — wiring/tests only, never for consumers."""
+        """The wrapped backend — factory-shape tests only, never for consumers."""
         return self._backend
 
     def _require_memory(self) -> MemoryServiceProtocol:

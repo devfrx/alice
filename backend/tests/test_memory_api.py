@@ -42,9 +42,19 @@ def _make_entry(
 
 def _build_app(memory_service=None) -> FastAPI:
     """Lightweight FastAPI app with only the memory router mounted."""
+    from backend.services.knowledge import QdrantBackend
+    from backend.services.knowledge.service import KnowledgeService
+
     app = FastAPI()
     app.include_router(router, prefix="/api")
-    app.state.context = SimpleNamespace(memory_service=memory_service)
+    knowledge_service = KnowledgeService(
+        backend=QdrantBackend(memory_service=memory_service),
+        memory_service=memory_service,
+    )
+    app.state.context = SimpleNamespace(
+        memory_service=memory_service,
+        knowledge_service=knowledge_service if memory_service is not None else None,
+    )
     return app
 
 
@@ -136,10 +146,10 @@ class TestMemoryEndpoints:
         resp = await client.get(_PREFIX)
         assert resp.status_code == 200
         data = resp.json()
-        assert "entries" in data
+        assert "items" in data
         assert "total" in data
         assert data["total"] == 1
-        assert len(data["entries"]) == 1
+        assert len(data["items"]) == 1
 
     async def test_list_memories_with_filters(self, memory_client):
         client, _ = memory_client

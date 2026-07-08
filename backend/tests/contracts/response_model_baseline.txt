@@ -3,9 +3,6 @@ DELETE /api/calendar/events/{event_id}
 DELETE /api/mcp/memory/entities
 DELETE /api/mcp/memory/observations
 DELETE /api/mcp/memory/relations
-DELETE /api/memory/all
-DELETE /api/memory/session
-DELETE /api/memory/{memory_id}
 DELETE /api/permission-rules/{conversation_id}/{rule_id}
 DELETE /api/settings/preferences
 DELETE /api/terminal/{conversation_id}/{session_id}
@@ -30,8 +27,6 @@ GET /api/knowledge/readiness
 GET /api/mcp/memory/graph
 GET /api/mcp/servers
 GET /api/mcp/servers/{server_name}
-GET /api/memory
-GET /api/memory/stats
 GET /api/models
 GET /api/models/capabilities
 GET /api/models/download/{job_id}
@@ -61,7 +56,6 @@ POST /api/mcp/memory/observations
 POST /api/mcp/memory/relations
 POST /api/mcp/memory/search
 POST /api/mcp/servers/{server_name}/reconnect
-POST /api/memory/search
 POST /api/models/download
 POST /api/models/load
 POST /api/models/unload

@@ -14,7 +14,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backend.core.config import AliceConfig
 from backend.core.event_bus import EventBus
@@ -253,11 +253,11 @@ class AppContext:
     # ------------------------------------------------------------------
 
     @property
-    def db(self) -> async_sessionmaker | None:
+    def db(self) -> async_sessionmaker[AsyncSession] | None:
         return self.conversation.db
 
     @db.setter
-    def db(self, value: async_sessionmaker | None) -> None:
+    def db(self, value: async_sessionmaker[AsyncSession] | None) -> None:
         self.conversation.db = value
 
     @property
@@ -383,18 +383,18 @@ class AppContext:
         self.platform.email_service = value
 
     @property
-    def plugin_local_state(self) -> dict[str, dict]:
+    def plugin_local_state(self) -> dict[str, dict[str, Any]]:
         return self.platform.plugin_local_state
 
     @plugin_local_state.setter
-    def plugin_local_state(self, value: dict[str, dict]) -> None:
+    def plugin_local_state(self, value: dict[str, dict[str, Any]]) -> None:
         self.platform.plugin_local_state = value
 
     # ------------------------------------------------------------------
     # Plugin state helpers
     # ------------------------------------------------------------------
 
-    def get_plugin_state(self, name: str) -> MappingProxyType:
+    def get_plugin_state(self, name: str) -> MappingProxyType[str, Any]:
         """Return a read-only view of a plugin's local state.
 
         Args:

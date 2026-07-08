@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backend.core.event_bus import EventBus
 from backend.core.protocols import (
@@ -71,7 +71,7 @@ class KnowledgeServices:
     ``knowledge_service`` is the ONLY consumer-facing entry point (Fase 4);
     the other fields are wiring/readiness/shutdown internals.  The runtime
     repair path (:func:`backend.services.knowledge_init.repair_vector_store`)
-    replaces this WHOLE group atomically (Fase 5)."""
+    replaces this WHOLE group atomically (Fase 5, Task 3)."""
 
     knowledge_service: KnowledgeServiceProtocol | None = None
     memory_service: MemoryServiceProtocol | None = None
@@ -98,7 +98,7 @@ class WorkspaceServices:
 class ConversationServices:
     """Conversation persistence and per-conversation artefacts."""
 
-    db: async_sessionmaker | None = None
+    db: async_sessionmaker[AsyncSession] | None = None
     engine: AsyncEngine | None = None
     context_manager: ContextManagerProtocol | None = None
     plan_service: Any = None
@@ -121,5 +121,5 @@ class PlatformServices:
     plugin_state_repo: Any = None
     preferences_service: PreferencesServiceProtocol | None = None
     email_service: EmailServiceProtocol | None = None
-    plugin_local_state: dict[str, dict] = field(default_factory=dict)
+    plugin_local_state: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""

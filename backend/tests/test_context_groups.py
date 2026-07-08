@@ -71,7 +71,39 @@ class TestFlatDelegation:
         ctx = create_context(config)
         assert ctx.event_bus is ctx.platform.event_bus
 
-    def test_every_flat_field_roundtrips(self, config):
+    def test_every_flat_field_roundtrips_into_its_group(self, config):
+        """Roundtrip AND placement: a cross-group delegation typo would
+        still roundtrip (non-slots dataclasses grow attributes silently),
+        so each sentinel must land on a field DECLARED by the expected
+        group — the executable form of the plan's field→group mapping."""
+        from dataclasses import fields as dc_fields
+
+        group_of: dict[str, str] = {}
+        group_of.update(dict.fromkeys((
+            "llm_service", "stt_service", "tts_service", "lmstudio_manager",
+            "vram_monitor", "model_registry", "model_downloader",
+            "embedding_client",
+        ), "inference"))
+        group_of.update(dict.fromkeys((
+            "knowledge_service", "memory_service", "qdrant_service",
+            "continuum_client", "rag_readiness",
+        ), "knowledge"))
+        group_of.update(dict.fromkeys((
+            "scope_service", "permission_service", "permission_mode_service",
+            "permission_rule_service", "terminal_session_manager",
+        ), "workspace"))
+        group_of.update(dict.fromkeys((
+            "db", "engine", "context_manager", "plan_service",
+            "plan_document_service", "artifact_registry",
+        ), "conversation"))
+        group_of.update(dict.fromkeys((
+            "event_bus", "config_service", "ws_connection_manager",
+            "plugin_manager", "tool_registry", "orchestrator",
+            "plugin_state_repo", "preferences_service", "email_service",
+            "plugin_local_state",
+        ), "platform"))
+        assert set(group_of) == set(AppContext.FLAT_FIELDS)
+
         ctx = create_context(config)
         for name in AppContext.FLAT_FIELDS:
             if name in ("event_bus", "plugin_local_state"):
@@ -79,6 +111,10 @@ class TestFlatDelegation:
             sentinel = object()
             setattr(ctx, name, sentinel)
             assert getattr(ctx, name) is sentinel, name
+            group = getattr(ctx, group_of[name])
+            declared = {f.name for f in dc_fields(group)}
+            assert name in declared, f"{name} not declared on {group_of[name]}"
+            assert getattr(group, name) is sentinel, name
 
 
 class TestGroupSwap:
@@ -94,12 +130,8 @@ class TestGroupSwap:
 
 
 class TestPluginState:
-    def test_get_set_plugin_state_still_work(self, config):
-        import asyncio
-
+    async def test_get_set_plugin_state_still_work(self, config):
         ctx = create_context(config)
-        asyncio.get_event_loop().run_until_complete(
-            ctx.set_plugin_state("demo", "k", 1),
-        )
+        await ctx.set_plugin_state("demo", "k", 1)
         assert dict(ctx.get_plugin_state("demo")) == {"k": 1}
         assert ctx.platform.plugin_local_state["demo"]["k"] == 1

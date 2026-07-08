@@ -10,7 +10,8 @@
 - **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9. È LA fonte di verità.
 - **Fasi 1a, 1b, 2, 3, 4: COMPLETE** — branch impilati NON mergiati e NON pushati per decisione utente
   (4 su 3 su 2 su 1b su 1a): `arch/fase1a-contratti-rest` → `arch/fase1b-ws-schema` →
-  `arch/fase2-persistenza` → `arch/fase3-contenuti` → `arch/fase4-conoscenza` (24 commit).
+  `arch/fase2-persistenza` → `arch/fase3-contenuti` → `arch/fase4-conoscenza`
+  (conteggio e head: `git log --oneline arch/fase3-contenuti..arch/fase4-conoscenza`).
 - **Fase 4 (Conoscenza): COMPLETATA** — review finale di fase «Phase ready with notes», zero fix
   richiesti. Piano chiuso e veritiero con esiti review per task + verdetto finale + backlog:
   `docs/superpowers/plans/2026-07-01-fase4-conoscenza.md`.

@@ -40,7 +40,7 @@ export const useMemoryStore = defineStore('memory', () => {
     error.value = null
     try {
       const data = await api.getMemories({ scope, category, limit, offset })
-      entries.value = data.entries
+      entries.value = data.items
       total.value = data.total
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)

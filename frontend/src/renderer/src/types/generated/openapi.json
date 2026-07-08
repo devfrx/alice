@@ -1135,6 +1135,94 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "KGEntityRead": {
+        "description": "Entity node as returned by the MCP memory server.",
+        "properties": {
+          "entityType": {
+            "title": "Entitytype",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "observations": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Observations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "entityType"
+        ],
+        "title": "KGEntityRead",
+        "type": "object"
+      },
+      "KGGraphResponse": {
+        "description": "Knowledge-graph snapshot (entities + relations).",
+        "properties": {
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/KGEntityRead"
+            },
+            "title": "Entities",
+            "type": "array"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/KGRelationRead"
+            },
+            "title": "Relations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entities",
+          "relations"
+        ],
+        "title": "KGGraphResponse",
+        "type": "object"
+      },
+      "KGMutationResponse": {
+        "description": "Mutation acknowledgement (the client reloads the graph).",
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "KGMutationResponse",
+        "type": "object"
+      },
+      "KGRelationRead": {
+        "description": "Directed relation between two entities.",
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "relationType": {
+            "title": "Relationtype",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "relationType"
+        ],
+        "title": "KGRelationRead",
+        "type": "object"
+      },
       "LoadModelRequest": {
         "description": "Body for ``POST /models/load``.",
         "properties": {
@@ -1202,6 +1290,241 @@
           "model"
         ],
         "title": "LoadModelRequest",
+        "type": "object"
+      },
+      "MemoryDeleteCountResponse": {
+        "description": "Bulk-delete count.",
+        "properties": {
+          "deleted_count": {
+            "title": "Deleted Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted_count"
+        ],
+        "title": "MemoryDeleteCountResponse",
+        "type": "object"
+      },
+      "MemoryDeleteResponse": {
+        "description": "Single-delete acknowledgement.",
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "MemoryDeleteResponse",
+        "type": "object"
+      },
+      "MemoryEntryRead": {
+        "description": "Public representation of a memory entry.",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "scope"
+        ],
+        "title": "MemoryEntryRead",
+        "type": "object"
+      },
+      "MemoryListResponse": {
+        "description": "Paginated memory list (``{items, total}`` convention, spec §6).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntryRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "MemoryListResponse",
+        "type": "object"
+      },
+      "MemorySearchHit": {
+        "description": "Search result: entry + similarity score.",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/MemoryEntryRead"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "entry",
+          "score"
+        ],
+        "title": "MemorySearchHit",
+        "type": "object"
+      },
+      "MemorySearchRequest": {
+        "description": "Body for ``POST /api/memory/search``.",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "MemorySearchRequest",
+        "type": "object"
+      },
+      "MemorySearchResponse": {
+        "description": "Semantic search results.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/MemorySearchHit"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "MemorySearchResponse",
+        "type": "object"
+      },
+      "MemoryStatsResponse": {
+        "description": "Aggregate memory statistics.",
+        "properties": {
+          "by_category": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Category",
+            "type": "object"
+          },
+          "by_scope": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Scope",
+            "type": "object"
+          },
+          "db_size_bytes": {
+            "title": "Db Size Bytes",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "by_scope",
+          "by_category",
+          "db_size_bytes"
+        ],
+        "title": "MemoryStatsResponse",
         "type": "object"
       },
       "ModelStatusResponse": {
@@ -1412,6 +1735,49 @@
           "updated_at"
         ],
         "title": "PlanDocumentResponse",
+        "type": "object"
+      },
+      "RagReadinessResponse": {
+        "description": "RAG/knowledge readiness verdict.",
+        "properties": {
+          "memory_enabled": {
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "tool_rag_enabled": {
+            "title": "Tool Rag Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ready",
+          "reason",
+          "memory_enabled",
+          "tool_rag_enabled"
+        ],
+        "title": "RagReadinessResponse",
+        "type": "object"
+      },
+      "ReembedToolsResponse": {
+        "description": "Outcome of the tool re-embedding trigger.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ReembedToolsResponse",
         "type": "object"
       },
       "RelationInput": {
@@ -2038,6 +2404,61 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VectorStoreCollectionInfo": {
+        "description": "Stats of a single Qdrant collection.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "points_count": {
+            "title": "Points Count",
+            "type": "integer"
+          },
+          "vectors_size": {
+            "title": "Vectors Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "points_count",
+          "vectors_size"
+        ],
+        "title": "VectorStoreCollectionInfo",
+        "type": "object"
+      },
+      "VectorStoreStatsResponse": {
+        "description": "Vector store status + effective RAG readiness.",
+        "properties": {
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/VectorStoreCollectionInfo"
+            },
+            "title": "Collections",
+            "type": "array"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "rag": {
+            "$ref": "#/components/schemas/RagReadinessResponse"
+          }
+        },
+        "required": [
+          "mode",
+          "connected",
+          "collections",
+          "rag"
+        ],
+        "title": "VectorStoreStatsResponse",
         "type": "object"
       },
       "WsAgentCriticInvoked": {
@@ -5894,40 +6315,6 @@
         ],
         "title": "SearchRequest",
         "type": "object"
-      },
-      "backend__api__routes__memory__SearchRequest": {
-        "description": "Body for POST /memory/search.",
-        "properties": {
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category"
-          },
-          "limit": {
-            "default": 10,
-            "maximum": 50.0,
-            "minimum": 1.0,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "query": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Query",
-            "type": "string"
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "title": "SearchRequest",
-        "type": "object"
       }
     }
   },
@@ -7820,9 +8207,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Readiness Api Knowledge Readiness Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RagReadinessResponse"
                 }
               }
             },
@@ -7854,7 +8239,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Delete Entities Api Mcp Memory Entities Delete"
+                  "$ref": "#/components/schemas/KGMutationResponse"
                 }
               }
             },
@@ -7894,7 +8279,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Create Entities Api Mcp Memory Entities Post"
+                  "$ref": "#/components/schemas/KGMutationResponse"
                 }
               }
             },
@@ -7926,7 +8311,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Read Graph Api Mcp Memory Graph Get"
+                  "$ref": "#/components/schemas/KGGraphResponse"
                 }
               }
             },
@@ -7958,7 +8343,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Open Nodes Api Mcp Memory Nodes Post"
+                  "$ref": "#/components/schemas/KGGraphResponse"
                 }
               }
             },
@@ -8000,7 +8385,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Delete Observations Api Mcp Memory Observations Delete"
+                  "$ref": "#/components/schemas/KGMutationResponse"
                 }
               }
             },
@@ -8040,7 +8425,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Add Observations Api Mcp Memory Observations Post"
+                  "$ref": "#/components/schemas/KGMutationResponse"
                 }
               }
             },
@@ -8082,7 +8467,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Delete Relations Api Mcp Memory Relations Delete"
+                  "$ref": "#/components/schemas/KGMutationResponse"
                 }
               }
             },
@@ -8122,7 +8507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Create Relations Api Mcp Memory Relations Post"
+                  "$ref": "#/components/schemas/KGMutationResponse"
                 }
               }
             },
@@ -8164,7 +8549,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Search Nodes Api Mcp Memory Search Post"
+                  "$ref": "#/components/schemas/KGGraphResponse"
                 }
               }
             },
@@ -8303,7 +8688,7 @@
     },
     "/api/memory": {
       "get": {
-        "description": "List memory entries with optional filters.\n\nReturns paginated entries ordered by creation time descending.",
+        "description": "List memory entries with optional filters.",
         "operationId": "list_memories_api_memory_get",
         "parameters": [
           {
@@ -8375,9 +8760,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Memories Api Memory Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryListResponse"
                 }
               }
             },
@@ -8409,11 +8792,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "integer"
-                  },
-                  "title": "Response Delete All Memory Api Memory All Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryDeleteCountResponse"
                 }
               }
             },
@@ -8434,7 +8813,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__memory__SearchRequest"
+                "$ref": "#/components/schemas/MemorySearchRequest"
               }
             }
           },
@@ -8445,9 +8824,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Search Memories Api Memory Search Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemorySearchResponse"
                 }
               }
             },
@@ -8479,11 +8856,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "integer"
-                  },
-                  "title": "Response Delete Session Memory Api Memory Session Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryDeleteCountResponse"
                 }
               }
             },
@@ -8505,9 +8878,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Memory Stats Api Memory Stats Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryStatsResponse"
                 }
               }
             },
@@ -8540,11 +8911,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Delete Memory Api Memory  Memory Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryDeleteResponse"
                 }
               }
             },
@@ -10389,11 +10756,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Reembed Tools Api Vector Store Reembed Tools Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ReembedToolsResponse"
                 }
               }
             },
@@ -10415,9 +10778,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Repair Api Vector Store Repair Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/VectorStoreStatsResponse"
                 }
               }
             },
@@ -10439,9 +10800,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Stats Api Vector Store Stats Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/VectorStoreStatsResponse"
                 }
               }
             },

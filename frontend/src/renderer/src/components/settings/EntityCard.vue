@@ -15,8 +15,8 @@
         </div>
 
         <!-- Observations -->
-        <div v-if="entity.observations.length > 0" class="ec__observations">
-            <div v-for="(obs, idx) in entity.observations" :key="idx" class="ec__obs">
+        <div v-if="(entity.observations ?? []).length > 0" class="ec__observations">
+            <div v-for="(obs, idx) in entity.observations ?? []" :key="idx" class="ec__obs">
                 <span class="ec__obs-text">{{ obs }}</span>
                 <button class="ec__obs-delete" title="Rimuovi osservazione" aria-label="Rimuovi osservazione"
                     @click="$emit('deleteObservation', entity.name, obs)">✕</button>

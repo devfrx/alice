@@ -1,60 +1,31 @@
-﻿/**
- * Memory-related types aligned with the AL\CE backend API.
+/**
+ * memory.ts — Frontend types for the AL\CE memory domain.
  *
- * Every interface here mirrors the JSON shapes returned by
- * `backend/api/routes/memory.py` so the frontend can consume
- * responses without transformation.
+ * Re-exports of the GENERATED OpenAPI schemas (single source of truth:
+ * backend/services/knowledge/schemas.py). Fields with backend defaults
+ * (category, source, created_at, …) are OPTIONAL here — consumers must
+ * use `??` fallbacks.
  */
 
-// ---------------------------------------------------------------------------
-// Entry
-// ---------------------------------------------------------------------------
+import type { ApiSchema } from './generated'
 
 /** Memory entry returned by the API. */
-export interface MemoryEntry {
-  id: string
-  content: string
-  scope: 'long_term' | 'session' | 'user_fact'
-  category: string | null
-  source: 'llm' | 'user' | 'plugin' | null
-  created_at: string
-  expires_at: string | null
-  conversation_id: string | null
-}
-
-// ---------------------------------------------------------------------------
-// Search
-// ---------------------------------------------------------------------------
+export type MemoryEntry = ApiSchema<'MemoryEntryRead'>
 
 /** Search result with similarity score. */
-export interface MemorySearchResult {
-  entry: MemoryEntry
-  score: number
-}
-
-// ---------------------------------------------------------------------------
-// Stats
-// ---------------------------------------------------------------------------
+export type MemorySearchResult = ApiSchema<'MemorySearchHit'>
 
 /** Memory statistics. */
-export interface MemoryStats {
-  total: number
-  by_scope: Record<string, number>
-  by_category: Record<string, number>
-  db_size_bytes: number
-}
+export type MemoryStats = ApiSchema<'MemoryStatsResponse'>
 
-// ---------------------------------------------------------------------------
-// REST response helpers
-// ---------------------------------------------------------------------------
-
-/** Memory list response. */
-export interface MemoryListResponse {
-  entries: MemoryEntry[]
-  total: number
-}
+/** Memory list response ({items, total}). */
+export type MemoryListResponse = ApiSchema<'MemoryListResponse'>
 
 /** Memory search response. */
-export interface MemorySearchResponse {
-  results: MemorySearchResult[]
-}
+export type MemorySearchResponse = ApiSchema<'MemorySearchResponse'>
+
+/** Single-delete acknowledgement. */
+export type MemoryDeleteResponse = ApiSchema<'MemoryDeleteResponse'>
+
+/** Bulk-delete count. */
+export type MemoryDeleteCountResponse = ApiSchema<'MemoryDeleteCountResponse'>

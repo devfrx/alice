@@ -5,27 +5,18 @@
  * at `/api/mcp/memory/*`.
  */
 
+import type { ApiSchema } from './generated'
+
 // ── Core entities ─────────────────────────────────────────────────────────
 
-/** A single entity in the knowledge graph. */
-export interface KGEntity {
-  name: string
-  entityType: string
-  observations: string[]
-}
+/** An entity node in the knowledge graph. */
+export type KGEntity = ApiSchema<'KGEntityRead'>
 
 /** A directed relation between two entities. */
-export interface KGRelation {
-  from: string
-  to: string
-  relationType: string
-}
+export type KGRelation = ApiSchema<'KGRelationRead'>
 
-/** The full knowledge graph structure. */
-export interface KGGraph {
-  entities: KGEntity[]
-  relations: KGRelation[]
-}
+/** The full knowledge graph structure (entities + relations). */
+export type KGGraph = ApiSchema<'KGGraphResponse'>
 
 // ── Request payloads ──────────────────────────────────────────────────────
 

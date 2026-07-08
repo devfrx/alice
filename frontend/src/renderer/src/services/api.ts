@@ -36,7 +36,9 @@ import type { AuditConfirmationsResponse } from '../types/audit'
 import type {
   MemoryListResponse,
   MemorySearchResponse,
-  MemoryStats
+  MemoryStats,
+  MemoryDeleteResponse,
+  MemoryDeleteCountResponse
 } from '../types/memory'
 import type { McpReconnectResponse, McpServersResponse } from '../types/mcp'
 import type {
@@ -656,16 +658,16 @@ export const api = {
     }),
 
   /** Delete a single memory entry by ID. */
-  deleteMemory: (id: string): Promise<{ deleted: true }> =>
-    request<{ deleted: true }>(`/memory/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteMemory: (id: string): Promise<MemoryDeleteResponse> =>
+    request<MemoryDeleteResponse>(`/memory/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   /** Clear all session-scoped memories. */
-  clearSessionMemory: (): Promise<{ deleted_count: number }> =>
-    request<{ deleted_count: number }>('/memory/session', { method: 'DELETE' }),
+  clearSessionMemory: (): Promise<MemoryDeleteCountResponse> =>
+    request<MemoryDeleteCountResponse>('/memory/session', { method: 'DELETE' }),
 
   /** Clear ALL memories (every scope). */
-  clearAllMemory: (): Promise<{ deleted_count: number }> =>
-    request<{ deleted_count: number }>('/memory/all', { method: 'DELETE' }),
+  clearAllMemory: (): Promise<MemoryDeleteCountResponse> =>
+    request<MemoryDeleteCountResponse>('/memory/all', { method: 'DELETE' }),
 
   /** Load memory statistics. */
   getMemoryStats: (): Promise<MemoryStats> =>
@@ -704,8 +706,8 @@ export const api = {
     }),
 
   /** Create new entities. */
-  createKGEntities: (payload: CreateEntitiesPayload): Promise<KGGraph> =>
-    request<KGGraph>('/mcp/memory/entities', {
+  createKGEntities: (payload: CreateEntitiesPayload): Promise<unknown> =>
+    request<unknown>('/mcp/memory/entities', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -718,8 +720,8 @@ export const api = {
     }),
 
   /** Create relations between entities. */
-  createKGRelations: (payload: CreateRelationsPayload): Promise<KGGraph> =>
-    request<KGGraph>('/mcp/memory/relations', {
+  createKGRelations: (payload: CreateRelationsPayload): Promise<unknown> =>
+    request<unknown>('/mcp/memory/relations', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

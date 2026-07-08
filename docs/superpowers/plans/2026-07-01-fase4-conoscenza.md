@@ -1879,6 +1879,8 @@ Atteso: check-contracts verde (eseguito DOPO il commit — untracked = dirty).
 
 ### Task 11: Smoke e2e + chiusura fase
 
+> **Esito (2026-07-08, eseguito dal controller):** DONE. Smoke e2e reale con backend avviato: `GET /api/knowledge/readiness` → verdetto tipizzato (`ready=false`, reason esplicativa: embedding API di LM Studio non in esecuzione — scenario previsto); `GET /api/vector-store/stats` → shape tipizzata completa (mode=embedded, 2 collections reali, rag annidato); `GET /api/memory?limit=5` → **`{items, total}` con 2 memorie REALI** serializzate dai KnowledgeDoc; `GET /api/mcp/memory/graph` → 503 tipizzato atteso (server MCP non connesso). `POST /api/memory/search` → 500 con embedding API giù: verificato dal traceback che è la catena `service→composite→qdrant_backend→MemoryService.search→embedder.encode` — comportamento IDENTICO al pre-fase (la vecchia route non aveva try/except; la UI gate su readiness) → backlog, non regressione. CLAUDE.md aggiornato in ENTRAMBI i punti (bullet AppContext + bullet Qdrant/knowledge → KnowledgeService). Gate finale: 228 test backend mirati + contracts, typecheck 0, vitest 259/259.
+
 **Files:**
 - Modify: `CLAUDE.md` (bullet Qdrant/knowledge)
 - Modify: questo piano (esiti per task)
@@ -1941,12 +1943,12 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 
 ## Criteri di uscita della fase
 
-- [ ] `KnowledgeService` unico ingresso: nessun consumer fuori da `services/knowledge/` tocca `knowledge_backend`/`memory_service` (guardie grep Task 9 verdi).
-- [ ] `ContinuumClient` costruito in UN solo punto (`core/app.py`).
-- [ ] Plugin memory = guscio sottile (5 tool, zero logica di persistenza propria); note tools continuum su `knowledge_service`.
-- [ ] Route memory/knowledge/vector-store/mcp-memory tipizzate; baseline ratchet −19; regen + check-contracts verdi.
-- [ ] FE su tipi generati per memoria, KG e vector store; typecheck 0; vitest verdi.
-- [ ] App avviabile; smoke e2e del dominio (readiness, stats, lista/search memoria) verificato.
+- [x] `KnowledgeService` unico ingresso: nessun consumer fuori da `services/knowledge/` tocca `knowledge_backend`/`memory_service` (guardie grep Task 9 verdi; alias `KnowledgeBackendProtocol` eliminato).
+- [x] `ContinuumClient` costruito in UN solo punto (`core/app.py`); fallback di knowledge_init e plugin continuum eliminati.
+- [x] Plugin memory = guscio sottile (5 tool, zero logica di persistenza propria; handler su `svc` narrowed, mypy 0); note tools continuum su `knowledge_service` (mypy 0 su plugins/continuum).
+- [x] Route memory/knowledge/vector-store/mcp-memory tipizzate; baseline ratchet −19 (zero voci del dominio residue); regen + check-contracts verdi.
+- [x] FE su tipi generati per memoria, KG e vector store; typecheck 0; vitest 259/259.
+- [x] App avviabile; smoke e2e del dominio verificato con dati reali (readiness, stats, lista memoria `{items,total}`; search 500 solo a embedding giù = parità pre-fase, a backlog).
 
 ## Backlog emerso (fuori scope fase 4)
 
@@ -1955,6 +1957,7 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 - (review Task 5, pre-esistente) `_format_memory_context`: se la prima riga eccede il budget la sezione viene iniettata header-only nel system prompt; il budget non conta header né separatori `\n` (`context_max_chars` non è un hard cap). Sistemare se/quando serve un cap rigoroso.
 - (review Task 7) Consolidare la costruzione duplicata di `RagReadinessResponse` (readiness route vs `_rag_status`) in un classmethod `from_readiness` e unificare le grafie "not initialized"/"not initialised" — DOPO il regen del Task 10 (tocca una stringa visibile in UI). mypy residuo su vector_store: `_get_ctx` Any-return + `QdrantServiceProtocol` senza `in_memory` (protocol gap, fase 5).
 - (review Task 10) `stores/memory.ts` senza spec vitest (rename `items` coperto solo da typecheck + smoke e2e): aggiungere `memory.spec.ts` (mock `api.getMemories`, pin del decremento di `clearSessionMemory`). Tipizzare le 6 mutazioni KG in `api.ts` con `ApiSchema<'KGMutationResponse'>` in un solo passaggio. `v-if` sul badge source vuoto in MemoryManager.
+- (smoke Task 11, pre-esistente) `POST /api/memory/search` risponde 500 quando l'embedding API è giù ma il memory service è wired (readiness.memory_enabled=False non gate la route REST — solo il turno la rispetta via `memory_ok`). Parità col pre-fase; valutare un 503 coerente col readiness in fase 5/6.
 
 - `api/routes/mcp_memory.py` importa `McpClientPlugin` (TYPE_CHECKING) e pesca il plugin dal plugin_manager — violazione §4 "route ↛ plugin internals" da sanare in fase 5 con un service/protocol MCP.
 - `MemoryService.list` con offset fa scroll O(offset) su Qdrant (pre-esistente); valutare cursor-based nella UI se le memorie crescono.

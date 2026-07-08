@@ -5,8 +5,9 @@ Qdrant store cannot be opened (e.g. data written by an incompatible
 ``qdrant-client`` version), the lifespan leaves ``ctx.qdrant_service`` /
 ``ctx.memory_service`` as ``None`` and the RAG stack disabled.  This module
 clears the embedded store, re-initialises Qdrant + memory + the knowledge
-service, re-points tool-RAG at the fresh services, recomputes readiness and
-broadcasts ``knowledge.status``.
+service, then atomically swaps the knowledge service group, re-points
+tool-RAG at the fresh services, recomputes readiness and broadcasts
+``knowledge.status``.
 
 Plugins read ``ctx.knowledge_service`` lazily on every call, so re-wiring
 the context is sufficient — no plugin re-initialisation is required.
@@ -21,6 +22,7 @@ from typing import Any
 
 from loguru import logger
 
+from backend.core.service_groups import KnowledgeServices
 from backend.services.qdrant_service import QdrantService
 from backend.services.rag_readiness import RagReadiness, check_rag_readiness
 
@@ -38,7 +40,7 @@ async def _emit_knowledge_status(ctx: Any, readiness: RagReadiness) -> None:
 
 
 async def repair_vector_store(ctx: Any) -> RagReadiness:
-    """Reset the embedded vector store and re-wire the RAG stack in place.
+    """Reset the embedded vector store and atomically swap the knowledge group.
 
     Destructive: clears persisted embedded vectors (memories/facts are
     regenerable).  Never raises — returns the recomputed
@@ -54,46 +56,45 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
     """
     config = ctx.config
 
-    # 1. Tear down the old client (if any), clear stale data, re-initialise.
+    # 1. Tear down the old client (if any; read BEFORE the swap below), clear
+    # stale data, re-initialise. Built in a local — not assigned to ctx yet.
     old = getattr(ctx, "qdrant_service", None)
     if old is not None:
         with contextlib.suppress(Exception):
             await old.close()
 
-    qdrant = QdrantService(config.qdrant)
-    qdrant.clear_embedded_data()
+    qdrant_service: Any = QdrantService(config.qdrant)
+    qdrant_service.clear_embedded_data()
     try:
-        await qdrant.initialize()
-        ctx.qdrant_service = qdrant
+        await qdrant_service.initialize()
         logger.info(
             "Repair: Qdrant re-initialised (mode={})", config.qdrant.mode,
         )
     except Exception as exc:
         logger.warning("Repair: Qdrant re-init failed: {}", exc)
         with contextlib.suppress(Exception):
-            await qdrant.close()
-        ctx.qdrant_service = None
+            await qdrant_service.close()
+        qdrant_service = None
 
-    # 2. Re-create the memory service when Qdrant is healthy.
-    ctx.memory_service = None
-    if config.memory.enabled and ctx.qdrant_service is not None:
+    # 2. Re-create the memory service when Qdrant is healthy. Local only.
+    memory_service: Any = None
+    if config.memory.enabled and qdrant_service is not None:
         from backend.services.memory_service import MemoryService
 
         memory_service = MemoryService(
             config.memory,
-            ctx.qdrant_service,
+            qdrant_service,
             ctx.embedding_client,
             embedding_model=config.qdrant.embedding_model,
         )
         try:
             await memory_service.initialize()
-            ctx.memory_service = memory_service
             logger.info("Repair: memory service re-initialised")
         except Exception as exc:
             logger.warning("Repair: memory service re-init failed: {}", exc)
             with contextlib.suppress(Exception):
                 await memory_service.close()
-            ctx.memory_service = None
+            memory_service = None
 
     # 3. Re-wire the knowledge service (reusing the shared Continuum client).
     from backend.services.knowledge.service import build_knowledge_service
@@ -106,10 +107,22 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
         logger.warning(
             "Repair: continuum enabled but no shared client — notes disabled",
         )
-    ctx.knowledge_service = build_knowledge_service(
+    knowledge_service = build_knowledge_service(
         continuum_enabled=config.continuum.enabled and client is not None,
-        memory_service=ctx.memory_service,
+        memory_service=memory_service,
         continuum_client=client,
+    )
+
+    # 3b. Swap the WHOLE knowledge group atomically: readers holding the
+    # old group keep a coherent (stale) view; readers dereferencing ctx
+    # see only the fully-wired new group. This closes the partial-state
+    # window the in-place rewiring had (Fase 4 review backlog).
+    ctx.knowledge = KnowledgeServices(
+        knowledge_service=knowledge_service,
+        memory_service=memory_service,
+        qdrant_service=qdrant_service,
+        continuum_client=client,
+        rag_readiness=None,
     )
 
     # 4. Point tool-RAG at the new backends and re-embed (best-effort).
@@ -123,7 +136,11 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
         except Exception as exc:
             logger.warning("Repair: tool registry refresh failed: {}", exc)
 
-    # 5. Recompute readiness and broadcast it.
+    # 5. Recompute readiness and broadcast it. This reads the group already
+    # swapped in step 3b (ctx.qdrant_service/memory_service resolve through
+    # the NEW group) and the tool registry refreshed in step 4, so it must
+    # run after both — hence the additive write here rather than folding
+    # `rag_readiness` into the KnowledgeServices literal above.
     readiness = await check_rag_readiness(ctx)
     ctx.rag_readiness = readiness
     await _emit_knowledge_status(ctx, readiness)

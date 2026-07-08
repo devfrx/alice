@@ -18,13 +18,16 @@ carrying the reason.
 from __future__ import annotations
 
 import contextlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from backend.core.service_groups import KnowledgeServices
 from backend.services.qdrant_service import QdrantService
 from backend.services.rag_readiness import RagReadiness, check_rag_readiness
+
+if TYPE_CHECKING:
+    from backend.services.memory_service import MemoryService
 
 
 async def _emit_knowledge_status(ctx: Any, readiness: RagReadiness) -> None:
@@ -63,21 +66,22 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
         with contextlib.suppress(Exception):
             await old.close()
 
-    qdrant_service: Any = QdrantService(config.qdrant)
-    qdrant_service.clear_embedded_data()
+    new_qdrant = QdrantService(config.qdrant)
+    new_qdrant.clear_embedded_data()
+    qdrant_service: QdrantService | None = new_qdrant
     try:
-        await qdrant_service.initialize()
+        await new_qdrant.initialize()
         logger.info(
             "Repair: Qdrant re-initialised (mode={})", config.qdrant.mode,
         )
     except Exception as exc:
         logger.warning("Repair: Qdrant re-init failed: {}", exc)
         with contextlib.suppress(Exception):
-            await qdrant_service.close()
+            await new_qdrant.close()
         qdrant_service = None
 
     # 2. Re-create the memory service when Qdrant is healthy. Local only.
-    memory_service: Any = None
+    memory_service: MemoryService | None = None
     if config.memory.enabled and qdrant_service is not None:
         from backend.services.memory_service import MemoryService
 
@@ -114,9 +118,11 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
     )
 
     # 3b. Swap the WHOLE knowledge group atomically: readers holding the
-    # old group keep a coherent (stale) view; readers dereferencing ctx
-    # see only the fully-wired new group. This closes the partial-state
-    # window the in-place rewiring had (Fase 4 review backlog).
+    # old group keep a coherent (stale) view — though its qdrant client is
+    # already closed, so operations through it fail as they always did
+    # mid-repair; readers dereferencing ctx see only the fully-wired new
+    # group. This closes the partial-state window the in-place rewiring
+    # had (Fase 4 review backlog).
     ctx.knowledge = KnowledgeServices(
         knowledge_service=knowledge_service,
         memory_service=memory_service,

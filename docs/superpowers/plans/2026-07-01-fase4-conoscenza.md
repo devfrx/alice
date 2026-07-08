@@ -1027,6 +1027,8 @@ git commit -m "refactor(chat): contesto memorie del turno via KnowledgeService" 
 
 ### Task 6: Route `/api/memory` tipizzate e deleganti (baseline −6)
 
+> **Esito (2026-07-08):** DONE. Spec review: conforme (parità query param/status code verbatim; baseline −6 esatte; `_serialize_entry`/`_get_memory_service` morti senza riferimenti residui). Quality review (top): "Ready: Yes" + fix applicati dal controller: fixture `_build_app` ora wired SEMPRE (il 503 disabled esercita `memory_available=False` come in produzione, non il ramo `svc is None` che in produzione esiste solo pre-wiring — coperto da test dedicato), test `DELETE /all` aggiunto, `getattr` difensivo rimosso dalla route. Nota reviewer: TOCTOU MIGLIORATO (lo snapshot del service è immutabile per request). Incidente corretto dal controller: l'implementer aveva convertito il file di test a CRLF — rinormalizzato a LF (`8f74780`), convenzione repo `i/lf`. Gate: 18 test pass (16 memory + 2 ratchet), mypy 0 su route+schemas. Commit `40cbed2` + `8f74780` + fix nel commit di esito.
+
 **Files:**
 - Create: `backend/services/knowledge/schemas.py`
 - Rewrite: `backend/api/routes/memory.py`

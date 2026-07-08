@@ -30,7 +30,7 @@ router = APIRouter(prefix="/memory", tags=["memory"])
 def _get_knowledge_service(request: Request) -> KnowledgeServiceProtocol:
     """Extract the knowledge service from app context or raise 503."""
     ctx = request.app.state.context
-    svc: KnowledgeServiceProtocol | None = getattr(ctx, "knowledge_service", None)
+    svc: KnowledgeServiceProtocol | None = ctx.knowledge_service
     if svc is None or not svc.memory_available:
         raise HTTPException(status_code=503, detail="Memory service not available")
     return svc

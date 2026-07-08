@@ -1337,6 +1337,8 @@ git commit -m "refactor(memory): route deleganti a KnowledgeService, response ti
 
 ### Task 7: `/api/knowledge/readiness` + `/api/vector-store*` tipizzate (baseline −4)
 
+> **Esito (2026-07-08):** DONE. Spec review: conforme (logica byte-identica, stringhe reason originali preservate incluse le due grafie, status code invariati; mypy 3 errori PRE-esistenti riprodotti sul parent). Quality review (top): "Ready: Yes", soli minor — applicato dal controller il one-liner `mode: str` (mypy 3→2, restanti fuori scope: `_get_ctx` Any-return e `in_memory` mancante nel protocol). Verificato dal reviewer: il FE NON matcha sulle stringhe `reason` (solo display). Backlog: consolidare `RagReadinessResponse.from_readiness` + unificare le grafie DOPO il regen del Task 10. Gate: ratchet verde, app boot ok. Commit `9fb0bf5` + fix nel commit di esito.
+
 **Files:**
 - Rewrite: `backend/api/routes/knowledge.py`
 - Modify: `backend/api/routes/vector_store.py`
@@ -1943,6 +1945,7 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 - (review Task 2) `repair_vector_store` senza test diretto: pinnare l'invariante nuovo "continuum enabled ma `ctx.continuum_client=None` → stack memory-only + warning + `ctx.knowledge_service` coerente" (serve monkeypatch di QdrantService; valutare al Task 9 o in fase 5).
 - (review Task 4) `ContinuumPlugin.execute_tool` gate TUTTI i tool (note inclusi) su `self._client is None` prima del dispatch a `execute_note_tool`: se client e knowledge_service venissero mai disaccoppiati, i note tool fallirebbero col messaggio sbagliato pur essendo funzionanti. Valutare di anteporre il check `NOTE_TOOL_NAMES`. Inoltre `initialize()` è senza test diretto (le fixture iniettano `_client`).
 - (review Task 5, pre-esistente) `_format_memory_context`: se la prima riga eccede il budget la sezione viene iniettata header-only nel system prompt; il budget non conta header né separatori `\n` (`context_max_chars` non è un hard cap). Sistemare se/quando serve un cap rigoroso.
+- (review Task 7) Consolidare la costruzione duplicata di `RagReadinessResponse` (readiness route vs `_rag_status`) in un classmethod `from_readiness` e unificare le grafie "not initialized"/"not initialised" — DOPO il regen del Task 10 (tocca una stringa visibile in UI). mypy residuo su vector_store: `_get_ctx` Any-return + `QdrantServiceProtocol` senza `in_memory` (protocol gap, fase 5).
 
 - `api/routes/mcp_memory.py` importa `McpClientPlugin` (TYPE_CHECKING) e pesca il plugin dal plugin_manager — violazione §4 "route ↛ plugin internals" da sanare in fase 5 con un service/protocol MCP.
 - `MemoryService.list` con offset fa scroll O(offset) su Qdrant (pre-esistente); valutare cursor-based nella UI se le memorie crescono.

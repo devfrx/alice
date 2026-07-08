@@ -98,7 +98,7 @@ async def _build_stats(ctx: AppContext) -> VectorStoreStatsResponse:
                 vectors_size=0,
             ))
 
-    mode = ctx.config.qdrant.mode
+    mode: str = ctx.config.qdrant.mode
     if ctx.qdrant_service.in_memory:
         mode = "in-memory (fallback)"
 

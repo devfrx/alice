@@ -61,6 +61,8 @@
 
 ### Task 1: `service_groups.py` + `AppContext` radice sottile con property deleganti
 
+> **Esito (2026-07-08):** DONE. Spec review: conforme (mappatura 34/34 verificata programmaticamente, bijezione FLAT_FIELDS↔gruppi, delega esaustiva; unica deviazione = riordino import di ruff). Quality review (top): "With fixes" — applicati dal controller in `c859291`: test plugin-state reso `async def` (get_event_loop deprecato, nota del piano il cui trigger era scattato), roundtrip test esteso con asserzione di PLACEMENT sul gruppo atteso (un typo cross-gruppo roundtrippava comunque — la mappatura del piano ora è eseguibile), type-args mypy-strict (`async_sessionmaker[AsyncSession]`, `dict[str, dict[str, Any]]`, `MappingProxyType[str, Any]`: mypy 7→0 sui due file core), docstring KnowledgeServices ancorata a "Task 3". Verifiche del reviewer: parità dataclass→classe su TUTTI i pattern consumer rischiosi (spec-mock, getattr-guard, nessun asdict/pickle/repr), design dello swap regge (nessun capture long-lived dei campi knowledge). Note per il futuro registrate nel backlog (snapshot di gruppo nel hot-path RAG; fixture spec-mock alla migrazione consumer). Gate: 39 test pass, ruff/mypy 0 sui file nuovi, boot ok, EOL i/lf. Commit `c1ce580` + `c859291`.
+
 **Files:**
 - Create: `backend/core/service_groups.py`
 - Rewrite: `backend/core/context.py`

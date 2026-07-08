@@ -986,6 +986,8 @@ git commit -m "refactor(kernel): bootstrap dichiarativo a stage, lifespan sottil
 
 ### Task 3: Repair a swap atomico del gruppo Knowledge + protocol gap `in_memory`
 
+> **Esito (2026-07-09):** DONE. Spec review: conforme (parità semantica branch-by-branch verificata; UNA sola assegnazione `ctx.knowledge` + sola scrittura additiva `rag_readiness`; tear-down pre-swap; mai un secondo ContinuumClient; monkeypatch MemoryService correttamente sul modulo sorgente per l'import deferred). Quality review (top): "With fixes" — verdetto chiave del reviewer: NESSUN interleaving costruibile in cui un reader osserva uno stato peggiore del pre-Task-3; la finestra post-swap con `rag_readiness=None` è un MIGLIORAMENTO stretto (prima: verdetto stantio su servizi semi-ricablati). Fix applicati dal controller in `95c2b2c`: invariante del test esteso a TUTTI e 5 i campi del vecchio gruppo (una regressione a UNA sola scrittura in-place ora fallisce il test), 2 test nuovi (memoria fallita con qdrant sano + re-point tool-RAG sui backend NUOVI — la riga load-bearing dello step 4), locali tipizzati (`QdrantService | None` via widening esplicito, `MemoryService | None` con TYPE_CHECKING; mypy 0 reale sul file), clausola onesta nel commento 3b (il client qdrant del vecchio gruppo è già chiuso). Backlog: repair concorrente non serializzato (lock a livello route, pre-esistente) + `memory_service` vecchio non chiuso (parità pre-fase). Gate: 27 test pass, boot ok, EOL i/lf. Commit `0b17d59` + `95c2b2c`.
+
 **Files:**
 - Modify: `backend/services/knowledge_init.py` (repair su gruppo)
 - Modify: `backend/core/protocols.py` (`QdrantServiceProtocol.in_memory`)

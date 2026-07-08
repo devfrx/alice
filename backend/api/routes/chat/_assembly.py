@@ -437,7 +437,7 @@ class TurnAssembler:
                 fp = Path(att["file_path"])
                 att["_bytes"] = await asyncio.to_thread(fp.read_bytes)
 
-        # --- retrieve relevant memories (Phase 9) -----------------
+        # --- retrieve relevant memories -----------------------------
         aux_parts: list[str] = []
         if (
             ctx.knowledge_service is not None

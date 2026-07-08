@@ -34,3 +34,10 @@ def test_truncates_at_max_chars() -> None:
     out = _format_memory_context(hits, 60)
     assert "x" * 50 in out
     assert "y" * 50 not in out
+
+
+def test_line_exactly_at_max_chars_is_included() -> None:
+    # "- [a] " + 50 chars = 56; the budget check is strict (>), so a line
+    # that lands exactly on max_chars must still be included.
+    out = _format_memory_context([_hit("x" * 50, "a")], 56)
+    assert "x" * 50 in out

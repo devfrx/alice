@@ -891,6 +891,8 @@ git commit -m "refactor(continuum): note tools su KnowledgeService, client condi
 
 ### Task 5: Contesto memoria nel turno via `knowledge_service`
 
+> **Esito (2026-07-02):** DONE. Spec review: conforme (blocco chirurgico; semantica di troncatura identica; fallback categoria equivalente via `_memory_entry_to_doc`; nessun ciclo di import). Quality review (top): "Ready: Yes" — no-op comportamentale verificato sull'intera catena (stesso search sottostante, threshold/ordering invariati; il RuntimeError da unwiring a metà turno cade nello stesso `except` di prima). Nit applicati dal controller: test sul confine esatto del budget (`==` incluso, `>` escluso) e commento "(Phase 9)" rimosso. Pre-esistente → backlog: header-only block se la prima riga eccede il budget + budget che ignora header/separatori. Gate: 4 test pass. Commit `5052868` + nit nel commit di esito.
+
 **Files:**
 - Modify: `backend/api/routes/chat/_helpers.py:285-302` (`_format_memory_context`)
 - Modify: `backend/api/routes/chat/_assembly.py:440-463` (retrieval memorie)
@@ -1938,6 +1940,7 @@ git commit -m "docs: fase4 - CLAUDE.md su KnowledgeService, tick criteri di usci
 
 - (review Task 2) `repair_vector_store` senza test diretto: pinnare l'invariante nuovo "continuum enabled ma `ctx.continuum_client=None` → stack memory-only + warning + `ctx.knowledge_service` coerente" (serve monkeypatch di QdrantService; valutare al Task 9 o in fase 5).
 - (review Task 4) `ContinuumPlugin.execute_tool` gate TUTTI i tool (note inclusi) su `self._client is None` prima del dispatch a `execute_note_tool`: se client e knowledge_service venissero mai disaccoppiati, i note tool fallirebbero col messaggio sbagliato pur essendo funzionanti. Valutare di anteporre il check `NOTE_TOOL_NAMES`. Inoltre `initialize()` è senza test diretto (le fixture iniettano `_client`).
+- (review Task 5, pre-esistente) `_format_memory_context`: se la prima riga eccede il budget la sezione viene iniettata header-only nel system prompt; il budget non conta header né separatori `\n` (`context_max_chars` non è un hard cap). Sistemare se/quando serve un cap rigoroso.
 
 - `api/routes/mcp_memory.py` importa `McpClientPlugin` (TYPE_CHECKING) e pesca il plugin dal plugin_manager — violazione §4 "route ↛ plugin internals" da sanare in fase 5 con un service/protocol MCP.
 - `MemoryService.list` con offset fa scroll O(offset) su Qdrant (pre-esistente); valutare cursor-based nella UI se le memorie crescono.

@@ -1738,6 +1738,8 @@ git commit -m "refactor(layering): calendar/MCP/terminal senza import route->plu
 
 ### Task 8: import-linter — contratti §4 in locale e in CI
 
+> **Esito (2026-07-10):** DONE, eseguito direttamente dal controller (configurazione a contenuto prescritto, gate auto-verificante). `import-linter==2.13`/`grimp==3.15` installati via uv (il venv non ha pip — usare `uv pip install`). Due aggiustamenti rispetto al TOML del piano, entrambi nel perimetro approvato: (1) l'entry `backend.core.bootstrap.* -> backend.api.*` inizialmente RIMOSSA per il fail "No matches" (nota c del piano), poi RIPRISTINATA con wildcard corretto — il problema era la sintassi, non l'assenza dell'import (bootstrap.surfaces importa `api.ws_schema.guard`); (2) i wildcard `*` di grimp matchano UN solo livello: gli import reali sono più profondi (`api.middleware.exception_handler`, `services.knowledge.service`) → `backend.core.app -> backend.api.**`, `bootstrap.* -> services.**`, `bootstrap.* -> api.**` (ricorsivi); `managed_services.* -> services.*` resta a un livello (sufficiente, verificato dal linter stesso). **Risultato: `Analyzed 454 files, 2605 dependencies — Contracts: 6 kept, 0 broken`**. Step CI inserito in contracts.yml tra "Contract tests" e "Generated artifacts are fresh" (import-linter arriva dal gruppo dev già installato dallo step venv). EOL i/lf. Commit `ef900ff`.
+
 **Files:**
 - Modify: `backend/pyproject.toml` (dev dep + `[tool.importlinter]`)
 - Modify: `.github/workflows/contracts.yml` (nuovo step)

@@ -13,18 +13,14 @@ from typing import Any
 from loguru import logger
 
 from backend.core.config import LLMConfig
-from backend.core.plugin_models import ConnectionStatus
 from backend.core.protocols import EmbeddingClientProtocol, QdrantServiceProtocol
-from backend.core.tools.availability import AvailabilityProbe
+from backend.core.tools.availability import (
+    USABLE_STATUSES,
+    AvailabilityProbe,
+    compose_available_tools,
+)
 from backend.core.tools.catalog import ToolCatalog
 from backend.core.vector_collections import COLLECTION_TOOLS, PROJECT_NS
-
-# Connection statuses treated as "the plugin can serve this tool".
-_USABLE_STATUSES = (
-    ConnectionStatus.CONNECTED,
-    ConnectionStatus.DEGRADED,
-    ConnectionStatus.UNKNOWN,
-)
 
 
 class ToolRag:
@@ -33,16 +29,23 @@ class ToolRag:
     Args:
         catalog: The tool catalog (definitions + owning-plugin lookup).
         availability: The availability probe (per-plugin connection status).
+        llm_config: LLM configuration supplying ``priority_plugins``.
     """
 
-    def __init__(self, catalog: ToolCatalog, availability: AvailabilityProbe) -> None:
+    def __init__(
+        self,
+        catalog: ToolCatalog,
+        availability: AvailabilityProbe,
+        *,
+        llm_config: LLMConfig | None = None,
+    ) -> None:
         self._catalog = catalog
         self._availability = availability
         self._logger = logger.bind(component="ToolRag")
 
         self._qdrant: QdrantServiceProtocol | None = None
         self._embedder: EmbeddingClientProtocol | None = None
-        self._llm_config: LLMConfig | None = None
+        self._llm_config = llm_config
 
     def set_vector_backends(
         self,
@@ -61,31 +64,6 @@ class ToolRag:
     def has_vector_backends(self) -> bool:
         """Whether both the Qdrant service and the embedding client are wired."""
         return bool(self._qdrant and self._embedder)
-
-    async def _get_available_tools(self) -> list[dict[str, Any]]:
-        """Available-tools composition used internally as a RAG fallback.
-
-        Mirrors ``ToolRegistry.get_available_tools`` (which stays on the
-        facade as the public entry point): tools whose owning plugin is
-        CONNECTED, DEGRADED or UNKNOWN, status resolved once per plugin via
-        :class:`AvailabilityProbe` (bounded + cached), never once per tool.
-        """
-        async with self._catalog.lock:
-            cache_snapshot = list(self._catalog.openai_cache)
-            plugin_map_snapshot = dict(self._catalog.tool_to_plugin)
-
-        plugin_names = {p for p in plugin_map_snapshot.values() if p}
-        statuses = await self._availability.resolve_plugin_statuses(plugin_names)
-
-        available: list[dict[str, Any]] = []
-        for entry in cache_snapshot:
-            ns_name: str = entry["function"]["name"]
-            plugin_name = plugin_map_snapshot.get(ns_name)
-            if plugin_name is None:
-                continue
-            if statuses.get(plugin_name) in _USABLE_STATUSES:
-                available.append(entry)
-        return available
 
     # ------------------------------------------------------------------
     # Tool RAG — embed & retrieve
@@ -126,9 +104,9 @@ class ToolRag:
         vectors = await self._embedder.encode_batch(texts)
 
         # Upsert tool points
+        from qdrant_client import models as qmodels
         points: list[Any] = []
         for ns_name, vector in zip(names, vectors):
-            from qdrant_client import models as qmodels
             tool_def = tools_snapshot[ns_name]
             fmt = tool_def.to_openai_format()
             fmt["function"]["name"] = ns_name
@@ -195,7 +173,7 @@ class ToolRag:
             OpenAI-format tool definitions.
         """
         if not self._qdrant or not self._embedder:
-            return await self._get_available_tools()
+            return await compose_available_tools(self._catalog, self._availability)
 
         try:
             vector = await self._embedder.encode(query)
@@ -203,7 +181,7 @@ class ToolRag:
             self._logger.warning(
                 "Embedding failed, falling back to full tools: {}", exc,
             )
-            return await self._get_available_tools()
+            return await compose_available_tools(self._catalog, self._availability)
 
         try:
             hits = await self._qdrant.search(
@@ -213,14 +191,14 @@ class ToolRag:
             self._logger.warning(
                 "Qdrant search failed, falling back to full tools: {}", exc,
             )
-            return await self._get_available_tools()
+            return await compose_available_tools(self._catalog, self._availability)
 
         if not hits:
             # Empty collection (e.g. embed_tools hasn't run yet)
             self._logger.debug(
                 "Tool RAG returned 0 hits, falling back to full tools",
             )
-            return await self._get_available_tools()
+            return await compose_available_tools(self._catalog, self._availability)
 
         # Collect tool names from hits
         hit_names: set[str] = set()
@@ -273,7 +251,7 @@ class ToolRag:
             if not is_hit and not is_priority and not is_always:
                 continue
 
-            if statuses.get(plugin_name) not in _USABLE_STATUSES:
+            if statuses.get(plugin_name) not in USABLE_STATUSES:
                 continue
 
             if ns_name not in seen:

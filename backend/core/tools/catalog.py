@@ -98,7 +98,8 @@ class ToolCatalog:
 
         Iterates every loaded plugin, validates each tool definition,
         and stores them under a namespaced key.  Duplicate namespaced
-        names across plugins raise ``ValueError``.
+        names across plugins are skipped with a warning (first
+        registration wins).
         """
         async with self._lock:
             new_tools: dict[str, ToolDefinition] = {}

@@ -26,7 +26,6 @@ from backend.core.config import LLMConfig
 from backend.core.event_bus import EventBus
 from backend.core.plugin_manager import PluginManager
 from backend.core.plugin_models import (
-    ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
     ToolResult,
@@ -34,6 +33,7 @@ from backend.core.plugin_models import (
 from backend.core.protocols import EmbeddingClientProtocol, QdrantServiceProtocol
 from backend.core.tools import AvailabilityProbe, ToolCatalog, ToolExecutor, ToolRag
 from backend.core.tools import policy as _policy
+from backend.core.tools.availability import compose_available_tools
 
 # ---------------------------------------------------------------------------
 # ToolRegistry
@@ -67,9 +67,8 @@ class ToolRegistry:
         self._catalog = ToolCatalog()
         self._availability = AvailabilityProbe(plugin_manager)
         self._executor = ToolExecutor(self._catalog, plugin_manager, event_bus)
-        self._rag = ToolRag(self._catalog, self._availability)
+        self._rag = ToolRag(self._catalog, self._availability, llm_config=llm_config)
         self._rag.set_vector_backends(qdrant_service, embedding_client)
-        self._rag._llm_config = llm_config
 
     # ------------------------------------------------------------------
     # Test-compat aliases for private state (backlog: migrate tests off
@@ -110,7 +109,8 @@ class ToolRegistry:
 
         Iterates every loaded plugin, validates each tool definition,
         and stores them under a namespaced key.  Duplicate namespaced
-        names across plugins raise ``ValueError``.
+        names across plugins are skipped with a warning (first
+        registration wins).
         """
         await self._catalog.refresh(self._plugin_manager)
 
@@ -166,26 +166,7 @@ class ToolRegistry:
         Returns:
             Filtered list of OpenAI-format tool dicts.
         """
-        async with self._catalog.lock:
-            cache_snapshot = list(self._catalog.openai_cache)
-            plugin_map_snapshot = dict(self._catalog.tool_to_plugin)
-
-        plugin_names = {p for p in plugin_map_snapshot.values() if p}
-        statuses = await self._availability.resolve_plugin_statuses(plugin_names)
-
-        available: list[dict[str, Any]] = []
-        for entry in cache_snapshot:
-            ns_name: str = entry["function"]["name"]
-            plugin_name = plugin_map_snapshot.get(ns_name)
-            if plugin_name is None:
-                continue
-            if statuses.get(plugin_name) in (
-                ConnectionStatus.CONNECTED,
-                ConnectionStatus.DEGRADED,
-                ConnectionStatus.UNKNOWN,
-            ):
-                available.append(entry)
-        return available
+        return await compose_available_tools(self._catalog, self._availability)
 
     async def get_tools_for_plugins(
         self, plugin_names: set[str],

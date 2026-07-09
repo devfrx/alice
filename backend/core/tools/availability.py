@@ -9,11 +9,22 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from backend.core.plugin_manager import PluginManager
 from backend.core.plugin_models import ConnectionStatus
+
+if TYPE_CHECKING:
+    from backend.core.tools.catalog import ToolCatalog
+
+# Connection statuses treated as "the plugin can serve this tool".
+USABLE_STATUSES = (
+    ConnectionStatus.CONNECTED,
+    ConnectionStatus.DEGRADED,
+    ConnectionStatus.UNKNOWN,
+)
 
 
 class AvailabilityProbe:
@@ -110,3 +121,39 @@ class AvailabilityProbe:
                 plugin_name, exc,
             )
             return ConnectionStatus.DISCONNECTED
+
+
+async def compose_available_tools(
+    catalog: ToolCatalog, availability: AvailabilityProbe,
+) -> list[dict[str, Any]]:
+    """Return tools whose owning plugin has a usable connection status.
+
+    The catalog × availability composition shared by the facade's
+    ``get_available_tools`` and tool-RAG's fallback branches: snapshot the
+    OpenAI cache under the catalog lock, resolve each owning plugin's
+    status once (bounded + cached, never once per tool), keep tools whose
+    plugin status is in :data:`USABLE_STATUSES`.
+
+    Args:
+        catalog: The tool catalog (definitions + owning-plugin lookup).
+        availability: The availability probe (per-plugin connection status).
+
+    Returns:
+        Filtered list of OpenAI-format tool dicts.
+    """
+    async with catalog.lock:
+        cache_snapshot = list(catalog.openai_cache)
+        plugin_map_snapshot = dict(catalog.tool_to_plugin)
+
+    plugin_names = {p for p in plugin_map_snapshot.values() if p}
+    statuses = await availability.resolve_plugin_statuses(plugin_names)
+
+    available: list[dict[str, Any]] = []
+    for entry in cache_snapshot:
+        ns_name: str = entry["function"]["name"]
+        plugin_name = plugin_map_snapshot.get(ns_name)
+        if plugin_name is None:
+            continue
+        if statuses.get(plugin_name) in USABLE_STATUSES:
+            available.append(entry)
+    return available

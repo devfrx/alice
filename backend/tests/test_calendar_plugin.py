@@ -15,7 +15,8 @@ from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus, AliceEvent
 from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
-from backend.plugins.calendar.plugin import CalendarEvent, CalendarPlugin
+from backend.plugins.calendar.plugin import CalendarPlugin
+from backend.services.calendar_events import CalendarEvent
 
 
 # ---------------------------------------------------------------------------

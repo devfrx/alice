@@ -3,7 +3,7 @@
 The execution layer for the scoped terminal.  It launches an **already
 validated** ``argv`` in an **already validated** working directory and captures
 the result *safely and boundedly*.  It is the deliberate counterpart to
-:mod:`backend.plugins.terminal.security`: that module decides *whether* a
+:mod:`backend.services.terminal.security`: that module decides *whether* a
 command may run; this one decides *how* it runs so that it can never exceed its
 time, memory, or process budget.  This module performs **no** input validation
 and never imports :mod:`.security` — the trust boundary (tokenised argv, in-scope

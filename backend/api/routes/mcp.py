@@ -2,29 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from backend.core.context import AppContext
 from backend.core.event_bus import AliceEvent
-
-if TYPE_CHECKING:
-    from backend.plugins.mcp_client.plugin import McpClientPlugin
+from backend.services.mcp_gateway import get_mcp_client
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
-
-
-def _get_mcp_plugin(ctx: AppContext) -> McpClientPlugin | None:
-    """Retrieve the McpClientPlugin from the plugin manager.
-
-    Returns:
-        The McpClientPlugin instance, or None if not loaded.
-    """
-    if ctx.plugin_manager is None:
-        return None
-    return ctx.plugin_manager.get_plugin("mcp_client")
 
 
 @router.get("/servers")
@@ -43,7 +30,7 @@ async def list_mcp_servers(request: Request) -> dict[str, Any]:
         for s in ctx.config.mcp.servers
     ]
 
-    plugin = _get_mcp_plugin(ctx)
+    plugin = get_mcp_client(ctx)
     statuses: dict[str, str] = {}
     if plugin:
         statuses = await plugin.get_status()
@@ -83,7 +70,7 @@ async def get_mcp_server(
             detail=f"MCP server '{server_name}' not found",
         )
 
-    plugin = _get_mcp_plugin(ctx)
+    plugin = get_mcp_client(ctx)
     statuses: dict[str, str] = {}
     if plugin:
         statuses = await plugin.get_status()
@@ -113,7 +100,7 @@ async def reconnect_mcp_server(
     """Attempt to reconnect to a specific MCP server."""
     ctx: AppContext = request.app.state.context
 
-    plugin = _get_mcp_plugin(ctx)
+    plugin = get_mcp_client(ctx)
     if plugin is None:
         raise HTTPException(
             status_code=503,

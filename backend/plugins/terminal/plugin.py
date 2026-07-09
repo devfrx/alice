@@ -1,7 +1,7 @@
 """AL\\CE — Scoped terminal plugin (Fase 6d).
 
 Ties the already-built, separately-reviewed security primitives
-(:mod:`backend.plugins.terminal.security`) and the bounded subprocess executor
+(:mod:`backend.services.terminal.security`) and the bounded subprocess executor
 (:mod:`backend.plugins.terminal.executor`) into a native :class:`BasePlugin`
 that exposes a single tool, ``run_terminal_command``.
 
@@ -40,7 +40,7 @@ from backend.core.plugin_models import (
 )
 from backend.core.screenshot_lockout import get_lockout
 from backend.plugins.terminal.executor import TerminalResult, run_command
-from backend.plugins.terminal.security import (
+from backend.services.terminal.security import (
     build_argv,
     ensure_sandbox,
     validate_cwd_within_scope,

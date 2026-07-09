@@ -48,6 +48,14 @@ class LLMServiceProtocol(Protocol):
         """Build the full system prompt with optional persona + memory context."""
         ...
 
+    def get_scoped_system_prompt(
+        self,
+        base_prompt_path: str,
+        memory_context: str | None = None,
+    ) -> str:
+        """Build a task-scoped system prompt from an ALTERNATE base file."""
+        ...
+
     def build_messages(
         self,
         user_content: str,
@@ -80,6 +88,8 @@ class LLMServiceProtocol(Protocol):
         memory_context: str | None = None,
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
+        response_format: dict[str, Any] | None = None,
+        temperature: float | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion, yielding event dicts."""
         ...
@@ -94,6 +104,14 @@ class LLMServiceProtocol(Protocol):
         self, lmstudio_manager: Any = None,
     ) -> int:
         """Return the active model's context window size in tokens."""
+        ...
+
+    def get_cached_context_window(self, lmstudio_manager: Any = None) -> int:
+        """Non-blocking context-window read (background refresh)."""
+        ...
+
+    def invalidate_context_window_cache(self) -> None:
+        """Drop the cached context window (next read re-probes)."""
         ...
 
     async def close(self) -> None:

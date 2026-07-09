@@ -57,7 +57,6 @@ Tools with `risk_level="forbidden"` are blocked at the tool loop level and canno
 ```yaml
 # config/default.yaml
 pc_automation:
-  enabled: false          # Must be explicitly enabled
   screenshot_lockout_s: 60
   command_timeout_s: 30
   max_command_output_chars: 500

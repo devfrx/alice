@@ -182,3 +182,12 @@ def test_removed_legacy_keys_are_stripped() -> None:
     assert "enabled" not in data["pc_automation"]
     assert "sound_enabled" not in data["notifications"]
     assert data["pc_automation"]["command_timeout_s"] == 30
+
+
+def test_stale_flag_survives_full_aliceconfig_construction() -> None:
+    """Fase 5: extra=forbid does not break when a dead flag reaches AliceConfig."""
+    from backend.core.config import AliceConfig
+
+    cfg = AliceConfig(voice={"wake_word": "alice", "voice_confirmation_enabled": True})
+    assert not hasattr(cfg.voice, "voice_confirmation_enabled")
+    assert cfg.voice.wake_word == "alice"

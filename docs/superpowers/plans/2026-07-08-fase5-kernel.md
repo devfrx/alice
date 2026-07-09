@@ -1900,6 +1900,10 @@ git commit -m "docs: fase5 - CLAUDE.md su gruppi/bootstrap/split/linter, esiti e
 
 ---
 
+## Review finale di fase (2026-07-10, modello top, range `arch/fase4-conoscenza..HEAD`)
+
+> **Verdetto: «Phase ready with notes» — zero fix richiesti.** Angolo cross-task: (1) gruppi/bootstrap/repair coerenti — nessuna referenza stale oltre lo swap (ToolRag ri-puntato dal repair via set_vector_backends; continuum_client costruito UNA volta nel bootstrap e riusato; embedding_client in Inference = stabile per costruzione); (2) facade registry vs facade LLM: divergenza di ownership dello stato (registry delega tutto, LLM tiene la context-window cache) GIUSTIFICATA dai vincoli di test binding su entrambi i lati → backlog di armonizzazione quando i test migreranno; (3) tutte le 7 ignore di import-linter VIVE, catene import di core/tools e services/llm rispettano lo spirito §4; (4) flag-registry e CLAUDE.md accurati vs codice; (5) zero morti (ruff F,E9 pulito sui file rifattorizzati; normalize_history re-export vivo; protocol allineati); (6) 59 file nel range, tutti attinenti, trailer su tutti i commit. Verifiche eseguite dal reviewer: lint-imports 6 kept, 18 test cross-task pass, boot 122 route.
+
 ## Criteri di uscita della fase (spec §9)
 
 1. Test mirati verdi su tutti i domini toccati (lista Task 9) + `tests/contracts/` verdi.
@@ -1917,3 +1921,7 @@ git commit -m "docs: fase5 - CLAUDE.md su gruppi/bootstrap/split/linter, esiti e
 4. Valutare lo spostamento di `usage_guidance_for` dal facade registry al prompt assembly (è composizione prompt, non catalogo).
 5. `mcp.py`: tipizzare le route MCP (`response_model`) e assorbire il burn-down ratchet del dominio (fasi 5-6 backlog fase 4, voce 1).
 6. Ereditati dalle fasi precedenti (handoff): 500→503 search a embedding giù; `MemoryService.list` offset O(n); eventi bulk delete artifacts; live-update whiteboard; CAD `export_url` (fase 6); export conversazioni a modello; `AgentTier` duplicato FE; vitest in CI; orb-era UI da eliminare (fase 6).
+7. (review finale) Armonizzare l'ownership dello stato dei due facade (registry delega tutto ai componenti, LLM tiene la context-window cache in proprio) quando i test vincolanti saranno migrati ai moduli — stessa voce dei punti 2 di questo backlog.
+8. (review finale) Le 4 lint di stile pre-esistenti spostate verbatim nei moduli nuovi (`SIM105`×2, `B905` in core/tools, `UP041` in bootstrap/senses) — pulizia opportunistica da una riga ciascuna, non più coperte dall'alibi "monolite legacy".
+9. (task 6) Guardia anti-drift per `docs/flag-registry.md` (test che enumeri i bool `enabled` del config model e ne verifichi la presenza nel registro); `test_plugins_enabled_list` rosso ereditato (21 plugin reali vs 20 attesi — fallisce identico sulla base fase 4, aggiornare l'atteso).
+10. (task 5, quality review) Footgun latente: `_client` httpx iniettato per riferimento in resolver/client — se un futuro hot-reload riassegnasse `svc._client`, ricostruire l'intero LLMService (come stt/tts), mai riassegnare il campo.

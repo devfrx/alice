@@ -110,10 +110,8 @@ voice:
   activation_mode: "push_to_talk"  # push_to_talk | wake_word | always_on
   silence_timeout_ms: 1500
   auto_tts_response: true
-  voice_confirmation_enabled: true
 
 pc_automation:
-  enabled: false
   screenshot_lockout_s: 60
   command_timeout_s: 30
   max_command_output_chars: 500
@@ -196,7 +194,6 @@ clipboard:
 
 notifications:
   app_id: 'AL\CE'
-  sound_enabled: true
   default_timeout_s: 5
   max_active_timers: 20
 

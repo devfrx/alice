@@ -166,3 +166,19 @@ def test_lmstudio_style_key_deepseek_reasoning() -> None:
     llm = LLMConfig(model="deepseek/deepseek-r1-0528-qwen3-8b")
     assert llm.supports_thinking is True
     assert llm.supports_vision is False
+
+
+def test_removed_legacy_keys_are_stripped() -> None:
+    """Fase 5: dead flags are stripped per-layer before model validation."""
+    from backend.core.config import migrate_legacy_config_keys
+
+    data = {
+        "voice": {"wake_word": "alice", "voice_confirmation_enabled": True},
+        "pc_automation": {"enabled": False, "command_timeout_s": 30},
+        "notifications": {"sound_enabled": True, "app_id": "AL\\CE"},
+    }
+    migrate_legacy_config_keys(data)
+    assert "voice_confirmation_enabled" not in data["voice"]
+    assert "enabled" not in data["pc_automation"]
+    assert "sound_enabled" not in data["notifications"]
+    assert data["pc_automation"]["command_timeout_s"] == 30

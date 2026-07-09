@@ -297,7 +297,7 @@ class LLMService:
     async def close(self) -> None:
         """Close the underlying httpx client and release caches."""
         await self._client.aclose()
-        self._llm_client._response_ids.clear()
+        self._llm_client.clear_response_ids()
         self._resolver.invalidate_model_cache()
         logger.debug("LLMService httpx client closed")
 

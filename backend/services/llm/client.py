@@ -55,6 +55,8 @@ class LLMClient:
         self._resolver = resolver
         self._model_registry = model_registry
         self._prompts = prompts
+        # Derived from the (runtime-immutable) config — ModelResolver
+        # derives the same flag independently; not shared mutable state.
         self._is_ollama = config.provider == "ollama"
         self._response_ids: OrderedDict[str, str] = OrderedDict()
         self._response_ids_max = 500
@@ -66,6 +68,10 @@ class LLMClient:
         # avoid a wasted round-trip on every classifier/planner/critic
         # call.
         self._supports_response_format: bool | None = None
+
+    def clear_response_ids(self) -> None:
+        """Drop the per-conversation response-id chain (used on close)."""
+        self._response_ids.clear()
 
     # ------------------------------------------------------------------
     # Streaming chat — public dispatcher

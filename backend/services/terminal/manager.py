@@ -39,9 +39,9 @@ from typing import Any
 from loguru import logger
 
 from backend.core.config import WorkspaceScopeConfig
-from backend.services.terminal.security import ensure_sandbox, validate_cwd_within_scope
 from backend.services.terminal.job import ProcessJob
 from backend.services.terminal.pty_backend import PtyProcess, spawn_pty
+from backend.services.terminal.security import ensure_sandbox, validate_cwd_within_scope
 from backend.services.terminal.session import TerminalSession
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None]]

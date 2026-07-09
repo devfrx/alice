@@ -9,7 +9,7 @@ nothing here imports from ``backend.plugins``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from fastapi import HTTPException
 
@@ -49,7 +49,12 @@ def get_mcp_client(ctx: AppContext) -> McpClientProtocol | None:
     plugin = ctx.plugin_manager.get_plugin("mcp_client")
     if plugin is None:
         return None
-    return cast("McpClientProtocol", plugin)  # structural: McpClientPlugin satisfies the protocol
+    # Structural: McpClientPlugin satisfies the protocol implicitly; the
+    # isinstance check (method PRESENCE only, thanks to runtime_checkable)
+    # turns a future rename into a clean 503 instead of an AttributeError.
+    if not isinstance(plugin, McpClientProtocol):
+        return None
+    return plugin
 
 
 def require_mcp_session(ctx: AppContext, server_name: str) -> McpSession:

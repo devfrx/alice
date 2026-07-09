@@ -6,7 +6,7 @@ The historical monolithic ``LLMService`` is split by responsibility:
   OpenAI-compatible SSE, non-streaming completion).
 - :mod:`prompting` — system-prompt composition and message building.
 - :mod:`model_resolution` — capability selection: ``"auto"`` model
-  resolution and the context-window cache, collaborating with
+  resolution and the per-model capability profile, collaborating with
   :class:`~backend.services.model_capability_registry.ModelCapabilityRegistry`.
 
 ``backend.services.llm_service.LLMService`` remains the facade every

@@ -104,10 +104,14 @@ export class WebSocketManager {
         return
       }
 
-      // Legacy generic dispatch, keyed by the frame's own `type` field.
-      // Only meaningful for non-chat consumers (see class docstring) since
-      // `useChat.ts` uses `onFrame` exclusively for contract messages.
-      this.emit(data.type ?? 'message', data)
+      // Legacy generic dispatch, keyed by the frame's own `type` field —
+      // only when NO typed consumer is attached (the voice channel's second
+      // WebSocketManager instance). On the chat singleton this is suppressed:
+      // otherwise a contract frame whose type collides with a socket-level
+      // event name ('error', 'connected', …) would corrupt connection state.
+      if (this.frameHandlers.length === 0) {
+        this.emit(data.type ?? 'message', data)
+      }
 
       // Typed exhaustive dispatch for the chat contract.
       for (const handler of this.frameHandlers.slice()) {

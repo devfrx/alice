@@ -11,8 +11,10 @@
  *
  * The composable:
  * - Connects on setup AND disconnects when the calling scope is disposed.
- * - Listens for `token`, `done`, and `error` WS events, forwarding them
- *   into the chat store so the UI stays reactive.
+ * - Dispatches every chat-WS frame through an exhaustive typed handler map
+ *   (`ChatHandlerMap` over `ChatServerMessage['type']`) into the chat and
+ *   agent-run stores, so the UI stays reactive and new backend frames fail
+ *   compilation until handled.
  * - Exposes a `sendMessage` helper that optimistically adds the user
  *   message to the store then sends it over the socket.
  */
@@ -117,8 +119,13 @@ export function useChat(): UseChatReturn {
     }
   }
 
-  const onSocketError = (): void => {
-    connectionStatus.value = 'error'
+  const onSocketError = (payload?: unknown): void => {
+    // Defensive: only genuine socket-level errors (native Events) may flip
+    // the connection status. Server-side `error` FRAMES are handled by the
+    // typed map and must never be mistaken for a broken socket.
+    if (payload instanceof Event) {
+      connectionStatus.value = 'error'
+    }
   }
 
   const onReconnectFailed = (): void => {
@@ -292,7 +299,11 @@ export function useChat(): UseChatReturn {
   }
 
   const dispatchFrame = (frame: ChatServerMessage): void => {
-    const handler = handlers[frame.type] as ((msg: ChatServerMessage) => void) | undefined
+    // Own-property lookup: a frame type like 'constructor' must hit the
+    // safety net below, not the Object prototype chain.
+    const handler = Object.prototype.hasOwnProperty.call(handlers, frame.type)
+      ? (handlers[frame.type] as (msg: ChatServerMessage) => void)
+      : undefined
     if (handler) {
       handler(frame)
     } else {

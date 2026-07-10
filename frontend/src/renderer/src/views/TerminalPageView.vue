@@ -38,6 +38,9 @@ interface TermHandle {
   fit: FitAddon
   unsub: () => void
   ro: ResizeObserver | null
+  /** Owning conversation, captured at attach time (resize frames must not
+   *  target the newly selected conversation during a switch). */
+  conv: string
 }
 const terms = new Map<string, TermHandle>()
 const hostEls = new Map<string, HTMLElement>()
@@ -90,7 +93,7 @@ function ensureTerm(session: TerminalSession): void {
   const ro = new ResizeObserver(() => fitAndReport(session.id))
   ro.observe(host)
 
-  terms.set(session.id, { term, fit, unsub, ro })
+  terms.set(session.id, { term, fit, unsub, ro, conv })
   fitAndReport(session.id)
 }
 
@@ -102,8 +105,7 @@ function fitAndReport(sessionId: string): void {
   } catch {
     return
   }
-  const conv = conversationId.value
-  if (conv) store.sendResize(conv, sessionId, handle.term.rows, handle.term.cols)
+  store.sendResize(handle.conv, sessionId, handle.term.rows, handle.term.cols)
 }
 
 function disposeTerm(sessionId: string): void {
@@ -143,7 +145,9 @@ async function openNew(): Promise<void> {
 }
 
 async function killSession(sessionId: string): Promise<void> {
-  const conv = conversationId.value
+  // Use the session's own conversation (not the currently selected one) so a
+  // click racing a conversation switch still targets the right PTY.
+  const conv = sessions.value.find((s) => s.id === sessionId)?.conversation_id
   if (!conv) return
   try {
     await store.kill(conv, sessionId)
@@ -153,7 +157,7 @@ async function killSession(sessionId: string): Promise<void> {
 }
 
 async function assignToAgent(sessionId: string): Promise<void> {
-  const conv = conversationId.value
+  const conv = sessions.value.find((s) => s.id === sessionId)?.conversation_id
   if (!conv) return
   try {
     await store.assign(conv, sessionId)
@@ -228,9 +232,19 @@ onBeforeUnmount(() => {
     <!-- Disabled capability -->
     <UiEmptyState
       v-if="!store.enabled"
-      icon="embedding"
+      icon="terminal"
       title="Terminale disabilitato"
       subtitle="Abilita il terminale nella configurazione (terminal.enabled) per usarlo."
+    />
+
+    <!-- Standalone page can be reached with no active conversation: the
+         terminal is per-conversation, so ask for one instead of showing a
+         dead-end disabled button. -->
+    <UiEmptyState
+      v-else-if="conversationId === null"
+      icon="terminal"
+      title="Nessuna conversazione attiva"
+      subtitle="Il terminale è legato a una conversazione: aprine una dalla sidebar per usarlo."
     />
 
     <!-- Enabled -->
@@ -306,7 +320,7 @@ onBeforeUnmount(() => {
         />
         <UiEmptyState
           v-if="sessions.length === 0"
-          icon="embedding"
+          icon="terminal"
           title="Nessun terminale aperto"
           subtitle="Apri un terminale per lavorare nella cartella dello scope."
         >

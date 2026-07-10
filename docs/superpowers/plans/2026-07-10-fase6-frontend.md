@@ -58,6 +58,8 @@
 
 ### Task 1: Terminale standalone — `views/TerminalPageView.vue` + route `/terminal`
 
+> **Esito (2026-07-10):** DONE. Spec review: conforme (diff verificata riga-per-riga contro TerminalModule: solo le 4 modifiche prescritte; route/sidebar/icona verbatim; TerminalModule intatto). Quality review (top): "Approved with nits" — fix applicati dal controller in un commit successivo: (1) IMPORTANT: stato vuoto dedicato per `conversationId === null` (su pagina standalone era un vicolo cieco col bottone disabilitato; ora UiEmptyState "Nessuna conversazione attiva"); (2) race del ResizeObserver su switch conversazione: `TermHandle.conv` catturato all'attach, `fitAndReport`/`killSession`/`assignToAgent` usano la conversazione della SESSIONE, non quella corrente; (3) `icon="embedding"` → `icon="terminal"` nei 3 UiEmptyState. Verificati dal reviewer: lifecycle/dispose corretti, replay buffer su rientro, subscribe multi-consumer sicuro, layout 100% su route non-assistant, icona solar esistente. Nit a11y (role=tab senza tastiera) → backlog. Commit `fb20090` + fix del controller.
+
 Additivo: l'app resta identica, il terminale diventa raggiungibile anche fuori dal Workspace. (Il modulo tile verrà rimosso nel Task 2.)
 
 **Files:**

@@ -11,7 +11,7 @@
  * and delegates mutations back through events / store actions.
  */
 import { computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
 import { useUIStore } from '../../stores/ui'
@@ -19,6 +19,7 @@ import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
 import { useToast } from '../../composables/useToast'
 import { chatApi } from '../../services/api'
+import { commandRegistry } from '../../commands'
 import BrandThemeToggle from '../branding/BrandThemeToggle.vue'
 import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
@@ -37,7 +38,6 @@ const props = withDefaults(defineProps<{ docked?: boolean }>(), { docked: false 
 const chatStore = useChatStore()
 const uiStore = useUIStore()
 const emailStore = useEmailStore()
-const router = useRouter()
 const route = useRoute()
 const { confirm } = useModal()
 const toast = useToast()
@@ -82,45 +82,30 @@ function toggle(): void {
 // Conversation actions (delegated to store)
 // -----------------------------------------------------------------------
 
-/** Select an existing conversation and make sure Horizon is on screen. */
+/** Select an existing conversation via the command layer. */
 async function onSelect(id: string): Promise<void> {
   try {
-    await chatStore.loadConversation(id)
+    await commandRegistry.execute('conversation.open', { conversation_id: id })
   } catch (err) {
-    console.error(`[AppSidebar] Failed to load conversation ${id}:`, err)
-    return
-  }
-  const current = router.currentRoute.value.name as string
-  if (current !== 'assistant') {
-    try {
-      await router.push('/assistant')
-    } catch (err) {
-      console.error('[AppSidebar] Navigation failed:', err)
-    }
+    console.error(`[AppSidebar] Failed to open conversation ${id}:`, err)
   }
 }
 
 /**
- * Go to the Home affordance — a fresh conversation on Horizon. Only spin up
- * a fresh draft when the current conversation already has content, so we
- * never leave a trail of empty chats; an already-empty conversation is
- * reused as-is.
+ * Go to the Home affordance — a fresh conversation on Horizon via the command
+ * layer; reuses an already-empty conversation by only creating when the
+ * current one has content.
  */
 async function onHome(): Promise<void> {
   toggle()
-  if (chatStore.messages.length > 0) {
-    try {
-      await chatStore.createConversation()
-    } catch (err) {
-      console.error('[AppSidebar] Failed to start a new conversation:', err)
+  try {
+    if (chatStore.messages.length > 0) {
+      await commandRegistry.execute('conversation.new', {})
+    } else {
+      await commandRegistry.execute('view.switch', { view: 'assistant' })
     }
-  }
-  if (router.currentRoute.value.name !== 'assistant') {
-    try {
-      await router.push('/assistant')
-    } catch (err) {
-      console.error('[AppSidebar] Home navigation failed:', err)
-    }
+  } catch (err) {
+    console.error('[AppSidebar] Home action failed:', err)
   }
 }
 
@@ -132,13 +117,10 @@ async function onHome(): Promise<void> {
  * conversation, so this never leaves a trail of blank chats.
  */
 async function onCreate(): Promise<void> {
-  await chatStore.createConversation()
-  if (router.currentRoute.value.name !== 'assistant') {
-    try {
-      await router.push('/assistant')
-    } catch (err) {
-      console.error('[AppSidebar] New-conversation navigation failed:', err)
-    }
+  try {
+    await commandRegistry.execute('conversation.new', {})
+  } catch (err) {
+    console.error('[AppSidebar] Failed to start a new conversation:', err)
   }
 }
 

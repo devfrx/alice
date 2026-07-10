@@ -13,6 +13,7 @@ import { useEventsWebSocket } from './composables/useEventsWebSocket'
 import { useSettingsStore } from './stores/settings'
 import { usePluginsStore } from './stores/plugins'
 import { waitForBackend } from './services/api'
+import { commandRegistry, installCoreCommands } from './commands'
 
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
@@ -24,6 +25,15 @@ const settingsStore = useSettingsStore()
 const pluginsStore = usePluginsStore()
 const router = useRouter()
 const route = useRoute()
+
+// Register the core UI commands once for the app lifetime (spec §7 registry;
+// the agent-facing manifest arrives in Fase 7). `commandRegistry` is a
+// module-level singleton, so under HMR this setup block can re-run without
+// the module being reloaded — guard on `has()` so a hot reload doesn't throw
+// DuplicateCommandError and break dev.
+if (!commandRegistry.has('view.switch')) {
+  installCoreCommands(router)
+}
 
 /**
  * Horizon chrome (centered layout + surface-0 backdrop) is keyed off the

@@ -1330,6 +1330,8 @@ DOPO il commit: `.\scripts\check-contracts.ps1` → PASS.
 
 ### Task 7: Lint sanato a fondo (errori + endOfLine + riformattazione completa)
 
+> **Esito (2026-07-11):** DONE. Commit `7439ff9` (169 file, +11144/−9048): `endOfLine: auto`, override `triple-slash-reference` per `**/*.d.ts`, 12 errori veri corretti a mano (return type espliciti su 7 file; parametri PROVATAMENTE morti rimossi: `_strokeWidth` di getIconSvgString con 3 call-site, `_userMessageId` di finalizeStream col caller; `props` inutilizzato; import `TransitionGroup` ridondante), riformattazione completa + `eslint --fix`, 3 `v-html` giustificati con disable e verifica del pipeline (markdown-it `html:false` + escape verificati; AppIcon = registry statico). **`npm run lint` = exit 0, 0 problemi.** QUINTO incidente EOL del programma intercettato IN CORSA dall'implementer (un run di `eslint --fix .` ha flippato 2 file a CRLF in modo non riproducibile — ripristinati e rieseguito; evidenza: set `i/crlf` identico prima/dopo, diff ±2 righe = solo trailing-newline). Quality review mirata ai soli hand-fix (il reformat è meccanico): Approved — entrambi i parametri rimossi provati morti nel sorgente pre-commit, annotazioni verificate chiave-per-chiave (incl. il return object di useCalendar), giustificazioni v-html fattualmente accurate, spot-check `-w` su 3 file senza cambi a livello token. Gate: lint 0/0, typecheck, 153 test, check-contracts PASS (generati non toccati dal reformat). Nota: 4 file pre-esistenti `i/lf w/crlf` (index.html, types/mcp.ts, types/plugin.ts, markdownRenderer.ts) documentati e lasciati stare.
+
 **Files:**
 - Modify: `frontend/.prettierrc.yaml`, `frontend/eslint.config.mjs`, i file con errori residui, l'intero renderer (riformattazione)
 
@@ -1393,6 +1395,8 @@ git commit -m "style(fe): repo-wide prettier reformat, endOfLine auto, fix remai
 ---
 
 ### Task 8: Gate CI frontend (lint + vitest) + `memory.spec.ts`
+
+> **Esito (2026-07-11):** DONE, eseguito dal CONTROLLER (task di configurazione con gate auto-verificanti, raffinamento fase 5). `memory.spec.ts` scritto sulle shape REALI dei tipi generati (MemoryEntryRead/MemorySearchHit/MemoryStatsResponse verificati in api.d.ts — zero cast, 9 test: lista, errori catturati senza throw, delete con rollback-assenza, clear sessione/tutto, search+clear, stats, search fallita) e due step aggiunti a contracts.yml dopo il typecheck (`npm run lint`, `npm test`). Gate: typecheck verde, 21 file/162 test verdi, lint exit 0 silenzioso.
 
 **Files:**
 - Create: `frontend/src/renderer/src/stores/memory.spec.ts`

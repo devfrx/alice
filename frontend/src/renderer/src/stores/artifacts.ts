@@ -223,6 +223,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
       items.value = []
       contents.value = {}
       total.value = 0
+      fetchedConversations.value.clear()
       return
     }
     for (const id of artifactIds) removeLocal(id)

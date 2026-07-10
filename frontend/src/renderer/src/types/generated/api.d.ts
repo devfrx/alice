@@ -2630,7 +2630,7 @@ export interface components {
             observations?: string[];
         };
         EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"];
-        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsArtifactsBulkDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
+        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsArtifactBulkDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
         /**
          * ExportedAttachment
          * @description One attachment inside an exported message.
@@ -3390,6 +3390,39 @@ export interface components {
             type: "agent.warning";
         };
         /**
+         * WsArtifactBulkDeleted
+         * @description Bulk artifact deletion (conversation cleanup or full wipe).
+         *
+         *     ``conversation_id`` is ``None`` for the delete-all wipe.  Pinned
+         *     artifacts of a deleted conversation survive detached
+         *     (``conversation_id=NULL``) and are NOT listed in ``artifact_ids``.
+         */
+        WsArtifactBulkDeleted: {
+            /** Artifact Ids */
+            artifact_ids: string[];
+            /**
+             * Conversation Id
+             * @default null
+             */
+            conversation_id?: string | null;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "artifact.bulk_deleted";
+        };
+        /**
          * WsArtifactCreated
          * @description A new artifact was registered in the artifacts registry.
          */
@@ -3472,39 +3505,6 @@ export interface components {
              * @enum {string}
              */
             type: "artifact.updated";
-        };
-        /**
-         * WsArtifactsBulkDeleted
-         * @description Bulk artifact deletion (conversation cleanup or full wipe).
-         *
-         *     ``conversation_id`` is ``None`` for the delete-all wipe.  Pinned
-         *     artifacts of a deleted conversation survive detached
-         *     (``conversation_id=NULL``) and are NOT listed in ``artifact_ids``.
-         */
-        WsArtifactsBulkDeleted: {
-            /** Artifact Ids */
-            artifact_ids: string[];
-            /**
-             * Conversation Id
-             * @default null
-             */
-            conversation_id?: string | null;
-            /**
-             * Correlation Id
-             * @default null
-             */
-            correlation_id?: string | null;
-            /**
-             * Origin
-             * @default system
-             * @enum {string}
-             */
-            origin?: "user" | "agent" | "system";
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "artifact.bulk_deleted";
         };
         /**
          * WsAskUserAnswer

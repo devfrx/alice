@@ -296,6 +296,29 @@ async def test_delete_for_conversation_emits_bulk_event(
 
 
 @pytest.mark.asyncio
+async def test_delete_for_conversation_pinned_only_emits_empty_bulk_event(
+    registry, captured_events, conversation_id, tmp_path,
+):
+    pinned = await _seed_artifact(registry, conversation_id, tmp_path / "p.glb", "pin")
+    await registry.set_pinned(pinned.id, True)
+    captured_events.clear()
+
+    deleted_count = await registry.delete_for_conversation(conversation_id)
+
+    # No rows deleted, but the pinned row WAS detached server-side: the FE
+    # still needs the event to mirror the detach and drop its cached list.
+    assert deleted_count == 0
+    assert len(captured_events) == 1
+    event = captured_events[0]
+    assert event["type"] == "artifact.bulk_deleted"
+    assert event["conversation_id"] == str(conversation_id)
+    assert event["artifact_ids"] == []
+    detached = await registry.get_artifact(pinned.id)
+    assert detached is not None
+    assert detached.conversation_id is None
+
+
+@pytest.mark.asyncio
 async def test_delete_all_emits_bulk_event_with_null_conversation(
     registry, captured_events, conversation_id, tmp_path,
 ):

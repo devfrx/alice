@@ -178,7 +178,7 @@ class WsArtifactDeleted(EventsServerFrame):
     artifact_id: str
 
 
-class WsArtifactsBulkDeleted(EventsServerFrame):
+class WsArtifactBulkDeleted(EventsServerFrame):
     """Bulk artifact deletion (conversation cleanup or full wipe).
 
     ``conversation_id`` is ``None`` for the delete-all wipe.  Pinned
@@ -390,7 +390,7 @@ EventsServerMessage = Annotated[
     | WsArtifactCreated
     | WsArtifactUpdated
     | WsArtifactDeleted
-    | WsArtifactsBulkDeleted
+    | WsArtifactBulkDeleted
     | WsTasksUpdated
     | WsPlanDocumentUpdated
     | WsScopeUpdated

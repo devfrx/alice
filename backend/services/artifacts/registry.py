@@ -476,7 +476,8 @@ class ArtifactRegistry:
         Pinned artifacts survive detached (``conversation_id=NULL``,
         preserved on the board); unpinned rows are deleted together with
         their on-disk files.  Emits a single ``artifact.bulk_deleted``
-        event (no per-row events).  Returns the number of deleted rows.
+        event (no per-row events) whenever rows were deleted OR pinned
+        rows were detached.  Returns the number of deleted rows.
         """
         conv_uuid = _to_uuid(conversation_id)
         async with self._session_factory() as session:
@@ -496,7 +497,7 @@ class ArtifactRegistry:
                         )
                     )
                 )
-            await conn.execute(
+            detach_result = await conn.execute(
                 sa.update(Artifact)
                 .where(
                     Artifact.conversation_id == conv_uuid,
@@ -504,13 +505,14 @@ class ArtifactRegistry:
                 )
                 .values(conversation_id=None)
             )
+            detached = int(detach_result.rowcount or 0)
             await session.commit()
 
         # Best-effort file cleanup AFTER commit (a transient FS failure
         # must not roll back the row deletion).
         for _aid, file_path in unpinned:
             await asyncio.to_thread(_unlink_quietly, _resolve_path(file_path))
-        if unpinned:
+        if unpinned or detached:
             await self._emit_event({
                 "type": "artifact.bulk_deleted",
                 "conversation_id": str(conv_uuid),

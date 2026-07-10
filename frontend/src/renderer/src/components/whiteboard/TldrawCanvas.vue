@@ -7,7 +7,6 @@
  * If no snapshot is provided as prop, it fetches it from the backend.
  */
 import { ref, onMounted, onBeforeUnmount, watch, type PropType } from 'vue'
-import { artifactsApi } from '@renderer/services/api'
 import { useArtifactsStore } from '../../stores/artifacts'
 import AppIcon from '../ui/AppIcon.vue'
 
@@ -58,23 +57,21 @@ async function mountReact(): Promise<void> {
   canvasReady.value = false
 
   /* Prefer the freshest cached content (kept current by `artifact.updated`
-   * live-updates), then the prop, then fetch directly from the backend. */
+   * live-updates), then the prop, then fetch THROUGH THE STORE so the cache
+   * gets populated — the live-update path relies on a cache entry existing
+   * (`applyArtifactUpdated` only force-refetches cached content). */
   let resolvedSnapshot =
     (artifactsStore.contents[props.boardId]?.snapshot as Record<string, unknown> | undefined) ??
     (props.snapshot as Record<string, unknown> | null)
   if (!resolvedSnapshot && props.boardId) {
-    try {
-      const res = await artifactsApi.getArtifactContent(props.boardId)
-      const snap = res.content?.snapshot
-      resolvedSnapshot = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
-    } catch (err: unknown) {
-      /* Detect 404 — board was deleted outside this conversation */
-      if (err instanceof Error && err.message.includes('API Error 404')) {
-        isOrphaned.value = true
-        return
-      }
-      /* Other errors (network, etc.) — start with empty canvas */
+    const content = await artifactsStore.fetchContent(props.boardId)
+    if (content === null) {
+      /* Fetch failed (404 board deleted, or network error) — orphan state */
+      isOrphaned.value = true
+      return
     }
+    const snap = content.snapshot
+    resolvedSnapshot = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
   }
   mountedSnapshotJson = resolvedSnapshot ? JSON.stringify(resolvedSnapshot) : null
 
@@ -109,6 +106,16 @@ async function mountReact(): Promise<void> {
   )
   root = newRoot as { render: (el: unknown) => void; unmount: () => void }
   canvasReady.value = true
+
+  /* Catch-up: a store update landing while the dynamic imports were in
+   * flight is consumed silently (the live-update watcher is gated by
+   * `canvasReady`). If the cache now differs from what was just mounted,
+   * run one more reload — it converges immediately because the reload
+   * prefers the cache, making the two JSONs equal. */
+  const latest = artifactsStore.contents[props.boardId]?.snapshot
+  if (latest !== undefined && JSON.stringify(latest) !== mountedSnapshotJson) {
+    void mountReact()
+  }
 }
 
 onMounted(() => {

@@ -7,6 +7,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import type { Router } from 'vue-router'
 import { commandRegistry } from './registry'
 import { installCoreCommands, SWITCHABLE_VIEWS } from './core'
+import { chatApi } from '../services/api'
 
 vi.mock('../services/api', () => ({
   chatApi: {
@@ -76,5 +77,31 @@ describe('installCoreCommands', () => {
     installCoreCommands(router)
     await commandRegistry.execute('artifact.show', { artifact_id: 'a1' })
     expect(router.push).toHaveBeenCalledWith({ name: 'board', query: { artifact: 'a1' } })
+  })
+
+  it('conversation.open loads the conversation, then navigates to Horizon', async () => {
+    const router = fakeRouter('settings')
+    installCoreCommands(router)
+    await commandRegistry.execute('conversation.open', { conversation_id: 'c1' })
+    expect(vi.mocked(chatApi.getConversation)).toHaveBeenCalledWith('c1', expect.anything())
+    expect(router.push).toHaveBeenCalledWith({ name: 'assistant' })
+  })
+
+  it('conversation.open does NOT navigate when the load fails', async () => {
+    const router = fakeRouter('settings')
+    installCoreCommands(router)
+    vi.mocked(chatApi.getConversation).mockRejectedValueOnce(new Error('404'))
+    await expect(
+      commandRegistry.execute('conversation.open', { conversation_id: 'missing' }),
+    ).rejects.toThrow('404')
+    expect(router.push).not.toHaveBeenCalled()
+  })
+
+  it('re-installing replaces the core set without throwing (HMR idempotency)', () => {
+    const first = fakeRouter()
+    const second = fakeRouter()
+    installCoreCommands(first)
+    expect(() => installCoreCommands(second)).not.toThrow()
+    expect(commandRegistry.list()).toHaveLength(5)
   })
 })

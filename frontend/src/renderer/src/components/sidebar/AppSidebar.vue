@@ -106,6 +106,11 @@ async function onHome(): Promise<void> {
     }
   } catch (err) {
     console.error('[AppSidebar] Home action failed:', err)
+    // Parity with the pre-command behavior: even when creating the fresh
+    // conversation fails, still land the user on the primary surface.
+    await commandRegistry
+      .execute('view.switch', { view: 'assistant' })
+      .catch((navErr) => console.error('[AppSidebar] Home navigation failed:', navErr))
   }
 }
 

@@ -451,6 +451,8 @@ git commit -m "feat(fe)!: Horizon is the only chat surface - remove Workspace st
 
 ### Task 3: Client REST per dominio — package `services/api/`
 
+> **Esito (2026-07-10):** DONE. Commit `749370e` (53 file: api.ts eliminato, 17 moduli + barrel creati, 35 consumer migrati incl. 6 spec con vi.mock per namespace). Spec review: conforme — censimento 93/93 metodi con biiezione verificata, spot-diff verbatim su 6 metodi, http.ts identico a righe 77-244, KG 6 mutazioni tipizzate + 3 letture invariate, barrel esatto, zero riferimenti residui all'oggetto `api`. Quality review (top): "Approved with nits" — verificati zero call-site piatti superstiti (anche multiline), nessuna collisione di nomi cross-namespace, mock coprenti tutti i metodi chiamati dagli store, niente cicli d'import (ws.ts→barrel ok), BASE_URL/request giustamente NON nel barrel; typecheck+140 test rilanciati verdi dal reviewer. Nit reale: flip EOL LF→CRLF su 5 store (QUARTO incidente EOL del programma) — sanato dal CONTROLLER in `5c44f95` (sed \r-strip, diff --ignore-cr-at-eol vuoto = pura normalizzazione). Suggerimento reviewer registrato nel backlog: `*.ts text eol=lf` in .gitattributes.
+
 Split PURO (i corpi dei metodi si spostano verbatim da `api.ts`, oggetto `api` incluso il commento di gruppo); unica modifica di comportamento: le 6 mutazioni KG tipizzate.
 
 **Files:**
@@ -599,6 +601,8 @@ git commit -m "refactor(fe): split flat api.ts into per-domain REST clients (ser
 ---
 
 ### Task 4: Dispatcher tipizzato sul canale chat-WS
+
+> **Esito (2026-07-10):** DONE, con una DEVIAZIONE ACCETTATA: la premessa del piano ("useChat è l'unico registrante") era vera solo per il singleton — `useVoice.ts` istanzia un SECONDO WebSocketManager (canale voce, frame fuori contratto) che usa l'emitter generico; l'implementer lo ha quindi MANTENUTO affiancandogli `onFrame`/`offFrame` tipizzati (commit `d27f074`). Probe di esaustività eseguita (chiave rimossa → TS2741, ripristinata → verde); 27/27 chiavi, corpi semanticamente identici (verificati handler per handler dal reviewer), zero cast nei corpi, alias già ApiSchema (nessun fix necessario). Quality review (top): "Needs fixes" — regressione VERA trovata: l'emit legacy sparava anche i frame contratto, così un frame server `error` (errore di turno transiente) flippava `connectionStatus='error'` (la vecchia guardia `instanceof Event` era caduta); più spoof teorico dei nomi socket-level e lookup su prototype-chain. Fix del CONTROLLER in `75357ff`: emit legacy soppresso quando `frameHandlers` non è vuoto (chiude l'intera classe di collisioni; il canale voce, senza frame handler, mantiene il percorso legacy), guardia `instanceof Event` ripristinata belt-and-braces, lookup con `hasOwnProperty`, docstring aggiornata. Re-review: ✅ Approved (verificati lifecycle non gated, voce intatta, edge HMR sicuro; 140 test rilanciati). Backlog: migrare useVoice a un pattern tipizzato analogo e ritirare l'emitter generico; alias `Ws*Message` orfani in types/chat.ts da potare nel Task 7.
 
 **Files:**
 - Rewrite (sezione emitter): `frontend/src/renderer/src/services/ws.ts`

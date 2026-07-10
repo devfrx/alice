@@ -10,18 +10,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useTasksStore } from './tasks'
-import { api } from '../services/api'
+import { tasksApi } from '../services/api'
 import type { TaskStep } from '../types/tasks'
 
-// The store imports `{ api }` from services/api; stub just the getTasks method
-// so ensureForConversation/fetch resolve without reaching a backend.
+// The store imports `{ tasksApi }` from services/api; stub just the getTasks
+// method so ensureForConversation/fetch resolve without reaching a backend.
 vi.mock('../services/api', () => ({
-  api: {
+  tasksApi: {
     getTasks: vi.fn(),
   },
 }))
 
-const getTasksMock = vi.mocked(api.getTasks)
+const getTasksMock = vi.mocked(tasksApi.getTasks)
 
 function step(text: string, status = 'pending'): TaskStep {
   return { step: text, status }

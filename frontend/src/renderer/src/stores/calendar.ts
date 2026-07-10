@@ -6,7 +6,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { api } from '../services/api'
+import { calendarApi } from '../services/api'
 import type { CalendarEvent, TodaySummary } from '../types/calendar'
 import { useChatStore } from './chat'
 
@@ -30,8 +30,8 @@ export const useCalendarStore = defineStore('calendar', () => {
     error.value = null
     try {
       const [today, upcoming] = await Promise.all([
-        api.getCalendarToday(),
-        api.getCalendarUpcoming(5),
+        calendarApi.getCalendarToday(),
+        calendarApi.getCalendarUpcoming(5),
       ])
       todaySummary.value = today
       upcomingEvents.value = upcoming

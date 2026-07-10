@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { api } from '../../services/api'
+import { pluginsApi } from '../../services/api'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 
 /* ── Type definitions ───────────────────────────────────────────────── */
@@ -132,7 +132,7 @@ async function doPing(): Promise<void> {
     pingError.value = ''
     pingResult.value = null
     try {
-        const res = await api.executePluginTool<PingResult>(
+        const res = await pluginsApi.executePluginTool<PingResult>(
             'network_probe', 'ping_host', { host, count: pingCount.value }
         )
         if (res.success) pingResult.value = res.content
@@ -187,7 +187,7 @@ async function doScan(): Promise<void> {
     scanResult.value = null
     showClosedPorts.value = false
     try {
-        const res = await api.executePluginTool<ScanResult>(
+        const res = await pluginsApi.executePluginTool<ScanResult>(
             'network_probe', 'scan_ports', { host, ports }
         )
         if (res.success) scanResult.value = res.content
@@ -206,7 +206,7 @@ async function checkService(): Promise<void> {
     svcError.value = ''
     svcResult.value = null
     try {
-        const res = await api.executePluginTool<ServiceResultData>(
+        const res = await pluginsApi.executePluginTool<ServiceResultData>(
             'network_probe', 'check_service',
             { host, port: svcPort.value, protocol: svcProtocol.value }
         )
@@ -232,7 +232,7 @@ async function discoverDevices(): Promise<void> {
     deviceError.value = ''
     deviceResult.value = null
     try {
-        const res = await api.executePluginTool<DeviceResult>(
+        const res = await pluginsApi.executePluginTool<DeviceResult>(
             'network_probe', 'discover_local_devices', {}
         )
         if (res.success) deviceResult.value = res.content
@@ -255,7 +255,7 @@ async function getNetworkInfo(): Promise<void> {
     infoError.value = ''
     infoResult.value = null
     try {
-        const res = await api.executePluginTool<NetworkInfoResult>(
+        const res = await pluginsApi.executePluginTool<NetworkInfoResult>(
             'network_probe', 'get_local_network_info', {}
         )
         if (res.success) infoResult.value = res.content
@@ -282,7 +282,7 @@ async function doTraceroute(): Promise<void> {
     traceError.value = ''
     traceResult.value = null
     try {
-        const res = await api.executePluginTool<TracerouteResult>(
+        const res = await pluginsApi.executePluginTool<TracerouteResult>(
             'network_probe', 'traceroute_host',
             { host, max_hops: traceMaxHops.value }
         )
@@ -309,7 +309,7 @@ async function doResolve(): Promise<void> {
     dnsError.value = ''
     dnsResult.value = null
     try {
-        const res = await api.executePluginTool<DnsResult>(
+        const res = await pluginsApi.executePluginTool<DnsResult>(
             'network_probe', 'resolve_hostname', { query }
         )
         if (res.success) dnsResult.value = res.content
@@ -333,7 +333,7 @@ async function getConnections(): Promise<void> {
     connError.value = ''
     connResult.value = null
     try {
-        const res = await api.executePluginTool<ConnectionsResult>(
+        const res = await pluginsApi.executePluginTool<ConnectionsResult>(
             'network_probe', 'get_open_connections',
             { protocol: connProtocol.value }
         )

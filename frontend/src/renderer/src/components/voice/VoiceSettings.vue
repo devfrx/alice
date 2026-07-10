@@ -6,7 +6,7 @@
  * from backend on mount and persists changes via PUT /config.
  */
 import { computed, onMounted, ref } from 'vue'
-import { api } from '../../services/api'
+import { configApi, voiceApi } from '../../services/api'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
@@ -172,8 +172,8 @@ function onKokoroVoiceChange(): void {
 onMounted(async () => {
   try {
     const [cfg, engines] = await Promise.all([
-      api.getConfig(),
-      api.getAvailableVoiceEngines().catch(() => null),
+      configApi.getConfig(),
+      voiceApi.getAvailableVoiceEngines().catch(() => null),
     ])
 
     // Filter TTS engine list to only installed libraries.
@@ -216,7 +216,7 @@ async function save(): Promise<void> {
   saving.value = true
   saveError.value = ''
   try {
-    await api.updateConfig({
+    await configApi.updateConfig({
       stt: {
         enabled: sttEnabled.value,
         model: sttModel.value,

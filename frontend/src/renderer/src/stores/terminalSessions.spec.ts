@@ -10,12 +10,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useTerminalSessionsStore } from './terminalSessions'
-import { api } from '../services/api'
+import { terminalApi } from '../services/api'
 import { sendEventsMessage } from '../composables/useEventsWebSocket'
 import type { TerminalSession } from '../types/terminal'
 
 vi.mock('../services/api', () => ({
-  api: {
+  terminalApi: {
     listTerminals: vi.fn(),
     createTerminal: vi.fn(),
     updateTerminal: vi.fn(),
@@ -27,9 +27,9 @@ vi.mock('../composables/useEventsWebSocket', () => ({
   sendEventsMessage: vi.fn(() => true),
 }))
 
-const listMock = vi.mocked(api.listTerminals)
-const createMock = vi.mocked(api.createTerminal)
-const deleteMock = vi.mocked(api.deleteTerminal)
+const listMock = vi.mocked(terminalApi.listTerminals)
+const createMock = vi.mocked(terminalApi.createTerminal)
+const deleteMock = vi.mocked(terminalApi.deleteTerminal)
 const sendMock = vi.mocked(sendEventsMessage)
 
 const CONV = 'c1'

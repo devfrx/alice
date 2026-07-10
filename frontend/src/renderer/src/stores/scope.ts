@@ -22,7 +22,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { scopeApi } from '../services/api'
 
 /** Per-conversation scope view-model. */
 interface ScopeEntry {
@@ -71,7 +71,7 @@ export const useScopeStore = defineStore('scope', () => {
   async function fetch(conversationId: string): Promise<void> {
     loading.value = true
     try {
-      const res = await api.getScope(conversationId)
+      const res = await scopeApi.getScope(conversationId)
       byConversation.value = {
         ...byConversation.value,
         [conversationId]: { folders: res.folders, isIdle: res.is_idle },
@@ -117,7 +117,7 @@ export const useScopeStore = defineStore('scope', () => {
    * running) propagate so the caller can surface a "scope locked" message.
    */
   async function setFolders(conversationId: string, folders: string[]): Promise<void> {
-    const res = await api.setScope(conversationId, folders)
+    const res = await scopeApi.setScope(conversationId, folders)
     byConversation.value = {
       ...byConversation.value,
       [conversationId]: { folders: res.folders, isIdle: res.is_idle },
@@ -129,7 +129,7 @@ export const useScopeStore = defineStore('scope', () => {
    * server-side. Lets an {@link ApiError} (409 `scope_locked`) propagate.
    */
   async function clear(conversationId: string): Promise<void> {
-    await api.clearScope(conversationId)
+    await scopeApi.clearScope(conversationId)
     byConversation.value = {
       ...byConversation.value,
       [conversationId]: { folders: [], isIdle: true },

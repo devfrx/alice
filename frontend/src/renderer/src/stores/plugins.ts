@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { pluginsApi } from '../services/api'
 import type { PluginInfo } from '../types/plugin'
 
 export const usePluginsStore = defineStore('plugins', () => {
@@ -11,7 +11,7 @@ export const usePluginsStore = defineStore('plugins', () => {
   async function loadPlugins(): Promise<void> {
     loading.value = true
     try {
-      plugins.value = await api.getPlugins()
+      plugins.value = await pluginsApi.getPlugins()
     } catch (err) {
       console.error('[plugins store] loadPlugins failed:', err)
     } finally {
@@ -21,7 +21,7 @@ export const usePluginsStore = defineStore('plugins', () => {
 
   async function togglePlugin(name: string, enabled: boolean): Promise<void> {
     try {
-      const updated = await api.togglePlugin(name, enabled)
+      const updated = await pluginsApi.togglePlugin(name, enabled)
       const idx = plugins.value.findIndex((p) => p.name === name)
       if (idx >= 0) {
         plugins.value[idx] = updated

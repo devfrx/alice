@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { api } from '../../services/api'
+import { pluginsApi } from '../../services/api'
 
 interface SearchResult {
   title: string
@@ -31,7 +31,7 @@ async function search(): Promise<void> {
   scrapedTexts.value = {}
   expandedMap.value = {}
   try {
-    const res = await api.executePluginTool<SearchResult[]>(
+    const res = await pluginsApi.executePluginTool<SearchResult[]>(
       'web_search', 'web_search', { query: q }
     )
     if (res.success) {
@@ -54,7 +54,7 @@ async function scrape(idx: number, url: string): Promise<void> {
   scrapingMap.value[idx] = true
   delete scrapeErrors.value[idx]
   try {
-    const res = await api.executePluginTool<string>(
+    const res = await pluginsApi.executePluginTool<string>(
       'web_search', 'web_scrape', { url }
     )
     if (res.success) {

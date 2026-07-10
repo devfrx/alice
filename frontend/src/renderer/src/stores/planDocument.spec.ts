@@ -11,18 +11,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { usePlanDocumentStore } from './planDocument'
-import { api } from '../services/api'
+import { tasksApi } from '../services/api'
 import type { WsPlanDocumentUpdatedMessage } from '../types/planDocument'
 
-// The store imports `{ api }` from services/api; stub just the getPlanDocument
-// method so ensureForConversation/fetch resolve without reaching a backend.
+// The store imports `{ tasksApi }` from services/api; stub just the
+// getPlanDocument method so ensureForConversation/fetch resolve without
+// reaching a backend.
 vi.mock('../services/api', () => ({
-  api: {
+  tasksApi: {
     getPlanDocument: vi.fn(),
   },
 }))
 
-const getPlanDocumentMock = vi.mocked(api.getPlanDocument)
+const getPlanDocumentMock = vi.mocked(tasksApi.getPlanDocument)
 
 function updated(
   conversationId: string,

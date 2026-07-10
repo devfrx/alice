@@ -2,13 +2,13 @@
 /**
  * ChartViewer.vue — Visualizza un grafico Apache ECharts nella chat.
  *
- * Carica la ChartSpec completa dall'endpoint REST GET /api/artifacts/{id}/content (api.getArtifactContent),
+ * Carica la ChartSpec completa dall'endpoint REST GET /api/artifacts/{id}/content (artifactsApi.getArtifactContent),
  * monta un'istanza echarts.init() sul div container e gestisce il resize.
  */
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import { api } from '../../services/api'
+import { artifactsApi } from '../../services/api'
 import type { ChartPayload } from '../../types/chat'
 
 const props = defineProps<{ payload: ChartPayload }>()
@@ -401,7 +401,7 @@ function sanitizeMarkData(series: Record<string, unknown>, key: string): void {
 
 async function loadAndRender(): Promise<void> {
     try {
-        const res = await api.getArtifactContent(props.payload.chart_id)
+        const res = await artifactsApi.getArtifactContent(props.payload.chart_id)
         const spec = res.content as { echarts_option?: Record<string, unknown> }
         fetchedOption = sanitizeOption(spec.echarts_option ?? {})
 

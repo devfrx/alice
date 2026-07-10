@@ -20,7 +20,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
-import { api } from '../../services/api'
+import { permissionsApi } from '../../services/api'
 import { useChatStore } from '../../stores/chat'
 import type {
   PermissionRule,
@@ -74,7 +74,7 @@ async function load(id: string | null): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    rules.value = await api.listPermissionRules(id)
+    rules.value = await permissionsApi.listPermissionRules(id)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Errore nel caricamento delle regole'
   } finally {
@@ -89,7 +89,7 @@ async function addRule(): Promise<void> {
   busy.value = true
   error.value = null
   try {
-    const created = await api.addPermissionRule(id, {
+    const created = await permissionsApi.addPermissionRule(id, {
       tool_name: tool,
       effect: newEffect.value,
       scope: newScope.value,
@@ -112,7 +112,7 @@ async function removeRule(rule: PermissionRule): Promise<void> {
   busy.value = true
   error.value = null
   try {
-    await api.deletePermissionRule(id, rule.id)
+    await permissionsApi.deletePermissionRule(id, rule.id)
     rules.value = rules.value.filter((r) => r.id !== rule.id)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Errore nella rimozione della regola'

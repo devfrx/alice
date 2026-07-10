@@ -5,13 +5,13 @@
  * - Maintain the sidebar conversation list (`conversations`)
  * - Track the active conversation (`currentConversation`)
  * - Accumulate streaming tokens from the WebSocket
- * - Dispatch REST calls via `services/api.ts`
+ * - Dispatch REST calls via `services/api/chat.ts` (`chatApi`)
  */
 
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
-import { api, resolveBackendUrl } from '../services/api'
+import { chatApi, resolveBackendUrl } from '../services/api'
 import type {
   AskUserRequest,
   ChatMessage,
@@ -216,7 +216,7 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Fetch the conversation list from the backend. */
   async function loadConversations(): Promise<void> {
-    const remote = (await api.getConversations()).items
+    const remote = (await chatApi.getConversations()).items
 
     // Merge: keep any locally-created conversations that the backend
     // does not know about yet (created while backend was down).
@@ -229,7 +229,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Try to persist orphan local-only conversations to the backend.
     for (const orphan of localOnly) {
-      api
+      chatApi
         .createConversation(orphan.id, orphan.title ?? undefined)
         .then((persisted) => {
           // Write back authoritative server timestamps.
@@ -288,7 +288,7 @@ export const useChatStore = defineStore('chat', () => {
 
     isLoadingConversation.value = true
     try {
-      const detail = await api.getConversation(id, signal)
+      const detail = await chatApi.getConversation(id, signal)
       // A newer selection won the race — discard this stale result.
       if (myGen !== _loadGeneration) return
       // Resolve relative attachment URLs to absolute backend URLs.
@@ -418,7 +418,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Persist on backend — on conflict (duplicate UUID) retry with a new ID.
     try {
-      const persisted = await api.createConversation(newId)
+      const persisted = await chatApi.createConversation(newId)
       // Sync any server-provided timestamps back into local state.
       localSummary.created_at = persisted.created_at
       localSummary.updated_at = persisted.updated_at
@@ -432,7 +432,7 @@ export const useChatStore = defineStore('chat', () => {
       if (isConflict) {
         const retryId = crypto.randomUUID()
         try {
-          const persisted = await api.createConversation(retryId)
+          const persisted = await chatApi.createConversation(retryId)
           // Update local references to the new ID.
           localSummary.id = retryId
           localSummary.created_at = persisted.created_at
@@ -465,7 +465,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Always attempt backend deletion — empty conversations are now persisted too.
     try {
-      await api.deleteConversation(id)
+      await chatApi.deleteConversation(id)
     } catch (err) {
       // Silently ignore 404 (conversation may not exist on backend if created while offline).
       const is404 = err instanceof Error && err.message.includes('404')
@@ -486,7 +486,7 @@ export const useChatStore = defineStore('chat', () => {
       cancelStream()
     }
 
-    await api.deleteAllConversations()
+    await chatApi.deleteAllConversations()
 
     conversations.value = []
     currentConversation.value = null
@@ -496,7 +496,7 @@ export const useChatStore = defineStore('chat', () => {
   /** Rename a conversation on the backend and update local state. */
   async function renameConversation(id: string, title: string): Promise<void> {
     try {
-      const result = await api.renameConversation(id, title)
+      const result = await chatApi.renameConversation(id, title)
 
       // Update sidebar entry
       const entry = conversations.value.find((c) => c.id === id)
@@ -683,12 +683,12 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Export a conversation as JSON from the backend. */
   async function exportConversation(id: string): Promise<ConversationExport> {
-    return api.exportConversation(id)
+    return chatApi.exportConversation(id)
   }
 
   /** Import a conversation from JSON and add it to the sidebar. */
   async function importConversation(data: ConversationExport): Promise<void> {
-    const summary = await api.importConversation(data)
+    const summary = await chatApi.importConversation(data)
     conversations.value.unshift(summary)
   }
 
@@ -829,7 +829,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Persist to backend.
     try {
-      const result = await api.switchVersion(
+      const result = await chatApi.switchVersion(
         currentConversation.value.id,
         versionGroupId,
         versionIndex,
@@ -868,7 +868,7 @@ export const useChatStore = defineStore('chat', () => {
     if (isStreamingCurrentConversation.value) return ''
 
     try {
-      const result = await api.branchConversation(
+      const result = await chatApi.branchConversation(
         currentConversation.value.id,
         fromMessageId,
         title,

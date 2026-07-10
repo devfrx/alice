@@ -18,7 +18,7 @@ import { useUIStore } from '../../stores/ui'
 import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
 import { useToast } from '../../composables/useToast'
-import { api } from '../../services/api'
+import { chatApi } from '../../services/api'
 import BrandThemeToggle from '../branding/BrandThemeToggle.vue'
 import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
@@ -178,7 +178,7 @@ async function onExportConversation(id: string): Promise<void> {
   try {
     const dir = await window.electron.fileOps.selectDirectory()
     if (!dir) return
-    const res = await api.backupConversations(dir, [id])
+    const res = await chatApi.backupConversations(dir, [id])
     if (res.exported === 0) {
       toast.warning('Conversazione non trovata sul backend: nessun file esportato')
       return
@@ -195,7 +195,7 @@ async function onBackupAll(): Promise<void> {
   try {
     const dir = await window.electron.fileOps.selectDirectory()
     if (!dir) return
-    const res = await api.backupConversations(dir)
+    const res = await chatApi.backupConversations(dir)
     if (res.exported === 0) {
       toast.warning('Nessuna conversazione da esportare')
       return

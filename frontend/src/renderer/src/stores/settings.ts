@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
-import { api } from '../services/api'
+import { configApi, modelsApi, settingsApi } from '../services/api'
 import type {
   AgentPrompts,
   AgentTier,
@@ -120,17 +120,17 @@ export const useSettingsStore = defineStore('settings', () => {
 
   watch(toolConfirmations, (val) => {
     if (_loadingToggles) return
-    api.setToolConfirmations(val).catch(console.error)
+    settingsApi.setToolConfirmations(val).catch(console.error)
   })
 
   watch(systemPromptEnabled, (val) => {
     if (_loadingToggles) return
-    api.setSystemPrompt(val).catch(console.error)
+    settingsApi.setSystemPrompt(val).catch(console.error)
   })
 
   watch(toolsEnabled, (val) => {
     if (_loadingToggles) return
-    api.setTools(val).catch(console.error)
+    settingsApi.setTools(val).catch(console.error)
   })
 
   /** Load toggle states from the backend (persisted preferences). */
@@ -138,9 +138,9 @@ export const useSettingsStore = defineStore('settings', () => {
     _loadingToggles = true
     try {
       const [tc, sp, t] = await Promise.all([
-        api.getToolConfirmations(),
-        api.getSystemPrompt(),
-        api.getTools(),
+        settingsApi.getToolConfirmations(),
+        settingsApi.getSystemPrompt(),
+        settingsApi.getTools(),
       ])
       toolConfirmations.value = tc.confirmations_enabled
       systemPromptEnabled.value = sp.system_prompt_enabled
@@ -186,7 +186,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Load the tool catalog and the persisted selection from the backend. */
   async function loadToolCatalog(): Promise<void> {
     try {
-      const catalog = await api.getToolCatalog()
+      const catalog = await settingsApi.getToolCatalog()
       toolCatalog.value = catalog.plugins
       disabledTools.value = new Set(catalog.disabled_tools)
     } catch (err) {
@@ -197,7 +197,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Persist the current disabled-tools set to the backend. */
   async function _persistDisabledTools(): Promise<void> {
     try {
-      const result = await api.setActiveTools([...disabledTools.value])
+      const result = await settingsApi.setActiveTools([...disabledTools.value])
       toolCatalog.value = result.plugins
       disabledTools.value = new Set(result.disabled_tools)
     } catch (err) {
@@ -252,7 +252,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Load persona + per-tier guidance from the resolved backend config. */
   async function loadAgentPrompts(): Promise<void> {
     try {
-      const cfg = await api.getResolvedConfig()
+      const cfg = await configApi.getResolvedConfig()
       const agent = (cfg.agent ?? {}) as Record<string, unknown>
       const prompts = (agent.prompts ?? {}) as Record<string, unknown>
       agentPrompts.value = {
@@ -269,7 +269,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Persist the global persona override (empty clears it). */
   async function saveAgentPersona(): Promise<void> {
     try {
-      await api.patchConfig('agent.prompts.persona', agentPrompts.value.persona)
+      await configApi.patchConfig('agent.prompts.persona', agentPrompts.value.persona)
     } catch (err) {
       console.warn('[settings store] saveAgentPersona failed:', err)
     }
@@ -281,7 +281,7 @@ export const useSettingsStore = defineStore('settings', () => {
    */
   async function saveAgentTierGuidance(): Promise<void> {
     try {
-      await api.patchConfig(
+      await configApi.patchConfig(
         'agent.prompts.tier_guidance',
         pruneTierGuidance(agentPrompts.value.tier_guidance),
       )
@@ -300,7 +300,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadSettings(): Promise<void> {
     _loadingSettings = true
     try {
-      const config = await api.getConfig()
+      const config = await configApi.getConfig()
       if (config.llm) {
         const llm = config.llm as Record<string, unknown>
         settings.value.llm.model = (llm.model as string) ?? settings.value.llm.model
@@ -369,7 +369,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function saveSettings(): Promise<void> {
     const emailPassword = settings.value.email.password.trim()
     try {
-      const updated = await api.updateConfig({
+      const updated = await configApi.updateConfig({
         llm: {
           temperature: settings.value.llm.temperature,
           max_tokens: settings.value.llm.maxTokens,
@@ -528,7 +528,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Check LM Studio connection and update status. */
   async function checkConnection(): Promise<void> {
     try {
-      const status = await api.getModelsStatus()
+      const status = await modelsApi.getModelsStatus()
       lmStudioConnected.value = status.connected
       loadedModelCount.value = status.loaded_model_count
     } catch {
@@ -540,7 +540,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Sync config model with the model currently loaded in LM Studio. */
   async function syncModel(): Promise<void> {
     try {
-      const result = await api.syncModel()
+      const result = await configApi.syncModel()
       if (result.synced && result.model) {
         settings.value.llm.model = result.model
       }
@@ -565,7 +565,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
     _loadModelsInFlight = (async () => {
       try {
-        models.value = await api.getModels()
+        models.value = await modelsApi.getModels()
         // Derive connection state from the freshly-fetched model list instead
         // of making a redundant /models/status round-trip via checkConnection().
         lmStudioConnected.value = true
@@ -583,7 +583,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (operationPollTimer.value !== null || _isResumingOperation) return
     _isResumingOperation = true
     try {
-      const op = await api.getModelOperation()
+      const op = await modelsApi.getModelOperation()
       if (op.status === 'in_progress') {
         currentOperation.value = op
         if (op.model && op.type !== 'unload') {
@@ -607,7 +607,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const clientType = currentOperation.value?.type ?? null
     const poll = async (): Promise<void> => {
       try {
-        const op = await api.getModelOperation()
+        const op = await modelsApi.getModelOperation()
         // Preserve client-side 'switch' type — backend only knows 'load'
         if (clientType === 'switch' && op.type === 'load') {
           op.type = 'switch'
@@ -649,7 +649,7 @@ export const useSettingsStore = defineStore('settings', () => {
     currentOperation.value = { status: 'in_progress', type: 'load', model: modelKey }
     startOperationPolling()
     try {
-      await api.loadModel(modelKey, config)
+      await modelsApi.loadModel(modelKey, config)
       await loadModels()
       // Sync backend config with the newly loaded model.
       await syncModel()
@@ -671,7 +671,7 @@ export const useSettingsStore = defineStore('settings', () => {
     currentOperation.value = { status: 'in_progress', type: 'unload', model: instanceId }
     startOperationPolling()
     try {
-      await api.unloadModel(instanceId)
+      await modelsApi.unloadModel(instanceId)
       await loadModels()
       // Sync backend config after unload.
       await syncModel()
@@ -688,7 +688,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Start downloading a model and begin polling for status. */
   async function downloadModel(model: string, quantization?: string): Promise<void> {
-    const response = await api.downloadModel(model, quantization)
+    const response = await modelsApi.downloadModel(model, quantization)
     if (response.job_id && response.status === 'downloading') {
       pollDownloadStatus(response.job_id)
     } else if (response.status === 'already_downloaded') {
@@ -700,7 +700,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function pollDownloadStatus(jobId: string): void {
     const poll = async (): Promise<void> => {
       try {
-        const status = await api.getDownloadStatus(jobId)
+        const status = await modelsApi.getDownloadStatus(jobId)
         activeDownloads.value = new Map(activeDownloads.value.set(jobId, status))
         if (status.status === 'downloading' || status.status === 'paused') {
           const tid = setTimeout(poll, 2000)

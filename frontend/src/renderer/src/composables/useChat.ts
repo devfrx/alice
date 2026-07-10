@@ -20,7 +20,7 @@
 import type { InjectionKey } from 'vue'
 import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
 
-import { api } from '../services/api'
+import { chatApi } from '../services/api'
 import { wsManager } from '../services/ws'
 import { useAgentRunStore } from '../stores/agentRun'
 import { useChatStore } from '../stores/chat'
@@ -456,7 +456,7 @@ export function useChat(): UseChatReturn {
     if (attachments?.length && convId) {
       try {
         uploaded = await Promise.all(
-          attachments.map((file) => api.uploadFile(file, convId))
+          attachments.map((file) => chatApi.uploadFile(file, convId))
         )
       } catch (err) {
         console.error('[useChat] Attachment upload failed:', err)
@@ -556,7 +556,7 @@ export function useChat(): UseChatReturn {
     if (attachments?.length) {
       try {
         uploaded = await Promise.all(
-          attachments.map((file) => api.uploadFile(file, convId))
+          attachments.map((file) => chatApi.uploadFile(file, convId))
         )
       } catch (err) {
         console.error('[useChat] Attachment upload failed:', err)

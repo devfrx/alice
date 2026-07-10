@@ -10,7 +10,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api } from '../services/api'
+import { artifactsApi } from '../services/api'
 import type {
   Artifact,
   ArtifactKind,
@@ -107,7 +107,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   async function fetch(params?: ArtifactListQuery): Promise<void> {
     loading.value = true
     try {
-      const res = await api.listArtifacts(params)
+      const res = await artifactsApi.listArtifacts(params)
       // Merge with existing items: replace those returned, keep others.
       const returnedIds = new Set(res.items.map((a) => a.id))
       const kept = items.value.filter((a) => !returnedIds.has(a.id))
@@ -143,7 +143,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     const existing = findById(id)
     if (existing) return existing
     try {
-      const artifact = await api.getArtifact(id)
+      const artifact = await artifactsApi.getArtifact(id)
       addArtifact(artifact)
       return artifact
     } catch (err) {
@@ -155,7 +155,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   /** Force-refresh a single artifact row from the backend (upsert). */
   async function refreshById(id: string): Promise<void> {
     try {
-      const artifact = await api.getArtifact(id)
+      const artifact = await artifactsApi.getArtifact(id)
       addArtifact(artifact)
     } catch (err) {
       console.warn('[artifacts] refreshById failed:', err)
@@ -169,7 +169,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   ): Promise<Record<string, unknown> | null> {
     if (!force && contents.value[id]) return contents.value[id]
     try {
-      const res = await api.getArtifactContent(id)
+      const res = await artifactsApi.getArtifactContent(id)
       contents.value[id] = res.content
       return res.content
     } catch (err) {
@@ -184,7 +184,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     patch: Record<string, unknown>,
   ): Promise<boolean> {
     try {
-      await api.updateArtifactContent(id, patch)
+      await artifactsApi.updateArtifactContent(id, patch)
       const cached = contents.value[id]
       if (cached) contents.value[id] = { ...cached, ...patch }
       return true
@@ -208,7 +208,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     // Optimistic update
     if (current) upsertById(id, { pinned: next })
     try {
-      const updated = await api.setArtifactPinned(id, next)
+      const updated = await artifactsApi.setArtifactPinned(id, next)
       addArtifact(updated)
     } catch (err) {
       // Roll back optimistic update
@@ -219,7 +219,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
 
   /** Delete an artifact server-side and remove it from the list. */
   async function remove(id: string, deleteFile = false): Promise<void> {
-    await api.deleteArtifact(id, deleteFile)
+    await artifactsApi.deleteArtifact(id, deleteFile)
     const idx = items.value.findIndex((a) => a.id === id)
     if (idx !== -1) items.value.splice(idx, 1)
     delete contents.value[id]

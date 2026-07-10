@@ -17,7 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { terminalApi } from '../services/api'
 import { sendEventsMessage } from '../composables/useEventsWebSocket'
 import type {
   TerminalCreateRequest,
@@ -149,7 +149,7 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
   async function fetch(conversationId: string): Promise<void> {
     loading.value = true
     try {
-      const res = await api.listTerminals(conversationId)
+      const res = await terminalApi.listTerminals(conversationId)
       enabled.value = res.enabled
       byConversation.value = { ...byConversation.value, [conversationId]: res.sessions }
       fetched.value.add(conversationId)
@@ -173,14 +173,14 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
   async function create(
     conversationId: string, body: TerminalCreateRequest = {},
   ): Promise<TerminalSession> {
-    const session = await api.createTerminal(conversationId, body)
+    const session = await terminalApi.createTerminal(conversationId, body)
     _upsert(conversationId, session)
     return session
   }
 
   /** Kill a session (its process tree). */
   async function kill(conversationId: string, sessionId: string): Promise<void> {
-    await api.deleteTerminal(conversationId, sessionId)
+    await terminalApi.deleteTerminal(conversationId, sessionId)
     _remove(conversationId, sessionId)
     buffers.delete(sessionId)
   }
@@ -189,13 +189,13 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
   async function rename(
     conversationId: string, sessionId: string, title: string,
   ): Promise<void> {
-    const updated = await api.updateTerminal(conversationId, sessionId, { title })
+    const updated = await terminalApi.updateTerminal(conversationId, sessionId, { title })
     _upsert(conversationId, updated)
   }
 
   /** Assign a session to the agent (exactly one per conversation). */
   async function assign(conversationId: string, sessionId: string): Promise<void> {
-    await api.updateTerminal(conversationId, sessionId, { assign_to_agent: true })
+    await terminalApi.updateTerminal(conversationId, sessionId, { assign_to_agent: true })
     _setAssigned(conversationId, sessionId)
   }
 

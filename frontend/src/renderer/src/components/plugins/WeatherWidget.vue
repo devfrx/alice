@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { api } from '../../services/api'
+import { pluginsApi } from '../../services/api'
 import { useChatStore } from '../../stores/chat'
 
 interface WeatherData {
@@ -55,7 +55,7 @@ async function fetchWeather(): Promise<void> {
   try {
     loading.value = !weather.value // only show spinner on first load
     error.value = false
-    const res = await api.executePluginTool<WeatherData>(
+    const res = await pluginsApi.executePluginTool<WeatherData>(
       'weather', 'get_weather', props.city ? { city: props.city } : {}
     )
     if (res.success) {

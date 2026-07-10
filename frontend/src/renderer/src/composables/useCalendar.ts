@@ -6,7 +6,7 @@
  * and helper utilities for rendering.
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import { api } from '../services/api'
+import { calendarApi } from '../services/api'
 import { useCalendarStore } from '../stores/calendar'
 import type { CalendarEvent } from '../types/calendar'
 
@@ -289,7 +289,7 @@ export function useCalendar() {
     const startDate = days[0].toISOString()
     const endDate = new Date(days[days.length - 1].getTime() + MS_PER_DAY).toISOString()
     try {
-      const result = await api.getCalendarEvents(startDate, endDate, 100)
+      const result = await calendarApi.getCalendarEvents(startDate, endDate, 100)
       // Drop the response if a newer fetch was started in the meantime.
       if (token !== fetchToken) return
       events.value = result
@@ -303,7 +303,7 @@ export function useCalendar() {
   }
 
   async function createEvent(data: EventFormData): Promise<void> {
-    await api.createCalendarEvent({
+    await calendarApi.createCalendarEvent({
       title: data.title,
       description: data.description || undefined,
       start_time: data.start,
@@ -323,13 +323,13 @@ export function useCalendar() {
     if (data.end !== undefined) payload.end_time = data.end
     if (data.reminder_minutes !== undefined) payload.reminder_minutes = data.reminder_minutes
     if (data.recurrence_rule !== undefined) payload.recurrence_rule = data.recurrence_rule
-    await api.updateCalendarEvent(id, payload)
+    await calendarApi.updateCalendarEvent(id, payload)
     await fetchEvents()
     await calendarStore.refresh()
   }
 
   async function deleteEvent(id: string): Promise<void> {
-    await api.deleteCalendarEvent(id)
+    await calendarApi.deleteCalendarEvent(id)
     await fetchEvents()
     await calendarStore.refresh()
   }

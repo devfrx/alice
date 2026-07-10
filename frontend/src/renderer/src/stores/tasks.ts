@@ -17,7 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { tasksApi } from '../services/api'
 import type { TaskStep } from '../types/tasks'
 
 export const useTasksStore = defineStore('tasks', () => {
@@ -54,7 +54,7 @@ export const useTasksStore = defineStore('tasks', () => {
   async function fetch(conversationId: string): Promise<void> {
     loading.value = true
     try {
-      const res = await api.getTasks(conversationId)
+      const res = await tasksApi.getTasks(conversationId)
       byConversation.value = { ...byConversation.value, [conversationId]: res.steps }
       fetched.value.add(conversationId)
     } finally {

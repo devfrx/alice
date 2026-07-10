@@ -88,7 +88,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { api } from '../../services/api'
+import { vectorStoreApi } from '../../services/api'
 import { useSettingsStore } from '../../stores/settings'
 import { useServicesStore } from '../../stores/services'
 import type { VectorStoreStats } from '../../types/settings'
@@ -113,7 +113,7 @@ async function refreshStats(): Promise<void> {
     loading.value = true
     error.value = null
     try {
-        stats.value = await api.getVectorStoreStats()
+        stats.value = await vectorStoreApi.getVectorStoreStats()
         servicesStore.onKnowledgeStatus({ ...stats.value.rag, type: 'knowledge.status' as const })
     } catch (err) {
         error.value = err instanceof Error ? err.message : 'Errore nel caricamento statistiche'
@@ -126,7 +126,7 @@ async function onReembed(): Promise<void> {
     reembedding.value = true
     error.value = null
     try {
-        const result = await api.reembedTools()
+        const result = await vectorStoreApi.reembedTools()
         if (result.status !== 'ok') {
             error.value = 'Reindicizzazione fallita'
         }
@@ -151,7 +151,7 @@ async function onRepair(): Promise<void> {
     repairing.value = true
     error.value = null
     try {
-        stats.value = await api.repairVectorStore()
+        stats.value = await vectorStoreApi.repairVectorStore()
         servicesStore.onKnowledgeStatus({ ...stats.value.rag, type: 'knowledge.status' as const })
     } catch (err) {
         error.value = err instanceof Error ? err.message : 'Errore durante la riparazione'

@@ -20,7 +20,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { tasksApi } from '../services/api'
 import type { PlanDocument, WsPlanDocumentUpdatedMessage } from '../types/planDocument'
 
 export const usePlanDocumentStore = defineStore('planDocument', () => {
@@ -71,7 +71,7 @@ export const usePlanDocumentStore = defineStore('planDocument', () => {
   async function fetch(conversationId: string): Promise<void> {
     loading.value = true
     try {
-      const res = await api.getPlanDocument(conversationId)
+      const res = await tasksApi.getPlanDocument(conversationId)
       if (res.body) {
         byConversation.value = {
           ...byConversation.value,

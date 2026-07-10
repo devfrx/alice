@@ -6,7 +6,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api } from '../services/api'
+import { memoryApi } from '../services/api'
 import type {
   MemoryEntry,
   MemorySearchResult,
@@ -39,7 +39,7 @@ export const useMemoryStore = defineStore('memory', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await api.getMemories({ scope, category, limit, offset })
+      const data = await memoryApi.getMemories({ scope, category, limit, offset })
       entries.value = data.items
       total.value = data.total
     } catch (err) {
@@ -58,7 +58,7 @@ export const useMemoryStore = defineStore('memory', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await api.searchMemories(query, limit, category)
+      const data = await memoryApi.searchMemories(query, limit, category)
       searchResults.value = data.results
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
@@ -71,7 +71,7 @@ export const useMemoryStore = defineStore('memory', () => {
   async function deleteMemory(id: string): Promise<void> {
     error.value = null
     try {
-      await api.deleteMemory(id)
+      await memoryApi.deleteMemory(id)
       entries.value = entries.value.filter((e) => e.id !== id)
       total.value = Math.max(0, total.value - 1)
     } catch (err) {
@@ -83,7 +83,7 @@ export const useMemoryStore = defineStore('memory', () => {
   async function clearSessionMemory(): Promise<void> {
     error.value = null
     try {
-      const { deleted_count } = await api.clearSessionMemory()
+      const { deleted_count } = await memoryApi.clearSessionMemory()
       entries.value = entries.value.filter((e) => e.scope !== 'session')
       total.value = Math.max(0, total.value - deleted_count)
     } catch (err) {
@@ -95,7 +95,7 @@ export const useMemoryStore = defineStore('memory', () => {
   async function clearAllMemory(): Promise<void> {
     error.value = null
     try {
-      await api.clearAllMemory()
+      await memoryApi.clearAllMemory()
       entries.value = []
       total.value = 0
     } catch (err) {
@@ -107,7 +107,7 @@ export const useMemoryStore = defineStore('memory', () => {
   async function loadStats(): Promise<void> {
     error.value = null
     try {
-      stats.value = await api.getMemoryStats()
+      stats.value = await memoryApi.getMemoryStats()
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
     }

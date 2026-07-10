@@ -6,7 +6,7 @@
  * Emits `'close'` with `true` (saved/deleted) or `false` (cancelled).
  */
 import { ref } from 'vue'
-import { api } from '../../services/api'
+import { calendarApi } from '../../services/api'
 import { useCalendarStore } from '../../stores/calendar'
 import { useModal } from '../../composables/useModal'
 import type { CalendarEvent, EventFormData } from '../../composables/useCalendar'
@@ -61,9 +61,9 @@ async function handleSave(): Promise<void> {
       if (payload.end !== undefined) updatePayload.end_time = payload.end
       if (payload.reminder_minutes !== undefined) updatePayload.reminder_minutes = payload.reminder_minutes
       if (payload.recurrence_rule !== undefined) updatePayload.recurrence_rule = payload.recurrence_rule
-      await api.updateCalendarEvent(props.editingEvent.id, updatePayload)
+      await calendarApi.updateCalendarEvent(props.editingEvent.id, updatePayload)
     } else {
-      await api.createCalendarEvent({
+      await calendarApi.createCalendarEvent({
         title: payload.title,
         description: payload.description || undefined,
         start_time: payload.start,
@@ -95,7 +95,7 @@ async function handleDelete(): Promise<void> {
   saving.value = true
   saveError.value = null
   try {
-    await api.deleteCalendarEvent(props.editingEvent.id)
+    await calendarApi.deleteCalendarEvent(props.editingEvent.id)
     await calendarStore.refresh()
     emit('close', true)
   } catch (err) {

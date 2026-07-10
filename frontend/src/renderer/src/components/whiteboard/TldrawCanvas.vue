@@ -7,7 +7,7 @@
  * If no snapshot is provided as prop, it fetches it from the backend.
  */
 import { ref, onMounted, onBeforeUnmount, watch, type PropType } from 'vue'
-import { api } from '@renderer/services/api'
+import { artifactsApi } from '@renderer/services/api'
 import AppIcon from '../ui/AppIcon.vue'
 
 const props = defineProps({
@@ -39,7 +39,7 @@ async function mountReact(): Promise<void> {
   let resolvedSnapshot = props.snapshot as Record<string, unknown> | null
   if (!resolvedSnapshot && props.boardId) {
     try {
-      const res = await api.getArtifactContent(props.boardId)
+      const res = await artifactsApi.getArtifactContent(props.boardId)
       const snap = res.content?.snapshot
       resolvedSnapshot = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
     } catch (err: unknown) {

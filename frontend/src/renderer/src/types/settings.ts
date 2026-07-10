@@ -155,8 +155,8 @@ export interface ToolCatalogResponse {
 
 /* ── Agent persona / per-tier guidance (backend `agent.prompts`) ─────────── */
 
-/** Permission-tier keys for per-tier agent guidance overrides. */
-export type AgentTier = 'strict' | 'auto_edits' | 'plan' | 'autopilot'
+/** Permission-tier keys for per-tier agent guidance overrides (generated vocab). */
+export type AgentTier = ApiSchema<'PermissionMode'>
 
 /**
  * User-customisable agent prompt overrides — mirrors the backend

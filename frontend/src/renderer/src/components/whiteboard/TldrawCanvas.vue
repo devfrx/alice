@@ -8,6 +8,7 @@
  */
 import { ref, onMounted, onBeforeUnmount, watch, type PropType } from 'vue'
 import { artifactsApi } from '@renderer/services/api'
+import { useArtifactsStore } from '../../stores/artifacts'
 import AppIcon from '../ui/AppIcon.vue'
 
 const props = defineProps({
@@ -22,21 +23,45 @@ const emit = defineEmits<{
   (e: 'change', snapshot: Record<string, unknown>): void
 }>()
 
+const artifactsStore = useArtifactsStore()
+
 const containerRef = ref<HTMLDivElement | null>(null)
 
 /** True when the board JSON file no longer exists on disk (404). */
 const isOrphaned = ref(false)
 
+/**
+ * True once the in-flight `mountReact()` call has fully resolved. Gates the
+ * live-update watcher below so a store update that lands mid-mount (a race
+ * between this component's own fetch and the parent's) cannot trigger a
+ * second, redundant reload right after the initial/board-switch one.
+ */
+const canvasReady = ref(false)
+
 /* React root handle */
 let root: { render: (el: unknown) => void; unmount: () => void } | null = null
+
+/**
+ * JSON of the snapshot currently rendered by the mounted editor. Used by the
+ * live-update watcher to tell a genuine external change apart from the echo
+ * of our own save (`change` emit → `saveContent` PATCH → backend emits
+ * `artifact.updated` → this client's own WS handler refetches content into
+ * the store — which would otherwise re-trigger a reload of what we just
+ * drew).
+ */
+let mountedSnapshotJson: string | null = null
 
 async function mountReact(): Promise<void> {
   if (!containerRef.value) return
 
   isOrphaned.value = false
+  canvasReady.value = false
 
-  /* If no snapshot provided as prop, fetch it from the backend */
-  let resolvedSnapshot = props.snapshot as Record<string, unknown> | null
+  /* Prefer the freshest cached content (kept current by `artifact.updated`
+   * live-updates), then the prop, then fetch directly from the backend. */
+  let resolvedSnapshot =
+    (artifactsStore.contents[props.boardId]?.snapshot as Record<string, unknown> | undefined) ??
+    (props.snapshot as Record<string, unknown> | null)
   if (!resolvedSnapshot && props.boardId) {
     try {
       const res = await artifactsApi.getArtifactContent(props.boardId)
@@ -51,6 +76,7 @@ async function mountReact(): Promise<void> {
       /* Other errors (network, etc.) — start with empty canvas */
     }
   }
+  mountedSnapshotJson = resolvedSnapshot ? JSON.stringify(resolvedSnapshot) : null
 
   /* Dynamic imports keep React out of the main Vue bundle */
   const [reactModule, reactDomModule, tldrawAppModule] = await Promise.all([
@@ -63,7 +89,7 @@ async function mountReact(): Promise<void> {
   const createRoot = reactDomModule.createRoot
   const TldrawApp = tldrawAppModule.default
 
-  /* Unmount any previous React root (board switch) */
+  /* Unmount any previous React root (board switch or live reload) */
   if (root) {
     root.unmount()
     root = null
@@ -75,11 +101,14 @@ async function mountReact(): Promise<void> {
   newRoot.render(
     createElement(TldrawApp, {
       snapshot: snapshotProp,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onDocumentChange: (snap: any) => emit('change', snap as Record<string, unknown>)
+      onDocumentChange: (snap: unknown) => {
+        mountedSnapshotJson = JSON.stringify(snap)
+        emit('change', snap as Record<string, unknown>)
+      }
     })
   )
   root = newRoot as { render: (el: unknown) => void; unmount: () => void }
+  canvasReady.value = true
 }
 
 onMounted(() => {
@@ -94,6 +123,24 @@ watch(
       root.unmount()
       root = null
     }
+    mountReact()
+  }
+)
+
+/**
+ * Live-update: when this board's cached JSON content changes to something
+ * other than what we just rendered/saved, reload the canvas in place (same
+ * Vue component instance, same board — only the internal React root is
+ * recreated, via the existing `mountReact()` load path). This is what makes
+ * an `artifact.updated` event (another client, or an agent tool editing the
+ * board) show up live without navigating away from the open board.
+ */
+watch(
+  () => artifactsStore.contents[props.boardId]?.snapshot,
+  (snap) => {
+    if (!canvasReady.value || snap === undefined) return
+    const json = JSON.stringify(snap ?? null)
+    if (json === mountedSnapshotJson) return // our own save echo — ignore
     mountReact()
   }
 )

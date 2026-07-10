@@ -475,8 +475,8 @@ class ArtifactRegistry:
 
         Pinned artifacts survive detached (``conversation_id=NULL``,
         preserved on the board); unpinned rows are deleted together with
-        their on-disk files.  No per-row WS events (bulk operation).
-        Returns the number of deleted rows.
+        their on-disk files.  Emits a single ``artifact.bulk_deleted``
+        event (no per-row events).  Returns the number of deleted rows.
         """
         conv_uuid = _to_uuid(conversation_id)
         async with self._session_factory() as session:
@@ -510,13 +510,20 @@ class ArtifactRegistry:
         # must not roll back the row deletion).
         for _aid, file_path in unpinned:
             await asyncio.to_thread(_unlink_quietly, _resolve_path(file_path))
+        if unpinned:
+            await self._emit_event({
+                "type": "artifact.bulk_deleted",
+                "conversation_id": str(conv_uuid),
+                "artifact_ids": [str(aid) for aid, _ in unpinned],
+            })
         return len(unpinned)
 
     async def delete_all(self) -> int:
         """Delete EVERY artifact row and on-disk file (full wipe).
 
         Used by "delete all conversations"; pinned status is irrelevant
-        because the user asked to delete everything.  No WS events.
+        because the user asked to delete everything.  Emits a single
+        ``artifact.bulk_deleted`` event with ``conversation_id=None``.
         """
         async with self._session_factory() as session:
             paths_q = await session.exec(
@@ -529,6 +536,12 @@ class ArtifactRegistry:
 
         for _aid, file_path in rows:
             await asyncio.to_thread(_unlink_quietly, _resolve_path(file_path))
+        if rows:
+            await self._emit_event({
+                "type": "artifact.bulk_deleted",
+                "conversation_id": None,
+                "artifact_ids": [str(aid) for aid, _ in rows],
+            })
         return len(rows)
 
     # ------------------------------------------------------------------

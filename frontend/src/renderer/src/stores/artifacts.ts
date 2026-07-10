@@ -201,6 +201,40 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     if (idx !== -1) items.value.splice(idx, 1)
   }
 
+  /**
+   * Fold an `artifact.updated` event: refresh the row AND, if the JSON
+   * content is cached, force-refetch it so open viewers (whiteboard) react.
+   */
+  async function applyArtifactUpdated(id: string): Promise<void> {
+    await refreshById(id)
+    if (contents.value[id]) {
+      await fetchContent(id, true)
+    }
+  }
+
+  /**
+   * Fold an `artifact.bulk_deleted` event. `conversationId === null` means a
+   * full wipe (delete_all). Pinned artifacts of a deleted conversation
+   * survive detached — mirror that locally by nulling their conversation_id.
+   */
+  function applyBulkDeleted(conversationId: string | null, artifactIds: string[]): void {
+    if (conversationId === null) {
+      // Full wipe: every row (pinned included) is gone server-side.
+      items.value = []
+      contents.value = {}
+      total.value = 0
+      return
+    }
+    for (const id of artifactIds) removeLocal(id)
+    for (const a of items.value) {
+      if (a.conversation_id === conversationId && a.pinned) {
+        upsertById(a.id, { conversation_id: null })
+      }
+    }
+    fetchedConversations.value.delete(conversationId)
+    total.value = Math.max(0, total.value - artifactIds.length)
+  }
+
   /** Toggle the pin flag for an artifact and persist server-side. */
   async function togglePin(id: string): Promise<void> {
     const current = findById(id)
@@ -245,6 +279,8 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     fetchContent,
     saveContent,
     removeLocal,
+    applyArtifactUpdated,
+    applyBulkDeleted,
     togglePin,
     remove,
     addArtifact,

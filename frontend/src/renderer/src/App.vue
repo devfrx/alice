@@ -26,10 +26,9 @@ const router = useRouter()
 const route = useRoute()
 
 /**
- * Assistant chrome (centered orb layout + surface-0 backdrop) must follow the
- * ACTIVE ROUTE, not the persisted `uiStore.mode`. `mode` is sticky across
- * secondary routes (mail/calendar/settings/…), so keying the layout off it
- * would center those views depending on which primary surface you came from.
+ * Horizon chrome (centered layout + surface-0 backdrop) is keyed off the
+ * ACTIVE ROUTE: it applies only while `/assistant` — the only chat surface —
+ * is on screen, never on secondary routes (mail/calendar/settings/…).
  */
 const isAssistantRoute = computed(() => route.name === 'assistant')
 
@@ -231,7 +230,7 @@ onUnmounted(() => {
   }
 }
 
-/* ── Mode-specific adjustments ──────────────────────────────────── */
+/* ── Horizon-route (assistant) adjustments ──────────────────────── */
 .alice-app--assistant .app-body {
   background: var(--surface-0);
 }

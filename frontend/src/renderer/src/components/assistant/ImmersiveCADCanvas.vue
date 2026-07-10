@@ -25,9 +25,9 @@ const props = withDefaults(
     /** Index of the currently displayed model. */
     activeIndex: number
     /**
-     * Hide the inline prev/next multi-model navigation. Used by the workspace
-     * Cad3dModule, which provides its own ModuleSelectorBar instead; assistant
-     * mode leaves this false to keep the built-in nav.
+     * Hide the inline prev/next multi-model navigation, for hosts that
+     * provide their own model selector. Horizon leaves this false to keep
+     * the built-in nav.
      */
     hideNav?: boolean
   }>(),

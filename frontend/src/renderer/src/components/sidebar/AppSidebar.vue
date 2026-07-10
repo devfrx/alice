@@ -44,11 +44,7 @@ const toast = useToast()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
 
-/**
- * Mode-tab active state is derived from the ROUTE (not `uiStore.mode`, which
- * defaults to 'assistant' and would falsely mark Assistente active while on
- * /workspace). Each tab is active only for its own surface, mutually exclusive.
- */
+/** True while Horizon (`/assistant`), the only chat surface, is on screen. */
 const isAssistantActive = computed(() => route.name === 'assistant')
 
 /**
@@ -86,7 +82,7 @@ function toggle(): void {
 // Conversation actions (delegated to store)
 // -----------------------------------------------------------------------
 
-/** Select an existing conversation — stay in the current mode. */
+/** Select an existing conversation and make sure Horizon is on screen. */
 async function onSelect(id: string): Promise<void> {
   try {
     await chatStore.loadConversation(id)

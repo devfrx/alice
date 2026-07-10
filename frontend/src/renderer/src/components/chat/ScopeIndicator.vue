@@ -24,7 +24,7 @@
  *   `DELETE` rejected with {@link ApiError} `status === 409` ("scope_locked") is
  *   caught and surfaced as a transient inline message (~5s auto-clear).
  *
- * Not mounted anywhere yet — it will be embedded in ChatInput in a later task.
+ * Mounted in the Horizon cockpit ({@link HorizonCockpit}) next to the composer.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 

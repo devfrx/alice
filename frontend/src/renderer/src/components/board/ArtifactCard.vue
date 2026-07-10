@@ -68,9 +68,24 @@ const formattedSize = computed(() => {
 
 const downloadHref = computed(() => resolveBackendUrl(props.artifact.download_url))
 
-function openConversation(): void {
-    // /hybrid retired (R3) → open conversation in Workspace (primary surface).
-    router.push({ path: '/workspace', query: { conv: props.artifact.conversation_id } })
+async function openConversation(): Promise<void> {
+    // Load the artifact's conversation into the chat store, then land on
+    // Horizon — the only chat surface since Fase 6.
+    const convId = props.artifact.conversation_id
+    if (!convId) return
+    try {
+        await chatStore.loadConversation(convId)
+    } catch (err) {
+        console.error(`[ArtifactCard] Failed to load conversation ${convId}:`, err)
+        return
+    }
+    if (router.currentRoute.value.name !== 'assistant') {
+        try {
+            await router.push('/assistant')
+        } catch (err) {
+            console.error('[ArtifactCard] Navigation failed:', err)
+        }
+    }
 }
 </script>
 

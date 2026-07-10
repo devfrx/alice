@@ -24,7 +24,7 @@ describe('summarizeTools', () => {
       activity('e1', 'success'),
       activity('e2', 'success'),
       activity('e3', 'running'),
-      activity('e4', 'error'),
+      activity('e4', 'error')
     ]
     expect(summarizeTools(tools)).toEqual({ total: 4, running: 1, success: 2, error: 1 })
   })
@@ -33,7 +33,7 @@ describe('summarizeTools', () => {
     const tools: ToolActivity[] = [
       activity('e1', 'running'),
       activity('e2', 'running'),
-      activity('e3', 'running'),
+      activity('e3', 'running')
     ]
     expect(summarizeTools(tools)).toEqual({ total: 3, running: 3, success: 0, error: 0 })
   })

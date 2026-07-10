@@ -66,7 +66,7 @@ const state = reactive<ModalState>({
   customComponent: null,
   customProps: {},
   width: null,
-  closeOnOverlay: true,
+  closeOnOverlay: true
 })
 
 function open(opts: ModalOptions): Promise<boolean> {
@@ -172,6 +172,13 @@ function openCustom(opts: CustomModalOptions): Promise<boolean> {
 }
 
 /** Composable entry point — returns the singleton API. */
-export function useModal() {
+export function useModal(): {
+  state: ModalState
+  confirm: (opts: ModalOptions) => Promise<boolean>
+  alert: (opts: Omit<ModalOptions, 'cancelText'>) => Promise<void>
+  show: (opts: ModalOptions) => Promise<boolean>
+  openCustom: (opts: CustomModalOptions) => Promise<boolean>
+  close: (result: boolean) => void
+} {
   return { state, confirm, alert, show, openCustom, close } as const
 }

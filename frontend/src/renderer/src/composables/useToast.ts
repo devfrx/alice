@@ -34,14 +34,13 @@ const DEFAULT_DURATION: Record<ToastType, number> = {
   info: 4000,
   success: 4000,
   warning: 4000,
-  error: 6000,
+  error: 6000
 }
 
 // ── Core helpers ──────────────────────────────────────────────
 
 function show(opts: ToastOptions | string): number {
-  const resolved: ToastOptions =
-    typeof opts === 'string' ? { message: opts } : opts
+  const resolved: ToastOptions = typeof opts === 'string' ? { message: opts } : opts
   const type = resolved.type ?? 'info'
   const duration = resolved.duration ?? DEFAULT_DURATION[type]
 
@@ -49,7 +48,10 @@ function show(opts: ToastOptions | string): number {
   toasts.value.push({ id, type, message: resolved.message, duration })
 
   if (duration > 0) {
-    _timers.set(id, setTimeout(() => dismiss(id), duration))
+    _timers.set(
+      id,
+      setTimeout(() => dismiss(id), duration)
+    )
   }
   return id
 }
@@ -90,6 +92,15 @@ function error(message: string, duration?: number): number {
 
 // ── Public composable ─────────────────────────────────────────
 
-export function useToast() {
+export function useToast(): {
+  toasts: Ref<Toast[]>
+  show: (opts: ToastOptions | string) => number
+  dismiss: (id: number) => void
+  dismissAll: () => void
+  info: (message: string, duration?: number) => number
+  success: (message: string, duration?: number) => number
+  warning: (message: string, duration?: number) => number
+  error: (message: string, duration?: number) => number
+} {
   return { toasts, show, dismiss, dismissAll, info, success, warning, error } as const
 }

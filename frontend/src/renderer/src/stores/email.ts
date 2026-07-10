@@ -77,7 +77,9 @@ export const useEmailStore = defineStore('email', () => {
   async function fetchFolders(): Promise<void> {
     try {
       folders.value = await emailApi.getEmailFolders()
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   function handleEmailReceived(folder: string): void {
@@ -91,8 +93,20 @@ export const useEmailStore = defineStore('email', () => {
   }
 
   return {
-    inbox, currentEmail, folders, loading, error, currentFolder, unreadCount,
-    fetchInbox, fetchEmail, searchEmails, markRead, archiveEmail,
-    fetchFolders, handleEmailReceived, clearCurrentEmail,
+    inbox,
+    currentEmail,
+    folders,
+    loading,
+    error,
+    currentFolder,
+    unreadCount,
+    fetchInbox,
+    fetchEmail,
+    searchEmails,
+    markRead,
+    archiveEmail,
+    fetchFolders,
+    handleEmailReceived,
+    clearCurrentEmail
   }
 })

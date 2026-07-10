@@ -144,7 +144,7 @@ async function onDeleteAll(): Promise<void> {
       title: 'Elimina tutte le conversazioni',
       message: 'Eliminare tutte le conversazioni? Questa azione è irreversibile.',
       type: 'danger',
-      confirmText: 'Elimina tutto',
+      confirmText: 'Elimina tutto'
     })
     if (!confirmed) return
     await chatStore.deleteAllConversations()
@@ -191,7 +191,7 @@ async function onBackupAll(): Promise<void> {
     window.electron.fileOps.showInFolder(res.path)
   } catch (err) {
     console.error('[AppSidebar] Failed to backup conversations:', err)
-    toast.error('Backup fallito: impossibile completare l\'export')
+    toast.error("Backup fallito: impossibile completare l'export")
   }
 }
 </script>
@@ -211,47 +211,77 @@ async function onBackupAll(): Promise<void> {
           <span class="sidebar__brand">
             <BrandWordmark brand="alce" />
           </span>
-          <button v-if="!props.docked" class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
+          <button
+            v-if="!props.docked"
+            class="sidebar__close"
+            aria-label="Chiudi sidebar"
+            @click="toggle"
+          >
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
         </div>
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
-          <button type="button" class="sidebar__link" :class="{ 'sidebar__link--active': isHomeActive }"
-            title="Home" @click="onHome">
+          <button
+            type="button"
+            class="sidebar__link"
+            :class="{ 'sidebar__link--active': isHomeActive }"
+            title="Home"
+            @click="onHome"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="home" :size="15" />
             </span>
             <span class="sidebar__link-label">Home</span>
           </button>
 
-          <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
-            @click="toggle">
+          <router-link
+            to="/whiteboard"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Lavagna"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="whiteboard-card" :size="15" />
             </span>
             <span class="sidebar__link-label">Lavagna</span>
           </router-link>
 
-          <router-link to="/board" class="sidebar__link" active-class="sidebar__link--active" title="Bacheca artefatti"
-            @click="toggle">
+          <router-link
+            to="/board"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Bacheca artefatti"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="bookmark" :size="15" />
             </span>
             <span class="sidebar__link-label">Bacheca</span>
           </router-link>
 
-          <router-link to="/terminal" class="sidebar__link" active-class="sidebar__link--active" title="Terminale"
-            @click="toggle">
+          <router-link
+            to="/terminal"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Terminale"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="terminal" :size="15" />
             </span>
             <span class="sidebar__link-label">Terminale</span>
           </router-link>
 
-          <router-link to="/email" class="sidebar__link" active-class="sidebar__link--active" title="Email"
-            @click="toggle">
+          <router-link
+            to="/email"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Email"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="email" :size="15" />
             </span>
@@ -259,8 +289,13 @@ async function onBackupAll(): Promise<void> {
             <span v-if="unreadBadge" class="sidebar__badge">{{ unreadBadge }}</span>
           </router-link>
 
-          <router-link to="/services" class="sidebar__link" active-class="sidebar__link--active" title="Servizi"
-            @click="toggle">
+          <router-link
+            to="/services"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Servizi"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="server" :size="15" />
             </span>
@@ -273,10 +308,18 @@ async function onBackupAll(): Promise<void> {
 
         <!-- Conversations section -->
         <div class="sidebar__conversations">
-          <ConversationList :conversations="chatStore.conversations"
-            :active-id="chatStore.currentConversation?.id ?? null" :streaming-id="chatStore.streamingConversationId"
-            @select="onSelect" @create="onCreate" @delete="onDelete" @delete-all="onDeleteAll" @rename="onRename"
-            @export="onExportConversation" @backup-all="onBackupAll" />
+          <ConversationList
+            :conversations="chatStore.conversations"
+            :active-id="chatStore.currentConversation?.id ?? null"
+            :streaming-id="chatStore.streamingConversationId"
+            @select="onSelect"
+            @create="onCreate"
+            @delete="onDelete"
+            @delete-all="onDeleteAll"
+            @rename="onRename"
+            @export="onExportConversation"
+            @backup-all="onBackupAll"
+          />
         </div>
 
         <!-- Footer: settings -->
@@ -286,8 +329,12 @@ async function onBackupAll(): Promise<void> {
             <BrandThemeToggle />
           </div>
 
-          <router-link to="/settings" class="sidebar__link sidebar__link--footer" active-class="sidebar__link--active"
-            @click="toggle">
+          <router-link
+            to="/settings"
+            class="sidebar__link sidebar__link--footer"
+            active-class="sidebar__link--active"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="settings" :size="15" />
             </span>
@@ -576,7 +623,6 @@ async function onBackupAll(): Promise<void> {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-
   .sidebar,
   .sidebar__backdrop,
   .sidebar__link,

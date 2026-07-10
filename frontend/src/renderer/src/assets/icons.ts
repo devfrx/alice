@@ -38,9 +38,9 @@ const _ICONS = {
   // ── Core UI ──────────────────────────────────────────────────────────────
 
   /** Generic close / remove */
-  'x': {
+  x: {
     inner: `<line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
-    viewBox: '0 0 24 24',
+    viewBox: '0 0 24 24'
   },
 
   /** Downward-pointing chevron */
@@ -56,25 +56,25 @@ const _ICONS = {
   'chevron-right': { icon: 'solar:alt-arrow-right-bold' },
 
   /** Checkmark (confirm, done) */
-  'check': { icon: 'solar:check-read-bold' },
+  check: { icon: 'solar:check-read-bold' },
 
   /** Plus / add */
-  'plus': {
+  plus: {
     inner: `<line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
-    viewBox: '0 0 24 24',
+    viewBox: '0 0 24 24'
   },
 
   /** Minus / indeterminate */
-  'minus': {
+  minus: {
     inner: `<line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
-    viewBox: '0 0 24 24',
+    viewBox: '0 0 24 24'
   },
 
   /** Magnifying glass (search) */
-  'search': { icon: 'solar:magnifer-bold' },
+  search: { icon: 'solar:magnifer-bold' },
 
   /** Gear / settings */
-  'settings': { icon: 'solar:settings-bold' },
+  settings: { icon: 'solar:settings-bold' },
 
   /** Clockwise refresh arrow */
   'refresh-cw': { icon: 'solar:refresh-bold' },
@@ -83,38 +83,38 @@ const _ICONS = {
   'refresh-ccw': { icon: 'solar:restart-bold' },
 
   /** Download arrow */
-  'download': { icon: 'solar:download-bold' },
+  download: { icon: 'solar:download-bold' },
 
   /** Left arrow (back navigation) */
   'arrow-left': { icon: 'solar:arrow-left-bold' },
 
   /** Hamburger / three-line menu */
-  'menu': { icon: 'solar:hamburger-menu-bold' },
+  menu: { icon: 'solar:hamburger-menu-bold' },
 
   // ── Editing ───────────────────────────────────────────────────────────────
 
   /** Pen / edit (square edit style) */
-  'edit': { icon: 'solar:pen-2-bold' },
+  edit: { icon: 'solar:pen-2-bold' },
 
   /** Pencil */
-  'pencil': { icon: 'solar:pen-bold' },
+  pencil: { icon: 'solar:pen-bold' },
 
   /** Trash / delete */
-  'trash': { icon: 'solar:trash-bin-trash-bold' },
+  trash: { icon: 'solar:trash-bin-trash-bold' },
 
   /** Pin / thumbtack */
-  'pin': { icon: 'solar:pin-bold' },
+  pin: { icon: 'solar:pin-bold' },
 
   /** Copy to clipboard */
-  'copy': { icon: 'solar:copy-bold' },
+  copy: { icon: 'solar:copy-bold' },
 
   /** Link / chain */
-  'link': { icon: 'solar:link-bold' },
+  link: { icon: 'solar:link-bold' },
 
   // ── Messaging ─────────────────────────────────────────────────────────────
 
   /** Chat bubble */
-  'message': { icon: 'solar:chat-round-bold' },
+  message: { icon: 'solar:chat-round-bold' },
 
   /** Chat bubble with plus (new chat) */
   'message-plus': { icon: 'solar:pen-new-round-bold' },
@@ -122,13 +122,13 @@ const _ICONS = {
   // ── Voice ─────────────────────────────────────────────────────────────────
 
   /** Microphone */
-  'mic': { icon: 'solar:microphone-bold' },
+  mic: { icon: 'solar:microphone-bold' },
 
   /** Microphone (alternate style) */
   'mic-alt': { icon: 'solar:microphone-2-bold' },
 
   /** Speaker / volume high */
-  'volume': { icon: 'solar:volume-loud-bold' },
+  volume: { icon: 'solar:volume-loud-bold' },
 
   /** Speaker / volume low */
   'volume-two': { icon: 'solar:volume-small-bold' },
@@ -136,13 +136,13 @@ const _ICONS = {
   // ── Input actions ─────────────────────────────────────────────────────────
 
   /** Paper plane / send */
-  'send': { icon: 'solar:plain-2-bold' },
+  send: { icon: 'solar:plain-2-bold' },
 
   /** Paperclip / attach */
-  'paperclip': { icon: 'solar:paperclip-bold' },
+  paperclip: { icon: 'solar:paperclip-bold' },
 
   /** Stop square (outline) */
-  'stop': { icon: 'solar:stop-bold' },
+  stop: { icon: 'solar:stop-bold' },
 
   /** Stop square (filled) */
   'stop-fill': { icon: 'solar:stop-bold' },
@@ -158,7 +158,7 @@ const _ICONS = {
   // ── Brand / AI persona ────────────────────────────────────────────────────
 
   /** Lightning bolt (processing) */
-  'lightning': { icon: 'solar:bolt-bold' },
+  lightning: { icon: 'solar:bolt-bold' },
 
   /** Lightning bolt with flash (intense) */
   'lightning-flash': { icon: 'solar:bolt-circle-bold' },
@@ -166,7 +166,7 @@ const _ICONS = {
   // ── Layout / navigation ───────────────────────────────────────────────────
 
   /** Home / dashboard landing */
-  'home': { icon: 'solar:home-smile-bold' },
+  home: { icon: 'solar:home-smile-bold' },
 
   /** Sidebar-only layout */
   'hybrid-sidebar': { icon: 'solar:sidebar-minimalistic-bold' },
@@ -175,41 +175,41 @@ const _ICONS = {
   'hybrid-home': { icon: 'solar:home-2-bold' },
 
   /** Terminal / code console */
-  'terminal': { icon: 'solar:code-square-bold' },
+  terminal: { icon: 'solar:code-square-bold' },
 
   // ── Info / feedback ───────────────────────────────────────────────────────
 
   /** Eye / visibility */
-  'eye': { icon: 'solar:eye-bold' },
+  eye: { icon: 'solar:eye-bold' },
 
   /** Lightbulb simple / idea hint */
   'lightbulb-simple': { icon: 'solar:lightbulb-minimalistic-bold' },
 
   /** Lightbulb / idea */
-  'lightbulb': { icon: 'solar:lightbulb-bold' },
+  lightbulb: { icon: 'solar:lightbulb-bold' },
 
   /** Thinking cap / reasoning mode */
   'thinking-cap': { icon: 'solar:diploma-bold' },
 
   /** Wrench / tool result */
-  'tool': { icon: 'solar:tuning-2-bold' },
+  tool: { icon: 'solar:tuning-2-bold' },
 
   /** Clock / timestamp */
-  'clock': { icon: 'solar:clock-circle-bold' },
+  clock: { icon: 'solar:clock-circle-bold' },
 
   /** User / person */
-  'user': { icon: 'solar:user-bold' },
+  user: { icon: 'solar:user-bold' },
 
   /** Git branch / fork */
-  'branch': { icon: 'solar:branching-paths-up-bold' },
+  branch: { icon: 'solar:branching-paths-up-bold' },
 
   // ── Files ─────────────────────────────────────────────────────────────────
 
   /** Folder */
-  'folder': { icon: 'solar:folder-bold' },
+  folder: { icon: 'solar:folder-bold' },
 
   /** Generic file */
-  'file': { icon: 'solar:file-bold' },
+  file: { icon: 'solar:file-bold' },
 
   /** File with text lines */
   'file-text': { icon: 'solar:file-text-bold' },
@@ -218,7 +218,7 @@ const _ICONS = {
   'file-lines': { icon: 'solar:document-text-bold' },
 
   /** Draft / new document */
-  'draft': { icon: 'solar:document-add-bold' },
+  draft: { icon: 'solar:document-add-bold' },
 
   // ── Alerts ────────────────────────────────────────────────────────────────
 
@@ -237,10 +237,10 @@ const _ICONS = {
   'box-3d': { icon: 'solar:box-minimalistic-bold' },
 
   /** Wireframe / mesh */
-  'wireframe': { icon: 'solar:widget-3-bold' },
+  wireframe: { icon: 'solar:widget-3-bold' },
 
   /** Crosshair / target */
-  'crosshair': { icon: 'solar:target-bold' },
+  crosshair: { icon: 'solar:target-bold' },
 
   /** Auto-rotate / 360 */
   'auto-rotate': { icon: 'solar:camera-rotate-bold' },
@@ -254,10 +254,10 @@ const _ICONS = {
   // ── Email / communications ────────────────────────────────────────────────
 
   /** Envelope / mail */
-  'mail': { icon: 'solar:letter-bold' },
+  mail: { icon: 'solar:letter-bold' },
 
   /** Email (alias) */
-  'email': { icon: 'solar:letter-bold' },
+  email: { icon: 'solar:letter-bold' },
 
   /** Email read / opened */
   'email-read': { icon: 'solar:letter-opened-bold' },
@@ -266,24 +266,24 @@ const _ICONS = {
   'email-unread': { icon: 'solar:letter-bold' },
 
   /** Inbox / tray */
-  'inbox': { icon: 'solar:inbox-bold' },
+  inbox: { icon: 'solar:inbox-bold' },
 
   /** Archive */
-  'archive': { icon: 'solar:archive-bold' },
+  archive: { icon: 'solar:archive-bold' },
 
   /** Star / favourite */
-  'star': { icon: 'solar:star-bold' },
+  star: { icon: 'solar:star-bold' },
 
   /** Bookmark */
-  'bookmark': { icon: 'solar:bookmark-bold' },
+  bookmark: { icon: 'solar:bookmark-bold' },
 
   /** Power on/off */
-  'power': { icon: 'solar:power-bold' },
+  power: { icon: 'solar:power-bold' },
 
   // ── Calendar ──────────────────────────────────────────────────────────────
 
   /** Calendar / date */
-  'calendar': { icon: 'solar:calendar-bold' },
+  calendar: { icon: 'solar:calendar-bold' },
 
   // ── Misc ──────────────────────────────────────────────────────────────────
 
@@ -302,37 +302,37 @@ const _ICONS = {
   // ── Settings / infrastructure ─────────────────────────────────────────────
 
   /** Package / dependency */
-  'package': { icon: 'solar:box-bold' },
+  package: { icon: 'solar:box-bold' },
 
   /** Sliders / tuning */
-  'sliders': { icon: 'solar:tuning-2-bold' },
+  sliders: { icon: 'solar:tuning-2-bold' },
 
   /** CPU */
-  'cpu': { icon: 'solar:cpu-bolt-bold' },
+  cpu: { icon: 'solar:cpu-bolt-bold' },
 
   /** Server */
-  'server': { icon: 'solar:server-square-bold' },
+  server: { icon: 'solar:server-square-bold' },
 
   /** Share / graph topology */
   'share-graph': { icon: 'solar:share-bold' },
 
   /** Book / documentation */
-  'book': { icon: 'solar:book-2-bold' },
+  book: { icon: 'solar:book-2-bold' },
 
   /** Database */
-  'database': { icon: 'solar:database-bold' },
+  database: { icon: 'solar:database-bold' },
 
   /** Shield / security */
-  'shield': { icon: 'solar:shield-bold' },
+  shield: { icon: 'solar:shield-bold' },
 
   /** Lock / restricted by the active mode */
-  'lock': { icon: 'solar:lock-keyhole-minimalistic-bold' },
+  lock: { icon: 'solar:lock-keyhole-minimalistic-bold' },
 
   /** Chip / hardware */
-  'chip': { icon: 'solar:cpu-bold' },
+  chip: { icon: 'solar:cpu-bold' },
 
   /** Embedding / vector representation */
-  'embedding': { icon: 'solar:programming-bold' },
+  embedding: { icon: 'solar:programming-bold' },
 
   /** Model load / download */
   'model-load': { icon: 'solar:download-minimalistic-bold' },
@@ -353,26 +353,26 @@ const _ICONS = {
   /** Window minimize button — original thin horizontal stroke */
   'win-minimize': {
     inner: `<line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>`,
-    viewBox: '0 0 10 10',
+    viewBox: '0 0 10 10'
   },
 
   /** Window maximize button — original square outline */
   'win-maximize': {
     inner: `<rect x="0.6" y="0.6" width="8.8" height="8.8" stroke="currentColor" stroke-width="1.2"/>`,
-    viewBox: '0 0 10 10',
+    viewBox: '0 0 10 10'
   },
 
   /** Window restore button — two overlapping squares */
   'win-restore': {
     inner: `<rect x="2" y="0" width="7.4" height="7.4" stroke="currentColor" stroke-width="1.2"/><rect x="0" y="2" width="7.4" height="7.4" fill="var(--bg-primary, #161616)" stroke="currentColor" stroke-width="1.2"/>`,
-    viewBox: '0 0 10 10',
+    viewBox: '0 0 10 10'
   },
 
   /** Window close button — original thin X */
   'win-close': {
     inner: `<line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>`,
-    viewBox: '0 0 10 10',
-  },
+    viewBox: '0 0 10 10'
+  }
 }
 
 export type AppIconName = keyof typeof _ICONS
@@ -389,14 +389,8 @@ export const ICONS = _ICONS as Record<AppIconName, IconDef>
 /**
  * Returns a complete `<svg>` HTML string for use outside Vue templates.
  * Used by composables (useCodeBlocks, useMarkdown) that inject raw HTML.
- * The `strokeWidth` parameter is kept for API compatibility but is unused
- * since Solar icons are fill-based.
  */
-export function getIconSvgString(
-  name: AppIconName,
-  size: number = 16,
-  _strokeWidth?: number,
-): string {
+export function getIconSvgString(name: AppIconName, size: number = 16): string {
   const def = ICONS[name]
   if (def.inner != null) {
     const viewBox = def.viewBox ?? '0 0 24 24'

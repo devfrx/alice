@@ -18,16 +18,16 @@ vi.mock('../services/api', () => ({
       title: null,
       created_at: '',
       updated_at: '',
-      messages: [],
-    }),
+      messages: []
+    })
   },
-  resolveBackendUrl: (p: string) => p,
+  resolveBackendUrl: (p: string) => p
 }))
 
 function fakeRouter(routeName = 'assistant'): Router {
   return {
     push: vi.fn().mockResolvedValue(undefined),
-    currentRoute: { value: { name: routeName } },
+    currentRoute: { value: { name: routeName } }
   } as unknown as Router
 }
 
@@ -45,7 +45,7 @@ describe('installCoreCommands', () => {
       'conversation.new',
       'conversation.open',
       'sidebar.toggle',
-      'view.switch',
+      'view.switch'
     ])
     expect(byName.get('view.switch')?.capability).toBe('navigation')
     expect(byName.get('conversation.new')?.capability).toBe('mutate')
@@ -58,9 +58,9 @@ describe('installCoreCommands', () => {
     installCoreCommands(router)
     await commandRegistry.execute('view.switch', { view: 'settings' })
     expect(router.push).toHaveBeenCalledWith({ name: 'settings' })
-    await expect(
-      commandRegistry.execute('view.switch', { view: 'not-a-view' }),
-    ).rejects.toThrow(/Unknown view/)
+    await expect(commandRegistry.execute('view.switch', { view: 'not-a-view' })).rejects.toThrow(
+      /Unknown view/
+    )
   })
 
   it('every SWITCHABLE_VIEWS entry is accepted', async () => {
@@ -92,7 +92,7 @@ describe('installCoreCommands', () => {
     installCoreCommands(router)
     vi.mocked(chatApi.getConversation).mockRejectedValueOnce(new Error('404'))
     await expect(
-      commandRegistry.execute('conversation.open', { conversation_id: 'missing' }),
+      commandRegistry.execute('conversation.open', { conversation_id: 'missing' })
     ).rejects.toThrow('404')
     expect(router.push).not.toHaveBeenCalled()
   })

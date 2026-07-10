@@ -15,7 +15,7 @@
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string,
+    message: string
   ) {
     super(message)
     this.name = 'ApiError'
@@ -80,21 +80,26 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
  */
 function withTimeout(
   external: AbortSignal | undefined,
-  timeoutMs: number,
+  timeoutMs: number
 ): { signal: AbortSignal; cleanup: () => void } {
   const ctrl = new AbortController()
-  const onAbort = (): void => { ctrl.abort((external as AbortSignal & { reason?: unknown }).reason) }
+  const onAbort = (): void => {
+    ctrl.abort((external as AbortSignal & { reason?: unknown }).reason)
+  }
   if (external) {
     if (external.aborted) ctrl.abort((external as AbortSignal & { reason?: unknown }).reason)
     else external.addEventListener('abort', onAbort, { once: true })
   }
-  const timer = setTimeout(() => ctrl.abort(new DOMException('Request timeout', 'TimeoutError')), timeoutMs)
+  const timer = setTimeout(
+    () => ctrl.abort(new DOMException('Request timeout', 'TimeoutError')),
+    timeoutMs
+  )
   return {
     signal: ctrl.signal,
     cleanup: () => {
       clearTimeout(timer)
       external?.removeEventListener('abort', onAbort)
-    },
+    }
   }
 }
 
@@ -112,7 +117,7 @@ function withTimeout(
 export async function request<T>(
   endpoint: string,
   options?: RequestInit,
-  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS
 ): Promise<T> {
   const { headers: customHeaders, signal: externalSignal, ...fetchOptions } = options ?? {}
   const isJsonBody = !!fetchOptions.body && typeof fetchOptions.body === 'string'
@@ -133,7 +138,10 @@ export async function request<T>(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new ApiError(response.status, `API Error ${response.status}: ${response.statusText} — ${body}`)
+    throw new ApiError(
+      response.status,
+      `API Error ${response.status}: ${response.statusText} — ${body}`
+    )
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
@@ -155,10 +163,7 @@ export async function request<T>(
  * @param signal - Optional AbortSignal for cancellation.
  * @returns `true` once the backend is reachable.
  */
-export async function waitForBackend(
-  intervalMs = 1000,
-  signal?: AbortSignal,
-): Promise<boolean> {
+export async function waitForBackend(intervalMs = 1000, signal?: AbortSignal): Promise<boolean> {
   while (!signal?.aborted) {
     try {
       const res = await fetch(`${BASE_URL}/health`, { signal })
@@ -168,7 +173,14 @@ export async function waitForBackend(
     }
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, intervalMs)
-      signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+      signal?.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(timer)
+          resolve()
+        },
+        { once: true }
+      )
     })
   }
   return false

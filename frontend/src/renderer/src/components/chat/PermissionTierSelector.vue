@@ -28,10 +28,30 @@ interface TierMeta {
 
 /** Tier presentation metadata (order = the cycle order shown in the menu). */
 const TIERS: readonly TierMeta[] = [
-  { mode: 'strict', label: 'Conferma', icon: 'shield', hint: 'Chiede conferma per ogni azione sensibile' },
-  { mode: 'auto_edits', label: 'Auto-modifiche', icon: 'edit', hint: 'Approva le scritture sicure nello scope; chiede per pericolose/comandi' },
-  { mode: 'plan', label: 'Pianifica', icon: 'file-lines', hint: 'Sola lettura: niente scritture né comandi' },
-  { mode: 'autopilot', label: 'Autopilota', icon: 'lightning', hint: 'Autonomia totale (i blocchi di sicurezza restano)' },
+  {
+    mode: 'strict',
+    label: 'Conferma',
+    icon: 'shield',
+    hint: 'Chiede conferma per ogni azione sensibile'
+  },
+  {
+    mode: 'auto_edits',
+    label: 'Auto-modifiche',
+    icon: 'edit',
+    hint: 'Approva le scritture sicure nello scope; chiede per pericolose/comandi'
+  },
+  {
+    mode: 'plan',
+    label: 'Pianifica',
+    icon: 'file-lines',
+    hint: 'Sola lettura: niente scritture né comandi'
+  },
+  {
+    mode: 'autopilot',
+    label: 'Autopilota',
+    icon: 'lightning',
+    hint: 'Autonomia totale (i blocchi di sicurezza restano)'
+  }
 ]
 
 const chatStore = useChatStore()

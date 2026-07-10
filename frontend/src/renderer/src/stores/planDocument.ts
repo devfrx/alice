@@ -75,7 +75,7 @@ export const usePlanDocumentStore = defineStore('planDocument', () => {
       if (res.body) {
         byConversation.value = {
           ...byConversation.value,
-          [conversationId]: { title: res.title, body: res.body, updatedAt: res.updated_at },
+          [conversationId]: { title: res.title, body: res.body, updatedAt: res.updated_at }
         }
       } else {
         clearDocument(conversationId)
@@ -107,7 +107,11 @@ export const usePlanDocumentStore = defineStore('planDocument', () => {
     if (msg.body) {
       byConversation.value = {
         ...byConversation.value,
-        [msg.conversation_id]: { title: msg.title, body: msg.body, updatedAt: msg.updated_at ?? null },
+        [msg.conversation_id]: {
+          title: msg.title,
+          body: msg.body,
+          updatedAt: msg.updated_at ?? null
+        }
       }
     } else {
       clearDocument(msg.conversation_id)
@@ -131,6 +135,6 @@ export const usePlanDocumentStore = defineStore('planDocument', () => {
     fetch,
     ensureForConversation,
     applyPlanDocumentUpdated,
-    reset,
+    reset
   }
 })

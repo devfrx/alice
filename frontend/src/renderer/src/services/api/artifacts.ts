@@ -5,7 +5,7 @@ import type {
   ArtifactContentResponse,
   ArtifactContentUpdateResponse,
   ArtifactKind,
-  ArtifactListResponse,
+  ArtifactListResponse
 } from '../../types/artifacts'
 
 export const artifactsApi = {
@@ -38,18 +38,18 @@ export const artifactsApi = {
   /** Merge top-level keys into the JSON content of an artifact. */
   updateArtifactContent: (
     id: string,
-    content: Record<string, unknown>,
+    content: Record<string, unknown>
   ): Promise<ArtifactContentUpdateResponse> =>
-    request<ArtifactContentUpdateResponse>(
-      `/artifacts/${encodeURIComponent(id)}/content`,
-      { method: 'PATCH', body: JSON.stringify({ content }) },
-    ),
+    request<ArtifactContentUpdateResponse>(`/artifacts/${encodeURIComponent(id)}/content`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content })
+    }),
 
   /** Pin or unpin an artifact. */
   setArtifactPinned: (id: string, pinned: boolean): Promise<Artifact> =>
     request<Artifact>(`/artifacts/${encodeURIComponent(id)}/pin`, {
       method: 'PATCH',
-      body: JSON.stringify({ pinned }),
+      body: JSON.stringify({ pinned })
     }),
 
   /**
@@ -58,9 +58,6 @@ export const artifactsApi = {
    */
   deleteArtifact: (id: string, deleteFile = false): Promise<void> => {
     const qs = deleteFile ? '?delete_file=true' : ''
-    return request<void>(
-      `/artifacts/${encodeURIComponent(id)}${qs}`,
-      { method: 'DELETE' },
-    )
-  },
+    return request<void>(`/artifacts/${encodeURIComponent(id)}${qs}`, { method: 'DELETE' })
+  }
 }

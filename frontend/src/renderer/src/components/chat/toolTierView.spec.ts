@@ -14,49 +14,52 @@ import {
   tierToolView,
   tierSummary,
   READ_ONLY_BLOCKED_CAPS,
-  PLANNING_ALWAYS_ALLOW,
+  PLANNING_ALWAYS_ALLOW
 } from './toolTierView'
 
 describe('isToolAllowedInTier', () => {
   it('blocks a write tool under the plan tier', () => {
     expect(
-      isToolAllowedInTier('plan', { name: 'pc_automation_write_file', capabilities: ['fs_write'] }),
+      isToolAllowedInTier('plan', { name: 'pc_automation_write_file', capabilities: ['fs_write'] })
     ).toBe(false)
   })
 
   it('blocks an exec tool under the plan tier', () => {
     expect(
-      isToolAllowedInTier('plan', { name: 'terminal_run', capabilities: ['process_exec'] }),
+      isToolAllowedInTier('plan', { name: 'terminal_run', capabilities: ['process_exec'] })
     ).toBe(false)
   })
 
   it('always allows a planning tool under the plan tier', () => {
     expect(
-      isToolAllowedInTier('plan', { name: 'agent_write_plan', capabilities: ['planning'] }),
+      isToolAllowedInTier('plan', { name: 'agent_write_plan', capabilities: ['planning'] })
     ).toBe(true)
   })
 
   it('keeps a planning tool allowed even when it carries a blocked capability', () => {
     expect(
-      isToolAllowedInTier('plan', { name: 'agent_write_plan', capabilities: ['fs_write'] }),
+      isToolAllowedInTier('plan', { name: 'agent_write_plan', capabilities: ['fs_write'] })
     ).toBe(true)
   })
 
   it('allows a read-only tool under the plan tier', () => {
-    expect(
-      isToolAllowedInTier('plan', { name: 'web_search', capabilities: ['network'] }),
-    ).toBe(true)
+    expect(isToolAllowedInTier('plan', { name: 'web_search', capabilities: ['network'] })).toBe(
+      true
+    )
   })
 
   it('allows write/exec tools under every non-plan tier', () => {
     expect(
-      isToolAllowedInTier('autopilot', { name: 'terminal_run', capabilities: ['process_exec'] }),
+      isToolAllowedInTier('autopilot', { name: 'terminal_run', capabilities: ['process_exec'] })
     ).toBe(true)
     expect(
-      isToolAllowedInTier('strict', { name: 'pc_automation_write_file', capabilities: ['fs_write'] }),
+      isToolAllowedInTier('strict', {
+        name: 'pc_automation_write_file',
+        capabilities: ['fs_write']
+      })
     ).toBe(true)
     expect(
-      isToolAllowedInTier('auto_edits', { name: 'terminal_run', capabilities: ['process_exec'] }),
+      isToolAllowedInTier('auto_edits', { name: 'terminal_run', capabilities: ['process_exec'] })
     ).toBe(true)
   })
 
@@ -66,7 +69,7 @@ describe('isToolAllowedInTier', () => {
       'agent_update_tasks',
       'agent_write_plan',
       'agent_spawn_subagent',
-      'agent_ask_user',
+      'agent_ask_user'
     ])
   })
 })
@@ -75,17 +78,41 @@ const catalog: ToolCatalogPlugin[] = [
   {
     plugin: 'agent',
     tools: [
-      { name: 'pc_automation_write_file', label: 'write_file', description: '', enabled: true, capabilities: ['fs_write'] },
-      { name: 'agent_write_plan', label: 'write_plan', description: '', enabled: true, capabilities: ['planning'] },
-      { name: 'web_search', label: 'search', description: '', enabled: true, capabilities: ['network'] },
-    ],
+      {
+        name: 'pc_automation_write_file',
+        label: 'write_file',
+        description: '',
+        enabled: true,
+        capabilities: ['fs_write']
+      },
+      {
+        name: 'agent_write_plan',
+        label: 'write_plan',
+        description: '',
+        enabled: true,
+        capabilities: ['planning']
+      },
+      {
+        name: 'web_search',
+        label: 'search',
+        description: '',
+        enabled: true,
+        capabilities: ['network']
+      }
+    ]
   },
   {
     plugin: 'terminal',
     tools: [
-      { name: 'terminal_run', label: 'run', description: '', enabled: true, capabilities: ['process_exec'] },
-    ],
-  },
+      {
+        name: 'terminal_run',
+        label: 'run',
+        description: '',
+        enabled: true,
+        capabilities: ['process_exec']
+      }
+    ]
+  }
 ]
 
 describe('tierToolView', () => {
@@ -105,7 +132,7 @@ describe('tierToolView', () => {
     expect(agent.tools.map((t) => t.name)).toEqual([
       'agent_write_plan',
       'web_search',
-      'pc_automation_write_file',
+      'pc_automation_write_file'
     ])
     expect(agent.tools[0].planning).toBe(true)
   })
@@ -117,7 +144,7 @@ describe('tierToolView', () => {
     expect(agent.tools.map((t) => t.name)).toEqual([
       'pc_automation_write_file',
       'agent_write_plan',
-      'web_search',
+      'web_search'
     ])
   })
 })

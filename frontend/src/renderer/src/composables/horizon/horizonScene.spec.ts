@@ -10,7 +10,7 @@ import {
   notchPositions,
   planView,
   toRoman,
-  type HorizonSceneInputs,
+  type HorizonSceneInputs
 } from './horizonScene'
 import type { TaskStep } from '../../types/tasks'
 
@@ -25,7 +25,7 @@ function inputs(over: Partial<HorizonSceneInputs> = {}): HorizonSceneInputs {
     stageOpen: false,
     artifactCount: 0,
     composerActive: false,
-    ...over,
+    ...over
   }
 }
 
@@ -50,21 +50,21 @@ describe('deriveSceneState', () => {
   it('working while streaming with active tools or an unfinished plan', () => {
     expect(deriveSceneState(inputs({ isStreaming: true, activeToolCount: 1 }))).toBe('working')
     expect(
-      deriveSceneState(inputs({ isStreaming: true, planSteps: [step('a', 'in_progress')] })),
+      deriveSceneState(inputs({ isStreaming: true, planSteps: [step('a', 'in_progress')] }))
     ).toBe('working')
   })
 
   it('a fully completed plan no longer forces working', () => {
     expect(
-      deriveSceneState(inputs({ isStreaming: true, planSteps: [step('a', 'completed')] })),
+      deriveSceneState(inputs({ isStreaming: true, planSteps: [step('a', 'completed')] }))
     ).toBe('responding')
   })
 
   it('presenting wins over everything when the stage is open with artifacts', () => {
     expect(
       deriveSceneState(
-        inputs({ stageOpen: true, artifactCount: 1, isStreaming: true, activeToolCount: 2 }),
-      ),
+        inputs({ stageOpen: true, artifactCount: 1, isStreaming: true, activeToolCount: 2 })
+      )
     ).toBe('presenting')
   })
 

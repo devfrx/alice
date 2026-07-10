@@ -31,23 +31,23 @@ export const AGENT_TIERS: readonly AgentTierMeta[] = [
   {
     key: 'strict',
     label: 'Conferma',
-    hint: 'Ogni strumento che modifica o esegue richiede una conferma esplicita.',
+    hint: 'Ogni strumento che modifica o esegue richiede una conferma esplicita.'
   },
   {
     key: 'auto_edits',
     label: 'Auto-modifiche',
-    hint: 'Le modifiche ai file avvengono senza conferma; i comandi restano confermati.',
+    hint: 'Le modifiche ai file avvengono senza conferma; i comandi restano confermati.'
   },
   {
     key: 'plan',
     label: 'Pianifica',
-    hint: 'Sola lettura: l’agente analizza e pianifica senza eseguire modifiche.',
+    hint: 'Sola lettura: l’agente analizza e pianifica senza eseguire modifiche.'
   },
   {
     key: 'autopilot',
     label: 'Autopilota',
-    hint: 'L’agente esegue tutto autonomamente, senza richiedere conferme.',
-  },
+    hint: 'L’agente esegue tutto autonomamente, senza richiedere conferme.'
+  }
 ] as const
 
 /** Build a fresh tier_guidance map with every tier present and blank. */
@@ -66,7 +66,7 @@ export function emptyTierGuidance(): Record<AgentTier, string> {
  * @returns A record with exactly the four tier keys.
  */
 export function normaliseTierGuidance(
-  raw: Record<string, unknown> | null | undefined,
+  raw: Record<string, unknown> | null | undefined
 ): Record<AgentTier, string> {
   const out = emptyTierGuidance()
   if (!raw || typeof raw !== 'object') return out
@@ -87,9 +87,7 @@ export function normaliseTierGuidance(
  * @param map - The current editor state (tier key → text).
  * @returns A map with only the non-blank overrides.
  */
-export function pruneTierGuidance(
-  map: Record<string, string>,
-): Record<string, string> {
+export function pruneTierGuidance(map: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(map)) {
     if (value && value.trim()) out[key] = value

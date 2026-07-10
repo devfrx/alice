@@ -139,9 +139,7 @@ export type WsToolCallMessage = ApiSchema<'WsToolCallStream'>
 export type WsToolExecutionStartMessage = ApiSchema<'WsToolExecutionStart'>
 export type WsToolExecutionDoneMessage = ApiSchema<'WsToolExecutionDone'>
 export type WsToolProgressMessage = ApiSchema<'WsToolProgress'>
-export type RememberChoice = NonNullable<
-  ApiSchema<'WsToolConfirmationResponse'>['remember']
->
+export type RememberChoice = NonNullable<ApiSchema<'WsToolConfirmationResponse'>['remember']>
 export type WsToolConfirmationRequiredMessage = ApiSchema<'WsToolConfirmationRequired'>
 export type WsToolConfirmationResponsePayload = ApiSchema<'WsToolConfirmationResponse'>
 export type AskUserQuestion = ApiSchema<'WsAskUserQuestion'>

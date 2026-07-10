@@ -16,7 +16,7 @@ export const scopeApi = {
   setScope: (conversationId: string, folders: string[]): Promise<ScopeResponse> =>
     request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, {
       method: 'PUT',
-      body: JSON.stringify({ folders }),
+      body: JSON.stringify({ folders })
     }),
 
   /**
@@ -26,5 +26,5 @@ export const scopeApi = {
    * (detail `"scope_locked"`) when a turn is running for the conversation.
    */
   clearScope: (conversationId: string): Promise<ScopeResponse> =>
-    request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, { method: 'DELETE' }),
+    request<ScopeResponse>(`/scope/${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
 }

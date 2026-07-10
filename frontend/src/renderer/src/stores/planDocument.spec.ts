@@ -19,8 +19,8 @@ import type { WsPlanDocumentUpdatedMessage } from '../types/planDocument'
 // reaching a backend.
 vi.mock('../services/api', () => ({
   tasksApi: {
-    getPlanDocument: vi.fn(),
-  },
+    getPlanDocument: vi.fn()
+  }
 }))
 
 const getPlanDocumentMock = vi.mocked(tasksApi.getPlanDocument)
@@ -29,7 +29,7 @@ function updated(
   conversationId: string,
   body: string,
   title = 'Piano',
-  updated_at: string | null = '2026-06-09T10:30:00Z',
+  updated_at: string | null = '2026-06-09T10:30:00Z'
 ): WsPlanDocumentUpdatedMessage {
   return { type: 'plan_document.updated', conversation_id: conversationId, title, body, updated_at }
 }
@@ -60,7 +60,7 @@ describe('fetch', () => {
       conversation_id: 'c1',
       title: 'Piano di rilascio',
       body: '# Step 1\nFare la cosa',
-      updated_at: '2026-06-09T10:30:00Z',
+      updated_at: '2026-06-09T10:30:00Z'
     })
     const s = usePlanDocumentStore()
 
@@ -70,7 +70,7 @@ describe('fetch', () => {
     expect(s.documentFor('c1')).toEqual({
       title: 'Piano di rilascio',
       body: '# Step 1\nFare la cosa',
-      updatedAt: '2026-06-09T10:30:00Z',
+      updatedAt: '2026-06-09T10:30:00Z'
     })
   })
 
@@ -79,7 +79,7 @@ describe('fetch', () => {
       conversation_id: 'c1',
       title: '',
       body: '',
-      updated_at: null,
+      updated_at: null
     })
     const s = usePlanDocumentStore()
 
@@ -95,7 +95,7 @@ describe('ensureForConversation', () => {
       conversation_id: 'c1',
       title: 'Piano',
       body: 'corpo',
-      updated_at: null,
+      updated_at: null
     })
     const s = usePlanDocumentStore()
 
@@ -118,7 +118,7 @@ describe('ensureForConversation', () => {
       conversation_id: 'c1',
       title: 'Piano',
       body: 'corpo',
-      updated_at: null,
+      updated_at: null
     })
     await s.ensureForConversation('c1')
     expect(getPlanDocumentMock).toHaveBeenCalledTimes(2)
@@ -140,7 +140,7 @@ describe('applyPlanDocumentUpdated', () => {
     expect(s.documentFor('c1')).toEqual({
       title: 'Titolo',
       body: '## Piano\nUno',
-      updatedAt: '2026-06-09T11:00:00Z',
+      updatedAt: '2026-06-09T11:00:00Z'
     })
   })
 
@@ -152,7 +152,7 @@ describe('applyPlanDocumentUpdated', () => {
     expect(s.documentFor('c1')).toEqual({
       title: 'Nuovo titolo',
       body: 'nuovo',
-      updatedAt: null,
+      updatedAt: null
     })
   })
 
@@ -185,7 +185,7 @@ describe('reset', () => {
       conversation_id: 'c1',
       title: 'Piano',
       body: 'corpo',
-      updated_at: null,
+      updated_at: null
     })
     const s = usePlanDocumentStore()
     await s.ensureForConversation('c1')

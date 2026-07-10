@@ -31,7 +31,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     try {
       const [today, upcoming] = await Promise.all([
         calendarApi.getCalendarToday(),
-        calendarApi.getCalendarUpcoming(5),
+        calendarApi.getCalendarUpcoming(5)
       ])
       todaySummary.value = today
       upcomingEvents.value = upcoming
@@ -50,9 +50,12 @@ export const useCalendarStore = defineStore('calendar', () => {
     // Skip the periodic refresh while a chat is streaming or during the
     // post-stream grace window so the calendar plugin doesn't compete
     // for backend resources mid-conversation.
-    refreshInterval = setInterval(() => {
-      if (!chatStore.isPollingPaused()) refresh()
-    }, 5 * 60 * 1000)
+    refreshInterval = setInterval(
+      () => {
+        if (!chatStore.isPollingPaused()) refresh()
+      },
+      5 * 60 * 1000
+    )
   }
 
   /** Stop periodic refresh. */
@@ -72,6 +75,6 @@ export const useCalendarStore = defineStore('calendar', () => {
     nextEvent,
     refresh,
     startPolling,
-    stopPolling,
+    stopPolling
   }
 })

@@ -39,16 +39,16 @@ export function useGenerationState(): UseGenerationState {
   const chatStore = useChatStore()
 
   const cadGenerationInProgress = computed<CadGenerationInfo | null>(() => {
-    const exec = chatStore.activeToolExecutions.find((e) => (
-      e.status === 'running' && normalizeCadToolName(e.toolName) !== null
-    ))
+    const exec = chatStore.activeToolExecutions.find(
+      (e) => e.status === 'running' && normalizeCadToolName(e.toolName) !== null
+    )
     if (!exec) return null
     const toolName = normalizeCadToolName(exec.toolName)
     if (!toolName) return null
     return {
       toolName,
       executionId: exec.executionId,
-      progress: exec.progress,
+      progress: exec.progress
     }
   })
 

@@ -1,4 +1,14 @@
-﻿import { app, shell, BrowserWindow, ipcMain, Menu, MenuItem, dialog, session, type WebContents } from 'electron'
+﻿import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  MenuItem,
+  dialog,
+  session,
+  type WebContents
+} from 'electron'
 import { spawn, spawnSync, ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, appendFileSync } from 'fs'
 import { basename, join, normalize } from 'path'
@@ -24,7 +34,13 @@ try {
 function logToFile(level: string, args: unknown[]): void {
   try {
     const line = `${new Date().toISOString()} [${level}] ${args
-      .map((a) => (a instanceof Error ? `${a.message}\n${a.stack ?? ''}` : typeof a === 'string' ? a : JSON.stringify(a)))
+      .map((a) =>
+        a instanceof Error
+          ? `${a.message}\n${a.stack ?? ''}`
+          : typeof a === 'string'
+            ? a
+            : JSON.stringify(a)
+      )
       .join(' ')}\n`
     appendFileSync(LOG_FILE, line)
   } catch {
@@ -37,9 +53,30 @@ function logToFile(level: string, args: unknown[]): void {
 const _origLog = console.log.bind(console)
 const _origWarn = console.warn.bind(console)
 const _origError = console.error.bind(console)
-console.log = (...args: unknown[]) => { logToFile('log', args); try { _origLog(...args) } catch { /* no console */ } }
-console.warn = (...args: unknown[]) => { logToFile('warn', args); try { _origWarn(...args) } catch { /* no console */ } }
-console.error = (...args: unknown[]) => { logToFile('error', args); try { _origError(...args) } catch { /* no console */ } }
+console.log = (...args: unknown[]) => {
+  logToFile('log', args)
+  try {
+    _origLog(...args)
+  } catch {
+    /* no console */
+  }
+}
+console.warn = (...args: unknown[]) => {
+  logToFile('warn', args)
+  try {
+    _origWarn(...args)
+  } catch {
+    /* no console */
+  }
+}
+console.error = (...args: unknown[]) => {
+  logToFile('error', args)
+  try {
+    _origError(...args)
+  } catch {
+    /* no console */
+  }
+}
 
 // Catch-all: surface uncaught failures in the main process so the user
 // can attach the log file to a bug report instead of seeing a silent exit.
@@ -115,7 +152,9 @@ function configureMediaPermissions(): void {
       return
     }
     const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined
-    callback(isTrustedRendererRequest(contents, details.requestingUrl) && isAudioMediaRequest(mediaTypes))
+    callback(
+      isTrustedRendererRequest(contents, details.requestingUrl) && isAudioMediaRequest(mediaTypes)
+    )
   })
 
   session.defaultSession.setPermissionCheckHandler((contents, permission, requestingOrigin) => {
@@ -164,13 +203,11 @@ function isBackendPortBound(): boolean {
   // the actual spawn.
   const r = spawnSync('netstat', ['-ano', '-p', 'tcp'], {
     encoding: 'utf8',
-    windowsHide: true,
+    windowsHide: true
   })
   if (r.status !== 0 || !r.stdout) return false
   const needle = `:${BACKEND_PORT}`
-  return r.stdout
-    .split(/\r?\n/)
-    .some((line) => line.includes('LISTENING') && line.includes(needle))
+  return r.stdout.split(/\r?\n/).some((line) => line.includes('LISTENING') && line.includes(needle))
 }
 
 /**
@@ -214,7 +251,7 @@ async function waitForBackendHealth(timeoutMs = BACKEND_STARTUP_TIMEOUT_MS): Pro
  */
 async function startPackagedBackend(): Promise<void> {
   const exe = resolveBackendExe()
-  if (!exe) return  // dev mode or missing binary — nothing to spawn
+  if (!exe) return // dev mode or missing binary — nothing to spawn
 
   // Pre-flight: if a previous run left a healthy backend on the port we
   // simply reuse it instead of spawning a duplicate that would crash on
@@ -463,7 +500,7 @@ app.whenReady().then(async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Seleziona cartella',
       properties: ['openDirectory'],
-      defaultPath: typeof defaultPath === 'string' ? defaultPath : undefined,
+      defaultPath: typeof defaultPath === 'string' ? defaultPath : undefined
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
@@ -479,10 +516,12 @@ app.whenReady().then(async () => {
       // Spelling suggestions (when available)
       if (params.dictionarySuggestions.length > 0) {
         for (const suggestion of params.dictionarySuggestions) {
-          menu.append(new MenuItem({
-            label: suggestion,
-            click: () => win.webContents.replaceMisspelling(suggestion),
-          }))
+          menu.append(
+            new MenuItem({
+              label: suggestion,
+              click: () => win.webContents.replaceMisspelling(suggestion)
+            })
+          )
         }
         menu.append(new MenuItem({ type: 'separator' }))
       }
@@ -492,12 +531,20 @@ app.whenReady().then(async () => {
         menu.append(new MenuItem({ role: 'undo', label: 'Annulla' }))
         menu.append(new MenuItem({ role: 'redo', label: 'Ripeti' }))
         menu.append(new MenuItem({ type: 'separator' }))
-        menu.append(new MenuItem({ role: 'cut', label: 'Taglia', enabled: params.editFlags.canCut }))
-        menu.append(new MenuItem({ role: 'copy', label: 'Copia', enabled: params.editFlags.canCopy }))
-        menu.append(new MenuItem({ role: 'paste', label: 'Incolla', enabled: params.editFlags.canPaste }))
+        menu.append(
+          new MenuItem({ role: 'cut', label: 'Taglia', enabled: params.editFlags.canCut })
+        )
+        menu.append(
+          new MenuItem({ role: 'copy', label: 'Copia', enabled: params.editFlags.canCopy })
+        )
+        menu.append(
+          new MenuItem({ role: 'paste', label: 'Incolla', enabled: params.editFlags.canPaste })
+        )
         menu.append(new MenuItem({ role: 'selectAll', label: 'Seleziona tutto' }))
       } else if (params.selectionText.trim().length > 0) {
-        menu.append(new MenuItem({ role: 'copy', label: 'Copia', enabled: params.editFlags.canCopy }))
+        menu.append(
+          new MenuItem({ role: 'copy', label: 'Copia', enabled: params.editFlags.canCopy })
+        )
         menu.append(new MenuItem({ type: 'separator' }))
         menu.append(new MenuItem({ role: 'selectAll', label: 'Seleziona tutto' }))
       }

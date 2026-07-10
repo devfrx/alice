@@ -50,6 +50,6 @@ export const useUIStore = defineStore('ui', () => {
     sidebarOpen,
     sidebarWidth,
     toggleSidebar,
-    setSidebarWidth,
+    setSidebarWidth
   }
 })

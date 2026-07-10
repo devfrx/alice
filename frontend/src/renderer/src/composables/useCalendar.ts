@@ -5,7 +5,7 @@
  * date navigation, event fetching via plugin tool execution,
  * and helper utilities for rendering.
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calendarApi } from '../services/api'
 import { useCalendarStore } from '../stores/calendar'
 import type { CalendarEvent } from '../types/calendar'
@@ -35,8 +35,18 @@ export type ViewMode = 'week' | 'month'
 export const HOURS = Array.from({ length: 17 }, (_, i) => i + 7)
 export const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 export const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+  'Gennaio',
+  'Febbraio',
+  'Marzo',
+  'Aprile',
+  'Maggio',
+  'Giugno',
+  'Luglio',
+  'Agosto',
+  'Settembre',
+  'Ottobre',
+  'Novembre',
+  'Dicembre'
 ]
 
 /** Milliseconds in one day. */
@@ -44,15 +54,42 @@ const MS_PER_DAY = 86_400_000
 
 /** Palette for event block backgrounds. */
 const EVENT_COLORS = [
-  '#C9A84C', '#E07B53', '#5DADE2', '#58D68D',
-  '#AF7AC5', '#F1948A', '#45B7D1', '#F0B27A'
+  '#C9A84C',
+  '#E07B53',
+  '#5DADE2',
+  '#58D68D',
+  '#AF7AC5',
+  '#F1948A',
+  '#45B7D1',
+  '#F0B27A'
 ]
 
 // ---------------------------------------------------------------------------
 // Composable
 // ---------------------------------------------------------------------------
 
-export function useCalendar() {
+export function useCalendar(): {
+  viewMode: Ref<ViewMode>
+  currentDate: Ref<Date>
+  events: Ref<CalendarEvent[]>
+  loading: Ref<boolean>
+  error: Ref<string | null>
+  headerLabel: ComputedRef<string>
+  visibleDays: ComputedRef<Date[]>
+  isToday: (d: Date) => boolean
+  isCurrentMonth: (d: Date) => boolean
+  eventsForDay: (day: Date) => CalendarEvent[]
+  eventStyle: (ev: CalendarEvent, day: Date) => Record<string, string>
+  eventColor: (ev: CalendarEvent) => string
+  eventColumnStyle: (ev: CalendarEvent, day: Date) => Record<string, string>
+  formatTime: (iso: string) => string
+  navigate: (direction: -1 | 1) => void
+  goToday: () => void
+  fetchEvents: () => Promise<void>
+  createEvent: (data: EventFormData) => Promise<void>
+  updateEvent: (id: string, data: Partial<EventFormData>) => Promise<void>
+  deleteEvent: (id: string) => Promise<void>
+} {
   const calendarStore = useCalendarStore()
   const viewMode = ref<ViewMode>('week')
   const currentDate = ref(new Date())
@@ -107,8 +144,7 @@ export function useCalendar() {
 
   const isToday = (d: Date): boolean => d.toDateString() === new Date().toDateString()
 
-  const isCurrentMonth = (d: Date): boolean =>
-    d.getMonth() === currentDate.value.getMonth()
+  const isCurrentMonth = (d: Date): boolean => d.getMonth() === currentDate.value.getMonth()
 
   /** Pre-computed map: date string → events for that day (O(1) lookup). */
   const eventsByDay = computed(() => {
@@ -119,7 +155,12 @@ export function useCalendar() {
       const endDay = new Date(event.end_time)
       endDay.setHours(0, 0, 0, 0)
       const endRaw = new Date(event.end_time)
-      if (endRaw.getHours() === 0 && endRaw.getMinutes() === 0 && endRaw.getSeconds() === 0 && endDay > startDay) {
+      if (
+        endRaw.getHours() === 0 &&
+        endRaw.getMinutes() === 0 &&
+        endRaw.getSeconds() === 0 &&
+        endDay > startDay
+      ) {
         endDay.setDate(endDay.getDate() - 1)
       }
       const cursor = new Date(startDay)
@@ -127,7 +168,8 @@ export function useCalendar() {
         const key = cursor.toDateString()
         if (!map.has(key)) map.set(key, [])
         const arr = map.get(key)!
-        if (!arr.some(e => e.id === event.id && e.occurrence_date === event.occurrence_date)) arr.push(event)
+        if (!arr.some((e) => e.id === event.id && e.occurrence_date === event.occurrence_date))
+          arr.push(event)
         cursor.setDate(cursor.getDate() + 1)
       }
     }
@@ -199,17 +241,20 @@ export function useCalendar() {
       const key = ev.occurrence_date ? `${ev.id}_${ev.occurrence_date}` : ev.id
       items.push({ key, startMin: range.startMin, endMin: range.endMin })
     }
-    items.sort(
-      (a, b) => a.startMin - b.startMin
-        || (b.endMin - b.startMin) - (a.endMin - a.startMin)
-    )
+    items.sort((a, b) => a.startMin - b.startMin || b.endMin - b.startMin - (a.endMin - a.startMin))
     const columns: number[] = []
     const placed: Array<{
-      key: string; column: number; startMin: number; endMin: number
+      key: string
+      column: number
+      startMin: number
+      endMin: number
     }> = []
     for (const item of items) {
-      let col = columns.findIndex(end => end <= item.startMin)
-      if (col === -1) { col = columns.length; columns.push(0) }
+      let col = columns.findIndex((end) => end <= item.startMin)
+      if (col === -1) {
+        col = columns.length
+        columns.push(0)
+      }
       columns[col] = item.endMin
       placed.push({ ...item, column: col })
     }
@@ -230,7 +275,7 @@ export function useCalendar() {
     if (cur.length > 0) groups.push(cur)
     const result = new Map<string, { left: string; width: string }>()
     for (const group of groups) {
-      const totalCols = Math.max(...group.map(e => e.column)) + 1
+      const totalCols = Math.max(...group.map((e) => e.column)) + 1
       const pct = 100 / totalCols
       for (const ev of group) {
         result.set(ev.key, {
@@ -252,10 +297,7 @@ export function useCalendar() {
   })
 
   /** Column position style (left/width) for an event on a specific day. */
-  function eventColumnStyle(
-    ev: CalendarEvent,
-    day: Date
-  ): Record<string, string> {
+  function eventColumnStyle(ev: CalendarEvent, day: Date): Record<string, string> {
     const layout = allDayLayouts.value.get(day.toDateString())
     if (!layout) return { left: '2px', width: 'calc(100% - 4px)' }
     const key = ev.occurrence_date ? `${ev.id}_${ev.occurrence_date}` : ev.id
@@ -274,7 +316,9 @@ export function useCalendar() {
     currentDate.value = d
   }
 
-  function goToday(): void { currentDate.value = new Date() }
+  function goToday(): void {
+    currentDate.value = new Date()
+  }
 
   // ── Data fetching ────────────────────────────────────────────
 
@@ -309,7 +353,7 @@ export function useCalendar() {
       start_time: data.start,
       end_time: data.end,
       reminder_minutes: data.reminder_minutes ?? undefined,
-      recurrence_rule: data.recurrence_rule || undefined,
+      recurrence_rule: data.recurrence_rule || undefined
     })
     await fetchEvents()
     await calendarStore.refresh()
@@ -338,9 +382,25 @@ export function useCalendar() {
   watch([currentDate, viewMode], fetchEvents)
 
   return {
-    viewMode, currentDate, events, loading, error, headerLabel,
-    visibleDays, isToday, isCurrentMonth, eventsForDay,
-    eventStyle, eventColor, eventColumnStyle, formatTime,
-    navigate, goToday, fetchEvents, createEvent, updateEvent, deleteEvent
+    viewMode,
+    currentDate,
+    events,
+    loading,
+    error,
+    headerLabel,
+    visibleDays,
+    isToday,
+    isCurrentMonth,
+    eventsForDay,
+    eventStyle,
+    eventColor,
+    eventColumnStyle,
+    formatTime,
+    navigate,
+    goToday,
+    fetchEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent
   }
 }

@@ -7,8 +7,11 @@
       </div>
       <ul class="sv__nav-list">
         <li v-for="item in navItems" :key="item.id">
-          <button class="sv__nav-item" :class="{ 'sv__nav-item--active': activeSection === item.id }"
-            @click="scrollTo(item.id)">
+          <button
+            class="sv__nav-item"
+            :class="{ 'sv__nav-item--active': activeSection === item.id }"
+            @click="scrollTo(item.id)"
+          >
             <AppIcon :name="item.iconName" :size="16" :stroke-width="1.5" class="sv__nav-icon" />
             <span>{{ item.label }}</span>
           </button>
@@ -19,12 +22,12 @@
     <!-- Scrollable content -->
     <div ref="contentRef" class="sv__content" @scroll="onScroll">
       <!-- Model -->
-      <section :ref="(el) => setSectionRef('model', el)" id="section-model" class="sv__section">
+      <section id="section-model" :ref="(el) => setSectionRef('model', el)" class="sv__section">
         <ModelManager />
       </section>
 
       <!-- LLM Parameters -->
-      <section :ref="(el) => setSectionRef('llm', el)" id="section-llm" class="sv__section">
+      <section id="section-llm" :ref="(el) => setSectionRef('llm', el)" class="sv__section">
         <div class="sv__section-head">
           <h3 class="sv__section-title">Parametri LLM</h3>
           <p class="sv__section-desc">Configura il comportamento del modello di linguaggio</p>
@@ -41,7 +44,10 @@
           <Transition name="sv-warn">
             <div v-if="!settingsStore.systemPromptEnabled" class="sv__warn">
               <AppIcon name="alert-triangle" :size="14" :stroke-width="2" />
-              <span>Senza system prompt il modello non avrà istruzioni su personalità, limiti e strumenti.</span>
+              <span
+                >Senza system prompt il modello non avrà istruzioni su personalità, limiti e
+                strumenti.</span
+              >
             </div>
           </Transition>
 
@@ -57,7 +63,10 @@
           <Transition name="sv-warn">
             <div v-if="!settingsStore.toolsEnabled" class="sv__warn">
               <AppIcon name="alert-triangle" :size="14" :stroke-width="2" />
-              <span>Senza tool calling il modello non potrà eseguire azioni (meteo, calendario, automazione).</span>
+              <span
+                >Senza tool calling il modello non potrà eseguire azioni (meteo, calendario,
+                automazione).</span
+              >
             </div>
           </Transition>
         </div>
@@ -66,76 +75,111 @@
           <label class="sv__field">
             <span class="sv__field-label">Come Alice deve chiamarti</span>
             <div class="sv__input-wrap">
-              <input v-model="settingsStore.settings.llm.userPreferredName" type="text" class="sv__input"
-                maxlength="80" placeholder="es. Marco" />
+              <input
+                v-model="settingsStore.settings.llm.userPreferredName"
+                type="text"
+                class="sv__input"
+                maxlength="80"
+                placeholder="es. Marco"
+              />
             </div>
           </label>
           <label class="sv__field">
             <span class="sv__field-label">Temperatura</span>
             <div class="sv__input-wrap">
-              <input v-model.number="settingsStore.settings.llm.temperature" type="number" class="sv__input" min="0"
-                max="2" step="0.1" />
+              <input
+                v-model.number="settingsStore.settings.llm.temperature"
+                type="number"
+                class="sv__input"
+                min="0"
+                max="2"
+                step="0.1"
+              />
             </div>
           </label>
           <label class="sv__field">
             <span class="sv__field-label">Max Tokens</span>
             <div class="sv__input-wrap">
-              <input v-model.number="settingsStore.settings.llm.maxTokens" type="number" class="sv__input" min="256"
-                max="131072" step="256" />
+              <input
+                v-model.number="settingsStore.settings.llm.maxTokens"
+                type="number"
+                class="sv__input"
+                min="256"
+                max="131072"
+                step="256"
+              />
             </div>
           </label>
           <label class="sv__field">
             <span class="sv__field-label">Max iterazioni strumenti</span>
             <div class="sv__input-wrap">
-              <input v-model.number="settingsStore.settings.llm.maxToolIterations" type="number" class="sv__input"
-                min="1" max="100" step="1" />
+              <input
+                v-model.number="settingsStore.settings.llm.maxToolIterations"
+                type="number"
+                class="sv__input"
+                min="1"
+                max="100"
+                step="1"
+              />
             </div>
           </label>
         </div>
       </section>
 
       <!-- Agent / Persona -->
-      <section :ref="(el) => setSectionRef('persona', el)" id="section-persona" class="sv__section">
+      <section id="section-persona" :ref="(el) => setSectionRef('persona', el)" class="sv__section">
         <AgentPersonaSettings />
       </section>
 
       <!-- Voice -->
-      <section :ref="(el) => setSectionRef('voice', el)" id="section-voice" class="sv__section">
+      <section id="section-voice" :ref="(el) => setSectionRef('voice', el)" class="sv__section">
         <VoiceSettings />
       </section>
 
       <!-- Plugins -->
-      <section :ref="(el) => setSectionRef('plugins', el)" id="section-plugins" class="sv__section">
+      <section id="section-plugins" :ref="(el) => setSectionRef('plugins', el)" class="sv__section">
         <PluginManagement />
       </section>
 
       <!-- Email -->
-      <section :ref="(el) => setSectionRef('email', el)" id="section-email" class="sv__section">
+      <section id="section-email" :ref="(el) => setSectionRef('email', el)" class="sv__section">
         <EmailSettings />
       </section>
 
       <!-- MCP Servers -->
-      <section :ref="(el) => setSectionRef('mcp', el)" id="section-mcp" class="sv__section">
+      <section id="section-mcp" :ref="(el) => setSectionRef('mcp', el)" class="sv__section">
         <McpManager />
       </section>
 
       <!-- Knowledge Graph -->
-      <section :ref="(el) => setSectionRef('knowledge', el)" id="section-knowledge" class="sv__section">
+      <section
+        id="section-knowledge"
+        :ref="(el) => setSectionRef('knowledge', el)"
+        class="sv__section"
+      >
         <KnowledgeGraphManager />
       </section>
 
       <!-- Memory -->
-      <section :ref="(el) => setSectionRef('memory', el)" id="section-memory" class="sv__section">
+      <section id="section-memory" :ref="(el) => setSectionRef('memory', el)" class="sv__section">
         <MemoryManager />
       </section>
 
       <!-- Vector Store -->
-      <section :ref="(el) => setSectionRef('vectorstore', el)" id="section-vectorstore" class="sv__section">
+      <section
+        id="section-vectorstore"
+        :ref="(el) => setSectionRef('vectorstore', el)"
+        class="sv__section"
+      >
         <VectorStoreManager />
       </section>
 
       <!-- Security -->
-      <section :ref="(el) => setSectionRef('security', el)" id="section-security" class="sv__section">
+      <section
+        id="section-security"
+        :ref="(el) => setSectionRef('security', el)"
+        class="sv__section"
+      >
         <div class="sv__section-head">
           <h3 class="sv__section-title">Sicurezza</h3>
           <p class="sv__section-desc">Controlla le autorizzazioni e i livelli di sicurezza</p>
@@ -146,13 +190,18 @@
               <span class="sv__row-label">Conferme strumenti</span>
               <span class="sv__row-hint">Richiedi conferma prima di eseguire strumenti</span>
             </div>
-            <UiToggle v-model="settingsStore.toolConfirmations" aria-label="Conferma esecuzione strumenti" />
+            <UiToggle
+              v-model="settingsStore.toolConfirmations"
+              aria-label="Conferma esecuzione strumenti"
+            />
           </div>
           <Transition name="sv-warn">
             <div v-if="!settingsStore.toolConfirmations" class="sv__warn">
               <AppIcon name="alert-triangle" :size="14" :stroke-width="2" />
-              <span>Disabilitare le conferme riduce la sicurezza. Gli strumenti pericolosi verranno eseguiti senza
-                approvazione.</span>
+              <span
+                >Disabilitare le conferme riduce la sicurezza. Gli strumenti pericolosi verranno
+                eseguiti senza approvazione.</span
+              >
             </div>
           </Transition>
         </div>
@@ -162,7 +211,7 @@
       </section>
 
       <!-- UI -->
-      <section :ref="(el) => setSectionRef('ui', el)" id="section-ui" class="sv__section">
+      <section id="section-ui" :ref="(el) => setSectionRef('ui', el)" class="sv__section">
         <div class="sv__section-head">
           <h3 class="sv__section-title">Interfaccia</h3>
           <p class="sv__section-desc">Personalizza l'aspetto e la lingua dell'applicazione</p>
@@ -171,9 +220,16 @@
           <label class="sv__field">
             <span class="sv__field-label">Tema</span>
             <div class="sv__input-wrap">
-              <UiSelect class="sv__select" :model-value="settingsStore.settings.ui.theme" :options="themeOptions"
-                size="md" aria-label="Tema"
-                @update:model-value="(v) => (settingsStore.settings.ui.theme = v === 'light' ? 'light' : 'dark')" />
+              <UiSelect
+                class="sv__select"
+                :model-value="settingsStore.settings.ui.theme"
+                :options="themeOptions"
+                size="md"
+                aria-label="Tema"
+                @update:model-value="
+                  (v) => (settingsStore.settings.ui.theme = v === 'light' ? 'light' : 'dark')
+                "
+              />
             </div>
           </label>
           <label class="sv__field">
@@ -215,11 +271,23 @@ const settingsStore = useSettingsStore()
 /* ── UI theme select ────────────────────────────────────────── */
 const themeOptions: UiSelectOption[] = [
   { value: 'dark', label: 'Scuro' },
-  { value: 'light', label: 'Chiaro' },
+  { value: 'light', label: 'Chiaro' }
 ]
 
 /* ── Navigation ─────────────────────────────────────────────── */
-type SectionId = 'model' | 'llm' | 'persona' | 'voice' | 'plugins' | 'email' | 'mcp' | 'knowledge' | 'memory' | 'vectorstore' | 'security' | 'ui'
+type SectionId =
+  | 'model'
+  | 'llm'
+  | 'persona'
+  | 'voice'
+  | 'plugins'
+  | 'email'
+  | 'mcp'
+  | 'knowledge'
+  | 'memory'
+  | 'vectorstore'
+  | 'security'
+  | 'ui'
 
 const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'model', label: 'Modello', iconName: 'package' },
@@ -233,13 +301,24 @@ const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'memory', label: 'Memoria', iconName: 'book' },
   { id: 'vectorstore', label: 'Vector Store', iconName: 'database' },
   { id: 'security', label: 'Sicurezza', iconName: 'shield' },
-  { id: 'ui', label: 'Interfaccia', iconName: 'settings' },
+  { id: 'ui', label: 'Interfaccia', iconName: 'settings' }
 ]
 
 const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
-  model: null, llm: null, persona: null, voice: null, plugins: null, email: null, mcp: null, knowledge: null, memory: null, vectorstore: null, security: null, ui: null,
+  model: null,
+  llm: null,
+  persona: null,
+  voice: null,
+  plugins: null,
+  email: null,
+  mcp: null,
+  knowledge: null,
+  memory: null,
+  vectorstore: null,
+  security: null,
+  ui: null
 })
 
 function setSectionRef(id: SectionId, el: Element | ComponentPublicInstance | null): void {
@@ -281,7 +360,7 @@ onMounted(() => {
         }
       }
     },
-    { root: container, rootMargin: '-20% 0px -70% 0px', threshold: 0 },
+    { root: container, rootMargin: '-20% 0px -70% 0px', threshold: 0 }
   )
 
   for (const item of navItems) {
@@ -590,7 +669,6 @@ onUnmounted(() => {
 
 /* ── Reduced motion ───────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-
   .sv__nav-item,
   .sv__nav-icon,
   .sv__input,

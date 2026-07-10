@@ -27,7 +27,8 @@
 }
 
 /* ─── Code block wrapper — floating card ─── */
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-wrapper {
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .code-block-wrapper {
   margin: var(--space-3) 0;
   border-radius: var(--panel-radius, var(--radius-md));
   overflow: hidden;
@@ -37,7 +38,8 @@
 }
 
 /* ─── Code block header (language label + copy button) ─── */
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-header {
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .code-block-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -76,22 +78,27 @@
   user-select: none;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-copy:hover {
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .code-block-copy:hover {
   color: var(--accent);
   background: var(--accent-dim);
   border-color: var(--accent-border);
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-copy--copied {
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .code-block-copy--copied {
   color: var(--success) !important;
   border-color: var(--success-border) !important;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-copy__label {
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .code-block-copy__label {
   pointer-events: none;
 }
 
-:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .code-block-copy svg {
+:is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .code-block-copy
+  svg {
   pointer-events: none;
   flex-shrink: 0;
 }
@@ -235,72 +242,94 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs {
   color: #2c2820;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name) {
   color: #6b4a2a;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-string, .hljs-addition) {
   color: #3d7a3a;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-comment, .hljs-quote) {
   color: #8c8278;
   font-style: italic;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-number, .hljs-literal) {
   color: #8b5e2a;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-type, .hljs-title) {
   color: #3a5a7a;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-attr, .hljs-variable, .hljs-template-variable) {
   color: #5a4030;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-function {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs-function {
   color: #3a5a7a;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-params {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs-params {
   color: #4a3828;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-regexp, .hljs-link) {
   color: #7a3a20;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-meta {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs-meta {
   color: #6a6258;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-deletion {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs-deletion {
   color: #8b2020;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-symbol, .hljs-bullet) {
   color: #6b4a2a;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-subst {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs-subst {
   color: #2c2820;
 }
 
-[data-theme="light"] :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-section {
+[data-theme='light']
+  :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
+  .hljs-section {
   color: #6b4a2a;
   font-weight: 600;
 }

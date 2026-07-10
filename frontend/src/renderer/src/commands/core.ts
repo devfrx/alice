@@ -19,7 +19,7 @@ export const SWITCHABLE_VIEWS = [
   'whiteboard',
   'board',
   'terminal',
-  'services',
+  'services'
 ] as const
 export type SwitchableView = (typeof SWITCHABLE_VIEWS)[number]
 
@@ -39,7 +39,7 @@ const CORE_COMMAND_NAMES = [
   'conversation.open',
   'conversation.new',
   'sidebar.toggle',
-  'artifact.show',
+  'artifact.show'
 ] as const
 
 export function installCoreCommands(router: Router): void {
@@ -59,14 +59,14 @@ export function installCoreCommands(router: Router): void {
     argsSchema: {
       type: 'object',
       properties: { view: { type: 'string', enum: [...SWITCHABLE_VIEWS] } },
-      required: ['view'],
+      required: ['view']
     },
     run: async ({ view }) => {
       if (!SWITCHABLE_VIEWS.includes(view)) {
         throw new Error(`Unknown view: ${String(view)}`)
       }
       await router.push({ name: view })
-    },
+    }
   })
 
   commandRegistry.register<ConversationOpenArgs>({
@@ -76,7 +76,7 @@ export function installCoreCommands(router: Router): void {
     argsSchema: {
       type: 'object',
       properties: { conversation_id: { type: 'string' } },
-      required: ['conversation_id'],
+      required: ['conversation_id']
     },
     run: async ({ conversation_id }) => {
       const chatStore = useChatStore()
@@ -84,7 +84,7 @@ export function installCoreCommands(router: Router): void {
       if (router.currentRoute.value.name !== 'assistant') {
         await router.push({ name: 'assistant' })
       }
-    },
+    }
   })
 
   commandRegistry.register({
@@ -98,7 +98,7 @@ export function installCoreCommands(router: Router): void {
       if (router.currentRoute.value.name !== 'assistant') {
         await router.push({ name: 'assistant' })
       }
-    },
+    }
   })
 
   commandRegistry.register({
@@ -110,7 +110,7 @@ export function installCoreCommands(router: Router): void {
     argsSchema: { type: 'object', properties: {} },
     run: () => {
       useUIStore().toggleSidebar()
-    },
+    }
   })
 
   commandRegistry.register<ArtifactShowArgs>({
@@ -120,13 +120,13 @@ export function installCoreCommands(router: Router): void {
     argsSchema: {
       type: 'object',
       properties: { artifact_id: { type: 'string' } },
-      required: ['artifact_id'],
+      required: ['artifact_id']
     },
     run: async ({ artifact_id }) => {
       // The board view does not consume `query.artifact` yet (backlog: it
       // may highlight/scroll to the artifact) — the command surface is
       // stable so Fase-7 callers need no change when that lands.
       await router.push({ name: 'board', query: { artifact: artifact_id } })
-    },
+    }
   })
 }

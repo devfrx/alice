@@ -7,7 +7,11 @@
  * collapsible model catalog with download buttons + progress bars.
  */
 import { computed, ref } from 'vue'
-import { useServicesStore, type ServiceSnapshot } from '../../stores/services'
+import {
+  useServicesStore,
+  type ServiceSnapshot,
+  type DownloadProgress
+} from '../../stores/services'
 import AppIcon from '../ui/AppIcon.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
 import type { AppIconName } from '../../assets/icons'
@@ -23,16 +27,13 @@ const STATUS_LABELS: Record<string, string> = {
   up: 'Attivo',
   down: 'Spento',
   degraded: 'Degradato',
-  starting: 'Avvio…',
+  starting: 'Avvio…'
 }
-const SERVICE_META: Record<
-  string,
-  { label: string; icon: AppIconName; tagline: string }
-> = {
+const SERVICE_META: Record<string, { label: string; icon: AppIconName; tagline: string }> = {
   llm: { label: 'LM Studio', icon: 'server', tagline: 'Modello linguistico locale' },
   stt: { label: 'Speech-to-Text', icon: 'mic', tagline: 'Trascrizione vocale (Whisper)' },
   tts: { label: 'Text-to-Speech', icon: 'volume', tagline: 'Sintesi vocale (Piper / XTTS)' },
-  vram: { label: 'VRAM Monitor', icon: 'cpu', tagline: 'Telemetria GPU NVIDIA' },
+  vram: { label: 'VRAM Monitor', icon: 'cpu', tagline: 'Telemetria GPU NVIDIA' }
 }
 
 const meta = computed(
@@ -40,24 +41,20 @@ const meta = computed(
     SERVICE_META[props.service.name] ?? {
       label: props.service.name,
       icon: 'server' as AppIconName,
-      tagline: '',
-    },
+      tagline: ''
+    }
 )
 const statusClass = computed(() => `is-${props.service.status}`)
-const statusLabel = computed(
-  () => STATUS_LABELS[props.service.status] ?? props.service.status,
-)
+const statusLabel = computed(() => STATUS_LABELS[props.service.status] ?? props.service.status)
 const isStarting = computed(() => props.service.status === 'starting')
 
-const isModelService = computed(
-  () => props.service.name === 'stt' || props.service.name === 'tts',
-)
+const isModelService = computed(() => props.service.name === 'stt' || props.service.name === 'tts')
 const catalog = computed(() =>
-  isModelService.value ? store.catalogs[props.service.name] ?? [] : [],
+  isModelService.value ? (store.catalogs[props.service.name] ?? []) : []
 )
 const installedCount = computed(() => catalog.value.filter((m) => m.installed).length)
 
-function progressFor(modelId: string) {
+function progressFor(modelId: string): DownloadProgress | undefined {
   return store.downloads[`${props.service.name}:${modelId}`]
 }
 function pct(modelId: string): number {
@@ -171,7 +168,7 @@ function fmtMb(mb: number): string {
               class="bar"
               :class="{
                 'bar--error': progressFor(m.model_id)?.phase === 'error',
-                'bar--done': progressFor(m.model_id)?.phase === 'completed',
+                'bar--done': progressFor(m.model_id)?.phase === 'completed'
               }"
             >
               <div class="bar__fill" :style="{ width: pct(m.model_id) + '%' }" />
@@ -192,8 +189,7 @@ function fmtMb(mb: number): string {
               class="btn btn--small btn--accent"
               type="button"
               :disabled="
-                !!progressFor(m.model_id) &&
-                progressFor(m.model_id)?.phase === 'downloading'
+                !!progressFor(m.model_id) && progressFor(m.model_id)?.phase === 'downloading'
               "
               @click="onDownload(m.model_id)"
             >
@@ -221,7 +217,11 @@ function fmtMb(mb: number): string {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
 }
 .service-card:hover {
   background: var(--surface-2);
@@ -240,10 +240,18 @@ function fmtMb(mb: number): string {
   background: transparent;
   transition: background 140ms ease;
 }
-.service-card.is-up::before { background: var(--success); }
-.service-card.is-degraded::before { background: var(--warning); }
-.service-card.is-down::before { background: var(--danger); }
-.service-card.is-starting::before { background: var(--accent); }
+.service-card.is-up::before {
+  background: var(--success);
+}
+.service-card.is-degraded::before {
+  background: var(--warning);
+}
+.service-card.is-down::before {
+  background: var(--danger);
+}
+.service-card.is-starting::before {
+  background: var(--accent);
+}
 
 /* ── Header ──────────────────────────────────────────────────── */
 .service-card__head {
@@ -306,8 +314,15 @@ function fmtMb(mb: number): string {
   animation: status-pulse 1.4s ease-in-out infinite;
 }
 @keyframes status-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
 }
 .service-card__status.is-up {
   background: var(--success-light);
@@ -389,7 +404,10 @@ function fmtMb(mb: number): string {
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 .btn:disabled {
   opacity: 0.5;
@@ -446,9 +464,13 @@ function fmtMb(mb: number): string {
   background: var(--surface-0);
   border: 1px solid var(--border);
   border-radius: 8px;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
-.model-row:hover { border-color: var(--border-hover); }
+.model-row:hover {
+  border-color: var(--border-hover);
+}
 .model-row.is-installed {
   background: var(--success-faint);
   border-color: var(--success-border);
@@ -520,8 +542,12 @@ function fmtMb(mb: number): string {
   border-radius: var(--radius-pill);
   transition: width 220ms ease;
 }
-.bar--done .bar__fill { background: var(--success); }
-.bar--error .bar__fill { background: var(--danger); }
+.bar--done .bar__fill {
+  background: var(--success);
+}
+.bar--error .bar__fill {
+  background: var(--danger);
+}
 .model-row__pct {
   font-size: var(--text-2xs);
   color: var(--text-muted);

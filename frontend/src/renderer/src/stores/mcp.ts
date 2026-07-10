@@ -16,12 +16,10 @@ export const useMcpStore = defineStore('mcp', () => {
   const reconnecting = ref<string | null>(null)
 
   const connectedCount = computed(
-    () => servers.value.filter((s) => s.status === 'connected').length,
+    () => servers.value.filter((s) => s.status === 'connected').length
   )
 
-  const totalTools = computed(
-    () => servers.value.reduce((sum, s) => sum + s.tools.length, 0),
-  )
+  const totalTools = computed(() => servers.value.reduce((sum, s) => sum + s.tools.length, 0))
 
   async function loadServers(): Promise<void> {
     loading.value = true
@@ -55,6 +53,6 @@ export const useMcpStore = defineStore('mcp', () => {
     connectedCount,
     totalTools,
     loadServers,
-    reconnectServer,
+    reconnectServer
   }
 })

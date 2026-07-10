@@ -23,7 +23,7 @@ import {
   onMounted,
   ref,
   watch,
-  type ComponentPublicInstance,
+  type ComponentPublicInstance
 } from 'vue'
 import AppIcon from './AppIcon.vue'
 import type { AppIconName } from '../../assets/icons'
@@ -53,7 +53,7 @@ const props = withDefaults(
     /** Equal-width segments (default) or content-sized. */
     equal?: boolean
   }>(),
-  { size: 'md', ariaLabel: undefined, equal: true },
+  { size: 'md', ariaLabel: undefined, equal: true }
 )
 
 const emit = defineEmits<{
@@ -68,9 +68,7 @@ function setTabRef(el: Element | ComponentPublicInstance | null, index: number):
   tabEls.value[index] = (el as HTMLElement | null) ?? null
 }
 
-const activeIndex = computed(() =>
-  props.options.findIndex((o) => o.value === props.modelValue),
-)
+const activeIndex = computed(() => props.options.findIndex((o) => o.value === props.modelValue))
 
 /** Inline style for the sliding indicator, measured from the active tab. */
 const indicatorStyle = ref<Record<string, string>>({ opacity: '0' })
@@ -85,7 +83,7 @@ function updateIndicator(): void {
   indicatorStyle.value = {
     transform: `translateX(${el.offsetLeft}px)`,
     width: `${el.offsetWidth}px`,
-    opacity: '1',
+    opacity: '1'
   }
 }
 
@@ -95,10 +93,7 @@ function select(option: UiSegmentedOption): void {
 
 let resizeObserver: ResizeObserver | null = null
 
-watch(
-  [activeIndex, () => props.options.length],
-  () => nextTick(updateIndicator),
-)
+watch([activeIndex, () => props.options.length], () => nextTick(updateIndicator))
 
 onMounted(() => {
   nextTick(updateIndicator)

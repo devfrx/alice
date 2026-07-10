@@ -66,7 +66,12 @@ export interface ModelUnloadResponse {
 }
 
 /** Download job status values. */
-export type DownloadStatus = 'downloading' | 'paused' | 'completed' | 'failed' | 'already_downloaded'
+export type DownloadStatus =
+  | 'downloading'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'already_downloaded'
 
 /** Response from POST /api/models/download. */
 export interface ModelDownloadResponse {

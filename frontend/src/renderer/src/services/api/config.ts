@@ -3,8 +3,7 @@ import { request } from './http'
 
 export const configApi = {
   /** Retrieve the current server configuration. */
-  getConfig: (): Promise<Record<string, unknown>> =>
-    request<Record<string, unknown>>('/config'),
+  getConfig: (): Promise<Record<string, unknown>> => request<Record<string, unknown>>('/config'),
 
   /** Update the server configuration. */
   updateConfig: (config: Record<string, unknown>): Promise<Record<string, unknown>> =>
@@ -36,7 +35,9 @@ export const configApi = {
    * @returns The full resolved config after the change.
    */
   patchConfig: (
-    path: string, value: unknown, layer: string = 'user',
+    path: string,
+    value: unknown,
+    layer: string = 'user'
   ): Promise<Record<string, unknown>> =>
     request<Record<string, unknown>>('/config', {
       method: 'PATCH',
@@ -47,5 +48,5 @@ export const configApi = {
   syncModel: (): Promise<{ synced: boolean; model?: string; reason?: string }> =>
     request<{ synced: boolean; model?: string; reason?: string }>('/config/sync-model', {
       method: 'POST'
-    }),
+    })
 }

@@ -7,7 +7,7 @@ import type {
   DownloadStatusResponse,
   LMStudioModel,
   ModelOperationResponse,
-  ToolCatalogPlugin,
+  ToolCatalogPlugin
 } from '../types/settings'
 import { emptyTierGuidance, normaliseTierGuidance, pruneTierGuidance } from '../utils/agentPrompts'
 import { useChatStore } from './chat'
@@ -140,7 +140,7 @@ export const useSettingsStore = defineStore('settings', () => {
       const [tc, sp, t] = await Promise.all([
         settingsApi.getToolConfirmations(),
         settingsApi.getSystemPrompt(),
-        settingsApi.getTools(),
+        settingsApi.getTools()
       ])
       toolConfirmations.value = tc.confirmations_enabled
       systemPromptEnabled.value = sp.system_prompt_enabled
@@ -172,7 +172,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * when Tool RAG is on (tools are auto-selected per message).
    */
   const toolSelectionAvailable = computed(
-    () => toolsEnabled.value && !settings.value.llm.toolRagEnabled,
+    () => toolsEnabled.value && !settings.value.llm.toolRagEnabled
   )
 
   /** Number of tools currently turned off (for badge display). */
@@ -215,9 +215,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /** Enable or disable every tool of a plugin at once, then persist. */
-  async function setPluginEnabled(
-    plugin: string, enabled: boolean,
-  ): Promise<void> {
+  async function setPluginEnabled(plugin: string, enabled: boolean): Promise<void> {
     const group = toolCatalog.value.find((p) => p.plugin === plugin)
     if (!group) return
     const next = new Set(disabledTools.value)
@@ -246,7 +244,7 @@ export const useSettingsStore = defineStore('settings', () => {
    */
   const agentPrompts = ref<AgentPrompts>({
     persona: '',
-    tier_guidance: emptyTierGuidance(),
+    tier_guidance: emptyTierGuidance()
   })
 
   /** Load persona + per-tier guidance from the resolved backend config. */
@@ -258,8 +256,8 @@ export const useSettingsStore = defineStore('settings', () => {
       agentPrompts.value = {
         persona: typeof prompts.persona === 'string' ? prompts.persona : '',
         tier_guidance: normaliseTierGuidance(
-          prompts.tier_guidance as Record<string, unknown> | null | undefined,
-        ),
+          prompts.tier_guidance as Record<string, unknown> | null | undefined
+        )
       }
     } catch (err) {
       console.warn('[settings store] loadAgentPrompts failed:', err)
@@ -283,7 +281,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       await configApi.patchConfig(
         'agent.prompts.tier_guidance',
-        pruneTierGuidance(agentPrompts.value.tier_guidance),
+        pruneTierGuidance(agentPrompts.value.tier_guidance)
       )
     } catch (err) {
       console.warn('[settings store] saveAgentTierGuidance failed:', err)
@@ -304,15 +302,20 @@ export const useSettingsStore = defineStore('settings', () => {
       if (config.llm) {
         const llm = config.llm as Record<string, unknown>
         settings.value.llm.model = (llm.model as string) ?? settings.value.llm.model
-        settings.value.llm.temperature = (llm.temperature as number) ?? settings.value.llm.temperature
+        settings.value.llm.temperature =
+          (llm.temperature as number) ?? settings.value.llm.temperature
         settings.value.llm.maxTokens = (llm.max_tokens as number) ?? settings.value.llm.maxTokens
-        settings.value.llm.maxToolIterations = (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
+        settings.value.llm.maxToolIterations =
+          (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
         settings.value.llm.contextCompressionEnabled =
-          (llm.context_compression_enabled as boolean) ?? settings.value.llm.contextCompressionEnabled
+          (llm.context_compression_enabled as boolean) ??
+          settings.value.llm.contextCompressionEnabled
         settings.value.llm.contextCompressionThreshold =
-          (llm.context_compression_threshold as number) ?? settings.value.llm.contextCompressionThreshold
+          (llm.context_compression_threshold as number) ??
+          settings.value.llm.contextCompressionThreshold
         settings.value.llm.contextCompressionReserve =
-          (llm.context_compression_reserve as number) ?? settings.value.llm.contextCompressionReserve
+          (llm.context_compression_reserve as number) ??
+          settings.value.llm.contextCompressionReserve
         settings.value.llm.toolRagEnabled =
           (llm.tool_rag_enabled as boolean) ?? settings.value.llm.toolRagEnabled
         settings.value.llm.toolRagTopK =
@@ -345,11 +348,15 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value.email.smtpPort = (email.smtp_port as number) ?? settings.value.email.smtpPort
         settings.value.email.smtpSsl = (email.smtp_ssl as boolean) ?? settings.value.email.smtpSsl
         settings.value.email.username = (email.username as string) ?? settings.value.email.username
-        settings.value.email.useKeyring = (email.use_keyring as boolean) ?? settings.value.email.useKeyring
-        settings.value.email.fetchLastN = (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
+        settings.value.email.useKeyring =
+          (email.use_keyring as boolean) ?? settings.value.email.useKeyring
+        settings.value.email.fetchLastN =
+          (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
         settings.value.email.maxFetch = (email.max_fetch as number) ?? settings.value.email.maxFetch
-        settings.value.email.imapIdleEnabled = (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
-        settings.value.email.archiveFolder = (email.archive_folder as string) ?? settings.value.email.archiveFolder
+        settings.value.email.imapIdleEnabled =
+          (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
+        settings.value.email.archiveFolder =
+          (email.archive_folder as string) ?? settings.value.email.archiveFolder
         settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? false
         settings.value.email.serviceRunning = (email.service_running as boolean) ?? false
         settings.value.email.password = ''
@@ -412,8 +419,10 @@ export const useSettingsStore = defineStore('settings', () => {
       })
       const email = updated.email as Record<string, unknown> | undefined
       if (email) {
-        settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? settings.value.email.passwordConfigured
-        settings.value.email.serviceRunning = (email.service_running as boolean) ?? settings.value.email.serviceRunning
+        settings.value.email.passwordConfigured =
+          (email.password_configured as boolean) ?? settings.value.email.passwordConfigured
+        settings.value.email.serviceRunning =
+          (email.service_running as boolean) ?? settings.value.email.serviceRunning
       }
       if (emailPassword) {
         _loadingSettings = true
@@ -427,11 +436,15 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(settings, () => {
-    if (_loadingSettings) return
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => saveSettings(), 1000)
-  }, { deep: true })
+  watch(
+    settings,
+    () => {
+      if (_loadingSettings) return
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => saveSettings(), 1000)
+    },
+    { deep: true }
+  )
 
   // NOTE: loadSettings() is deferred — called by initialize() after backend is ready.
 
@@ -479,8 +492,8 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   /** The active embedding model (if any). */
-  const activeEmbeddingModel = computed(() =>
-    models.value.find((m) => m.loaded && m.type === 'embedding') ?? null
+  const activeEmbeddingModel = computed(
+    () => models.value.find((m) => m.loaded && m.type === 'embedding') ?? null
   )
 
   /** All LLM models (excludes embedding). */
@@ -496,16 +509,20 @@ export const useSettingsStore = defineStore('settings', () => {
   const unloadedModels = computed(() => models.value.filter((m) => !m.loaded))
 
   /** Whether ANY model operation is in progress (global lock). */
-  const isAnyOperationInProgress = computed(() =>
-    currentOperation.value !== null &&
-    currentOperation.value.status === 'in_progress'
+  const isAnyOperationInProgress = computed(
+    () => currentOperation.value !== null && currentOperation.value.status === 'in_progress'
   )
 
   /** Description of the current operation for UI display. */
   const operationDescription = computed(() => {
     const op = currentOperation.value
     if (!op || op.status === 'idle') return null
-    const typeLabel = op.type === 'load' ? 'Caricamento' : op.type === 'unload' ? 'Rimozione dalla memoria' : 'Cambio modello'
+    const typeLabel =
+      op.type === 'load'
+        ? 'Caricamento'
+        : op.type === 'unload'
+          ? 'Rimozione dalla memoria'
+          : 'Cambio modello'
     return `${typeLabel}: ${op.model ?? '...'}`
   })
 
@@ -569,7 +586,7 @@ export const useSettingsStore = defineStore('settings', () => {
         // Derive connection state from the freshly-fetched model list instead
         // of making a redundant /models/status round-trip via checkConnection().
         lmStudioConnected.value = true
-        loadedModelCount.value = models.value.filter(m => m.loaded).length
+        loadedModelCount.value = models.value.filter((m) => m.loaded).length
       } finally {
         isLoadingModels.value = false
         _loadModelsInFlight = null
@@ -644,7 +661,7 @@ export const useSettingsStore = defineStore('settings', () => {
     modelKey: string,
     config?: { context_length?: number; flash_attention?: boolean }
   ): Promise<void> {
-    if (isAnyOperationInProgress.value) throw new Error('Un\'altra operazione è in corso')
+    if (isAnyOperationInProgress.value) throw new Error("Un'altra operazione è in corso")
     loadingModelKeys.value = new Set([...loadingModelKeys.value, modelKey])
     currentOperation.value = { status: 'in_progress', type: 'load', model: modelKey }
     startOperationPolling()
@@ -666,7 +683,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Unload a model instance from LM Studio. */
   async function unloadModel(instanceId: string): Promise<void> {
-    if (isAnyOperationInProgress.value) throw new Error('Un\'altra operazione è in corso')
+    if (isAnyOperationInProgress.value) throw new Error("Un'altra operazione è in corso")
     unloadingInstanceIds.value = new Set([...unloadingInstanceIds.value, instanceId])
     currentOperation.value = { status: 'in_progress', type: 'unload', model: instanceId }
     startOperationPolling()

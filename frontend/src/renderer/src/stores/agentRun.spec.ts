@@ -17,7 +17,7 @@ import type {
   WsTurnFinishedMessage,
   WsTurnLlmStepMessage,
   WsTurnStartedMessage,
-  WsTurnUsageMessage,
+  WsTurnUsageMessage
 } from '../types/turn'
 
 // ---------------------------------------------------------------------------
@@ -36,21 +36,21 @@ function toolCall(
   turnId: string,
   executionId: string,
   toolName = 'web_search',
-  args: Record<string, unknown> = { q: 'alice' },
+  args: Record<string, unknown> = { q: 'alice' }
 ): WsToolCallMessage {
   return {
     type: 'tool.call',
     turn_id: turnId,
     execution_id: executionId,
     tool_name: toolName,
-    args,
+    args
   }
 }
 
 function toolResult(
   turnId: string,
   executionId: string,
-  overrides: Partial<WsToolResultMessage> = {},
+  overrides: Partial<WsToolResultMessage> = {}
 ): WsToolResultMessage {
   return {
     type: 'tool.result',
@@ -59,14 +59,14 @@ function toolResult(
     tool_name: 'web_search',
     success: true,
     result: 'ok',
-    ...overrides,
+    ...overrides
   }
 }
 
 function interactionRequested(
   turnId: string,
   executionId: string,
-  overrides: Partial<WsInteractionRequestedMessage> = {},
+  overrides: Partial<WsInteractionRequestedMessage> = {}
 ): WsInteractionRequestedMessage {
   return {
     type: 'interaction.requested',
@@ -74,14 +74,14 @@ function interactionRequested(
     execution_id: executionId,
     kind: 'tool_confirmation',
     tool_name: 'run_terminal_command',
-    ...overrides,
+    ...overrides
   }
 }
 
 function interactionResolved(
   turnId: string,
   executionId: string,
-  overrides: Partial<WsInteractionResolvedMessage> = {},
+  overrides: Partial<WsInteractionResolvedMessage> = {}
 ): WsInteractionResolvedMessage {
   return {
     type: 'interaction.resolved',
@@ -89,7 +89,7 @@ function interactionResolved(
     execution_id: executionId,
     kind: 'tool_confirmation',
     outcome: 'approved',
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -102,13 +102,13 @@ function usage(turnId: string, overrides: Partial<WsTurnUsageMessage> = {}): WsT
     output_tokens: 20,
     tool_calls: 1,
     max_steps: 8,
-    ...overrides,
+    ...overrides
   }
 }
 
 function finished(
   turnId: string,
-  overrides: Partial<WsTurnFinishedMessage> = {},
+  overrides: Partial<WsTurnFinishedMessage> = {}
 ): WsTurnFinishedMessage {
   return {
     type: 'turn.finished',
@@ -117,7 +117,7 @@ function finished(
     input_tokens: 100,
     output_tokens: 20,
     steps: 1,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -155,7 +155,7 @@ describe('happy-path turn', () => {
       executionId: 'e1',
       toolName: 'web_search',
       status: 'success',
-      result: 'ok',
+      result: 'ok'
     })
     expect(run!.tools[0].args).toEqual({ q: 'alice' })
   })
@@ -208,7 +208,7 @@ describe('tool.result handling', () => {
     expect(run!.tools[0]).toMatchObject({
       executionId: 'e1',
       status: 'success',
-      result: 'early',
+      result: 'early'
     })
 
     // A subsequent tool.call for the same executionId must NOT duplicate it.
@@ -237,7 +237,7 @@ describe('interaction handling', () => {
       executionId: 'x1',
       kind: 'tool_confirmation',
       toolName: 'run_terminal_command',
-      status: 'pending',
+      status: 'pending'
     })
   })
 
@@ -268,7 +268,7 @@ describe('interaction handling', () => {
     const s = useAgentRunStore()
     // No turn.started, no requested — the resolved frame arrives first.
     s.applyInteractionResolved(
-      interactionResolved('t1', 'x1', { kind: 'ask_user', outcome: 'answered' }),
+      interactionResolved('t1', 'x1', { kind: 'ask_user', outcome: 'answered' })
     )
 
     const run = s.runByTurnId('t1')
@@ -279,7 +279,7 @@ describe('interaction handling', () => {
       executionId: 'x1',
       kind: 'ask_user',
       status: 'resolved',
-      outcome: 'answered',
+      outcome: 'answered'
     })
 
     // A subsequent requested for the same executionId must NOT duplicate it.
@@ -352,9 +352,27 @@ describe('seq', () => {
   it('assigns monotonic seq across interleaved tools and interactions', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
-    s.applyToolCall({ type: 'tool.call', turn_id: 't1', execution_id: 'e1', tool_name: 'web_search', args: {} })
-    s.applyInteractionRequested({ type: 'interaction.requested', turn_id: 't1', execution_id: 'e2', kind: 'tool_confirmation', tool_name: 'write_file' })
-    s.applyToolCall({ type: 'tool.call', turn_id: 't1', execution_id: 'e3', tool_name: 'read_file', args: {} })
+    s.applyToolCall({
+      type: 'tool.call',
+      turn_id: 't1',
+      execution_id: 'e1',
+      tool_name: 'web_search',
+      args: {}
+    })
+    s.applyInteractionRequested({
+      type: 'interaction.requested',
+      turn_id: 't1',
+      execution_id: 'e2',
+      kind: 'tool_confirmation',
+      tool_name: 'write_file'
+    })
+    s.applyToolCall({
+      type: 'tool.call',
+      turn_id: 't1',
+      execution_id: 'e3',
+      tool_name: 'read_file',
+      args: {}
+    })
     const run = s.runByTurnId('t1')!
     expect(run.tools.find((t) => t.executionId === 'e1')!.seq).toBe(0)
     expect(run.interactions.find((i) => i.executionId === 'e2')!.seq).toBe(1)
@@ -370,7 +388,14 @@ describe('beginPendingTurn', () => {
   it('beginPendingTurn shows a fresh pending run, not the prior finished one', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
-    s.applyTurnFinished({ type: 'turn.finished', turn_id: 't1', finish_reason: 'stop', input_tokens: 10, output_tokens: 5, steps: 1 })
+    s.applyTurnFinished({
+      type: 'turn.finished',
+      turn_id: 't1',
+      finish_reason: 'stop',
+      input_tokens: 10,
+      output_tokens: 5,
+      steps: 1
+    })
     expect(s.currentRun!.status).toBe('finished')
     s.beginPendingTurn()
     expect(s.currentRun!.status).toBe('running')

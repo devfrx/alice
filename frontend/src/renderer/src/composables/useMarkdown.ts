@@ -92,8 +92,7 @@ function wikilinkPlugin(mdi: MarkdownIt): void {
       const display = (pipeIdx >= 0 ? inner.slice(pipeIdx + 1) : inner).trim()
 
       const tokenOpen = state.push('html_inline', '', 0)
-      tokenOpen.content =
-        `<a class="wikilink" data-target="${escapeHtml(target)}">`
+      tokenOpen.content = `<a class="wikilink" data-target="${escapeHtml(target)}">`
 
       const tokenText = state.push('html_inline', '', 0)
       tokenText.content = escapeHtml(display)
@@ -107,7 +106,7 @@ function wikilinkPlugin(mdi: MarkdownIt): void {
   })
 }
 
-const copySvg = getIconSvgString('copy', 16, 2)
+const copySvg = getIconSvgString('copy', 16)
 
 /** Module-level singleton — avoids re-creating on every composable call. */
 const md: MarkdownIt = new MarkdownIt({
@@ -134,16 +133,18 @@ const md: MarkdownIt = new MarkdownIt({
     const langClass = (normalizedLang || 'plaintext').replace(/[^a-zA-Z0-9_-]/g, '')
     const dataCode = encodeBase64(str)
 
-    return `<div class="code-block-wrapper">` +
+    return (
+      `<div class="code-block-wrapper">` +
       `<div class="code-block-header">` +
-        `<span class="code-block-lang">${langLabel}</span>` +
-        `<button class="code-block-copy" data-code="${dataCode}" title="Copia codice">` +
-          copySvg +
-          `<span class="code-block-copy__label">Copia</span>` +
-        `</button>` +
+      `<span class="code-block-lang">${langLabel}</span>` +
+      `<button class="code-block-copy" data-code="${dataCode}" title="Copia codice">` +
+      copySvg +
+      `<span class="code-block-copy__label">Copia</span>` +
+      `</button>` +
       `</div>` +
       `<pre class="code-block"><code class="hljs language-${langClass}">${highlighted}</code></pre>` +
-    `</div>`
+      `</div>`
+    )
   }
 })
 

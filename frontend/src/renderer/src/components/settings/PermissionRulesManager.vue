@@ -22,16 +22,10 @@ import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 import { permissionsApi } from '../../services/api'
 import { useChatStore } from '../../stores/chat'
-import type {
-  PermissionRule,
-  RuleEffect,
-  RuleScope,
-} from '../../types/permission'
+import type { PermissionRule, RuleEffect, RuleScope } from '../../types/permission'
 
 const chatStore = useChatStore()
-const conversationId = computed<string | null>(
-  () => chatStore.currentConversation?.id ?? null,
-)
+const conversationId = computed<string | null>(() => chatStore.currentConversation?.id ?? null)
 
 const rules = ref<PermissionRule[]>([])
 const loading = ref(false)
@@ -46,23 +40,23 @@ const newScope = ref<RuleScope>('global')
 const effectOptions: UiSelectOption[] = [
   { value: 'allow', label: 'Consenti' },
   { value: 'ask', label: 'Chiedi' },
-  { value: 'deny', label: 'Nega' },
+  { value: 'deny', label: 'Nega' }
 ]
 
 const scopeOptions: UiSelectOption[] = [
   { value: 'global', label: 'Globale' },
-  { value: 'conversation', label: 'Questa conversazione' },
+  { value: 'conversation', label: 'Questa conversazione' }
 ]
 
 const canSubmit = computed(
-  () => !!conversationId.value && newTool.value.trim().length > 0 && !busy.value,
+  () => !!conversationId.value && newTool.value.trim().length > 0 && !busy.value
 )
 
 /** Rules sorted deny → ask → allow, then by tool name, for a stable read. */
 const sortedRules = computed<PermissionRule[]>(() => {
   const rank: Record<RuleEffect, number> = { deny: 0, ask: 1, allow: 2 }
   return [...rules.value].sort(
-    (a, b) => rank[a.effect] - rank[b.effect] || a.tool_name.localeCompare(b.tool_name),
+    (a, b) => rank[a.effect] - rank[b.effect] || a.tool_name.localeCompare(b.tool_name)
   )
 })
 
@@ -92,7 +86,7 @@ async function addRule(): Promise<void> {
     const created = await permissionsApi.addPermissionRule(id, {
       tool_name: tool,
       effect: newEffect.value,
-      scope: newScope.value,
+      scope: newScope.value
     })
     // UPSERT: replace a matching (scope, tool) rule if present, else append.
     const idx = rules.value.findIndex((r) => r.id === created.id)
@@ -141,13 +135,35 @@ watch(conversationId, (id) => load(id))
     <template v-else>
       <!-- Add form -->
       <form class="prm__add" @submit.prevent="addRule">
-        <input v-model="newTool" type="text" class="prm__input" placeholder="Nome strumento (es. run_terminal_command)"
-          aria-label="Nome strumento" />
-        <UiSelect class="prm__select" :model-value="newEffect" :options="effectOptions" size="sm" aria-label="Effetto"
-          @update:model-value="(v) => (newEffect = v as RuleEffect)" />
-        <UiSelect class="prm__select" :model-value="newScope" :options="scopeOptions" size="sm" aria-label="Ambito"
-          @update:model-value="(v) => (newScope = v as RuleScope)" />
-        <button type="submit" class="prm__add-btn" :disabled="!canSubmit" aria-label="Aggiungi regola">
+        <input
+          v-model="newTool"
+          type="text"
+          class="prm__input"
+          placeholder="Nome strumento (es. run_terminal_command)"
+          aria-label="Nome strumento"
+        />
+        <UiSelect
+          class="prm__select"
+          :model-value="newEffect"
+          :options="effectOptions"
+          size="sm"
+          aria-label="Effetto"
+          @update:model-value="(v) => (newEffect = v as RuleEffect)"
+        />
+        <UiSelect
+          class="prm__select"
+          :model-value="newScope"
+          :options="scopeOptions"
+          size="sm"
+          aria-label="Ambito"
+          @update:model-value="(v) => (newScope = v as RuleScope)"
+        />
+        <button
+          type="submit"
+          class="prm__add-btn"
+          :disabled="!canSubmit"
+          aria-label="Aggiungi regola"
+        >
           <AppIcon name="plus" :size="14" :stroke-width="2" />
           Aggiungi
         </button>
@@ -166,8 +182,13 @@ watch(conversationId, (id) => load(id))
           <span class="prm__effect" :class="`prm__effect--${rule.effect}`">{{ rule.effect }}</span>
           <span class="prm__tool" :title="rule.tool_name">{{ rule.tool_name }}</span>
           <span class="prm__scope">{{ rule.conversation_id ? 'conversazione' : 'globale' }}</span>
-          <button type="button" class="prm__del" :disabled="busy" aria-label="Rimuovi regola"
-            @click="removeRule(rule)">
+          <button
+            type="button"
+            class="prm__del"
+            :disabled="busy"
+            aria-label="Rimuovi regola"
+            @click="removeRule(rule)"
+          >
             <AppIcon name="trash" :size="14" :stroke-width="2" />
           </button>
         </li>
@@ -342,7 +363,9 @@ watch(conversationId, (id) => load(id))
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .prm__del:hover:not(:disabled) {

@@ -21,7 +21,7 @@ import type {
   ConversationExport,
   ConversationSummary,
   FileAttachment,
-  ToolExecution,
+  ToolExecution
 } from '../types/chat'
 
 const ACTIVE_CONVERSATION_STORAGE_KEY = 'alice_active_conversation_id'
@@ -64,7 +64,7 @@ export const useChatStore = defineStore('chat', () => {
 
   watch(
     () => currentConversation.value?.id ?? null,
-    (id) => storeActiveConversationId(id),
+    (id) => storeActiveConversationId(id)
   )
 
   /** Whether the LLM is currently streaming a response. */
@@ -222,9 +222,8 @@ export const useChatStore = defineStore('chat', () => {
     // does not know about yet (created while backend was down).
     const remoteIds = new Set(remote.map((c) => c.id))
     const localOnly = conversations.value.filter(
-      (c) => !remoteIds.has(c.id) && (
-        c.message_count === 0 || c.id === streamingConversationId.value
-      )
+      (c) =>
+        !remoteIds.has(c.id) && (c.message_count === 0 || c.id === streamingConversationId.value)
     )
 
     // Try to persist orphan local-only conversations to the backend.
@@ -305,8 +304,7 @@ export const useChatStore = defineStore('chat', () => {
       // Skip if we already hold real (non-estimated) data from streaming —
       // the GET endpoint only returns estimates.
       const hasRealData = contextInfo.value && !contextInfo.value.isEstimated
-      const isStreamingThisConversation =
-        isStreaming.value && streamingConversationId.value === id
+      const isStreamingThisConversation = isStreaming.value && streamingConversationId.value === id
       if (detail.context_info && !isStreamingThisConversation && !hasRealData) {
         contextInfo.value = {
           used: detail.context_info.used,
@@ -316,7 +314,7 @@ export const useChatStore = defineStore('chat', () => {
           wasCompressed: detail.context_info.was_compressed,
           messagesSummarized: detail.context_info.messages_summarized ?? 0,
           isEstimated: detail.context_info.is_estimated ?? true,
-          breakdown: detail.context_info.breakdown,
+          breakdown: detail.context_info.breakdown
         }
       }
     } catch (err) {
@@ -350,15 +348,21 @@ export const useChatStore = defineStore('chat', () => {
       currentConversation.value.messages.length === 0 &&
       currentConversation.value.id !== streamingConversationId.value
     ) {
-      return conversations.value.find((c) => c.id === currentConversation.value?.id) ?? {
-        id: currentConversation.value.id,
-        title: currentConversation.value.title,
-        created_at: currentConversation.value.created_at,
-        updated_at: currentConversation.value.updated_at,
-        message_count: 0,
-      }
+      return (
+        conversations.value.find((c) => c.id === currentConversation.value?.id) ?? {
+          id: currentConversation.value.id,
+          title: currentConversation.value.title,
+          created_at: currentConversation.value.created_at,
+          updated_at: currentConversation.value.updated_at,
+          message_count: 0
+        }
+      )
     }
-    return conversations.value.find((c) => c.message_count === 0 && c.id !== streamingConversationId.value) ?? null
+    return (
+      conversations.value.find(
+        (c) => c.message_count === 0 && c.id !== streamingConversationId.value
+      ) ?? null
+    )
   }
 
   /** Restore the best existing conversation without creating a new empty one. */
@@ -534,7 +538,7 @@ export const useChatStore = defineStore('chat', () => {
   function addUserMessage(
     content: string,
     attachments?: FileAttachment[],
-    editInfo?: { versionGroupId: string; versionIndex: number },
+    editInfo?: { versionGroupId: string; versionIndex: number }
   ): void {
     if (!currentConversation.value) return
 
@@ -570,7 +574,7 @@ export const useChatStore = defineStore('chat', () => {
       created_at: new Date().toISOString(),
       attachments: attachments?.length ? attachments : undefined,
       version_group_id: versionGroupId,
-      version_index: versionIndex,
+      version_index: versionIndex
     }
 
     currentConversation.value.messages.push(msg)
@@ -580,8 +584,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!currentConversation.value.active_versions) {
         currentConversation.value.active_versions = {}
       }
-      currentConversation.value.active_versions[editInfo.versionGroupId] =
-        editInfo.versionIndex
+      currentConversation.value.active_versions[editInfo.versionGroupId] = editInfo.versionIndex
     }
 
     streamGeneration.value++
@@ -626,8 +629,7 @@ export const useChatStore = defineStore('chat', () => {
     conversationId: string,
     messageId: string,
     versionGroupId?: string | null,
-    versionIndex?: number,
-    _userMessageId?: string,
+    versionIndex?: number
   ): void {
     // Prevent double-finalization.
     if (!isStreaming.value) return
@@ -658,7 +660,7 @@ export const useChatStore = defineStore('chat', () => {
       created_at: new Date().toISOString(),
       thinking_content: currentThinkingContent.value || null,
       version_group_id: versionGroupId ?? undefined,
-      version_index: versionIndex ?? undefined,
+      version_index: versionIndex ?? undefined
     }
 
     currentConversation.value.messages.push(assistantMsg)
@@ -789,7 +791,7 @@ export const useChatStore = defineStore('chat', () => {
         created_at: new Date().toISOString(),
         thinking_content: currentThinkingContent.value || null,
         version_group_id: lastUserMsg?.version_group_id,
-        version_index: lastUserMsg?.version_index,
+        version_index: lastUserMsg?.version_index
       }
       currentConversation.value.messages.push(partialMsg)
     }
@@ -813,10 +815,7 @@ export const useChatStore = defineStore('chat', () => {
    * No-op during streaming: switching versions while a response is being
    * generated would corrupt the context seen by the LLM.
    */
-  async function switchVersion(
-    versionGroupId: string,
-    versionIndex: number,
-  ): Promise<void> {
+  async function switchVersion(versionGroupId: string, versionIndex: number): Promise<void> {
     if (!currentConversation.value) return
     if (isStreamingCurrentConversation.value) return
 
@@ -832,7 +831,7 @@ export const useChatStore = defineStore('chat', () => {
       const result = await chatApi.switchVersion(
         currentConversation.value.id,
         versionGroupId,
-        versionIndex,
+        versionIndex
       )
       if (currentConversation.value) {
         currentConversation.value.active_versions = result.active_versions
@@ -860,10 +859,7 @@ export const useChatStore = defineStore('chat', () => {
    * @param title - Optional title override. Defaults to server-generated.
    * @returns UUID of the newly created conversation, or empty string on guard.
    */
-  async function branchConversation(
-    fromMessageId: string,
-    title?: string,
-  ): Promise<string> {
+  async function branchConversation(fromMessageId: string, title?: string): Promise<string> {
     if (!currentConversation.value) return ''
     if (isStreamingCurrentConversation.value) return ''
 
@@ -871,7 +867,7 @@ export const useChatStore = defineStore('chat', () => {
       const result = await chatApi.branchConversation(
         currentConversation.value.id,
         fromMessageId,
-        title,
+        title
       )
       // Refresh sidebar list so the new conversation appears.
       await loadConversations()
@@ -948,6 +944,6 @@ export const useChatStore = defineStore('chat', () => {
     removePendingAskUser,
     updateContextInfo,
     setCompressingContext,
-    setCompressionDone,
+    setCompressionDone
   }
 })

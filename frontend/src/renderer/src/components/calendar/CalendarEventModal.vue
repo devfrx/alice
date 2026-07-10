@@ -19,7 +19,7 @@ const recurrenceOptions: UiSelectOption[] = [
   { value: 'FREQ=WEEKLY', label: 'Ogni settimana' },
   { value: 'FREQ=WEEKLY;BYDAY=MO,WE,FR', label: 'Lun/Mer/Ven' },
   { value: 'FREQ=MONTHLY', label: 'Ogni mese' },
-  { value: 'FREQ=YEARLY', label: 'Ogni anno' },
+  { value: 'FREQ=YEARLY', label: 'Ogni anno' }
 ]
 
 interface CalendarEventModalProps {
@@ -43,14 +43,15 @@ async function handleSave(): Promise<void> {
   saving.value = true
   saveError.value = null
   if (new Date(form.value.end) <= new Date(form.value.start)) {
-    saveError.value = 'La fine deve essere dopo l\'inizio'
+    saveError.value = "La fine deve essere dopo l'inizio"
     saving.value = false
     return
   }
   const rawReminder: unknown = form.value.reminder_minutes
-  const reminderMinutes = (rawReminder != null && rawReminder !== '' && !Number.isNaN(Number(rawReminder)))
-    ? Number(rawReminder)
-    : null
+  const reminderMinutes =
+    rawReminder != null && rawReminder !== '' && !Number.isNaN(Number(rawReminder))
+      ? Number(rawReminder)
+      : null
   const payload: EventFormData = { ...form.value, reminder_minutes: reminderMinutes }
   try {
     if (props.editingEvent) {
@@ -59,8 +60,10 @@ async function handleSave(): Promise<void> {
       if (payload.description !== undefined) updatePayload.description = payload.description
       if (payload.start !== undefined) updatePayload.start_time = payload.start
       if (payload.end !== undefined) updatePayload.end_time = payload.end
-      if (payload.reminder_minutes !== undefined) updatePayload.reminder_minutes = payload.reminder_minutes
-      if (payload.recurrence_rule !== undefined) updatePayload.recurrence_rule = payload.recurrence_rule
+      if (payload.reminder_minutes !== undefined)
+        updatePayload.reminder_minutes = payload.reminder_minutes
+      if (payload.recurrence_rule !== undefined)
+        updatePayload.recurrence_rule = payload.recurrence_rule
       await calendarApi.updateCalendarEvent(props.editingEvent.id, updatePayload)
     } else {
       await calendarApi.createCalendarEvent({
@@ -69,7 +72,7 @@ async function handleSave(): Promise<void> {
         start_time: payload.start,
         end_time: payload.end,
         reminder_minutes: payload.reminder_minutes ?? undefined,
-        recurrence_rule: payload.recurrence_rule || undefined,
+        recurrence_rule: payload.recurrence_rule || undefined
       })
     }
     await calendarStore.refresh()
@@ -89,7 +92,7 @@ async function handleDelete(): Promise<void> {
       ? 'Eliminare questo evento e tutte le occorrenze? Azione irreversibile.'
       : 'Eliminare questo evento? Azione irreversibile.',
     type: 'danger',
-    confirmText: 'Elimina',
+    confirmText: 'Elimina'
   })
   if (!confirmed) return
   saving.value = true
@@ -152,13 +155,24 @@ async function handleDelete(): Promise<void> {
     </div>
 
     <div class="event-form__actions">
-      <button v-if="editingEvent" class="event-form__btn event-form__btn--danger" :disabled="saving"
-        @click="handleDelete">Elimina</button>
+      <button
+        v-if="editingEvent"
+        class="event-form__btn event-form__btn--danger"
+        :disabled="saving"
+        @click="handleDelete"
+      >
+        Elimina
+      </button>
       <div class="event-form__spacer" />
-      <button class="event-form__btn event-form__btn--secondary" @click="emit('close', false)">Annulla</button>
-      <button class="event-form__btn event-form__btn--primary"
-        :disabled="saving || !form.title || !form.start || !form.end" @click="handleSave">
-        {{ saving ? 'Salvataggio...' : (editingEvent ? 'Aggiorna' : 'Crea') }}
+      <button class="event-form__btn event-form__btn--secondary" @click="emit('close', false)">
+        Annulla
+      </button>
+      <button
+        class="event-form__btn event-form__btn--primary"
+        :disabled="saving || !form.title || !form.start || !form.end"
+        @click="handleSave"
+      >
+        {{ saving ? 'Salvataggio...' : editingEvent ? 'Aggiorna' : 'Crea' }}
       </button>
     </div>
   </div>

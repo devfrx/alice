@@ -7,17 +7,15 @@ import type {
   ModelLoadResponse,
   ModelOperationResponse,
   ModelUnloadResponse,
-  ModelsStatusResponse,
+  ModelsStatusResponse
 } from '../../types/settings'
 
 export const modelsApi = {
   /** Retrieve the list of available LLM models (via /config/models). */
-  getModels: (): Promise<LMStudioModel[]> =>
-    request<LMStudioModel[]>('/config/models'),
+  getModels: (): Promise<LMStudioModel[]> => request<LMStudioModel[]>('/config/models'),
 
   /** Retrieve the list of available LLM models (via /models). */
-  listModels: (): Promise<LMStudioModel[]> =>
-    request<LMStudioModel[]>('/models'),
+  listModels: (): Promise<LMStudioModel[]> => request<LMStudioModel[]>('/models'),
 
   /** Load a model into LM Studio. */
   loadModel: (
@@ -53,5 +51,5 @@ export const modelsApi = {
 
   /** Get current model operation status. */
   getModelOperation: (): Promise<ModelOperationResponse> =>
-    request<ModelOperationResponse>('/models/operation'),
+    request<ModelOperationResponse>('/models/operation')
 }

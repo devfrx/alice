@@ -12,17 +12,12 @@ import {
   AGENT_TIERS,
   emptyTierGuidance,
   normaliseTierGuidance,
-  pruneTierGuidance,
+  pruneTierGuidance
 } from './agentPrompts'
 
 describe('AGENT_TIERS', () => {
   it('lists the four backend permission tiers in order', () => {
-    expect(AGENT_TIERS.map((t) => t.key)).toEqual([
-      'strict',
-      'auto_edits',
-      'plan',
-      'autopilot',
-    ])
+    expect(AGENT_TIERS.map((t) => t.key)).toEqual(['strict', 'auto_edits', 'plan', 'autopilot'])
   })
 })
 
@@ -32,7 +27,7 @@ describe('emptyTierGuidance', () => {
       strict: '',
       auto_edits: '',
       plan: '',
-      autopilot: '',
+      autopilot: ''
     })
   })
 
@@ -49,7 +44,7 @@ describe('normaliseTierGuidance', () => {
       strict: '',
       auto_edits: '',
       plan: 'P',
-      autopilot: '',
+      autopilot: ''
     })
   })
 
@@ -63,13 +58,13 @@ describe('normaliseTierGuidance', () => {
     const out = normaliseTierGuidance({
       strict: 'S',
       bogus: 'ignored',
-      autopilot: 123 as unknown as string,
+      autopilot: 123 as unknown as string
     })
     expect(out).toEqual({
       strict: 'S',
       auto_edits: '',
       plan: '',
-      autopilot: '',
+      autopilot: ''
     })
   })
 })
@@ -81,8 +76,8 @@ describe('pruneTierGuidance', () => {
         strict: 'keep',
         auto_edits: '',
         plan: '   ',
-        autopilot: 'also keep',
-      }),
+        autopilot: 'also keep'
+      })
     ).toEqual({ strict: 'keep', autopilot: 'also keep' })
   })
 
@@ -92,7 +87,7 @@ describe('pruneTierGuidance', () => {
 
   it('preserves text with surrounding meaningful content', () => {
     expect(pruneTierGuidance({ plan: ' guidance ' })).toEqual({
-      plan: ' guidance ',
+      plan: ' guidance '
     })
   })
 })

@@ -17,14 +17,17 @@ import type { PermissionModeResponse } from '../types/permission'
 vi.mock('../services/api', () => ({
   permissionsApi: {
     getPermissionMode: vi.fn(),
-    setPermissionMode: vi.fn(),
-  },
+    setPermissionMode: vi.fn()
+  }
 }))
 
 const getMock = vi.mocked(permissionsApi.getPermissionMode)
 const setMock = vi.mocked(permissionsApi.setPermissionMode)
 
-function res(conversation_id: string, mode: PermissionModeResponse['mode']): PermissionModeResponse {
+function res(
+  conversation_id: string,
+  mode: PermissionModeResponse['mode']
+): PermissionModeResponse {
   return { conversation_id, mode }
 }
 

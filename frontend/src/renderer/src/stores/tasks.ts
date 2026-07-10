@@ -99,6 +99,6 @@ export const useTasksStore = defineStore('tasks', () => {
     fetch,
     ensureForConversation,
     applyTasksUpdated,
-    reset,
+    reset
   }
 })

@@ -13,13 +13,7 @@
  * `resize` — listeners are added/removed symmetrically from the `isOpen` watch
  * so every close path tears them down, and the scope teardown removes them too.
  */
-import {
-  nextTick,
-  onScopeDispose,
-  ref,
-  watch,
-  type Ref,
-} from 'vue'
+import { nextTick, onScopeDispose, ref, watch, type Ref } from 'vue'
 
 /** Preferred side of the anchor on which to place the floating element. */
 export type FloatingPlacement = 'top' | 'bottom'
@@ -63,14 +57,14 @@ export function useFloatingPosition(
   anchorEl: Ref<HTMLElement | null>,
   floatingEl: Ref<HTMLElement | null>,
   isOpen: Ref<boolean>,
-  options: UseFloatingPositionOptions = {},
+  options: UseFloatingPositionOptions = {}
 ): UseFloatingPositionReturn {
   const {
     placement = 'bottom',
     align = 'start',
     offset = 8,
     matchWidth = false,
-    flip = true,
+    flip = true
   } = options
 
   // Start hidden + fixed (never `static`) so the panel can't flash at the
@@ -79,7 +73,7 @@ export function useFloatingPosition(
     position: 'fixed',
     top: '-9999px',
     left: '-9999px',
-    visibility: 'hidden',
+    visibility: 'hidden'
   }
   const floatingStyle = ref<Record<string, string>>({ ...HIDDEN_STYLE })
 
@@ -208,7 +202,7 @@ export function useFloatingPosition(
         removeListeners()
       }
     },
-    { immediate: true },
+    { immediate: true }
   )
 
   onScopeDispose(removeListeners)

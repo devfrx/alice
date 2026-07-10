@@ -27,36 +27,28 @@ export interface PluginComponent {
 const PLUGIN_COMPONENT_REGISTRY: PluginComponent[] = [
   {
     name: 'calendar',
-    component: defineAsyncComponent(
-      () => import('../components/plugins/CalendarView.vue')
-    ),
+    component: defineAsyncComponent(() => import('../components/plugins/CalendarView.vue')),
     mountPoint: 'sidebar',
-    order: 10,
+    order: 10
   },
   {
     name: 'calendar',
-    component: defineAsyncComponent(
-      () => import('../components/plugins/CalendarView.vue')
-    ),
+    component: defineAsyncComponent(() => import('../components/plugins/CalendarView.vue')),
     mountPoint: 'settings-panel',
-    order: 10,
+    order: 10
   },
   {
     name: 'web_search',
-    component: defineAsyncComponent(
-      () => import('../components/plugins/SearchResultsPanel.vue')
-    ),
+    component: defineAsyncComponent(() => import('../components/plugins/SearchResultsPanel.vue')),
     mountPoint: 'sidebar',
-    order: 20,
+    order: 20
   },
   {
     name: 'network_probe',
-    component: defineAsyncComponent(
-      () => import('../components/plugins/NetworkProbePanel.vue')
-    ),
+    component: defineAsyncComponent(() => import('../components/plugins/NetworkProbePanel.vue')),
     mountPoint: 'sidebar',
-    order: 30,
-  },
+    order: 30
+  }
 ]
 
 /**
@@ -74,15 +66,11 @@ export function usePluginComponents(): {
 
   /** Filter registry entries by mount point, keeping only enabled plugins. */
   function getComponentsForMountPoint(mountPoint: MountPoint): PluginComponent[] {
-    const enabledNames = new Set(
-      pluginsStore.plugins
-        .filter((p) => p.enabled)
-        .map((p) => p.name)
-    )
+    const enabledNames = new Set(pluginsStore.plugins.filter((p) => p.enabled).map((p) => p.name))
 
-    return PLUGIN_COMPONENT_REGISTRY
-      .filter((entry) => entry.mountPoint === mountPoint && enabledNames.has(entry.name))
-      .sort((a, b) => a.order - b.order)
+    return PLUGIN_COMPONENT_REGISTRY.filter(
+      (entry) => entry.mountPoint === mountPoint && enabledNames.has(entry.name)
+    ).sort((a, b) => a.order - b.order)
   }
 
   const toolbarComponents = computed(() => getComponentsForMountPoint('toolbar'))
@@ -95,6 +83,6 @@ export function usePluginComponents(): {
     sidebarComponents,
     settingsComponents,
     modalComponents,
-    getComponentsForMountPoint,
+    getComponentsForMountPoint
   }
 }

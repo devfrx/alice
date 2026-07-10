@@ -26,11 +26,11 @@ vi.mock('../services/api', () => ({
       title: null,
       created_at: '',
       updated_at: '',
-      messages: [],
+      messages: []
     }),
-    createConversation: vi.fn().mockResolvedValue({ created_at: '', updated_at: '' }),
+    createConversation: vi.fn().mockResolvedValue({ created_at: '', updated_at: '' })
   },
-  resolveBackendUrl: (u: string) => u,
+  resolveBackendUrl: (u: string) => u
 }))
 
 function askReq(executionId: string, text = 'Which file?', options?: string[]): AskUserRequest {
@@ -55,7 +55,7 @@ describe('pendingAskUser add/remove', () => {
     expect(Object.keys(s.pendingAskUser)).toEqual(['e1'])
     expect(s.pendingAskUser['e1']).toMatchObject({
       executionId: 'e1',
-      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }],
+      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }]
     })
   })
 
@@ -63,7 +63,7 @@ describe('pendingAskUser add/remove', () => {
     const store = useChatStore()
     store.addPendingAskUser({
       executionId: 'e1',
-      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }],
+      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }]
     })
     const pending = store.pendingAskUser['e1']
     expect(pending.questions[0].id).toBe('q1')
@@ -103,7 +103,7 @@ describe('pendingAskUser cleanup', () => {
       title: null,
       created_at: '',
       updated_at: '',
-      messages: [],
+      messages: []
     }
     s.currentConversation = conv
     // Drive the store into a streaming state so finalizeStream's guard passes.

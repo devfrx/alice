@@ -19,12 +19,12 @@ vi.mock('../services/api', () => ({
     listTerminals: vi.fn(),
     createTerminal: vi.fn(),
     updateTerminal: vi.fn(),
-    deleteTerminal: vi.fn(),
-  },
+    deleteTerminal: vi.fn()
+  }
 }))
 
 vi.mock('../composables/useEventsWebSocket', () => ({
-  sendEventsMessage: vi.fn(() => true),
+  sendEventsMessage: vi.fn(() => true)
 }))
 
 const listMock = vi.mocked(terminalApi.listTerminals)
@@ -46,7 +46,7 @@ function sess(id: string, over: Partial<TerminalSession> = {}): TerminalSession 
     created_at: '2026-06-09T00:00:00Z',
     pid: 100,
     alive: true,
-    ...over,
+    ...over
   }
 }
 
@@ -76,7 +76,11 @@ describe('terminalSessions store', () => {
 
   it('kill removes the session and drops its buffer', async () => {
     const s = useTerminalSessionsStore()
-    s.applySessionOpened({ type: 'terminal.session_opened', conversation_id: CONV, session: sess('a') })
+    s.applySessionOpened({
+      type: 'terminal.session_opened',
+      conversation_id: CONV,
+      session: sess('a')
+    })
     s.applyOutput({ type: 'terminal.output', conversation_id: CONV, session_id: 'a', data: 'hi' })
     expect(s.bufferFor('a')).toBe('hi')
     deleteMock.mockResolvedValue(undefined)
@@ -87,9 +91,22 @@ describe('terminalSessions store', () => {
 
   it('folds session_opened / renamed / assigned / closed', () => {
     const s = useTerminalSessionsStore()
-    s.applySessionOpened({ type: 'terminal.session_opened', conversation_id: CONV, session: sess('a') })
-    s.applySessionOpened({ type: 'terminal.session_opened', conversation_id: CONV, session: sess('b') })
-    s.applyRenamed({ type: 'terminal.renamed', conversation_id: CONV, session_id: 'a', title: 'Logs' })
+    s.applySessionOpened({
+      type: 'terminal.session_opened',
+      conversation_id: CONV,
+      session: sess('a')
+    })
+    s.applySessionOpened({
+      type: 'terminal.session_opened',
+      conversation_id: CONV,
+      session: sess('b')
+    })
+    s.applyRenamed({
+      type: 'terminal.renamed',
+      conversation_id: CONV,
+      session_id: 'a',
+      title: 'Logs'
+    })
     s.applyAssigned({ type: 'terminal.assigned', conversation_id: CONV, session_id: 'b' })
     expect(s.sessionsFor(CONV).find((x) => x.id === 'a')?.title).toBe('Logs')
     expect(s.assignedFor(CONV)?.id).toBe('b')
@@ -106,7 +123,12 @@ describe('terminalSessions store', () => {
     expect(seen).toEqual(['one', 'two'])
     expect(s.bufferFor('a')).toBe('onetwo')
     unsub()
-    s.applyOutput({ type: 'terminal.output', conversation_id: CONV, session_id: 'a', data: 'three' })
+    s.applyOutput({
+      type: 'terminal.output',
+      conversation_id: CONV,
+      session_id: 'a',
+      data: 'three'
+    })
     expect(seen).toEqual(['one', 'two']) // unsubscribed
     expect(s.bufferFor('a')).toBe('onetwothree') // buffer still accrues
   })
@@ -116,10 +138,17 @@ describe('terminalSessions store', () => {
     s.sendInput(CONV, 'a', 'ls\r')
     s.sendResize(CONV, 'a', 30, 100)
     expect(sendMock).toHaveBeenCalledWith({
-      type: 'terminal.input', conversation_id: CONV, session_id: 'a', data: 'ls\r',
+      type: 'terminal.input',
+      conversation_id: CONV,
+      session_id: 'a',
+      data: 'ls\r'
     })
     expect(sendMock).toHaveBeenCalledWith({
-      type: 'terminal.resize', conversation_id: CONV, session_id: 'a', rows: 30, cols: 100,
+      type: 'terminal.resize',
+      conversation_id: CONV,
+      session_id: 'a',
+      rows: 30,
+      cols: 100
     })
   })
 

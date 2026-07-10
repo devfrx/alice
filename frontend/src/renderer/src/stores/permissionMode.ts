@@ -73,7 +73,7 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
   function applyModeUpdated(msg: WsPermissionModeUpdatedMessage): void {
     byConversation.value = {
       ...byConversation.value,
-      [msg.conversation_id]: msg.mode,
+      [msg.conversation_id]: msg.mode
     }
   }
 
@@ -86,7 +86,10 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
       byConversation.value = { ...byConversation.value, [conversationId]: res.mode }
     } catch (err) {
       // Roll back the optimistic change on failure.
-      byConversation.value = { ...byConversation.value, [conversationId]: prev ?? DEFAULT_PERMISSION_MODE }
+      byConversation.value = {
+        ...byConversation.value,
+        [conversationId]: prev ?? DEFAULT_PERMISSION_MODE
+      }
       throw err
     }
   }
@@ -108,6 +111,6 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
     ensureForConversation,
     applyModeUpdated,
     setMode,
-    reset,
+    reset
   }
 })

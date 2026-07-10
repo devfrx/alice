@@ -53,7 +53,9 @@ const buttonTitle = computed(() => {
   return 'Clicca per parlare (tasto destro: microfono)'
 })
 
-const showPermissionNotice = computed(() => permissionDenied.value && !isActive.value && !isProcessing.value)
+const showPermissionNotice = computed(
+  () => permissionDenied.value && !isActive.value && !isProcessing.value
+)
 
 /** Whether the device dropdown is visible. */
 const showDeviceMenu = ref(false)
@@ -70,7 +72,9 @@ function onClick(): void {
   /* ripple feedback */
   clicking.value = true
   requestAnimationFrame(() => {
-    setTimeout(() => { clicking.value = false }, 200)
+    setTimeout(() => {
+      clicking.value = false
+    }, 200)
   })
 
   if (isProcessing.value) {
@@ -98,65 +102,102 @@ function selectDevice(deviceId: string): void {
 /* --- Computed inline styles for the 3 concentric rings --- */
 const ringInnerStyle = computed(() => ({
   opacity: 0.6 + level.value * 0.4,
-  transform: `scale(${1 + level.value * 0.15})`,
+  transform: `scale(${1 + level.value * 0.15})`
 }))
 const ringMidStyle = computed(() => ({
   opacity: level.value * 0.8,
-  transform: `scale(${1 + level.value * 0.35})`,
+  transform: `scale(${1 + level.value * 0.35})`
 }))
 const ringOuterStyle = computed(() => ({
   opacity: level.value * 0.5,
-  transform: `scale(${1 + level.value * 0.55})`,
+  transform: `scale(${1 + level.value * 0.55})`
 }))
 </script>
 
 <template>
   <div class="mic-wrapper">
-    <button ref="triggerRef" class="mic-btn" :class="{
-      'mic-btn--active': isActive,
-      'mic-btn--processing': isProcessing,
-      'mic-btn--disabled': !available || !connected,
-      'mic-btn--permission-denied': permissionDenied,
-      'mic-btn--click': clicking,
-    }" :disabled="!available || !connected"
+    <button
+      ref="triggerRef"
+      class="mic-btn"
+      :class="{
+        'mic-btn--active': isActive,
+        'mic-btn--processing': isProcessing,
+        'mic-btn--disabled': !available || !connected,
+        'mic-btn--permission-denied': permissionDenied,
+        'mic-btn--click': clicking
+      }"
+      :disabled="!available || !connected"
       :aria-describedby="showPermissionNotice ? 'mic-permission-notice' : undefined"
-      :aria-label="isActive ? 'Clicca per inviare' : isProcessing ? 'Clicca per annullare' : 'Clicca per parlare'"
-      :title="buttonTitle" @click.prevent="onClick" @contextmenu="onContextMenu">
+      :aria-label="
+        isActive
+          ? 'Clicca per inviare'
+          : isProcessing
+            ? 'Clicca per annullare'
+            : 'Clicca per parlare'
+      "
+      :title="buttonTitle"
+      @click.prevent="onClick"
+      @contextmenu="onContextMenu"
+    >
       <!-- Multi-ring audio visualization (recording) -->
       <span v-if="isActive" class="mic-ring mic-ring--inner" :style="ringInnerStyle" />
       <span v-if="isActive && level > 0.15" class="mic-ring mic-ring--mid" :style="ringMidStyle" />
-      <span v-if="isActive && level > 0.3" class="mic-ring mic-ring--outer" :style="ringOuterStyle" />
+      <span
+        v-if="isActive && level > 0.3"
+        class="mic-ring mic-ring--outer"
+        :style="ringOuterStyle"
+      />
 
       <!-- Processing conic gradient border -->
       <span v-if="isProcessing" class="mic-btn__conic" />
 
       <!-- Icon: mic or processing dots -->
       <Transition name="icon-morph" mode="out-in">
-        <AppIcon v-if="!isProcessing" key="mic" name="mic" :size="15" class="mic-btn__icon"
-          :class="{ 'mic-btn__icon--rec': isActive }" />
-        <span v-else key="dots" class="mic-btn__dots">
-          <span /><span /><span />
-        </span>
+        <AppIcon
+          v-if="!isProcessing"
+          key="mic"
+          name="mic"
+          :size="15"
+          class="mic-btn__icon"
+          :class="{ 'mic-btn__icon--rec': isActive }"
+        />
+        <span v-else key="dots" class="mic-btn__dots"> <span /><span /><span /> </span>
       </Transition>
     </button>
 
     <Transition name="mic-notice">
-      <span v-if="showPermissionNotice" id="mic-permission-notice" class="mic-permission-notice" role="status">
+      <span
+        v-if="showPermissionNotice"
+        id="mic-permission-notice"
+        class="mic-permission-notice"
+        role="status"
+      >
         Microfono bloccato
       </span>
     </Transition>
 
     <!-- Device selection dropdown (right-click) -->
-    <UiPopover :open="showDeviceMenu" :anchor-el="triggerRef" placement="top" align="end" width="240px"
-      aria-label="Selezione microfono" @update:open="showDeviceMenu = $event">
+    <UiPopover
+      :open="showDeviceMenu"
+      :anchor-el="triggerRef"
+      placement="top"
+      align="end"
+      width="240px"
+      aria-label="Selezione microfono"
+      @update:open="showDeviceMenu = $event"
+    >
       <div class="mic-menu">
         <div class="mic-menu__title">Microfono</div>
         <div v-if="audioDevices.length === 0" class="mic-menu__empty">
           Nessun dispositivo trovato
         </div>
-        <button v-for="device in audioDevices" :key="device.deviceId" class="mic-menu__item"
+        <button
+          v-for="device in audioDevices"
+          :key="device.deviceId"
+          class="mic-menu__item"
           :class="{ 'mic-menu__item--active': device.deviceId === selectedDeviceId }"
-          @click="selectDevice(device.deviceId)">
+          @click="selectDevice(device.deviceId)"
+        >
           <span class="mic-menu__check">{{ device.deviceId === selectedDeviceId ? '✓' : '' }}</span>
           {{ device.label }}
         </button>
@@ -190,7 +231,8 @@ const ringOuterStyle = computed(() => ({
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color var(--duration-fast) ease,
+  transition:
+    color var(--duration-fast) ease,
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease;
   outline: none;
@@ -255,7 +297,9 @@ const ringOuterStyle = computed(() => ({
 
 .mic-notice-enter-active,
 .mic-notice-leave-active {
-  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
+  transition:
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 
 .mic-notice-enter-from,
@@ -288,7 +332,9 @@ const ringOuterStyle = computed(() => ({
   position: absolute;
   border-radius: var(--radius-md);
   pointer-events: none;
-  transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+  transition:
+    transform 0.1s ease-out,
+    opacity 0.1s ease-out;
 }
 
 .mic-ring--inner {
@@ -313,7 +359,11 @@ const ringOuterStyle = computed(() => ({
   border-radius: var(--radius-full);
   background: conic-gradient(from 0deg, transparent 50%, var(--accent) 80%, transparent 100%);
   mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px));
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px));
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2px),
+    black calc(100% - 2px)
+  );
   animation: conic-spin 1s linear infinite;
   pointer-events: none;
   opacity: 0.7;
@@ -363,7 +413,6 @@ const ringOuterStyle = computed(() => ({
 }
 
 @keyframes dot-bounce {
-
   0%,
   80%,
   100% {
@@ -380,7 +429,9 @@ const ringOuterStyle = computed(() => ({
 /* ── Icon morph transition ── */
 .icon-morph-enter-active,
 .icon-morph-leave-active {
-  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
+  transition:
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 
 .icon-morph-enter-from {
@@ -457,7 +508,6 @@ const ringOuterStyle = computed(() => ({
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .mic-btn--active,
   .mic-btn__conic,
   .mic-btn__dots span,

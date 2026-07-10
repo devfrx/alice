@@ -17,8 +17,8 @@ import type { TaskStep } from '../types/tasks'
 // method so ensureForConversation/fetch resolve without reaching a backend.
 vi.mock('../services/api', () => ({
   tasksApi: {
-    getTasks: vi.fn(),
-  },
+    getTasks: vi.fn()
+  }
 }))
 
 const getTasksMock = vi.mocked(tasksApi.getTasks)
@@ -43,12 +43,12 @@ describe('applyTasksUpdated', () => {
 
     s.applyTasksUpdated({
       conversation_id: 'c1',
-      steps: [step('research', 'in_progress'), step('write')],
+      steps: [step('research', 'in_progress'), step('write')]
     })
 
     expect(s.tasksFor('c1')).toEqual([
       { step: 'research', status: 'in_progress' },
-      { step: 'write', status: 'pending' },
+      { step: 'write', status: 'pending' }
     ])
   })
 
@@ -57,12 +57,12 @@ describe('applyTasksUpdated', () => {
     s.applyTasksUpdated({ conversation_id: 'c1', steps: [step('a')] })
     s.applyTasksUpdated({
       conversation_id: 'c1',
-      steps: [step('x', 'completed'), step('y', 'in_progress')],
+      steps: [step('x', 'completed'), step('y', 'in_progress')]
     })
 
     expect(s.tasksFor('c1')).toEqual([
       { step: 'x', status: 'completed' },
-      { step: 'y', status: 'in_progress' },
+      { step: 'y', status: 'in_progress' }
     ])
   })
 
@@ -95,7 +95,7 @@ describe('ensureForConversation', () => {
   it('calls api.getTasks once and dedupes on the second call', async () => {
     getTasksMock.mockResolvedValue({
       conversation_id: 'c1',
-      steps: [step('a', 'completed')],
+      steps: [step('a', 'completed')]
     })
     const s = useTasksStore()
 
@@ -117,7 +117,7 @@ describe('ensureForConversation', () => {
 
     getTasksMock.mockResolvedValueOnce({
       conversation_id: 'c1',
-      steps: [step('a')],
+      steps: [step('a')]
     })
     await s.ensureForConversation('c1')
     expect(getTasksMock).toHaveBeenCalledTimes(2)

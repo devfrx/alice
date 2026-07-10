@@ -19,5 +19,5 @@ export const auditApi = {
     if (params?.offset !== undefined) qs.set('offset', String(params.offset))
     const q = qs.toString()
     return request<AuditConfirmationsResponse>(`/audit/confirmations${q ? `?${q}` : ''}`)
-  },
+  }
 }

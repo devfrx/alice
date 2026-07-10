@@ -55,11 +55,7 @@ export interface UseChatReturn {
   /** Send a user message with optional attachments. */
   sendMessage: (content: string, conversationId?: string, attachments?: File[]) => Promise<void>
   /** Edit a previously sent user message and regenerate the response. */
-  editMessage: (
-    messageId: string,
-    newContent: string,
-    attachments?: File[]
-  ) => Promise<void>
+  editMessage: (messageId: string, newContent: string, attachments?: File[]) => Promise<void>
   /** Stop the in-progress generation. */
   stopGeneration: () => void
   /** Respond to a tool confirmation request. */
@@ -158,8 +154,7 @@ export function useChat(): UseChatReturn {
         msg.conversation_id,
         msg.message_id,
         msg.version_group_id,
-        msg.version_index,
-        msg.user_message_id,
+        msg.version_index
       )
     },
 
@@ -184,7 +179,12 @@ export function useChat(): UseChatReturn {
 
     tool_execution_done: (msg) => {
       if (store.streamGeneration !== activeGeneration) return
-      store.completeToolExecution(msg.execution_id, msg.result, msg.success, msg.content_type ?? undefined)
+      store.completeToolExecution(
+        msg.execution_id,
+        msg.result,
+        msg.success,
+        msg.content_type ?? undefined
+      )
     },
 
     tool_progress: (msg) => {
@@ -195,7 +195,7 @@ export function useChat(): UseChatReturn {
         step: msg.step ?? undefined,
         total: msg.total ?? undefined,
         percent: msg.percent ?? undefined,
-        elapsedS: msg.elapsed_s ?? undefined,
+        elapsedS: msg.elapsed_s ?? undefined
       })
     },
 
@@ -253,7 +253,7 @@ export function useChat(): UseChatReturn {
         wasCompressed: msg.was_compressed,
         messagesSummarized: msg.messages_summarized ?? 0,
         isEstimated: msg.is_estimated ?? true,
-        breakdown: msg.breakdown ?? undefined,
+        breakdown: msg.breakdown ?? undefined
       })
     },
 
@@ -389,9 +389,7 @@ export function useChat(): UseChatReturn {
     let uploaded: FileAttachment[] | undefined
     if (attachments?.length && convId) {
       try {
-        uploaded = await Promise.all(
-          attachments.map((file) => chatApi.uploadFile(file, convId))
-        )
+        uploaded = await Promise.all(attachments.map((file) => chatApi.uploadFile(file, convId)))
       } catch (err) {
         console.error('[useChat] Attachment upload failed:', err)
       }
@@ -453,9 +451,7 @@ export function useChat(): UseChatReturn {
     }
 
     // Find the original message to determine version group.
-    const original = store.currentConversation.messages.find(
-      (m) => m.id === messageId
-    )
+    const original = store.currentConversation.messages.find((m) => m.id === messageId)
     if (!original || original.role !== 'user') {
       console.error('[useChat] editMessage: target message not found or not a user message')
       return
@@ -489,9 +485,7 @@ export function useChat(): UseChatReturn {
     let uploaded: FileAttachment[] | undefined
     if (attachments?.length) {
       try {
-        uploaded = await Promise.all(
-          attachments.map((file) => chatApi.uploadFile(file, convId))
-        )
+        uploaded = await Promise.all(attachments.map((file) => chatApi.uploadFile(file, convId)))
       } catch (err) {
         console.error('[useChat] Attachment upload failed:', err)
       }
@@ -500,7 +494,7 @@ export function useChat(): UseChatReturn {
     // Optimistic UI update.
     store.addUserMessage(trimmed, uploaded, {
       versionGroupId,
-      versionIndex: newVersionIndex,
+      versionIndex: newVersionIndex
     })
 
     // Reset the live agent thread so it shows a fresh "starting" state instead
@@ -519,7 +513,7 @@ export function useChat(): UseChatReturn {
       content: trimmed,
       conversation_id: convId,
       attachments: uploaded?.map((a) => a.file_id),
-      edit_message_id: messageId,
+      edit_message_id: messageId
     }
 
     wsManager.send(payload)

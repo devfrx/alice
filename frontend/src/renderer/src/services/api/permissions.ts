@@ -4,7 +4,7 @@ import type {
   PermissionMode,
   PermissionModeResponse,
   PermissionRule,
-  PermissionRuleCreate,
+  PermissionRuleCreate
 } from '../../types/permission'
 
 export const permissionsApi = {
@@ -18,11 +18,12 @@ export const permissionsApi = {
    * gated call.
    */
   setPermissionMode: (
-    conversationId: string, mode: PermissionMode,
+    conversationId: string,
+    mode: PermissionMode
   ): Promise<PermissionModeResponse> =>
     request<PermissionModeResponse>(`/permission-mode/${encodeURIComponent(conversationId)}`, {
       method: 'PUT',
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify({ mode })
     }),
 
   /**
@@ -38,19 +39,18 @@ export const permissionsApi = {
    * (scope, tool_name).
    */
   addPermissionRule: (
-    conversationId: string, body: PermissionRuleCreate,
+    conversationId: string,
+    body: PermissionRuleCreate
   ): Promise<PermissionRule> =>
     request<PermissionRule>(`/permission-rules/${encodeURIComponent(conversationId)}`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     }),
 
   /** Delete a persistent rule by id (no-op if it does not exist). */
-  deletePermissionRule: (
-    conversationId: string, ruleId: string,
-  ): Promise<void> =>
+  deletePermissionRule: (conversationId: string, ruleId: string): Promise<void> =>
     request<void>(
       `/permission-rules/${encodeURIComponent(conversationId)}/${encodeURIComponent(ruleId)}`,
-      { method: 'DELETE' },
-    ),
+      { method: 'DELETE' }
+    )
 }

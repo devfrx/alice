@@ -75,7 +75,10 @@ export class WebSocketManager {
   /** Open the WebSocket connection. Safe to call multiple times. */
   connect(): void {
     // Prevent duplicate connections
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
       return
     }
 
@@ -182,7 +185,7 @@ export class WebSocketManager {
     // Exponential backoff capped at maxReconnectDelay to avoid multi-minute stalls.
     const delay = Math.min(
       this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
-      this.maxReconnectDelay,
+      this.maxReconnectDelay
     )
     console.log(`[ALICE WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
     this.reconnectTimer = setTimeout(() => this.connect(), delay)
@@ -212,7 +215,9 @@ export class WebSocketManager {
     }
 
     // Buffer is full — queue the message
-    console.warn(`[ALICE WS] Backpressure: bufferedAmount=${this.ws.bufferedAmount}, queueing message`)
+    console.warn(
+      `[ALICE WS] Backpressure: bufferedAmount=${this.ws.bufferedAmount}, queueing message`
+    )
     if (this.sendQueue.length >= this.maxQueueSize) {
       this.sendQueue.shift() // drop oldest
       console.warn('[ALICE WS] Queue full, dropping oldest message')

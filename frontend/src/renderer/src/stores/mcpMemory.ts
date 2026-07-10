@@ -76,7 +76,7 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
 
   /** Create new entities and reload the graph. */
   async function createEntities(
-    items: { name: string; entityType: string; observations: string[] }[],
+    items: { name: string; entityType: string; observations: string[] }[]
   ): Promise<void> {
     error.value = null
     try {
@@ -100,7 +100,7 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
 
   /** Create relations between entities and reload. */
   async function createRelations(
-    items: { from: string; to: string; relationType: string }[],
+    items: { from: string; to: string; relationType: string }[]
   ): Promise<void> {
     error.value = null
     try {
@@ -113,7 +113,7 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
 
   /** Delete specific relations and reload. */
   async function deleteRelations(
-    items: { from: string; to: string; relationType: string }[],
+    items: { from: string; to: string; relationType: string }[]
   ): Promise<void> {
     error.value = null
     try {
@@ -125,14 +125,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
   }
 
   /** Add observations to an existing entity and reload. */
-  async function addObservations(
-    entityName: string,
-    contents: string[],
-  ): Promise<void> {
+  async function addObservations(entityName: string, contents: string[]): Promise<void> {
     error.value = null
     try {
       await mcpMemoryApi.addKGObservations({
-        observations: [{ entityName, contents }],
+        observations: [{ entityName, contents }]
       })
       await loadGraph()
     } catch (err) {
@@ -141,14 +138,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
   }
 
   /** Remove specific observations from an entity and reload. */
-  async function deleteObservations(
-    entityName: string,
-    observations: string[],
-  ): Promise<void> {
+  async function deleteObservations(entityName: string, observations: string[]): Promise<void> {
     error.value = null
     try {
       await mcpMemoryApi.deleteKGObservations({
-        deletions: [{ entityName, observations }],
+        deletions: [{ entityName, observations }]
       })
       await loadGraph()
     } catch (err) {
@@ -183,6 +177,6 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
     deleteRelations,
     addObservations,
     deleteObservations,
-    clearSearch,
+    clearSearch
   }
 })

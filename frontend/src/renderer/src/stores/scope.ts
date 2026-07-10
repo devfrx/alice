@@ -74,7 +74,7 @@ export const useScopeStore = defineStore('scope', () => {
       const res = await scopeApi.getScope(conversationId)
       byConversation.value = {
         ...byConversation.value,
-        [conversationId]: { folders: res.folders, isIdle: res.is_idle },
+        [conversationId]: { folders: res.folders, isIdle: res.is_idle }
       }
       fetched.value.add(conversationId)
     } finally {
@@ -105,8 +105,8 @@ export const useScopeStore = defineStore('scope', () => {
       ...byConversation.value,
       [msg.conversation_id]: {
         folders: msg.folders,
-        isIdle: existing?.isIdle ?? true,
-      },
+        isIdle: existing?.isIdle ?? true
+      }
     }
   }
 
@@ -120,7 +120,7 @@ export const useScopeStore = defineStore('scope', () => {
     const res = await scopeApi.setScope(conversationId, folders)
     byConversation.value = {
       ...byConversation.value,
-      [conversationId]: { folders: res.folders, isIdle: res.is_idle },
+      [conversationId]: { folders: res.folders, isIdle: res.is_idle }
     }
   }
 
@@ -132,7 +132,7 @@ export const useScopeStore = defineStore('scope', () => {
     await scopeApi.clearScope(conversationId)
     byConversation.value = {
       ...byConversation.value,
-      [conversationId]: { folders: [], isIdle: true },
+      [conversationId]: { folders: [], isIdle: true }
     }
   }
 
@@ -156,6 +156,6 @@ export const useScopeStore = defineStore('scope', () => {
     applyScopeUpdated,
     setFolders,
     clear,
-    reset,
+    reset
   }
 })

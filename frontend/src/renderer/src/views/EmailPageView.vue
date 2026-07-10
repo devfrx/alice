@@ -32,7 +32,12 @@ onMounted(async () => {
   await syncDeepLink(props.id)
 })
 
-watch(() => props.id, (id) => { void syncDeepLink(id) })
+watch(
+  () => props.id,
+  (id) => {
+    void syncDeepLink(id)
+  }
+)
 </script>
 
 <template>

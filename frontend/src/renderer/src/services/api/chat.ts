@@ -54,7 +54,9 @@ export const chatApi = {
 
   /** Delete a conversation and all its messages. */
   deleteConversation: (id: string): Promise<DeleteConversationResponse> =>
-    request<DeleteConversationResponse>(`/chat/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    request<DeleteConversationResponse>(`/chat/conversations/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }),
 
   /** Delete ALL conversations, messages, and files. */
   deleteAllConversations: (): Promise<DeleteAllConversationsResponse> =>
@@ -99,7 +101,7 @@ export const chatApi = {
   branchConversation: (
     conversationId: string,
     fromMessageId: string,
-    title?: string,
+    title?: string
   ): Promise<BranchConversationResponse> => {
     const body: BranchConversationRequest = { from_message_id: fromMessageId }
     if (title) body.title = title
@@ -107,7 +109,7 @@ export const chatApi = {
       `/chat/conversations/${encodeURIComponent(conversationId)}/branch`,
       {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
       }
     )
   },
@@ -135,5 +137,5 @@ export const chatApi = {
     // Resolve relative URL to absolute backend URL so images load in Electron.
     data.url = resolveBackendUrl(data.url)
     return data
-  },
+  }
 }

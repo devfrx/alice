@@ -164,7 +164,12 @@ onBeforeUnmount(() => {
   <div class="tldraw-host">
     <!-- Orphan state: board was deleted from the whiteboard page -->
     <div v-if="isOrphaned" class="tldraw-orphaned">
-      <AppIcon name="whiteboard-deleted" :size="24" :stroke-width="1.5" class="tldraw-orphaned__icon" />
+      <AppIcon
+        name="whiteboard-deleted"
+        :size="24"
+        :stroke-width="1.5"
+        class="tldraw-orphaned__icon"
+      />
       <p class="tldraw-orphaned__text">Lavagna non più disponibile</p>
       <p class="tldraw-orphaned__hint">Il file è stato eliminato dalla pagina Lavagne</p>
     </div>

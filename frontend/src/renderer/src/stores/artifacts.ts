@@ -11,11 +11,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { artifactsApi } from '../services/api'
-import type {
-  Artifact,
-  ArtifactKind,
-  ArtifactListQuery,
-} from '../types/artifacts'
+import type { Artifact, ArtifactKind, ArtifactListQuery } from '../types/artifacts'
 
 export const useArtifactsStore = defineStore('artifacts', () => {
   // -----------------------------------------------------------------------
@@ -47,7 +43,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
       cad_3d_text: [],
       cad_3d_image: [],
       chart: [],
-      whiteboard: [],
+      whiteboard: []
     }
     for (const a of items.value) {
       const bucket = map[a.kind]
@@ -111,9 +107,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
       // Merge with existing items: replace those returned, keep others.
       const returnedIds = new Set(res.items.map((a) => a.id))
       const kept = items.value.filter((a) => !returnedIds.has(a.id))
-      items.value = [...res.items, ...kept].sort((a, b) =>
-        b.created_at.localeCompare(a.created_at),
-      )
+      items.value = [...res.items, ...kept].sort((a, b) => b.created_at.localeCompare(a.created_at))
       total.value = res.total
       if (params?.conversation_id) {
         fetchedConversations.value.add(params.conversation_id)
@@ -163,10 +157,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   }
 
   /** Fetch (and cache) the JSON content of a chart/whiteboard artifact. */
-  async function fetchContent(
-    id: string,
-    force = false,
-  ): Promise<Record<string, unknown> | null> {
+  async function fetchContent(id: string, force = false): Promise<Record<string, unknown> | null> {
     if (!force && contents.value[id]) return contents.value[id]
     try {
       const res = await artifactsApi.getArtifactContent(id)
@@ -179,10 +170,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   }
 
   /** Merge top-level keys into an artifact's JSON content (PATCH + local cache). */
-  async function saveContent(
-    id: string,
-    patch: Record<string, unknown>,
-  ): Promise<boolean> {
+  async function saveContent(id: string, patch: Record<string, unknown>): Promise<boolean> {
     try {
       await artifactsApi.updateArtifactContent(id, patch)
       const cached = contents.value[id]
@@ -285,6 +273,6 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     togglePin,
     remove,
     addArtifact,
-    upsertById,
+    upsertById
   }
 })

@@ -17,7 +17,7 @@ function toolMsg(id: string, content: string): ChatMessage {
     content,
     tool_calls: null,
     tool_call_id: `tc-${id}`,
-    created_at: '2026-06-07T00:00:00Z',
+    created_at: '2026-06-07T00:00:00Z'
   } as ChatMessage
 }
 
@@ -27,7 +27,7 @@ function chart(id: string): ChartPayload {
     title: `Chart ${id}`,
     chart_type: 'bar',
     chart_url: `/api/charts/${id}`,
-    created_at: '2026-06-07T00:00:00Z',
+    created_at: '2026-06-07T00:00:00Z'
   }
 }
 
@@ -63,7 +63,7 @@ describe('extractCharts', () => {
       toolMsg('1', JSON.stringify(chart('c1'))),
       toolMsg('2', 'plain text result'),
       toolMsg('3', JSON.stringify({ board_id: 'wb1', kind: 'whiteboard' })),
-      toolMsg('4', JSON.stringify(chart('c2'))),
+      toolMsg('4', JSON.stringify(chart('c2')))
     ]
     const result = extractCharts(messages)
     expect(result.map((c) => c.chart_id)).toEqual(['c1', 'c2'])
@@ -73,7 +73,7 @@ describe('extractCharts', () => {
     const messages = [
       toolMsg('1', JSON.stringify(chart('first'))),
       toolMsg('2', JSON.stringify(chart('second'))),
-      toolMsg('3', JSON.stringify(chart('third'))),
+      toolMsg('3', JSON.stringify(chart('third')))
     ]
     const ids = extractCharts(messages).map((c) => c.chart_id)
     expect(ids).toEqual(['first', 'second', 'third'])
@@ -82,10 +82,7 @@ describe('extractCharts', () => {
   })
 
   it('ignores malformed JSON without throwing', () => {
-    const messages = [
-      toolMsg('1', '{ broken json'),
-      toolMsg('2', JSON.stringify(chart('ok'))),
-    ]
+    const messages = [toolMsg('1', '{ broken json'), toolMsg('2', JSON.stringify(chart('ok')))]
     expect(extractCharts(messages).map((c) => c.chart_id)).toEqual(['ok'])
   })
 })

@@ -7,11 +7,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { memoryApi } from '../services/api'
-import type {
-  MemoryEntry,
-  MemorySearchResult,
-  MemoryStats
-} from '../types/memory'
+import type { MemoryEntry, MemorySearchResult, MemoryStats } from '../types/memory'
 
 export const useMemoryStore = defineStore('memory', () => {
   // -----------------------------------------------------------------------
@@ -50,11 +46,7 @@ export const useMemoryStore = defineStore('memory', () => {
   }
 
   /** Semantic search over memories. */
-  async function searchMemories(
-    query: string,
-    limit = 10,
-    category?: string
-  ): Promise<void> {
+  async function searchMemories(query: string, limit = 10, category?: string): Promise<void> {
     loading.value = true
     error.value = null
     try {

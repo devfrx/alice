@@ -11,7 +11,7 @@ describe('segmentSentences', () => {
   it('splits complete sentences and keeps the unterminated rest', () => {
     expect(segmentSentences('Prima frase. Seconda frase! E poi')).toMatchObject({
       sentences: ['Prima frase.', 'Seconda frase!'],
-      rest: 'E poi',
+      rest: 'E poi'
     })
   })
 
@@ -22,7 +22,7 @@ describe('segmentSentences', () => {
   it('returns everything as rest when nothing terminates', () => {
     expect(segmentSentences('streaming senza fine')).toMatchObject({
       sentences: [],
-      rest: 'streaming senza fine',
+      rest: 'streaming senza fine'
     })
   })
 })
@@ -67,7 +67,7 @@ describe('useSentencePacer', () => {
     const source = ref('Tutto. Subito.')
     const streaming = ref(true)
     const pacer = scope.run(() =>
-      useSentencePacer(source, streaming, { intervalMs: 300, immediate: true }),
+      useSentencePacer(source, streaming, { intervalMs: 300, immediate: true })
     )!
     await vi.advanceTimersByTimeAsync(0)
     expect(pacer.displayed.value).toBe('Tutto. Subito.')

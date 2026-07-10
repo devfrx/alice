@@ -53,5 +53,5 @@ export const settingsApi = {
 
   /** Reset all persisted preferences to defaults. */
   resetPreferences: (): Promise<{ deleted: number; message: string }> =>
-    request<{ deleted: number; message: string }>('/settings/preferences', { method: 'DELETE' }),
+    request<{ deleted: number; message: string }>('/settings/preferences', { method: 'DELETE' })
 }

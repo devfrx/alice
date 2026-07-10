@@ -10,19 +10,12 @@ const emailStore = useEmailStore()
 
 async function handleArchive(): Promise<void> {
   if (!emailStore.currentEmail) return
-  await emailStore.archiveEmail(
-    emailStore.currentEmail.uid,
-    emailStore.currentFolder,
-  )
+  await emailStore.archiveEmail(emailStore.currentEmail.uid, emailStore.currentFolder)
 }
 
 async function handleMarkRead(read: boolean): Promise<void> {
   if (!emailStore.currentEmail) return
-  await emailStore.markRead(
-    emailStore.currentEmail.uid,
-    read,
-    emailStore.currentFolder,
-  )
+  await emailStore.markRead(emailStore.currentEmail.uid, read, emailStore.currentFolder)
 }
 
 /** Extract display name from "Name <email>" format. */
@@ -52,7 +45,7 @@ function formatFullDate(dateStr: string): string {
     month: 'long',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit',
+    minute: '2-digit'
   })
 }
 </script>
@@ -66,14 +59,23 @@ function formatFullDate(dateStr: string): string {
       </button>
 
       <div class="viewer__topbar-actions">
-        <button class="viewer__topbar-btn"
+        <button
+          class="viewer__topbar-btn"
           :title="emailStore.currentEmail.is_read ? 'Segna come non letta' : 'Segna come letta'"
-          @click="handleMarkRead(!emailStore.currentEmail?.is_read)">
-          <AppIcon :name="emailStore.currentEmail.is_read ? 'email-read' : 'email-unread'" :size="16"
-            :stroke-width="1.8" />
+          @click="handleMarkRead(!emailStore.currentEmail?.is_read)"
+        >
+          <AppIcon
+            :name="emailStore.currentEmail.is_read ? 'email-read' : 'email-unread'"
+            :size="16"
+            :stroke-width="1.8"
+          />
         </button>
 
-        <button class="viewer__topbar-btn viewer__topbar-btn--accent" title="Archivia" @click="handleArchive">
+        <button
+          class="viewer__topbar-btn viewer__topbar-btn--accent"
+          title="Archivia"
+          @click="handleArchive"
+        >
           <AppIcon name="archive" :size="16" :stroke-width="1.8" />
         </button>
       </div>

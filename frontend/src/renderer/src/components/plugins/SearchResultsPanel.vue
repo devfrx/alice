@@ -8,7 +8,7 @@ interface SearchResult {
   snippet: string
 }
 
-const props = defineProps<{ visible: boolean }>()
+defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; 'use-text': [text: string] }>()
 
 const query = ref('')
@@ -31,9 +31,9 @@ async function search(): Promise<void> {
   scrapedTexts.value = {}
   expandedMap.value = {}
   try {
-    const res = await pluginsApi.executePluginTool<SearchResult[]>(
-      'web_search', 'web_search', { query: q }
-    )
+    const res = await pluginsApi.executePluginTool<SearchResult[]>('web_search', 'web_search', {
+      query: q
+    })
     if (res.success) {
       results.value = res.content
     } else {
@@ -54,9 +54,7 @@ async function scrape(idx: number, url: string): Promise<void> {
   scrapingMap.value[idx] = true
   delete scrapeErrors.value[idx]
   try {
-    const res = await pluginsApi.executePluginTool<string>(
-      'web_search', 'web_scrape', { url }
-    )
+    const res = await pluginsApi.executePluginTool<string>('web_search', 'web_scrape', { url })
     if (res.success) {
       scrapedTexts.value[idx] = res.content
       expandedMap.value[idx] = true
@@ -95,8 +93,13 @@ function openUrl(url: string): void {
       </header>
 
       <div class="search-panel__input-wrap">
-        <input v-model="query" class="search-panel__input" type="text" placeholder="Cerca sul web..."
-          @keydown.enter="search" />
+        <input
+          v-model="query"
+          class="search-panel__input"
+          type="text"
+          placeholder="Cerca sul web..."
+          @keydown.enter="search"
+        />
       </div>
 
       <div class="search-panel__body">
@@ -111,9 +114,7 @@ function openUrl(url: string): void {
         </div>
 
         <!-- Empty -->
-        <div v-else-if="!results.length" class="search-panel__status">
-          Cerca qualcosa…
-        </div>
+        <div v-else-if="!results.length" class="search-panel__status">Cerca qualcosa…</div>
 
         <!-- Results -->
         <div v-else class="search-panel__results">
@@ -124,11 +125,18 @@ function openUrl(url: string): void {
             <span class="search-panel__card-url">{{ r.url }}</span>
             <p class="search-panel__card-snippet">{{ r.snippet }}</p>
             <div class="search-panel__card-actions">
-              <button class="search-panel__btn" :disabled="!!scrapingMap[i]" @click="scrape(i, r.url)">
+              <button
+                class="search-panel__btn"
+                :disabled="!!scrapingMap[i]"
+                @click="scrape(i, r.url)"
+              >
                 {{ scrapingMap[i] ? '⏳' : expandedMap[i] ? '▼ Chiudi' : '📄 Scrape' }}
               </button>
-              <button v-if="scrapedTexts[i]" class="search-panel__btn search-panel__btn--accent"
-                @click="emit('use-text', scrapedTexts[i])">
+              <button
+                v-if="scrapedTexts[i]"
+                class="search-panel__btn search-panel__btn--accent"
+                @click="emit('use-text', scrapedTexts[i])"
+              >
                 ➜ Usa in chat
               </button>
             </div>
@@ -136,7 +144,9 @@ function openUrl(url: string): void {
               ⚠️ {{ scrapeErrors[i] }}
             </div>
             <Transition name="scrape-expand">
-              <pre v-if="expandedMap[i] && scrapedTexts[i]" class="search-panel__scraped">{{ scrapedTexts[i] }}</pre>
+              <pre v-if="expandedMap[i] && scrapedTexts[i]" class="search-panel__scraped">{{
+                scrapedTexts[i]
+              }}</pre>
             </Transition>
           </article>
         </div>
@@ -368,7 +378,9 @@ function openUrl(url: string): void {
 /* Scrape expand */
 .scrape-expand-enter-active,
 .scrape-expand-leave-active {
-  transition: max-height 0.2s ease, opacity 0.2s;
+  transition:
+    max-height 0.2s ease,
+    opacity 0.2s;
 }
 
 .scrape-expand-enter-from,

@@ -19,11 +19,8 @@ export const pluginsApi = {
     tool: string,
     args: Record<string, unknown> = {}
   ): Promise<{ success: boolean; content: T; error_message?: string }> =>
-    request<{ success: boolean; content: T; error_message?: string }>(
-      '/plugins/execute',
-      {
-        method: 'POST',
-        body: JSON.stringify({ plugin, tool, args })
-      }
-    ),
+    request<{ success: boolean; content: T; error_message?: string }>('/plugins/execute', {
+      method: 'POST',
+      body: JSON.stringify({ plugin, tool, args })
+    })
 }

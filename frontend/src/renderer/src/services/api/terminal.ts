@@ -4,7 +4,7 @@ import type {
   TerminalCreateRequest,
   TerminalListResponse,
   TerminalSession,
-  TerminalUpdateRequest,
+  TerminalUpdateRequest
 } from '../../types/terminal'
 
 export const terminalApi = {
@@ -14,28 +14,29 @@ export const terminalApi = {
 
   /** Open a new interactive terminal session (scope-confined). */
   createTerminal: (
-    conversationId: string, body: TerminalCreateRequest = {},
+    conversationId: string,
+    body: TerminalCreateRequest = {}
   ): Promise<TerminalSession> =>
     request<TerminalSession>(`/terminal/${encodeURIComponent(conversationId)}`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     }),
 
   /** Rename and/or (re)assign a terminal session to the agent. */
   updateTerminal: (
-    conversationId: string, sessionId: string, body: TerminalUpdateRequest,
+    conversationId: string,
+    sessionId: string,
+    body: TerminalUpdateRequest
   ): Promise<TerminalSession> =>
     request<TerminalSession>(
       `/terminal/${encodeURIComponent(conversationId)}/${encodeURIComponent(sessionId)}`,
-      { method: 'PATCH', body: JSON.stringify(body) },
+      { method: 'PATCH', body: JSON.stringify(body) }
     ),
 
   /** Kill a terminal session (its whole process tree). */
-  deleteTerminal: (
-    conversationId: string, sessionId: string,
-  ): Promise<void> =>
+  deleteTerminal: (conversationId: string, sessionId: string): Promise<void> =>
     request<void>(
       `/terminal/${encodeURIComponent(conversationId)}/${encodeURIComponent(sessionId)}`,
-      { method: 'DELETE' },
-    ),
+      { method: 'DELETE' }
+    )
 }

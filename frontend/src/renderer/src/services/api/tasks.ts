@@ -10,5 +10,5 @@ export const tasksApi = {
 
   /** Fetch the persisted plan document (Markdown write-up) for a conversation. */
   getPlanDocument: (conversationId: string): Promise<PlanDocumentResponse> =>
-    request<PlanDocumentResponse>(`/plan-document/${encodeURIComponent(conversationId)}`),
+    request<PlanDocumentResponse>(`/plan-document/${encodeURIComponent(conversationId)}`)
 }

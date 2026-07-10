@@ -49,7 +49,7 @@ const XTERM_THEME = {
   background: '#0d1117',
   foreground: '#c9d1d9',
   cursor: '#58a6ff',
-  selectionBackground: '#264f78',
+  selectionBackground: '#264f78'
 }
 
 function setHostRef(sessionId: string, el: Element | null): void {
@@ -69,7 +69,7 @@ function ensureTerm(session: TerminalSession): void {
     cursorBlink: true,
     theme: XTERM_THEME,
     scrollback: 5000,
-    convertEol: false,
+    convertEol: false
   })
   const fit = new FitAddon()
   term.loadAddon(fit)
@@ -138,7 +138,7 @@ async function openNew(): Promise<void> {
     const session = await store.create(conv)
     await activate(session.id)
   } catch (e) {
-    errorMsg.value = e instanceof Error ? e.message : "Impossibile aprire il terminale"
+    errorMsg.value = e instanceof Error ? e.message : 'Impossibile aprire il terminale'
   } finally {
     busy.value = false
   }
@@ -199,7 +199,7 @@ watch(
       }
     })
   },
-  { immediate: true },
+  { immediate: true }
 )
 
 // Dispose xterms for sessions that have vanished; keep the active tab valid.
@@ -218,7 +218,7 @@ watch(
       void activate(list[0].id)
     }
   },
-  { deep: false },
+  { deep: false }
 )
 
 onBeforeUnmount(() => {
@@ -298,8 +298,13 @@ onBeforeUnmount(() => {
             <AppIcon name="x" :size="12" />
           </button>
         </div>
-        <button class="tm__new" title="Nuovo terminale" aria-label="Nuovo terminale"
-          :disabled="busy || conversationId === null" @click="openNew">
+        <button
+          class="tm__new"
+          title="Nuovo terminale"
+          aria-label="Nuovo terminale"
+          :disabled="busy || conversationId === null"
+          @click="openNew"
+        >
           <AppIcon name="plus" :size="14" />
         </button>
       </div>
@@ -325,7 +330,11 @@ onBeforeUnmount(() => {
           subtitle="Apri un terminale per lavorare nella cartella dello scope."
         >
           <template #actions>
-            <button class="tm__open-btn" :disabled="busy || conversationId === null" @click="openNew">
+            <button
+              class="tm__open-btn"
+              :disabled="busy || conversationId === null"
+              @click="openNew"
+            >
               <AppIcon name="plus" :size="14" />
               Apri terminale
             </button>

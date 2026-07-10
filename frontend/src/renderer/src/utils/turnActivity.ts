@@ -31,7 +31,7 @@ export function summarizeTools(tools: ToolActivity[]): ToolStatusSummary {
     total: tools.length,
     running: 0,
     success: 0,
-    error: 0,
+    error: 0
   }
   for (const tool of tools) {
     if (tool.status === 'running') summary.running += 1

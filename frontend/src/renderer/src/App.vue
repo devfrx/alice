@@ -57,9 +57,12 @@ const backendReady = ref(false)
 const startupMessage = computed(() => {
   if (!backendReady.value) return 'In attesa del backend…'
   switch (chatApi.connectionStatus.value) {
-    case 'connecting': return 'Connessione al backend…'
-    case 'error': return 'Errore di connessione…'
-    default: return 'Caricamento dati…'
+    case 'connecting':
+      return 'Connessione al backend…'
+    case 'error':
+      return 'Errore di connessione…'
+    default:
+      return 'Caricamento dati…'
   }
 })
 
@@ -88,7 +91,7 @@ onMounted(async () => {
   await Promise.all([
     settingsStore.initialize(),
     pluginsStore.loadPlugins(),
-    settingsStore.resumeOperationTracking(),
+    settingsStore.resumeOperationTracking()
   ])
 
   // 4. Guard: component may have unmounted during async ops
@@ -106,7 +109,11 @@ onUnmounted(() => {
   <div id="alice-app" :class="{ 'alice-app--assistant': isAssistantRoute }">
     <TitleBar />
     <div v-if="settingsStore.isAnyOperationInProgress" class="global-operation-bar">
-      <div class="global-operation-bar__track" role="progressbar" aria-label="Operazione modello in corso">
+      <div
+        class="global-operation-bar__track"
+        role="progressbar"
+        aria-label="Operazione modello in corso"
+      >
         <div class="global-operation-bar__fill" />
       </div>
       <span class="global-operation-bar__text">{{ settingsStore.operationDescription }}</span>
@@ -225,7 +232,6 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .view-enter-active,
   .view-leave-active {
     transition: opacity 120ms ease;

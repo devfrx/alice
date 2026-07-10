@@ -20,9 +20,15 @@ const emit = defineEmits<{ forecast: [] }>()
 const REFRESH_MS = 10 * 60 * 1000
 
 const weatherIcons: Record<string, string> = {
-  clear: '☀️', cloudy: '☁️', partly_cloudy: '⛅',
-  rain: '🌧️', snow: '❄️', thunderstorm: '⛈️',
-  fog: '🌫️', wind: '💨', default: '🌡️'
+  clear: '☀️',
+  cloudy: '☁️',
+  partly_cloudy: '⛅',
+  rain: '🌧️',
+  snow: '❄️',
+  thunderstorm: '⛈️',
+  fog: '🌫️',
+  wind: '💨',
+  default: '🌡️'
 }
 
 const weather = ref<WeatherData | null>(null)
@@ -56,7 +62,9 @@ async function fetchWeather(): Promise<void> {
     loading.value = !weather.value // only show spinner on first load
     error.value = false
     const res = await pluginsApi.executePluginTool<WeatherData>(
-      'weather', 'get_weather', props.city ? { city: props.city } : {}
+      'weather',
+      'get_weather',
+      props.city ? { city: props.city } : {}
     )
     if (res.success) {
       weather.value = res.content
@@ -182,7 +190,6 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-
   0%,
   100% {
     opacity: 0.3;
@@ -245,7 +252,9 @@ onUnmounted(() => {
 /* Transition */
 .weather-drop-enter-active,
 .weather-drop-leave-active {
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .weather-drop-enter-from,

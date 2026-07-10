@@ -9,7 +9,16 @@
  * trigger server-side STT transcription.
  */
 
-import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref, type ShallowRef } from 'vue'
+import {
+  computed,
+  onScopeDispose,
+  ref,
+  shallowRef,
+  watch,
+  type ComputedRef,
+  type Ref,
+  type ShallowRef
+} from 'vue'
 
 import { BACKEND_HOST } from '../services/api'
 import { WebSocketManager } from '../services/ws'
@@ -147,10 +156,10 @@ export function useVoice(): UseVoiceReturn {
   }
 
   // -- Silence-based auto-stop (continuous modes) --
-  const SILENCE_THRESHOLD = 0.04        // normalised level below which we consider silence
-  const SPEECH_THRESHOLD = 0.06         // level above which we consider speech started
-  const SILENCE_TIMEOUT_MS = 1500       // ms of continuous silence before auto-stop
-  let speechDetected = false            // has the user started speaking this recording?
+  const SILENCE_THRESHOLD = 0.04 // normalised level below which we consider silence
+  const SPEECH_THRESHOLD = 0.06 // level above which we consider speech started
+  const SILENCE_TIMEOUT_MS = 1500 // ms of continuous silence before auto-stop
+  let speechDetected = false // has the user started speaking this recording?
   let silenceSince: number | null = null // timestamp when silence started
 
   // -- STT processing timeout --
@@ -200,16 +209,25 @@ export function useVoice(): UseVoiceReturn {
     if (d.auto_tts_response !== undefined) store.autoTtsResponse = d.auto_tts_response
 
     // Clear any pending retry
-    if (sttRetryTimer) { clearTimeout(sttRetryTimer); sttRetryTimer = null }
+    if (sttRetryTimer) {
+      clearTimeout(sttRetryTimer)
+      sttRetryTimer = null
+    }
 
     // Auto-start recording in continuous modes
-    if (d.stt_available && (store.activationMode === 'always_on' || store.activationMode === 'wake_word')) {
+    if (
+      d.stt_available &&
+      (store.activationMode === 'always_on' || store.activationMode === 'wake_word')
+    ) {
       scheduleAutoRestart()
     }
 
     // If STT is not yet available but we're in continuous mode, retry connection
     // after a delay (STT may still be loading after a config save).
-    if (!d.stt_available && (store.activationMode === 'always_on' || store.activationMode === 'wake_word')) {
+    if (
+      !d.stt_available &&
+      (store.activationMode === 'always_on' || store.activationMode === 'wake_word')
+    ) {
       console.log('[ALICE Voice] STT not available yet, will retry connection in 5s')
       sttRetryTimer = setTimeout(() => {
         sttRetryTimer = null
@@ -241,7 +259,10 @@ export function useVoice(): UseVoiceReturn {
         return
       }
       // Strip the wake word prefix from the cleaned text, then recover rest
-      const afterWw = cleaned.slice(ww.length).replace(/^[,.:;!?\s]+/, '').trim()
+      const afterWw = cleaned
+        .slice(ww.length)
+        .replace(/^[,.:;!?\s]+/, '')
+        .trim()
       if (!afterWw) {
         console.log('[ALICE Voice] Only wake word spoken, no command')
         store.isProcessing = false
@@ -264,7 +285,10 @@ export function useVoice(): UseVoiceReturn {
     store.isProcessing = true
     startSttTimeout()
   }
-  const onTtsStart = (): void => { store.isSpeaking = true; ttsBackendDone = false }
+  const onTtsStart = (): void => {
+    store.isSpeaking = true
+    ttsBackendDone = false
+  }
   const onTtsDone = (): void => {
     ttsBackendDone = true
     audioConvertChain = Promise.resolve()
@@ -285,13 +309,15 @@ export function useVoice(): UseVoiceReturn {
   // Binary audio chunks arrive as Blob in browsers — convert and queue sequentially.
   let audioConvertChain: Promise<void> = Promise.resolve()
   const onBinaryAudio = (data: unknown): void => {
-    audioConvertChain = audioConvertChain.then(async () => {
-      const buf = data instanceof Blob ? await data.arrayBuffer() : data as ArrayBuffer
-      audioQueue.push(buf)
-      if (!isPlayingQueue) playNextChunk()
-    }).catch((err) => {
-      console.error('[ALICE Voice] Audio convert error:', err)
-    })
+    audioConvertChain = audioConvertChain
+      .then(async () => {
+        const buf = data instanceof Blob ? await data.arrayBuffer() : (data as ArrayBuffer)
+        audioQueue.push(buf)
+        if (!isPlayingQueue) playNextChunk()
+      })
+      .catch((err) => {
+        console.error('[ALICE Voice] Audio convert error:', err)
+      })
   }
   const onVoiceError = (data: unknown): void => {
     const d = data as { message: string }
@@ -418,15 +444,37 @@ export function useVoice(): UseVoiceReturn {
   // -----------------------------------------------------------------------
 
   function cleanupRecordingResources(): void {
-    if (levelTimer) { clearInterval(levelTimer); levelTimer = null }
-    if (workletNode) { workletNode.disconnect(); workletNode = null }
-    if (analyserNode) { analyserNode.disconnect(); analyserNode = null }
-    if (audioContext) { audioContext.close().catch(() => { /* already closed */ }); audioContext = null }
-    if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null }
+    if (levelTimer) {
+      clearInterval(levelTimer)
+      levelTimer = null
+    }
+    if (workletNode) {
+      workletNode.disconnect()
+      workletNode = null
+    }
+    if (analyserNode) {
+      analyserNode.disconnect()
+      analyserNode = null
+    }
+    if (audioContext) {
+      audioContext.close().catch(() => {
+        /* already closed */
+      })
+      audioContext = null
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((t) => t.stop())
+      mediaStream = null
+    }
   }
 
   function cleanupPlaybackResources(): void {
-    if (playbackCtx) { playbackCtx.close().catch(() => { /* already closed */ }); playbackCtx = null }
+    if (playbackCtx) {
+      playbackCtx.close().catch(() => {
+        /* already closed */
+      })
+      playbackCtx = null
+    }
     audioQueue.length = 0
     isPlayingQueue = false
     ttsBackendDone = false
@@ -481,7 +529,7 @@ export function useVoice(): UseVoiceReturn {
       sampleRate: 16000,
       channelCount: 1,
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseSuppression: true
     }
     if (selectedDeviceId.value) {
       audioConstraints.deviceId = { exact: selectedDeviceId.value }
@@ -497,13 +545,22 @@ export function useVoice(): UseVoiceReturn {
       micPermission.value = name === 'NotFoundError' ? 'prompt' : 'denied'
       store.micPermission = micPermission.value
       if (name === 'NotAllowedError' || name === 'SecurityError') {
-        showVoiceNotice('Permesso microfono negato. Abilitalo nelle impostazioni dell\'app o del browser.', 'error')
+        showVoiceNotice(
+          "Permesso microfono negato. Abilitalo nelle impostazioni dell'app o del browser.",
+          'error'
+        )
       } else if (name === 'NotFoundError') {
-        showVoiceNotice('Nessun microfono trovato. Collega o seleziona un dispositivo audio.', 'error')
+        showVoiceNotice(
+          'Nessun microfono trovato. Collega o seleziona un dispositivo audio.',
+          'error'
+        )
       } else if (name === 'NotReadableError') {
         showVoiceNotice('Il microfono risulta occupato da un altro programma.', 'error')
       } else {
-        showVoiceNotice('Non riesco ad avviare il microfono. Controlla dispositivo e permessi.', 'error')
+        showVoiceNotice(
+          'Non riesco ad avviare il microfono. Controlla dispositivo e permessi.',
+          'error'
+        )
       }
       return
     }
@@ -518,7 +575,9 @@ export function useVoice(): UseVoiceReturn {
 
     audioContext = new AudioContext({ sampleRate: 16000 })
     const actualSampleRate = audioContext.sampleRate
-    console.log(`[ALICE Voice] AudioContext sampleRate: requested=16000, actual=${actualSampleRate}`)
+    console.log(
+      `[ALICE Voice] AudioContext sampleRate: requested=16000, actual=${actualSampleRate}`
+    )
     const source = audioContext.createMediaStreamSource(mediaStream)
 
     // Level analyser
@@ -560,10 +619,16 @@ export function useVoice(): UseVoiceReturn {
       console.error('[ALICE Voice] AudioWorklet addModule failed:', err)
       showVoiceNotice('Acquisizione audio non avviata: AudioWorklet non disponibile.', 'error')
       // Cleanup on failure
-      if (levelTimer) { clearInterval(levelTimer); levelTimer = null }
-      analyserNode?.disconnect(); analyserNode = null
-      audioContext.close(); audioContext = null
-      mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null
+      if (levelTimer) {
+        clearInterval(levelTimer)
+        levelTimer = null
+      }
+      analyserNode?.disconnect()
+      analyserNode = null
+      audioContext.close()
+      audioContext = null
+      mediaStream.getTracks().forEach((t) => t.stop())
+      mediaStream = null
       return
     }
 
@@ -604,10 +669,18 @@ export function useVoice(): UseVoiceReturn {
       const devices = await navigator.mediaDevices.enumerateDevices()
       audioDevices.value = devices
         .filter((d) => d.kind === 'audioinput')
-        .map((d) => ({ deviceId: d.deviceId, label: d.label || `Microfono (${d.deviceId.slice(0, 8)})` }))
+        .map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Microfono (${d.deviceId.slice(0, 8)})`
+        }))
       console.log('[ALICE Voice] Available audio devices:', audioDevices.value)
-      if (selectedDeviceId.value && !audioDevices.value.some(d => d.deviceId === selectedDeviceId.value)) {
-        console.warn('[ALICE Voice] Selected mic device disappeared from device list, resetting to default')
+      if (
+        selectedDeviceId.value &&
+        !audioDevices.value.some((d) => d.deviceId === selectedDeviceId.value)
+      ) {
+        console.warn(
+          '[ALICE Voice] Selected mic device disappeared from device list, resetting to default'
+        )
         selectedDeviceId.value = ''
       }
     } catch (err) {
@@ -635,7 +708,9 @@ export function useVoice(): UseVoiceReturn {
     // Stop the currently playing audio by closing the playback context.
     // This immediately silences any AudioBufferSourceNode in flight.
     if (playbackCtx) {
-      playbackCtx.close().catch(() => { /* already closed */ })
+      playbackCtx.close().catch(() => {
+        /* already closed */
+      })
       playbackCtx = null
     }
     audioQueue.length = 0
@@ -678,15 +753,26 @@ export function useVoice(): UseVoiceReturn {
   function disconnect(): void {
     clearSttTimeout()
     cancelAutoRestart()
-    if (sttRetryTimer) { clearTimeout(sttRetryTimer); sttRetryTimer = null }
+    if (sttRetryTimer) {
+      clearTimeout(sttRetryTimer)
+      sttRetryTimer = null
+    }
     stopListening()
     cancelSpeak()
     voiceWs.disconnect()
     cleanupAudioResources()
-    if (playbackCtx) { playbackCtx.close().catch(() => { /* already closed */ }); playbackCtx = null }
+    if (playbackCtx) {
+      playbackCtx.close().catch(() => {
+        /* already closed */
+      })
+      playbackCtx = null
+    }
     audioQueue.length = 0
     isPlayingQueue = false
-    if (workletBlobUrl) { URL.revokeObjectURL(workletBlobUrl); workletBlobUrl = null }
+    if (workletBlobUrl) {
+      URL.revokeObjectURL(workletBlobUrl)
+      workletBlobUrl = null
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -726,6 +812,6 @@ export function useVoice(): UseVoiceReturn {
     cancelSpeak,
     connect,
     disconnect,
-    refreshDevices,
+    refreshDevices
   }
 }

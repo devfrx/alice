@@ -18,7 +18,7 @@ describe('register/list', () => {
   it('throws on duplicate names', () => {
     reg.register({ name: 'a.one', title: 'A', capability: 'read', run: () => 1 })
     expect(() =>
-      reg.register({ name: 'a.one', title: 'A2', capability: 'read', run: () => 2 }),
+      reg.register({ name: 'a.one', title: 'A2', capability: 'read', run: () => 2 })
     ).toThrow(DuplicateCommandError)
   })
 

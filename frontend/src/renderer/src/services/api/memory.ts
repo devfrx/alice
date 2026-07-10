@@ -46,8 +46,7 @@ export const memoryApi = {
     request<MemoryDeleteCountResponse>('/memory/all', { method: 'DELETE' }),
 
   /** Load memory statistics. */
-  getMemoryStats: (): Promise<MemoryStats> =>
-    request<MemoryStats>('/memory/stats'),
+  getMemoryStats: (): Promise<MemoryStats> => request<MemoryStats>('/memory/stats')
 }
 
 export const vectorStoreApi = {
@@ -64,5 +63,5 @@ export const vectorStoreApi = {
    * Destructive: clears persisted embedded vectors. Returns refreshed stats.
    */
   repairVectorStore: (): Promise<VectorStoreStats> =>
-    request<VectorStoreStats>('/vector-store/repair', { method: 'POST' }),
+    request<VectorStoreStats>('/vector-store/repair', { method: 'POST' })
 }

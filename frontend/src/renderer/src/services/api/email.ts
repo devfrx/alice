@@ -25,23 +25,23 @@ export const emailApi = {
   searchEmails: (req: EmailSearchRequest): Promise<EmailHeader[]> =>
     request<EmailHeader[]>('/email/search', {
       method: 'POST',
-      body: JSON.stringify(req),
+      body: JSON.stringify(req)
     }),
 
   /** Mark email as read or unread. */
   markEmailRead: (uid: string, folder: string, read: boolean): Promise<{ success: boolean }> =>
     request<{ success: boolean }>(
       `/email/${encodeURIComponent(uid)}/read?folder=${encodeURIComponent(folder)}&read=${read}`,
-      { method: 'PUT' },
+      { method: 'PUT' }
     ),
 
   /** Archive an email. */
   archiveEmail: (uid: string, fromFolder: string): Promise<{ success: boolean }> =>
     request<{ success: boolean }>(
       `/email/${encodeURIComponent(uid)}/archive?from_folder=${encodeURIComponent(fromFolder)}`,
-      { method: 'PUT' },
+      { method: 'PUT' }
     ),
 
   /** List IMAP folders. */
-  getEmailFolders: (): Promise<string[]> => request<string[]>('/email/folders'),
+  getEmailFolders: (): Promise<string[]> => request<string[]>('/email/folders')
 }

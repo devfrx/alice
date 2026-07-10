@@ -25,7 +25,7 @@ export interface WhiteboardBoardItem {
 /** Pure mapping Artifact → board view-model (exported for tests). */
 export function toBoardItem(
   a: Artifact,
-  titleOf: (id: string | null) => string | null,
+  titleOf: (id: string | null) => string | null
 ): WhiteboardBoardItem {
   const meta = a.artifact_metadata ?? {}
   const convId = a.conversation_id ?? null
@@ -35,13 +35,11 @@ export function toBoardItem(
     conversationId: convId,
     conversationTitle: titleOf(convId),
     shapeCount: typeof meta.shape_count === 'number' ? meta.shape_count : 0,
-    updatedAt: a.updated_at,
+    updatedAt: a.updated_at
   }
 }
 
-export function useWhiteboardBoards(
-  conversationId?: () => string | null | undefined,
-): {
+export function useWhiteboardBoards(conversationId?: () => string | null | undefined): {
   boards: ComputedRef<WhiteboardBoardItem[]>
   loading: ComputedRef<boolean>
   refresh: () => Promise<void>
@@ -66,13 +64,13 @@ export function useWhiteboardBoards(
     const convId = conversationId?.()
     await artifactsStore.fetch({
       kind: 'whiteboard',
-      ...(convId ? { conversation_id: convId } : {}),
+      ...(convId ? { conversation_id: convId } : {})
     })
   }
 
   return {
     boards,
     loading: computed(() => artifactsStore.loading),
-    refresh,
+    refresh
   }
 }

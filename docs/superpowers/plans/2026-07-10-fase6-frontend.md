@@ -151,6 +151,8 @@ git commit -m "feat(fe): standalone /terminal page hosting the PTY terminal" -m 
 
 ### Task 2: Rimozione stack Workspace + dead code orb (Horizon unica superficie)
 
+> **Esito (2026-07-10):** DONE. 53 file nel commit principale (`84959b8`, ~4.900 righe rimosse: stack completo + prima/seconda ondata orfani; tenuti ChartViewer e useCodeBlocks, vivi in Horizon). Spec review: conforme (ui.ts e router identici al piano; deletion list completa; zero riferimenti pendenti; ha trovato il link WORKSPACE residuo). Quality review (top): "Needs fixes" — CRITICO trovato: `HorizonView.vue:541` RouterLink a `{name:'workspace'}` (route name rimosso) → MATCHER_NOT_FOUND al mount = superficie primaria morta al lancio; IMPORTANT: `ArtifactCard.openConversation` puntava ancora a `/workspace` con query morta. Fix in `85e5deb` (implementer): link rimosso, ArtifactCard rimigrato a loadConversation+/assistant con guard, terza ondata orfani cancellata (ThinkingSection/ToolCallSection/TaskStepList, grep-verificati), commenti stantii riscritti (App/AppSidebar/ScopeIndicator/HorizonCockpit/ImmersiveCADCanvas). Fallback localStorage NON aggiunto (decisione dati azzerabili). Re-review: ✅ Approved. Gate: typecheck+vitest (18 file/140 test) verdi, 0 errori eslint nuovi, EOL ok. Nota operativa: un reviewer ha corrotto transitoriamente node_modules (npm in worktree) — i prompt reviewer ora vietano mutazioni dell'albero.
+
 **Files:**
 - Rewrite: `frontend/src/renderer/src/stores/ui.ts`
 - Rewrite: `frontend/src/renderer/src/router/index.ts`

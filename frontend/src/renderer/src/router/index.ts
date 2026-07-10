@@ -113,6 +113,12 @@ const router = createRouter({
       meta: { title: 'Bacheca', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
+      path: '/terminal',
+      name: 'terminal',
+      component: () => import('../views/TerminalPageView.vue'),
+      meta: { title: 'Terminale', transition: DEFAULT_PAGE_TRANSITION }
+    },
+    {
       path: '/services',
       name: 'services',
       component: () => import('../views/ServicesView.vue'),

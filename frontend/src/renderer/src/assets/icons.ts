@@ -186,6 +186,9 @@ const _ICONS = {
   /** Modules / panels grid (workspace module launcher) */
   'modules': { icon: 'solar:widget-2-bold' },
 
+  /** Terminal / code console */
+  'terminal': { icon: 'solar:code-square-bold' },
+
   // ── Info / feedback ───────────────────────────────────────────────────────
 
   /** Eye / visibility */

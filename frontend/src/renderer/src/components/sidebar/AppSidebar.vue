@@ -296,6 +296,14 @@ async function onBackupAll(): Promise<void> {
             <span class="sidebar__link-label">Bacheca</span>
           </router-link>
 
+          <router-link to="/terminal" class="sidebar__link" active-class="sidebar__link--active" title="Terminale"
+            @click="toggle">
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <AppIcon name="terminal" :size="15" />
+            </span>
+            <span class="sidebar__link-label">Terminale</span>
+          </router-link>
+
           <router-link to="/email" class="sidebar__link" active-class="sidebar__link--active" title="Email"
             @click="toggle">
             <span class="sidebar__link-icon" aria-hidden="true">

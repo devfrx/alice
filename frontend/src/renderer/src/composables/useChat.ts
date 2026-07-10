@@ -28,35 +28,23 @@ import { useSettingsStore } from '../stores/settings'
 import type {
   AskUserAnswer,
   FileAttachment,
-  WsAskUserRequiredMessage,
   WsAskUserResponsePayload,
   WsCancelPayload,
-  WsContextCompressionDoneMessage,
-  WsContextInfoMessage,
-  WsDoneMessage,
-  WsErrorMessage,
-  WsLlmRequeryMessage,
   RememberChoice,
   WsSendPayload,
-  WsThinkingMessage,
-  WsTokenMessage,
-  WsToolConfirmationRequiredMessage,
-  WsToolConfirmationResponsePayload,
-  WsToolExecutionDoneMessage,
-  WsToolExecutionStartMessage,
-  WsToolProgressMessage,
-  WsWarningMessage
+  WsToolConfirmationResponsePayload
 } from '../types/chat'
-import type {
-  WsInteractionRequestedMessage,
-  WsInteractionResolvedMessage,
-  WsToolCallMessage,
-  WsToolResultMessage,
-  WsTurnFinishedMessage,
-  WsTurnLlmStepMessage,
-  WsTurnStartedMessage,
-  WsTurnUsageMessage
-} from '../types/turn'
+import type { ChatServerMessage } from '../types/generated'
+
+/**
+ * Exhaustive map of chat-WS frame types to handlers. Adding a frame to the
+ * backend ws_schema and regenerating the contracts makes this object FAIL TO
+ * COMPILE until the new frame is handled (or explicitly no-op'd) — same
+ * guarantee the events channel has had since 1b.
+ */
+type ChatHandlerMap = {
+  [K in ChatServerMessage['type']]: (msg: Extract<ChatServerMessage, { type: K }>) => void
+}
 
 /** Connection status reported by the composable. */
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -104,7 +92,7 @@ export function useChat(): UseChatReturn {
   let activeGeneration = 0
 
   // -----------------------------------------------------------------------
-  // WS event handlers (named so they can be removed in cleanup)
+  // Socket-level lifecycle handlers (named so they can be removed in cleanup)
   // -----------------------------------------------------------------------
 
   const onConnected = (): void => {
@@ -129,241 +117,199 @@ export function useChat(): UseChatReturn {
     }
   }
 
-  const onError = (data: unknown): void => {
-    // Only set connection-level error for native WS errors (Event objects),
-    // not for server-side error frames (which are JSON with type:'error').
-    if (data instanceof Event) {
-      connectionStatus.value = 'error'
-    }
+  const onSocketError = (): void => {
+    connectionStatus.value = 'error'
   }
 
   const onReconnectFailed = (): void => {
     connectionStatus.value = 'error'
   }
 
-  const onToken = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return // stale event
-    const msg = data as WsTokenMessage
-    store.appendToStream(msg.content)
-  }
+  // -----------------------------------------------------------------------
+  // Chat frame handlers (exhaustive over ChatServerMessage['type'])
+  // -----------------------------------------------------------------------
 
-  const onThinking = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return // stale event
-    const msg = data as WsThinkingMessage
-    store.appendToThinking(msg.content)
-  }
+  const noop = (): void => {}
 
-  const onDone = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return // stale event
-    const msg = data as WsDoneMessage
-    if (msg.finish_reason && msg.finish_reason !== 'stop') {
-      console.debug('[useChat] Stream finished with reason:', msg.finish_reason)
-    }
-    store.finalizeStream(
-      msg.conversation_id,
-      msg.message_id,
-      msg.version_group_id,
-      msg.version_index,
-      msg.user_message_id,
-    )
-  }
+  const handlers: ChatHandlerMap = {
+    token: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return // stale event
+      store.appendToStream(msg.content)
+    },
 
-  const onToolCall = (data: unknown): void => {
+    thinking: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return // stale event
+      store.appendToThinking(msg.content)
+    },
+
+    done: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return // stale event
+      if (msg.finish_reason && msg.finish_reason !== 'stop') {
+        console.debug('[useChat] Stream finished with reason:', msg.finish_reason)
+      }
+      store.finalizeStream(
+        msg.conversation_id,
+        msg.message_id,
+        msg.version_group_id,
+        msg.version_index,
+        msg.user_message_id,
+      )
+    },
+
+    error: (msg) => {
+      console.error('[useChat] Server error:', msg.content)
+      // Don't cancel stream here — transient LLM errors during tool loop
+      // re-queries would kill the entire stream.  The backend sends a
+      // proper "done" event when the response is truly finished.
+    },
+
+    warning: (msg) => {
+      console.warn('[useChat] Server warning:', msg.content)
+    },
+
     // Legacy handler kept for backward compatibility with older backends.
-    console.debug('[useChat] Legacy tool_call event received:', data)
+    tool_call: (msg) => console.debug('[useChat] Legacy tool_call frame:', msg),
+
+    tool_execution_start: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+      store.addToolExecution(msg.execution_id, msg.tool_name)
+    },
+
+    tool_execution_done: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+      store.completeToolExecution(msg.execution_id, msg.result, msg.success, msg.content_type ?? undefined)
+    },
+
+    tool_progress: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+      store.updateToolExecutionProgress(msg.execution_id, {
+        phase: msg.phase ?? undefined,
+        label: msg.label ?? null,
+        step: msg.step ?? undefined,
+        total: msg.total ?? undefined,
+        percent: msg.percent ?? undefined,
+        elapsedS: msg.elapsed_s ?? undefined,
+      })
+    },
+
+    tool_confirmation_required: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+
+      // Auto-approve safe tools or ALL tools when confirmations are disabled.
+      if (msg.risk_level === 'safe' || !settingsStore.toolConfirmations) {
+        respondToConfirmation(msg.execution_id, true)
+        return
+      }
+
+      store.addPendingConfirmation({
+        executionId: msg.execution_id,
+        toolName: msg.tool_name,
+        args: msg.args,
+        riskLevel: msg.risk_level,
+        description: msg.description,
+        reasoning: msg.reasoning ?? undefined,
+        allowRemember: msg.allow_remember
+      })
+    },
+
+    ask_user_required: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+
+      // ask_user always needs human input — there is no auto-approve path.
+      store.addPendingAskUser({
+        executionId: msg.execution_id,
+        questions: msg.questions
+      })
+    },
+
+    llm_requery: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+      console.debug('[useChat] LLM re-query iteration:', msg.iteration)
+      // Reset streaming content for the new LLM iteration.
+      // The previous iteration's content is already persisted server-side.
+      store.currentStreamContent = ''
+      // Accumulate thinking across iterations so all reasoning stays visible.
+      // Previous iterations are separated by a horizontal rule.
+      if (store.currentThinkingContent) {
+        store.currentThinkingContent += '\n\n---\n\n'
+      }
+    },
+
+    context_info: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+      if (store.streamingConversationId !== store.currentConversation?.id) return
+      store.updateContextInfo({
+        used: msg.used,
+        available: msg.available,
+        contextWindow: msg.context_window,
+        percentage: msg.percentage,
+        wasCompressed: msg.was_compressed,
+        messagesSummarized: msg.messages_summarized ?? 0,
+        isEstimated: msg.is_estimated ?? true,
+        breakdown: msg.breakdown ?? undefined,
+      })
+    },
+
+    context_compression_start: () => {
+      if (store.streamGeneration !== activeGeneration) return
+      if (store.streamingConversationId !== store.currentConversation?.id) return
+      store.setCompressingContext(true)
+    },
+
+    context_compression_done: (msg) => {
+      if (store.streamGeneration !== activeGeneration) return
+      if (store.streamingConversationId !== store.currentConversation?.id) return
+      store.setCompressionDone(msg.messages_summarized)
+    },
+
+    context_compression_failed: () => {
+      if (store.streamGeneration !== activeGeneration) return
+      if (store.streamingConversationId !== store.currentConversation?.id) return
+      store.setCompressingContext(false)
+    },
+
+    // Client-tool bridge: no renderer executor is wired yet (dormant since 1b).
+    client_tool_call: noop,
+
+    // -- Canonical turn-event stream (Fase 3) ------------------------------
+    // Additive, run-scoped frames folded into the agentRun store. They are
+    // NOT gated on the stale-generation guard: runs are keyed by `turn_id`,
+    // so late frames after navigation still land on the correct run.
+
+    'turn.started': (msg) => agentRunStore.applyTurnStarted(msg),
+    'turn.llm_step': (msg) => agentRunStore.applyLlmStep(msg),
+    'tool.call': (msg) => agentRunStore.applyToolCall(msg),
+    'tool.result': (msg) => agentRunStore.applyToolResult(msg),
+    'interaction.requested': (msg) => agentRunStore.applyInteractionRequested(msg),
+    'interaction.resolved': (msg) => agentRunStore.applyInteractionResolved(msg),
+    'turn.usage': (msg) => agentRunStore.applyTurnUsage(msg),
+    'turn.finished': (msg) => agentRunStore.applyTurnFinished(msg),
+
+    // Reflective-executor telemetry frames — no UI surface yet (backlog).
+    'agent.critic_invoked': noop,
+
+    'agent.warning': (msg) => console.warn('[useChat] Agent warning frame:', msg)
   }
 
-  const onToolExecutionStart = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    const msg = data as WsToolExecutionStartMessage
-    store.addToolExecution(msg.execution_id, msg.tool_name)
-  }
-
-  const onToolExecutionDone = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    const msg = data as WsToolExecutionDoneMessage
-    store.completeToolExecution(msg.execution_id, msg.result, msg.success, msg.content_type ?? undefined)
-  }
-
-  const onToolProgress = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    const msg = data as WsToolProgressMessage
-    store.updateToolExecutionProgress(msg.execution_id, {
-      phase: msg.phase ?? undefined,
-      label: msg.label ?? null,
-      step: msg.step ?? undefined,
-      total: msg.total ?? undefined,
-      percent: msg.percent ?? undefined,
-      elapsedS: msg.elapsed_s ?? undefined,
-    })
-  }
-
-  const onToolConfirmationRequired = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    const msg = data as WsToolConfirmationRequiredMessage
-
-    // Auto-approve safe tools or ALL tools when confirmations are disabled.
-    if (msg.risk_level === 'safe' || !settingsStore.toolConfirmations) {
-      respondToConfirmation(msg.execution_id, true)
-      return
+  const dispatchFrame = (frame: ChatServerMessage): void => {
+    const handler = handlers[frame.type] as ((msg: ChatServerMessage) => void) | undefined
+    if (handler) {
+      handler(frame)
+    } else {
+      // Runtime safety net for frames newer than the bundled contract.
+      console.warn('[useChat] Unhandled chat frame type:', (frame as { type?: string }).type)
     }
-
-    store.addPendingConfirmation({
-      executionId: msg.execution_id,
-      toolName: msg.tool_name,
-      args: msg.args,
-      riskLevel: msg.risk_level,
-      description: msg.description,
-      reasoning: msg.reasoning ?? undefined,
-      allowRemember: msg.allow_remember
-    })
-  }
-
-  const onAskUserRequired = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    const msg = data as WsAskUserRequiredMessage
-
-    // ask_user always needs human input — there is no auto-approve path.
-    store.addPendingAskUser({
-      executionId: msg.execution_id,
-      questions: msg.questions
-    })
-  }
-
-  const onLlmRequery = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    const msg = data as WsLlmRequeryMessage
-    console.debug('[useChat] LLM re-query iteration:', msg.iteration)
-    // Reset streaming content for the new LLM iteration.
-    // The previous iteration's content is already persisted server-side.
-    store.currentStreamContent = ''
-    // Accumulate thinking across iterations so all reasoning stays visible.
-    // Previous iterations are separated by a horizontal rule.
-    if (store.currentThinkingContent) {
-      store.currentThinkingContent += '\n\n---\n\n'
-    }
-  }
-
-  const onWarning = (data: unknown): void => {
-    const msg = data as WsWarningMessage
-    console.warn('[useChat] Server warning:', msg.content)
-  }
-
-  const onContextInfo = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    if (store.streamingConversationId !== store.currentConversation?.id) return
-    const msg = data as WsContextInfoMessage
-    store.updateContextInfo({
-      used: msg.used,
-      available: msg.available,
-      contextWindow: msg.context_window,
-      percentage: msg.percentage,
-      wasCompressed: msg.was_compressed,
-      messagesSummarized: msg.messages_summarized ?? 0,
-      isEstimated: msg.is_estimated ?? true,
-      breakdown: msg.breakdown ?? undefined,
-    })
-  }
-
-  const onContextCompressionStart = (): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    if (store.streamingConversationId !== store.currentConversation?.id) return
-    store.setCompressingContext(true)
-  }
-
-  const onContextCompressionDone = (data: unknown): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    if (store.streamingConversationId !== store.currentConversation?.id) return
-    const msg = data as WsContextCompressionDoneMessage
-    store.setCompressionDone(msg.messages_summarized)
-  }
-
-  const onContextCompressionFailed = (): void => {
-    if (store.streamGeneration !== activeGeneration) return
-    if (store.streamingConversationId !== store.currentConversation?.id) return
-    store.setCompressingContext(false)
-  }
-
-  const onWsError = (data: unknown): void => {
-    // Only handle server-side error frames (JSON objects with content),
-    // skip native WebSocket error Events.
-    if (data instanceof Event) return
-    const msg = data as WsErrorMessage
-    console.error('[useChat] Server error:', msg.content)
-    // Don't cancel stream here — transient LLM errors during tool loop
-    // re-queries would kill the entire stream.  The backend sends a
-    // proper "done" event when the response is truly finished.
-  }
-
-  // -- Canonical turn-event stream (Fase 3) ------------------------------
-  // Additive, run-scoped frames folded into the agentRun store. They are
-  // NOT gated on the stale-generation guard: runs are keyed by `turn_id`,
-  // so late frames after navigation still land on the correct run.
-
-  const onTurnStarted = (data: unknown): void => {
-    agentRunStore.applyTurnStarted(data as WsTurnStartedMessage)
-  }
-
-  const onTurnLlmStep = (data: unknown): void => {
-    agentRunStore.applyLlmStep(data as WsTurnLlmStepMessage)
-  }
-
-  const onTurnToolCall = (data: unknown): void => {
-    agentRunStore.applyToolCall(data as WsToolCallMessage)
-  }
-
-  const onTurnToolResult = (data: unknown): void => {
-    agentRunStore.applyToolResult(data as WsToolResultMessage)
-  }
-
-  const onInteractionRequested = (data: unknown): void => {
-    agentRunStore.applyInteractionRequested(data as WsInteractionRequestedMessage)
-  }
-
-  const onInteractionResolved = (data: unknown): void => {
-    agentRunStore.applyInteractionResolved(data as WsInteractionResolvedMessage)
-  }
-
-  const onTurnUsage = (data: unknown): void => {
-    agentRunStore.applyTurnUsage(data as WsTurnUsageMessage)
-  }
-
-  const onTurnFinished = (data: unknown): void => {
-    agentRunStore.applyTurnFinished(data as WsTurnFinishedMessage)
   }
 
   // -----------------------------------------------------------------------
   // Register handlers & connect
   // -----------------------------------------------------------------------
 
+  wsManager.onFrame(dispatchFrame)
   wsManager.on('connected', onConnected)
   wsManager.on('disconnected', onDisconnected)
-  wsManager.on('error', onError)
+  wsManager.on('error', onSocketError)
   wsManager.on('reconnect_failed', onReconnectFailed)
-  wsManager.on('token', onToken)
-  wsManager.on('thinking', onThinking)
-  wsManager.on('done', onDone)
-  wsManager.on('tool_call', onToolCall)
-  wsManager.on('tool_execution_start', onToolExecutionStart)
-  wsManager.on('tool_execution_done', onToolExecutionDone)
-  wsManager.on('tool_progress', onToolProgress)
-  wsManager.on('tool_confirmation_required', onToolConfirmationRequired)
-  wsManager.on('ask_user_required', onAskUserRequired)
-  wsManager.on('llm_requery', onLlmRequery)
-  wsManager.on('warning', onWarning)
-  wsManager.on('error', onWsError) // also catches server-side error frames
-  wsManager.on('context_info', onContextInfo)
-  wsManager.on('context_compression_start', onContextCompressionStart)
-  wsManager.on('context_compression_done', onContextCompressionDone)
-  wsManager.on('context_compression_failed', onContextCompressionFailed)
-  wsManager.on('turn.started', onTurnStarted)
-  wsManager.on('turn.llm_step', onTurnLlmStep)
-  wsManager.on('tool.call', onTurnToolCall)
-  wsManager.on('tool.result', onTurnToolResult)
-  wsManager.on('interaction.requested', onInteractionRequested)
-  wsManager.on('interaction.resolved', onInteractionResolved)
-  wsManager.on('turn.usage', onTurnUsage)
-  wsManager.on('turn.finished', onTurnFinished)
 
   // WebSocket connection is deferred — App.vue calls wsManager.connect()
   // after the backend health check passes.
@@ -380,34 +326,11 @@ export function useChat(): UseChatReturn {
   // -----------------------------------------------------------------------
 
   onScopeDispose(() => {
+    wsManager.offFrame(dispatchFrame)
     wsManager.off('connected', onConnected)
     wsManager.off('disconnected', onDisconnected)
-    wsManager.off('error', onError)
+    wsManager.off('error', onSocketError)
     wsManager.off('reconnect_failed', onReconnectFailed)
-    wsManager.off('token', onToken)
-    wsManager.off('thinking', onThinking)
-    wsManager.off('done', onDone)
-    wsManager.off('tool_call', onToolCall)
-    wsManager.off('tool_execution_start', onToolExecutionStart)
-    wsManager.off('tool_execution_done', onToolExecutionDone)
-    wsManager.off('tool_progress', onToolProgress)
-    wsManager.off('tool_confirmation_required', onToolConfirmationRequired)
-    wsManager.off('ask_user_required', onAskUserRequired)
-    wsManager.off('llm_requery', onLlmRequery)
-    wsManager.off('warning', onWarning)
-    wsManager.off('error', onWsError)
-    wsManager.off('context_info', onContextInfo)
-    wsManager.off('context_compression_start', onContextCompressionStart)
-    wsManager.off('context_compression_done', onContextCompressionDone)
-    wsManager.off('context_compression_failed', onContextCompressionFailed)
-    wsManager.off('turn.started', onTurnStarted)
-    wsManager.off('turn.llm_step', onTurnLlmStep)
-    wsManager.off('tool.call', onTurnToolCall)
-    wsManager.off('tool.result', onTurnToolResult)
-    wsManager.off('interaction.requested', onInteractionRequested)
-    wsManager.off('interaction.resolved', onInteractionResolved)
-    wsManager.off('turn.usage', onTurnUsage)
-    wsManager.off('turn.finished', onTurnFinished)
     wsManager.disconnect()
   })
 

@@ -1,27 +1,50 @@
-﻿/**
+/**
  * WebSocket connection manager for the AL\CE backend.
  *
- * Provides typed event dispatching, automatic reconnection with
- * exponential back-off, and clean teardown via {@link disconnect}.
+ * Two dispatch mechanisms coexist:
+ * - Typed frame dispatch (`onFrame` / `offFrame`): every parsed server frame
+ *   is delivered as a {@link ChatServerMessage}, exhaustively matched by the
+ *   caller — see `useChat.ts`, which is the sole consumer of the singleton
+ *   {@link wsManager} (the chat channel, `/api/ws/chat`).
+ * - A generic, string-keyed event emitter (`on` / `off`), covering both
+ *   socket-level lifecycle events (connect, disconnect, error,
+ *   reconnect-failed, binary) AND arbitrary per-frame-type events. This
+ *   class is instantiated a *second* time by `useVoice.ts` (`voiceWs`, see
+ *   `/api/voice/ws/voice`) for a message vocabulary (`voice_ready`,
+ *   `transcript`, `tts_start`, ...) that is outside the generated
+ *   `ChatServerMessage` contract — it is not produced by `ws_schema` and has
+ *   no exhaustive union, so it cannot use `onFrame`. The generic emitter is
+ *   kept for that consumer; `useChat.ts` only uses it for the socket-level
+ *   events.
+ *
+ * Also provides automatic reconnection with exponential back-off, and clean
+ * teardown via {@link WebSocketManager.disconnect}.
  */
 
+import type { ChatServerMessage } from '../types/generated'
 import { BACKEND_HOST } from './api'
 
 /** Default chat WebSocket URL derived from the backend host. */
 const DEFAULT_CHAT_WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/ws/chat`
 
-/** Callback signature for all WebSocket events. */
+/** Callback signature for the generic string-keyed emitter (socket-level events and, for non-chat consumers, per-frame-type events). */
 type MessageHandler = (data: unknown) => void
+/** Handler receiving every parsed server frame (exhaustive dispatch upstream — chat channel only). */
+type FrameHandler = (msg: ChatServerMessage) => void
 
 /**
  * Manages a single WebSocket connection with:
  * - automatic reconnect (exponential back-off, configurable cap)
- * - typed event emitter (`on` / `off` / `emit`)
+ * - typed frame dispatch (`onFrame` / `offFrame`) for the chat contract
+ * - a generic string-keyed event emitter (`on` / `off` / `emit`) for
+ *   socket-level lifecycle events and, for non-chat consumers, per-frame-type
+ *   events
  * - JSON and binary send helpers
  */
 export class WebSocketManager {
   private ws: WebSocket | null = null
   private readonly url: string
+  private frameHandlers: FrameHandler[] = []
   private handlers: Map<string, MessageHandler[]> = new Map()
   private reconnectAttempts = 0
   private readonly maxReconnectAttempts = 10
@@ -72,12 +95,27 @@ export class WebSocketManager {
     }
 
     this.ws.onmessage = (event: MessageEvent): void => {
+      let data: { type?: string } & Record<string, unknown>
       try {
-        const data = JSON.parse(event.data as string)
-        this.emit(data.type ?? 'message', data)
+        data = JSON.parse(event.data as string)
       } catch {
-        // Binary data (e.g. audio frames) — pass through raw
+        // Binary data (e.g. audio frames) — pass through raw.
         this.emit('binary', event.data)
+        return
+      }
+
+      // Legacy generic dispatch, keyed by the frame's own `type` field.
+      // Only meaningful for non-chat consumers (see class docstring) since
+      // `useChat.ts` uses `onFrame` exclusively for contract messages.
+      this.emit(data.type ?? 'message', data)
+
+      // Typed exhaustive dispatch for the chat contract.
+      for (const handler of this.frameHandlers.slice()) {
+        try {
+          handler(data as ChatServerMessage)
+        } catch (err) {
+          console.error('[ALICE WS] Frame handler threw:', err)
+        }
       }
     }
 
@@ -150,7 +188,15 @@ export class WebSocketManager {
   // Sending
   // -----------------------------------------------------------------------
 
-  /** Send a JSON-serialisable payload with backpressure management. */
+  /**
+   * Send a JSON-serialisable payload with backpressure management.
+   *
+   * Kept as `unknown` rather than a `ChatClientMessage` union: the user send
+   * frame ({@link WsSendPayload} / `WsUserMessage`) has no `type` discriminant
+   * on the wire — the backend channel pump treats any unrecognized frame as a
+   * user message — so it deliberately sits outside the generated client
+   * union (a Fase-1b decision; see `types/chat.ts`).
+   */
   send(data: unknown): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return
 
@@ -203,7 +249,23 @@ export class WebSocketManager {
   }
 
   // -----------------------------------------------------------------------
-  // Event emitter
+  // Frame dispatch (chat contract messages)
+  // -----------------------------------------------------------------------
+
+  /** Register a handler invoked for every parsed {@link ChatServerMessage} frame. */
+  onFrame(handler: FrameHandler): void {
+    this.frameHandlers.push(handler)
+  }
+
+  /** Remove a previously registered frame handler. */
+  offFrame(handler: FrameHandler): void {
+    const idx = this.frameHandlers.indexOf(handler)
+    if (idx !== -1) this.frameHandlers.splice(idx, 1)
+  }
+
+  // -----------------------------------------------------------------------
+  // Generic event emitter (socket-level lifecycle; per-frame-type for
+  // non-chat consumers — see class docstring)
   // -----------------------------------------------------------------------
 
   /** Register a handler for `event`. */

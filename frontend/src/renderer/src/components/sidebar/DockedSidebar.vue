@@ -17,14 +17,12 @@
  * modals/toasts (z-modal / z-toast) always render above it.
  */
 import { computed, watch } from 'vue'
-import AppSidebar from '../sidebar/AppSidebar.vue'
+import AppSidebar from './AppSidebar.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import { useResizablePane } from '../../composables/useResizablePane'
 import { useUIStore } from '../../stores/ui'
-import { useWorkspaceStore } from '../../stores/workspace'
 
 const uiStore = useUIStore()
-const workspaceStore = useWorkspaceStore()
 
 // Resizable width, initialised from the persisted store value. We keep the
 // composable's `size` in sync with the store and commit back on every change
@@ -33,17 +31,17 @@ const { size, isDragging, onMouseDown, setSize } = useResizablePane({
   axis: 'x',
   min: 200,
   max: 420,
-  initial: workspaceStore.sidebarWidth
+  initial: uiStore.sidebarWidth
 })
 
 // Commit resize → store (persists).
 watch(size, (v) => {
-  if (v !== workspaceStore.sidebarWidth) workspaceStore.setSidebarWidth(v)
+  if (v !== uiStore.sidebarWidth) uiStore.setSidebarWidth(v)
 })
 
 // If the store width changes elsewhere, mirror it into the composable.
 watch(
-  () => workspaceStore.sidebarWidth,
+  () => uiStore.sidebarWidth,
   (v) => {
     if (v !== size.value) setSize(v)
   }

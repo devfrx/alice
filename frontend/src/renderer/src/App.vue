@@ -5,7 +5,7 @@ import { useRouter, useRoute } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
-import DockedSidebar from './components/canvas/DockedSidebar.vue'
+import DockedSidebar from './components/sidebar/DockedSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
 import { UiToast, AliceLoader } from './components/ui'
 import { useChat, ChatApiKey } from './composables/useChat'
@@ -118,7 +118,6 @@ onUnmounted(() => {
         </ErrorBoundary>
       </main>
     </div>
-    <!-- <ModeSwitcher v-if="uiStore.mode !== 'assistant'" /> NON ATTIVARE! -->
     <ModalContainer />
     <UiToast />
     <AliceLoader :visible="startupLoading" :message="startupMessage" />

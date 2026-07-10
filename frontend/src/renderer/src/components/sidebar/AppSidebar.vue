@@ -24,7 +24,6 @@ import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
-import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 /**
  * When `docked` is true the sidebar renders inline inside its parent frame
@@ -51,48 +50,17 @@ const unreadBadge = computed(() => emailStore.unreadCount)
  * /workspace). Each tab is active only for its own surface, mutually exclusive.
  */
 const isAssistantActive = computed(() => route.name === 'assistant')
-const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
 /**
- * The Home surface is the empty-conversation state of the Workspace, so the
- * Home nav item is "active" exactly when that surface is on screen: we're on
- * the workspace route and the active conversation holds no messages.
+ * The Home affordance is "fresh conversation on the primary surface": active
+ * exactly when Horizon is on screen with an empty conversation.
  */
 const isHomeActive = computed(
   () =>
-    isWorkspaceActive.value &&
+    isAssistantActive.value &&
     chatStore.messages.length === 0 &&
     !chatStore.isStreamingCurrentConversation
 )
-
-/** The two primary-surface options for the shared segmented control. */
-const modeTabOptions: UiSegmentedOption[] = [
-  { value: 'assistant', label: 'Assistente', icon: 'orb' },
-  { value: 'workspace', label: 'Workspace', icon: 'hybrid-panel' },
-]
-
-/** Active segment value derived from the route (null on other surfaces). */
-const activeModeValue = computed<string | null>(() => {
-  if (isAssistantActive.value) return 'assistant'
-  if (isWorkspaceActive.value) return 'workspace'
-  return null
-})
-
-/**
- * Route to the chosen surface. Navigation is the source of truth — the
- * router's afterEach guard syncs `uiStore.mode` from the active route — so
- * BOTH segments must actually push their route (previously only Workspace did,
- * which is why the Assistente tab appeared dead).
- */
-async function onModeSelect(value: string | number): Promise<void> {
-  toggle() // close the floating overlay (no-op when docked)
-  if (activeModeValue.value === value) return
-  try {
-    await router.push(value === 'workspace' ? '/workspace' : '/assistant')
-  } catch (err) {
-    console.error('[AppSidebar] Mode navigation failed:', err)
-  }
-}
 
 /**
  * Whether the sidebar body is shown.
@@ -127,21 +95,20 @@ async function onSelect(id: string): Promise<void> {
     return
   }
   const current = router.currentRoute.value.name as string
-  // 'workspace' and 'assistant' are the active chat surfaces; navigate there if not already on one.
-  if (current !== 'assistant' && current !== 'workspace') {
+  if (current !== 'assistant') {
     try {
-      await router.push({ name: uiStore.mode })
+      await router.push('/assistant')
     } catch (err) {
-      console.error('[AppSidebar] Navigation failed, falling back to home:', err)
-      await router.replace({ name: 'home' }).catch(() => { })
+      console.error('[AppSidebar] Navigation failed:', err)
     }
   }
 }
 
 /**
- * Go to the Home surface (the empty Workspace). Only spin up a fresh draft
- * when the current conversation already has content, so we never leave a trail
- * of empty chats; an already-empty conversation is reused as-is.
+ * Go to the Home affordance — a fresh conversation on Horizon. Only spin up
+ * a fresh draft when the current conversation already has content, so we
+ * never leave a trail of empty chats; an already-empty conversation is
+ * reused as-is.
  */
 async function onHome(): Promise<void> {
   toggle()
@@ -152,9 +119,9 @@ async function onHome(): Promise<void> {
       console.error('[AppSidebar] Failed to start a new conversation:', err)
     }
   }
-  if (router.currentRoute.value.name !== 'workspace') {
+  if (router.currentRoute.value.name !== 'assistant') {
     try {
-      await router.push('/workspace')
+      await router.push('/assistant')
     } catch (err) {
       console.error('[AppSidebar] Home navigation failed:', err)
     }
@@ -162,17 +129,17 @@ async function onHome(): Promise<void> {
 }
 
 /**
- * Start a new conversation on the Home — the empty-conversation state of the
- * Workspace. A fresh conversation always opens as the Home (never the assistant
- * orb, never a stale secondary route); typing the first message then cross-fades
- * it into the live Workspace chat. `createConversation` reuses any existing
- * empty conversation, so this never leaves a trail of blank chats.
+ * Start a new conversation on the Home — the empty-conversation state of
+ * Horizon. A fresh conversation always opens as the Home (never a stale
+ * secondary route); typing the first message then cross-fades it into the
+ * live conversation. `createConversation` reuses any existing empty
+ * conversation, so this never leaves a trail of blank chats.
  */
 async function onCreate(): Promise<void> {
   await chatStore.createConversation()
-  if (router.currentRoute.value.name !== 'workspace') {
+  if (router.currentRoute.value.name !== 'assistant') {
     try {
-      await router.push('/workspace')
+      await router.push('/assistant')
     } catch (err) {
       console.error('[AppSidebar] New-conversation navigation failed:', err)
     }
@@ -265,10 +232,6 @@ async function onBackupAll(): Promise<void> {
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
         </div>
-
-        <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
-        <UiSegmented class="sidebar__mode-seg" :model-value="activeModeValue" :options="modeTabOptions"
-          aria-label="Modalità primaria" @update:model-value="(v) => void onModeSelect(v)" />
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
@@ -484,12 +447,6 @@ async function onBackupAll(): Promise<void> {
   flex-direction: column;
   gap: var(--space-0-5);
   padding: 0 var(--space-3) var(--space-2);
-  flex-shrink: 0;
-}
-
-/* ── Mode tabs (Assistente / Workspace) — shared UiSegmented ────── */
-.sidebar__mode-seg {
-  margin: 0 var(--space-3) var(--space-3);
   flex-shrink: 0;
 }
 

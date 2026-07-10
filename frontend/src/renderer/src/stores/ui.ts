@@ -1,69 +1,55 @@
-﻿/**
- * Pinia store managing UI mode state for AL\CE.
+/**
+ * Pinia store for shell UI state.
  *
- * Active modes (the two primary chat surfaces):
- * - 'assistant' — Living AI orb, voice-first interaction.
- * - 'workspace' — Tiling panel workspace.
- *
- * `mode` tracks whichever primary surface is active so the shell (root body
- * class, ambient/orb gating, "return to chat surface" navigation) stays
- * coherent. The router's `afterEach` keeps it in sync with the active route.
- *
- * The 'hybrid' dual-pane mode was retired (R3) in favour of Workspace; the
- * `/hybrid → /workspace` router redirect preserves old deep links, and any
- * stale persisted `alice_ui_mode = 'hybrid'` resolves to 'assistant' on load.
+ * Since Fase 6 the route is the single source of truth for which surface is
+ * on screen (Horizon is the only chat surface); this store only tracks shell
+ * chrome: the docked sidebar's open state and persisted width.
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
-export type UIMode = 'assistant' | 'workspace'
+const SIDEBAR_WIDTH_KEY = 'alice_sidebar_width'
+
+function loadSidebarWidth(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY)
+    if (raw !== null) {
+      const n = parseInt(raw, 10)
+      if (!isNaN(n)) return Math.min(420, Math.max(200, n))
+    }
+  } catch {
+    /* localStorage may be unavailable */
+  }
+  return 260
+}
 
 export const useUIStore = defineStore('ui', () => {
-  const mode = ref<UIMode>(loadMode())
-
   /**
    * Sidebar open state — source of truth for the docked sidebar's
-   * visible(expanded/rail) ↔ closed state. Starts open since the docked
-   * sidebar is now a primary surface of the shell.
+   * expanded ↔ closed state (wired to the TitleBar toggle).
    */
   const sidebarOpen = ref(true)
 
-  /** Whether the ambient background is visible. */
-  const ambientEnabled = computed(() => mode.value === 'assistant')
-
-  /** Whether the orb/living visualization is visible. */
-  const orbVisible = computed(() => mode.value === 'assistant')
-
-  function setMode(newMode: UIMode): void {
-    mode.value = newMode
-    try {
-      localStorage.setItem('alice_ui_mode', newMode)
-    } catch {
-      /* localStorage may be unavailable */
-    }
-  }
-
-  function loadMode(): UIMode {
-    try {
-      const stored = localStorage.getItem('alice_ui_mode')
-      if (stored === 'assistant' || stored === 'workspace') return stored
-      // Legacy 'hybrid' (retired R3) and any other value fall through to 'assistant'.
-    } catch {
-      /* localStorage may be unavailable */
-    }
-    return 'assistant'
-  }
+  /** Persisted sidebar width in px (clamped 200–420). */
+  const sidebarWidth = ref<number>(loadSidebarWidth())
 
   function toggleSidebar(): void {
     sidebarOpen.value = !sidebarOpen.value
   }
 
+  function setSidebarWidth(n: number): void {
+    sidebarWidth.value = Math.min(420, Math.max(200, n))
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value))
+    } catch {
+      /* localStorage may be unavailable */
+    }
+  }
+
   return {
-    mode,
     sidebarOpen,
-    ambientEnabled,
-    orbVisible,
-    setMode,
+    sidebarWidth,
     toggleSidebar,
+    setSidebarWidth,
   }
 })

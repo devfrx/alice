@@ -12,7 +12,7 @@
  * @example
  *   <UiSegmented
  *     v-model="tab"
- *     :options="[{ value: 'a', label: 'A', icon: 'orb' }, { value: 'b', label: 'B' }]"
+ *     :options="[{ value: 'a', label: 'A', icon: 'home' }, { value: 'b', label: 'B' }]"
  *     aria-label="Sezione"
  *   />
  */

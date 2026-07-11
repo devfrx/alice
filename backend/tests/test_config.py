@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from backend.core.config import (
     DEFAULT_MODEL,
     KNOWN_MODELS,
@@ -191,3 +193,24 @@ def test_stale_flag_survives_full_aliceconfig_construction() -> None:
     cfg = AliceConfig(voice={"wake_word": "alice", "voice_confirmation_enabled": True})
     assert not hasattr(cfg.voice, "voice_confirmation_enabled")
     assert cfg.voice.wake_word == "alice"
+
+
+class TestCommandsConfig:
+    """Command Bridge config section (Fase 7, spec §7)."""
+
+    def test_defaults(self) -> None:
+        from backend.core.config import AliceConfig
+
+        cfg = AliceConfig()
+        assert cfg.commands.enabled is True
+        assert cfg.commands.rpc_timeout_s == 10.0
+        assert cfg.commands.disabled_commands == []
+
+    def test_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from backend.core.config import CommandsConfig
+
+        monkeypatch.setenv("ALICE_COMMANDS__ENABLED", "false")
+        monkeypatch.setenv("ALICE_COMMANDS__RPC_TIMEOUT_S", "3.5")
+        cfg = CommandsConfig()
+        assert cfg.enabled is False
+        assert cfg.rpc_timeout_s == 3.5

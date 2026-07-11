@@ -130,6 +130,11 @@ permissions:
   confirmations_enabled: true
   confirmation_timeout_s: 60
 
+# Command Bridge (spec §7): the agent drives app UI commands over the events WS.
+commands:
+  enabled: true
+  rpc_timeout_s: 10.0
+
 agent:
   # Single model-driven loop: the model decides step-by-step, with the
   # update_plan / spawn_subagent meta-tools for structure and an optional

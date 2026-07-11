@@ -71,13 +71,52 @@ class CommandSpec:
     args_schema: dict[str, Any]
 
 
+#: Cap on enum values spelled out per argument in the usage guidance.
+_GUIDANCE_MAX_ENUM_VALUES = 20
+
+
+def _render_args_schema(schema: dict[str, Any]) -> str:
+    """Render a manifest ``args_schema`` as a compact one-line arg spec.
+
+    The model only sees the tool surface: without this, valid argument
+    names and enum values never reach it and it has to guess (e.g.
+    ``view="assistente"``). The schema is client-supplied — every access
+    is defensive, garbage renders as ``no args`` instead of raising.
+    """
+    props = schema.get("properties")
+    if not isinstance(props, dict) or not props:
+        return "no args"
+    required_raw = schema.get("required")
+    required = (
+        {str(item) for item in required_raw}
+        if isinstance(required_raw, list)
+        else set()
+    )
+    parts: list[str] = []
+    for prop_name, spec in props.items():
+        if not isinstance(spec, dict):
+            continue
+        enum = spec.get("enum")
+        if isinstance(enum, list) and enum:
+            values = [str(value) for value in enum[:_GUIDANCE_MAX_ENUM_VALUES]]
+            if len(enum) > _GUIDANCE_MAX_ENUM_VALUES:
+                values.append("…")
+            type_part = "one of: " + " | ".join(values)
+        else:
+            type_part = str(spec.get("type", "any"))
+        suffix = "" if prop_name in required else ", optional"
+        parts.append(f"{prop_name} ({type_part}{suffix})")
+    return "; ".join(parts) if parts else "no args"
+
+
 def build_app_command_definition(specs: list[CommandSpec]) -> ToolDefinition:
     """Build the kernel-owned ``app_command`` ToolDefinition for *specs*.
 
     The live manifest is baked into the tool surface: the ``name`` parameter
     carries an enum of the agent-callable command names (so the executor's
     JSON-Schema validation rejects unknown names for free) and
-    ``usage_guidance`` lists each command for the system prompt.
+    ``usage_guidance`` lists each command — including its rendered args
+    schema — for the system prompt.
 
     Args:
         specs: Accepted manifest entries (possibly empty).
@@ -92,7 +131,8 @@ def build_app_command_definition(specs: list[CommandSpec]) -> ToolDefinition:
     guidance: str | None = None
     if specs:
         lines = [
-            f"- `{spec.name}` ({spec.capability}): {spec.description}"
+            f"- `{spec.name}` ({spec.capability}): {spec.description}. "
+            f"Args: {_render_args_schema(spec.args_schema)}"
             for spec in sorted(specs, key=lambda spec: spec.name)
         ]
         guidance = (

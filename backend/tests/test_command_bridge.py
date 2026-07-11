@@ -260,6 +260,60 @@ def test_build_app_command_definition_bakes_manifest() -> None:
     assert "enum" not in empty.parameters["properties"]["name"]
 
 
+def test_usage_guidance_renders_args_schema() -> None:
+    """The model must see valid arg names/enums, not guess them (smoke fase 8)."""
+    specs = [
+        CommandSpec(
+            name="view.switch",
+            description="Switch the main app view",
+            capability="navigation",
+            args_schema={
+                "type": "object",
+                "properties": {
+                    "view": {"type": "string", "enum": ["workspace", "assistant"]},
+                },
+                "required": ["view"],
+            },
+        ),
+        CommandSpec(
+            name="conversation.new",
+            description="Start a new conversation",
+            capability="navigation",
+            args_schema={"type": "object", "properties": {}},
+        ),
+        CommandSpec(
+            name="conversation.open",
+            description="Open a conversation",
+            capability="navigation",
+            args_schema={
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string"}},
+                "required": ["conversation_id"],
+            },
+        ),
+    ]
+    guidance = build_app_command_definition(specs).usage_guidance or ""
+    # Enum values are spelled out so the model picks a valid one.
+    assert "workspace" in guidance
+    assert "assistant" in guidance
+    # Required vs optional and plain-typed args are rendered.
+    assert "conversation_id (string)" in guidance
+    # A command without args says so explicitly.
+    assert "no args" in guidance
+
+
+def test_usage_guidance_survives_malformed_args_schema() -> None:
+    """The manifest is client-supplied: garbage schemas must not raise."""
+    specs = [
+        CommandSpec(
+            name="weird.cmd", description="Weird", capability="read",
+            args_schema={"properties": "not-a-dict", "required": 42},
+        ),
+    ]
+    guidance = build_app_command_definition(specs).usage_guidance or ""
+    assert "weird.cmd" in guidance
+
+
 @pytest.mark.asyncio
 async def test_app_command_through_real_executor_enforces_manifest_enum() -> None:
     """Integration seam: real ToolRegistry executor × real bridge (Q7a).

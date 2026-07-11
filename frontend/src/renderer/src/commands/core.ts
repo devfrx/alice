@@ -12,6 +12,7 @@ import { useUIStore } from '../stores/ui'
 
 /** Route names addressable via `view.switch`. */
 export const SWITCHABLE_VIEWS = [
+  'workspace',
   'assistant',
   'calendar',
   'settings',
@@ -21,6 +22,9 @@ export const SWITCHABLE_VIEWS = [
   'terminal',
   'services'
 ] as const
+
+/** Route names of the two primary chat surfaces. */
+const CHAT_SURFACES = new Set<string>(['workspace', 'assistant'])
 export type SwitchableView = (typeof SWITCHABLE_VIEWS)[number]
 
 export interface ViewSwitchArgs {
@@ -81,8 +85,11 @@ export function installCoreCommands(router: Router): void {
     run: async ({ conversation_id }) => {
       const chatStore = useChatStore()
       await chatStore.loadConversation(conversation_id)
-      if (router.currentRoute.value.name !== 'assistant') {
-        await router.push({ name: 'assistant' })
+      // Land on the active primary surface (Workspace or Horizon) when on a
+      // secondary route; stay put when already on a chat surface.
+      const current = router.currentRoute.value.name as string
+      if (!CHAT_SURFACES.has(current)) {
+        await router.push({ name: useUIStore().mode })
       }
     }
   })
@@ -95,8 +102,9 @@ export function installCoreCommands(router: Router): void {
     run: async () => {
       const chatStore = useChatStore()
       await chatStore.createConversation()
-      if (router.currentRoute.value.name !== 'assistant') {
-        await router.push({ name: 'assistant' })
+      const current = router.currentRoute.value.name as string
+      if (!CHAT_SURFACES.has(current)) {
+        await router.push({ name: useUIStore().mode })
       }
     }
   })

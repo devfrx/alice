@@ -79,12 +79,20 @@ describe('installCoreCommands', () => {
     expect(router.push).toHaveBeenCalledWith({ name: 'board', query: { artifact: 'a1' } })
   })
 
-  it('conversation.open loads the conversation, then navigates to Horizon', async () => {
+  it('conversation.open loads the conversation, then lands on the active chat surface', async () => {
     const router = fakeRouter('settings')
     installCoreCommands(router)
     await commandRegistry.execute('conversation.open', { conversation_id: 'c1' })
     expect(vi.mocked(chatApi.getConversation)).toHaveBeenCalledWith('c1', expect.anything())
-    expect(router.push).toHaveBeenCalledWith({ name: 'assistant' })
+    // ui.mode defaults to 'workspace' (no localStorage in the node test env).
+    expect(router.push).toHaveBeenCalledWith({ name: 'workspace' })
+  })
+
+  it('conversation.open stays put when already on a chat surface', async () => {
+    const router = fakeRouter('assistant')
+    installCoreCommands(router)
+    await commandRegistry.execute('conversation.open', { conversation_id: 'c1' })
+    expect(router.push).not.toHaveBeenCalled()
   })
 
   it('conversation.open does NOT navigate when the load fails', async () => {

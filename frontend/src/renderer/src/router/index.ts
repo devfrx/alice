@@ -13,11 +13,17 @@
  *   - `/calendar`   — optional `?date=YYYY-MM-DD` query (delegated to the
  *                     CalendarView component).
  *
- * Since Fase 6 Horizon (`/assistant`) is the only chat surface: the retired
- * Workspace/Hybrid routes redirect there so old deep links keep resolving.
+ * Two primary chat surfaces coexist: the Workspace (`/workspace`, tiling
+ * panels with per-conversation modules — the operational surface) and
+ * Horizon (`/assistant`, the editorial assistant scene). `MODE_ROUTES`
+ * keeps the ui store's `mode` in sync with whichever is active.
  */
 import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteLocationNormalized, RouterScrollBehavior } from 'vue-router'
+import { useUIStore, type UIMode } from '../stores/ui'
+
+/** Route names that correspond to a UI mode (the primary chat surfaces). */
+const MODE_ROUTES = new Set<string>(['assistant', 'workspace'])
 
 /** Window-title suffix shared by every page. */
 const TITLE_SUFFIX = 'AL\\CE'
@@ -47,19 +53,21 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/assistant'
+      redirect: '/workspace'
     },
     {
-      // Legacy named redirect: keeps old `#/home` deep links and
-      // `{ name: 'home' }` fallbacks resolving to the primary surface.
+      // The Home is not a standalone page — it is the empty-conversation
+      // state of the Workspace (see WorkspaceView). This named redirect keeps
+      // old `#/home` deep links and `{ name: 'home' }` fallbacks resolving.
       path: '/home',
       name: 'home',
-      redirect: '/assistant'
+      redirect: '/workspace'
     },
     {
-      // Workspace retired (Fase 6) — Horizon is the only chat surface.
       path: '/workspace',
-      redirect: '/assistant'
+      name: 'workspace',
+      component: () => import('../views/WorkspaceView.vue'),
+      meta: { title: 'Workspace', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
       path: '/assistant',
@@ -68,9 +76,9 @@ const router = createRouter({
       meta: { title: 'Assistente', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
-      // HybridView retired — redirect to the primary surface.
+      // HybridView retired — redirect to Workspace (the primary surface).
       path: '/hybrid',
-      redirect: '/assistant'
+      redirect: '/workspace'
     },
     {
       path: '/calendar',
@@ -117,9 +125,21 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/assistant'
+      redirect: '/workspace'
     }
   ]
+})
+
+// Keep the UI mode store in sync with the current route so navigating via
+// sidebar links, browser back/forward, or programmatic pushes all update it.
+router.afterEach((to) => {
+  const name = to.name as string | undefined
+  if (name && MODE_ROUTES.has(name)) {
+    const uiStore = useUIStore()
+    if (uiStore.mode !== name) {
+      uiStore.setMode(name as UIMode)
+    }
+  }
 })
 
 // Mirror the active route meta into the window/document title so the Electron

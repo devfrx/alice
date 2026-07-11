@@ -20,12 +20,8 @@ import type { ApiSchema } from './generated'
 export type PermissionMode = ApiSchema<'PermissionMode'>
 export type PermissionModeResponse = ApiSchema<'PermissionModeResponse'>
 
-/** Events-WS frame pushing the current tier for a conversation. */
-export interface WsPermissionModeUpdatedMessage {
-  type: 'permission_mode.updated'
-  conversation_id: string
-  mode: PermissionMode
-}
+/** Generated from the backend WS contract — do not redefine locally. */
+export type WsPermissionModeUpdatedMessage = ApiSchema<'WsPermissionModeUpdated'>
 
 /**
  * The effect of a persistent permission rule (mirrors backend ``RuleEffect``).

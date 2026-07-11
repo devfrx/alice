@@ -170,8 +170,8 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         args: {},
         status,
         result: msg.result,
-        contentType: msg.content_type,
-        artifactId: msg.artifact_id,
+        contentType: msg.content_type ?? undefined,
+        artifactId: msg.artifact_id ?? undefined,
         seq: run.tools.length + run.interactions.length,
       }
       run.tools = [...run.tools, activity]
@@ -181,8 +181,8 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       ...run.tools[idx],
       status,
       result: msg.result,
-      contentType: msg.content_type,
-      artifactId: msg.artifact_id,
+      contentType: msg.content_type ?? undefined,
+      artifactId: msg.artifact_id ?? undefined,
     }
     run.tools = [...run.tools.slice(0, idx), updated, ...run.tools.slice(idx + 1)]
   }
@@ -199,7 +199,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     const activity: InteractionActivity = {
       executionId: msg.execution_id,
       kind: msg.kind,
-      toolName: msg.tool_name,
+      toolName: msg.tool_name ?? undefined,
       status: 'pending',
       seq: run.tools.length + run.interactions.length,
     }
@@ -251,7 +251,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
   function applyTurnFinished(msg: WsTurnFinishedMessage): void {
     const run = ensureRun(msg.turn_id)
     run.status = 'finished'
-    run.finishReason = msg.finish_reason
+    run.finishReason = msg.finish_reason ?? null
     run.inputTokens = msg.input_tokens
     run.outputTokens = msg.output_tokens
     run.step = msg.steps

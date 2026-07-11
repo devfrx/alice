@@ -25,3 +25,22 @@ def test_main_writes_deterministic_json(tmp_path: Path) -> None:
     assert out.read_text(encoding="utf-8") == first
     parsed = json.loads(first)
     assert "/api/health" in parsed["paths"]
+
+
+def test_ws_contract_injected_as_components() -> None:
+    """The WS channel unions ride the same OpenAPI document (spec §6)."""
+    schema = build_schema()
+    components = schema["components"]["schemas"]
+    for union_name in (
+        "ChatServerMessage",
+        "ChatClientMessage",
+        "WsUserMessage",
+        "EventsServerMessage",
+        "EventsClientMessage",
+    ):
+        assert union_name in components, union_name
+    # Discriminated member schemas land as named components too.
+    assert "WsToken" in components
+    assert "WsCalendarChanged" in components
+    # The discriminator survives so openapi-typescript emits a tagged union.
+    assert components["EventsServerMessage"]["discriminator"]["propertyName"] == "type"

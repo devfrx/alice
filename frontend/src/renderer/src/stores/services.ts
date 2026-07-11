@@ -14,6 +14,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { BACKEND_HOST } from '../services/api'
 import type { RagReadinessStatus } from '../types/settings'
+import type { ApiSchema } from '../types/generated'
 
 const API = `${BACKEND_HOST}/api`
 
@@ -223,12 +224,7 @@ export const useServicesStore = defineStore('services', () => {
 
   // ----- WS event handlers (called from useEventsWebSocket) -------------
 
-  function onServiceStatus(payload: {
-    service?: string
-    status?: ServiceStatus
-    detail?: string | null
-    timestamp?: string | null
-  }): void {
+  function onServiceStatus(payload: ApiSchema<'WsServiceStatus'>): void {
     if (!payload.service || !payload.status) return
     const idx = services.value.findIndex((s) => s.name === payload.service)
     if (idx === -1) {
@@ -236,15 +232,17 @@ export const useServicesStore = defineStore('services', () => {
       void refresh()
       return
     }
+    const status = payload.status as ServiceStatus
+    const timestamp = payload.timestamp != null ? String(payload.timestamp) : null
     services.value[idx] = {
       ...services.value[idx],
-      status: payload.status,
+      status,
       detail: payload.detail ?? null,
-      last_check: payload.timestamp ?? services.value[idx].last_check,
+      last_check: timestamp ?? services.value[idx].last_check,
     }
   }
 
-  function onKnowledgeStatus(payload: Partial<RagReadinessStatus>): void {
+  function onKnowledgeStatus(payload: ApiSchema<'WsKnowledgeStatus'>): void {
     knowledge.value = {
       ready: !!payload.ready,
       reason: payload.reason ?? '',
@@ -253,10 +251,20 @@ export const useServicesStore = defineStore('services', () => {
     }
   }
 
-  function onDownloadProgress(payload: DownloadProgress): void {
+  function onDownloadProgress(payload: ApiSchema<'WsModelDownloadProgress'>): void {
+    if (!payload.service || !payload.model_id) return
     const key = `${payload.service}:${payload.model_id}`
-    downloads.value = { ...downloads.value, [key]: payload }
-    if (payload.phase === 'completed') {
+    const progress: DownloadProgress = {
+      service: payload.service,
+      model_id: payload.model_id,
+      downloaded_bytes: payload.downloaded_bytes ?? 0,
+      total_bytes: payload.total_bytes ?? 0,
+      phase: (payload.phase ?? 'downloading') as DownloadProgress['phase'],
+      file: payload.file ?? '',
+      error: payload.error ?? undefined,
+    }
+    downloads.value = { ...downloads.value, [key]: progress }
+    if (progress.phase === 'completed') {
       void loadCatalog(payload.service as 'stt' | 'tts')
     }
   }

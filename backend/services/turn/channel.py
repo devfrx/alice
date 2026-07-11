@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -137,9 +138,17 @@ class WebSocketInteractionChannel:
 
     Args:
         ws: The accepted FastAPI ``WebSocket`` to read from / reply on.
+        frame_validator: Optional callable injected by the api layer to
+            validate outbound frames against the typed contract.  The
+            ``services`` layer must never import ``backend.api.ws_schema``
+            directly (spec §4).
     """
 
-    def __init__(self, ws: WebSocket) -> None:
+    def __init__(
+        self,
+        ws: WebSocket,
+        frame_validator: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
         self._ws = ws
         self._pending: dict[str, _Pending] = {}
         self._user_messages: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
@@ -147,6 +156,7 @@ class WebSocketInteractionChannel:
         self._cancelled = False
         self._connected = True
         self._pump_task: asyncio.Task[None] | None = None
+        self._validate = frame_validator
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -357,6 +367,8 @@ class WebSocketInteractionChannel:
 
     async def _send(self, frame: dict[str, Any]) -> bool:
         """Send an outbound request frame; return ``False`` on disconnect."""
+        if self._validate is not None:
+            self._validate(frame)
         from fastapi import WebSocketDisconnect
 
         try:

@@ -1,0 +1,55 @@
+# FE<->BE contract gates (Fase 1 of the architecture remediation).
+# Windows runner: the repo targets Windows first and the codegen scripts
+# are PowerShell. Codegen tool versions are pinned by npm ci (lockfile).
+name: contracts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Create venv and install backend
+        run: |
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.venv\Scripts\python.exe -m pip install -e "backend[dev,memory]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.venv\Scripts\python.exe -m pip install sqlite-vec
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Contract tests
+        working-directory: backend
+        run: |
+          ..\.venv\Scripts\python.exe -m pytest tests/contracts/ -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Generated artifacts are fresh
+        run: .\scripts\check-contracts.ps1
+
+      - name: Frontend typecheck
+        working-directory: frontend
+        run: npm run typecheck

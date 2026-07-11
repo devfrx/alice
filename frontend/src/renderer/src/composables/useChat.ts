@@ -182,19 +182,19 @@ export function useChat(): UseChatReturn {
   const onToolExecutionDone = (data: unknown): void => {
     if (store.streamGeneration !== activeGeneration) return
     const msg = data as WsToolExecutionDoneMessage
-    store.completeToolExecution(msg.execution_id, msg.result, msg.success, msg.content_type)
+    store.completeToolExecution(msg.execution_id, msg.result, msg.success, msg.content_type ?? undefined)
   }
 
   const onToolProgress = (data: unknown): void => {
     if (store.streamGeneration !== activeGeneration) return
     const msg = data as WsToolProgressMessage
     store.updateToolExecutionProgress(msg.execution_id, {
-      phase: msg.phase,
+      phase: msg.phase ?? undefined,
       label: msg.label ?? null,
-      step: msg.step,
-      total: msg.total,
-      percent: msg.percent,
-      elapsedS: msg.elapsed_s,
+      step: msg.step ?? undefined,
+      total: msg.total ?? undefined,
+      percent: msg.percent ?? undefined,
+      elapsedS: msg.elapsed_s ?? undefined,
     })
   }
 
@@ -214,7 +214,7 @@ export function useChat(): UseChatReturn {
       args: msg.args,
       riskLevel: msg.risk_level,
       description: msg.description,
-      reasoning: msg.reasoning,
+      reasoning: msg.reasoning ?? undefined,
       allowRemember: msg.allow_remember
     })
   }
@@ -261,7 +261,7 @@ export function useChat(): UseChatReturn {
       wasCompressed: msg.was_compressed,
       messagesSummarized: msg.messages_summarized ?? 0,
       isEstimated: msg.is_estimated ?? true,
-      breakdown: msg.breakdown,
+      breakdown: msg.breakdown ?? undefined,
     })
   }
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Composable for the persistent events WebSocket connection.
  *
  * Connects to `/api/events/ws` on setup and dispatches incoming
@@ -13,23 +13,23 @@ import { useMcpStore } from '../stores/mcp'
 import { useArtifactsStore } from '../stores/artifacts'
 import { useServicesStore } from '../stores/services'
 import { useTasksStore } from '../stores/tasks'
-import type { WsTasksUpdatedMessage } from '../types/tasks'
 import { usePlanDocumentStore } from '../stores/planDocument'
-import type { WsPlanDocumentUpdatedMessage } from '../types/planDocument'
 import { useScopeStore } from '../stores/scope'
-import type { WsScopeUpdatedMessage } from '../types/scope'
 import { usePermissionModeStore } from '../stores/permissionMode'
-import type { WsPermissionModeUpdatedMessage } from '../types/permission'
 import { useTerminalSessionsStore } from '../stores/terminalSessions'
-import type {
-  WsTerminalAssignedMessage,
-  WsTerminalClosedMessage,
-  WsTerminalOutputMessage,
-  WsTerminalRenamedMessage,
-  WsTerminalSessionOpenedMessage,
-} from '../types/terminal'
+import type { EventsClientMessage, EventsServerMessage } from '../types/generated'
 import { BACKEND_HOST } from '../services/api'
+
 const WS_URL = `${BACKEND_HOST.replace(/^http/, 'ws')}/api/events/ws`
+
+/**
+ * Exhaustive map of events-WS frame types to handlers. Adding a frame to
+ * the backend ws_schema and regenerating the contracts makes this object
+ * FAIL TO COMPILE until the new frame is handled (or explicitly no-op'd).
+ */
+type EventsHandlerMap = {
+  [K in EventsServerMessage['type']]: (msg: Extract<EventsServerMessage, { type: K }>) => void
+}
 
 /**
  * Module-level singleton socket. The events WS is connected exactly once (in
@@ -45,7 +45,7 @@ let ws: WebSocket | null = null
  * @returns `true` if the frame was sent, `false` when the socket is not open
  *   (the caller may drop the frame — terminal I/O is best-effort).
  */
-export function sendEventsMessage(frame: Record<string, unknown>): boolean {
+export function sendEventsMessage(frame: EventsClientMessage): boolean {
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(frame))
     return true
@@ -79,6 +79,34 @@ export function useEventsWebSocket(): {
   let megaCycles = 0
   const MAX_MEGA_CYCLES = 3
 
+  const noop = (): void => {}
+  const handlers: EventsHandlerMap = {
+    pong: noop,
+    heartbeat: noop,
+    'calendar.changed': () => void calendarStore.refresh(),
+    'mcp.server.connected': () => void mcpStore.loadServers(),
+    'mcp.server.disconnected': () => void mcpStore.loadServers(),
+    'email.received': (msg) => emailStore.handleEmailReceived(msg.folder ?? 'INBOX'),
+    'email.sent': noop,
+    'note.created': noop,
+    'note.updated': noop,
+    'note.deleted': noop,
+    'service.status': (msg) => servicesStore.onServiceStatus(msg),
+    'service.model_download_progress': (msg) => servicesStore.onDownloadProgress(msg),
+    'knowledge.status': (msg) => servicesStore.onKnowledgeStatus(msg),
+    'artifact.created': (msg) => void artifactsStore.fetchById(msg.artifact_id),
+    'tasks.updated': (msg) => tasksStore.applyTasksUpdated(msg),
+    'plan_document.updated': (msg) => planDocumentStore.applyPlanDocumentUpdated(msg),
+    'scope.updated': (msg) => scopeStore.applyScopeUpdated(msg),
+    'permission_mode.updated': (msg) => permissionModeStore.applyModeUpdated(msg),
+    'config.changed': noop,
+    'terminal.session_opened': (msg) => terminalStore.applySessionOpened(msg),
+    'terminal.output': (msg) => terminalStore.applyOutput(msg),
+    'terminal.closed': (msg) => terminalStore.applyClosed(msg),
+    'terminal.renamed': (msg) => terminalStore.applyRenamed(msg),
+    'terminal.assigned': (msg) => terminalStore.applyAssigned(msg)
+  }
+
   function connect(): void {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
       return
@@ -96,89 +124,24 @@ export function useEventsWebSocket(): {
 
       // Send ping every 30s to keep connection alive
       pingInterval = setInterval(() => {
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }))
-        }
+        sendEventsMessage({ type: 'ping' })
       }, 30_000)
     }
 
     ws.onmessage = (event: MessageEvent): void => {
+      let data: EventsServerMessage
       try {
-        const data = JSON.parse(event.data)
-        if (data.type === 'pong' || data.type === 'heartbeat') {
-          return // Keep-alive, ignore
-        }
-
-        // Forward calendar change events to the store
-        if (data.type === 'calendar_changed') {
-          void calendarStore.refresh()
-        }
-
-        // Refresh MCP state on server connect/disconnect
-        if (
-          data.type === 'mcp.server.connected' ||
-          data.type === 'mcp.server.disconnected'
-        ) {
-          void mcpStore.loadServers()
-        }
-
-        // Handle email events (Phase 15)
-        if (data.type === 'email.received' && typeof data.folder === 'string') {
-          emailStore.handleEmailReceived(data.folder as string)
-        }
-
-        // Handle artifact events: lazy-fetch the new artifact and add to store.
-        if (data.type === 'artifact.created' && typeof data.artifact_id === 'string') {
-          void artifactsStore.fetchById(data.artifact_id as string)
-        }
-
-        // Handle Service Orchestrator events (Phase 1 finalisation).
-        if (data.type === 'service.status') {
-          servicesStore.onServiceStatus(data)
-        }
-        if (data.type === 'service.model_download_progress') {
-          servicesStore.onDownloadProgress(data)
-        }
-
-        // Knowledge/RAG readiness changes (e.g. after a vector-store repair).
-        if (data.type === 'knowledge.status') {
-          servicesStore.onKnowledgeStatus(data)
-        }
-
-        // Handle task updates: fold the full pushed step list into the store.
-        if (data.type === 'tasks.updated' && typeof data.conversation_id === 'string') {
-          tasksStore.applyTasksUpdated(data as WsTasksUpdatedMessage)
-        }
-
-        // Handle plan-document updates: fold the pushed markdown doc into the store.
-        if (data.type === 'plan_document.updated' && typeof data.conversation_id === 'string') {
-          planDocumentStore.applyPlanDocumentUpdated(data as WsPlanDocumentUpdatedMessage)
-        }
-
-        // Handle scope updates: fold the full pushed folder list into the store.
-        if (data.type === 'scope.updated' && typeof data.conversation_id === 'string') {
-          scopeStore.applyScopeUpdated(data as WsScopeUpdatedMessage)
-        }
-
-        // Handle permission-tier updates: fold the pushed tier into the store.
-        if (data.type === 'permission_mode.updated' && typeof data.conversation_id === 'string') {
-          permissionModeStore.applyModeUpdated(data as WsPermissionModeUpdatedMessage)
-        }
-
-        // Handle interactive-terminal lifecycle + output frames.
-        if (data.type === 'terminal.output') {
-          terminalStore.applyOutput(data as WsTerminalOutputMessage)
-        } else if (data.type === 'terminal.session_opened') {
-          terminalStore.applySessionOpened(data as WsTerminalSessionOpenedMessage)
-        } else if (data.type === 'terminal.closed') {
-          terminalStore.applyClosed(data as WsTerminalClosedMessage)
-        } else if (data.type === 'terminal.renamed') {
-          terminalStore.applyRenamed(data as WsTerminalRenamedMessage)
-        } else if (data.type === 'terminal.assigned') {
-          terminalStore.applyAssigned(data as WsTerminalAssignedMessage)
-        }
+        data = JSON.parse(event.data as string) as EventsServerMessage
       } catch {
         console.warn('[ALICE Events WS] Failed to parse message')
+        return
+      }
+      const handler = handlers[data.type] as ((msg: EventsServerMessage) => void) | undefined
+      if (handler) {
+        handler(data)
+      } else {
+        // Runtime safety net for frames newer than the bundled contract.
+        console.warn('[ALICE Events WS] Unhandled frame type:', (data as { type?: string }).type)
       }
     }
 

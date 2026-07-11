@@ -1,9 +1,10 @@
 ﻿/**
  * Chat-related types aligned with the AL\CE backend API.
  *
- * Every interface here mirrors the JSON shapes returned by
- * `backend/api/routes/chat.py` so the frontend can consume
- * responses without transformation.
+ * WebSocket frame types (WsToken, WsDone, WsError, etc.) are re-exported from
+ * the generated contract (`./generated`, regenerated via `scripts/gen-contracts.ps1`).
+ * Only view-models and REST conversation types (ChatMessage, ConversationSummary,
+ * ConversationDetail, etc.) are hand-written here.
  */
 
 // ---------------------------------------------------------------------------
@@ -122,224 +123,35 @@ export interface RenameConversationResponse {
 // WebSocket
 // ---------------------------------------------------------------------------
 
-/** Payload the client sends over the WebSocket. */
-export interface WsSendPayload {
-  content: string
-  conversation_id?: string
-  attachments?: string[]
-  /** When set, this message is an edit of the specified user message. */
-  edit_message_id?: string
-}
+import type { ApiSchema, ChatServerMessage } from './generated'
 
-/** A streamed token frame from the server. */
-export interface WsTokenMessage {
-  type: 'token'
-  content: string
-}
-
-/** A thinking token frame from the server. */
-export interface WsThinkingMessage {
-  type: 'thinking'
-  content: string
-}
-
-/** Server signals the response is complete. */
-export interface WsDoneMessage {
-  type: 'done'
-  conversation_id: string
-  message_id: string
-  /** Server-assigned ID for the user message. */
-  user_message_id?: string
-  finish_reason?: string
-  /** Version group for the completed response (if message was edited). */
-  version_group_id?: string | null
-  /** Version index within the group. */
-  version_index?: number
-}
-
-/** Payload the client sends to cancel an in-progress generation. */
-export interface WsCancelPayload {
-  type: 'cancel'
-}
-
-/** Server reports an error. */
-export interface WsErrorMessage {
-  type: 'error'
-  content: string
-}
-
-/** Server signals a tool has started executing. */
-export interface WsToolExecutionStartMessage {
-  type: 'tool_execution_start'
-  tool_name: string
-  execution_id: string
-}
-
-/** Server signals a tool has finished executing. */
-export interface WsToolExecutionDoneMessage {
-  type: 'tool_execution_done'
-  tool_name: string
-  result: string
-  execution_id: string
-  success: boolean
-  /** MIME type of the result content (e.g. "image/png"). */
-  content_type?: string
-  /**
-   * UUID of the artifact registered for this tool result, when the tool
-   * produced a binary output that the artifacts registry parsed
-   * (e.g. ``cad_generate``). Absent for tools without a parser or when
-   * registration failed silently.
-   */
-  artifact_id?: string
-}
-
-/**
- * A "don't ask again" persistence choice the user can attach to an approval.
- *
- * - `none` — one-shot, ask again next time (the default).
- * - `session` — grant this tool for the rest of the conversation (in-memory).
- * - `persistent` — write a persistent allow-rule (survives restarts).
- *
- * Mirrors the backend `_REMEMBER_CHOICES` in `services/turn/pipeline.py`.
- */
-export type RememberChoice = 'none' | 'session' | 'persistent'
-
-/** Server requests user confirmation before running a tool. */
-export interface WsToolConfirmationRequiredMessage {
-  type: 'tool_confirmation_required'
-  tool_name: string
-  args: Record<string, unknown>
-  execution_id: string
-  risk_level: 'safe' | 'medium' | 'dangerous' | 'forbidden'
-  description: string
-  /** LLM reasoning/thinking content explaining why this tool was called. */
-  reasoning?: string
-  /**
-   * When `true` the server accepts a `remember` choice on the response so the
-   * client may offer "don't ask again" (session / persistent) options.
-   */
-  allow_remember?: boolean
-}
-
-/** Payload the client sends to approve/reject a tool confirmation. */
-export interface WsToolConfirmationResponsePayload {
-  type: 'tool_confirmation_response'
-  execution_id: string
-  approved: boolean
-  /**
-   * Optional persistence for the decision. Only honoured by the server on an
-   * approval (`approved: true`); omitted/ignored on rejection. Defaults to
-   * `none` when absent.
-   */
-  remember?: RememberChoice
-}
-
-/**
- * A single question within an `ask_user` interaction. Each question is
- * answered independently and correlated back to its answer by `id`.
- *
- * - `radio` — single choice among `options`.
- * - `checkbox` — multiple choices among `options`.
- *
- * When `allow_free_text` is set the user may type an answer in addition to (or
- * instead of) picking options; `options` is omitted when the tool passed no
- * suggested choices.
- */
-export interface AskUserQuestion {
-  id: string
-  text: string
-  type: 'radio' | 'checkbox'
-  options?: string[]
-  allow_free_text?: boolean
-}
-
-/**
- * Server requests structured input from the user before a tool can proceed
- * (the `ask_user` meta-tool). Unlike a tool confirmation this always needs
- * human input — there is no auto-approve path. Carries one or more questions
- * answered together as a short sequential wizard.
- */
-export interface WsAskUserRequiredMessage {
-  type: 'ask_user_required'
-  execution_id: string
-  questions: AskUserQuestion[]
-}
-
-/** A single answer within an `ask_user_response`, keyed by `question_id`. */
-export interface AskUserAnswer {
-  question_id: string
-  selected: string[]
-  free_text?: string
-}
-
-/** Payload the client sends back with the user's answers to an `ask_user`. */
-export interface WsAskUserResponsePayload {
-  type: 'ask_user_response'
-  execution_id: string
-  answers: AskUserAnswer[]
-}
-
-/** Server signals it is re-querying the LLM after tool execution. */
-export interface WsLlmRequeryMessage {
-  type: 'llm_requery'
-  iteration: number
-}
-
-/** Server sends a warning message. */
-export interface WsWarningMessage {
-  type: 'warning'
-  content: string
-}
-
-/** Per-category token usage breakdown sent with context_info events. */
-export interface ContextBreakdown {
-  system: number
-  tools: number
-  messages: number
-  files: number
-  tool_results: number
-  other: number
-}
-
-/** Server sends context window usage information. */
-export interface WsContextInfoMessage {
-  type: 'context_info'
-  used: number
-  available: number
-  context_window: number
-  percentage: number
-  was_compressed: boolean
-  messages_summarized: number
-  is_estimated: boolean
-  breakdown?: ContextBreakdown
-}
-
-/** Server signals context compression has started. */
-export interface WsContextCompressionStartMessage {
-  type: 'context_compression_start'
-}
-
-/** Server signals context compression completed. */
-export interface WsContextCompressionDoneMessage {
-  type: 'context_compression_done'
-  messages_summarized: number
-  summary_message_id?: string
-}
-
-/** Server signals context compression failed. */
-export interface WsContextCompressionFailedMessage {
-  type: 'context_compression_failed'
-}
-
-/** Server signals the LLM wants to invoke a tool (forwarded from LLM stream). */
-export interface WsToolCallMessage {
-  type: 'tool_call'
-  id: string
-  function: {
-    name: string
-    arguments: string
-  }
-}
+/** Generated from the backend WS contract — do not redefine locally. */
+export type WsSendPayload = ApiSchema<'WsUserMessage'>
+export type WsTokenMessage = ApiSchema<'WsToken'>
+export type WsThinkingMessage = ApiSchema<'WsThinking'>
+export type WsDoneMessage = ApiSchema<'WsDone'>
+export type WsCancelPayload = ApiSchema<'WsCancel'>
+export type WsErrorMessage = ApiSchema<'WsError'>
+export type WsToolCallMessage = ApiSchema<'WsToolCallStream'>
+export type WsToolExecutionStartMessage = ApiSchema<'WsToolExecutionStart'>
+export type WsToolExecutionDoneMessage = ApiSchema<'WsToolExecutionDone'>
+export type WsToolProgressMessage = ApiSchema<'WsToolProgress'>
+export type RememberChoice = NonNullable<
+  ApiSchema<'WsToolConfirmationResponse'>['remember']
+>
+export type WsToolConfirmationRequiredMessage = ApiSchema<'WsToolConfirmationRequired'>
+export type WsToolConfirmationResponsePayload = ApiSchema<'WsToolConfirmationResponse'>
+export type AskUserQuestion = ApiSchema<'WsAskUserQuestion'>
+export type WsAskUserRequiredMessage = ApiSchema<'WsAskUserRequired'>
+export type AskUserAnswer = ApiSchema<'WsAskUserAnswer'>
+export type WsAskUserResponsePayload = ApiSchema<'WsAskUserResponse'>
+export type WsLlmRequeryMessage = ApiSchema<'WsLlmRequery'>
+export type WsWarningMessage = ApiSchema<'WsWarning'>
+export type ContextBreakdown = ApiSchema<'WsContextBreakdown'>
+export type WsContextInfoMessage = ApiSchema<'WsContextInfo'>
+export type WsContextCompressionStartMessage = ApiSchema<'WsContextCompressionStart'>
+export type WsContextCompressionDoneMessage = ApiSchema<'WsContextCompressionDone'>
+export type WsContextCompressionFailedMessage = ApiSchema<'WsContextCompressionFailed'>
 
 // ---------------------------------------------------------------------------
 // CAD / 3D Model
@@ -428,19 +240,6 @@ export interface ToolProgressSnapshot {
   elapsedS?: number
 }
 
-/** Server pushes incremental progress for a long-running tool. */
-export interface WsToolProgressMessage {
-  type: 'tool_progress'
-  tool_name: string
-  execution_id: string
-  phase?: string
-  label?: string | null
-  step?: number
-  total?: number
-  percent?: number
-  elapsed_s?: number
-}
-
 /** A pending tool confirmation awaiting user approval. */
 export interface ConfirmationRequest {
   executionId: string
@@ -479,24 +278,8 @@ export interface ContextInfo {
   breakdown?: ContextBreakdown
 }
 
-/** Discriminated union of all server→client WebSocket frames. */
-export type WsMessage =
-  | WsTokenMessage
-  | WsThinkingMessage
-  | WsDoneMessage
-  | WsErrorMessage
-  | WsToolCallMessage
-  | WsToolExecutionStartMessage
-  | WsToolExecutionDoneMessage
-  | WsToolProgressMessage
-  | WsToolConfirmationRequiredMessage
-  | WsAskUserRequiredMessage
-  | WsLlmRequeryMessage
-  | WsWarningMessage
-  | WsContextInfoMessage
-  | WsContextCompressionStartMessage
-  | WsContextCompressionDoneMessage
-  | WsContextCompressionFailedMessage
+/** Discriminated union of all server→client chat frames (generated). */
+export type WsMessage = ChatServerMessage
 
 // ---------------------------------------------------------------------------
 // Export / Import

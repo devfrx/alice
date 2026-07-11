@@ -271,6 +271,148 @@
         "title": "BranchConversationResponse",
         "type": "object"
       },
+      "ChatClientMessage": {
+        "discriminator": {
+          "mapping": {
+            "ask_user_response": "#/components/schemas/WsAskUserResponse",
+            "cancel": "#/components/schemas/WsCancel",
+            "client_tool_result": "#/components/schemas/WsClientToolResult",
+            "tool_confirmation_response": "#/components/schemas/WsToolConfirmationResponse"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/WsCancel"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolConfirmationResponse"
+          },
+          {
+            "$ref": "#/components/schemas/WsClientToolResult"
+          },
+          {
+            "$ref": "#/components/schemas/WsAskUserResponse"
+          }
+        ]
+      },
+      "ChatServerMessage": {
+        "discriminator": {
+          "mapping": {
+            "agent.critic_invoked": "#/components/schemas/WsAgentCriticInvoked",
+            "agent.warning": "#/components/schemas/WsAgentWarning",
+            "ask_user_required": "#/components/schemas/WsAskUserRequired",
+            "client_tool_call": "#/components/schemas/WsClientToolCall",
+            "context_compression_done": "#/components/schemas/WsContextCompressionDone",
+            "context_compression_failed": "#/components/schemas/WsContextCompressionFailed",
+            "context_compression_start": "#/components/schemas/WsContextCompressionStart",
+            "context_info": "#/components/schemas/WsContextInfo",
+            "done": "#/components/schemas/WsDone",
+            "error": "#/components/schemas/WsError",
+            "interaction.requested": "#/components/schemas/WsInteractionRequested",
+            "interaction.resolved": "#/components/schemas/WsInteractionResolved",
+            "llm_requery": "#/components/schemas/WsLlmRequery",
+            "thinking": "#/components/schemas/WsThinking",
+            "token": "#/components/schemas/WsToken",
+            "tool.call": "#/components/schemas/WsTurnToolCall",
+            "tool.result": "#/components/schemas/WsTurnToolResult",
+            "tool_call": "#/components/schemas/WsToolCallStream",
+            "tool_confirmation_required": "#/components/schemas/WsToolConfirmationRequired",
+            "tool_execution_done": "#/components/schemas/WsToolExecutionDone",
+            "tool_execution_start": "#/components/schemas/WsToolExecutionStart",
+            "tool_progress": "#/components/schemas/WsToolProgress",
+            "turn.finished": "#/components/schemas/WsTurnFinished",
+            "turn.llm_step": "#/components/schemas/WsTurnLlmStep",
+            "turn.started": "#/components/schemas/WsTurnStarted",
+            "turn.usage": "#/components/schemas/WsTurnUsage",
+            "warning": "#/components/schemas/WsWarning"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/WsToken"
+          },
+          {
+            "$ref": "#/components/schemas/WsThinking"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolCallStream"
+          },
+          {
+            "$ref": "#/components/schemas/WsError"
+          },
+          {
+            "$ref": "#/components/schemas/WsDone"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolExecutionStart"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolExecutionDone"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolProgress"
+          },
+          {
+            "$ref": "#/components/schemas/WsContextInfo"
+          },
+          {
+            "$ref": "#/components/schemas/WsContextCompressionStart"
+          },
+          {
+            "$ref": "#/components/schemas/WsContextCompressionDone"
+          },
+          {
+            "$ref": "#/components/schemas/WsContextCompressionFailed"
+          },
+          {
+            "$ref": "#/components/schemas/WsLlmRequery"
+          },
+          {
+            "$ref": "#/components/schemas/WsWarning"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolConfirmationRequired"
+          },
+          {
+            "$ref": "#/components/schemas/WsClientToolCall"
+          },
+          {
+            "$ref": "#/components/schemas/WsAskUserRequired"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnStarted"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnLlmStep"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnToolCall"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnToolResult"
+          },
+          {
+            "$ref": "#/components/schemas/WsInteractionRequested"
+          },
+          {
+            "$ref": "#/components/schemas/WsInteractionResolved"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnUsage"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnFinished"
+          },
+          {
+            "$ref": "#/components/schemas/WsAgentCriticInvoked"
+          },
+          {
+            "$ref": "#/components/schemas/WsAgentWarning"
+          }
+        ]
+      },
       "CreateEntitiesRequest": {
         "description": "Request body for creating entities.",
         "properties": {
@@ -489,6 +631,132 @@
         ],
         "title": "EntityInput",
         "type": "object"
+      },
+      "EventsClientMessage": {
+        "discriminator": {
+          "mapping": {
+            "ping": "#/components/schemas/WsPing",
+            "terminal.input": "#/components/schemas/WsTerminalInput",
+            "terminal.resize": "#/components/schemas/WsTerminalResize"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/WsPing"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalInput"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalResize"
+          }
+        ]
+      },
+      "EventsServerMessage": {
+        "discriminator": {
+          "mapping": {
+            "artifact.created": "#/components/schemas/WsArtifactCreated",
+            "calendar.changed": "#/components/schemas/WsCalendarChanged",
+            "config.changed": "#/components/schemas/WsConfigChanged",
+            "email.received": "#/components/schemas/WsEmailReceived",
+            "email.sent": "#/components/schemas/WsEmailSent",
+            "heartbeat": "#/components/schemas/WsHeartbeat",
+            "knowledge.status": "#/components/schemas/WsKnowledgeStatus",
+            "mcp.server.connected": "#/components/schemas/WsMcpServerConnected",
+            "mcp.server.disconnected": "#/components/schemas/WsMcpServerDisconnected",
+            "note.created": "#/components/schemas/WsNoteCreated",
+            "note.deleted": "#/components/schemas/WsNoteDeleted",
+            "note.updated": "#/components/schemas/WsNoteUpdated",
+            "permission_mode.updated": "#/components/schemas/WsPermissionModeUpdated",
+            "plan_document.updated": "#/components/schemas/WsPlanDocumentUpdated",
+            "pong": "#/components/schemas/WsPong",
+            "scope.updated": "#/components/schemas/WsScopeUpdated",
+            "service.model_download_progress": "#/components/schemas/WsModelDownloadProgress",
+            "service.status": "#/components/schemas/WsServiceStatus",
+            "tasks.updated": "#/components/schemas/WsTasksUpdated",
+            "terminal.assigned": "#/components/schemas/WsTerminalAssigned",
+            "terminal.closed": "#/components/schemas/WsTerminalClosed",
+            "terminal.output": "#/components/schemas/WsTerminalOutput",
+            "terminal.renamed": "#/components/schemas/WsTerminalRenamed",
+            "terminal.session_opened": "#/components/schemas/WsTerminalSessionOpened"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/WsPong"
+          },
+          {
+            "$ref": "#/components/schemas/WsHeartbeat"
+          },
+          {
+            "$ref": "#/components/schemas/WsMcpServerConnected"
+          },
+          {
+            "$ref": "#/components/schemas/WsMcpServerDisconnected"
+          },
+          {
+            "$ref": "#/components/schemas/WsEmailReceived"
+          },
+          {
+            "$ref": "#/components/schemas/WsEmailSent"
+          },
+          {
+            "$ref": "#/components/schemas/WsNoteCreated"
+          },
+          {
+            "$ref": "#/components/schemas/WsNoteUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsNoteDeleted"
+          },
+          {
+            "$ref": "#/components/schemas/WsServiceStatus"
+          },
+          {
+            "$ref": "#/components/schemas/WsKnowledgeStatus"
+          },
+          {
+            "$ref": "#/components/schemas/WsModelDownloadProgress"
+          },
+          {
+            "$ref": "#/components/schemas/WsArtifactCreated"
+          },
+          {
+            "$ref": "#/components/schemas/WsTasksUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsPlanDocumentUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsScopeUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsPermissionModeUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsCalendarChanged"
+          },
+          {
+            "$ref": "#/components/schemas/WsConfigChanged"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalSessionOpened"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalOutput"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalClosed"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalRenamed"
+          },
+          {
+            "$ref": "#/components/schemas/WsTerminalAssigned"
+          }
+        ]
       },
       "HTTPValidationError": {
         "properties": {
@@ -1370,6 +1638,3695 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WsAgentCriticInvoked": {
+        "additionalProperties": false,
+        "description": "The reflective executor invoked the critic pass.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Run Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "step_index": {
+            "default": 0,
+            "title": "Step Index",
+            "type": "integer"
+          },
+          "type": {
+            "const": "agent.critic_invoked",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "source"
+        ],
+        "title": "WsAgentCriticInvoked",
+        "type": "object"
+      },
+      "WsAgentWarning": {
+        "additionalProperties": false,
+        "description": "A structural warning from the agentic layer (e.g. degeneration).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Run Id"
+          },
+          "type": {
+            "const": "agent.warning",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "code",
+          "message"
+        ],
+        "title": "WsAgentWarning",
+        "type": "object"
+      },
+      "WsArtifactCreated": {
+        "additionalProperties": false,
+        "description": "A new artifact was registered in the artifacts registry.",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "type": {
+            "const": "artifact.created",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id",
+          "kind",
+          "conversation_id"
+        ],
+        "title": "WsArtifactCreated",
+        "type": "object"
+      },
+      "WsAskUserAnswer": {
+        "additionalProperties": false,
+        "description": "One answer within an ``ask_user_response`` frame.",
+        "properties": {
+          "free_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Free Text"
+          },
+          "question_id": {
+            "title": "Question Id",
+            "type": "string"
+          },
+          "selected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "question_id"
+        ],
+        "title": "WsAskUserAnswer",
+        "type": "object"
+      },
+      "WsAskUserQuestion": {
+        "additionalProperties": false,
+        "description": "One question within an ``ask_user_required`` frame.",
+        "properties": {
+          "allow_free_text": {
+            "default": false,
+            "title": "Allow Free Text",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "radio",
+              "checkbox"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "type"
+        ],
+        "title": "WsAskUserQuestion",
+        "type": "object"
+      },
+      "WsAskUserRequired": {
+        "additionalProperties": false,
+        "description": "The agent needs clarification from the user before proceeding.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/WsAskUserQuestion"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "type": {
+            "const": "ask_user_required",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id",
+          "questions"
+        ],
+        "title": "WsAskUserRequired",
+        "type": "object"
+      },
+      "WsAskUserResponse": {
+        "additionalProperties": false,
+        "description": "User answers to an ``ask_user_required`` request.",
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/WsAskUserAnswer"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "ask_user_response",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id",
+          "answers"
+        ],
+        "title": "WsAskUserResponse",
+        "type": "object"
+      },
+      "WsCalendarChanged": {
+        "additionalProperties": false,
+        "description": "A calendar event was created, updated, or deleted.",
+        "properties": {
+          "action": {
+            "enum": [
+              "created",
+              "updated",
+              "deleted"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "calendar.changed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "action",
+          "event_id"
+        ],
+        "title": "WsCalendarChanged",
+        "type": "object"
+      },
+      "WsCancel": {
+        "additionalProperties": false,
+        "description": "Cancel the current in-flight turn.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "cancel",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsCancel",
+        "type": "object"
+      },
+      "WsClientToolCall": {
+        "additionalProperties": false,
+        "description": "Delegate a UI-side tool execution to the connected client.",
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "client_tool_call",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id",
+          "tool_name",
+          "args"
+        ],
+        "title": "WsClientToolCall",
+        "type": "object"
+      },
+      "WsClientToolResult": {
+        "additionalProperties": false,
+        "description": "Result of a UI-side tool execution requested by ``client_tool_call``.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Result"
+          },
+          "success": {
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "client_tool_result",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id"
+        ],
+        "title": "WsClientToolResult",
+        "type": "object"
+      },
+      "WsConfigChanged": {
+        "additionalProperties": false,
+        "description": "A layered-config key was mutated.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "type": {
+            "const": "config.changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "default": null,
+            "title": "Value"
+          }
+        },
+        "required": [
+          "type",
+          "path",
+          "layer"
+        ],
+        "title": "WsConfigChanged",
+        "type": "object"
+      },
+      "WsContextBreakdown": {
+        "additionalProperties": false,
+        "description": "Per-category token breakdown within a ``context_info`` frame.",
+        "properties": {
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "messages": {
+            "title": "Messages",
+            "type": "integer"
+          },
+          "other": {
+            "title": "Other",
+            "type": "integer"
+          },
+          "system": {
+            "title": "System",
+            "type": "integer"
+          },
+          "tool_results": {
+            "title": "Tool Results",
+            "type": "integer"
+          },
+          "tools": {
+            "title": "Tools",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "system",
+          "tools",
+          "messages",
+          "files",
+          "tool_results",
+          "other"
+        ],
+        "title": "WsContextBreakdown",
+        "type": "object"
+      },
+      "WsContextCompressionDone": {
+        "additionalProperties": false,
+        "description": "Context compression completed successfully.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "messages_summarized": {
+            "title": "Messages Summarized",
+            "type": "integer"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "summary_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Summary Message Id"
+          },
+          "type": {
+            "const": "context_compression_done",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "messages_summarized"
+        ],
+        "title": "WsContextCompressionDone",
+        "type": "object"
+      },
+      "WsContextCompressionFailed": {
+        "additionalProperties": false,
+        "description": "Context compression failed; the turn continues uncompressed.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "context_compression_failed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsContextCompressionFailed",
+        "type": "object"
+      },
+      "WsContextCompressionStart": {
+        "additionalProperties": false,
+        "description": "Context compression is about to begin.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "context_compression_start",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsContextCompressionStart",
+        "type": "object"
+      },
+      "WsContextInfo": {
+        "additionalProperties": false,
+        "description": "Current context-window utilisation snapshot.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "breakdown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WsContextBreakdown"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "context_window": {
+            "title": "Context Window",
+            "type": "integer"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "is_estimated": {
+            "default": false,
+            "title": "Is Estimated",
+            "type": "boolean"
+          },
+          "messages_summarized": {
+            "title": "Messages Summarized",
+            "type": "integer"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "percentage": {
+            "title": "Percentage",
+            "type": "number"
+          },
+          "type": {
+            "const": "context_info",
+            "title": "Type",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          },
+          "was_compressed": {
+            "title": "Was Compressed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "used",
+          "available",
+          "context_window",
+          "percentage",
+          "was_compressed",
+          "messages_summarized"
+        ],
+        "title": "WsContextInfo",
+        "type": "object"
+      },
+      "WsDone": {
+        "additionalProperties": false,
+        "description": "Final turn frame (built in chat ``_persist`` after the DB commit).",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "finish_reason": {
+            "title": "Finish Reason",
+            "type": "string"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "done",
+            "title": "Type",
+            "type": "string"
+          },
+          "user_message_id": {
+            "title": "User Message Id",
+            "type": "string"
+          },
+          "version_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Version Group Id"
+          },
+          "version_index": {
+            "title": "Version Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "message_id",
+          "user_message_id",
+          "finish_reason",
+          "version_index"
+        ],
+        "title": "WsDone",
+        "type": "object"
+      },
+      "WsEmailReceived": {
+        "additionalProperties": false,
+        "description": "A new email arrived in a monitored folder.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "folder": {
+            "default": "INBOX",
+            "title": "Folder",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "email.received",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsEmailReceived",
+        "type": "object"
+      },
+      "WsEmailSent": {
+        "additionalProperties": false,
+        "description": "An outbound email was sent.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "email.sent",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsEmailSent",
+        "type": "object"
+      },
+      "WsError": {
+        "additionalProperties": false,
+        "description": "A hard error that terminated the turn.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "WsError",
+        "type": "object"
+      },
+      "WsHeartbeat": {
+        "additionalProperties": false,
+        "description": "Periodic liveness frame pushed when the client is idle.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "heartbeat",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsHeartbeat",
+        "type": "object"
+      },
+      "WsInteractionRequested": {
+        "additionalProperties": false,
+        "description": "An interaction (confirmation / client tool / clarification) was requested.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "tool_confirmation",
+              "client_tool_call",
+              "ask_user"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tool Name"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "interaction.requested",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "execution_id",
+          "kind"
+        ],
+        "title": "WsInteractionRequested",
+        "type": "object"
+      },
+      "WsInteractionResolved": {
+        "additionalProperties": false,
+        "description": "An in-flight interaction completed (or was cancelled/timed-out).",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "tool_confirmation",
+              "client_tool_call",
+              "ask_user"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "approved",
+              "rejected",
+              "answered",
+              "executed",
+              "timeout",
+              "cancelled",
+              "disconnected",
+              "failed"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "interaction.resolved",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "execution_id",
+          "kind",
+          "outcome"
+        ],
+        "title": "WsInteractionResolved",
+        "type": "object"
+      },
+      "WsKnowledgeStatus": {
+        "additionalProperties": false,
+        "description": "The composite knowledge backend reported its readiness.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "memory_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Memory Enabled"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ready"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "tool_rag_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tool Rag Enabled"
+          },
+          "type": {
+            "const": "knowledge.status",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsKnowledgeStatus",
+        "type": "object"
+      },
+      "WsLlmRequery": {
+        "additionalProperties": false,
+        "description": "The tool loop is making another LLM call after tool execution.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "iteration": {
+            "title": "Iteration",
+            "type": "integer"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "llm_requery",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "iteration"
+        ],
+        "title": "WsLlmRequery",
+        "type": "object"
+      },
+      "WsMcpServerConnected": {
+        "additionalProperties": false,
+        "description": "An MCP server successfully connected.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Server"
+          },
+          "type": {
+            "const": "mcp.server.connected",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsMcpServerConnected",
+        "type": "object"
+      },
+      "WsMcpServerDisconnected": {
+        "additionalProperties": false,
+        "description": "An MCP server disconnected.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Server"
+          },
+          "type": {
+            "const": "mcp.server.disconnected",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsMcpServerDisconnected",
+        "type": "object"
+      },
+      "WsModelDownloadProgress": {
+        "additionalProperties": true,
+        "description": "Progress update for an in-flight model download.\n\nPayload forwarded verbatim from the bus; ``extra='allow'`` because the\ndownloader may add fields without a synchronized schema bump.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "downloaded_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Downloaded Bytes"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Phase"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Service"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Bytes"
+          },
+          "type": {
+            "const": "service.model_download_progress",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsModelDownloadProgress",
+        "type": "object"
+      },
+      "WsNoteCreated": {
+        "additionalProperties": false,
+        "description": "A new note was created.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "type": {
+            "const": "note.created",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsNoteCreated",
+        "type": "object"
+      },
+      "WsNoteDeleted": {
+        "additionalProperties": false,
+        "description": "A note was deleted.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "note.deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsNoteDeleted",
+        "type": "object"
+      },
+      "WsNoteUpdated": {
+        "additionalProperties": false,
+        "description": "An existing note was updated.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "note.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsNoteUpdated",
+        "type": "object"
+      },
+      "WsPermissionModeUpdated": {
+        "additionalProperties": false,
+        "description": "The permission tier changed for a conversation.\n\n``mode`` is a Literal (not the ``PermissionMode`` enum) to avoid a\n``$defs`` name collision with the REST component of the same name;\n``test_mode_literal_matches_enum`` pins the two in sync.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "mode": {
+            "enum": [
+              "strict",
+              "auto_edits",
+              "plan",
+              "autopilot"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "permission_mode.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "mode"
+        ],
+        "title": "WsPermissionModeUpdated",
+        "type": "object"
+      },
+      "WsPing": {
+        "additionalProperties": false,
+        "description": "Keep-alive ping from the client; server replies with ``pong``.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "ping",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsPing",
+        "type": "object"
+      },
+      "WsPlanDocumentUpdated": {
+        "additionalProperties": false,
+        "description": "The agent wrote or edited the plan document for a conversation.",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "plan_document.updated",
+            "title": "Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "title",
+          "body"
+        ],
+        "title": "WsPlanDocumentUpdated",
+        "type": "object"
+      },
+      "WsPong": {
+        "additionalProperties": false,
+        "description": "Reply to a client ``ping``.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "pong",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsPong",
+        "type": "object"
+      },
+      "WsScopeUpdated": {
+        "additionalProperties": false,
+        "description": "The workspace scope (allowed folders) changed for a conversation.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "folders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Folders",
+            "type": "array"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "scope.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "folders"
+        ],
+        "title": "WsScopeUpdated",
+        "type": "object"
+      },
+      "WsServiceStatus": {
+        "additionalProperties": false,
+        "description": "A backend service changed its readiness status.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
+          },
+          "type": {
+            "const": "service.status",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "service",
+          "status"
+        ],
+        "title": "WsServiceStatus",
+        "type": "object"
+      },
+      "WsTaskStep": {
+        "additionalProperties": true,
+        "description": "One ordered step of a conversation task list (``update_plan``).\n\nextra='allow' because the step dicts come from the agent's\n``update_plan`` tool and may grow.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "status"
+        ],
+        "title": "WsTaskStep",
+        "type": "object"
+      },
+      "WsTasksUpdated": {
+        "additionalProperties": false,
+        "description": "The agent updated the mutable task list for a conversation.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/WsTaskStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "type": {
+            "const": "tasks.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "steps"
+        ],
+        "title": "WsTasksUpdated",
+        "type": "object"
+      },
+      "WsTerminalAssigned": {
+        "additionalProperties": false,
+        "description": "A terminal session was assigned to a conversation.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "terminal.assigned",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session_id"
+        ],
+        "title": "WsTerminalAssigned",
+        "type": "object"
+      },
+      "WsTerminalClosed": {
+        "additionalProperties": false,
+        "description": "A terminal session was closed.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exit Code"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "terminal.closed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session_id"
+        ],
+        "title": "WsTerminalClosed",
+        "type": "object"
+      },
+      "WsTerminalInput": {
+        "additionalProperties": false,
+        "description": "Keyboard input from the client destined for a PTY session.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "data": {
+            "title": "Data",
+            "type": "string"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "terminal.input",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session_id",
+          "data"
+        ],
+        "title": "WsTerminalInput",
+        "type": "object"
+      },
+      "WsTerminalOutput": {
+        "additionalProperties": false,
+        "description": "PTY output data from a terminal session.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "data": {
+            "title": "Data",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "terminal.output",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session_id",
+          "data"
+        ],
+        "title": "WsTerminalOutput",
+        "type": "object"
+      },
+      "WsTerminalRenamed": {
+        "additionalProperties": false,
+        "description": "A terminal session was given a new title.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "terminal.renamed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session_id",
+          "title"
+        ],
+        "title": "WsTerminalRenamed",
+        "type": "object"
+      },
+      "WsTerminalResize": {
+        "additionalProperties": false,
+        "description": "Terminal resize notification from the client.",
+        "properties": {
+          "cols": {
+            "title": "Cols",
+            "type": "integer"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "terminal.resize",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session_id",
+          "rows",
+          "cols"
+        ],
+        "title": "WsTerminalResize",
+        "type": "object"
+      },
+      "WsTerminalSession": {
+        "additionalProperties": false,
+        "description": "JSON snapshot of a live terminal session (``session.snapshot()``).",
+        "properties": {
+          "agent_assigned": {
+            "title": "Agent Assigned",
+            "type": "boolean"
+          },
+          "alive": {
+            "title": "Alive",
+            "type": "boolean"
+          },
+          "cols": {
+            "title": "Cols",
+            "type": "integer"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pid"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "title",
+          "cwd",
+          "rows",
+          "cols",
+          "agent_assigned",
+          "created_at",
+          "alive"
+        ],
+        "title": "WsTerminalSession",
+        "type": "object"
+      },
+      "WsTerminalSessionOpened": {
+        "additionalProperties": false,
+        "description": "A new terminal session was opened.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/WsTerminalSession"
+          },
+          "type": {
+            "const": "terminal.session_opened",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "session"
+        ],
+        "title": "WsTerminalSessionOpened",
+        "type": "object"
+      },
+      "WsThinking": {
+        "additionalProperties": false,
+        "description": "A reasoning/thinking token from the LLM (extended thinking mode).",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "thinking",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "WsThinking",
+        "type": "object"
+      },
+      "WsToken": {
+        "additionalProperties": false,
+        "description": "A single streamed token from the LLM.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "token",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "WsToken",
+        "type": "object"
+      },
+      "WsToolCallFunction": {
+        "additionalProperties": false,
+        "description": "The function sub-object of a raw LLM tool-call stream forward.",
+        "properties": {
+          "arguments": {
+            "title": "Arguments",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "title": "WsToolCallFunction",
+        "type": "object"
+      },
+      "WsToolCallStream": {
+        "additionalProperties": false,
+        "description": "LLM requested a tool (raw stream forward, pre-execution).",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "function": {
+            "$ref": "#/components/schemas/WsToolCallFunction"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_call",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "function"
+        ],
+        "title": "WsToolCallStream",
+        "type": "object"
+      },
+      "WsToolConfirmationRequired": {
+        "additionalProperties": false,
+        "description": "The turn executor needs the user to approve a risky tool call.",
+        "properties": {
+          "allow_remember": {
+            "default": true,
+            "title": "Allow Remember",
+            "type": "boolean"
+          },
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reasoning"
+          },
+          "risk_level": {
+            "enum": [
+              "safe",
+              "medium",
+              "dangerous",
+              "forbidden"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_confirmation_required",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id",
+          "tool_name",
+          "args",
+          "risk_level",
+          "description"
+        ],
+        "title": "WsToolConfirmationRequired",
+        "type": "object"
+      },
+      "WsToolConfirmationResponse": {
+        "additionalProperties": false,
+        "description": "User response to a ``tool_confirmation_required`` request.",
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "remember": {
+            "default": "none",
+            "enum": [
+              "none",
+              "session",
+              "persistent"
+            ],
+            "title": "Remember",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_confirmation_response",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id",
+          "approved"
+        ],
+        "title": "WsToolConfirmationResponse",
+        "type": "object"
+      },
+      "WsToolExecutionDone": {
+        "additionalProperties": false,
+        "description": "The tool executor finished running a tool.",
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Artifact Id"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Content Type"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "result": {
+            "title": "Result",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_execution_done",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "tool_name",
+          "result",
+          "execution_id",
+          "success"
+        ],
+        "title": "WsToolExecutionDone",
+        "type": "object"
+      },
+      "WsToolExecutionStart": {
+        "additionalProperties": false,
+        "description": "The tool executor began running a tool.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_execution_start",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "tool_name",
+          "execution_id"
+        ],
+        "title": "WsToolExecutionStart",
+        "type": "object"
+      },
+      "WsToolProgress": {
+        "additionalProperties": true,
+        "description": "Incremental progress; tools merge arbitrary extra keys (extra=allow).",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "elapsed_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Elapsed S"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Percent"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Phase"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Step"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "type": {
+            "const": "tool_progress",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "tool_name",
+          "execution_id"
+        ],
+        "title": "WsToolProgress",
+        "type": "object"
+      },
+      "WsTurnFinished": {
+        "additionalProperties": false,
+        "description": "The turn has finished; summary statistics follow.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Finish Reason"
+          },
+          "input_tokens": {
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "output_tokens": {
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "steps": {
+            "title": "Steps",
+            "type": "integer"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.finished",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "input_tokens",
+          "output_tokens",
+          "steps"
+        ],
+        "title": "WsTurnFinished",
+        "type": "object"
+      },
+      "WsTurnLlmStep": {
+        "additionalProperties": false,
+        "description": "The turn executor began an LLM step.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.llm_step",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "step"
+        ],
+        "title": "WsTurnLlmStep",
+        "type": "object"
+      },
+      "WsTurnStarted": {
+        "additionalProperties": false,
+        "description": "A new turn has started processing.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.started",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "conversation_id"
+        ],
+        "title": "WsTurnStarted",
+        "type": "object"
+      },
+      "WsTurnToolCall": {
+        "additionalProperties": false,
+        "description": "The turn executor dispatched a tool call.",
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool.call",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "execution_id",
+          "tool_name",
+          "args"
+        ],
+        "title": "WsTurnToolCall",
+        "type": "object"
+      },
+      "WsTurnToolResult": {
+        "additionalProperties": false,
+        "description": "A tool returned its result to the turn executor.",
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Artifact Id"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Content Type"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "result": {
+            "title": "Result",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool.result",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "execution_id",
+          "tool_name",
+          "success",
+          "result"
+        ],
+        "title": "WsTurnToolResult",
+        "type": "object"
+      },
+      "WsTurnUsage": {
+        "additionalProperties": false,
+        "description": "Per-step token usage snapshot emitted by the turn executor.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "input_tokens": {
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "max_steps": {
+            "title": "Max Steps",
+            "type": "integer"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "output_tokens": {
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "tool_calls": {
+            "title": "Tool Calls",
+            "type": "integer"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.usage",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "step",
+          "input_tokens",
+          "output_tokens",
+          "tool_calls",
+          "max_steps"
+        ],
+        "title": "WsTurnUsage",
+        "type": "object"
+      },
+      "WsUserMessage": {
+        "additionalProperties": false,
+        "description": "A plain user message — the UNTAGGED chat frame.\n\nDeliberately NOT part of :data:`ChatClientMessage`: the wire format has\nno ``type`` key (the channel pump treats any unrecognized frame as a\nuser message). Exported as a named component for the FE send payload.",
+        "properties": {
+          "attachments": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attachments"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "edit_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Edit Message Id"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "WsUserMessage",
+        "type": "object"
+      },
+      "WsWarning": {
+        "additionalProperties": false,
+        "description": "A non-fatal warning from the turn executor.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "warning",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "WsWarning",
         "type": "object"
       },
       "_ExecuteRequest": {

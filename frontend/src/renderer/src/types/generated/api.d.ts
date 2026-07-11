@@ -2454,7 +2454,7 @@ export interface components {
              * Pinned
              * @default false
              */
-            pinned: boolean;
+            pinned?: boolean;
             /** Size Bytes */
             size_bytes: number;
             /** Title */
@@ -2519,6 +2519,8 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        ChatClientMessage: components["schemas"]["WsCancel"] | components["schemas"]["WsToolConfirmationResponse"] | components["schemas"]["WsClientToolResult"] | components["schemas"]["WsAskUserResponse"];
+        ChatServerMessage: components["schemas"]["WsToken"] | components["schemas"]["WsThinking"] | components["schemas"]["WsToolCallStream"] | components["schemas"]["WsError"] | components["schemas"]["WsDone"] | components["schemas"]["WsToolExecutionStart"] | components["schemas"]["WsToolExecutionDone"] | components["schemas"]["WsToolProgress"] | components["schemas"]["WsContextInfo"] | components["schemas"]["WsContextCompressionStart"] | components["schemas"]["WsContextCompressionDone"] | components["schemas"]["WsContextCompressionFailed"] | components["schemas"]["WsLlmRequery"] | components["schemas"]["WsWarning"] | components["schemas"]["WsToolConfirmationRequired"] | components["schemas"]["WsClientToolCall"] | components["schemas"]["WsAskUserRequired"] | components["schemas"]["WsTurnStarted"] | components["schemas"]["WsTurnLlmStep"] | components["schemas"]["WsTurnToolCall"] | components["schemas"]["WsTurnToolResult"] | components["schemas"]["WsInteractionRequested"] | components["schemas"]["WsInteractionResolved"] | components["schemas"]["WsTurnUsage"] | components["schemas"]["WsTurnFinished"] | components["schemas"]["WsAgentCriticInvoked"] | components["schemas"]["WsAgentWarning"];
         /**
          * CreateEntitiesRequest
          * @description Request body for creating entities.
@@ -2610,8 +2612,10 @@ export interface components {
              * Observations
              * @default []
              */
-            observations: string[];
+            observations?: string[];
         };
+        EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"];
+        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2646,14 +2650,14 @@ export interface components {
              * Loaded Model Count
              * @default 0
              */
-            loaded_model_count: number;
+            loaded_model_count?: number;
             /** Loaded Models */
             loaded_models?: string[];
             /**
              * Total Model Count
              * @default 0
              */
-            total_model_count: number;
+            total_model_count?: number;
         };
         /**
          * ObservationInput
@@ -2721,7 +2725,7 @@ export interface components {
              * Scope
              * @default conversation
              */
-            scope: string;
+            scope?: string;
             /** Tool Name */
             tool_name: string;
         };
@@ -2842,19 +2846,19 @@ export interface components {
              * Assign To Agent
              * @default false
              */
-            assign_to_agent: boolean;
+            assign_to_agent?: boolean;
             /**
              * Cols
              * @default 80
              */
-            cols: number;
+            cols?: number;
             /** Cwd */
             cwd?: string | null;
             /**
              * Rows
              * @default 24
              */
-            rows: number;
+            rows?: number;
             /** Title */
             title?: string | null;
         };
@@ -2948,7 +2952,7 @@ export interface components {
              * Capabilities
              * @default []
              */
-            capabilities: string[];
+            capabilities?: string[];
             /** Description */
             description: string;
             /** Enabled */
@@ -3040,6 +3044,1941 @@ export interface components {
             type: string;
         };
         /**
+         * WsAgentCriticInvoked
+         * @description The reflective executor invoked the critic pass.
+         */
+        WsAgentCriticInvoked: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Run Id
+             * @default null
+             */
+            run_id?: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Step Index
+             * @default 0
+             */
+            step_index?: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "agent.critic_invoked";
+        };
+        /**
+         * WsAgentWarning
+         * @description A structural warning from the agentic layer (e.g. degeneration).
+         */
+        WsAgentWarning: {
+            /** Code */
+            code: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Message */
+            message: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Run Id
+             * @default null
+             */
+            run_id?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "agent.warning";
+        };
+        /**
+         * WsArtifactCreated
+         * @description A new artifact was registered in the artifacts registry.
+         */
+        WsArtifactCreated: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Kind */
+            kind: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Title
+             * @default null
+             */
+            title?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "artifact.created";
+        };
+        /**
+         * WsAskUserAnswer
+         * @description One answer within an ``ask_user_response`` frame.
+         */
+        WsAskUserAnswer: {
+            /**
+             * Free Text
+             * @default null
+             */
+            free_text?: string | null;
+            /** Question Id */
+            question_id: string;
+            /** Selected */
+            selected?: string[];
+        };
+        /**
+         * WsAskUserQuestion
+         * @description One question within an ``ask_user_required`` frame.
+         */
+        WsAskUserQuestion: {
+            /**
+             * Allow Free Text
+             * @default false
+             */
+            allow_free_text?: boolean;
+            /** Id */
+            id: string;
+            /** Options */
+            options?: string[];
+            /** Text */
+            text: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "radio" | "checkbox";
+        };
+        /**
+         * WsAskUserRequired
+         * @description The agent needs clarification from the user before proceeding.
+         */
+        WsAskUserRequired: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Questions */
+            questions: components["schemas"]["WsAskUserQuestion"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ask_user_required";
+        };
+        /**
+         * WsAskUserResponse
+         * @description User answers to an ``ask_user_required`` request.
+         */
+        WsAskUserResponse: {
+            /** Answers */
+            answers: components["schemas"]["WsAskUserAnswer"][];
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ask_user_response";
+        };
+        /**
+         * WsCalendarChanged
+         * @description A calendar event was created, updated, or deleted.
+         */
+        WsCalendarChanged: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "created" | "updated" | "deleted";
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Event Id */
+            event_id: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "calendar.changed";
+        };
+        /**
+         * WsCancel
+         * @description Cancel the current in-flight turn.
+         */
+        WsCancel: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "cancel";
+        };
+        /**
+         * WsClientToolCall
+         * @description Delegate a UI-side tool execution to the connected client.
+         */
+        WsClientToolCall: {
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "client_tool_call";
+        };
+        /**
+         * WsClientToolResult
+         * @description Result of a UI-side tool execution requested by ``client_tool_call``.
+         */
+        WsClientToolResult: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Error
+             * @default null
+             */
+            error?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Result
+             * @default null
+             */
+            result?: string | unknown[] | {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Success
+             * @default false
+             */
+            success?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "client_tool_result";
+        };
+        /**
+         * WsConfigChanged
+         * @description A layered-config key was mutated.
+         */
+        WsConfigChanged: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Layer */
+            layer: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Path */
+            path: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "config.changed";
+            /**
+             * Value
+             * @default null
+             */
+            value?: unknown;
+        };
+        /**
+         * WsContextBreakdown
+         * @description Per-category token breakdown within a ``context_info`` frame.
+         */
+        WsContextBreakdown: {
+            /** Files */
+            files: number;
+            /** Messages */
+            messages: number;
+            /** Other */
+            other: number;
+            /** System */
+            system: number;
+            /** Tool Results */
+            tool_results: number;
+            /** Tools */
+            tools: number;
+        };
+        /**
+         * WsContextCompressionDone
+         * @description Context compression completed successfully.
+         */
+        WsContextCompressionDone: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Messages Summarized */
+            messages_summarized: number;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Summary Message Id
+             * @default null
+             */
+            summary_message_id?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "context_compression_done";
+        };
+        /**
+         * WsContextCompressionFailed
+         * @description Context compression failed; the turn continues uncompressed.
+         */
+        WsContextCompressionFailed: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "context_compression_failed";
+        };
+        /**
+         * WsContextCompressionStart
+         * @description Context compression is about to begin.
+         */
+        WsContextCompressionStart: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "context_compression_start";
+        };
+        /**
+         * WsContextInfo
+         * @description Current context-window utilisation snapshot.
+         */
+        WsContextInfo: {
+            /** Available */
+            available: number;
+            /** @default null */
+            breakdown?: components["schemas"]["WsContextBreakdown"] | null;
+            /** Context Window */
+            context_window: number;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Is Estimated
+             * @default false
+             */
+            is_estimated?: boolean;
+            /** Messages Summarized */
+            messages_summarized: number;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Percentage */
+            percentage: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "context_info";
+            /** Used */
+            used: number;
+            /** Was Compressed */
+            was_compressed: boolean;
+        };
+        /**
+         * WsDone
+         * @description Final turn frame (built in chat ``_persist`` after the DB commit).
+         */
+        WsDone: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Finish Reason */
+            finish_reason: string;
+            /** Message Id */
+            message_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "done";
+            /** User Message Id */
+            user_message_id: string;
+            /**
+             * Version Group Id
+             * @default null
+             */
+            version_group_id?: string | null;
+            /** Version Index */
+            version_index: number;
+        };
+        /**
+         * WsEmailReceived
+         * @description A new email arrived in a monitored folder.
+         */
+        WsEmailReceived: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Folder
+             * @default INBOX
+             */
+            folder?: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "email.received";
+        };
+        /**
+         * WsEmailSent
+         * @description An outbound email was sent.
+         */
+        WsEmailSent: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Message Id
+             * @default null
+             */
+            message_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "email.sent";
+        };
+        /**
+         * WsError
+         * @description A hard error that terminated the turn.
+         */
+        WsError: {
+            /** Content */
+            content: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error";
+        };
+        /**
+         * WsHeartbeat
+         * @description Periodic liveness frame pushed when the client is idle.
+         */
+        WsHeartbeat: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "heartbeat";
+        };
+        /**
+         * WsInteractionRequested
+         * @description An interaction (confirmation / client tool / clarification) was requested.
+         */
+        WsInteractionRequested: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "tool_confirmation" | "client_tool_call" | "ask_user";
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Tool Name
+             * @default null
+             */
+            tool_name?: string | null;
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "interaction.requested";
+        };
+        /**
+         * WsInteractionResolved
+         * @description An in-flight interaction completed (or was cancelled/timed-out).
+         */
+        WsInteractionResolved: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "tool_confirmation" | "client_tool_call" | "ask_user";
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "approved" | "rejected" | "answered" | "executed" | "timeout" | "cancelled" | "disconnected" | "failed";
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "interaction.resolved";
+        };
+        /**
+         * WsKnowledgeStatus
+         * @description The composite knowledge backend reported its readiness.
+         */
+        WsKnowledgeStatus: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Memory Enabled
+             * @default null
+             */
+            memory_enabled?: boolean | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Ready
+             * @default null
+             */
+            ready?: boolean | null;
+            /**
+             * Reason
+             * @default null
+             */
+            reason?: string | null;
+            /**
+             * Tool Rag Enabled
+             * @default null
+             */
+            tool_rag_enabled?: boolean | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "knowledge.status";
+        };
+        /**
+         * WsLlmRequery
+         * @description The tool loop is making another LLM call after tool execution.
+         */
+        WsLlmRequery: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Iteration */
+            iteration: number;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "llm_requery";
+        };
+        /**
+         * WsMcpServerConnected
+         * @description An MCP server successfully connected.
+         */
+        WsMcpServerConnected: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Server
+             * @default null
+             */
+            server?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "mcp.server.connected";
+        };
+        /**
+         * WsMcpServerDisconnected
+         * @description An MCP server disconnected.
+         */
+        WsMcpServerDisconnected: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Reason
+             * @default null
+             */
+            reason?: string | null;
+            /**
+             * Server
+             * @default null
+             */
+            server?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "mcp.server.disconnected";
+        };
+        /**
+         * WsModelDownloadProgress
+         * @description Progress update for an in-flight model download.
+         *
+         *     Payload forwarded verbatim from the bus; ``extra='allow'`` because the
+         *     downloader may add fields without a synchronized schema bump.
+         */
+        WsModelDownloadProgress: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Downloaded Bytes
+             * @default null
+             */
+            downloaded_bytes?: number | null;
+            /**
+             * Error
+             * @default null
+             */
+            error?: string | null;
+            /**
+             * File
+             * @default null
+             */
+            file?: string | null;
+            /**
+             * Model Id
+             * @default null
+             */
+            model_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Phase
+             * @default null
+             */
+            phase?: string | null;
+            /**
+             * Service
+             * @default null
+             */
+            service?: string | null;
+            /**
+             * Total Bytes
+             * @default null
+             */
+            total_bytes?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "service.model_download_progress";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * WsNoteCreated
+         * @description A new note was created.
+         */
+        WsNoteCreated: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Note Id
+             * @default null
+             */
+            note_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Title
+             * @default null
+             */
+            title?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "note.created";
+        };
+        /**
+         * WsNoteDeleted
+         * @description A note was deleted.
+         */
+        WsNoteDeleted: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Note Id
+             * @default null
+             */
+            note_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "note.deleted";
+        };
+        /**
+         * WsNoteUpdated
+         * @description An existing note was updated.
+         */
+        WsNoteUpdated: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Note Id
+             * @default null
+             */
+            note_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "note.updated";
+        };
+        /**
+         * WsPermissionModeUpdated
+         * @description The permission tier changed for a conversation.
+         *
+         *     ``mode`` is a Literal (not the ``PermissionMode`` enum) to avoid a
+         *     ``$defs`` name collision with the REST component of the same name;
+         *     ``test_mode_literal_matches_enum`` pins the two in sync.
+         */
+        WsPermissionModeUpdated: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "strict" | "auto_edits" | "plan" | "autopilot";
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "permission_mode.updated";
+        };
+        /**
+         * WsPing
+         * @description Keep-alive ping from the client; server replies with ``pong``.
+         */
+        WsPing: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ping";
+        };
+        /**
+         * WsPlanDocumentUpdated
+         * @description The agent wrote or edited the plan document for a conversation.
+         */
+        WsPlanDocumentUpdated: {
+            /** Body */
+            body: string;
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "plan_document.updated";
+            /**
+             * Updated At
+             * @default null
+             */
+            updated_at?: string | null;
+        };
+        /**
+         * WsPong
+         * @description Reply to a client ``ping``.
+         */
+        WsPong: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "pong";
+        };
+        /**
+         * WsScopeUpdated
+         * @description The workspace scope (allowed folders) changed for a conversation.
+         */
+        WsScopeUpdated: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Folders */
+            folders: string[];
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "scope.updated";
+        };
+        /**
+         * WsServiceStatus
+         * @description A backend service changed its readiness status.
+         */
+        WsServiceStatus: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Detail
+             * @default null
+             */
+            detail?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Service */
+            service: string;
+            /** Status */
+            status: string;
+            /**
+             * Timestamp
+             * @default null
+             */
+            timestamp?: number | string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "service.status";
+        };
+        /**
+         * WsTaskStep
+         * @description One ordered step of a conversation task list (``update_plan``).
+         *
+         *     extra='allow' because the step dicts come from the agent's
+         *     ``update_plan`` tool and may grow.
+         */
+        WsTaskStep: {
+            /** Status */
+            status: string;
+            /** Step */
+            step: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * WsTasksUpdated
+         * @description The agent updated the mutable task list for a conversation.
+         */
+        WsTasksUpdated: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Steps */
+            steps: components["schemas"]["WsTaskStep"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tasks.updated";
+        };
+        /**
+         * WsTerminalAssigned
+         * @description A terminal session was assigned to a conversation.
+         */
+        WsTerminalAssigned: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Session Id */
+            session_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.assigned";
+        };
+        /**
+         * WsTerminalClosed
+         * @description A terminal session was closed.
+         */
+        WsTerminalClosed: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Exit Code
+             * @default null
+             */
+            exit_code?: number | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Session Id */
+            session_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.closed";
+        };
+        /**
+         * WsTerminalInput
+         * @description Keyboard input from the client destined for a PTY session.
+         */
+        WsTerminalInput: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Data */
+            data: string;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Session Id */
+            session_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.input";
+        };
+        /**
+         * WsTerminalOutput
+         * @description PTY output data from a terminal session.
+         */
+        WsTerminalOutput: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Data */
+            data: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Session Id */
+            session_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.output";
+        };
+        /**
+         * WsTerminalRenamed
+         * @description A terminal session was given a new title.
+         */
+        WsTerminalRenamed: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Session Id */
+            session_id: string;
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.renamed";
+        };
+        /**
+         * WsTerminalResize
+         * @description Terminal resize notification from the client.
+         */
+        WsTerminalResize: {
+            /** Cols */
+            cols: number;
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Rows */
+            rows: number;
+            /** Session Id */
+            session_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.resize";
+        };
+        /**
+         * WsTerminalSession
+         * @description JSON snapshot of a live terminal session (``session.snapshot()``).
+         */
+        WsTerminalSession: {
+            /** Agent Assigned */
+            agent_assigned: boolean;
+            /** Alive */
+            alive: boolean;
+            /** Cols */
+            cols: number;
+            /** Conversation Id */
+            conversation_id: string;
+            /** Created At */
+            created_at: string;
+            /** Cwd */
+            cwd: string;
+            /** Id */
+            id: string;
+            /**
+             * Pid
+             * @default null
+             */
+            pid?: number | null;
+            /** Rows */
+            rows: number;
+            /** Title */
+            title: string;
+        };
+        /**
+         * WsTerminalSessionOpened
+         * @description A new terminal session was opened.
+         */
+        WsTerminalSessionOpened: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            session: components["schemas"]["WsTerminalSession"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "terminal.session_opened";
+        };
+        /**
+         * WsThinking
+         * @description A reasoning/thinking token from the LLM (extended thinking mode).
+         */
+        WsThinking: {
+            /** Content */
+            content: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "thinking";
+        };
+        /**
+         * WsToken
+         * @description A single streamed token from the LLM.
+         */
+        WsToken: {
+            /** Content */
+            content: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "token";
+        };
+        /**
+         * WsToolCallFunction
+         * @description The function sub-object of a raw LLM tool-call stream forward.
+         */
+        WsToolCallFunction: {
+            /** Arguments */
+            arguments: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * WsToolCallStream
+         * @description LLM requested a tool (raw stream forward, pre-execution).
+         */
+        WsToolCallStream: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            function: components["schemas"]["WsToolCallFunction"];
+            /** Id */
+            id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_call";
+        };
+        /**
+         * WsToolConfirmationRequired
+         * @description The turn executor needs the user to approve a risky tool call.
+         */
+        WsToolConfirmationRequired: {
+            /**
+             * Allow Remember
+             * @default true
+             */
+            allow_remember?: boolean;
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Description */
+            description: string;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Reasoning
+             * @default null
+             */
+            reasoning?: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "safe" | "medium" | "dangerous" | "forbidden";
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_confirmation_required";
+        };
+        /**
+         * WsToolConfirmationResponse
+         * @description User response to a ``tool_confirmation_required`` request.
+         */
+        WsToolConfirmationResponse: {
+            /** Approved */
+            approved: boolean;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Remember
+             * @default none
+             * @enum {string}
+             */
+            remember?: "none" | "session" | "persistent";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_confirmation_response";
+        };
+        /**
+         * WsToolExecutionDone
+         * @description The tool executor finished running a tool.
+         */
+        WsToolExecutionDone: {
+            /**
+             * Artifact Id
+             * @default null
+             */
+            artifact_id?: string | null;
+            /**
+             * Content Type
+             * @default null
+             */
+            content_type?: string | null;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Result */
+            result: string;
+            /** Success */
+            success: boolean;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_execution_done";
+        };
+        /**
+         * WsToolExecutionStart
+         * @description The tool executor began running a tool.
+         */
+        WsToolExecutionStart: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_execution_start";
+        };
+        /**
+         * WsToolProgress
+         * @description Incremental progress; tools merge arbitrary extra keys (extra=allow).
+         */
+        WsToolProgress: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Elapsed S
+             * @default null
+             */
+            elapsed_s?: number | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Label
+             * @default null
+             */
+            label?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Percent
+             * @default null
+             */
+            percent?: number | null;
+            /**
+             * Phase
+             * @default null
+             */
+            phase?: string | null;
+            /**
+             * Step
+             * @default null
+             */
+            step?: number | null;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * Total
+             * @default null
+             */
+            total?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_progress";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * WsTurnFinished
+         * @description The turn has finished; summary statistics follow.
+         */
+        WsTurnFinished: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Finish Reason
+             * @default null
+             */
+            finish_reason?: string | null;
+            /** Input Tokens */
+            input_tokens: number;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Output Tokens */
+            output_tokens: number;
+            /** Steps */
+            steps: number;
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.finished";
+        };
+        /**
+         * WsTurnLlmStep
+         * @description The turn executor began an LLM step.
+         */
+        WsTurnLlmStep: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Step */
+            step: number;
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.llm_step";
+        };
+        /**
+         * WsTurnStarted
+         * @description A new turn has started processing.
+         */
+        WsTurnStarted: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.started";
+        };
+        /**
+         * WsTurnToolCall
+         * @description The turn executor dispatched a tool call.
+         */
+        WsTurnToolCall: {
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Tool Name */
+            tool_name: string;
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool.call";
+        };
+        /**
+         * WsTurnToolResult
+         * @description A tool returned its result to the turn executor.
+         */
+        WsTurnToolResult: {
+            /**
+             * Artifact Id
+             * @default null
+             */
+            artifact_id?: string | null;
+            /**
+             * Content Type
+             * @default null
+             */
+            content_type?: string | null;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Execution Id */
+            execution_id: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Result */
+            result: string;
+            /** Success */
+            success: boolean;
+            /** Tool Name */
+            tool_name: string;
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool.result";
+        };
+        /**
+         * WsTurnUsage
+         * @description Per-step token usage snapshot emitted by the turn executor.
+         */
+        WsTurnUsage: {
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Max Steps */
+            max_steps: number;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /** Output Tokens */
+            output_tokens: number;
+            /** Step */
+            step: number;
+            /** Tool Calls */
+            tool_calls: number;
+            /** Turn Id */
+            turn_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.usage";
+        };
+        /**
+         * WsUserMessage
+         * @description A plain user message — the UNTAGGED chat frame.
+         *
+         *     Deliberately NOT part of :data:`ChatClientMessage`: the wire format has
+         *     no ``type`` key (the channel pump treats any unrecognized frame as a
+         *     user message). Exported as a named component for the FE send payload.
+         */
+        WsUserMessage: {
+            /**
+             * Attachments
+             * @default null
+             */
+            attachments?: string[] | null;
+            /** Content */
+            content: string;
+            /**
+             * Conversation Id
+             * @default null
+             */
+            conversation_id?: string | null;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Edit Message Id
+             * @default null
+             */
+            edit_message_id?: string | null;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+        };
+        /**
+         * WsWarning
+         * @description A non-fatal warning from the turn executor.
+         */
+        WsWarning: {
+            /** Content */
+            content: string;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "warning";
+        };
+        /**
          * _ExecuteRequest
          * @description Body schema for ``POST /plugins/execute``.
          */
@@ -3062,7 +5001,7 @@ export interface components {
              * Folder
              * @default INBOX
              */
-            folder: string;
+            folder?: string;
             /** Limit */
             limit?: number | null;
             /** Query */
@@ -3087,7 +5026,7 @@ export interface components {
              * Limit
              * @default 10
              */
-            limit: number;
+            limit?: number;
             /** Query */
             query: string;
         };

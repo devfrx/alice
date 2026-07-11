@@ -6,6 +6,8 @@
  * them via REST + a WebSocket ``artifact.created`` event.
  */
 
+import type { ApiSchema } from './generated'
+
 /**
  * Kinds of persisted artifacts. Currently limited to the two CAD pipelines
  * exposed by the backend; future kinds (image / audio / chart / whiteboard)
@@ -56,11 +58,5 @@ export interface ArtifactListQuery {
   offset?: number
 }
 
-/** Payload of the global ``artifact.created`` WebSocket event. */
-export interface ArtifactCreatedEvent {
-  type: 'artifact.created'
-  artifact_id: string
-  kind: ArtifactKind
-  conversation_id: string
-  title: string
-}
+/** Generated from the backend WS contract — do not redefine locally. */
+export type ArtifactCreatedEvent = ApiSchema<'WsArtifactCreated'>

@@ -528,6 +528,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ws_connection_manager = WSConnectionManager()
     ctx.ws_connection_manager = ws_connection_manager
+    from backend.api.ws_schema.guard import events_frame_validator
+
+    ws_connection_manager.set_frame_validator(events_frame_validator)
 
     # -- Bridge MCP events to the events WebSocket ----------------------
     async def _forward_mcp_connected(**kwargs):

@@ -65,7 +65,8 @@ const OUTCOME_GLYPH: Record<InteractionOutcome, string> = {
   executed: 'eseguito',
   failed: 'fallito',
   cancelled: 'annullato',
-  timeout: 'scaduto'
+  timeout: 'scaduto',
+  disconnected: 'disconnesso'
 }
 const KIND_LABEL: Record<InteractionActivity['kind'], string> = {
   tool_confirmation: 'conferma',

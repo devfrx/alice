@@ -107,7 +107,7 @@ export const usePlanDocumentStore = defineStore('planDocument', () => {
     if (msg.body) {
       byConversation.value = {
         ...byConversation.value,
-        [msg.conversation_id]: { title: msg.title, body: msg.body, updatedAt: msg.updated_at },
+        [msg.conversation_id]: { title: msg.title, body: msg.body, updatedAt: msg.updated_at ?? null },
       }
     } else {
       clearDocument(msg.conversation_id)

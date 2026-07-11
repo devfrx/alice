@@ -356,6 +356,44 @@ class PermissionService:
             return GateDecision.confirm()
         return GateDecision.allow()
 
+    def explain_denial(
+        self,
+        *,
+        tool_name: str,
+        args: dict[str, object],
+        tool_def: ToolDefinition | None,
+        conversation_id: str,
+        mode: PermissionMode | None,
+    ) -> str | None:
+        """Gate one call for surfaces that have no confirmation UI (Fase 8).
+
+        Same policy as a normal turn (spec §4.5: no privileged path), but a
+        ``NEEDS_CONFIRMATION`` verdict is a *denial* here: headless surfaces
+        (sub-agents, autonomous turns) have no user to ask — the Fase 7
+        clean-result philosophy.
+
+        Returns:
+            ``None`` when the call may run, else a human-readable reason.
+        """
+        if mode is None:
+            mode = PermissionMode.STRICT
+        decision = self.decide(
+            tool_name=tool_name,
+            args=args,
+            tool_def=tool_def,
+            conversation_id=conversation_id,
+            mode=mode,
+        )
+        if decision.action is GateAction.ALLOW:
+            return None
+        if decision.action is GateAction.NEEDS_CONFIRMATION:
+            return (
+                f"Tool '{tool_name}' requires user confirmation, which is "
+                "not available in this context."
+            )
+        reason = f" ({decision.reason})" if decision.reason else ""
+        return f"Tool '{tool_name}' denied by permission policy{reason}."
+
     def _decide_ui_command(
         self,
         args: dict[str, object],

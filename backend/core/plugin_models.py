@@ -20,6 +20,11 @@ MAX_TOOL_DESCRIPTION_LENGTH: int = 1024
 MAX_TOOL_RESULT_LENGTH: int = 15_000
 PLUGIN_API_VERSION: str = "1.0.0"
 
+#: Pseudo owner recorded in the catalog's tool→plugin map for kernel-owned
+#: tools (spec §7: ``app_command`` belongs to the kernel, not a plugin). The
+#: availability probe treats this owner as always connected.
+KERNEL_TOOL_OWNER = "kernel"
+
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------

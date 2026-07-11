@@ -373,6 +373,25 @@ class PermissionsConfig(BaseSettings):
     user, never the model) overrides this default."""
 
 
+class CommandsConfig(BaseSettings):
+    """Command Bridge policy (Fase 7, spec §7).
+
+    Governs the kernel-owned ``app_command`` tool and the events-WS command
+    RPC. ``disabled_commands`` is the per-command denylist the spec calls
+    "allowlist configurabile per comando": a listed command is dropped at
+    manifest ingestion and refused at call time.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_COMMANDS__")
+
+    enabled: bool = True
+    """Master switch for the Command Bridge (tool + manifest ingestion)."""
+    rpc_timeout_s: float = 10.0
+    """Seconds the ``app_command`` tool waits for the UI's command.result."""
+    disabled_commands: list[str] = Field(default_factory=list)
+    """Command names never callable by the agent, regardless of manifest."""
+
+
 class WorkspaceScopeConfig(BaseSettings):
     """Workspace-scope policy for tool filesystem confinement (Fase 6)."""
 
@@ -1322,6 +1341,7 @@ class AliceConfig(BaseSettings):
     permissions: PermissionsConfig = Field(
         default_factory=PermissionsConfig
     )
+    commands: CommandsConfig = Field(default_factory=CommandsConfig)
     scope: WorkspaceScopeConfig = Field(default_factory=WorkspaceScopeConfig)
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)

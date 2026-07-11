@@ -2475,6 +2475,28 @@ export interface components {
         ChatClientMessage: components["schemas"]["WsCancel"] | components["schemas"]["WsToolConfirmationResponse"] | components["schemas"]["WsClientToolResult"] | components["schemas"]["WsAskUserResponse"];
         ChatServerMessage: components["schemas"]["WsToken"] | components["schemas"]["WsThinking"] | components["schemas"]["WsToolCallStream"] | components["schemas"]["WsError"] | components["schemas"]["WsDone"] | components["schemas"]["WsToolExecutionStart"] | components["schemas"]["WsToolExecutionDone"] | components["schemas"]["WsToolProgress"] | components["schemas"]["WsContextInfo"] | components["schemas"]["WsContextCompressionStart"] | components["schemas"]["WsContextCompressionDone"] | components["schemas"]["WsContextCompressionFailed"] | components["schemas"]["WsLlmRequery"] | components["schemas"]["WsWarning"] | components["schemas"]["WsToolConfirmationRequired"] | components["schemas"]["WsClientToolCall"] | components["schemas"]["WsAskUserRequired"] | components["schemas"]["WsTurnStarted"] | components["schemas"]["WsTurnLlmStep"] | components["schemas"]["WsTurnToolCall"] | components["schemas"]["WsTurnToolResult"] | components["schemas"]["WsInteractionRequested"] | components["schemas"]["WsInteractionResolved"] | components["schemas"]["WsTurnUsage"] | components["schemas"]["WsTurnFinished"] | components["schemas"]["WsAgentCriticInvoked"] | components["schemas"]["WsAgentWarning"];
         /**
+         * CommandManifestEntry
+         * @description One agent-exposable UI command, as declared by the frontend registry.
+         *
+         *     The manifest is the THIRD generated contract (spec §7): this model rides
+         *     the same OpenAPI-injection pipeline as the channel unions.
+         */
+        CommandManifestEntry: {
+            /** Args Schema */
+            args_schema?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "navigation" | "read" | "mutate" | "destructive";
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+        };
+        /**
          * ConversationExport
          * @description Full conversation export (REST response body and backup file schema).
          */
@@ -2629,8 +2651,8 @@ export interface components {
              */
             observations?: string[];
         };
-        EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"];
-        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsArtifactBulkDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
+        EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"] | components["schemas"]["WsCommandManifest"] | components["schemas"]["WsCommandResult"];
+        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsArtifactBulkDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"] | components["schemas"]["WsCommandRequest"];
         /**
          * ExportedAttachment
          * @description One attachment inside an exported message.
@@ -3716,6 +3738,104 @@ export interface components {
              * @enum {string}
              */
             type: "client_tool_result";
+        };
+        /**
+         * WsCommandManifest
+         * @description The frontend's agent-exposable command manifest.
+         *
+         *     Sent on events-WS connect and whenever the exposed set changes. It
+         *     REPLACES the backend's previous manifest wholesale.
+         */
+        WsCommandManifest: {
+            /** Commands */
+            commands?: components["schemas"]["CommandManifestEntry"][];
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "command.manifest";
+        };
+        /**
+         * WsCommandRequest
+         * @description Command Layer RPC (spec §7): the kernel asks the UI to run a command.
+         *
+         *     First real consumer of the envelope's ``correlation_id``: REQUIRED here
+         *     (narrowed from the envelope's optional default) — the bridge always sets
+         *     it and the client MUST echo it verbatim on the matching
+         *     ``command.result`` frame. ``origin`` defaults to ``agent`` because the
+         *     request is issued on the agent's behalf inside a turn.
+         */
+        WsCommandRequest: {
+            /** Args */
+            args?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Conversation Id
+             * @default null
+             */
+            conversation_id?: string | null;
+            /** Correlation Id */
+            correlation_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @default agent
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "command.request";
+        };
+        /**
+         * WsCommandResult
+         * @description The UI's response to a ``command.request``.
+         *
+         *     ``correlation_id`` must echo the request's id verbatim — REQUIRED here
+         *     (narrowed from the envelope's optional default) so a missing echo is a
+         *     validation error, not a silently dropped frame.
+         */
+        WsCommandResult: {
+            /** Correlation Id */
+            correlation_id: string;
+            /**
+             * Error
+             * @default null
+             */
+            error?: string | null;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Origin
+             * @default user
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Result
+             * @default null
+             */
+            result?: unknown;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "command.result";
         };
         /**
          * WsConfigChanged

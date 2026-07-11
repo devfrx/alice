@@ -380,6 +380,11 @@ class ToolRegistryProtocol(Protocol):
     async def get_relevant_tools(
         self, query: str, k: int,
     ) -> list[dict[str, Any]]: ...
+    async def register_kernel_tool(
+        self, tool_def: ToolDefinition, handler: Any,
+    ) -> None:
+        """Register (or replace) a kernel-owned tool (spec §7)."""
+        ...
 
 
 # ---------------------------------------------------------------------------

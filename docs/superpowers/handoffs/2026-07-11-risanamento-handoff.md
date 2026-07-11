@@ -1,203 +1,176 @@
-# Handoff — Risanamento architetturale AL\CE (stato al 2026-07-11, post-Fase 6)
+# Handoff — Risanamento architetturale AL\CE (stato al 2026-07-11, post-Fase 7)
 
 > Per la sessione che continua questo lavoro a contesto fresco/compattato. Contiene SOLO ciò che
 > non è ricostruibile dal repo: stato, decisioni, gotchas pagati sul campo, recon da fare.
 > Fonti di verità nel repo: spec e piani citati sotto. Questo file SOSTITUISCE la versione
-> precedente (post-fase5, `2026-07-10-risanamento-handoff.md`); la storia è in git.
+> precedente (post-fase6, stesso path); la storia è in git.
 
 ## Stato del programma
 
 - **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9. È LA fonte di verità.
-- **Fasi 1a, 1b, 2, 3, 4, 5, 6: COMPLETE, PUSHATE e MERGIATE in `main`** (2026-07-11, richiesta
-  utente): merge sequenziali `--no-ff` uno per fase — `f0b0e94` (1a) → `6d250c3` (1b) → `9d24717`
-  (2) → `a5197d4` (3) → `921dd02` (4) → `e90f166` (5) → `5aa2660` (6, HEAD di main; contenuto
-  identico a `arch/fase6-frontend`, diff vuoto verificato). I branch `arch/fase*` esistono anche
-  su origin.
-- **Fase 6 (Frontend): COMPLETATA** — review finale di fase «Phase ready with notes», finding
-  applicati sul branch. Piano chiuso e veritiero con esiti review per task + verdetto finale +
-  backlog consolidato: `docs/superpowers/plans/2026-07-10-fase6-frontend.md`.
-- Pending esterni: chip/task `task_6c67e5a8` (fix suite lenta); CI `contracts.yml` partita per la
-  PRIMA volta coi push su main del 2026-07-11 (7 run, windows-latest) — VERIFICARE su GitHub che
-  siano verdi (contratti backend, import-linter, check-contracts, typecheck + lint + vitest FE).
-- **Smoke funzionale interattivo (npm run dev) NON eseguito in fase 6** — da fare alla prima
-  apertura dell'app (checklist nel gate finale del piano: apre su /assistant, /terminal funziona,
-  deep-link legacy redirigono, conversazione dalla sidebar via command layer).
+- **Fasi 1a, 1b, 2, 3, 4, 5, 6: COMPLETE e MERGIATE in `main`** (merge sequenziali `--no-ff`,
+  ultimo `5aa2660`; correzione Workspace `bbd05cb` = HEAD di main). Branch `arch/fase*` anche su origin.
+- **Fase 7 (Command Bridge): COMPLETA su `arch/fase7-command-bridge`** (base `bbd05cb` = main,
+  HEAD `a55bc1f`) — **NON pushata, NON mergiata**: la politica di merge la decide l'utente volta
+  per volta. Review finale di fase: «Phase ready with notes», note applicate. Piano chiuso e
+  veritiero con esiti review per task + verdetto finale + backlog:
+  `docs/superpowers/plans/2026-07-11-fase7-command-bridge.md`.
+- Pending esterni: CI `contracts.yml` da verificare su GitHub per i push di main del 2026-07-11;
+  chip/task `task_6c67e5a8` (fix suite lenta); **smoke funzionale interattivo MAI eseguito**
+  (né fase 6 né 7): alla prima `npm run dev` fare ENTRAMBE le checklist (gate finale piano fase 6
+  + step 9.6 piano fase 7).
 
-## Cosa ha consegnato la Fase 6 (mappa rapida, dettagli nel piano)
+## Cosa ha consegnato la Fase 7 (mappa rapida, dettagli e esiti review nel piano)
 
-- **⚠️ CORRETTO IL 2026-07-11**: la fase 6 aveva rimosso TUTTO lo stack Workspace interpretando
-  male "Horizon unica superficie" — **errore**: il Workspace (tiling + moduli per-conversazione)
-  è superficie DI PRODOTTO della visione Jarvis (la spec §7 presuppone `panel.open`); "rimozione
-  orb-era" = SOLO dead code orb. **Ripristinato in `fix/restore-workspace` (`ec3cf1a`)**: file
-  verbatim dal pre-rimozione adattati ai seam di fase 6 — ui.mode+MODE_ROUTES di nuovo vivi
-  ACCANTO a sidebarWidth, `/` → `/workspace`, comandi mode-aware (`conversation.open/new`
-  atterrano su `ui.mode`, `view.switch` include workspace), icone orb/hybrid-panel/modules e CSS
-  chat-edge ripristinati, TaskStrip.spec migrato a `tasksApi`. Review del ripristino: Approved.
-  Restano rimossi SOLO i morti veri (ModeSwitcher, 3 componenti voice orfani, keyframes orb).
-  Della fase 6 restano validi: `/terminal` standalone (convive col TerminalModule del workspace),
-  `DockedSidebar` in `components/sidebar/` su `ui.sidebarWidth`.
-- **Client REST per dominio**: `services/api.ts` (988 righe) → package `services/api/` (`http.ts`
-  core + 17 moduli dominio + barrel `index.ts`). 93/93 metodi mossi verbatim, 39 importer migrati
-  (spec inclusi, mock per namespace), NESSUN oggetto `api` legacy. Unica modifica: 6 mutazioni KG
-  tipizzate `KGMutationResponse`. Il PATH `services/api` resta valido (directory index).
-- **Dispatcher chat-WS esaustivo** (`useChat.ts`): `ChatHandlerMap` mapped-type su
-  `ChatServerMessage['type']` (27 chiavi), zero cast nei corpi. `WebSocketManager` ha `onFrame`/
-  `offFrame` tipizzati; l'emitter generico a stringhe RESTA per il secondo instance del canale
-  VOCE (`useVoice.ts`, vocabolario fuori contratto) ma è SOPPRESSO sul singleton chat quando c'è
-  un frame-handler (altrimenti un frame `error` corrompeva connectionStatus — fix da review).
-- **Command Registry** (`src/renderer/src/commands/`): CommandDefinition con capability tag §7 +
-  `exposeToAgent` default-false (seam anti-escalation, TESTATO); 5 core commands (view.switch,
-  conversation.open/new, sidebar.toggle, artifact.show); install IDEMPOTENTE da App.vue (unregister
-  + register: un guard di presenza terrebbe closure stantie sotto HMR); AppSidebar E ArtifactCard
-  passano dal registry. Manifest/app_command = fase 7.
-- **Eventi artifacts**: frame `artifact.bulk_deleted` (`WsArtifactBulkDeleted`, conversation_id
-  nullable = wipe totale) emesso da delete_for_conversation (anche su soli pinned-detach) e
-  delete_all; FE `applyBulkDeleted` (rimozione + detach pinned locale). `artifact.updated` ora
-  invalida ANCHE la cache contenuti (`applyArtifactUpdated`) → live-update whiteboard, con fix
-  critici da review in TldrawCanvas: fallback via store (non api raw), debounce 1500ms CANCELLATO
-  all'unmount (rischio revert silenzioso degli edit agente), recheck post-mount, echo-guard JSON.
-- **CAD**: `export_url` rimosso dai METADATA artifact (derivabile da `download_url` computed);
-  payload live del turno e route legacy `/api/cad/models/{name}` INVARIATI (l'artifact id nasce
-  solo in tool_loop.py:636). `AgentTier` = alias `ApiSchema<'PermissionMode'>`.
-- **Lint SANATO**: `npm run lint` = exit 0 con 0 errori e 0 warning. `endOfLine: auto`,
-  riformattazione completa (169 file), override triple-slash per `*.d.ts`, 12 errori veri corretti
-  (parametri provati morti rimossi: `_strokeWidth`, `_userMessageId`), 3 `v-html` giustificati con
-  verifica del pipeline (markdown-it `html:false`). CI: `npm run lint` + `npm test` in
-  contracts.yml. Suite vitest: 21 file / 162 test (nuovi: commands 10, memory store 9).
+- **Contratto WS Command Layer**: frame `command.request` (server→client, `origin="agent"`,
+  `correlation_id` OBBLIGATORIO — primo consumatore reale del campo riservato in 1b),
+  `command.result` e `command.manifest` (client→server) + `CommandManifestEntry` in
+  `api/ws_schema/events.py`; vocabolari congelati aggiornati; il manifest è il TERZO contratto
+  e viaggia nella stessa pipeline codegen (nessuna modifica alla pipeline: hoisting automatico
+  via unioni).
+- **Kernel tools**: meccanismo generico in `core/tools/` — `ToolCatalog.register_kernel_tool`
+  (nome BARE, owner fittizio `KERNEL_TOOL_OWNER="kernel"` in `plugin_models.py`, sopravvive ai
+  refresh e vince le collisioni), probe availability short-circuit su owner kernel, dispatch
+  dedicato nell'executor (stessa pipeline timeout/validazione/sanitizzazione), facade+protocol.
+- **`CommandBridgeService`** (`services/command_bridge.py`, gruppo `workspace`): manifest store
+  con **anti-escalation STRUTTURALE** (grammatica `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$` +
+  NFKC+strip PRIMA del check sui domini guardrail `permission|permissions|permission_mode|scope|
+  guardrail|guardrails`; capability fuori vocabolario respinte; `commands.disabled_commands`);
+  RPC pending-future su `correlation_id` (broadcast → `wait_for` con `commands.rpc_timeout_s`,
+  default 10s < `timeout_ms` 30s del tool); OGNI fallimento è un risultato pulito ("UI not
+  available", "Unknown command…", timeout) — mai eccezioni; a bridge disabilitato il manifest è
+  IGNORATO (early-return: niente ingestione né registrazione tool). A ogni manifest il tool
+  `app_command` viene RI-registrato con enum dei nomi nei parameters (l'executor valida gratis)
+  e `usage_guidance` che elenca i comandi.
+- **Gating**: `PermissionService.decide` step "2-bis" — tag statico `ui_command`, capability
+  EFFETTIVA per-call risolta via `command_capability_provider` (= `bridge.capability_of`).
+  Matrice §7: navigation/read ALLOW ovunque (plan incluso); mutate/destructive DENY in plan,
+  CONFIRM in strict; auto_edits ALLOW mutate / CONFIRM destructive; autopilot ALLOW; ignoto →
+  destructive (fail-conservative). Un IBRIDO `ui_command`+fs/exec NON prende il ramo: cade nel
+  confinamento scope (il tag non scavalca mai il guard by-construction).
+- **Wiring**: `WorkspaceServices.command_bridge_service` + property ctx; bridge creato in
+  `stage_workspace` PRIMA di PermissionService; `app_command` registrato al boot con manifest
+  vuoto se `commands.enabled`; route events valida l'inbound con `validate_events_client` e
+  smista manifest/result al bridge (frame invalidi = drop loggato, mai socket giù).
+- **Frontend**: `commands/bridge.ts` (proiezione manifest SOLO `exposeToAgent===true` + doppio
+  check a esecuzione — anti-escalation su entrambi i lati), `commands/validate.ts` (validatore
+  JSON-Schema-subset senza dipendenze, semantica own-property contro prototype-chain tricks,
+  fallback "no-args" per comandi senza schema), handler `command.request` nel dispatcher
+  esaustivo, manifest inviato a OGNI onopen. 4 comandi core esposti con `description`
+  machine-facing: `view.switch`, `conversation.open`, `conversation.new`, `artifact.show`
+  (`sidebar.toggle` resta UI-only). Config: `commands.{enabled,rpc_timeout_s,disabled_commands}`.
 
-## Decisioni registrate in Fase 6 (non rilitigare)
+## Decisioni registrate in Fase 7 (non rilitigare)
 
-1. **[CORRETTA il 2026-07-11] Due superfici chat di prodotto**: Workspace (`/workspace`, tiling
-   + moduli per-conversazione, primaria: `/` atterra lì, la Home è il suo stato vuoto) e Horizon
-   (`/assistant`, scena assistente). `ui.mode` (route-synced) traccia quale è attiva; le altre
-   feature sono route standalone (whiteboard, board, terminal…). Il Workspace NON è legacy e
-   NON va rimosso: è parte della visione Jarvis-like (decisione utente esplicita).
-2. **Niente barrel di compatibilità `api`**: i consumer usano i namespace di dominio; `BASE_URL`
-   e `request` sono interni al package (non nel barrel).
-3. **L'emitter generico di WebSocketManager sopravvive SOLO per il canale voce** (deviazione
-   accettata: la premessa "useChat unico registrante" valeva per il singleton, non per la classe);
-   migrare la voce e ritirarlo è backlog.
-4. **Install dei comandi idempotente** (mai presence-guard: closure stantie sotto HMR);
-   `exposeToAgent` default false; nessun comando guardrail sarà MAI exposable (invariante §7).
-5. **Dati azzerabili confermati**: nessuna migrazione localStorage (nuova chiave
-   `alice_sidebar_width`, le vecchie chiavi restano orfane).
-6. **Orphan-state whiteboard allargato agli errori di rete** (più sicuro del canvas bianco che
-   rischiava PATCH di snapshot quasi-vuoto su contenuto reale).
-7. Docstring/commenti in inglese; piano ed esiti in italiano.
+1. **Tool kernel via catalogo, non plugin**: la spec impone "di proprietà del kernel"; nessun
+   plugin fittizio — meccanismo kernel-tools nel catalogo con owner `kernel`.
+2. **Gating dinamico dentro `decide()`** (provider iniettato), NON middleware dedicato; la
+   conferma riusa ConfirmationMiddleware standard.
+3. **RPC via broadcast** sul canale events (app single-window; primo `command.result` vince,
+   duplicati no-op). `origin` di `command.result` resta default `user` (decisione contratto).
+4. **Validatore FE fatto in casa** (subset noto, zero dipendenze — niente ajv).
+5. Il test fase-6 "tutti exposeToAgent false" è stato DELIBERATAMENTE sostituito dal test
+   "insieme esposto == {i 4 core}" (fase 7 è la fase che espone).
+6. `always_offered=True` su `app_command`: superficie di protocollo; a manifest vuoto il tool
+   esiste e risponde pulito.
 
-## Prossimo lavoro: Fase 7 — Command Bridge (spec §7, riga 216)
+## Prossimo lavoro: Fase 8 — Fondamenta Jarvis (spec §8, riga 217)
 
-> **ATTENZIONE, collisione di nomi**: nel codice e nelle memorie esiste un ALTRO "Fase 7" — la
-> fase 7 del VECCHIO programma agent-rework (tiered permissions + scope + PTY terminal), GIÀ
-> MERGIATA in main via `20c952d` e ampiamente citata nei commenti ("Fase 7", "Fase 7 E1").
-> Qui "Fase 7" = la fase 7 del RISANAMENTO (Command Bridge). Non confonderle.
+Da scrivere con `writing-plans` su branch `arch/fase8-fondamenta-jarvis` (base: decisa
+dall'utente — main post-merge fase 7, o impilato su fase 7). Requisiti spec: `TriggerService`
+(turni autonomi da cron/eventi bus/hotword; filtro default su `origin=agent` contro
+l'auto-innesco), `AttentionService` (punto unico di decisione dell'iniziativa verso l'utente),
+task in background osservabili (eventi tipizzati di avanzamento, store `tasks`); voce e
+subagent ricondotti alla stessa policy di gating. Si posano INTERFACCE, non implementazioni
+ricche. Dipende da fasi 5 e 7 (entrambe complete).
 
-Da scrivere con `writing-plans` su branch `arch/fase7-command-bridge` (figlio di `main`, che dal
-2026-07-11 contiene tutte le fasi mergiate). Requisiti spec: tool `app_command(name, args)` di proprietà del kernel;
-manifest dei comandi come TERZO contratto (stessa pipeline di generazione/validazione); RPC
-backend→frontend con correlation_id + timeout + "UI non disponibile" come risultato pulito;
-gating permission-mode sui capability tag; **invariante anti-escalation strutturale** (comandi
-guardrail non registrabili come agent-callable). Dipende da fasi 5 e 6 (entrambe complete).
+### Recon fase 8 — note utili già verificate in fase 7
 
-Messaggio di kickoff della sessione (copiare tale e quale):
-«leggi specs, piano ed handoff della skill superpowers e continuiamo l'implementazione. /using-superpowers»
+- L'`origin` è su OGNI frame di entrambi i canali (default per classe base); `command.request`
+  porta già `origin="agent"` — il filtro anti-eco del TriggerService ha il dato che gli serve.
+- Lo store FE `tasks` + frame `tasks.updated` esistono già (agent run); il "task in background
+  osservabile" formalizzato è da disegnare sopra.
+- L'event bus (`core/event_bus.py`, `AliceEvent`) è il punto di aggancio dei trigger; i bridge
+  bus→WS vivono in `bootstrap/surfaces.py`, i callback di servizio in conversation/workspace.
+- Un turno autonomo "è un turno normale": l'ingresso oggi è solo il WS chat
+  (`api/routes/chat/ws.py` + `_assembly.py`); serve un seam per avviare turni senza socket chat
+  (l'`InteractionChannel` ha semantica di disconnessione — attenzione a conferme/ask_user in
+  turni headless: oggi la conferma richiede il canale chat; la fase 7 ha già il precedente
+  "UI not available" come risultato pulito).
+- Backlog fase 7 rilevante per fase 8: grant per-COMANDO, capability nel frame di conferma,
+  esenzione dedup per ui_command, hook change-notification del registry per il manifest.
 
-### Recon fase 7 — note utili già verificate in fase 6
+## Workflow collaudato (riusare così; raffinamenti fase 7 inclusi)
 
-- Il registry FE è pronto come seam: metadata serializzabili (name/title/capability/argsSchema/
-  exposeToAgent), `run` escluso naturalmente dalla proiezione manifest. MANCANO (backlog fase 6,
-  da piazzare nella fase): validazione runtime `argsSchema` nel bridge (execute NON valida — gli
-  args agente sono JSON non fidato) e campo `description` machine-facing per il manifest LLM.
-- L'events-WS ha già correlation_id nell'envelope (1b); il seam RPC backend→FE è NUOVO (oggi i WS
-  sono push-only): servono richiesta con correlation_id, attesa con timeout lato tool, risposta
-  client→server (il vocabolario client events oggi ha solo ping/terminal.* — andrà esteso).
-- `WsSendPayload` (frame invio chat) è senza `type` nel vocabolario client (decisione 1b):
-  se la fase 7 tocca il protocollo client→server, valutare la promozione a frame tipizzato.
-- Il circuito eventi FE è esaustivo compile-time: ogni frame nuovo → regen → chiave obbligatoria
-  nel dispatcher (garanzia collaudata due volte in fase 6).
-
-## Workflow collaudato (riusare così; raffinamenti fase 6 inclusi)
-
-- Per fase: branch dedicato → `writing-plans` (codice VERBATIM, comandi esatti) → `subagent-driven-development`:
-  implementer (sonnet) + spec reviewer (sonnet) + quality reviewer (modello top, SEMPRE) IN
-  PARALLELO dopo verifica del diff → fix loop → review finale di fase (modello top, range intero,
-  angolo = coerenza cross-task) → branch impilato, handoff aggiornato.
-- I nit banali e i fix enumerati con precisione li applica il CONTROLLER direttamente (gate scoped);
-  i fix che richiedono lettura/giudizio tornano all'IMPLEMENTER via SendMessage (mantiene il
-  contesto). Task di pura configurazione con gate auto-verificante → controller direttamente.
-- **Raffinamento fase 6**: nei prompt dei reviewer scrivere ESPLICITAMENTE "READ-ONLY, mai
-  npm install/ci" (un reviewer ha corrotto node_modules a metà fase); ai reviewer di RE-review
-  passare la lista puntata di cosa verificare per finding.
+- Per fase: branch dedicato → `writing-plans` (codice VERBATIM, comandi esatti) →
+  `subagent-driven-development`: implementer (sonnet) per task; spec review = CONTROLLER quando
+  il diff è verbatim-dal-piano (gate auto-verificanti); quality review (modello top) per i task
+  core/security; review FINALE di fase (top, range intero, angolo cross-task) SEMPRE.
+- I fix enumerati con precisione li applica il CONTROLLER direttamente; i fix che richiedono
+  giudizio tornano all'implementer via SendMessage. Task di pura configurazione con gate
+  auto-verificante → controller direttamente (fase 7: Task 7 regen).
+- **Raffinamento fase 7**: implementer e reviewer possono girare IN PARALLELO se su file
+  disgiunti; ma il controller NON committa mentre un implementer è attivo nello stesso worktree
+  (race sull'index git: un `git add` concorrente può far inghiottire file altrui al commit) —
+  applicare gli edit subito, DIFFERIRE il commit al rientro dell'agente. Dire agli agent di
+  IGNORARE (mai stage-are) i file altrui modificati nel working tree, e al reviewer di ignorare
+  le modifiche uncommitted.
 - Ogni fix di review aggiorna ANCHE il piano (esito per task, sempre); finding fuori task → backlog.
-- Le review trovano cose VERE anche a fase matura: in fase 6 un crash reale della superficie
-  primaria (RouterLink a route rinominata — MATCHER_NOT_FOUND al mount), una regressione di stato
-  (frame error → connectionStatus), un buco funzionale (live-update mai attiva su percorso
-  Horizon) e un rischio data-loss (debounce non cancellato). NON saltare i cicli, né la review
-  FINALE (ha colto il bypass del registry e una promessa di task caduta nel vuoto).
-- Commit convenzionali + trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`. Mai push senza richiesta.
+- Le review trovano cose VERE anche in fase matura — fase 7: bypass unicode/prototype-chain su
+  ENTRAMTI i validatori (BE nomi manifest, FE args), ibrido `ui_command`+fs che saltava il
+  confinamento scope, master-switch che non spegneva davvero il tool. NON saltare i cicli né la
+  review finale.
+- Commit convenzionali + trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`. Mai push/merge senza richiesta.
 
-## Gotchas (validi anche dopo la fase 6)
+## Gotchas (validi anche dopo la fase 7)
 
-1. **Suite backend completa IMPRATICABILE** (fixture `app` ~25s/test). Verifica di fase = test mirati
-   per dominio + `tests/contracts/`. Subagent avvisati di NON killare run lente (timeout 600s).
-2. **`npm run lint` ORA È VERDE (exit 0, 0/0) ed è gate CI** — non è più tollerato introdurre
-   errori O warning; `npm test` (vitest, 21 file/162 test, <1s) idem. Il gate FE completo è:
-   typecheck + lint + test.
-3. **ruff/mypy con errori pre-esistenti** → scoped; file nuovi puliti; confrontare con `git show <base>:file`.
-4. **EOL: CINQUE incidenti nel programma** (2 in fase 4, 1 in fase 5, 2 in fase 6: flip CRLF di
-   5 store nel Task 3 sanato dal controller; flip non-riproducibile di 2 file durante un
-   `eslint --fix .` nel Task 7, colto in corsa). `endOfLine: auto` ora protegge prettier, ma
-   SEMPRE verificare `git ls-files --eol` PRIMA e DOPO ogni commit; diff sospettosamente grande =
-   flip (`git diff --ignore-cr-at-eol --stat` per smascherarlo). MAI cmdlet PowerShell su file
-   non-ASCII. Restano 4 file `i/lf w/crlf` storici (documentati nel backlog).
-5. **Subagent**: prescrizioni ESATTE e VERIFICARE IL DIFF al ritorno (`git show`); reviewer
-   READ-ONLY espliciti; un reviewer morto/troncato (limite sessione) → rilanciare con SendMessage
-   chiedendo di COMPLETARE, non ripartire.
+1. **Suite backend completa IMPRATICABILE** (fixture `app` ~25s/test). Verifica di fase = test
+   mirati per dominio + `tests/contracts/`. Subagent avvisati di NON killare run lente.
+2. **Gate FE completo = typecheck + lint (0 err/0 warn) + vitest** (ora 29 file / 301 test, <1s).
+3. **ruff/mypy con errori pre-esistenti** → scoped; file NUOVI puliti (`ruff --fix` sui test
+   nuovi); `protocols.py` ha 3 errori storici (A002 ×2, I001) fuori dal codice fase 7.
+4. **EOL**: nessun incidente in fase 7 (prima fase pulita). SEMPRE `git ls-files --eol` /
+   `git diff --stat` prima dei commit; `.gitignore` è `i/mixed` STORICO (pre-programma).
+5. **Subagent**: prescrizioni ESATTE e VERIFICARE IL DIFF al ritorno; reviewer READ-ONLY
+   espliciti (mai npm install/ci); un agente morto → SendMessage per COMPLETARE, non ripartire.
 6. **`check-contracts.ps1` DOPO il commit** (untracked = dirty). Regen SOLO nel task previsto.
-   NB PS 5.1: redirigere stderr (`2>&1`) su script che loggano via loguru produce falsi exit 1.
 7. **PowerShell 5.1**: niente `&&`; pytest da `backend/` con `..\.venv\Scripts\python.exe -m pytest`;
-   boot-check e lint-imports dalla REPO ROOT.
+   boot-check e lint-imports dalla REPO ROOT (`.\.venv\Scripts\lint-imports.exe --config backend/pyproject.toml`).
 8. **Il venv NON ha pip** → `uv pip install`.
-9. **`ToolResult.error()` riempie `error_message`, NON `content`**.
-10. **Campi generati opzionali**: fallback `??` nei consumer, mai tipi a mano.
-11. **Contratti WS**: modello in ws_schema + vocabolario congelato + dispatcher FE esaustivo
-    (ora su ENTRAMBI i canali). Il frame server si aggiunge in 4 punti: classe, union, frozen
-    vocab test, handler FE (il typecheck FORZA il quarto dopo la regen).
+9. **`ToolResult.error()` riempie `error_message`, NON `content`** (il loop rende error_message al modello).
+10. **Campi generati opzionali**: fallback `??` nei consumer; ma i campi narrowed-required
+    (es. `correlation_id` sui frame RPC) sono REQUIRED anche nel TS — narrowing pydantic
+    sull'envelope è il pattern giusto PRIMA della regen.
+11. **Contratti WS**: frame server nuovo = 4 punti (classe, union, frozen vocab test, handler FE
+    post-regen — il typecheck FORZA il quarto). Frame client nuovo = classe + union + frozen
+    vocab + branch nel receive loop della route (validare con `validate_events_client`).
 12. **`test_plugins_enabled_list` è ROSSO ereditato** (21 vs 20): non è una regressione.
-13. **import-linter**: dalla REPO ROOT; wildcard `*` un livello, `**` ricorsivo; ignore
-    non-matchante = run fallito.
-14. **File "modified since read"**: dopo che un subagent tocca un file che il controller aveva
-    letto, ri-Read prima di Edit (il tracking del harness lo impone).
+13. **File "modified since read"**: dopo che un subagent tocca un file letto dal controller,
+    ri-Read prima di Edit.
+14. **`Object.hasOwn` / semantica own-property** nei validatori TS di input non fidato — `in` e
+    lookup nudi attraversano la prototype chain.
 
-## Backlog (in fondo ai piani 1a/1b/2/3/4/5/6; voci fase 6 principali)
+## Backlog (in fondo al piano fase 7 le voci complete; principali)
 
-1. Per fase 7: validazione argsSchema al bridge; `description` machine-facing; promozione
-   WsSendPayload; router-link → comandi; board che consuma `?artifact=`.
-2. Migrare useVoice a pattern tipizzato e ritirare l'emitter generico; hasOwnProperty anche nel
-   dispatcher events; bridge client_tool_call; validazione runtime frame WS (zod/valibot).
-3. `.gitattributes` con `*.ts text eol=lf` + normalizzare i 4 file `w/crlf` storici.
-4. CAD: unificazione payload live su endpoint artifacts (richiede artifact id nel tool result).
-5. TldrawCanvas: orphan dead-end pre-esistente; camera/undo reset su update esterno (manca
-   loadSnapshot incrementale); copy "deleted" per errori di rete.
-6. `auditApi` morto pre-fase (cablare UI audit o rimuovere modulo+endpoint); ~15 icone senza
-   consumatori; a11y tabs terminale.
-6-bis. Dal ripristino Workspace (review Approved, note minori): stato sidebar morto in
-   `stores/workspace.ts` (sidebarMode/sidebarWidth — DockedSidebar usa ui.sidebarWidth) da potare;
-   doppio GET del contenuto whiteboard su cold-open (dedup in-flight in `fetchContent`); param
-   stantio sui tile già aperti in `useModuleItemSelection` (pre-esistente); `/` → `/workspace`
-   hardcoded sovrascrive `alice_ui_mode` persistito al cold start (scelta di prodotto, valutare
-   "riapri sull'ultima superficie").
-7. Ereditati (fasi 1-5): migrazione consumer ai gruppi ctx; test LLM/registry via moduli;
-   guardia anti-drift flag-registry; route MCP tipizzate + ratchet; 500→503 search; offset O(n);
-   export conversazioni a modello; dedup broadcaster.
+1. **Fase 7 → fase 8**: grant per-COMANDO (`app_command:{name}` in ConfirmationMiddleware);
+   capability per-call nei metadata del frame di conferma (oggi mostra `safe` anche per
+   destructive); esenzione DedupMiddleware per tool `ui_command`; short-circuit del confirm
+   nella finestra manifest-vuoto; hook change-notification sul registry FE → re-invio manifest;
+   cap su `usage_guidance`; clamp `rpc_timeout_s` vs `timeout_ms`; multi-window (broadcast
+   esegue ovunque) se mai arriverà.
+2. Ereditati fase 6: migrare useVoice a pattern tipizzato e ritirare l'emitter generico;
+   `.gitattributes` + normalizzare i 4 file `w/crlf` storici; `auditApi` morto; CAD payload
+   live su artifacts; TldrawCanvas orphan/camera; workspace store: stato sidebar morto;
+   dedup GET whiteboard; `/` → `/workspace` vs `alice_ui_mode` persistito.
+3. Ereditati fasi 1-5: migrazione consumer ai gruppi ctx; guardia anti-drift flag-registry;
+   route MCP tipizzate + ratchet; 500→503 search; offset O(n); export conversazioni a modello;
+   dedup broadcaster.
 
 ## Decisioni utente registrate (non rilitigare)
 
-- Refactor incrementale, app sempre funzionante; dati azzerabili (no migrazioni); orb-era E
-  Workspace eliminati (Horizon unica superficie, terminale salvato standalone — decisione
-  2026-07-10 "la soluzione più professionale, senza debiti"); lint sanato A FONDO con reformat
-  completo e gate CI (stessa decisione); codegen completo; visione = runtime agentico locale con
-  Command Layer (invariante anti-escalation non negoziabile, spec §7).
-- I branch di fase sono restati impilati e locali fino al 2026-07-11, quando l'utente ha chiesto
-  push + merge sequenziale in `main` (fatto, vedi Stato). Le prossime fasi partono da `main`; la
-  politica di merge la decide l'utente volta per volta (mai push/merge senza richiesta).
+- Refactor incrementale, app sempre funzionante; dati azzerabili (no migrazioni); DUE superfici
+  chat di prodotto (Workspace `/workspace` primaria + Horizon `/assistant`) — il Workspace NON
+  si rimuove MAI (visione Jarvis); lint sanato a fondo con gate CI; codegen completo; visione =
+  runtime agentico locale con Command Layer (invariante anti-escalation non negoziabile, §7).
+- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta. La fase 7 è locale su
+  `arch/fase7-command-bridge` in attesa di decisione.

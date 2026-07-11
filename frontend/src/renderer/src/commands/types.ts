@@ -16,6 +16,11 @@ export interface CommandDefinition<A = Record<string, never>> {
   name: string
   /** Human-readable label (command palette / audit). */
   title: string
+  /**
+   * Machine-facing description (English) for the agent manifest. Required
+   * on every `exposeToAgent` command; `title` stays the human label.
+   */
+  description?: string
   capability: CommandCapability
   /**
    * Whether the command may appear in the agent-callable manifest (Fase 7).

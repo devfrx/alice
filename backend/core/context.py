@@ -249,6 +249,14 @@ class AppContext:
     def terminal_session_manager(self, value: Any) -> None:
         self.workspace.terminal_session_manager = value
 
+    @property
+    def command_bridge_service(self) -> Any:
+        return self.workspace.command_bridge_service
+
+    @command_bridge_service.setter
+    def command_bridge_service(self, value: Any) -> None:
+        self.workspace.command_bridge_service = value
+
     # ------------------------------------------------------------------
     # Conversation group
     # ------------------------------------------------------------------

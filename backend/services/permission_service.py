@@ -44,6 +44,15 @@ ScopeProvider = Callable[[str], "list[Path] | None"]
 # or ``None`` when no rule applies (the gate then falls back to the tier).
 RuleProvider = Callable[[str, str], "RuleEffect | None"]
 
+# Resolves a UI command name to its manifest capability tag
+# (navigation|read|mutate|destructive), or ``None`` when unknown (Fase 7).
+CommandCapabilityProvider = Callable[[str], "str | None"]
+
+#: Capability tag marking the kernel's ``app_command`` tool: its EFFECTIVE
+#: capability is per-call (the invoked command's manifest tag), resolved via
+#: the injected ``command_capability_provider``.
+UI_COMMAND_CAPABILITY = "ui_command"
+
 # Capability tags that mark a tool as filesystem-path-confined.
 _DEFAULT_FS_CAPABILITIES: frozenset[str] = frozenset({"fs_read", "fs_write"})
 
@@ -134,6 +143,7 @@ class PermissionService:
         rule_provider: RuleProvider | None = None,
         forbidden_paths: Iterable[str | Path] = (),
         fs_capabilities: Iterable[str] = _DEFAULT_FS_CAPABILITIES,
+        command_capability_provider: CommandCapabilityProvider | None = None,
     ) -> None:
         """Initialise the service.
 
@@ -148,10 +158,15 @@ class PermissionService:
                 workspace scope is set (Fase 6 ``WorkspaceScopeConfig``).
             fs_capabilities: Capability tags that mark a tool as
                 path-confined. Defaults to ``{"fs_read", "fs_write"}``.
+            command_capability_provider: Resolves a UI command name to its
+                manifest capability tag (Fase 7 Command Bridge). ``None``
+                (or an unknown command) makes ``app_command`` calls
+                fail-conservative (treated as ``destructive``).
         """
         self._scope_provider = scope_provider
         self._rule_provider = rule_provider
         self._fs_capabilities = frozenset(fs_capabilities)
+        self._command_capability_provider = command_capability_provider
         self._forbidden_paths: tuple[Path, ...] = tuple(
             self._safe_resolve(p) for p in forbidden_paths
         )
@@ -228,6 +243,10 @@ class PermissionService:
 
         1. forbidden risk → DENY (breaker).
         2. explicit ``deny`` rule → DENY (a user prohibition wins everywhere).
+        2-bis. ``ui_command`` tool without fs/exec capabilities → the §7
+           matrix on the invoked command's manifest tag
+           (:meth:`_decide_ui_command`); a hybrid with fs/exec capabilities
+           falls through to the scope guard below.
         3. fs tool with no scope set → DENY (scope is the workspace boundary —
            holds even in autopilot).
         4. fs tool whose path is out of scope → DENY (a session grant or an
@@ -272,6 +291,16 @@ class PermissionService:
         # 2. explicit deny rule — a user prohibition wins in every tier.
         if rule is RuleEffect.DENY:
             return GateDecision.deny(PermissionOutcome.DENY_RULE, "user_denied")
+
+        # 2-bis. UI commands (Fase 7, spec §7): the EFFECTIVE capability is
+        # the invoked command's manifest tag, not the tool's own — resolve it
+        # per-call and apply the §7 matrix. Grants and allow/ask rules keep
+        # their usual precedence; the deny rule above already won. A hybrid
+        # declaring ui_command TOGETHER with fs/exec capabilities does NOT
+        # take this branch: it falls through to scope confinement below, so
+        # the tag can never be used to skip the by-construction fs guard.
+        if UI_COMMAND_CAPABILITY in caps and not (is_fs or is_exec):
+            return self._decide_ui_command(args, mode, granted=granted, rule=rule)
 
         # 3 + 4. filesystem scope confinement (by construction).
         if is_fs:
@@ -326,6 +355,51 @@ class PermissionService:
         if self.requires_confirmation(tool_def):
             return GateDecision.confirm()
         return GateDecision.allow()
+
+    def _decide_ui_command(
+        self,
+        args: dict[str, object],
+        mode: PermissionMode,
+        *,
+        granted: bool,
+        rule: RuleEffect | None,
+    ) -> GateDecision:
+        """Spec §7 matrix for ``app_command``: gate on the command's tag.
+
+        ``navigation``/``read`` are always allowed (reads never prompt, any
+        tier — plan included); ``mutate``/``destructive`` are denied in
+        ``plan`` and confirmed in ``strict``; ``auto_edits`` auto-approves
+        ``mutate`` but confirms ``destructive``; ``autopilot`` allows. An
+        unknown command (absent manifest/provider) is treated as
+        ``destructive`` — fail-conservative; execution then returns its own
+        clean "unknown command" / "UI not available" result.
+        """
+        command = str(args.get("name", ""))
+        # The provider only ever returns manifest-validated tags (the bridge
+        # rejects out-of-vocabulary capabilities at ingestion); any other
+        # non-falsy string still lands in the destructive-equivalent branch.
+        capability = (
+            self._command_capability_provider(command)
+            if self._command_capability_provider is not None
+            else None
+        ) or "destructive"
+        if capability in ("navigation", "read"):
+            return GateDecision.allow()
+        if mode is PermissionMode.PLAN:
+            logger.info(
+                "Permission: ui command '{}' denied in plan mode (capability {})",
+                command, capability,
+            )
+            return GateDecision.deny(PermissionOutcome.DENY_PLAN_MODE, "plan_mode")
+        if granted or rule is RuleEffect.ALLOW:
+            return GateDecision.allow()
+        if rule is RuleEffect.ASK:
+            return GateDecision.confirm()
+        if mode is PermissionMode.AUTOPILOT:
+            return GateDecision.allow()
+        if mode is PermissionMode.AUTO_EDITS and capability == "mutate":
+            return GateDecision.allow()
+        return GateDecision.confirm()
 
     def _check_scope(
         self,

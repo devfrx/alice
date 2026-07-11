@@ -62,6 +62,25 @@ async def stage_workspace(ctx: AppContext) -> None:
     await rule_service.load_all()
     ctx.permission_rule_service = rule_service
 
+    # -- Command Bridge (Fase 7, spec §7): agent-driven UI commands ------
+    # Needs the events-WS manager (stage_surfaces) and the tool registry
+    # (stage_plugins) — both already wired when this stage runs. Created
+    # BEFORE PermissionService so its bound ``capability_of`` can be
+    # injected as the per-call capability resolver for ``app_command``.
+    from backend.services.command_bridge import (
+        CommandBridgeService,
+        build_app_command_definition,
+    )
+
+    command_bridge = CommandBridgeService(
+        ws_manager=ctx.ws_connection_manager,
+        tool_registry=ctx.tool_registry,
+        enabled=ctx.config.commands.enabled,
+        rpc_timeout_s=ctx.config.commands.rpc_timeout_s,
+        disabled_commands=ctx.config.commands.disabled_commands,
+    )
+    ctx.command_bridge_service = command_bridge
+
     # -- Permission service (central tool risk / scope / tier authority) -
     # Fase 6: ScopeService supplies the per-conversation scope provider, so a
     # tool tagged fs_read/fs_write is confined by construction. Fase 7:
@@ -76,6 +95,7 @@ async def stage_workspace(ctx: AppContext) -> None:
         scope_provider=scope_service.effective_roots,
         rule_provider=rule_service.match,
         forbidden_paths=ctx.config.scope.forbidden_paths,
+        command_capability_provider=command_bridge.capability_of,
     )
 
     # -- Interactive terminal session manager (Fase 7 E1) ---------------
@@ -96,3 +116,13 @@ async def stage_workspace(ctx: AppContext) -> None:
 
     terminal_manager.set_event_callback(_broadcast_terminal_event)
     ctx.terminal_session_manager = terminal_manager
+
+    # -- Kernel tool: app_command (spec §7) ------------------------------
+    # Registered from boot with an empty manifest so the tool exists even
+    # before the UI connects; every command.manifest re-registers it with
+    # the live name enum + usage guidance.
+    if ctx.config.commands.enabled and ctx.tool_registry is not None:
+        await ctx.tool_registry.register_kernel_tool(
+            build_app_command_definition([]),
+            command_bridge.execute_app_command,
+        )

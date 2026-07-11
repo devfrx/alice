@@ -93,6 +93,8 @@ class WorkspaceServices:
     permission_mode_service: Any = None
     permission_rule_service: Any = None
     terminal_session_manager: Any = None
+    command_bridge_service: Any = None
+    """Command Bridge (spec §7): manifest + events-WS RPC for app_command."""
 
 
 @dataclass

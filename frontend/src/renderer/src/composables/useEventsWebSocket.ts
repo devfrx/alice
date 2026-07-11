@@ -17,6 +17,7 @@ import { usePlanDocumentStore } from '../stores/planDocument'
 import { useScopeStore } from '../stores/scope'
 import { usePermissionModeStore } from '../stores/permissionMode'
 import { useTerminalSessionsStore } from '../stores/terminalSessions'
+import { handleCommandRequest, sendCommandManifest } from '../commands/bridge'
 import type { EventsClientMessage, EventsServerMessage } from '../types/generated'
 import { BACKEND_HOST } from '../services/api'
 
@@ -104,6 +105,7 @@ export function useEventsWebSocket(): {
     'scope.updated': (msg) => scopeStore.applyScopeUpdated(msg),
     'permission_mode.updated': (msg) => permissionModeStore.applyModeUpdated(msg),
     'config.changed': noop,
+    'command.request': (msg) => void handleCommandRequest(msg, sendEventsMessage),
     'terminal.session_opened': (msg) => terminalStore.applySessionOpened(msg),
     'terminal.output': (msg) => terminalStore.applyOutput(msg),
     'terminal.closed': (msg) => terminalStore.applyClosed(msg),
@@ -130,6 +132,10 @@ export function useEventsWebSocket(): {
       pingInterval = setInterval(() => {
         sendEventsMessage({ type: 'ping' })
       }, 30_000)
+
+      // Command Layer (Fase 7): declare the agent-callable manifest on every
+      // (re)connect — the backend replaces its copy wholesale.
+      sendCommandManifest(sendEventsMessage)
     }
 
     ws.onmessage = (event: MessageEvent): void => {

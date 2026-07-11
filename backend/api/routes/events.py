@@ -2,7 +2,9 @@
 
 Clients connect once at startup to ``/api/events/ws`` and receive
 push notifications whenever a background task completes, fails,
-or changes status.
+or changes status. Since Fase 7 the channel also carries inbound
+control frames: live terminal input/resize and the Command Layer RPC
+(``command.manifest`` ingestion + ``command.result`` correlation).
 """
 
 from __future__ import annotations
@@ -14,7 +16,9 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
+from pydantic import ValidationError
 
+from backend.api.ws_schema import validate_events_client
 from backend.core.context import AppContext
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -55,6 +59,31 @@ async def _handle_terminal_frame(
                 await mgr.resize(conv, session_id, rows, cols)
     except Exception as exc:  # pragma: no cover — defensive
         logger.debug("terminal control frame failed: {}", exc)
+
+
+async def _handle_command_frame(ctx: Any, data: dict[str, Any]) -> None:
+    """Validate and route a Command Layer frame (spec §7) from the client.
+
+    ``command.manifest`` replaces the bridge's agent-callable manifest;
+    ``command.result`` resolves the pending RPC future by ``correlation_id``.
+    Best-effort: an invalid frame is debug-logged and ignored — a bad frame
+    must never drop the events socket.
+    """
+    bridge = getattr(ctx, "command_bridge_service", None)
+    if bridge is None:
+        return
+    try:
+        frame = validate_events_client(data)
+    except ValidationError as exc:
+        logger.debug("Events WS: invalid command frame ignored: {}", exc)
+        return
+    if frame.type == "command.manifest":
+        await bridge.set_manifest([entry.model_dump() for entry in frame.commands])
+    elif frame.type == "command.result":
+        bridge.resolve(
+            frame.correlation_id,
+            {"ok": frame.ok, "result": frame.result, "error": frame.error},
+        )
 
 
 @router.websocket("/ws")
@@ -98,6 +127,10 @@ async def ws_events(websocket: WebSocket) -> None:
                     # the user types during a turn. Output flows back out via
                     # the broadcast channel (terminal.output events).
                     await _handle_terminal_frame(ctx, mtype, data)
+                elif mtype in ("command.manifest", "command.result"):
+                    # Command Layer RPC (spec §7): manifest ingestion and
+                    # command.result correlation for the app_command tool.
+                    await _handle_command_frame(ctx, data)
             except TimeoutError:
                 await websocket.send_json({"type": "heartbeat"})
             except WebSocketDisconnect:

@@ -49,6 +49,8 @@ EXPECTED_EVENTS_SERVER_TYPES = frozenset({
     "terminal.renamed",
     "terminal.assigned",
     "command.request",
+    "background_task.updated",
+    "attention.raised",
 })
 
 EXPECTED_EVENTS_CLIENT_TYPES = frozenset({
@@ -149,6 +151,25 @@ REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
         "correlation_id": "c-1",
         "name": "view.switch",
         "args": {"view": "board"},
+        "conversation_id": "conv-1",
+    },
+    {
+        "type": "background_task.updated",
+        "origin": "agent",
+        "task_id": "bt-1",
+        "kind": "subagent",
+        "label": "Research task",
+        "status": "running",
+        "progress": 0.5,
+        "detail": "step 3/6",
+        "conversation_id": "conv-1",
+        "updated_at": "2026-07-11T12:00:00+00:00",
+    },
+    {
+        "type": "attention.raised",
+        "source": "trigger:morning-briefing",
+        "message": "Autonomous turn completed",
+        "priority": "normal",
         "conversation_id": "conv-1",
     },
 ]
@@ -276,3 +297,34 @@ def test_mode_literal_matches_enum() -> None:
 
     literal = WsPermissionModeUpdated.model_fields["mode"].annotation
     assert set(typing.get_args(literal)) == {m.value for m in PermissionMode}
+
+
+def test_background_task_status_vocabulary_is_frozen() -> None:
+    """The status literal is part of the contract."""
+    from backend.api.ws_schema.events import WsBackgroundTaskUpdated
+
+    with pytest.raises(ValidationError):
+        WsBackgroundTaskUpdated.model_validate(
+            {
+                "type": "background_task.updated",
+                "task_id": "bt-1",
+                "kind": "subagent",
+                "label": "x",
+                "status": "paused",
+                "updated_at": "2026-07-11T12:00:00+00:00",
+            },
+        )
+
+
+def test_attention_priority_vocabulary_is_frozen() -> None:
+    from backend.api.ws_schema.events import WsAttentionRaised
+
+    with pytest.raises(ValidationError):
+        WsAttentionRaised.model_validate(
+            {
+                "type": "attention.raised",
+                "source": "s",
+                "message": "m",
+                "priority": "screaming",
+            },
+        )

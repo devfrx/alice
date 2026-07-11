@@ -11,6 +11,9 @@
  */
 import { ref, onMounted, nextTick } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiTextarea from '../ui/UiTextarea.vue'
 
 const props = defineProps<{
   /** Original message content to edit. */
@@ -22,15 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [result: boolean] }>()
 
 const content = ref(props.originalContent)
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
-
-/** Auto-resize textarea to fit content. */
-function autoResize(): void {
-  const el = textareaRef.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = `${Math.min(el.scrollHeight, 320)}px`
-}
+const dialogRef = ref<HTMLElement | null>(null)
 
 async function handleSubmit(): Promise<void> {
   const trimmed = content.value.trim()
@@ -51,44 +46,42 @@ function handleKeydown(e: KeyboardEvent): void {
 
 onMounted(async () => {
   await nextTick()
-  const el = textareaRef.value
+  const el = dialogRef.value?.querySelector('textarea')
   if (el) {
     el.focus()
     el.setSelectionRange(el.value.length, el.value.length)
-    autoResize()
   }
 })
 </script>
 
 <template>
-  <div class="edit-dialog" @keydown="handleKeydown">
+  <div ref="dialogRef" class="edit-dialog" @keydown="handleKeydown">
     <div class="edit-dialog__header">
       <span class="edit-dialog__title">Modifica messaggio</span>
-      <button class="edit-dialog__close" aria-label="Annulla" @click="emit('close', false)">
+      <UiIconButton size="sm" variant="ghost" label="Annulla" @click="emit('close', false)">
         <AppIcon name="x" :size="16" />
-      </button>
+      </UiIconButton>
     </div>
-    <textarea
-      ref="textareaRef"
+    <UiTextarea
       v-model="content"
-      class="edit-dialog__textarea"
-      rows="3"
+      :rows="3"
+      auto-grow
+      :max-rows="14"
       placeholder="Scrivi il messaggio modificato…"
-      @input="autoResize"
+      aria-label="Modifica messaggio"
     />
     <div class="edit-dialog__actions">
       <span class="edit-dialog__hint">Ctrl+Invio per inviare</span>
       <div class="edit-dialog__buttons">
-        <button class="edit-dialog__btn edit-dialog__btn--cancel" @click="emit('close', false)">
-          Annulla
-        </button>
-        <button
-          class="edit-dialog__btn edit-dialog__btn--submit"
+        <UiButton variant="secondary" size="sm" @click="emit('close', false)">Annulla</UiButton>
+        <UiButton
+          variant="primary"
+          size="sm"
           :disabled="!content.trim() || content.trim() === originalContent"
           @click="handleSubmit"
         >
           Invia modifica
-        </button>
+        </UiButton>
       </div>
     </div>
   </div>
@@ -114,49 +107,6 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
-.edit-dialog__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.edit-dialog__close:hover {
-  color: var(--text-primary);
-  background: var(--surface-2);
-}
-
-.edit-dialog__textarea {
-  width: 100%;
-  min-height: 72px;
-  max-height: 320px;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-0);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  line-height: var(--leading-relaxed);
-  resize: none;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.edit-dialog__textarea:focus {
-  border-color: var(--accent-border);
-}
-
 .edit-dialog__actions {
   display: flex;
   align-items: center;
@@ -171,43 +121,5 @@ onMounted(async () => {
 .edit-dialog__buttons {
   display: flex;
   gap: var(--space-2);
-}
-
-.edit-dialog__btn {
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.edit-dialog__btn--cancel {
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.edit-dialog__btn--cancel:hover {
-  background: var(--surface-2);
-  color: var(--text-primary);
-}
-
-.edit-dialog__btn--submit {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-on-accent);
-}
-
-.edit-dialog__btn--submit:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.edit-dialog__btn--submit:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

@@ -8,6 +8,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 import type { ConfirmationRequest, RememberChoice } from '../../types/chat'
+import UiButton from '../ui/UiButton.vue'
+import UiBadge from '../ui/UiBadge.vue'
 
 const props = defineProps<{
   /** The pending confirmation request to display. */
@@ -42,6 +44,11 @@ const timerColor = computed(() => {
   if (remainingSeconds.value <= 20) return 'var(--warning)'
   return 'var(--text-secondary)'
 })
+
+/** Risk badge variant — medium maps to warning, dangerous/forbidden to danger. */
+const riskBadgeVariant = computed<'warning' | 'danger'>(() =>
+  props.confirmation.riskLevel === 'medium' ? 'warning' : 'danger'
+)
 
 const formattedTime = computed(() => {
   const s = remainingSeconds.value
@@ -124,12 +131,9 @@ onUnmounted(() => {
         </div>
 
         <div class="confirm-card__risk">
-          <span
-            class="confirm-card__risk-badge"
-            :class="`confirm-card__risk-badge--${confirmation.riskLevel}`"
-          >
+          <UiBadge class="confirm-card__risk-badge" :variant="riskBadgeVariant">
             {{ confirmation.riskLevel }}
-          </span>
+          </UiBadge>
         </div>
 
         <p v-if="confirmation.description" class="confirm-card__desc">
@@ -177,12 +181,10 @@ onUnmounted(() => {
         </div>
 
         <div class="confirm-card__actions">
-          <button class="confirm-card__btn confirm-card__btn--reject" @click="reject">
-            Rifiuta
-          </button>
-          <button class="confirm-card__btn confirm-card__btn--approve" @click="approve">
+          <UiButton variant="secondary" @click="reject">Rifiuta</UiButton>
+          <UiButton class="confirm-card__btn--approve" variant="primary" @click="approve">
             Approva
-          </button>
+          </UiButton>
         </div>
 
         <p class="confirm-card__hint">Esc = Rifiuta</p>
@@ -270,31 +272,9 @@ onUnmounted(() => {
 }
 
 .confirm-card__risk-badge {
-  display: inline-block;
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: var(--space-0-5) var(--space-2);
-  border-radius: var(--radius-sm);
-}
-
-.confirm-card__risk-badge--medium {
-  color: var(--warning);
-  background: var(--warning-bg);
-  border: 1px solid var(--warning-border);
-}
-
-.confirm-card__risk-badge--dangerous {
-  color: var(--error);
-  background: var(--error-bg);
-  border: 1px solid var(--error-border);
-}
-
-.confirm-card__risk-badge--forbidden {
-  color: var(--error-severe);
-  background: var(--error-severe-bg);
-  border: 1px solid var(--error-severe-border);
 }
 
 .confirm-card__desc {
@@ -430,41 +410,6 @@ onUnmounted(() => {
   display: flex;
   gap: var(--space-2-5);
   justify-content: flex-end;
-}
-
-.confirm-card__btn {
-  padding: var(--space-2) var(--space-5);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.confirm-card__btn--approve {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--surface-0);
-}
-
-.confirm-card__btn--approve:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-.confirm-card__btn--reject {
-  background: transparent;
-  border-color: var(--border);
-  color: var(--danger);
-}
-
-.confirm-card__btn--reject:hover {
-  background: var(--danger-light);
-  border-color: var(--danger-border);
 }
 
 .confirm-card__hint {

@@ -24,6 +24,7 @@ import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -220,17 +221,15 @@ defineExpose({
     <!-- Bottom control row: left config group / right actions group -->
     <div class="ci__controls">
       <div class="ci__controls-left">
-        <button
-          class="ci__ghost"
+        <UiIconButton
+          size="sm"
+          variant="ghost"
           :disabled="disabled || !supportsVision"
-          :aria-label="
-            supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'
-          "
-          :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
+          :label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
           @click="openFilePicker"
         >
           <AppIcon name="paperclip" :size="14" />
-        </button>
+        </UiIconButton>
 
         <div class="ci__divider" />
 
@@ -254,14 +253,15 @@ defineExpose({
           :is-compressing="chatStore.isCompressingContext"
         />
 
-        <button
-          class="ci__ghost ci__mode"
-          :aria-label="modeTitle"
-          :title="modeTitle"
+        <UiIconButton
+          class="ci__mode"
+          size="sm"
+          variant="ghost"
+          :label="modeTitle"
           @click="toggleMode"
         >
           <AppIcon :name="modeIcon" :size="13" />
-        </button>
+        </UiIconButton>
 
         <div
           class="ci__dot"
@@ -538,34 +538,6 @@ defineExpose({
 }
 
 /* ============================================================
-   Ghost icon utilities (attach, mode)
-   ============================================================ */
-.ci__ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    color var(--duration-fast) ease,
-    background var(--duration-fast) ease;
-}
-.ci__ghost:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-.ci__ghost:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
-}
-
-/* ============================================================
    Group micro-label
    ============================================================ */
 .ci__glabel {
@@ -615,10 +587,6 @@ defineExpose({
 .ci__seg--models :deep(.ms__trigger:not(.ms__trigger--embedding)) {
   border-color: var(--border-hover, var(--border));
   background: var(--surface-3);
-}
-
-.ci__mode {
-  color: var(--text-secondary);
 }
 
 /* ============================================================

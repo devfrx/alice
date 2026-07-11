@@ -11,6 +11,7 @@
 import { ref, computed } from 'vue'
 
 import type { AskUserRequest, AskUserAnswer } from '../../types/chat'
+import UiButton from '../ui/UiButton.vue'
 
 const props = defineProps<{ request: AskUserRequest }>()
 const emit = defineEmits<{ answer: [executionId: string, answers: AskUserAnswer[]] }>()
@@ -88,17 +89,12 @@ function submit(): void {
     />
 
     <div class="ask-card__nav">
-      <button type="button" class="ask-card__btn" :disabled="step === 0" @click="back">
+      <UiButton variant="secondary" size="sm" :disabled="step === 0" @click="back">
         Indietro
-      </button>
-      <button
-        type="button"
-        class="ask-card__btn ask-card__btn--primary"
-        :disabled="!canAdvance"
-        @click="next"
-      >
+      </UiButton>
+      <UiButton variant="primary" size="sm" :disabled="!canAdvance" @click="next">
         {{ step < total - 1 ? 'Avanti' : 'Invia' }}
-      </button>
+      </UiButton>
     </div>
   </div>
 </template>
@@ -185,25 +181,5 @@ function submit(): void {
   justify-content: space-between;
   gap: 8px;
   margin-top: 4px;
-}
-
-.ask-card__btn {
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-  color: inherit;
-  cursor: pointer;
-}
-
-.ask-card__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.ask-card__btn--primary {
-  background: var(--accent);
-  color: var(--surface-0);
-  border-color: var(--accent);
 }
 </style>

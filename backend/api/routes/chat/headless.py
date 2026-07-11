@@ -32,10 +32,15 @@ if TYPE_CHECKING:
     from backend.services.turn.models import TurnResult
 
 
-def _strip_client_tools(
+def _strip_ui_tools(
     ctx: AppContext, tools: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]] | None:
-    """Drop client-executed tools: a headless turn has no UI to run them."""
+    """Drop UI-dependent tools: a headless turn has no UI to serve them.
+
+    Covers both client-executed tools and user-interaction tools
+    (``ask_user``): the channel would collapse them to clean errors anyway,
+    but not offering them avoids wasted loop iterations.
+    """
     if not tools:
         return tools
     registry = ctx.tool_registry
@@ -43,9 +48,12 @@ def _strip_client_tools(
         return tools
     kept: list[dict[str, Any]] = []
     for entry in tools:
-        name = entry.get("function", {}).get("name", "")
+        fn = entry.get("function")
+        name = fn.get("name", "") if isinstance(fn, dict) else ""
         tool_def = registry.get_tool_definition(name)
-        if tool_def is not None and tool_def.client_execution:
+        if tool_def is not None and (
+            tool_def.client_execution or tool_def.user_interaction
+        ):
             continue
         kept.append(entry)
     return kept
@@ -89,7 +97,7 @@ async def run_headless_turn(
             return None
 
         turn = replace(
-            assembly.turn, tools=_strip_client_tools(ctx, assembly.turn.tools),
+            assembly.turn, tools=_strip_ui_tools(ctx, assembly.turn.tools),
         )
         sink = NullEventSink()
         channel = HeadlessInteractionChannel()

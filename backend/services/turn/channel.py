@@ -504,7 +504,11 @@ class HeadlessInteractionChannel:
 
     @property
     def cancelled(self) -> bool:
-        """Whether the (externally settable) cancel flag is up."""
+        """Whether the internal cancel flag is up (never set by this class).
+
+        Headless turns are cancelled from outside via the runner's asyncio
+        task (e.g. ``TriggerService.shutdown``), not through this channel.
+        """
         return self._cancel_event.is_set()
 
     @property

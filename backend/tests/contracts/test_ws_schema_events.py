@@ -48,12 +48,15 @@ EXPECTED_EVENTS_SERVER_TYPES = frozenset({
     "terminal.closed",
     "terminal.renamed",
     "terminal.assigned",
+    "command.request",
 })
 
 EXPECTED_EVENTS_CLIENT_TYPES = frozenset({
     "ping",
     "terminal.input",
     "terminal.resize",
+    "command.manifest",
+    "command.result",
 })
 
 REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
@@ -140,6 +143,14 @@ REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
     {"type": "terminal.closed", "conversation_id": "c1", "session_id": "s1", "exit_code": None},
     {"type": "terminal.renamed", "conversation_id": "c1", "session_id": "s1", "title": "t"},
     {"type": "terminal.assigned", "conversation_id": "c1", "session_id": "s1"},
+    {
+        "type": "command.request",
+        "origin": "agent",
+        "correlation_id": "c-1",
+        "name": "view.switch",
+        "args": {"view": "board"},
+        "conversation_id": "conv-1",
+    },
 ]
 
 REPRESENTATIVE_CLIENT_FRAMES: list[dict[str, Any]] = [
@@ -151,6 +162,29 @@ REPRESENTATIVE_CLIENT_FRAMES: list[dict[str, Any]] = [
         "session_id": "s1",
         "rows": 40,
         "cols": 120,
+    },
+    {
+        "type": "command.manifest",
+        "commands": [
+            {
+                "name": "view.switch",
+                "description": "Switch the main app view",
+                "capability": "navigation",
+                "args_schema": {"type": "object", "properties": {}},
+            },
+        ],
+    },
+    {
+        "type": "command.result",
+        "correlation_id": "c-1",
+        "ok": True,
+        "result": {"done": True},
+    },
+    {
+        "type": "command.result",
+        "correlation_id": "c-2",
+        "ok": False,
+        "error": "Unknown view",
     },
 ]
 

@@ -20,7 +20,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.api.ws_schema._base import ClientFrame, EventsServerFrame
+from backend.api.ws_schema._base import ClientFrame, EventsServerFrame, Origin
 
 # ---------------------------------------------------------------------------
 # Keep-alives
@@ -341,6 +341,27 @@ class WsTerminalAssigned(EventsServerFrame):
 
 
 # ---------------------------------------------------------------------------
+# Command Layer RPC (spec §7)
+# ---------------------------------------------------------------------------
+
+
+class WsCommandRequest(EventsServerFrame):
+    """Command Layer RPC (spec §7): the kernel asks the UI to run a command.
+
+    First real consumer of the envelope's ``correlation_id``: the bridge
+    always sets it and the client MUST echo it verbatim on the matching
+    ``command.result`` frame. ``origin`` defaults to ``agent`` because the
+    request is issued on the agent's behalf inside a turn.
+    """
+
+    type: Literal["command.request"]
+    origin: Origin = "agent"
+    name: str
+    args: dict[str, Any] = Field(default_factory=dict)
+    conversation_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Client→server frames
 # ---------------------------------------------------------------------------
 
@@ -368,6 +389,45 @@ class WsTerminalResize(ClientFrame):
     session_id: str
     rows: int
     cols: int
+
+
+class CommandManifestEntry(BaseModel):
+    """One agent-exposable UI command, as declared by the frontend registry.
+
+    The manifest is the THIRD generated contract (spec §7): this model rides
+    the same OpenAPI-injection pipeline as the channel unions.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    description: str
+    capability: Literal["navigation", "read", "mutate", "destructive"]
+    args_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class WsCommandManifest(ClientFrame):
+    """The frontend's agent-exposable command manifest.
+
+    Sent on events-WS connect and whenever the exposed set changes. It
+    REPLACES the backend's previous manifest wholesale.
+    """
+
+    type: Literal["command.manifest"]
+    commands: list[CommandManifestEntry] = Field(default_factory=list)
+
+
+class WsCommandResult(ClientFrame):
+    """The UI's response to a ``command.request``.
+
+    ``correlation_id`` (envelope) must echo the request's id; a frame
+    without it is dropped by the route.
+    """
+
+    type: Literal["command.result"]
+    ok: bool
+    result: Any = None
+    error: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -401,11 +461,12 @@ EventsServerMessage = Annotated[
     | WsTerminalOutput
     | WsTerminalClosed
     | WsTerminalRenamed
-    | WsTerminalAssigned,
+    | WsTerminalAssigned
+    | WsCommandRequest,
     Field(discriminator="type"),
 ]
 
 EventsClientMessage = Annotated[
-    WsPing | WsTerminalInput | WsTerminalResize,
+    WsPing | WsTerminalInput | WsTerminalResize | WsCommandManifest | WsCommandResult,
     Field(discriminator="type"),
 ]

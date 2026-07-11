@@ -49,8 +49,36 @@ describe('installCoreCommands', () => {
     ])
     expect(byName.get('view.switch')?.capability).toBe('navigation')
     expect(byName.get('conversation.new')?.capability).toBe('mutate')
-    // Anti-escalation seam: nothing in the core set is agent-exposable yet.
-    for (const def of byName.values()) expect(def.exposeToAgent ?? false).toBe(false)
+  })
+
+  it('exposes exactly the Fase 7 agent-callable core set', () => {
+    installCoreCommands(fakeRouter())
+    const exposed = commandRegistry
+      .list()
+      .filter((d) => d.exposeToAgent === true)
+      .map((d) => d.name)
+      .sort()
+    expect(exposed).toEqual([
+      'artifact.show',
+      'conversation.new',
+      'conversation.open',
+      'view.switch'
+    ])
+  })
+
+  it('every exposed command carries a machine-facing description', () => {
+    installCoreCommands(fakeRouter())
+    for (const def of commandRegistry.list()) {
+      if (def.exposeToAgent === true) {
+        expect(def.description, `${def.name} needs a description`).toBeTruthy()
+      }
+    }
+  })
+
+  it('keeps sidebar.toggle UI-only (never agent-callable)', () => {
+    installCoreCommands(fakeRouter())
+    const def = commandRegistry.list().find((d) => d.name === 'sidebar.toggle')
+    expect(def?.exposeToAgent ?? false).toBe(false)
   })
 
   it('view.switch pushes the named route and rejects unknown views', async () => {

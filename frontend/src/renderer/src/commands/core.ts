@@ -59,6 +59,8 @@ export function installCoreCommands(router: Router): void {
   commandRegistry.register<ViewSwitchArgs>({
     name: 'view.switch',
     title: 'Vai alla vista',
+    description: 'Switch the main app view to the given route name',
+    exposeToAgent: true,
     capability: 'navigation',
     argsSchema: {
       type: 'object',
@@ -76,6 +78,8 @@ export function installCoreCommands(router: Router): void {
   commandRegistry.register<ConversationOpenArgs>({
     name: 'conversation.open',
     title: 'Apri conversazione',
+    description: 'Open an existing conversation by id and land on the active chat surface',
+    exposeToAgent: true,
     capability: 'navigation',
     argsSchema: {
       type: 'object',
@@ -97,6 +101,8 @@ export function installCoreCommands(router: Router): void {
   commandRegistry.register({
     name: 'conversation.new',
     title: 'Nuova conversazione',
+    description: 'Create a new conversation and land on the active chat surface',
+    exposeToAgent: true,
     capability: 'mutate',
     argsSchema: { type: 'object', properties: {} },
     run: async () => {
@@ -124,6 +130,8 @@ export function installCoreCommands(router: Router): void {
   commandRegistry.register<ArtifactShowArgs>({
     name: 'artifact.show',
     title: 'Mostra artefatto',
+    description: 'Open the artifacts board focused on the given artifact id',
+    exposeToAgent: true,
     capability: 'navigation',
     argsSchema: {
       type: 'object',

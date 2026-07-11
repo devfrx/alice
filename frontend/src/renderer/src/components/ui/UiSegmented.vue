@@ -242,10 +242,6 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.ui-seg__tab:focus-visible {
-  box-shadow: 0 0 0 2px var(--focus-ring-color);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ui-seg__indicator {
     transition: opacity 200ms ease;

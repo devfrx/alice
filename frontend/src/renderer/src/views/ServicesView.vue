@@ -463,9 +463,6 @@ async function refreshAll(): Promise<void> {
   background: var(--surface-selected);
   color: var(--text-primary);
 }
-.rail-row:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent-border);
-}
 .rail-row__dot {
   flex: 0 0 auto;
   width: 7px;

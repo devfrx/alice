@@ -146,11 +146,6 @@ function toggle(): void {
   transition: background var(--duration-fast) ease;
 }
 
-.ui-toggle:focus-visible {
-  outline: 2px solid var(--accent-border);
-  outline-offset: 2px;
-}
-
 .ui-toggle:disabled {
   cursor: not-allowed;
   opacity: var(--opacity-disabled);

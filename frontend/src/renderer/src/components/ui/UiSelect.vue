@@ -313,11 +313,6 @@ watch(activeIndex, (index) => {
   border-color: var(--accent-border);
 }
 
-.ui-select__trigger:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--focus-ring-color);
-}
-
 .ui-select__trigger:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;

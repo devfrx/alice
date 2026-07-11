@@ -3,9 +3,10 @@
 The six persistent-note tools — ``create_note``, ``read_note``,
 ``update_note``, ``delete_note``, ``search_notes``, ``list_notes`` — that
 let the agent manage Continuum notes. They route through the application's
-:class:`~backend.services.knowledge.protocol.KnowledgeBackend` with
-``kind="note"``, which delegates note storage to the running Continuum
-server (see :class:`~backend.services.knowledge.continuum_backend.\
+knowledge service
+(:class:`~backend.services.knowledge.protocol.KnowledgeServiceProtocol`)
+with ``kind="note"``, which delegates note storage to the running
+Continuum server (see :class:`~backend.services.knowledge.continuum_backend.\
 ContinuumBackend`). Markdown bodies are rendered to HTML on write so the
 LLM can author natural markdown while Continuum stores rich blocks.
 
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from loguru import Logger
 
     from backend.core.context import AppContext
+    from backend.core.protocols import KnowledgeServiceProtocol
 
 
 #: Tool names handled by this module. Used by the plugin to route dispatch
@@ -318,36 +320,37 @@ async def execute_note_tool(
     args: dict[str, Any],
     logger: Logger,
 ) -> ToolResult:
-    """Execute one of the note CRUD tools against the knowledge backend.
+    """Execute one of the note CRUD tools against the knowledge service.
 
     Args:
-        ctx: Application context exposing ``knowledge_backend``,
+        ctx: Application context exposing ``knowledge_service``,
             ``event_bus`` and ``config``.
         tool_name: One of :data:`NOTE_TOOL_NAMES`.
         args: Validated tool arguments from the LLM call.
         logger: Plugin logger used to record failures.
 
     Returns:
-        A :class:`ToolResult`; an error result when the knowledge backend
+        A :class:`ToolResult`; an error result when the knowledge service
         is unavailable or the operation fails.
     """
-    if ctx.knowledge_backend is None:
+    svc = ctx.knowledge_service
+    if svc is None:
         return ToolResult.error("Note service not available")
 
     start = time.perf_counter()
 
     if tool_name == "create_note":
-        return await _handle_create(ctx, args, start, logger)
+        return await _handle_create(svc, ctx, args, start, logger)
     if tool_name == "read_note":
-        return await _handle_read(ctx, args, start, logger)
+        return await _handle_read(svc, ctx, args, start, logger)
     if tool_name == "update_note":
-        return await _handle_update(ctx, args, start, logger)
+        return await _handle_update(svc, ctx, args, start, logger)
     if tool_name == "delete_note":
-        return await _handle_delete(ctx, args, start, logger)
+        return await _handle_delete(svc, ctx, args, start, logger)
     if tool_name == "search_notes":
-        return await _handle_search(ctx, args, start, logger)
+        return await _handle_search(svc, args, start, logger)
     if tool_name == "list_notes":
-        return await _handle_list(ctx, args, start, logger)
+        return await _handle_list(svc, args, start, logger)
 
     return ToolResult.error(f"Unknown tool: {tool_name}")
 
@@ -357,9 +360,21 @@ async def execute_note_tool(
 # ---------------------------------------------------------------------------
 
 async def _handle_create(
-    ctx: AppContext, args: dict[str, Any], start: float, logger: Logger,
+    svc: KnowledgeServiceProtocol,
+    ctx: AppContext,
+    args: dict[str, Any],
+    start: float,
+    logger: Logger,
 ) -> ToolResult:
-    """Create a new note."""
+    """Create a new note.
+
+    Args:
+        svc: Narrowed knowledge service (non-``None``).
+        ctx: Application context; used here for ``event_bus``.
+        args: Validated tool arguments from the LLM call.
+        start: Perf-counter timestamp taken before dispatch.
+        logger: Plugin logger used to record failures.
+    """
     title = (args.get("title") or "").strip()
     if not title:
         return ToolResult.error("Missing required parameter: title")
@@ -372,7 +387,7 @@ async def _handle_create(
     tags = args.get("tags")
 
     try:
-        doc = await ctx.knowledge_backend.create(
+        doc = await svc.create(
             KnowledgeDocCreate(
                 kind="note",
                 title=title,
@@ -399,9 +414,21 @@ async def _handle_create(
 
 
 async def _handle_read(
-    ctx: AppContext, args: dict[str, Any], start: float, logger: Logger,
+    svc: KnowledgeServiceProtocol,
+    ctx: AppContext,
+    args: dict[str, Any],
+    start: float,
+    logger: Logger,
 ) -> ToolResult:
-    """Read a note by ID."""
+    """Read a note by ID.
+
+    Args:
+        svc: Narrowed knowledge service (non-``None``).
+        ctx: Application context; used here for ``config``.
+        args: Validated tool arguments from the LLM call.
+        start: Perf-counter timestamp taken before dispatch.
+        logger: Plugin logger used to record failures.
+    """
     note_id = (args.get("note_id") or "").strip()
     if not note_id:
         return ToolResult.error("Missing required parameter: note_id")
@@ -411,7 +438,7 @@ async def _handle_read(
         return ToolResult.error(f"Invalid note_id: {note_id!r}")
 
     try:
-        doc = await ctx.knowledge_backend.get(note_id, kind="note")
+        doc = await svc.get(note_id, kind="note")
         elapsed = (time.perf_counter() - start) * 1000
         if doc is None:
             return ToolResult.error(
@@ -435,9 +462,21 @@ async def _handle_read(
 
 
 async def _handle_update(
-    ctx: AppContext, args: dict[str, Any], start: float, logger: Logger,
+    svc: KnowledgeServiceProtocol,
+    ctx: AppContext,
+    args: dict[str, Any],
+    start: float,
+    logger: Logger,
 ) -> ToolResult:
-    """Update an existing note."""
+    """Update an existing note.
+
+    Args:
+        svc: Narrowed knowledge service (non-``None``).
+        ctx: Application context; used here for ``event_bus``.
+        args: Validated tool arguments from the LLM call.
+        start: Perf-counter timestamp taken before dispatch.
+        logger: Plugin logger used to record failures.
+    """
     note_id = (args.get("note_id") or "").strip()
     if not note_id:
         return ToolResult.error("Missing required parameter: note_id")
@@ -461,7 +500,7 @@ async def _handle_update(
         if pinned_arg is not None:
             patch_metadata["pinned"] = pinned_arg
 
-        doc = await ctx.knowledge_backend.update(
+        doc = await svc.update(
             note_id,
             KnowledgeDocPatch(
                 title=args.get("title"),
@@ -494,9 +533,21 @@ async def _handle_update(
 
 
 async def _handle_delete(
-    ctx: AppContext, args: dict[str, Any], start: float, logger: Logger,
+    svc: KnowledgeServiceProtocol,
+    ctx: AppContext,
+    args: dict[str, Any],
+    start: float,
+    logger: Logger,
 ) -> ToolResult:
-    """Delete a note by ID."""
+    """Delete a note by ID.
+
+    Args:
+        svc: Narrowed knowledge service (non-``None``).
+        ctx: Application context; used here for ``event_bus``.
+        args: Validated tool arguments from the LLM call.
+        start: Perf-counter timestamp taken before dispatch.
+        logger: Plugin logger used to record failures.
+    """
     note_id = (args.get("note_id") or "").strip()
     if not note_id:
         return ToolResult.error("Missing required parameter: note_id")
@@ -506,7 +557,7 @@ async def _handle_delete(
         return ToolResult.error(f"Invalid note_id: {note_id!r}")
 
     try:
-        deleted = await ctx.knowledge_backend.delete(note_id, kind="note")
+        deleted = await svc.delete(note_id, kind="note")
         elapsed = (time.perf_counter() - start) * 1000
         if deleted:
             await ctx.event_bus.emit(
@@ -526,9 +577,19 @@ async def _handle_delete(
 
 
 async def _handle_search(
-    ctx: AppContext, args: dict[str, Any], start: float, logger: Logger,
+    svc: KnowledgeServiceProtocol,
+    args: dict[str, Any],
+    start: float,
+    logger: Logger,
 ) -> ToolResult:
-    """Search notes by text and semantic similarity."""
+    """Search notes by text and semantic similarity.
+
+    Args:
+        svc: Narrowed knowledge service (non-``None``).
+        args: Validated tool arguments from the LLM call.
+        start: Perf-counter timestamp taken before dispatch.
+        logger: Plugin logger used to record failures.
+    """
     query = (args.get("query") or "").strip()
     if not query:
         return ToolResult.error("Missing required parameter: query")
@@ -544,7 +605,7 @@ async def _handle_search(
         if args.get("tags") is not None:
             search_filters["tags"] = args.get("tags")
 
-        hits = await ctx.knowledge_backend.search(
+        hits = await svc.search(
             query,
             kind="note",
             k=limit,
@@ -579,9 +640,19 @@ async def _handle_search(
 
 
 async def _handle_list(
-    ctx: AppContext, args: dict[str, Any], start: float, logger: Logger,
+    svc: KnowledgeServiceProtocol,
+    args: dict[str, Any],
+    start: float,
+    logger: Logger,
 ) -> ToolResult:
-    """List notes with optional filters."""
+    """List notes with optional filters.
+
+    Args:
+        svc: Narrowed knowledge service (non-``None``).
+        args: Validated tool arguments from the LLM call.
+        start: Perf-counter timestamp taken before dispatch.
+        logger: Plugin logger used to record failures.
+    """
     limit = args.get("limit", 20)
     if not isinstance(limit, int) or not 1 <= limit <= 50:
         limit = 20
@@ -596,7 +667,7 @@ async def _handle_list(
         if pinned_only:
             list_filters["pinned_only"] = True
 
-        docs, total = await ctx.knowledge_backend.list(
+        docs, total = await svc.list(
             kind="note",
             filters=list_filters or None,
             limit=limit,

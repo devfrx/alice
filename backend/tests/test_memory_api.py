@@ -42,9 +42,21 @@ def _make_entry(
 
 def _build_app(memory_service=None) -> FastAPI:
     """Lightweight FastAPI app with only the memory router mounted."""
+    from backend.services.knowledge import QdrantBackend
+    from backend.services.knowledge.service import KnowledgeService
+
     app = FastAPI()
     app.include_router(router, prefix="/api")
-    app.state.context = SimpleNamespace(memory_service=memory_service)
+    knowledge_service = KnowledgeService(
+        backend=QdrantBackend(memory_service=memory_service),
+        memory_service=memory_service,
+    )
+    # The service is ALWAYS wired (as in production, where the factory never
+    # returns None): the disabled case exercises memory_available=False.
+    app.state.context = SimpleNamespace(
+        memory_service=memory_service,
+        knowledge_service=knowledge_service,
+    )
     return app
 
 
@@ -99,10 +111,19 @@ async def memory_client(mock_memory_service):
 
 @pytest.mark.asyncio
 class TestMemoryDisabled:
-    """Endpoints return 503 when memory_service is None."""
+    """Endpoints return 503 when the memory side of the service is off."""
 
     async def test_list_memories_503_when_disabled(self, disabled_client):
         resp = await disabled_client.get(_PREFIX)
+        assert resp.status_code == 503
+
+    async def test_list_memories_503_when_service_not_wired(self):
+        # Pre-wiring window: AppContext.knowledge_service defaults to None.
+        app = _build_app(memory_service=None)
+        app.state.context.knowledge_service = None
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            resp = await c.get(_PREFIX)
         assert resp.status_code == 503
 
     async def test_search_memories_503_when_disabled(self, disabled_client):
@@ -136,10 +157,10 @@ class TestMemoryEndpoints:
         resp = await client.get(_PREFIX)
         assert resp.status_code == 200
         data = resp.json()
-        assert "entries" in data
+        assert "items" in data
         assert "total" in data
         assert data["total"] == 1
-        assert len(data["entries"]) == 1
+        assert len(data["items"]) == 1
 
     async def test_list_memories_with_filters(self, memory_client):
         client, _ = memory_client
@@ -191,6 +212,15 @@ class TestMemoryEndpoints:
         assert resp.status_code == 200
         data = resp.json()
         assert data["deleted_count"] == 5
+
+    async def test_delete_all_memory(self, memory_client):
+        client, mock_svc = memory_client
+        mock_svc.delete_all = AsyncMock(return_value=10)
+        resp = await client.delete(f"{_PREFIX}/all")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deleted_count"] == 10
+        mock_svc.delete_all.assert_awaited_once()
 
     async def test_stats(self, memory_client):
         client, _ = memory_client

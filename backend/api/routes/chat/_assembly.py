@@ -437,23 +437,25 @@ class TurnAssembler:
                 fp = Path(att["file_path"])
                 att["_bytes"] = await asyncio.to_thread(fp.read_bytes)
 
-        # --- retrieve relevant memories (Phase 9) -----------------
+        # --- retrieve relevant memories -----------------------------
         aux_parts: list[str] = []
         if (
-            ctx.memory_service
+            ctx.knowledge_service is not None
+            and ctx.knowledge_service.memory_available
             and ctx.config.memory.inject_in_context
             and memory_ok
         ):
             try:
-                relevant = await ctx.memory_service.search(
-                    query=user_content,
+                hits = await ctx.knowledge_service.search(
+                    user_content,
+                    kind="memory",
                     k=ctx.config.memory.top_k,
-                    filter={"scope": "long_term"},
+                    filters={"scope": "long_term"},
                 )
-                if relevant:
+                if hits:
                     aux_parts.append(
                         _format_memory_context(
-                            relevant,
+                            hits,
                             ctx.config.memory.context_max_chars,
                         )
                     )

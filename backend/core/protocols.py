@@ -522,7 +522,7 @@ class MemoryServiceProtocol(Protocol):
 # an alias here so ``AppContext`` can reference it consistently with the
 # rest of the protocol surface.
 from backend.services.knowledge.protocol import (  # noqa: E402
-    KnowledgeBackend as KnowledgeBackendProtocol,
+    KnowledgeServiceProtocol as KnowledgeServiceProtocol,
 )
 
 

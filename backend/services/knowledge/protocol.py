@@ -208,3 +208,69 @@ class KnowledgeBackend(Protocol):
     async def health(self) -> BackendHealth:
         """Return a lightweight health snapshot for the backend."""
         ...
+
+
+@runtime_checkable
+class KnowledgeServiceProtocol(Protocol):
+    """Single entry point to the knowledge domain (Fase 4).
+
+    Facade over the composable :class:`KnowledgeBackend` plus the memory
+    admin operations the backend protocol does not model.  Tools and
+    routes depend on THIS — never on ``memory_service`` or a backend.
+    """
+
+    @property
+    def memory_available(self) -> bool:
+        """True when memory/fact-kind operations can succeed."""
+        ...
+
+    @property
+    def backend(self) -> KnowledgeBackend:
+        """The wrapped backend — factory-shape tests only."""
+        ...
+
+    async def search(
+        self,
+        query: str,
+        *,
+        kind: KnowledgeKind,
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[KnowledgeHit]: ...
+
+    async def get(
+        self, doc_id: str, *, kind: KnowledgeKind,
+    ) -> KnowledgeDoc | None: ...
+
+    async def create(self, doc: KnowledgeDocCreate) -> KnowledgeDoc: ...
+
+    async def update(
+        self,
+        doc_id: str,
+        patch: KnowledgeDocPatch,
+        *,
+        kind: KnowledgeKind,
+    ) -> KnowledgeDoc | None: ...
+
+    async def delete(
+        self, doc_id: str, *, kind: KnowledgeKind,
+    ) -> bool: ...
+
+    async def list(
+        self,
+        *,
+        kind: KnowledgeKind,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[KnowledgeDoc], int]: ...
+
+    async def delete_by_filter(
+        self, *, kind: KnowledgeKind, filters: dict[str, Any],
+    ) -> int: ...
+
+    async def health(self) -> BackendHealth: ...
+
+    async def memory_stats(self) -> dict[str, Any]: ...
+
+    async def delete_all_memories(self) -> int: ...

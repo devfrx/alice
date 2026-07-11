@@ -5,13 +5,13 @@ Qdrant store cannot be opened (e.g. data written by an incompatible
 ``qdrant-client`` version), the lifespan leaves ``ctx.qdrant_service`` /
 ``ctx.memory_service`` as ``None`` and the RAG stack disabled.  This module
 clears the embedded store, re-initialises Qdrant + memory + the knowledge
-backend, re-points tool-RAG at the fresh services, recomputes readiness and
+service, re-points tool-RAG at the fresh services, recomputes readiness and
 broadcasts ``knowledge.status``.
 
-Plugins read ``ctx.knowledge_backend`` / ``ctx.memory_service`` lazily on every
-call, so re-wiring the context is sufficient — no plugin re-initialisation is
-required.  Never raises: a failed repair returns a disabled
-:class:`RagReadiness` carrying the reason.
+Plugins read ``ctx.knowledge_service`` lazily on every call, so re-wiring
+the context is sufficient — no plugin re-initialisation is required.
+Never raises: a failed repair returns a disabled :class:`RagReadiness`
+carrying the reason.
 """
 
 from __future__ import annotations
@@ -95,32 +95,22 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
                 await memory_service.close()
             ctx.memory_service = None
 
-    # 3. Re-wire the knowledge backend (preserving the continuum note side).
-    from backend.services.knowledge import QdrantBackend
+    # 3. Re-wire the knowledge service (reusing the shared Continuum client).
+    from backend.services.knowledge.service import build_knowledge_service
 
-    qdrant_backend = QdrantBackend(memory_service=ctx.memory_service)
-    if config.continuum.enabled:
-        from backend.services.knowledge import (
-            CompositeKnowledgeBackend,
-            ContinuumBackend,
-            ContinuumClient,
+    client = getattr(ctx, "continuum_client", None)
+    if config.continuum.enabled and client is None:
+        # The client is built once in the lifespan; if it is missing here
+        # the wiring is broken — proceed memory-only, never build a second
+        # client.
+        logger.warning(
+            "Repair: continuum enabled but no shared client — notes disabled",
         )
-
-        client = getattr(ctx, "continuum_client", None)
-        if client is None:
-            client = ContinuumClient(
-                base_url=config.continuum.base_url,
-                api_token=config.continuum.api_token,
-                timeout_s=config.continuum.timeout_s,
-                folder_cache_ttl_s=config.continuum.folder_cache_ttl_s,
-            )
-            ctx.continuum_client = client
-        ctx.knowledge_backend = CompositeKnowledgeBackend(
-            note_backend=ContinuumBackend(client=client),
-            memory_backend=qdrant_backend,
-        )
-    else:
-        ctx.knowledge_backend = qdrant_backend
+    ctx.knowledge_service = build_knowledge_service(
+        continuum_enabled=config.continuum.enabled and client is not None,
+        memory_service=ctx.memory_service,
+        continuum_client=client,
+    )
 
     # 4. Point tool-RAG at the new backends and re-embed (best-effort).
     if ctx.tool_registry is not None:

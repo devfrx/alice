@@ -3,6 +3,8 @@
  * Types aligned with LM Studio v1 REST API model responses.
  */
 
+import type { ApiSchema } from './generated'
+
 /** Quantization info for a model. */
 export interface ModelQuantization {
   name: string | null
@@ -110,28 +112,14 @@ export interface ModelOperationResponse {
   started_at?: string
 }
 
-/** Qdrant vector store statistics */
-export interface VectorStoreCollectionInfo {
-  name: string
-  points_count: number
-  vectors_size: number
-}
+/** Effective RAG readiness (generated from the backend contract). */
+export type RagReadinessStatus = ApiSchema<'RagReadinessResponse'>
 
-/** Whether the vector/embedding (RAG) stack is currently usable. */
-export interface RagReadinessStatus {
-  ready: boolean
-  reason: string
-  memory_enabled: boolean
-  tool_rag_enabled: boolean
-}
+/** Stats of a single Qdrant collection. */
+export type VectorStoreCollectionInfo = ApiSchema<'VectorStoreCollectionInfo'>
 
-export interface VectorStoreStats {
-  mode: string
-  connected: boolean
-  collections: VectorStoreCollectionInfo[]
-  /** Effective RAG readiness (independent of the persisted toggle). */
-  rag: RagReadinessStatus
-}
+/** Vector store status + effective RAG readiness. */
+export type VectorStoreStats = ApiSchema<'VectorStoreStatsResponse'>
 
 /** A single tool in the chat tool-picker catalog. */
 export interface ToolCatalogTool {

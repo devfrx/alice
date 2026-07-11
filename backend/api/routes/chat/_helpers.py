@@ -17,6 +17,7 @@ from loguru import logger
 from backend.core.context import AppContext
 from backend.db.models import ArtifactKind, Message
 from backend.services.context_manager import ContextManager
+from backend.services.knowledge import KnowledgeHit
 from backend.services.permission_mode_policy import ModePolicy
 from backend.services.permission_mode_service import PermissionMode
 
@@ -283,18 +284,15 @@ def _build_mcp_context(ctx: AppContext) -> str | None:
 
 
 def _format_memory_context(
-    memories: list[dict[str, Any]], max_chars: int,
+    hits: list[KnowledgeHit], max_chars: int,
 ) -> str:
     """Serialize relevant memories into a text block for the system prompt."""
     lines = ["[RELEVANT MEMORIES]"]
     total = 0
-    for m in memories:
-        entry = m.get("entry")
-        if entry is None:
-            continue
-        cat = getattr(entry, "category", None) or "general"
-        content = getattr(entry, "content", "")
-        line = f"- [{cat}] {content}"
+    for hit in hits:
+        doc = hit.doc
+        cat = (doc.metadata or {}).get("category") or "general"
+        line = f"- [{cat}] {doc.content}"
         if total + len(line) > max_chars:
             break
         lines.append(line)

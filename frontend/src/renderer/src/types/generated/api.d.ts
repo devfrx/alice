@@ -1089,8 +1089,6 @@ export interface paths {
         /**
          * List Memories
          * @description List memory entries with optional filters.
-         *
-         *     Returns paginated entries ordered by creation time descending.
          */
         get: operations["list_memories_api_memory_get"];
         put?: never;
@@ -2696,6 +2694,54 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * KGEntityRead
+         * @description Entity node as returned by the MCP memory server.
+         */
+        KGEntityRead: {
+            /** Entitytype */
+            entityType: string;
+            /** Name */
+            name: string;
+            /**
+             * Observations
+             * @default []
+             */
+            observations?: string[];
+        };
+        /**
+         * KGGraphResponse
+         * @description Knowledge-graph snapshot (entities + relations).
+         */
+        KGGraphResponse: {
+            /** Entities */
+            entities: components["schemas"]["KGEntityRead"][];
+            /** Relations */
+            relations: components["schemas"]["KGRelationRead"][];
+        };
+        /**
+         * KGMutationResponse
+         * @description Mutation acknowledgement (the client reloads the graph).
+         */
+        KGMutationResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok?: boolean;
+        };
+        /**
+         * KGRelationRead
+         * @description Directed relation between two entities.
+         */
+        KGRelationRead: {
+            /** From */
+            from: string;
+            /** Relationtype */
+            relationType: string;
+            /** To */
+            to: string;
+        };
+        /**
          * LoadModelRequest
          * @description Body for ``POST /models/load``.
          */
@@ -2712,6 +2758,104 @@ export interface components {
             num_experts?: number | null;
             /** Offload Kv Cache To Gpu */
             offload_kv_cache_to_gpu?: boolean | null;
+        };
+        /**
+         * MemoryDeleteCountResponse
+         * @description Bulk-delete count.
+         */
+        MemoryDeleteCountResponse: {
+            /** Deleted Count */
+            deleted_count: number;
+        };
+        /**
+         * MemoryDeleteResponse
+         * @description Single-delete acknowledgement.
+         */
+        MemoryDeleteResponse: {
+            /** Deleted */
+            deleted: boolean;
+        };
+        /**
+         * MemoryEntryRead
+         * @description Public representation of a memory entry.
+         */
+        MemoryEntryRead: {
+            /** Category */
+            category?: string | null;
+            /** Content */
+            content: string;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Id */
+            id: string;
+            /** Scope */
+            scope: string;
+            /** Source */
+            source?: string | null;
+        };
+        /**
+         * MemoryListResponse
+         * @description Paginated memory list (``{items, total}`` convention, spec §6).
+         */
+        MemoryListResponse: {
+            /** Items */
+            items: components["schemas"]["MemoryEntryRead"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * MemorySearchHit
+         * @description Search result: entry + similarity score.
+         */
+        MemorySearchHit: {
+            entry: components["schemas"]["MemoryEntryRead"];
+            /** Score */
+            score: number;
+        };
+        /**
+         * MemorySearchRequest
+         * @description Body for ``POST /api/memory/search``.
+         */
+        MemorySearchRequest: {
+            /** Category */
+            category?: string | null;
+            /**
+             * Limit
+             * @default 10
+             */
+            limit?: number;
+            /** Query */
+            query: string;
+        };
+        /**
+         * MemorySearchResponse
+         * @description Semantic search results.
+         */
+        MemorySearchResponse: {
+            /** Results */
+            results: components["schemas"]["MemorySearchHit"][];
+        };
+        /**
+         * MemoryStatsResponse
+         * @description Aggregate memory statistics.
+         */
+        MemoryStatsResponse: {
+            /** By Category */
+            by_category: {
+                [key: string]: number;
+            };
+            /** By Scope */
+            by_scope: {
+                [key: string]: number;
+            };
+            /** Db Size Bytes */
+            db_size_bytes: number;
+            /** Total */
+            total: number;
         };
         /**
          * ModelStatusResponse
@@ -2836,6 +2980,28 @@ export interface components {
             title: string;
             /** Updated At */
             updated_at: string | null;
+        };
+        /**
+         * RagReadinessResponse
+         * @description RAG/knowledge readiness verdict.
+         */
+        RagReadinessResponse: {
+            /** Memory Enabled */
+            memory_enabled: boolean;
+            /** Ready */
+            ready: boolean;
+            /** Reason */
+            reason: string;
+            /** Tool Rag Enabled */
+            tool_rag_enabled: boolean;
+        };
+        /**
+         * ReembedToolsResponse
+         * @description Outcome of the tool re-embedding trigger.
+         */
+        ReembedToolsResponse: {
+            /** Status */
+            status: string;
         };
         /**
          * RelationInput
@@ -3132,6 +3298,31 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VectorStoreCollectionInfo
+         * @description Stats of a single Qdrant collection.
+         */
+        VectorStoreCollectionInfo: {
+            /** Name */
+            name: string;
+            /** Points Count */
+            points_count: number;
+            /** Vectors Size */
+            vectors_size: number;
+        };
+        /**
+         * VectorStoreStatsResponse
+         * @description Vector store status + effective RAG readiness.
+         */
+        VectorStoreStatsResponse: {
+            /** Collections */
+            collections: components["schemas"]["VectorStoreCollectionInfo"][];
+            /** Connected */
+            connected: boolean;
+            /** Mode */
+            mode: string;
+            rag: components["schemas"]["RagReadinessResponse"];
         };
         /**
          * WsAgentCriticInvoked
@@ -5156,21 +5347,6 @@ export interface components {
             /** Query */
             query: string;
         };
-        /**
-         * SearchRequest
-         * @description Body for POST /memory/search.
-         */
-        backend__api__routes__memory__SearchRequest: {
-            /** Category */
-            category?: string | null;
-            /**
-             * Limit
-             * @default 10
-             */
-            limit?: number;
-            /** Query */
-            query: string;
-        };
     };
     responses: never;
     parameters: never;
@@ -6472,9 +6648,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["RagReadinessResponse"];
                 };
             };
         };
@@ -6498,7 +6672,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6531,7 +6705,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6560,7 +6734,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGGraphResponse"];
                 };
             };
         };
@@ -6584,7 +6758,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGGraphResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6617,7 +6791,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6650,7 +6824,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6683,7 +6857,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6716,7 +6890,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6749,7 +6923,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KGGraphResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6875,9 +7049,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MemoryListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6906,9 +7078,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: number;
-                    };
+                    "application/json": components["schemas"]["MemoryDeleteCountResponse"];
                 };
             };
         };
@@ -6922,7 +7092,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["backend__api__routes__memory__SearchRequest"];
+                "application/json": components["schemas"]["MemorySearchRequest"];
             };
         };
         responses: {
@@ -6932,9 +7102,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MemorySearchResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6963,9 +7131,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: number;
-                    };
+                    "application/json": components["schemas"]["MemoryDeleteCountResponse"];
                 };
             };
         };
@@ -6985,9 +7151,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MemoryStatsResponse"];
                 };
             };
         };
@@ -7009,9 +7173,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: boolean;
-                    };
+                    "application/json": components["schemas"]["MemoryDeleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8414,9 +8576,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["ReembedToolsResponse"];
                 };
             };
         };
@@ -8436,9 +8596,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VectorStoreStatsResponse"];
                 };
             };
         };
@@ -8458,9 +8616,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VectorStoreStatsResponse"];
                 };
             };
         };

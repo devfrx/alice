@@ -52,13 +52,15 @@ def _make_memory_entry(
 
 @pytest.fixture
 def mock_ctx():
-    """Build a mock AppContext with a real ``QdrantBackend`` wrapping a mocked memory service."""
+    """Mock AppContext with a real KnowledgeService over a mocked memory service."""
     from backend.core.context import AppContext
     from backend.services.knowledge import QdrantBackend
+    from backend.services.knowledge.service import KnowledgeService
 
     ctx = MagicMock(spec=AppContext)
     ctx.memory_service = AsyncMock()
-    ctx.knowledge_backend = QdrantBackend(
+    ctx.knowledge_service = KnowledgeService(
+        backend=QdrantBackend(memory_service=ctx.memory_service),
         memory_service=ctx.memory_service,
     )
     ctx.config = MagicMock()
@@ -85,11 +87,16 @@ def plugin(mock_ctx):
 
 @pytest.fixture
 def plugin_no_service(mock_ctx):
-    """MemoryPlugin where the knowledge backend (memory) is unavailable."""
+    """MemoryPlugin where the memory side of the knowledge service is unavailable."""
     from backend.plugins.memory.plugin import MemoryPlugin
+    from backend.services.knowledge import QdrantBackend
+    from backend.services.knowledge.service import KnowledgeService
 
     mock_ctx.memory_service = None
-    mock_ctx.knowledge_backend = None
+    mock_ctx.knowledge_service = KnowledgeService(
+        backend=QdrantBackend(memory_service=None),
+        memory_service=None,
+    )
     p = MemoryPlugin()
     p._ctx = mock_ctx
     p._initialized = True
@@ -456,6 +463,36 @@ class TestMemoryServiceUnavailable:
             {},
             exec_context,
         )
+
+        assert result.success is False
+        assert result.error_message is not None
+
+
+# ===================================================================
+# 8. Dependency / connection status
+# ===================================================================
+
+
+class TestDependencyReporting:
+    """check_dependencies / get_connection_status reflect the knowledge service."""
+
+    def test_dependencies_ok_when_available(self, plugin):
+        assert plugin.check_dependencies() == []
+
+    def test_dependencies_report_knowledge_service(self, plugin_no_service):
+        assert plugin_no_service.check_dependencies() == ["knowledge_service"]
+
+    async def test_execute_tool_errors_when_service_is_none(
+        self, mock_ctx, exec_context
+    ):
+        from backend.plugins.memory.plugin import MemoryPlugin
+
+        mock_ctx.knowledge_service = None
+        p = MemoryPlugin()
+        p._ctx = mock_ctx
+        p._initialized = True
+
+        result = await p.execute_tool("recall", {"query": "x"}, exec_context)
 
         assert result.success is False
         assert result.error_message is not None

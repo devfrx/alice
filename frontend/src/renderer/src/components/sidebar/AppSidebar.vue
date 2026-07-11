@@ -25,6 +25,7 @@ import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 /**
@@ -248,14 +249,15 @@ async function onBackupAll(): Promise<void> {
           <span class="sidebar__brand">
             <BrandWordmark brand="alce" />
           </span>
-          <button
+          <UiIconButton
             v-if="!props.docked"
-            class="sidebar__close"
-            aria-label="Chiudi sidebar"
+            label="Chiudi sidebar"
+            variant="ghost"
+            size="sm"
             @click="toggle"
           >
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
-          </button>
+          </UiIconButton>
         </div>
 
         <!-- Primary surface tabs: Assistente (Horizon) | Workspace (chat+modules) -->
@@ -502,27 +504,6 @@ async function onBackupAll(): Promise<void> {
   text-transform: uppercase;
 }
 
-.sidebar__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.sidebar__close:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
 /* Navigation */
 .sidebar__nav {
   display: flex;
@@ -675,7 +656,6 @@ async function onBackupAll(): Promise<void> {
   .sidebar__backdrop,
   .sidebar__link,
   .sidebar__link-icon,
-  .sidebar__close,
   .sidebar-slide-enter-active,
   .sidebar-slide-leave-active,
   .sidebar-backdrop-enter-active,

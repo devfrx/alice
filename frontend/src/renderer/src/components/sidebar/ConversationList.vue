@@ -12,6 +12,8 @@ import { computed, nextTick, ref, onMounted, onBeforeUnmount } from 'vue'
 
 import type { ConversationSummary } from '../../types/chat'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 import { formatRelativeTime } from '../../utils/relativeTime'
 
 const props = defineProps<{
@@ -199,32 +201,35 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
     <div class="conv-list__header">
       <span class="conv-list__title">Conversazioni</span>
       <div class="conv-list__header-actions">
-        <button
+        <UiIconButton
           class="conv-list__header-btn"
-          aria-label="Nuova chat"
-          title="Nuova chat"
+          label="Nuova chat"
+          variant="ghost"
+          size="xs"
           @click="emit('create')"
         >
           <AppIcon name="plus" :size="12" />
-        </button>
-        <button
+        </UiIconButton>
+        <UiIconButton
           v-if="conversations.length > 0"
           class="conv-list__header-btn"
-          aria-label="Backup di tutte le conversazioni"
-          title="Backup di tutte le conversazioni"
+          label="Backup di tutte le conversazioni"
+          variant="ghost"
+          size="xs"
           @click="emit('backup-all')"
         >
           <AppIcon name="folder" :size="11" />
-        </button>
-        <button
+        </UiIconButton>
+        <UiIconButton
           v-if="conversations.length > 0"
           class="conv-list__header-btn conv-list__header-btn--danger"
-          aria-label="Elimina tutte le conversazioni"
-          title="Elimina tutte"
+          label="Elimina tutte le conversazioni"
+          variant="ghost"
+          size="xs"
           @click="emit('delete-all')"
         >
           <AppIcon name="trash" :size="11" />
-        </button>
+        </UiIconButton>
       </div>
     </div>
 
@@ -287,55 +292,61 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
 
           <!-- Action buttons (slide-in on hover) -->
           <div class="conv-item__actions" @click.stop>
-            <button
+            <UiIconButton
               v-if="renamingId !== conv.id"
               class="conv-item__action"
-              aria-label="Esporta conversazione"
+              label="Esporta conversazione"
               title="Esporta backup JSON"
+              variant="ghost"
+              size="xs"
               @click="emit('export', conv.id)"
             >
               <AppIcon name="folder" :size="11" />
-            </button>
-            <button
+            </UiIconButton>
+            <UiIconButton
               v-if="renamingId !== conv.id"
               class="conv-item__action"
-              aria-label="Rinomina conversazione"
-              title="Rinomina"
+              label="Rinomina conversazione"
+              variant="ghost"
+              size="xs"
               @click="startRename(conv)"
             >
               <AppIcon name="pencil" :size="11" />
-            </button>
-            <button
+            </UiIconButton>
+            <UiIconButton
               v-if="renamingId === conv.id"
               class="conv-item__action conv-item__action--confirm"
-              aria-label="Conferma"
-              title="Conferma"
+              label="Conferma"
+              variant="ghost"
+              size="xs"
               @click="confirmRename(conv.id)"
             >
               <AppIcon name="check" :size="11" :stroke-width="2.5" />
-            </button>
-            <button
+            </UiIconButton>
+            <UiIconButton
               class="conv-item__action conv-item__action--danger"
-              aria-label="Elimina conversazione"
-              title="Elimina"
+              label="Elimina conversazione"
+              variant="ghost"
+              size="xs"
               :disabled="conv.id === streamingId"
               @click="emit('delete', conv.id)"
             >
               <AppIcon name="trash" :size="11" />
-            </button>
+            </UiIconButton>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Empty state -->
-    <div v-if="conversations.length === 0" class="conv-list__empty">
-      <span class="conv-list__empty-icon" aria-hidden="true">
-        <AppIcon name="message" :size="28" :stroke-width="1.2" />
-      </span>
-      <span class="conv-list__empty-text">Nessuna conversazione</span>
-      <span class="conv-list__empty-sub">Crea una nuova chat per iniziare</span>
-    </div>
+    <UiEmptyState
+      v-if="conversations.length === 0"
+      class="conv-list__empty"
+      icon="message"
+      :icon-size="28"
+      title="Nessuna conversazione"
+      subtitle="Crea una nuova chat per iniziare"
+    />
   </div>
 </template>
 
@@ -377,25 +388,9 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   gap: var(--space-0-5);
 }
 
-/* Compact icon button — subtle, accent on hover */
-.conv-list__header-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
-}
-
+/* Accent hover overrides the kit's default ghost hover (text-primary) — matches
+   the previous bespoke treatment for header actions. */
 .conv-list__header-btn:hover {
-  background: var(--surface-hover);
   color: var(--accent);
 }
 
@@ -612,28 +607,8 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   pointer-events: auto;
 }
 
-/* Icon button: --text-muted default → --text-primary on hover */
-.conv-item__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.conv-item__action:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
+/* Kit ghost default already covers text-muted → text-primary / surface-hover;
+   only the state-specific overrides below are bespoke. */
 .conv-item__action--confirm:hover {
   color: var(--success);
 }
@@ -648,29 +623,7 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
 .conv-list__empty {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
   pointer-events: none;
-}
-
-.conv-list__empty-icon {
-  color: var(--text-muted);
-  opacity: 0.35;
-}
-
-.conv-list__empty-text {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--text-secondary);
-}
-
-.conv-list__empty-sub {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
 }
 
 /* ─── Reduced motion ────────────────────────────────────────── */

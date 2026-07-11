@@ -1555,6 +1555,9 @@ git commit -m "ci(fe): lint and vitest gates in contracts.yml; memory store spec
 
 ## Gate finale di fase
 
+> **Esito (2026-07-11): FASE COMPLETATA — verdetto review finale "Phase ready with notes".**
+> Gate tutti verdi sull'albero finale: FE typecheck + lint (exit 0, 0/0) + vitest 21 file/162 test; backend 101 test (contracts + artifact registry); boot ok; check-contracts PASS; import-linter 6/6 kept (454 file). Review finale (modello top, range intero, angolo coerenza cross-task): rimozione senza residui vivi, i 4 seam nuovi coerenti fra loro, esiti del piano veritieri alla verifica a campione, startup path sano. Finding IMPORTANT (unico con peso architetturale): `ArtifactCard.openConversation` duplicava `conversation.open` bypassando il registry (nato dall'incrocio Task 2×Task 5) — FIXATO dal controller in `a00e863` insieme ai minor: variabili CSS `--chat-edge-fade-*` orfane, 12 alias `Ws*Message` morti potati (grep-verificati uno a uno; la promessa del Task 4 era caduta nel vuoto — colta dalla review finale), icona `hybrid-home` residua. Smoke funzionale interattivo (npm run dev) NON eseguito in sessione: da fare alla prima apertura dell'app.
+
 1. Da `frontend/`: `npm run typecheck` + `npm run lint` (exit 0) + `npm test` → tutti PASS.
 2. Da `backend/`: `..\.venv\Scripts\python.exe -m pytest tests/contracts/ tests/test_artifact_registry.py -v` → PASS (rossi ereditati esclusi).
 3. Da repo root: boot-check `create_app` + `.\scripts\check-contracts.ps1` + `./.venv/Scripts/lint-imports --config backend/pyproject.toml` (6 contratti kept) → PASS.
@@ -1562,11 +1565,23 @@ git commit -m "ci(fe): lint and vitest gates in contracts.yml; memory store spec
 5. Review finale di fase (modello top, range `arch/fase5-kernel..HEAD`, angolo: coerenza cross-task + regressioni di rimozione).
 6. Aggiornare l'handoff (`docs/superpowers/handoffs/`) con stato post-fase6.
 
-## Backlog di fase (fuori scope, registrare in fondo al piano a fine esecuzione)
+## Backlog di fase (consolidato a fine esecuzione, 2026-07-11)
 
-- Unificazione COMPLETA del payload CAD live sull'endpoint artifacts (`/api/cad/models/{name}` rimovibile solo quando il payload del turno porta l'artifact id — richiede arricchimento del tool result in tool_loop, fase 7/8).
-- Bridge `client_tool_call` nel renderer (frame oggi no-op esplicito).
-- Frame di invio chat (`WsSendPayload`) senza `type` nel vocabolario client — valutare la promozione a frame tipizzato in fase 7 (breaking sul protocollo WS).
-- Validazione runtime dei frame WS in ingresso (oggi cast al confine, come events — eventuale zod/valibot).
-- Migrare i `<router-link>` di navigazione ai comandi quando la palette/manifest lo richiederà (fase 7).
+**Per la fase 7 (Command Bridge) — direttamente rilevanti:**
+- Validazione runtime `argsSchema` OBBLIGATORIA nel bridge `app_command` (`commandRegistry.execute` non valida; gli args dell'agente arrivano come JSON non fidato).
+- Campo `description` machine-facing (inglese) su `CommandDefinition` per il manifest LLM (`title` è label umana italiana). Aggiunta non-breaking.
+- Frame di invio chat (`WsSendPayload`) senza `type` nel vocabolario client — valutare la promozione a frame tipizzato (breaking sul protocollo WS).
+- Migrare i `<router-link>` di navigazione ai comandi quando palette/manifest lo richiederanno.
 - `artifact.show` porta `?artifact=` alla board: la view può imparare a evidenziare/scrollare l'artifact.
+
+**Sanature tecniche:**
+- Migrare `useVoice.ts` a un pattern tipizzato analogo a chat/events e ritirare l'emitter generico per stringhe da `WebSocketManager`.
+- Guard own-property (`hasOwnProperty`) anche nel dispatcher events (`useEventsWebSocket.ts:143`) — parità col fix del canale chat.
+- Bridge `client_tool_call` nel renderer (frame oggi no-op esplicito, dormiente da 1b).
+- Validazione runtime dei frame WS in ingresso (oggi cast al confine — eventuale zod/valibot).
+- `*.ts text eol=lf` (e affini) in `.gitattributes` — 5 incidenti EOL nel programma; 4 file pre-esistenti `i/lf w/crlf` da normalizzare (index.html, types/mcp.ts, types/plugin.ts, markdownRenderer.ts).
+- Unificazione COMPLETA del payload CAD live sull'endpoint artifacts (`/api/cad/models/{name}` rimovibile solo quando il tool result porta l'artifact id — arricchimento in tool_loop, fase 7/8).
+- TldrawCanvas: orphan dead-end pre-esistente (`isOrphaned` non resettato al cambio board) + copy "deleted" mostrata anche per errori di rete; su update esterno genuino il remount resetta camera/undo (manca `editor.loadSnapshot` incrementale).
+- `auditApi` (audit.ts) morto già pre-fase (zero consumer di getAuditConfirmations): cablare una UI audit o rimuovere modulo+endpoint.
+- ~15 icone del registry senza consumatori (link, message-plus, mic-alt, volume-two, stop-fill, spinner-*, lightbulb-simple, clock, file-text, bar-chart, search-plus, maximize-fit, stt/tts-indicator) — potare o usare.
+- A11y della pagina terminale: `role="tab"` senza pattern tastiera.

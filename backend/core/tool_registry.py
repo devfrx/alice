@@ -34,6 +34,7 @@ from backend.core.protocols import EmbeddingClientProtocol, QdrantServiceProtoco
 from backend.core.tools import AvailabilityProbe, ToolCatalog, ToolExecutor, ToolRag
 from backend.core.tools import policy as _policy
 from backend.core.tools.availability import compose_available_tools
+from backend.core.tools.catalog import KernelToolHandler
 
 # ---------------------------------------------------------------------------
 # ToolRegistry
@@ -141,6 +142,12 @@ class ToolRegistry:
         re-evaluated instead of serving a stale cached status.
         """
         self._availability.clear_status_cache()
+
+    async def register_kernel_tool(
+        self, tool_def: ToolDefinition, handler: KernelToolHandler,
+    ) -> None:
+        """Register (or replace) a kernel-owned tool (spec §7: app_command)."""
+        await self._catalog.register_kernel_tool(tool_def, handler)
 
     # ------------------------------------------------------------------
     # Query methods

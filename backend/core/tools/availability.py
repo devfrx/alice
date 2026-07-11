@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from backend.core.plugin_manager import PluginManager
-from backend.core.plugin_models import ConnectionStatus
+from backend.core.plugin_models import KERNEL_TOOL_OWNER, ConnectionStatus
 
 if TYPE_CHECKING:
     from backend.core.tools.catalog import ToolCatalog
@@ -100,6 +100,10 @@ class AvailabilityProbe:
         Returns ``DISCONNECTED`` on a missing plugin, a timeout, or any error
         so callers treat the plugin as unavailable instead of blocking.
         """
+        if plugin_name == KERNEL_TOOL_OWNER:
+            # Kernel-owned tools have no plugin to probe: always reachable.
+            return ConnectionStatus.CONNECTED
+
         plugin = self._plugin_manager.get_plugin(plugin_name)
         if plugin is None:
             return ConnectionStatus.DISCONNECTED

@@ -10,16 +10,23 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from loguru import logger
 
 from backend.core.plugin_manager import PluginManager
 from backend.core.plugin_models import (
+    KERNEL_TOOL_OWNER,
     MAX_TOOL_DESCRIPTION_LENGTH,
     TOOL_NAME_PATTERN,
+    ExecutionContext,
     ToolDefinition,
+    ToolResult,
 )
+
+#: Signature of a kernel-owned tool handler (no owning plugin to delegate to).
+KernelToolHandler = Callable[[dict[str, Any], ExecutionContext], Awaitable[ToolResult]]
 
 
 def _validate_json_schema(schema: Any) -> dict[str, Any]:
@@ -56,6 +63,8 @@ class ToolCatalog:
         self._openai_cache: list[dict[str, Any]] = []
         self._lock = asyncio.Lock()
         self._logger = logger.bind(component="ToolCatalog")
+        self._kernel_tools: dict[str, ToolDefinition] = {}
+        self._kernel_handlers: dict[str, KernelToolHandler] = {}
 
     # ------------------------------------------------------------------
     # Shared state accessors (used by sibling components)
@@ -89,6 +98,36 @@ class ToolCatalog:
         """Return the owning plugin name for a namespaced tool name."""
         return self._tool_to_plugin.get(ns_name)
 
+    def kernel_handler_of(self, ns_name: str) -> KernelToolHandler | None:
+        """Return the kernel handler for *ns_name*, or ``None`` for plugin tools."""
+        return self._kernel_handlers.get(ns_name)
+
+    async def register_kernel_tool(
+        self, tool_def: ToolDefinition, handler: KernelToolHandler,
+    ) -> None:
+        """Register (or replace) a kernel-owned tool (spec §7).
+
+        Kernel tools have no owning plugin: they are stored under their BARE
+        name (no ``<plugin>_`` prefix), mapped to :data:`KERNEL_TOOL_OWNER`,
+        and survive :meth:`refresh`. Re-registration replaces definition and
+        handler in place (the Command Bridge re-registers ``app_command`` on
+        every manifest update to refresh the name enum).
+        """
+        async with self._lock:
+            self._kernel_tools[tool_def.name] = tool_def
+            self._kernel_handlers[tool_def.name] = handler
+            self._tools[tool_def.name] = tool_def
+            self._tool_to_plugin[tool_def.name] = KERNEL_TOOL_OWNER
+            fmt = tool_def.to_openai_format()
+            fmt["function"]["name"] = tool_def.name
+            for i, entry in enumerate(self._openai_cache):
+                if entry["function"]["name"] == tool_def.name:
+                    self._openai_cache[i] = fmt
+                    break
+            else:
+                self._openai_cache.append(fmt)
+            self._logger.info("Kernel tool registered: {}", tool_def.name)
+
     # ------------------------------------------------------------------
     # Refresh / rebuild
     # ------------------------------------------------------------------
@@ -102,8 +141,11 @@ class ToolCatalog:
         registration wins).
         """
         async with self._lock:
-            new_tools: dict[str, ToolDefinition] = {}
-            new_map: dict[str, str] = {}
+            # Kernel-owned tools survive every rebuild and win collisions
+            # (a plugin tool landing on the same namespaced name is skipped
+            # by the existing first-wins check below).
+            new_tools: dict[str, ToolDefinition] = dict(self._kernel_tools)
+            new_map: dict[str, str] = dict.fromkeys(self._kernel_tools, KERNEL_TOOL_OWNER)
 
             plugins = plugin_manager.get_all_plugins()
 

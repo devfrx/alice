@@ -232,6 +232,7 @@ class ToolExecutor:
         async with self._catalog.lock:
             tool_def = self._catalog.tools.get(tool_name)
             plugin_name = self._catalog.tool_to_plugin.get(tool_name)
+            kernel_handler = self._catalog.kernel_handler_of(tool_name)
 
             # Fallback: LLMs sometimes drop the "<plugin>_" prefix and
             # emit the bare tool name (e.g. "remember" instead of
@@ -252,6 +253,7 @@ class ToolExecutor:
                     tool_name = resolved
                     tool_def = self._catalog.tools.get(resolved)
                     plugin_name = self._catalog.tool_to_plugin.get(resolved)
+                    kernel_handler = self._catalog.kernel_handler_of(resolved)
                 elif len(candidates) > 1:
                     return ToolResult.error(
                         f"Tool '{tool_name}' is ambiguous: matches "
@@ -264,18 +266,19 @@ class ToolExecutor:
                 "not found in registry"
             )
 
-        if plugin_name is None:
-            return ToolResult.error(
-                f"Tool '{tool_name}' not available: "
-                "no owning plugin"
-            )
-
-        plugin = self._plugin_manager.get_plugin(plugin_name)
-        if plugin is None:
-            return ToolResult.error(
-                f"Tool '{tool_name}' not available: "
-                f"plugin '{plugin_name}' is not loaded"
-            )
+        plugin: Any = None
+        if kernel_handler is None:
+            if plugin_name is None:
+                return ToolResult.error(
+                    f"Tool '{tool_name}' not available: "
+                    "no owning plugin"
+                )
+            plugin = self._plugin_manager.get_plugin(plugin_name)
+            if plugin is None:
+                return ToolResult.error(
+                    f"Tool '{tool_name}' not available: "
+                    f"plugin '{plugin_name}' is not loaded"
+                )
 
         # --- emit start event ---
         await self._event_bus.emit(
@@ -317,10 +320,12 @@ class ToolExecutor:
         timeout_s = tool_def.timeout_ms / 1000.0
 
         try:
+            if kernel_handler is not None:
+                invocation = kernel_handler(args, context)
+            else:
+                invocation = plugin.execute_tool(tool_def.name, args, context)
             result: ToolResult = await asyncio.wait_for(
-                plugin.execute_tool(
-                    tool_def.name, args, context,
-                ),
+                invocation,
                 timeout=timeout_s,
             )
         except TimeoutError:

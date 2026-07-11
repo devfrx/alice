@@ -38,6 +38,9 @@ function clear(): void {
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape' && props.modelValue) {
+    // Chromium clears input[type=search] natively on Escape (even with the
+    // cancel button hidden) — prevent it so clear() emits exactly once.
+    e.preventDefault()
     e.stopPropagation()
     clear()
   }
@@ -67,7 +70,7 @@ function onKeydown(e: KeyboardEvent): void {
         :aria-label="clearLabel"
         @click="clear"
       >
-        <AppIcon name="circle-x" :size="12" />
+        <AppIcon name="x" :size="12" />
       </button>
     </template>
   </UiInput>

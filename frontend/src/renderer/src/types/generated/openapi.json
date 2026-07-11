@@ -487,6 +487,42 @@
           }
         ]
       },
+      "CommandManifestEntry": {
+        "additionalProperties": false,
+        "description": "One agent-exposable UI command, as declared by the frontend registry.\n\nThe manifest is the THIRD generated contract (spec §7): this model rides\nthe same OpenAPI-injection pipeline as the channel unions.",
+        "properties": {
+          "args_schema": {
+            "additionalProperties": true,
+            "title": "Args Schema",
+            "type": "object"
+          },
+          "capability": {
+            "enum": [
+              "navigation",
+              "read",
+              "mutate",
+              "destructive"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "capability"
+        ],
+        "title": "CommandManifestEntry",
+        "type": "object"
+      },
       "ConversationExport": {
         "description": "Full conversation export (REST response body and backup file schema).",
         "properties": {
@@ -851,6 +887,8 @@
       "EventsClientMessage": {
         "discriminator": {
           "mapping": {
+            "command.manifest": "#/components/schemas/WsCommandManifest",
+            "command.result": "#/components/schemas/WsCommandResult",
             "ping": "#/components/schemas/WsPing",
             "terminal.input": "#/components/schemas/WsTerminalInput",
             "terminal.resize": "#/components/schemas/WsTerminalResize"
@@ -866,6 +904,12 @@
           },
           {
             "$ref": "#/components/schemas/WsTerminalResize"
+          },
+          {
+            "$ref": "#/components/schemas/WsCommandManifest"
+          },
+          {
+            "$ref": "#/components/schemas/WsCommandResult"
           }
         ]
       },
@@ -877,6 +921,7 @@
             "artifact.deleted": "#/components/schemas/WsArtifactDeleted",
             "artifact.updated": "#/components/schemas/WsArtifactUpdated",
             "calendar.changed": "#/components/schemas/WsCalendarChanged",
+            "command.request": "#/components/schemas/WsCommandRequest",
             "config.changed": "#/components/schemas/WsConfigChanged",
             "email.received": "#/components/schemas/WsEmailReceived",
             "email.sent": "#/components/schemas/WsEmailSent",
@@ -983,6 +1028,9 @@
           },
           {
             "$ref": "#/components/schemas/WsTerminalAssigned"
+          },
+          {
+            "$ref": "#/components/schemas/WsCommandRequest"
           }
         ]
       },
@@ -3201,6 +3249,156 @@
           "execution_id"
         ],
         "title": "WsClientToolResult",
+        "type": "object"
+      },
+      "WsCommandManifest": {
+        "additionalProperties": false,
+        "description": "The frontend's agent-exposable command manifest.\n\nSent on events-WS connect and whenever the exposed set changes. It\nREPLACES the backend's previous manifest wholesale.",
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/CommandManifestEntry"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "command.manifest",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "WsCommandManifest",
+        "type": "object"
+      },
+      "WsCommandRequest": {
+        "additionalProperties": false,
+        "description": "Command Layer RPC (spec §7): the kernel asks the UI to run a command.\n\nFirst real consumer of the envelope's ``correlation_id``: REQUIRED here\n(narrowed from the envelope's optional default) — the bridge always sets\nit and the client MUST echo it verbatim on the matching\n``command.result`` frame. ``origin`` defaults to ``agent`` because the\nrequest is issued on the agent's behalf inside a turn.",
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "command.request",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "correlation_id",
+          "type",
+          "name"
+        ],
+        "title": "WsCommandRequest",
+        "type": "object"
+      },
+      "WsCommandResult": {
+        "additionalProperties": false,
+        "description": "The UI's response to a ``command.request``.\n\n``correlation_id`` must echo the request's id verbatim — REQUIRED here\n(narrowed from the envelope's optional default) so a missing echo is a\nvalidation error, not a silently dropped frame.",
+        "properties": {
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "result": {
+            "default": null,
+            "title": "Result"
+          },
+          "type": {
+            "const": "command.result",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "correlation_id",
+          "type",
+          "ok"
+        ],
+        "title": "WsCommandResult",
         "type": "object"
       },
       "WsConfigChanged": {

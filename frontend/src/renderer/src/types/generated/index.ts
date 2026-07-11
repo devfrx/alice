@@ -15,3 +15,7 @@ export type ChatServerMessage = ApiSchema<'ChatServerMessage'>
 export type ChatClientMessage = ApiSchema<'ChatClientMessage'>
 export type EventsServerMessage = ApiSchema<'EventsServerMessage'>
 export type EventsClientMessage = ApiSchema<'EventsClientMessage'>
+
+/** Command Layer RPC frames (Fase 7, spec §7). */
+export type WsCommandRequest = ApiSchema<'WsCommandRequest'>
+export type CommandManifestEntry = ApiSchema<'CommandManifestEntry'>

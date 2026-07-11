@@ -206,6 +206,12 @@ onUnmounted(() => {
   box-shadow: var(--shadow-floating);
 }
 
+/* Focus programmatico di focus-trap sul contenitore: non è un'affordance
+   interattiva — l'anello globale qui è solo rumore. */
+.modal-card:focus-visible {
+  outline: none;
+}
+
 .modal-card__title {
   margin: 0 0 var(--space-2-5);
   font-size: var(--text-lg);

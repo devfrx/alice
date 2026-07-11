@@ -1701,6 +1701,8 @@ Se `test_context_groups.py` è stato aggiornato, includilo nel commit.
 
 ### Task 7: rigenerazione contratti (UNICO task che rigenera)
 
+> **Esito (2026-07-11):** DONE (controller — task di pura configurazione con gate auto-verificante). Commit `33aa1a1`: regen (`openapi.json` +198, `api.d.ts` +124, nuovi componenti `WsCommandRequest`/`WsCommandManifest`/`WsCommandResult`/`CommandManifestEntry` nelle unioni) + alias in `index.ts`. Tripwire VERIFICATO: `npm run typecheck` rosso con esattamente `TS2741: Property '"command.request"' is missing in EventsHandlerMap` (la garanzia compile-time del dispatcher esaustivo funziona; si risolve nel Task 8). `check-contracts.ps1` post-commit: «Contracts are up to date».
+
 **Files:**
 - Regenerate: `frontend/src/renderer/src/types/generated/openapi.json`, `frontend/src/renderer/src/types/generated/api.d.ts`
 - Modify: `frontend/src/renderer/src/types/generated/index.ts`
@@ -1735,6 +1737,8 @@ Expected: exit 0 (albero pulito).
 ---
 
 ### Task 8: frontend — description, comandi esposti, validatore, bridge, dispatcher
+
+> **Esito (2026-07-11):** DONE. Commit `0790b7e` (implementer, verbatim; typecheck 0 col tripwire risolto, 298 test verdi, lint 0/0). Spec review: controller (diff == piano; doppio filtro anti-escalation presente). Quality review (top): «With fixes» — verificati positivamente ordering install-prima-di-connect (App.vue), freshness del manifest su ogni reconnect/HMR (entrambe le direzioni di staleness fail-closed), conformità frame vs `WsCommandResult`, fire-and-forget rejection-safe; 2 Important applicati dal controller in `355e2e8`: (1) semantica own-property nel validatore (`Object.hasOwn` — `constructor`/`toString`/`__proto__` non bypassano più unknown-arg né soddisfano required) e (2) i comandi esposti SENZA schema si validano contro lo stesso fallback "no-args" che il manifest pubblicizza (asimmetria chiusa). Minor applicati: warn su reply droppata a socket chiuso, commento-seam su manifest-on-change. +3 test (301 totali). A backlog: hook di change-notification sul registry per il re-invio del manifest su registrazione dinamica; `origin` su `command.result` resta default `user` (decisione a livello contratto, nota).
 
 **Files:**
 - Modify: `frontend/src/renderer/src/commands/types.ts`, `commands/core.ts`, `commands/core.spec.ts`, `commands/index.ts`, `composables/useEventsWebSocket.ts`
@@ -2185,6 +2189,12 @@ git commit -m "feat(fe): Command Bridge - manifest, args validation, command.req
 
 ### Task 9: gate finale di fase
 
+> **Esito (2026-07-11):** DONE, **verdetto review finale di fase (top, range intero `bbcb0b4..355e2e8`): «Phase ready with notes»**. Trace end-to-end verificata link-per-link senza rotture (offer → gate → confirm → executor kernel → RPC → FE → result → loop); contratti coerenti a tre vie (Pydantic ↔ TS generato ↔ dict reali su entrambe le direzioni); checklist §7 tutta soddisfatta (manifest terzo contratto in pipeline, RPC correlation+timeout, UI-unavailable pulito, gating per tier, anti-escalation strutturale su ENTRAMBI i lati, origin sui frame, nessun echo-loop creato); 137 test scoped verdi in review. 1 Important applicato dal controller in `a55bc1f`: `set_manifest` early-return a bridge disabilitato (prima ogni connect FE ri-registrava il tool che il flag dichiara di spegnere) + riga flag-registry corretta + test; applicati anche: 3 docstring stale (emit-sites ws_schema, route events non più push-only, precedenza 2-bis in decide()), test di integrazione executor-reale→bridge-reale (enum del manifest respinge nomi off-manifest nel VERO executor + happy path completo).
+>
+> **Gate finali eseguiti (controller):** suite mirata backend 290+139 verdi (unico rosso: `test_plugins_enabled_list` EREDITATO 21-vs-20, gotcha documentato); lint-imports 6 kept / 0 broken; boot-check `boot ok`; `check-contracts.ps1` «up to date»; FE typecheck 0 / vitest 301/301 (29 file) / lint 0 errori 0 warning; EOL: nessun flip (`.gitignore` i/mixed è storico pre-fase).
+>
+> **NON eseguito: smoke E2E manuale interattivo (step 9.6)** — richiede LM Studio + app Electron viva; da fare alla prima apertura (checklist nel task sopra). Minors della review finale a backlog (sotto). Merge/push: decisione utente.
+
 - [ ] **Step 9.1: suite mirata backend** (da `backend/`):
 
 ```powershell
@@ -2235,6 +2245,7 @@ Checklist (con backend + `npm run dev` attivi, LM Studio/Ollama su):
 
 ## Backlog emerso in pianificazione
 
+0-ter. **Da review finale di fase (2026-07-11):** (a) `DedupMiddleware` deduplica anche gli ui_command — un `view.switch{board}` ripetuto legittimamente nello stesso turno viene saltato; valutare l'esenzione dei tool `ui_command` (stessa ratio dei client tools: stato UI vivo); (b) il frame di conferma in strict mostra `risk_level="safe"` anche per comandi manifest-`destructive` — far emergere la capability per-call nei metadata di conferma (si sposa con i grant per-comando); (c) finestra manifest-vuoto: strict/auto_edits chiedono CONFERMA per una chiamata destinata a fallire pulita ("Unknown command… none") — valutare short-circuit a deny/errore senza prompt.
 0-bis. **Da review Task 4/5 (2026-07-11):** (a) granularità dei grant per-COMANDO — oggi "always allow" su `app_command` copre TUTTI i comandi del manifest, destructive inclusi; chiave composta `app_command:{name}` in ConfirmationMiddleware; (b) cap morbido su `usage_guidance` (cresce linearmente col manifest, nessun limite come per `description`); (c) clamp/log su `rpc_timeout_s >= timeout_ms/1000` alla costruzione del bridge; (d) TOCTOU capability tra decide() ed esecuzione su manifest update (finestra accettata, solo FE fidato — commentata nel codice); (e) multi-window: `command.request` è broadcast, TUTTE le finestre eseguono (oggi single-window; con multi-window servirà target di sessione o focus-guard FE).
 1. `commandRegistry.execute` resta non-validante per i call-site UI (la validazione è solo sul percorso agente): valutare estenderla anche alla UI.
 2. Manifest non persistito: dopo un riavvio backend con UI già connessa il manifest arriva solo alla riconnessione WS (il reconnect FE lo ri-invia: accettabile; verificare in smoke).

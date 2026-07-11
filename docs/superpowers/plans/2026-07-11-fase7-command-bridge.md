@@ -2193,7 +2193,9 @@ git commit -m "feat(fe): Command Bridge - manifest, args validation, command.req
 >
 > **Gate finali eseguiti (controller):** suite mirata backend 290+139 verdi (unico rosso: `test_plugins_enabled_list` EREDITATO 21-vs-20, gotcha documentato); lint-imports 6 kept / 0 broken; boot-check `boot ok`; `check-contracts.ps1` «up to date»; FE typecheck 0 / vitest 301/301 (29 file) / lint 0 errori 0 warning; EOL: nessun flip (`.gitignore` i/mixed è storico pre-fase).
 >
-> **NON eseguito: smoke E2E manuale interattivo (step 9.6)** — richiede LM Studio + app Electron viva; da fare alla prima apertura (checklist nel task sopra). Minors della review finale a backlog (sotto). Merge/push: decisione utente.
+> **NON eseguito: smoke E2E manuale interattivo (step 9.6)** — richiede LM Studio + app Electron viva; da fare alla prima apertura (checklist nel task sopra). Minors della review finale a backlog (sotto).
+>
+> **MERGIATA in `main` il 2026-07-11 sera su richiesta utente**: branch pushato su origin, merge `--no-ff` `1e91a00`, main pushato.
 
 - [ ] **Step 9.1: suite mirata backend** (da `backend/`):
 

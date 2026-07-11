@@ -8,17 +8,15 @@
 ## Stato del programma
 
 - **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9. È LA fonte di verità.
-- **Fasi 1a, 1b, 2, 3, 4, 5, 6: COMPLETE e MERGIATE in `main`** (merge sequenziali `--no-ff`,
-  ultimo `5aa2660`; correzione Workspace `bbd05cb` = HEAD di main). Branch `arch/fase*` anche su origin.
-- **Fase 7 (Command Bridge): COMPLETA su `arch/fase7-command-bridge`** (base `bbd05cb` = main,
-  HEAD `a55bc1f`) — **NON pushata, NON mergiata**: la politica di merge la decide l'utente volta
-  per volta. Review finale di fase: «Phase ready with notes», note applicate. Piano chiuso e
-  veritiero con esiti review per task + verdetto finale + backlog:
-  `docs/superpowers/plans/2026-07-11-fase7-command-bridge.md`.
-- Pending esterni: CI `contracts.yml` da verificare su GitHub per i push di main del 2026-07-11;
-  chip/task `task_6c67e5a8` (fix suite lenta); **smoke funzionale interattivo MAI eseguito**
-  (né fase 6 né 7): alla prima `npm run dev` fare ENTRAMBE le checklist (gate finale piano fase 6
-  + step 9.6 piano fase 7).
+- **Fasi 1a, 1b, 2, 3, 4, 5, 6, 7: COMPLETE, PUSHATE e MERGIATE in `main`** (merge sequenziali
+  `--no-ff`; fase 7 mergiata il 2026-07-11 su richiesta utente: merge `1e91a00` = HEAD di main,
+  branch `arch/fase7-command-bridge` anche su origin). Review finale fase 7: «Phase ready with
+  notes», note applicate. Piano chiuso e veritiero con esiti review per task + verdetto finale
+  + backlog: `docs/superpowers/plans/2026-07-11-fase7-command-bridge.md`.
+- Pending esterni: CI `contracts.yml` da verificare su GitHub per i push di main del 2026-07-11
+  (fasi 1-6 al mattino + fase 7 `1e91a00` alla sera); chip/task `task_6c67e5a8` (fix suite
+  lenta); **smoke funzionale interattivo MAI eseguito** (né fase 6 né 7): alla prima
+  `npm run dev` fare ENTRAMBE le checklist (gate finale piano fase 6 + step 9.6 piano fase 7).
 
 ## Cosa ha consegnato la Fase 7 (mappa rapida, dettagli e esiti review nel piano)
 
@@ -76,8 +74,8 @@
 
 ## Prossimo lavoro: Fase 8 — Fondamenta Jarvis (spec §8, riga 217)
 
-Da scrivere con `writing-plans` su branch `arch/fase8-fondamenta-jarvis` (base: decisa
-dall'utente — main post-merge fase 7, o impilato su fase 7). Requisiti spec: `TriggerService`
+Da scrivere con `writing-plans` su branch `arch/fase8-fondamenta-jarvis` figlio di `main`
+(che dal 2026-07-11 sera contiene TUTTE le fasi 1-7 mergiate). Requisiti spec: `TriggerService`
 (turni autonomi da cron/eventi bus/hotword; filtro default su `origin=agent` contro
 l'auto-innesco), `AttentionService` (punto unico di decisione dell'iniziativa verso l'utente),
 task in background osservabili (eventi tipizzati di avanzamento, store `tasks`); voce e
@@ -172,5 +170,5 @@ ricche. Dipende da fasi 5 e 7 (entrambe complete).
   chat di prodotto (Workspace `/workspace` primaria + Horizon `/assistant`) — il Workspace NON
   si rimuove MAI (visione Jarvis); lint sanato a fondo con gate CI; codegen completo; visione =
   runtime agentico locale con Command Layer (invariante anti-escalation non negoziabile, §7).
-- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta. La fase 7 è locale su
-  `arch/fase7-command-bridge` in attesa di decisione.
+- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta (fase 7: richiesto e
+  fatto il 2026-07-11 sera, merge `1e91a00`). Le prossime fasi partono da `main`.

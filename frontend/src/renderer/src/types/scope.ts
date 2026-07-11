@@ -15,12 +15,10 @@
  *   (no re-fetch required). The frame omits `is_idle`.
  */
 
-/** REST payload returned by `GET` / `PUT` / `DELETE /api/scope/{conversation_id}`. */
-export interface ScopeResponse {
-  conversation_id: string
-  folders: string[]
-  is_idle: boolean
-}
+import type { ApiSchema } from './generated'
+
+/** Generated from the backend contract — do not redefine locally. */
+export type ScopeResponse = ApiSchema<'ScopeResponse'>
 
 /** Events-WS frame pushing the full, current folder scope for a conversation. */
 export interface WsScopeUpdatedMessage {

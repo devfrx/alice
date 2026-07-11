@@ -14,14 +14,11 @@
  *   frame folded directly into the `permissionMode` Pinia store.
  */
 
-/** The four authorization tiers (mirrors backend ``PermissionMode``). */
-export type PermissionMode = 'strict' | 'auto_edits' | 'plan' | 'autopilot'
+import type { ApiSchema } from './generated'
 
-/** REST payload returned by `GET` / `PUT /api/permission-mode/{conversation_id}`. */
-export interface PermissionModeResponse {
-  conversation_id: string
-  mode: PermissionMode
-}
+/** Generated from the backend contract — do not redefine locally. */
+export type PermissionMode = ApiSchema<'PermissionMode'>
+export type PermissionModeResponse = ApiSchema<'PermissionModeResponse'>
 
 /** Events-WS frame pushing the current tier for a conversation. */
 export interface WsPermissionModeUpdatedMessage {

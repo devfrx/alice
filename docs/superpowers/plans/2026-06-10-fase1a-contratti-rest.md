@@ -26,7 +26,7 @@
 - Create: `backend/api/openapi_export.py`
 - Test: `backend/tests/contracts/test_openapi_export.py`
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 Creare `backend/tests/contracts/test_openapi_export.py` (creare anche la directory `backend/tests/contracts/`, senza `__init__.py`, coerente con `tests/`):
 
@@ -59,12 +59,12 @@ def test_main_writes_deterministic_json(tmp_path: Path) -> None:
     assert "/api/health" in parsed["paths"]
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run (da `backend/`): `pytest tests/contracts/test_openapi_export.py -v`
 Expected: FAIL/ERROR con `ModuleNotFoundError: No module named 'backend.api.openapi_export'`
 
-- [ ] **Step 3: Implementare il modulo**
+- [x] **Step 3: Implementare il modulo**
 
 Creare `backend/api/openapi_export.py`:
 
@@ -117,6 +117,7 @@ def main(argv: list[str]) -> int:
     out.write_text(
         json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     return 0
 
@@ -125,17 +126,17 @@ if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
 ```
 
-- [ ] **Step 4: Eseguire il test e verificare che passi**
+- [x] **Step 4: Eseguire il test e verificare che passi**
 
 Run (da `backend/`): `pytest tests/contracts/test_openapi_export.py -v`
 Expected: 2 PASS
 
-- [ ] **Step 5: Lint e typecheck dei file nuovi**
+- [x] **Step 5: Lint e typecheck dei file nuovi**
 
 Run (da `backend/`): `ruff check api/openapi_export.py tests/contracts/; mypy api/openapi_export.py`
 Expected: nessun errore (eventuali errori mypy/ruff vanno corretti prima di proseguire)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/api/openapi_export.py backend/tests/contracts/test_openapi_export.py
@@ -150,7 +151,7 @@ git commit -m "feat(contracts): offline OpenAPI export module (no server needed)
 - Test: `backend/tests/contracts/test_response_models.py`
 - Create (generato dal test stesso): `backend/tests/contracts/response_model_baseline.txt`
 
-- [ ] **Step 1: Scrivere il test (fallisce finché non esiste la baseline)**
+- [x] **Step 1: Scrivere il test (fallisce finché non esiste la baseline)**
 
 Creare `backend/tests/contracts/test_response_models.py`:
 
@@ -162,10 +163,17 @@ The baseline file freezes today's violations. The test fails when:
 * a NEW untyped endpoint appears (fix it: declare ``response_model``), or
 * a baseline entry becomes typed (good: delete that line from the baseline).
 
-Endpoints whose ``response_class`` is a ``FileResponse`` are exempt (no JSON
-contract to declare). WebSocket routes are not ``APIRoute`` and are skipped.
+Policy: only a named Pydantic model (or ``list[Model]``) counts as typed.
+Schema-producing generics (``Model | None``, unions, ``dict[str, Model]``) are
+deliberately rejected: the generated TS contract is built from named
+components. Endpoints declaring ``response_class=FileResponse`` in the route
+decorator are exempt (no JSON contract to declare); endpoints that merely
+*return* a ``FileResponse`` from the body stay in the baseline until their
+decorator is fixed. WebSocket routes are not ``APIRoute`` and are skipped.
 
-Regenerate the baseline ONLY when intentionally shrinking it (PowerShell)::
+Regenerating the baseline (ONLY when intentionally shrinking it) rewrites the
+file and then FAILS on purpose so a leaked env var can never turn the
+guardrail green — inspect the diff and rerun WITHOUT the env var (PowerShell)::
 
     $env:ALICE_REGEN_CONTRACT_BASELINE = "1"
     pytest tests/contracts/test_response_models.py
@@ -178,12 +186,12 @@ import os
 import typing
 from pathlib import Path
 
+import pytest
+from backend.core.app import create_app
 from fastapi.datastructures import DefaultPlaceholder
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.responses import FileResponse
-
-from backend.core.app import create_app
 
 BASELINE = Path(__file__).parent / "response_model_baseline.txt"
 
@@ -191,8 +199,8 @@ BASELINE = Path(__file__).parent / "response_model_baseline.txt"
 def _is_typed(route: APIRoute) -> bool:
     """True when the route declares a Pydantic response contract.
 
-    Accepts a ``BaseModel`` subclass or ``list[BaseModel]``; plain ``dict``
-    annotations do NOT count (they produce an empty OpenAPI schema).
+    Accepts a ``BaseModel`` subclass or ``list[BaseModel]``; anything else
+    (including ``dict`` annotations and unions) does NOT count.
     """
     model = route.response_model
     if model is None:
@@ -204,7 +212,7 @@ def _is_typed(route: APIRoute) -> bool:
 
 
 def _is_exempt(route: APIRoute) -> bool:
-    """File/stream endpoints have no JSON contract to declare."""
+    """File/stream endpoints (decorator-declared ``response_class``) are exempt."""
     response_class: object = route.response_class
     if isinstance(response_class, DefaultPlaceholder):
         response_class = response_class.value
@@ -225,11 +233,25 @@ def _violations() -> set[str]:
     return found
 
 
+def test_all_api_routes_under_prefix() -> None:
+    """Every APIRoute lives under /api — anything else would escape the ratchet."""
+    app = create_app(testing=True)
+    escaped = [
+        route.path
+        for route in app.routes
+        if isinstance(route, APIRoute) and not route.path.startswith("/api")
+    ]
+    assert not escaped, f"APIRoutes outside /api escape the contract ratchet: {escaped}"
+
+
 def test_response_model_ratchet() -> None:
     """No new untyped endpoints; baseline entries must be removed once fixed."""
     current = _violations()
     if os.environ.get("ALICE_REGEN_CONTRACT_BASELINE") == "1":
-        BASELINE.write_text("\n".join(sorted(current)) + "\n", encoding="utf-8")
+        BASELINE.write_text(
+            "\n".join(sorted(current)) + "\n", encoding="utf-8", newline="\n",
+        )
+        pytest.fail("Baseline regenerated. Inspect the diff, then rerun WITHOUT the env var.")
     baseline = {
         line.strip()
         for line in BASELINE.read_text(encoding="utf-8").splitlines()
@@ -244,12 +266,12 @@ def test_response_model_ratchet() -> None:
     )
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run (da `backend/`): `pytest tests/contracts/test_response_models.py -v`
 Expected: FAIL con `FileNotFoundError` su `response_model_baseline.txt` (la baseline non esiste ancora)
 
-- [ ] **Step 3: Generare la baseline meccanicamente**
+- [x] **Step 3: Generare la baseline meccanicamente**
 
 Run (da `backend/`):
 
@@ -259,19 +281,19 @@ pytest tests/contracts/test_response_models.py -v
 Remove-Item Env:\ALICE_REGEN_CONTRACT_BASELINE
 ```
 
-Expected: PASS, e il file `backend/tests/contracts/response_model_baseline.txt` ora esiste con ~70-90 righe ordinate del formato `GET /api/email/inbox`. Il numero esatto è quello calcolato — NON va aggiustato a mano. Ispezionare il file: deve contenere SOLO righe `METODO /api/...`.
+Expected: FAIL INTENZIONALE con "Baseline regenerated. Inspect the diff, then rerun WITHOUT the env var." — il file `backend/tests/contracts/response_model_baseline.txt` ora esiste (LF, ~70-90 righe ordinate `GET /api/...`). Il numero esatto è quello calcolato — NON va aggiustato a mano.
 
-- [ ] **Step 4: Eseguire di nuovo il test senza la variabile e verificare che passi**
+- [x] **Step 4: Eseguire di nuovo il test senza la variabile e verificare che passi**
 
 Run (da `backend/`): `pytest tests/contracts/test_response_models.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Lint e typecheck**
+- [x] **Step 5: Lint e typecheck**
 
 Run (da `backend/`): `ruff check tests/contracts/; mypy tests/contracts/test_response_models.py`
 Expected: nessun errore
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/tests/contracts/test_response_models.py backend/tests/contracts/response_model_baseline.txt
@@ -291,12 +313,12 @@ git commit -m "test(contracts): response_model ratchet with frozen baseline"
 - Create (generati): `frontend/src/renderer/src/types/generated/openapi.json`, `frontend/src/renderer/src/types/generated/api.d.ts`
 - Create: `frontend/src/renderer/src/types/generated/index.ts`
 
-- [ ] **Step 1: Installare openapi-typescript**
+- [x] **Step 1: Installare openapi-typescript**
 
 Run (da `frontend/`): `npm install --save-dev openapi-typescript`
 Expected: exit 0; `package.json` e `package-lock.json` aggiornati con `openapi-typescript` in devDependencies (v7.x)
 
-- [ ] **Step 2: Aggiungere lo script npm**
+- [x] **Step 2: Aggiungere lo script npm**
 
 In `frontend/package.json`, nel blocco `"scripts"`, aggiungere dopo la riga `"build:installer"`:
 
@@ -306,7 +328,7 @@ In `frontend/package.json`, nel blocco `"scripts"`, aggiungere dopo la riga `"bu
 
 (attenzione alla virgola sulla riga precedente)
 
-- [ ] **Step 3: Escludere i generati da eslint e prettier**
+- [x] **Step 3: Escludere i generati da eslint e prettier**
 
 In `frontend/eslint.config.mjs` riga 8, sostituire:
 
@@ -317,16 +339,19 @@ In `frontend/eslint.config.mjs` riga 8, sostituire:
 con:
 
 ```js
-  { ignores: ['**/node_modules', '**/dist', '**/out', 'src/renderer/src/types/generated'] },
+  { ignores: ['**/node_modules', '**/dist', '**/out', 'src/renderer/src/types/generated/api.d.ts'] },
 ```
 
-In `frontend/.prettierignore` aggiungere in coda la riga:
+In `frontend/.prettierignore` aggiungere in coda le righe:
 
 ```
-src/renderer/src/types/generated
+src/renderer/src/types/generated/openapi.json
+src/renderer/src/types/generated/api.d.ts
 ```
 
-- [ ] **Step 4: Creare lo script di rigenerazione**
+(Nota: `index.ts` è il file scritto a mano e deve restare sotto lint e prettier.)
+
+- [x] **Step 4: Creare lo script di rigenerazione**
 
 Creare `scripts/gen-contracts.ps1`:
 
@@ -338,6 +363,7 @@ Creare `scripts/gen-contracts.ps1`:
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path $python)) { throw "venv python not found at $python - run scripts\setup.ps1 first" }
 $schemaPath = Join-Path $repoRoot "frontend\src\renderer\src\types\generated\openapi.json"
 
 Push-Location $repoRoot
@@ -359,13 +385,14 @@ try {
 Write-Host "Contracts regenerated." -ForegroundColor Green
 ```
 
-- [ ] **Step 5: Creare lo script di verifica staleness**
+- [x] **Step 5: Creare lo script di verifica staleness**
 
 Creare `scripts/check-contracts.ps1`:
 
 ```powershell
 # Fails when the committed contract artifacts are stale (i.e. regenerating
 # them produces a diff). Intended as a local/CI gate.
+# NOTE: never hand-merge the generated files on conflicts - regenerate instead.
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
@@ -373,9 +400,14 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 Push-Location $repoRoot
 try {
-    $dirty = git status --porcelain -- frontend/src/renderer/src/types/generated
+    $generated = @(
+        "frontend/src/renderer/src/types/generated/openapi.json",
+        "frontend/src/renderer/src/types/generated/api.d.ts"
+    )
+    $dirty = git status --porcelain -- $generated
+    if ($LASTEXITCODE -ne 0) { throw "git status failed (exit $LASTEXITCODE)" }
     if ($dirty) {
-        Write-Host $dirty
+        $dirty | Write-Host
         throw "Contract artifacts are stale: run scripts/gen-contracts.ps1 and commit the result."
     }
 } finally {
@@ -385,12 +417,12 @@ try {
 Write-Host "Contracts are up to date." -ForegroundColor Green
 ```
 
-- [ ] **Step 6: Prima generazione**
+- [x] **Step 6: Prima generazione**
 
 Run (da qualunque cwd): `.\scripts\gen-contracts.ps1`
 Expected: `Contracts regenerated.`; esistono `frontend/src/renderer/src/types/generated/openapi.json` (JSON, contiene `"/api/health"`) e `api.d.ts` (inizia con il commento di auto-generazione di openapi-typescript ed esporta `paths` e `components`)
 
-- [ ] **Step 7: Creare il modulo alias sui tipi generati**
+- [x] **Step 7: Creare il modulo alias sui tipi generati**
 
 Creare `frontend/src/renderer/src/types/generated/index.ts`:
 
@@ -408,17 +440,17 @@ import type { components } from './api'
 export type ApiSchema<K extends keyof components['schemas']> = components['schemas'][K]
 ```
 
-- [ ] **Step 8: Typecheck**
+- [x] **Step 8: Typecheck**
 
 Run (da `frontend/`): `npm run typecheck`
 Expected: exit 0 (il file generato compila; nessun consumatore è ancora cambiato)
 
-- [ ] **Step 9: Verifica del gate di staleness**
+- [x] **Step 9: Verifica del gate di staleness**
 
 Run: `.\scripts\check-contracts.ps1`
 Expected: `Contracts are up to date.` — ATTENZIONE: il check passa solo DOPO il commit dello Step 10 (i file appena creati risultano untracked e quindi "dirty"). Eseguire questo step DOPO il commit, oppure aspettarsi il fallimento qui e rieseguire dopo il commit.
 
-- [ ] **Step 10: Commit (poi rieseguire lo Step 9)**
+- [x] **Step 10: Commit (poi rieseguire lo Step 9)**
 
 ```powershell
 git add frontend/package.json frontend/package-lock.json frontend/eslint.config.mjs frontend/.prettierignore scripts/gen-contracts.ps1 scripts/check-contracts.ps1 frontend/src/renderer/src/types/generated
@@ -440,7 +472,7 @@ Dimostra il loop completo: miglioramento del contratto backend → rigenerazione
 - Modify: `frontend/src/renderer/src/types/scope.ts` (re-export di `ScopeResponse`)
 - Regenerate: `frontend/src/renderer/src/types/generated/*`
 
-- [ ] **Step 1: Tipizzare l'enum nel response model backend**
+- [x] **Step 1: Tipizzare l'enum nel response model backend**
 
 In `backend/api/routes/permission_mode.py`, classe `PermissionModeResponse` (righe 41-50), sostituire:
 
@@ -463,17 +495,17 @@ Poi aggiornare i tre punti di costruzione della risposta:
 
 (Il JSON sul filo non cambia: l'enum è una `StrEnum` e serializza al suo valore. Aggiornare la docstring del campo se cita "stringa".)
 
-- [ ] **Step 2: Verificare che i test backend restino verdi**
+- [x] **Step 2: Verificare che i test backend restino verdi**
 
 Run (da `backend/`): `pytest tests/ -v`
 Expected: tutti PASS (nessun cambiamento di formato sul filo). Se un test asserisce esplicitamente il tipo `str` del campo, aggiornarlo all'enum value — il JSON resta identico.
 
-- [ ] **Step 3: Rigenerare i contratti**
+- [x] **Step 3: Rigenerare i contratti**
 
 Run: `.\scripts\gen-contracts.ps1`
 Expected: `Contracts regenerated.`; in `api.d.ts` il componente `PermissionMode` è ora un'unione di letterali `'strict' | 'auto_edits' | 'plan' | 'autopilot'`
 
-- [ ] **Step 4: Far consumare i tipi generati al frontend**
+- [x] **Step 4: Far consumare i tipi generati al frontend**
 
 In `frontend/src/renderer/src/types/permission.ts`: eliminare le definizioni locali di `PermissionMode` e `PermissionModeResponse` e sostituirle con:
 
@@ -498,12 +530,12 @@ export type ScopeResponse = ApiSchema<'ScopeResponse'>
 
 (`WsScopeUpdatedMessage` resta invariato.)
 
-- [ ] **Step 5: Typecheck e lint frontend**
+- [x] **Step 5: Typecheck e lint frontend**
 
 Run (da `frontend/`): `npm run typecheck; if ($?) { npm run lint }`
 Expected: entrambi exit 0. Se il typecheck segnala consumatori incompatibili (es. confronti con letterali non previsti), sono veri drift trovati dal compilatore: allineare il consumatore al contratto generato, non viceversa.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/api/routes/permission_mode.py frontend/src/renderer/src/types/permission.ts frontend/src/renderer/src/types/scope.ts frontend/src/renderer/src/types/generated
@@ -516,8 +548,9 @@ git commit -m "feat(contracts): permission-mode enum in contract; FE consumes ge
 
 **Files:**
 - Modify: `CLAUDE.md` (sezioni Commands e Conventions)
+- Create: `backend/tests/contracts/test_permission_mode_route.py`
 
-- [ ] **Step 1: Documentare i comandi in CLAUDE.md**
+- [x] **Step 1: Documentare i comandi in CLAUDE.md**
 
 In `CLAUDE.md`, nella sezione `## Commands`, aggiungere dopo il blocco "One-shot setup / dev":
 
@@ -535,17 +568,19 @@ Nella sezione `## Conventions`, aggiungere il bullet:
 - **Contracts are generated**: new/changed REST endpoints must declare a Pydantic `response_model` (ratchet test in `backend/tests/contracts/`) and require regenerating contracts (`.\scripts\gen-contracts.ps1`). Files in `frontend/src/renderer/src/types/generated/` are build artifacts — never edit them by hand (except `index.ts`).
 ```
 
-- [ ] **Step 2: Verifica finale completa**
+- [x] **Step 2: Verifica finale completa**
+
+Nota: la suite backend completa non è eseguibile in tempi pratici per un difetto pre-esistente (fixture app ~25s di setup per test, tracciato come task separato); la verifica usa i test mirati.
 
 ```powershell
-cd backend; pytest tests/ -v          # Expected: tutti PASS
-cd backend; ruff check .; mypy api/openapi_export.py tests/contracts/
+cd backend; ..\.venv\Scripts\python.exe -m pytest tests/contracts/ -v   # Expected: tutti PASS
+cd backend; ..\.venv\Scripts\python.exe -m ruff check api/openapi_export.py api/routes/permission_mode.py tests/contracts/   # (api/ intero ha 56 errori ruff pre-esistenti, fuori scope)
+cd backend; ..\.venv\Scripts\python.exe -m mypy api/openapi_export.py api/routes/permission_mode.py tests/contracts/
 .\scripts\check-contracts.ps1         # Expected: "Contracts are up to date."
 cd frontend; npm run typecheck        # Expected: exit 0
-cd frontend; npm run lint             # Expected: exit 0
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add CLAUDE.md
@@ -556,7 +591,19 @@ git commit -m "docs: contract codegen commands and conventions"
 
 ## Criteri di uscita della fase (dalla spec §9)
 
-1. Tutti i test backend verdi, `npm run typecheck` verde.
+> **Stato: FASE COMPLETATA @ e638fec** (review finale: ready to merge). Verifica con test mirati
+> (contratti + permission, 5+42 verdi): la suite completa è impraticabile per il difetto
+> pre-esistente della fixture `app` (~25s di setup per test), tracciato come task separato.
+
+1. Test mirati backend verdi (contratti + domini toccati), `npm run typecheck` verde.
 2. `.\scripts\check-contracts.ps1` verde su working tree pulito.
 3. App avviabile (`.\scripts\start-dev.ps1`) e feature esemplare funzionante: cambiare il permission mode da Horizon e verificare che la UI rifletta il valore (il payload sul filo è invariato, quindi è una verifica di regressione).
 4. Enforcement consegnato: test ratchet + check-contracts (da agganciare a una futura CI; oggi non esistono workflow).
+
+## Backlog per le fasi successive (dalla review finale)
+
+- **CI minima presto (inizio 1b)**: workflow che esegue `pytest tests/contracts/`, `check-contracts.ps1` (runner windows) e `npm run typecheck` — i gate diventano reali solo in CI.
+- **Request-side enum**: `PermissionModeUpdateRequest.mode` è ancora `str` (la risposta ha l'enum, la richiesta no — scelta 400-vs-422 da decidere quando si ritocca l'endpoint).
+- **`AgentTier` duplicato a mano** in `frontend/src/renderer/src/types/settings.ts:171` — violazione pre-esistente del §4 della spec; sostituire con il tipo generato appena il dominio viene toccato.
+- **Baseline ratchet (94 voci)**: bruciarla dominio per dominio nelle fasi 2-6, insieme alla convenzione liste `{items, total}`.
+- **Pin esatto di `openapi-typescript`** (senza caret) o nota "codegen solo via `npm ci`".

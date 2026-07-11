@@ -57,6 +57,12 @@ npm run build:win        # NSIS installer
 .\scripts\start-dev.ps1        # launches backend + frontend together
 ```
 
+### Contracts (FE<->BE codegen)
+```powershell
+.\scripts\gen-contracts.ps1      # regenerate OpenAPI schema + generated TS types
+.\scripts\check-contracts.ps1    # fail if committed contract artifacts are stale
+```
+
 ### Service ports
 Backend `8000`, frontend dev `5173`, LM Studio `1234`, Ollama `11434`, TRELLIS `8090`.
 
@@ -100,6 +106,7 @@ The backend is **plugin-based and dependency-injected**. Three concepts tie it t
 - **TypeScript/Vue**: `<script setup lang="ts">` only, Composition API (`ref`/`computed`/`watch`), no `any`, scoped CSS.
 - **Contract consistency is critical**: API endpoints, WS message types, frontend TS types, Pinia stores, and DB models must all stay in agreement. A backend change to a WS event or REST shape requires the matching frontend update. Verify all callers before changing a signature/endpoint/schema.
 - Prefer small, single-responsibility modules. Verify a function/endpoint exists before calling it and that you're not duplicating one before creating it.
+- **Contracts are generated**: new/changed REST endpoints must declare a Pydantic `response_model` (ratchet test in `backend/tests/contracts/`) and require regenerating contracts (`.\scripts\gen-contracts.ps1`). Files in `frontend/src/renderer/src/types/generated/` are build artifacts — never edit them by hand (except `index.ts`) and never hand-merge them on conflicts: regenerate instead.
 
 ## Notes
 

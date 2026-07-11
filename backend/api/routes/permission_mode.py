@@ -43,11 +43,12 @@ class PermissionModeResponse(BaseModel):
 
     Attributes:
         conversation_id: The owning conversation id (canonical string form).
-        mode: The tier — ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.
+        mode: The authorization tier (:class:`PermissionMode`):
+            ``strict`` / ``auto_edits`` / ``plan`` / ``autopilot``.
     """
 
     conversation_id: str
-    mode: str
+    mode: PermissionMode
 
 
 class PermissionModeUpdateRequest(BaseModel):
@@ -124,10 +125,10 @@ async def get_permission_mode(
     service = _get_mode_service(request)
     if service is None:
         return PermissionModeResponse(
-            conversation_id=str(conv_uuid), mode=PermissionMode.STRICT.value,
+            conversation_id=str(conv_uuid), mode=PermissionMode.STRICT,
         )
     mode = service.get_mode(conv_uuid)
-    return PermissionModeResponse(conversation_id=str(conv_uuid), mode=mode.value)
+    return PermissionModeResponse(conversation_id=str(conv_uuid), mode=mode)
 
 
 @router.put(
@@ -172,4 +173,4 @@ async def put_permission_mode(
             detail=f"Invalid permission mode: {body.mode}",
         ) from exc
     await service.set_mode(conv_uuid, mode)
-    return PermissionModeResponse(conversation_id=str(conv_uuid), mode=mode.value)
+    return PermissionModeResponse(conversation_id=str(conv_uuid), mode=mode)

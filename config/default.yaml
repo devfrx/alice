@@ -140,6 +140,11 @@ attention:
   enabled: true
   cooldown_s: 30.0                # min seconds between non-urgent notifications
 
+# Fondamenta Jarvis (spec §8): autonomous-turn trigger sources.
+triggers:
+  enabled: true
+  max_concurrent_turns: 1         # extra fires are skipped, not queued
+
 agent:
   # Single model-driven loop: the model decides step-by-step, with the
   # update_plan / spawn_subagent meta-tools for structure and an optional

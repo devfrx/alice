@@ -314,7 +314,7 @@ watch(
       composerActive.value = true
       composerRef.value?.seed(spoken)
     } else {
-      send(spoken).catch(console.error)
+      send(spoken, undefined, undefined, { source: 'voice' }).catch(console.error)
     }
   }
 )

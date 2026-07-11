@@ -52,8 +52,13 @@ type ChatHandlerMap = {
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export interface UseChatReturn {
-  /** Send a user message with optional attachments. */
-  sendMessage: (content: string, conversationId?: string, attachments?: File[]) => Promise<void>
+  /** Send a user message with optional attachments and input-modality source. */
+  sendMessage: (
+    content: string,
+    conversationId?: string,
+    attachments?: File[],
+    options?: { source?: 'text' | 'voice' }
+  ) => Promise<void>
   /** Edit a previously sent user message and regenerate the response. */
   editMessage: (messageId: string, newContent: string, attachments?: File[]) => Promise<void>
   /** Stop the in-progress generation. */
@@ -360,7 +365,8 @@ export function useChat(): UseChatReturn {
   async function sendMessage(
     content: string,
     conversationId?: string,
-    attachments?: File[]
+    attachments?: File[],
+    options?: { source?: 'text' | 'voice' }
   ): Promise<void> {
     const trimmed = content.trim()
     if (!trimmed && (!attachments || attachments.length === 0)) return
@@ -416,7 +422,8 @@ export function useChat(): UseChatReturn {
     const payload: WsSendPayload = {
       content: trimmed,
       conversation_id: convId,
-      attachments: uploaded?.map((a) => a.file_id)
+      attachments: uploaded?.map((a) => a.file_id),
+      ...(options?.source ? { source: options.source } : {})
     }
 
     wsManager.send(payload)

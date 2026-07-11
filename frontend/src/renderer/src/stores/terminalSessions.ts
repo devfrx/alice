@@ -17,7 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { terminalApi } from '../services/api'
 import { sendEventsMessage } from '../composables/useEventsWebSocket'
 import type {
   TerminalCreateRequest,
@@ -26,7 +26,7 @@ import type {
   WsTerminalClosedMessage,
   WsTerminalOutputMessage,
   WsTerminalRenamedMessage,
-  WsTerminalSessionOpenedMessage,
+  WsTerminalSessionOpenedMessage
 } from '../types/terminal'
 
 /** Max scrollback bytes retained per session for reattach replay. */
@@ -102,18 +102,21 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
   function _upsert(conversationId: string, session: TerminalSession): void {
     const list = byConversation.value[conversationId] ?? []
     const idx = list.findIndex((s) => s.id === session.id)
-    const next = idx >= 0 ? list.map((s) => (s.id === session.id ? session : s)) : [...list, session]
+    const next =
+      idx >= 0 ? list.map((s) => (s.id === session.id ? session : s)) : [...list, session]
     byConversation.value = { ...byConversation.value, [conversationId]: next }
   }
 
   function _patch(
-    conversationId: string, sessionId: string, patch: Partial<TerminalSession>,
+    conversationId: string,
+    sessionId: string,
+    patch: Partial<TerminalSession>
   ): void {
     const list = byConversation.value[conversationId]
     if (!list) return
     byConversation.value = {
       ...byConversation.value,
-      [conversationId]: list.map((s) => (s.id === sessionId ? { ...s, ...patch } : s)),
+      [conversationId]: list.map((s) => (s.id === sessionId ? { ...s, ...patch } : s))
     }
   }
 
@@ -122,7 +125,7 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
     if (!list) return
     byConversation.value = {
       ...byConversation.value,
-      [conversationId]: list.filter((s) => s.id !== sessionId),
+      [conversationId]: list.filter((s) => s.id !== sessionId)
     }
   }
 
@@ -131,7 +134,7 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
     if (!list) return
     byConversation.value = {
       ...byConversation.value,
-      [conversationId]: list.map((s) => ({ ...s, agent_assigned: s.id === sessionId })),
+      [conversationId]: list.map((s) => ({ ...s, agent_assigned: s.id === sessionId }))
     }
   }
 
@@ -149,7 +152,7 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
   async function fetch(conversationId: string): Promise<void> {
     loading.value = true
     try {
-      const res = await api.listTerminals(conversationId)
+      const res = await terminalApi.listTerminals(conversationId)
       enabled.value = res.enabled
       byConversation.value = { ...byConversation.value, [conversationId]: res.sessions }
       fetched.value.add(conversationId)
@@ -171,31 +174,30 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
 
   /** Open a new session. Lets {@link ApiError} (e.g. 400 no-scope, 403) propagate. */
   async function create(
-    conversationId: string, body: TerminalCreateRequest = {},
+    conversationId: string,
+    body: TerminalCreateRequest = {}
   ): Promise<TerminalSession> {
-    const session = await api.createTerminal(conversationId, body)
+    const session = await terminalApi.createTerminal(conversationId, body)
     _upsert(conversationId, session)
     return session
   }
 
   /** Kill a session (its process tree). */
   async function kill(conversationId: string, sessionId: string): Promise<void> {
-    await api.deleteTerminal(conversationId, sessionId)
+    await terminalApi.deleteTerminal(conversationId, sessionId)
     _remove(conversationId, sessionId)
     buffers.delete(sessionId)
   }
 
   /** Rename a session. */
-  async function rename(
-    conversationId: string, sessionId: string, title: string,
-  ): Promise<void> {
-    const updated = await api.updateTerminal(conversationId, sessionId, { title })
+  async function rename(conversationId: string, sessionId: string, title: string): Promise<void> {
+    const updated = await terminalApi.updateTerminal(conversationId, sessionId, { title })
     _upsert(conversationId, updated)
   }
 
   /** Assign a session to the agent (exactly one per conversation). */
   async function assign(conversationId: string, sessionId: string): Promise<void> {
-    await api.updateTerminal(conversationId, sessionId, { assign_to_agent: true })
+    await terminalApi.updateTerminal(conversationId, sessionId, { assign_to_agent: true })
     _setAssigned(conversationId, sessionId)
   }
 
@@ -208,19 +210,17 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
       type: 'terminal.input',
       conversation_id: conversationId,
       session_id: sessionId,
-      data,
+      data
     })
   }
 
-  function sendResize(
-    conversationId: string, sessionId: string, rows: number, cols: number,
-  ): void {
+  function sendResize(conversationId: string, sessionId: string, rows: number, cols: number): void {
     sendEventsMessage({
       type: 'terminal.resize',
       conversation_id: conversationId,
       session_id: sessionId,
       rows,
-      cols,
+      cols
     })
   }
 
@@ -287,6 +287,6 @@ export const useTerminalSessionsStore = defineStore('terminalSessions', () => {
     applyClosed,
     applyRenamed,
     applyAssigned,
-    reset,
+    reset
   }
 })

@@ -178,6 +178,19 @@ class WsArtifactDeleted(EventsServerFrame):
     artifact_id: str
 
 
+class WsArtifactBulkDeleted(EventsServerFrame):
+    """Bulk artifact deletion (conversation cleanup or full wipe).
+
+    ``conversation_id`` is ``None`` for the delete-all wipe.  Pinned
+    artifacts of a deleted conversation survive detached
+    (``conversation_id=NULL``) and are NOT listed in ``artifact_ids``.
+    """
+
+    type: Literal["artifact.bulk_deleted"]
+    conversation_id: str | None = None
+    artifact_ids: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Agent tasks / plan document
 # ---------------------------------------------------------------------------
@@ -377,6 +390,7 @@ EventsServerMessage = Annotated[
     | WsArtifactCreated
     | WsArtifactUpdated
     | WsArtifactDeleted
+    | WsArtifactBulkDeleted
     | WsTasksUpdated
     | WsPlanDocumentUpdated
     | WsScopeUpdated

@@ -12,17 +12,16 @@
  *  - Each toast exposes an explicit close button (kept alongside the
  *    whole-toast click dismiss for mouse convenience).
  */
-import { TransitionGroup } from 'vue'
 import { useToast } from '../../composables/useToast'
 import type { ToastType } from '../../composables/useToast'
 
 const { toasts, dismiss } = useToast()
 
 const ICONS: Record<ToastType, string> = {
-  info: '\u2139',    // ℹ
+  info: '\u2139', // ℹ
   success: '\u2713', // ✓
   warning: '\u26A0', // ⚠
-  error: '\u2715',   // ✕
+  error: '\u2715' // ✕
 }
 
 const isAssertive = (type: ToastType): boolean => type === 'error' || type === 'warning'
@@ -30,15 +29,37 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
 
 <template>
   <Teleport to="body">
-    <TransitionGroup name="ui-toast" tag="div" class="ui-toast-container" aria-live="polite" aria-atomic="false">
-      <div v-for="toast in toasts" :key="toast.id" class="ui-toast" :class="`ui-toast--${toast.type}`"
+    <TransitionGroup
+      name="ui-toast"
+      tag="div"
+      class="ui-toast-container"
+      aria-live="polite"
+      aria-atomic="false"
+    >
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        class="ui-toast"
+        :class="`ui-toast--${toast.type}`"
         :role="isAssertive(toast.type) ? 'alert' : 'status'"
-        :aria-live="isAssertive(toast.type) ? 'assertive' : 'polite'" @click="dismiss(toast.id)">
+        :aria-live="isAssertive(toast.type) ? 'assertive' : 'polite'"
+        @click="dismiss(toast.id)"
+      >
         <span class="ui-toast__icon" aria-hidden="true">{{ ICONS[toast.type] }}</span>
         <span class="ui-toast__text">{{ toast.message }}</span>
-        <button type="button" class="ui-toast__close" aria-label="Dismiss notification" @click.stop="dismiss(toast.id)">
+        <button
+          type="button"
+          class="ui-toast__close"
+          aria-label="Dismiss notification"
+          @click.stop="dismiss(toast.id)"
+        >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-            <path d="M2 2 L8 8 M8 2 L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            <path
+              d="M2 2 L8 8 M8 2 L2 8"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
           </svg>
         </button>
       </div>

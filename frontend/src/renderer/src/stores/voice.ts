@@ -211,6 +211,6 @@ export const useVoiceStore = defineStore('voice', () => {
     startRecordingTimer,
     stopRecordingTimer,
     clearTranscript,
-    reset,
+    reset
   }
 })

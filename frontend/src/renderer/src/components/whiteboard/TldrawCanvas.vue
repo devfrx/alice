@@ -7,7 +7,7 @@
  * If no snapshot is provided as prop, it fetches it from the backend.
  */
 import { ref, onMounted, onBeforeUnmount, watch, type PropType } from 'vue'
-import { api } from '@renderer/services/api'
+import { useArtifactsStore } from '../../stores/artifacts'
 import AppIcon from '../ui/AppIcon.vue'
 
 const props = defineProps({
@@ -22,35 +22,58 @@ const emit = defineEmits<{
   (e: 'change', snapshot: Record<string, unknown>): void
 }>()
 
+const artifactsStore = useArtifactsStore()
+
 const containerRef = ref<HTMLDivElement | null>(null)
 
 /** True when the board JSON file no longer exists on disk (404). */
 const isOrphaned = ref(false)
 
+/**
+ * True once the in-flight `mountReact()` call has fully resolved. Gates the
+ * live-update watcher below so a store update that lands mid-mount (a race
+ * between this component's own fetch and the parent's) cannot trigger a
+ * second, redundant reload right after the initial/board-switch one.
+ */
+const canvasReady = ref(false)
+
 /* React root handle */
 let root: { render: (el: unknown) => void; unmount: () => void } | null = null
+
+/**
+ * JSON of the snapshot currently rendered by the mounted editor. Used by the
+ * live-update watcher to tell a genuine external change apart from the echo
+ * of our own save (`change` emit → `saveContent` PATCH → backend emits
+ * `artifact.updated` → this client's own WS handler refetches content into
+ * the store — which would otherwise re-trigger a reload of what we just
+ * drew).
+ */
+let mountedSnapshotJson: string | null = null
 
 async function mountReact(): Promise<void> {
   if (!containerRef.value) return
 
   isOrphaned.value = false
+  canvasReady.value = false
 
-  /* If no snapshot provided as prop, fetch it from the backend */
-  let resolvedSnapshot = props.snapshot as Record<string, unknown> | null
+  /* Prefer the freshest cached content (kept current by `artifact.updated`
+   * live-updates), then the prop, then fetch THROUGH THE STORE so the cache
+   * gets populated — the live-update path relies on a cache entry existing
+   * (`applyArtifactUpdated` only force-refetches cached content). */
+  let resolvedSnapshot =
+    (artifactsStore.contents[props.boardId]?.snapshot as Record<string, unknown> | undefined) ??
+    (props.snapshot as Record<string, unknown> | null)
   if (!resolvedSnapshot && props.boardId) {
-    try {
-      const res = await api.getArtifactContent(props.boardId)
-      const snap = res.content?.snapshot
-      resolvedSnapshot = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
-    } catch (err: unknown) {
-      /* Detect 404 — board was deleted outside this conversation */
-      if (err instanceof Error && err.message.includes('API Error 404')) {
-        isOrphaned.value = true
-        return
-      }
-      /* Other errors (network, etc.) — start with empty canvas */
+    const content = await artifactsStore.fetchContent(props.boardId)
+    if (content === null) {
+      /* Fetch failed (404 board deleted, or network error) — orphan state */
+      isOrphaned.value = true
+      return
     }
+    const snap = content.snapshot
+    resolvedSnapshot = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
   }
+  mountedSnapshotJson = resolvedSnapshot ? JSON.stringify(resolvedSnapshot) : null
 
   /* Dynamic imports keep React out of the main Vue bundle */
   const [reactModule, reactDomModule, tldrawAppModule] = await Promise.all([
@@ -63,7 +86,7 @@ async function mountReact(): Promise<void> {
   const createRoot = reactDomModule.createRoot
   const TldrawApp = tldrawAppModule.default
 
-  /* Unmount any previous React root (board switch) */
+  /* Unmount any previous React root (board switch or live reload) */
   if (root) {
     root.unmount()
     root = null
@@ -75,11 +98,24 @@ async function mountReact(): Promise<void> {
   newRoot.render(
     createElement(TldrawApp, {
       snapshot: snapshotProp,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onDocumentChange: (snap: any) => emit('change', snap as Record<string, unknown>)
+      onDocumentChange: (snap: unknown) => {
+        mountedSnapshotJson = JSON.stringify(snap)
+        emit('change', snap as Record<string, unknown>)
+      }
     })
   )
   root = newRoot as { render: (el: unknown) => void; unmount: () => void }
+  canvasReady.value = true
+
+  /* Catch-up: a store update landing while the dynamic imports were in
+   * flight is consumed silently (the live-update watcher is gated by
+   * `canvasReady`). If the cache now differs from what was just mounted,
+   * run one more reload — it converges immediately because the reload
+   * prefers the cache, making the two JSONs equal. */
+  const latest = artifactsStore.contents[props.boardId]?.snapshot
+  if (latest !== undefined && JSON.stringify(latest) !== mountedSnapshotJson) {
+    void mountReact()
+  }
 }
 
 onMounted(() => {
@@ -98,6 +134,24 @@ watch(
   }
 )
 
+/**
+ * Live-update: when this board's cached JSON content changes to something
+ * other than what we just rendered/saved, reload the canvas in place (same
+ * Vue component instance, same board — only the internal React root is
+ * recreated, via the existing `mountReact()` load path). This is what makes
+ * an `artifact.updated` event (another client, or an agent tool editing the
+ * board) show up live without navigating away from the open board.
+ */
+watch(
+  () => artifactsStore.contents[props.boardId]?.snapshot,
+  (snap) => {
+    if (!canvasReady.value || snap === undefined) return
+    const json = JSON.stringify(snap ?? null)
+    if (json === mountedSnapshotJson) return // our own save echo — ignore
+    mountReact()
+  }
+)
+
 onBeforeUnmount(() => {
   if (root) {
     root.unmount()
@@ -110,7 +164,12 @@ onBeforeUnmount(() => {
   <div class="tldraw-host">
     <!-- Orphan state: board was deleted from the whiteboard page -->
     <div v-if="isOrphaned" class="tldraw-orphaned">
-      <AppIcon name="whiteboard-deleted" :size="24" :stroke-width="1.5" class="tldraw-orphaned__icon" />
+      <AppIcon
+        name="whiteboard-deleted"
+        :size="24"
+        :stroke-width="1.5"
+        class="tldraw-orphaned__icon"
+      />
       <p class="tldraw-orphaned__text">Lavagna non più disponibile</p>
       <p class="tldraw-orphaned__hint">Il file è stato eliminato dalla pagina Lavagne</p>
     </div>

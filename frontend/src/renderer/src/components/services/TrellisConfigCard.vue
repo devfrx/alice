@@ -14,10 +14,7 @@
  * ``props.service.name``.
  */
 import { computed, onMounted, ref } from 'vue'
-import {
-  useServicesStore,
-  type ServiceSnapshot,
-} from '../../stores/services'
+import { useServicesStore, type ServiceSnapshot } from '../../stores/services'
 import AppIcon from '../ui/AppIcon.vue'
 import UiToggle from '../ui/UiToggle.vue'
 
@@ -42,13 +39,11 @@ const STATUS_LABELS: Record<string, string> = {
   up: 'Attivo',
   down: 'Spento',
   degraded: 'Degradato',
-  starting: 'Avvio…',
+  starting: 'Avvio…'
 }
 
 type TrellisVariant = 'trellis' | 'trellis2' | 'trellis2multiview'
-const variant = computed<TrellisVariant>(
-  () => props.service.name as TrellisVariant,
-)
+const variant = computed<TrellisVariant>(() => props.service.name as TrellisVariant)
 const isV2 = computed(() => variant.value === 'trellis2')
 const isMV = computed(() => variant.value === 'trellis2multiview')
 const hasGuide = computed(() => isV2.value || isMV.value)
@@ -64,10 +59,8 @@ const variantLabel = computed(() => {
   return 'TRELLIS'
 })
 const tagline = computed(() => {
-  if (isMV.value)
-    return 'Multi-image-to-3D · porta 8092 · richiede setup compilazione'
-  if (isV2.value)
-    return 'Image-to-3D · porta 8091 · richiede setup compilazione'
+  if (isMV.value) return 'Multi-image-to-3D · porta 8092 · richiede setup compilazione'
+  if (isV2.value) return 'Image-to-3D · porta 8091 · richiede setup compilazione'
   return 'Text-to-3D · porta 8090'
 })
 const placeholder = computed(() => {
@@ -77,9 +70,7 @@ const placeholder = computed(() => {
 })
 
 const statusClass = computed(() => `is-${props.service.status}`)
-const statusLabel = computed(
-  () => STATUS_LABELS[props.service.status] ?? props.service.status,
-)
+const statusLabel = computed(() => STATUS_LABELS[props.service.status] ?? props.service.status)
 const isStarting = computed(() => props.service.status === 'starting')
 const isStopped = computed(() => props.service.status === 'down')
 
@@ -97,9 +88,7 @@ onMounted(async () => {
 })
 
 async function pickDir(): Promise<void> {
-  const picked = await window.electron.fileOps.selectDirectory(
-    dirPath.value || undefined,
-  )
+  const picked = await window.electron.fileOps.selectDirectory(dirPath.value || undefined)
   if (picked) dirPath.value = picked
 }
 
@@ -197,13 +186,15 @@ async function stopService(): Promise<void> {
             <span>Sfoglia</span>
           </button>
         </div>
-        <span class="trellis-card__hint">
-          Percorso del clone locale del repository.
-        </span>
+        <span class="trellis-card__hint"> Percorso del clone locale del repository. </span>
       </label>
 
-      <UiToggle v-model="enabled" :disabled="loading" label="Abilita servizio"
-          hint="Quando attivo, AL\CE può avviare automaticamente il processo." />
+      <UiToggle
+        v-model="enabled"
+        :disabled="loading"
+        label="Abilita servizio"
+        hint="Quando attivo, AL\CE può avviare automaticamente il processo."
+      />
     </div>
 
     <div v-if="saveError" class="trellis-card__alert trellis-card__alert--error">
@@ -268,7 +259,10 @@ async function stopService(): Promise<void> {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
-  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 .trellis-card:hover {
   background: var(--surface-2);
@@ -287,10 +281,18 @@ async function stopService(): Promise<void> {
   background: transparent;
   transition: background 140ms ease;
 }
-.trellis-card.is-up::before { background: var(--success); }
-.trellis-card.is-degraded::before { background: var(--warning); }
-.trellis-card.is-down::before { background: var(--danger); }
-.trellis-card.is-starting::before { background: var(--accent); }
+.trellis-card.is-up::before {
+  background: var(--success);
+}
+.trellis-card.is-degraded::before {
+  background: var(--warning);
+}
+.trellis-card.is-down::before {
+  background: var(--danger);
+}
+.trellis-card.is-starting::before {
+  background: var(--accent);
+}
 
 /* ── Header ──────────────────────────────────────────────────── */
 .trellis-card__head {
@@ -353,13 +355,32 @@ async function stopService(): Promise<void> {
   animation: status-pulse 1.4s ease-in-out infinite;
 }
 @keyframes status-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
 }
-.trellis-card__status.is-up { background: var(--success-light); color: var(--success); }
-.trellis-card__status.is-degraded { background: var(--warning-bg); color: var(--warning); }
-.trellis-card__status.is-down { background: var(--danger-faint); color: var(--danger); }
-.trellis-card__status.is-starting { background: var(--accent-dim); color: var(--accent); }
+.trellis-card__status.is-up {
+  background: var(--success-light);
+  color: var(--success);
+}
+.trellis-card__status.is-degraded {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.trellis-card__status.is-down {
+  background: var(--danger-faint);
+  color: var(--danger);
+}
+.trellis-card__status.is-starting {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
 
 /* ── Detail line ─────────────────────────────────────────────── */
 .trellis-card__detail {
@@ -409,15 +430,21 @@ async function stopService(): Promise<void> {
   color: var(--text-primary);
   font-size: var(--text-xs);
   font-family: var(--font-mono);
-  transition: border-color 120ms ease, background 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
 }
-.trellis-card__input::placeholder { color: var(--text-muted); }
+.trellis-card__input::placeholder {
+  color: var(--text-muted);
+}
 .trellis-card__input:focus {
   outline: none;
   border-color: var(--accent-border);
   background: var(--surface-2);
 }
-.trellis-card__input:disabled { opacity: 0.6; }
+.trellis-card__input:disabled {
+  opacity: 0.6;
+}
 
 /* ── Alerts ──────────────────────────────────────────────────── */
 .trellis-card__alert {
@@ -456,9 +483,15 @@ async function stopService(): Promise<void> {
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .btn--ghost {
   background: transparent;
   color: var(--text-secondary);
@@ -478,6 +511,10 @@ async function stopService(): Promise<void> {
   background: var(--accent-medium);
   border-color: var(--accent-strong);
 }
-.btn--icon { flex: 0 0 auto; }
-.btn--right { margin-left: auto; }
+.btn--icon {
+  flex: 0 0 auto;
+}
+.btn--right {
+  margin-left: auto;
+}
 </style>

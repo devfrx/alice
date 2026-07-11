@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useChatStore } from './chat'
-import { api } from '../services/api'
+import { chatApi } from '../services/api'
 import type { AskUserRequest, ConversationDetail } from '../types/chat'
 
 // finalizeStream() fires loadConversations()/loadConversation() as
@@ -19,18 +19,18 @@ import type { AskUserRequest, ConversationDetail } from '../types/chat'
 // reaching for a backend (the store swallows their rejections, but resolving
 // keeps the test free of stray network noise).
 vi.mock('../services/api', () => ({
-  api: {
+  chatApi: {
     getConversations: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     getConversation: vi.fn().mockResolvedValue({
       id: 'c1',
       title: null,
       created_at: '',
       updated_at: '',
-      messages: [],
+      messages: []
     }),
-    createConversation: vi.fn().mockResolvedValue({ created_at: '', updated_at: '' }),
+    createConversation: vi.fn().mockResolvedValue({ created_at: '', updated_at: '' })
   },
-  resolveBackendUrl: (u: string) => u,
+  resolveBackendUrl: (u: string) => u
 }))
 
 function askReq(executionId: string, text = 'Which file?', options?: string[]): AskUserRequest {
@@ -55,7 +55,7 @@ describe('pendingAskUser add/remove', () => {
     expect(Object.keys(s.pendingAskUser)).toEqual(['e1'])
     expect(s.pendingAskUser['e1']).toMatchObject({
       executionId: 'e1',
-      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }],
+      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }]
     })
   })
 
@@ -63,7 +63,7 @@ describe('pendingAskUser add/remove', () => {
     const store = useChatStore()
     store.addPendingAskUser({
       executionId: 'e1',
-      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }],
+      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }]
     })
     const pending = store.pendingAskUser['e1']
     expect(pending.questions[0].id).toBe('q1')
@@ -103,7 +103,7 @@ describe('pendingAskUser cleanup', () => {
       title: null,
       created_at: '',
       updated_at: '',
-      messages: [],
+      messages: []
     }
     s.currentConversation = conv
     // Drive the store into a streaming state so finalizeStream's guard passes.
@@ -138,7 +138,7 @@ describe('loadConversation race guard', () => {
     // Do NOT pre-seed `conversations` with A/B (or seed with message_count > 0) so the
     // API path is taken rather than the local-empty short-circuit.
     const resolvers: Record<string, (v: unknown) => void> = {}
-    vi.spyOn(api, 'getConversation').mockImplementation(
+    vi.spyOn(chatApi, 'getConversation').mockImplementation(
       (id: string) =>
         new Promise((res) => {
           resolvers[id] = res

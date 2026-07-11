@@ -7,17 +7,31 @@
  */
 import {
   useCalendar,
-  HOURS, DAY_NAMES,
-  type CalendarEvent, type EventFormData
+  HOURS,
+  DAY_NAMES,
+  type CalendarEvent,
+  type EventFormData
 } from '../../composables/useCalendar'
 import { useModal } from '../../composables/useModal'
 import CalendarEventModal from '../calendar/CalendarEventModal.vue'
 
 const {
-  viewMode, loading, error, headerLabel, events,
-  visibleDays, isToday, isCurrentMonth, eventsForDay,
-  eventStyle, eventColor, eventColumnStyle, formatTime,
-  navigate, goToday, fetchEvents
+  viewMode,
+  loading,
+  error,
+  headerLabel,
+  events,
+  visibleDays,
+  isToday,
+  isCurrentMonth,
+  eventsForDay,
+  eventStyle,
+  eventColor,
+  eventColumnStyle,
+  formatTime,
+  navigate,
+  goToday,
+  fetchEvents
 } = useCalendar()
 
 const { openCustom } = useModal()
@@ -36,13 +50,13 @@ function toDatetimeLocalValue(iso: string): string {
 async function openEventModal(
   editingEvent: CalendarEvent | null,
   initialForm: EventFormData,
-  title: string,
+  title: string
 ): Promise<void> {
   const saved = await openCustom({
     component: CalendarEventModal,
     props: { editingEvent, initialForm },
     title,
-    width: '480px',
+    width: '480px'
   })
   if (saved) await fetchEvents()
 }
@@ -52,14 +66,18 @@ function handleDayClick(day: Date): void {
   clickDate.setHours(9, 0, 0, 0)
   const endDate = new Date(clickDate)
   endDate.setHours(10, 0, 0, 0)
-  openEventModal(null, {
-    title: '',
-    description: '',
-    start: toLocalISOString(clickDate),
-    end: toLocalISOString(endDate),
-    reminder_minutes: null,
-    recurrence_rule: '',
-  }, 'Nuovo Evento')
+  openEventModal(
+    null,
+    {
+      title: '',
+      description: '',
+      start: toLocalISOString(clickDate),
+      end: toLocalISOString(endDate),
+      reminder_minutes: null,
+      recurrence_rule: ''
+    },
+    'Nuovo Evento'
+  )
 }
 
 /** Week-view: open create form with the clicked hour pre-filled. */
@@ -68,26 +86,34 @@ function handleHourClick(day: Date, hour: number): void {
   clickDate.setHours(hour, 0, 0, 0)
   const endDate = new Date(day)
   endDate.setHours(hour + 1, 0, 0, 0)
-  openEventModal(null, {
-    title: '',
-    description: '',
-    start: toLocalISOString(clickDate),
-    end: toLocalISOString(endDate),
-    reminder_minutes: null,
-    recurrence_rule: '',
-  }, 'Nuovo Evento')
+  openEventModal(
+    null,
+    {
+      title: '',
+      description: '',
+      start: toLocalISOString(clickDate),
+      end: toLocalISOString(endDate),
+      reminder_minutes: null,
+      recurrence_rule: ''
+    },
+    'Nuovo Evento'
+  )
 }
 
 function handleEventClick(ev: CalendarEvent, e: MouseEvent): void {
   e.stopPropagation()
-  openEventModal(ev, {
-    title: ev.title,
-    description: ev.description ?? '',
-    start: toDatetimeLocalValue(ev.start_time),
-    end: toDatetimeLocalValue(ev.end_time),
-    reminder_minutes: ev.reminder_minutes,
-    recurrence_rule: ev.recurrence_rule ?? '',
-  }, 'Modifica Evento')
+  openEventModal(
+    ev,
+    {
+      title: ev.title,
+      description: ev.description ?? '',
+      start: toDatetimeLocalValue(ev.start_time),
+      end: toDatetimeLocalValue(ev.end_time),
+      reminder_minutes: ev.reminder_minutes,
+      recurrence_rule: ev.recurrence_rule ?? ''
+    },
+    'Modifica Evento'
+  )
 }
 
 /** Extract the effective hour for creating a new event from an event block. */
@@ -110,10 +136,18 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
       </div>
       <h2 class="calendar__title">{{ headerLabel }}</h2>
       <div class="calendar__mode">
-        <button :class="['calendar__btn', { 'calendar__btn--active': viewMode === 'week' }]"
-          @click="viewMode = 'week'">Settimana</button>
-        <button :class="['calendar__btn', { 'calendar__btn--active': viewMode === 'month' }]"
-          @click="viewMode = 'month'">Mese</button>
+        <button
+          :class="['calendar__btn', { 'calendar__btn--active': viewMode === 'week' }]"
+          @click="viewMode = 'week'"
+        >
+          Settimana
+        </button>
+        <button
+          :class="['calendar__btn', { 'calendar__btn--active': viewMode === 'month' }]"
+          @click="viewMode = 'month'"
+        >
+          Mese
+        </button>
       </div>
     </header>
 
@@ -125,28 +159,53 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
     <div v-else-if="viewMode === 'week'" class="calendar__week">
       <div class="calendar__week-header">
         <div class="calendar__time-gutter"></div>
-        <div v-for="day in visibleDays" :key="day.toISOString()"
-          :class="['calendar__day-label', { 'calendar__day-label--today': isToday(day) }]">
-          {{ DAY_NAMES[day.getDay() === 0 ? 6 : day.getDay() - 1] }} <span class="calendar__day-num">{{ day.getDate()
-          }}</span>
+        <div
+          v-for="day in visibleDays"
+          :key="day.toISOString()"
+          :class="['calendar__day-label', { 'calendar__day-label--today': isToday(day) }]"
+        >
+          {{ DAY_NAMES[day.getDay() === 0 ? 6 : day.getDay() - 1] }}
+          <span class="calendar__day-num">{{ day.getDate() }}</span>
         </div>
       </div>
       <div class="calendar__week-body">
         <div class="calendar__time-gutter">
-          <div v-for="h in HOURS" :key="h" class="calendar__hour-label">{{ String(h).padStart(2, '0') }}:00</div>
+          <div v-for="h in HOURS" :key="h" class="calendar__hour-label">
+            {{ String(h).padStart(2, '0') }}:00
+          </div>
         </div>
-        <div v-for="day in visibleDays" :key="day.toISOString()"
-          :class="['calendar__day-col', { 'calendar__day-col--today': isToday(day) }]">
-          <div v-for="h in HOURS" :key="h" class="calendar__hour-slot" @click.stop="handleHourClick(day, h)"></div>
-          <div v-for="ev in eventsForDay(day)" :key="ev.occurrence_date ? `${ev.id}_${ev.occurrence_date}` : ev.id"
+        <div
+          v-for="day in visibleDays"
+          :key="day.toISOString()"
+          :class="['calendar__day-col', { 'calendar__day-col--today': isToday(day) }]"
+        >
+          <div
+            v-for="h in HOURS"
+            :key="h"
+            class="calendar__hour-slot"
+            @click.stop="handleHourClick(day, h)"
+          ></div>
+          <div
+            v-for="ev in eventsForDay(day)"
+            :key="ev.occurrence_date ? `${ev.id}_${ev.occurrence_date}` : ev.id"
             class="calendar__event"
-            :style="{ ...eventStyle(ev, day), ...eventColumnStyle(ev, day), backgroundColor: eventColor(ev) }"
+            :style="{
+              ...eventStyle(ev, day),
+              ...eventColumnStyle(ev, day),
+              backgroundColor: eventColor(ev)
+            }"
             :title="`${ev.title}\n${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`"
-            @click="handleEventClick(ev, $event)">
+            @click="handleEventClick(ev, $event)"
+          >
             <span class="calendar__event-time">{{ formatTime(ev.start_time) }}</span>
             <span class="calendar__event-title">{{ ev.title }}</span>
-            <button class="calendar__event-add" @click.stop="handleHourClick(day, getEventHour(ev, day))"
-              title="Nuovo evento">+</button>
+            <button
+              class="calendar__event-add"
+              title="Nuovo evento"
+              @click.stop="handleHourClick(day, getEventHour(ev, day))"
+            >
+              +
+            </button>
           </div>
         </div>
       </div>
@@ -157,17 +216,32 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
         <div v-for="name in DAY_NAMES" :key="name">{{ name }}</div>
       </div>
       <div class="calendar__month-grid">
-        <div v-for="day in visibleDays" :key="day.toISOString()"
-          :class="['calendar__month-cell', { 'calendar__month-cell--today': isToday(day), 'calendar__month-cell--dim': !isCurrentMonth(day) }]"
-          @click="handleDayClick(day)">
+        <div
+          v-for="day in visibleDays"
+          :key="day.toISOString()"
+          :class="[
+            'calendar__month-cell',
+            {
+              'calendar__month-cell--today': isToday(day),
+              'calendar__month-cell--dim': !isCurrentMonth(day)
+            }
+          ]"
+          @click="handleDayClick(day)"
+        >
           <span class="calendar__month-date">{{ day.getDate() }}</span>
           <template v-for="(dayEvts, dayEvtIdx) in [eventsForDay(day)]">
-            <div v-for="ev in dayEvts.slice(0, 3)" :key="ev.occurrence_date ? `${ev.id}_${ev.occurrence_date}` : ev.id"
-              class="calendar__month-event" :style="{ backgroundColor: eventColor(ev) }"
-              @click="handleEventClick(ev, $event)">{{ ev.title }}</div>
-            <span v-if="dayEvts.length > 3" :key="`more-${dayEvtIdx}`" class="calendar__month-more">+{{ dayEvts.length -
-              3 }}
-              altri</span>
+            <div
+              v-for="ev in dayEvts.slice(0, 3)"
+              :key="ev.occurrence_date ? `${ev.id}_${ev.occurrence_date}` : ev.id"
+              class="calendar__month-event"
+              :style="{ backgroundColor: eventColor(ev) }"
+              @click="handleEventClick(ev, $event)"
+            >
+              {{ ev.title }}
+            </div>
+            <span v-if="dayEvts.length > 3" :key="`more-${dayEvtIdx}`" class="calendar__month-more"
+              >+{{ dayEvts.length - 3 }} altri</span
+            >
           </template>
         </div>
       </div>

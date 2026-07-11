@@ -57,19 +57,15 @@ function isTrellis(name: string): boolean {
   return TRELLIS_NAMES.includes(name as (typeof TRELLIS_NAMES)[number])
 }
 
-const stdServices = computed(() =>
-  store.services.filter((s) => !isTrellis(s.name)),
-)
-const trellisServices = computed(() =>
-  store.services.filter((s) => isTrellis(s.name)),
-)
+const stdServices = computed(() => store.services.filter((s) => !isTrellis(s.name)))
+const trellisServices = computed(() => store.services.filter((s) => isTrellis(s.name)))
 
 // ── Row display metadata (icon + human label) ───────────────────
 const STATUS_LABELS: Record<string, string> = {
   up: 'Attivo',
   down: 'Spento',
   degraded: 'Degradato',
-  starting: 'Avvio…',
+  starting: 'Avvio…'
 }
 const SERVICE_LABELS: Record<string, { label: string; icon: AppIconName }> = {
   llm: { label: 'LM Studio', icon: 'server' },
@@ -78,7 +74,7 @@ const SERVICE_LABELS: Record<string, { label: string; icon: AppIconName }> = {
   vram: { label: 'VRAM Monitor', icon: 'cpu' },
   trellis: { label: 'TRELLIS', icon: 'box-3d' },
   trellis2: { label: 'TRELLIS.2', icon: 'box-3d' },
-  trellis2multiview: { label: 'TRELLIS.2 Multi-view', icon: 'box-3d' },
+  trellis2multiview: { label: 'TRELLIS.2 Multi-view', icon: 'box-3d' }
 }
 function metaFor(svc: ServiceSnapshot): { label: string; icon: AppIconName } {
   return SERVICE_LABELS[svc.name] ?? { label: svc.name, icon: 'server' }
@@ -88,12 +84,10 @@ function statusLabelFor(svc: ServiceSnapshot): string {
 }
 
 // ── Header summary ──────────────────────────────────────────────
-const upCount = computed(
-  () => store.services.filter((s) => s.status === 'up').length,
-)
+const upCount = computed(() => store.services.filter((s) => s.status === 'up').length)
 const totalServices = computed(() => store.services.length)
 const activeDownloads = computed(
-  () => Object.values(store.downloads).filter((d) => d.phase === 'downloading').length,
+  () => Object.values(store.downloads).filter((d) => d.phase === 'downloading').length
 )
 const overallClass = computed(() => {
   if (!totalServices.value) return 'is-neutral'
@@ -115,21 +109,18 @@ watch(
     }
     // Default to first service, and stay valid if the list changes / the
     // selected service disappears.
-    if (
-      !selectedServiceName.value ||
-      !list.some((s) => s.name === selectedServiceName.value)
-    ) {
+    if (!selectedServiceName.value || !list.some((s) => s.name === selectedServiceName.value)) {
       selectedServiceName.value = list[0].name
     }
   },
-  { immediate: true },
+  { immediate: true }
 )
 
 const selectedService = computed<ServiceSnapshot | null>(
-  () => store.services.find((s) => s.name === selectedServiceName.value) ?? null,
+  () => store.services.find((s) => s.name === selectedServiceName.value) ?? null
 )
 const selectedIsTrellis = computed(() =>
-  selectedService.value ? isTrellis(selectedService.value.name) : false,
+  selectedService.value ? isTrellis(selectedService.value.name) : false
 )
 
 function select(name: string): void {
@@ -140,11 +131,7 @@ async function refreshAll(): Promise<void> {
   if (refreshing.value) return
   refreshing.value = true
   try {
-    await Promise.all([
-      store.refresh(),
-      store.loadCatalog('stt'),
-      store.loadCatalog('tts'),
-    ])
+    await Promise.all([store.refresh(), store.loadCatalog('stt'), store.loadCatalog('tts')])
   } finally {
     refreshing.value = false
   }
@@ -194,11 +181,7 @@ async function refreshAll(): Promise<void> {
     </div>
 
     <div class="services-view__body">
-      <nav
-        v-if="store.services.length"
-        class="services-view__rail"
-        aria-label="Elenco servizi"
-      >
+      <nav v-if="store.services.length" class="services-view__rail" aria-label="Elenco servizi">
         <template v-if="stdServices.length">
           <p class="services-view__rail-label">Microservizi</p>
           <button
@@ -251,14 +234,9 @@ async function refreshAll(): Promise<void> {
             @restart="store.restart(selectedService.name)"
           />
         </div>
-        <UiEmptyState
-          v-else-if="!store.error"
-          icon="server"
-          title="Nessun servizio registrato"
-        />
+        <UiEmptyState v-else-if="!store.error" icon="server" title="Nessun servizio registrato" />
       </section>
     </div>
-
   </main>
 </template>
 
@@ -341,20 +319,40 @@ async function refreshAll(): Promise<void> {
 .services-view__overall-label {
   text-transform: lowercase;
 }
-.services-view__overall.is-up { color: var(--success); }
-.services-view__overall.is-up .services-view__overall-value { color: var(--success); }
-.services-view__overall.is-degraded { color: var(--warning); }
-.services-view__overall.is-degraded .services-view__overall-value { color: var(--warning); }
-.services-view__overall.is-down { color: var(--danger); }
-.services-view__overall.is-down .services-view__overall-value { color: var(--danger); }
-.services-view__overall.is-starting { color: var(--accent); }
-.services-view__overall.is-starting .services-view__overall-value { color: var(--accent); }
-.services-view__overall.is-neutral .services-view__overall-value { color: var(--text-secondary); }
+.services-view__overall.is-up {
+  color: var(--success);
+}
+.services-view__overall.is-up .services-view__overall-value {
+  color: var(--success);
+}
+.services-view__overall.is-degraded {
+  color: var(--warning);
+}
+.services-view__overall.is-degraded .services-view__overall-value {
+  color: var(--warning);
+}
+.services-view__overall.is-down {
+  color: var(--danger);
+}
+.services-view__overall.is-down .services-view__overall-value {
+  color: var(--danger);
+}
+.services-view__overall.is-starting {
+  color: var(--accent);
+}
+.services-view__overall.is-starting .services-view__overall-value {
+  color: var(--accent);
+}
+.services-view__overall.is-neutral .services-view__overall-value {
+  color: var(--text-secondary);
+}
 .services-view__overall.is-accent {
   background: var(--accent-dim);
   color: var(--accent);
 }
-.services-view__overall.is-accent .services-view__overall-value { color: var(--accent); }
+.services-view__overall.is-accent .services-view__overall-value {
+  color: var(--accent);
+}
 
 /* ── Refresh button ───────────────────────────────────────────── */
 .services-view__refresh {
@@ -371,7 +369,10 @@ async function refreshAll(): Promise<void> {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
 .services-view__refresh:hover:not(:disabled) {
   background: var(--surface-3);
@@ -386,7 +387,9 @@ async function refreshAll(): Promise<void> {
   animation: services-spin 0.9s linear infinite;
 }
 @keyframes services-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Error banner ────────────────────────────────────────────── */
@@ -448,7 +451,9 @@ async function refreshAll(): Promise<void> {
   cursor: pointer;
   text-align: left;
   color: var(--text-secondary);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 .rail-row:hover {
   background: var(--surface-hover);
@@ -470,16 +475,31 @@ async function refreshAll(): Promise<void> {
   background: var(--text-muted);
   box-shadow: 0 0 6px transparent;
 }
-.rail-row__dot.is-up { background: var(--success); box-shadow: 0 0 6px var(--success); }
-.rail-row__dot.is-degraded { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
-.rail-row__dot.is-down { background: var(--danger); }
+.rail-row__dot.is-up {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+.rail-row__dot.is-degraded {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+}
+.rail-row__dot.is-down {
+  background: var(--danger);
+}
 .rail-row__dot.is-starting {
   background: var(--accent);
   animation: status-pulse 1.4s ease-in-out infinite;
 }
 @keyframes status-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
 }
 .rail-row__icon {
   flex: 0 0 auto;

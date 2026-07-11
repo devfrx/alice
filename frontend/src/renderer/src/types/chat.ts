@@ -128,33 +128,23 @@ export type BranchConversationRequest = ApiSchema<'BranchConversationRequest'>
 // WebSocket
 // ---------------------------------------------------------------------------
 
-/** Generated from the backend WS contract — do not redefine locally. */
+/**
+ * Generated from the backend WS contract — do not redefine locally.
+ *
+ * Only the aliases with live consumers are kept: since the exhaustive
+ * `ChatHandlerMap` dispatcher (Fase 6, Task 4) handler parameters are
+ * narrowed via `Extract<ChatServerMessage, …>`, so the per-frame server
+ * aliases (WsToken, WsDone, …) are no longer needed here.
+ */
 export type WsSendPayload = ApiSchema<'WsUserMessage'>
-export type WsTokenMessage = ApiSchema<'WsToken'>
-export type WsThinkingMessage = ApiSchema<'WsThinking'>
-export type WsDoneMessage = ApiSchema<'WsDone'>
 export type WsCancelPayload = ApiSchema<'WsCancel'>
-export type WsErrorMessage = ApiSchema<'WsError'>
 export type WsToolCallMessage = ApiSchema<'WsToolCallStream'>
-export type WsToolExecutionStartMessage = ApiSchema<'WsToolExecutionStart'>
-export type WsToolExecutionDoneMessage = ApiSchema<'WsToolExecutionDone'>
-export type WsToolProgressMessage = ApiSchema<'WsToolProgress'>
-export type RememberChoice = NonNullable<
-  ApiSchema<'WsToolConfirmationResponse'>['remember']
->
-export type WsToolConfirmationRequiredMessage = ApiSchema<'WsToolConfirmationRequired'>
+export type RememberChoice = NonNullable<ApiSchema<'WsToolConfirmationResponse'>['remember']>
 export type WsToolConfirmationResponsePayload = ApiSchema<'WsToolConfirmationResponse'>
 export type AskUserQuestion = ApiSchema<'WsAskUserQuestion'>
-export type WsAskUserRequiredMessage = ApiSchema<'WsAskUserRequired'>
 export type AskUserAnswer = ApiSchema<'WsAskUserAnswer'>
 export type WsAskUserResponsePayload = ApiSchema<'WsAskUserResponse'>
-export type WsLlmRequeryMessage = ApiSchema<'WsLlmRequery'>
-export type WsWarningMessage = ApiSchema<'WsWarning'>
 export type ContextBreakdown = ApiSchema<'WsContextBreakdown'>
-export type WsContextInfoMessage = ApiSchema<'WsContextInfo'>
-export type WsContextCompressionStartMessage = ApiSchema<'WsContextCompressionStart'>
-export type WsContextCompressionDoneMessage = ApiSchema<'WsContextCompressionDone'>
-export type WsContextCompressionFailedMessage = ApiSchema<'WsContextCompressionFailed'>
 
 // ---------------------------------------------------------------------------
 // CAD / 3D Model

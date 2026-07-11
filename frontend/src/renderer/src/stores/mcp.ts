@@ -7,7 +7,7 @@
 
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api } from '../services/api'
+import { mcpApi } from '../services/api'
 import type { McpServerInfo } from '../types/mcp'
 
 export const useMcpStore = defineStore('mcp', () => {
@@ -16,17 +16,15 @@ export const useMcpStore = defineStore('mcp', () => {
   const reconnecting = ref<string | null>(null)
 
   const connectedCount = computed(
-    () => servers.value.filter((s) => s.status === 'connected').length,
+    () => servers.value.filter((s) => s.status === 'connected').length
   )
 
-  const totalTools = computed(
-    () => servers.value.reduce((sum, s) => sum + s.tools.length, 0),
-  )
+  const totalTools = computed(() => servers.value.reduce((sum, s) => sum + s.tools.length, 0))
 
   async function loadServers(): Promise<void> {
     loading.value = true
     try {
-      const res = await api.getMcpServers()
+      const res = await mcpApi.getMcpServers()
       servers.value = res.servers
     } catch (err) {
       console.error('[mcp store] loadServers failed:', err)
@@ -38,7 +36,7 @@ export const useMcpStore = defineStore('mcp', () => {
   async function reconnectServer(name: string): Promise<void> {
     reconnecting.value = name
     try {
-      await api.reconnectMcpServer(name)
+      await mcpApi.reconnectMcpServer(name)
       await loadServers()
     } catch (err) {
       console.error(`[mcp store] reconnect '${name}' failed:`, err)
@@ -55,6 +53,6 @@ export const useMcpStore = defineStore('mcp', () => {
     connectedCount,
     totalTools,
     loadServers,
-    reconnectServer,
+    reconnectServer
   }
 })

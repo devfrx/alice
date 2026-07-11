@@ -10,12 +10,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api } from '../services/api'
-import type {
-  Artifact,
-  ArtifactKind,
-  ArtifactListQuery,
-} from '../types/artifacts'
+import { artifactsApi } from '../services/api'
+import type { Artifact, ArtifactKind, ArtifactListQuery } from '../types/artifacts'
 
 export const useArtifactsStore = defineStore('artifacts', () => {
   // -----------------------------------------------------------------------
@@ -47,7 +43,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
       cad_3d_text: [],
       cad_3d_image: [],
       chart: [],
-      whiteboard: [],
+      whiteboard: []
     }
     for (const a of items.value) {
       const bucket = map[a.kind]
@@ -107,13 +103,11 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   async function fetch(params?: ArtifactListQuery): Promise<void> {
     loading.value = true
     try {
-      const res = await api.listArtifacts(params)
+      const res = await artifactsApi.listArtifacts(params)
       // Merge with existing items: replace those returned, keep others.
       const returnedIds = new Set(res.items.map((a) => a.id))
       const kept = items.value.filter((a) => !returnedIds.has(a.id))
-      items.value = [...res.items, ...kept].sort((a, b) =>
-        b.created_at.localeCompare(a.created_at),
-      )
+      items.value = [...res.items, ...kept].sort((a, b) => b.created_at.localeCompare(a.created_at))
       total.value = res.total
       if (params?.conversation_id) {
         fetchedConversations.value.add(params.conversation_id)
@@ -143,7 +137,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     const existing = findById(id)
     if (existing) return existing
     try {
-      const artifact = await api.getArtifact(id)
+      const artifact = await artifactsApi.getArtifact(id)
       addArtifact(artifact)
       return artifact
     } catch (err) {
@@ -155,7 +149,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   /** Force-refresh a single artifact row from the backend (upsert). */
   async function refreshById(id: string): Promise<void> {
     try {
-      const artifact = await api.getArtifact(id)
+      const artifact = await artifactsApi.getArtifact(id)
       addArtifact(artifact)
     } catch (err) {
       console.warn('[artifacts] refreshById failed:', err)
@@ -163,13 +157,10 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   }
 
   /** Fetch (and cache) the JSON content of a chart/whiteboard artifact. */
-  async function fetchContent(
-    id: string,
-    force = false,
-  ): Promise<Record<string, unknown> | null> {
+  async function fetchContent(id: string, force = false): Promise<Record<string, unknown> | null> {
     if (!force && contents.value[id]) return contents.value[id]
     try {
-      const res = await api.getArtifactContent(id)
+      const res = await artifactsApi.getArtifactContent(id)
       contents.value[id] = res.content
       return res.content
     } catch (err) {
@@ -179,12 +170,9 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   }
 
   /** Merge top-level keys into an artifact's JSON content (PATCH + local cache). */
-  async function saveContent(
-    id: string,
-    patch: Record<string, unknown>,
-  ): Promise<boolean> {
+  async function saveContent(id: string, patch: Record<string, unknown>): Promise<boolean> {
     try {
-      await api.updateArtifactContent(id, patch)
+      await artifactsApi.updateArtifactContent(id, patch)
       const cached = contents.value[id]
       if (cached) contents.value[id] = { ...cached, ...patch }
       return true
@@ -201,6 +189,41 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     if (idx !== -1) items.value.splice(idx, 1)
   }
 
+  /**
+   * Fold an `artifact.updated` event: refresh the row AND, if the JSON
+   * content is cached, force-refetch it so open viewers (whiteboard) react.
+   */
+  async function applyArtifactUpdated(id: string): Promise<void> {
+    await refreshById(id)
+    if (contents.value[id]) {
+      await fetchContent(id, true)
+    }
+  }
+
+  /**
+   * Fold an `artifact.bulk_deleted` event. `conversationId === null` means a
+   * full wipe (delete_all). Pinned artifacts of a deleted conversation
+   * survive detached — mirror that locally by nulling their conversation_id.
+   */
+  function applyBulkDeleted(conversationId: string | null, artifactIds: string[]): void {
+    if (conversationId === null) {
+      // Full wipe: every row (pinned included) is gone server-side.
+      items.value = []
+      contents.value = {}
+      total.value = 0
+      fetchedConversations.value.clear()
+      return
+    }
+    for (const id of artifactIds) removeLocal(id)
+    for (const a of items.value) {
+      if (a.conversation_id === conversationId && a.pinned) {
+        upsertById(a.id, { conversation_id: null })
+      }
+    }
+    fetchedConversations.value.delete(conversationId)
+    total.value = Math.max(0, total.value - artifactIds.length)
+  }
+
   /** Toggle the pin flag for an artifact and persist server-side. */
   async function togglePin(id: string): Promise<void> {
     const current = findById(id)
@@ -208,7 +231,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     // Optimistic update
     if (current) upsertById(id, { pinned: next })
     try {
-      const updated = await api.setArtifactPinned(id, next)
+      const updated = await artifactsApi.setArtifactPinned(id, next)
       addArtifact(updated)
     } catch (err) {
       // Roll back optimistic update
@@ -219,7 +242,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
 
   /** Delete an artifact server-side and remove it from the list. */
   async function remove(id: string, deleteFile = false): Promise<void> {
-    await api.deleteArtifact(id, deleteFile)
+    await artifactsApi.deleteArtifact(id, deleteFile)
     const idx = items.value.findIndex((a) => a.id === id)
     if (idx !== -1) items.value.splice(idx, 1)
     delete contents.value[id]
@@ -245,9 +268,11 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     fetchContent,
     saveContent,
     removeLocal,
+    applyArtifactUpdated,
+    applyBulkDeleted,
     togglePin,
     remove,
     addArtifact,
-    upsertById,
+    upsertById
   }
 })

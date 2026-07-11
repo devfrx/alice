@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { api } from '../services/api'
+import { emailApi } from '../services/api'
 import type { EmailHeader, EmailDetail, EmailSearchRequest } from '../types/email'
 
 export const useEmailStore = defineStore('email', () => {
@@ -20,7 +20,7 @@ export const useEmailStore = defineStore('email', () => {
     loading.value = true
     error.value = null
     try {
-      inbox.value = await api.getEmailInbox({ folder, limit, unread_only: unreadOnly })
+      inbox.value = await emailApi.getEmailInbox({ folder, limit, unread_only: unreadOnly })
       currentFolder.value = folder
     } catch (err) {
       error.value = _toErrorMessage(err)
@@ -33,7 +33,7 @@ export const useEmailStore = defineStore('email', () => {
     loading.value = true
     error.value = null
     try {
-      const detail = await api.getEmail(uid, folder)
+      const detail = await emailApi.getEmail(uid, folder)
       // Backend detail response may omit is_read; infer from inbox header
       const idx = inbox.value.findIndex((e) => e.uid === uid)
       if (idx !== -1) {
@@ -53,7 +53,7 @@ export const useEmailStore = defineStore('email', () => {
     loading.value = true
     error.value = null
     try {
-      inbox.value = await api.searchEmails(req)
+      inbox.value = await emailApi.searchEmails(req)
     } catch (err) {
       error.value = _toErrorMessage(err)
     } finally {
@@ -62,22 +62,24 @@ export const useEmailStore = defineStore('email', () => {
   }
 
   async function markRead(uid: string, read = true, folder = 'INBOX'): Promise<void> {
-    await api.markEmailRead(uid, folder, read)
+    await emailApi.markEmailRead(uid, folder, read)
     const idx = inbox.value.findIndex((e) => e.uid === uid)
     if (idx !== -1) inbox.value[idx].is_read = read
     if (currentEmail.value?.uid === uid) currentEmail.value.is_read = read
   }
 
   async function archiveEmail(uid: string, fromFolder = 'INBOX'): Promise<void> {
-    await api.archiveEmail(uid, fromFolder)
+    await emailApi.archiveEmail(uid, fromFolder)
     inbox.value = inbox.value.filter((e) => e.uid !== uid)
     if (currentEmail.value?.uid === uid) currentEmail.value = null
   }
 
   async function fetchFolders(): Promise<void> {
     try {
-      folders.value = await api.getEmailFolders()
-    } catch { /* non-critical */ }
+      folders.value = await emailApi.getEmailFolders()
+    } catch {
+      /* non-critical */
+    }
   }
 
   function handleEmailReceived(folder: string): void {
@@ -91,8 +93,20 @@ export const useEmailStore = defineStore('email', () => {
   }
 
   return {
-    inbox, currentEmail, folders, loading, error, currentFolder, unreadCount,
-    fetchInbox, fetchEmail, searchEmails, markRead, archiveEmail,
-    fetchFolders, handleEmailReceived, clearCurrentEmail,
+    inbox,
+    currentEmail,
+    folders,
+    loading,
+    error,
+    currentFolder,
+    unreadCount,
+    fetchInbox,
+    fetchEmail,
+    searchEmails,
+    markRead,
+    archiveEmail,
+    fetchFolders,
+    handleEmailReceived,
+    clearCurrentEmail
   }
 })

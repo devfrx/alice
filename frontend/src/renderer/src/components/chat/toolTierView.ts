@@ -27,7 +27,7 @@ export const PLANNING_ALWAYS_ALLOW = [
   'agent_update_tasks',
   'agent_write_plan',
   'agent_spawn_subagent',
-  'agent_ask_user',
+  'agent_ask_user'
 ] as const
 
 /** Whether a tool is one of the always-allowed planning tools. */
@@ -45,11 +45,11 @@ export function isPlanningTool(name: string): boolean {
  */
 export function isToolAllowedInTier(
   tier: string,
-  tool: { name: string; capabilities: string[] },
+  tool: { name: string; capabilities: string[] }
 ): boolean {
   if (tier !== 'plan') return true
   const blocked = tool.capabilities.some((cap) =>
-    (READ_ONLY_BLOCKED_CAPS as readonly string[]).includes(cap),
+    (READ_ONLY_BLOCKED_CAPS as readonly string[]).includes(cap)
   )
   if (!blocked) return true
   // Planning tools are sovereign — allowed even with a blocked capability.
@@ -80,7 +80,7 @@ export function tierToolView(tier: string, catalog: ToolCatalogPlugin[]): TierTo
       name: tool.name,
       label: tool.label,
       allowed: isToolAllowedInTier(tier, tool),
-      planning: isPlanningTool(tool.name),
+      planning: isPlanningTool(tool.name)
     }))
     if (tier === 'plan') {
       tools.sort((a, b) => {

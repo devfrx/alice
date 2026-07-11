@@ -10,9 +10,7 @@ import { useWhiteboardBoards } from '../composables/whiteboard/useWhiteboardBoar
 import WhiteboardListSidebar from '../components/whiteboard/WhiteboardListSidebar.vue'
 import AppIcon from '../components/ui/AppIcon.vue'
 
-const TldrawCanvas = defineAsyncComponent(
-  () => import('../components/whiteboard/TldrawCanvas.vue')
-)
+const TldrawCanvas = defineAsyncComponent(() => import('../components/whiteboard/TldrawCanvas.vue'))
 
 const artifactsStore = useArtifactsStore()
 const { boards, loading, refresh } = useWhiteboardBoards()
@@ -31,7 +29,8 @@ async function onSelectBoard(id: string): Promise<void> {
   const content = await artifactsStore.fetchContent(id, true)
   if (currentBoardId.value !== id) return // a newer selection won — drop this resolution
   const snap = content?.snapshot
-  currentSnapshot.value = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
+  currentSnapshot.value =
+    snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
 }
 
 async function onDeleteBoard(id: string): Promise<void> {
@@ -60,7 +59,11 @@ function onSnapshotChange(snapshot: Record<string, unknown>): void {
 
     <div class="whiteboard-page__canvas">
       <template v-if="hasBoard">
-        <TldrawCanvas :board-id="currentBoardId ?? ''" :snapshot="currentSnapshot" @change="onSnapshotChange" />
+        <TldrawCanvas
+          :board-id="currentBoardId ?? ''"
+          :snapshot="currentSnapshot"
+          @change="onSnapshotChange"
+        />
       </template>
       <template v-else>
         <div class="whiteboard-page__empty">

@@ -34,12 +34,12 @@ const TIER_LABELS: Record<PermissionMode, string> = {
   strict: 'Rigorosa',
   auto_edits: 'Modifiche automatiche',
   plan: 'Pianificazione',
-  autopilot: 'Autopilota',
+  autopilot: 'Autopilota'
 }
 
 /** The active conversation's permission tier (defaults to ``strict``). */
 const activeTier = computed<PermissionMode>(() =>
-  permissionModeStore.modeFor(chatStore.currentConversation?.id ?? ''),
+  permissionModeStore.modeFor(chatStore.currentConversation?.id ?? '')
 )
 
 /** Readable label of the active tier. */
@@ -56,7 +56,7 @@ const ragActive = computed<boolean>(() => settingsStore.settings.llm.toolRagEnab
 
 /** Number of tools withheld by the active tier (chip hint; non-zero only in plan). */
 const blockedCount = computed<number>(() =>
-  groups.value.reduce((n, g) => n + g.tools.filter((t) => !t.allowed).length, 0),
+  groups.value.reduce((n, g) => n + g.tools.filter((t) => !t.allowed).length, 0)
 )
 
 function toggleOpen(): void {
@@ -69,7 +69,10 @@ function ensureTier(id: string | undefined): void {
 }
 
 onMounted(() => ensureTier(chatStore.currentConversation?.id))
-watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
+watch(
+  () => chatStore.currentConversation?.id,
+  (id) => ensureTier(id)
+)
 </script>
 
 <template>
@@ -86,7 +89,11 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
     >
       <AppIcon name="sliders" :size="11" />
       <span class="ctc__chip-label">Strumenti</span>
-      <span v-if="blockedCount > 0" class="ctc__badge" :title="`${blockedCount} strumenti bloccati dalla modalità`">
+      <span
+        v-if="blockedCount > 0"
+        class="ctc__badge"
+        :title="`${blockedCount} strumenti bloccati dalla modalità`"
+      >
         <AppIcon name="lock" :size="9" />{{ blockedCount }}
       </span>
     </button>
@@ -114,9 +121,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
         Selezione automatica (RAG) entro i limiti della modalità.
       </p>
 
-      <div v-if="groups.length === 0" class="ctc__empty">
-        Nessuno strumento disponibile.
-      </div>
+      <div v-if="groups.length === 0" class="ctc__empty">Nessuno strumento disponibile.</div>
 
       <ul v-else class="ctc__list">
         <li v-for="group in groups" :key="group.plugin" class="ctc__group">
@@ -132,7 +137,7 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
               class="ctc__tool"
               :class="{
                 'ctc__tool--blocked': !tool.allowed,
-                'ctc__tool--planning': tool.planning,
+                'ctc__tool--planning': tool.planning
               }"
               :title="!tool.allowed ? `Bloccato dalla modalità ${tierLabel}` : undefined"
             >
@@ -366,5 +371,4 @@ watch(() => chatStore.currentConversation?.id, (id) => ensureTier(id))
   text-decoration: line-through;
   text-decoration-color: var(--border);
 }
-
 </style>

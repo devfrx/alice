@@ -5,7 +5,7 @@ import { useRouter, useRoute } from 'vue-router'
 
 import TitleBar from './components/TitleBar.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
-import DockedSidebar from './components/canvas/DockedSidebar.vue'
+import DockedSidebar from './components/sidebar/DockedSidebar.vue'
 import ModalContainer from './components/ModalContainer.vue'
 import { UiToast, AliceLoader } from './components/ui'
 import { useChat, ChatApiKey } from './composables/useChat'
@@ -13,6 +13,7 @@ import { useEventsWebSocket } from './composables/useEventsWebSocket'
 import { useSettingsStore } from './stores/settings'
 import { usePluginsStore } from './stores/plugins'
 import { waitForBackend } from './services/api'
+import { installCoreCommands } from './commands'
 
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
@@ -25,11 +26,16 @@ const pluginsStore = usePluginsStore()
 const router = useRouter()
 const route = useRoute()
 
+// Register the core UI commands for the app lifetime (spec §7 registry; the
+// agent-facing manifest arrives in Fase 7). The install is idempotent — it
+// re-registers the core set — so an HMR re-run of this setup block swaps in
+// fresh handler closures instead of throwing or keeping stale ones.
+installCoreCommands(router)
+
 /**
- * Assistant chrome (centered orb layout + surface-0 backdrop) must follow the
- * ACTIVE ROUTE, not the persisted `uiStore.mode`. `mode` is sticky across
- * secondary routes (mail/calendar/settings/…), so keying the layout off it
- * would center those views depending on which primary surface you came from.
+ * Horizon chrome (centered layout + surface-0 backdrop) is keyed off the
+ * ACTIVE ROUTE: it applies only while `/assistant` — the only chat surface —
+ * is on screen, never on secondary routes (mail/calendar/settings/…).
  */
 const isAssistantRoute = computed(() => route.name === 'assistant')
 
@@ -51,9 +57,12 @@ const backendReady = ref(false)
 const startupMessage = computed(() => {
   if (!backendReady.value) return 'In attesa del backend…'
   switch (chatApi.connectionStatus.value) {
-    case 'connecting': return 'Connessione al backend…'
-    case 'error': return 'Errore di connessione…'
-    default: return 'Caricamento dati…'
+    case 'connecting':
+      return 'Connessione al backend…'
+    case 'error':
+      return 'Errore di connessione…'
+    default:
+      return 'Caricamento dati…'
   }
 })
 
@@ -82,7 +91,7 @@ onMounted(async () => {
   await Promise.all([
     settingsStore.initialize(),
     pluginsStore.loadPlugins(),
-    settingsStore.resumeOperationTracking(),
+    settingsStore.resumeOperationTracking()
   ])
 
   // 4. Guard: component may have unmounted during async ops
@@ -100,7 +109,11 @@ onUnmounted(() => {
   <div id="alice-app" :class="{ 'alice-app--assistant': isAssistantRoute }">
     <TitleBar />
     <div v-if="settingsStore.isAnyOperationInProgress" class="global-operation-bar">
-      <div class="global-operation-bar__track" role="progressbar" aria-label="Operazione modello in corso">
+      <div
+        class="global-operation-bar__track"
+        role="progressbar"
+        aria-label="Operazione modello in corso"
+      >
         <div class="global-operation-bar__fill" />
       </div>
       <span class="global-operation-bar__text">{{ settingsStore.operationDescription }}</span>
@@ -118,7 +131,6 @@ onUnmounted(() => {
         </ErrorBoundary>
       </main>
     </div>
-    <!-- <ModeSwitcher v-if="uiStore.mode !== 'assistant'" /> NON ATTIVARE! -->
     <ModalContainer />
     <UiToast />
     <AliceLoader :visible="startupLoading" :message="startupMessage" />
@@ -220,7 +232,6 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .view-enter-active,
   .view-leave-active {
     transition: opacity 120ms ease;
@@ -232,7 +243,7 @@ onUnmounted(() => {
   }
 }
 
-/* ── Mode-specific adjustments ──────────────────────────────────── */
+/* ── Horizon-route (assistant) adjustments ──────────────────────── */
 .alice-app--assistant .app-body {
   background: var(--surface-0);
 }

@@ -19,7 +19,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api } from '../services/api'
+import { permissionsApi } from '../services/api'
 import type { PermissionMode, WsPermissionModeUpdatedMessage } from '../types/permission'
 
 /** The default tier assumed before a snapshot is fetched (matches backend). */
@@ -52,7 +52,7 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
 
   /** Fetch the tier snapshot for a conversation, replacing any cached entry. */
   async function fetch(conversationId: string): Promise<void> {
-    const res = await api.getPermissionMode(conversationId)
+    const res = await permissionsApi.getPermissionMode(conversationId)
     byConversation.value = { ...byConversation.value, [conversationId]: res.mode }
     fetched.value.add(conversationId)
   }
@@ -73,7 +73,7 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
   function applyModeUpdated(msg: WsPermissionModeUpdatedMessage): void {
     byConversation.value = {
       ...byConversation.value,
-      [msg.conversation_id]: msg.mode,
+      [msg.conversation_id]: msg.mode
     }
   }
 
@@ -82,11 +82,14 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
     const prev = byConversation.value[conversationId]
     byConversation.value = { ...byConversation.value, [conversationId]: mode }
     try {
-      const res = await api.setPermissionMode(conversationId, mode)
+      const res = await permissionsApi.setPermissionMode(conversationId, mode)
       byConversation.value = { ...byConversation.value, [conversationId]: res.mode }
     } catch (err) {
       // Roll back the optimistic change on failure.
-      byConversation.value = { ...byConversation.value, [conversationId]: prev ?? DEFAULT_PERMISSION_MODE }
+      byConversation.value = {
+        ...byConversation.value,
+        [conversationId]: prev ?? DEFAULT_PERMISSION_MODE
+      }
       throw err
     }
   }
@@ -108,6 +111,6 @@ export const usePermissionModeStore = defineStore('permissionMode', () => {
     ensureForConversation,
     applyModeUpdated,
     setMode,
-    reset,
+    reset
   }
 })

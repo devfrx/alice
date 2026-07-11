@@ -22,22 +22,20 @@ const FOLDER_META: Record<string, { icon: AppIconName; label: string }> = {
   '[Gmail]/Spam': { icon: 'alert-triangle', label: 'Spam' },
   '[Gmail]/Cestino': { icon: 'trash', label: 'Cestino' },
   '[Gmail]/Tutti i messaggi': { icon: 'archive', label: 'Tutti' },
-  'Unsubscribed mailing lists': { icon: 'power', label: 'Disiscritti' },
+  'Unsubscribed mailing lists': { icon: 'power', label: 'Disiscritti' }
 }
 
-function getMeta(folder: string) {
+function getMeta(folder: string): { icon: AppIconName; label: string } {
   return FOLDER_META[folder] ?? { icon: 'folder', label: folder }
 }
 
 /** Primary folders shown first, rest grouped below. */
 const primaryFolders = computed(() =>
-  emailStore.folders.filter((f) => ['INBOX', '[Gmail]/Posta inviata', '[Gmail]/Bozze'].includes(f)),
+  emailStore.folders.filter((f) => ['INBOX', '[Gmail]/Posta inviata', '[Gmail]/Bozze'].includes(f))
 )
 
 const secondaryFolders = computed(() =>
-  emailStore.folders.filter(
-    (f) => !['INBOX', '[Gmail]/Posta inviata', '[Gmail]/Bozze'].includes(f),
-  ),
+  emailStore.folders.filter((f) => !['INBOX', '[Gmail]/Posta inviata', '[Gmail]/Bozze'].includes(f))
 )
 </script>
 
@@ -49,10 +47,19 @@ const secondaryFolders = computed(() =>
 
     <!-- Primary folders -->
     <nav class="folders__nav">
-      <button v-for="folder in primaryFolders" :key="folder" class="folders__item"
+      <button
+        v-for="folder in primaryFolders"
+        :key="folder"
+        class="folders__item"
         :class="{ 'folders__item--active': emailStore.currentFolder === folder }"
-        @click="emailStore.fetchInbox(folder)">
-        <AppIcon class="folders__icon" :name="getMeta(folder).icon" :size="16" :stroke-width="1.8" />
+        @click="emailStore.fetchInbox(folder)"
+      >
+        <AppIcon
+          class="folders__icon"
+          :name="getMeta(folder).icon"
+          :size="16"
+          :stroke-width="1.8"
+        />
         <span class="folders__label">{{ getMeta(folder).label }}</span>
         <span v-if="folder === 'INBOX' && emailStore.unreadCount > 0" class="folders__badge">
           {{ emailStore.unreadCount }}
@@ -64,10 +71,19 @@ const secondaryFolders = computed(() =>
 
     <!-- Secondary folders -->
     <nav class="folders__nav folders__nav--secondary">
-      <button v-for="folder in secondaryFolders" :key="folder" class="folders__item"
+      <button
+        v-for="folder in secondaryFolders"
+        :key="folder"
+        class="folders__item"
         :class="{ 'folders__item--active': emailStore.currentFolder === folder }"
-        @click="emailStore.fetchInbox(folder)">
-        <AppIcon class="folders__icon" :name="getMeta(folder).icon" :size="16" :stroke-width="1.8" />
+        @click="emailStore.fetchInbox(folder)"
+      >
+        <AppIcon
+          class="folders__icon"
+          :name="getMeta(folder).icon"
+          :size="16"
+          :stroke-width="1.8"
+        />
         <span class="folders__label">{{ getMeta(folder).label }}</span>
       </button>
     </nav>

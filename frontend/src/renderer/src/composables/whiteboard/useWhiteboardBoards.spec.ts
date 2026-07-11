@@ -13,7 +13,7 @@ const art = {
   file_path: 'data/artifacts/whiteboard/a1.json',
   mime: 'application/json',
   size_bytes: 10,
-  download_url: '/api/artifacts/a1/download',
+  download_url: '/api/artifacts/a1/download'
 } as unknown as Artifact
 
 describe('toBoardItem', () => {
@@ -26,7 +26,11 @@ describe('toBoardItem', () => {
   })
 
   it('defaults shapeCount to 0 and titles to null when metadata is missing', () => {
-    const bare = { ...art, artifact_metadata: undefined, conversation_id: null } as unknown as Artifact
+    const bare = {
+      ...art,
+      artifact_metadata: undefined,
+      conversation_id: null
+    } as unknown as Artifact
     const item = toBoardItem(bare, () => null)
     expect(item.shapeCount).toBe(0)
     expect(item.conversationTitle).toBeNull()

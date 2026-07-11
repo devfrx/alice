@@ -23,7 +23,7 @@ import { onBeforeUnmount, ref, toRef, watch } from 'vue'
 import {
   useFloatingPosition,
   type FloatingAlign,
-  type FloatingPlacement,
+  type FloatingPlacement
 } from '../../composables/useFloatingPosition'
 
 const props = withDefaults(
@@ -60,8 +60,8 @@ const props = withDefaults(
     closeOnOutside: true,
     closeOnEsc: true,
     panelClass: undefined,
-    ariaLabel: undefined,
-  },
+    ariaLabel: undefined
+  }
 )
 
 const emit = defineEmits<{
@@ -79,7 +79,7 @@ const { floatingStyle, update } = useFloatingPosition(anchorRef, panelRef, openR
   placement: props.placement,
   align: props.align,
   offset: props.offset,
-  matchWidth: props.matchWidth,
+  matchWidth: props.matchWidth
 })
 
 /** Request a close (host owns the actual state). */
@@ -124,7 +124,7 @@ watch(
     if (open) addListeners()
     else removeListeners()
   },
-  { immediate: true },
+  { immediate: true }
 )
 
 onBeforeUnmount(removeListeners)

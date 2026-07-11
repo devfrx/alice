@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * HorizonCockpit — the controls rail that materializes under the serif
- * composer: the same capabilities as the workspace ChatInput (attachments,
- * models, scope, tools, permission tier, context, mic, send/stop) REUSING
- * those components as-is. Horizon contributes only the transparent shell.
+ * composer: the full chat-input capability set (attachments, models, scope,
+ * tools, permission tier, context, mic, send/stop) REUSING the shared chat
+ * components as-is. Horizon contributes only the transparent shell.
  */
 import { computed, ref } from 'vue'
 import ModelSelector from '../settings/ModelSelector.vue'

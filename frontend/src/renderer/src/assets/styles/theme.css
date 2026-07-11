@@ -9,86 +9,82 @@
 
 /* ── Backgrounds ───────────────────────────────────────────── */
 :root {
-  --bg-primary: #1A1A19;                       /* Neutral dark base */
-  --bg-secondary: #222221;                     /* Panel / sidebar */
-  --bg-tertiary: #2A2A28;                      /* Elevated surfaces (cards, tooltips) */
-  --bg-input: rgba(232, 220, 200, 0.04);       /* Input fields */
-  --bg-tool: rgba(26, 26, 25, 0.8);           /* Tool/code bubble background */
+  --bg-primary: #1a1a19; /* Neutral dark base */
+  --bg-secondary: #222221; /* Panel / sidebar */
+  --bg-tertiary: #2a2a28; /* Elevated surfaces (cards, tooltips) */
+  --bg-input: rgba(232, 220, 200, 0.04); /* Input fields */
+  --bg-tool: rgba(26, 26, 25, 0.8); /* Tool/code bubble background */
 }
 
 /* ── Surface Elevation System ──────────────────────────────── */
 :root {
-  --surface-0: #1A1A19;                        /* Base layer — page background */
-  --surface-1: #222221;                        /* Sidebar, panels */
-  --surface-2: #2A2A28;                        /* Cards, dropdowns */
-  --surface-3: #333331;                        /* Elevated cards, popovers */
-  --surface-4: #3D3D3A;                        /* Maximum elevation */
-  --surface-hover: rgba(232, 220, 200, 0.04);  /* Interactive surface hover */
+  --surface-0: #1a1a19; /* Base layer — page background */
+  --surface-1: #222221; /* Sidebar, panels */
+  --surface-2: #2a2a28; /* Cards, dropdowns */
+  --surface-3: #333331; /* Elevated cards, popovers */
+  --surface-4: #3d3d3a; /* Maximum elevation */
+  --surface-hover: rgba(232, 220, 200, 0.04); /* Interactive surface hover */
   --surface-active: rgba(232, 220, 200, 0.06); /* Interactive surface active/pressed */
-  --surface-selected: rgba(232, 220, 200, 0.08);/* Selected item background */
-  --surface-inset: rgba(0, 0, 0, 0.2);         /* Inset surfaces (well, trough) */
-
-  /* Chat edge fades (used by ChatPanel message columns) */
-  --chat-edge-fade-top: 20px;
-  --chat-edge-fade-bottom: 28px;
+  --surface-selected: rgba(232, 220, 200, 0.08); /* Selected item background */
+  --surface-inset: rgba(0, 0, 0, 0.2); /* Inset surfaces (well, trough) */
 }
 
 /* ── Typography ────────────────────────────────────────────── */
 :root {
-  --text-primary: #ECEAE5;                     /* Near-white, minimal warmth */
-  --text-secondary: #ADABA4;                   /* Muted neutral gray */
-  --text-muted: #74726B;                       /* Very subtle */
+  --text-primary: #eceae5; /* Near-white, minimal warmth */
+  --text-secondary: #adaba4; /* Muted neutral gray */
+  --text-muted: #74726b; /* Very subtle */
 }
 
 /* ── Accent — Warm Cream "Panna" ───────────────────────────── */
 :root {
-  --accent: #E8DCC8;                           /* Primary cream accent — mirrored as --hz-line-rgb in horizon.css */
-  --accent-hover: #F5EDE0;                     /* Lighter cream on hover */
-  --accent-dim: rgba(232, 220, 200, 0.10);    /* Subtle cream fill */
-  --accent-border: rgba(232, 220, 200, 0.20); /* Cream border */
-  --accent-glow: rgba(232, 220, 200, 0.06);   /* Subtle glow */
-  --accent-faint: rgba(232, 220, 200, 0.03);  /* Barely visible tint */
+  --accent: #e8dcc8; /* Primary cream accent — mirrored as --hz-line-rgb in horizon.css */
+  --accent-hover: #f5ede0; /* Lighter cream on hover */
+  --accent-dim: rgba(232, 220, 200, 0.1); /* Subtle cream fill */
+  --accent-border: rgba(232, 220, 200, 0.2); /* Cream border */
+  --accent-glow: rgba(232, 220, 200, 0.06); /* Subtle glow */
+  --accent-faint: rgba(232, 220, 200, 0.03); /* Barely visible tint */
   --accent-subtle: rgba(232, 220, 200, 0.05); /* Subtle tint for banners */
-  --accent-light: rgba(232, 220, 200, 0.08);  /* Light fill */
+  --accent-light: rgba(232, 220, 200, 0.08); /* Light fill */
   --accent-medium: rgba(232, 220, 200, 0.15); /* Medium fill / borders */
-  --accent-strong: rgba(232, 220, 200, 0.20); /* Strong fill on hover */
-  --accent-vivid: rgba(232, 220, 200, 0.30);  /* Scrollbar hover / heavy fill */
+  --accent-strong: rgba(232, 220, 200, 0.2); /* Strong fill on hover */
+  --accent-vivid: rgba(232, 220, 200, 0.3); /* Scrollbar hover / heavy fill */
   --accent-text-glow: 0 0 20px rgba(232, 220, 200, 0.08); /* Text shadow glow */
 }
 
 /* ── Semantic Colors ───────────────────────────────────────── */
 :root {
-  --danger: #B85C5C;                           /* Muted red — destructive actions */
+  --danger: #b85c5c; /* Muted red — destructive actions */
   --danger-hover: rgba(184, 92, 92, 0.15);
-  --danger-faint: rgba(184, 92, 92, 0.04);    /* Error boundary bg */
-  --danger-light: rgba(184, 92, 92, 0.1);     /* Error state bg */
-  --danger-medium: rgba(184, 92, 92, 0.18);   /* Stop button hover */
-  --danger-border: rgba(184, 92, 92, 0.30);   /* Danger button border */
-  --danger-strong: rgba(184, 92, 92, 0.35);   /* Stop ring/border */
-  --danger-glow: rgba(184, 92, 92, 0.4);      /* Error dot glow */
+  --danger-faint: rgba(184, 92, 92, 0.04); /* Error boundary bg */
+  --danger-light: rgba(184, 92, 92, 0.1); /* Error state bg */
+  --danger-medium: rgba(184, 92, 92, 0.18); /* Stop button hover */
+  --danger-border: rgba(184, 92, 92, 0.3); /* Danger button border */
+  --danger-strong: rgba(184, 92, 92, 0.35); /* Stop ring/border */
+  --danger-glow: rgba(184, 92, 92, 0.4); /* Error dot glow */
 
-  --success: #5C9A6E;                          /* Muted green — positive status */
+  --success: #5c9a6e; /* Muted green — positive status */
   --success-glow: rgba(92, 154, 110, 0.4);
-  --success-faint: rgba(92, 154, 110, 0.03);  /* Loaded model row tint */
-  --success-light: rgba(92, 154, 110, 0.1);   /* Status badge bg */
+  --success-faint: rgba(92, 154, 110, 0.03); /* Loaded model row tint */
+  --success-light: rgba(92, 154, 110, 0.1); /* Status badge bg */
   --success-medium: rgba(92, 154, 110, 0.12); /* Loaded badge bg */
   --success-border: rgba(92, 154, 110, 0.25); /* Loaded badge border */
 
-  --warning: #D4A72C;                          /* Amber — medium risk */
+  --warning: #d4a72c; /* Amber — medium risk */
   --warning-bg: rgba(212, 167, 44, 0.1);
   --warning-border: rgba(212, 167, 44, 0.25);
 
-  --error: #E06060;                            /* Red — dangerous state */
+  --error: #e06060; /* Red — dangerous state */
   --error-bg: rgba(224, 96, 96, 0.1);
   --error-border: rgba(224, 96, 96, 0.25);
   --error-bg-hover: rgba(224, 96, 96, 0.15);
   --error-border-hover: rgba(224, 96, 96, 0.4);
 
-  --error-severe: #DC3545;                     /* Red — forbidden state */
+  --error-severe: #dc3545; /* Red — forbidden state */
   --error-severe-bg: rgba(220, 53, 69, 0.12);
   --error-severe-border: rgba(220, 53, 69, 0.4);
 
-  --approve: #4ade80;                          /* Green — approve action */
+  --approve: #4ade80; /* Green — approve action */
   --approve-bg: rgba(74, 222, 128, 0.12);
   --approve-border: rgba(74, 222, 128, 0.3);
   --approve-bg-hover: rgba(74, 222, 128, 0.2);
@@ -97,27 +93,27 @@
 
 /* ── White Overlays ────────────────────────────────────────── */
 :root {
-  --white-faint: rgba(255, 255, 255, 0.02);   /* Barely visible fill */
-  --white-subtle: rgba(255, 255, 255, 0.04);  /* Subtle hover/badge bg */
-  --white-light: rgba(255, 255, 255, 0.06);   /* Light hover / code bg */
-  --white-medium: rgba(255, 255, 255, 0.08);  /* Titlebar hover */
-  --white-strong: rgba(255, 255, 255, 0.10);  /* Strong border / hover */
-  --white-heavy: rgba(255, 255, 255, 0.14);   /* Active overlay close hover */
-  --white-dim: rgba(255, 255, 255, 0.20);     /* Border hover on overlay */
+  --white-faint: rgba(255, 255, 255, 0.02); /* Barely visible fill */
+  --white-subtle: rgba(255, 255, 255, 0.04); /* Subtle hover/badge bg */
+  --white-light: rgba(255, 255, 255, 0.06); /* Light hover / code bg */
+  --white-medium: rgba(255, 255, 255, 0.08); /* Titlebar hover */
+  --white-strong: rgba(255, 255, 255, 0.1); /* Strong border / hover */
+  --white-heavy: rgba(255, 255, 255, 0.14); /* Active overlay close hover */
+  --white-dim: rgba(255, 255, 255, 0.2); /* Border hover on overlay */
 }
 
 /* ── Black Overlays ────────────────────────────────────────── */
 :root {
-  --black-light: rgba(0, 0, 0, 0.25);         /* Pre block bg */
-  --black-medium: rgba(0, 0, 0, 0.4);         /* Shadow base */
-  --black-heavy: rgba(0, 0, 0, 0.6);          /* Modal/dialog backdrop */
-  --black-overlay: rgba(0, 0, 0, 0.8);        /* Image overlay backdrop */
+  --black-light: rgba(0, 0, 0, 0.25); /* Pre block bg */
+  --black-medium: rgba(0, 0, 0, 0.4); /* Shadow base */
+  --black-heavy: rgba(0, 0, 0, 0.6); /* Modal/dialog backdrop */
+  --black-overlay: rgba(0, 0, 0, 0.8); /* Image overlay backdrop */
 }
 
 /* ── Borders ───────────────────────────────────────────────── */
 :root {
-  --border: rgba(255, 255, 255, 0.06);        /* Very subtle borders */
-  --border-hover: rgba(255, 255, 255, 0.10);
+  --border: rgba(255, 255, 255, 0.06); /* Very subtle borders */
+  --border-hover: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Shadows ───────────────────────────────────────────────── */
@@ -132,12 +128,12 @@
 
 /* ── Radii ─────────────────────────────────────────────────── */
 :root {
-  --radius-xs: 3px;                            /* Scrollbar thumb, minimal */
+  --radius-xs: 3px; /* Scrollbar thumb, minimal */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --radius-pill: 9999px;                       /* Pill/tag shapes */
-  --radius-full: 50%;                          /* Perfect circles */
+  --radius-pill: 9999px; /* Pill/tag shapes */
+  --radius-full: 50%; /* Perfect circles */
 }
 
 /* ── Spacing Scale ─────────────────────────────────────────── */
@@ -159,15 +155,15 @@
 
 /* ── Font Sizes ────────────────────────────────────────────── */
 :root {
-  --text-2xs: 0.6rem;                          /* 9.6px — micro labels */
-  --text-xs: 0.68rem;                          /* 10.9px — timestamps, badges */
-  --text-sm: 0.75rem;                          /* 12px — labels, small UI */
-  --text-base: 0.82rem;                        /* 13.1px — default UI text */
-  --text-md: 0.9rem;                           /* 14.4px — body text, bubbles */
-  --text-lg: 1rem;                             /* 16px — dialog titles */
-  --text-xl: 1.3rem;                           /* 20.8px — section headings */
-  --text-2xl: 1.6rem;                          /* 25.6px — large headings */
-  --text-3xl: 3rem;                            /* 48px — hero display */
+  --text-2xs: 0.6rem; /* 9.6px — micro labels */
+  --text-xs: 0.68rem; /* 10.9px — timestamps, badges */
+  --text-sm: 0.75rem; /* 12px — labels, small UI */
+  --text-base: 0.82rem; /* 13.1px — default UI text */
+  --text-md: 0.9rem; /* 14.4px — body text, bubbles */
+  --text-lg: 1rem; /* 16px — dialog titles */
+  --text-xl: 1.3rem; /* 20.8px — section headings */
+  --text-2xl: 1.6rem; /* 25.6px — large headings */
+  --text-3xl: 3rem; /* 48px — hero display */
 }
 
 /* ── Font Weights ──────────────────────────────────────────── */
@@ -181,11 +177,11 @@
 
 /* ── Line Heights ──────────────────────────────────────────── */
 :root {
-  --leading-tight: 1.2;                        /* Compact text, badges */
-  --leading-snug: 1.4;                         /* Description text */
-  --leading-normal: 1.5;                       /* Standard body text */
-  --leading-relaxed: 1.55;                     /* Chat/code content */
-  --leading-loose: 1.6;                        /* Message bubbles */
+  --leading-tight: 1.2; /* Compact text, badges */
+  --leading-snug: 1.4; /* Description text */
+  --leading-normal: 1.5; /* Standard body text */
+  --leading-relaxed: 1.55; /* Chat/code content */
+  --leading-loose: 1.6; /* Message bubbles */
 }
 
 /* ── Letter Spacing ────────────────────────────────────────── */
@@ -193,34 +189,34 @@
   --tracking-tight: 0.02em;
   --tracking-normal: 0.04em;
   --tracking-wide: 0.06em;
-  --tracking-wider: 0.25em;                    /* Headings, empty states */
-  --tracking-widest: 0.35em;                   /* Hero text */
+  --tracking-wider: 0.25em; /* Headings, empty states */
+  --tracking-widest: 0.35em; /* Hero text */
 }
 
 /* ── Z-Index Layers ────────────────────────────────────────── */
 :root {
   --z-base: 0;
-  --z-raised: 2;                               /* Texture overlays */
-  --z-sticky: 10;                              /* Sidebar, titlebar, scroll btn */
-  --z-dropdown: 100;                           /* Dropdown menus */
-  --z-overlay: 1000;                           /* Dialog overlays */
-  --z-modal: 9999;                             /* Modal / confirm overlays */
+  --z-raised: 2; /* Texture overlays */
+  --z-sticky: 10; /* Sidebar, titlebar, scroll btn */
+  --z-dropdown: 100; /* Dropdown menus */
+  --z-overlay: 1000; /* Dialog overlays */
+  --z-modal: 9999; /* Modal / confirm overlays */
 }
 
 /* ── Opacity Levels ────────────────────────────────────────── */
 :root {
-  --opacity-disabled: 0.3;                     /* Disabled buttons */
-  --opacity-muted: 0.45;                       /* Very muted content */
-  --opacity-dim: 0.5;                          /* Dimmed elements */
-  --opacity-soft: 0.6;                         /* Soft icons, subtitles */
-  --opacity-medium: 0.7;                       /* Medium visibility */
-  --opacity-visible: 0.8;                      /* Nearly full visibility */
+  --opacity-disabled: 0.3; /* Disabled buttons */
+  --opacity-muted: 0.45; /* Very muted content */
+  --opacity-dim: 0.5; /* Dimmed elements */
+  --opacity-soft: 0.6; /* Soft icons, subtitles */
+  --opacity-medium: 0.7; /* Medium visibility */
+  --opacity-visible: 0.8; /* Nearly full visibility */
 }
 
 /* ── Overlay / Backdrop ────────────────────────────────────── */
 :root {
-  --blur-sm: 4px;                              /* Modal backdrop blur */
-  --blur-md: 8px;                              /* Image overlay blur */
+  --blur-sm: 4px; /* Modal backdrop blur */
+  --blur-md: 8px; /* Image overlay blur */
 }
 
 /* ── Motion ────────────────────────────────────────────────── */
@@ -244,10 +240,11 @@
 
 /* ── Font Stacks ───────────────────────────────────────────── */
 :root {
-  --font-sans: 'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, Oxygen, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  --font-sans:
+    'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   /* Display/heading font. Serif was retired by user request — headings now
    * use AL\CE's default sans so the whole UI shares one typeface. Kept as a
    * token so a serif (or any other display face) can be reintroduced in one
@@ -276,15 +273,15 @@
 
 /* ── Legacy compat (consumed by electron-vite boilerplate) ── */
 :root {
-  --color-background-mute: #2A2A28;
+  --color-background-mute: #2a2a28;
 }
 
 /* ── Glass Effects ───────────────────────────────────────────── */
 :root {
-  --glass-bg: rgba(26, 26, 25, 0.80);
-  --glass-bg-light: rgba(26, 26, 25, 0.50);
+  --glass-bg: rgba(26, 26, 25, 0.8);
+  --glass-bg-light: rgba(26, 26, 25, 0.5);
   --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-border-hover: rgba(255, 255, 255, 0.10);
+  --glass-border-hover: rgba(255, 255, 255, 0.1);
   --glass-blur: 12px;
   --glass-blur-heavy: 16px;
 }
@@ -292,7 +289,11 @@
 /* ── Gradient Accents ────────────────────────────────────────── */
 :root {
   --gradient-gold: linear-gradient(135deg, rgba(232, 220, 200, 0.06), rgba(232, 220, 200, 0.02));
-  --gradient-gold-strong: linear-gradient(135deg, rgba(232, 220, 200, 0.12), rgba(232, 220, 200, 0.04));
+  --gradient-gold-strong: linear-gradient(
+    135deg,
+    rgba(232, 220, 200, 0.12),
+    rgba(232, 220, 200, 0.04)
+  );
   --gradient-crimson: linear-gradient(135deg, rgba(184, 92, 92, 0.08), rgba(184, 92, 92, 0.02));
   --gradient-emerald: linear-gradient(135deg, rgba(92, 154, 110, 0.08), rgba(92, 154, 110, 0.02));
   --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.01) 0%, transparent 100%);
@@ -301,14 +302,14 @@
 /* ── State Colors ──────────────────────────────────────── */
 :root {
   --listening: #ae4141;
-  --listening-dim: rgba(224, 96, 96, 0.10);
-  --listening-border: rgba(224, 96, 96, 0.20);
+  --listening-dim: rgba(224, 96, 96, 0.1);
+  --listening-border: rgba(224, 96, 96, 0.2);
   --speaking: #376744;
-  --speaking-dim: rgba(92, 154, 110, 0.10);
-  --speaking-border: rgba(92, 154, 110, 0.20);
-  --thinking: #E8DCC8;
-  --thinking-dim: rgba(232, 220, 200, 0.10);
-  --thinking-border: rgba(232, 220, 200, 0.20);
+  --speaking-dim: rgba(92, 154, 110, 0.1);
+  --speaking-border: rgba(92, 154, 110, 0.2);
+  --thinking: #e8dcc8;
+  --thinking-dim: rgba(232, 220, 200, 0.1);
+  --thinking-border: rgba(232, 220, 200, 0.2);
 }
 
 /* ── Enhanced Motion System ────────────────────────────────── */
@@ -343,17 +344,17 @@
   --content-width-md: 768px;
   --content-width-lg: 1024px;
   --content-width-xl: 1280px;
-  --content-width-reading: 65ch;               /* Optimal reading width */
+  --content-width-reading: 65ch; /* Optimal reading width */
 
   --sidebar-width: 260px;
   --sidebar-collapsed: 42px;
-  --titlebar-height: 38px;                     /* Slightly taller for breathing room */
-  --input-height-sm: 28px;                     /* Compact density */
+  --titlebar-height: 38px; /* Slightly taller for breathing room */
+  --input-height-sm: 28px; /* Compact density */
   --input-height-md: 32px;
   --input-height-lg: 38px;
 
   /* Chat reading size — additive; components may consume for message bodies */
-  --chat-reading-size: 0.92rem;               /* ~14.7px — slightly larger than UI base */
+  --chat-reading-size: 0.92rem; /* ~14.7px — slightly larger than UI base */
 }
 
 /* ── Interactive State Tokens ──────────────────────────────── */
@@ -368,13 +369,10 @@
 :root {
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.15);
-  --shadow-accent: 0 0 0 1px var(--accent-border),
-                   0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-accent: 0 0 0 1px var(--accent-border), 0 2px 8px rgba(0, 0, 0, 0.2);
   --shadow-focus: none;
-  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.3),
-                     0 0 0 1px rgba(255, 255, 255, 0.04);
-  --shadow-floating: 0 12px 36px rgba(0, 0, 0, 0.35),
-                     0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-floating: 0 12px 36px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* ── Panel Tokens (canvas components) ─────────────────────── */
@@ -422,7 +420,11 @@ body {
   letter-spacing: var(--tracking-tight);
   /* Enable Geist contextual alternates + tabular nums for aligned numerics
    * in lists, timestamps, token counts. Disable discretionary ligatures. */
-  font-feature-settings: 'cv11', 'ss01', 'ss03', 'tnum' 1;
+  font-feature-settings:
+    'cv11',
+    'ss01',
+    'ss03',
+    'tnum' 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -471,7 +473,7 @@ textarea:focus:not(:focus-visible) {
 
 /* ── Selection ─────────────────────────────────────────────── */
 ::selection {
-  background: var(--selection-bg, rgba(232, 220, 200, 0.20));
+  background: var(--selection-bg, rgba(232, 220, 200, 0.2));
   color: var(--text-primary);
 }
 
@@ -501,7 +503,13 @@ textarea:focus:not(:focus-visible) {
 
 /* ── Heading base — serif display ──────────────────────────── */
 /* Component scoped styles that set font-family explicitly will still win. */
-h1, h2, h3, h4, h5, h6, .u-display {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.u-display {
   font-family: var(--font-display);
   letter-spacing: var(--tracking-tight);
 }
@@ -513,41 +521,41 @@ h1, h2, h3, h4, h5, h6, .u-display {
  *  Applied via  data-theme="light"  on <html>.
  * ═══════════════════════════════════════════════════════════════
  */
-[data-theme="light"] {
+[data-theme='light'] {
   color-scheme: light;
 
   /* ── Backgrounds ─────────────────────────────────────────── */
-  --bg-primary: #FAF9F5;                       /* Ivory paper base */
-  --bg-secondary: #F3EFE9;                     /* Panel / sidebar */
-  --bg-tertiary: #EAE4DB;                      /* Elevated surfaces (cards, tooltips) */
-  --bg-input: rgba(140, 106, 74, 0.04);        /* Input fields */
-  --bg-tool: rgba(234, 228, 219, 0.85);        /* Tool/code bubble background */
+  --bg-primary: #faf9f5; /* Ivory paper base */
+  --bg-secondary: #f3efe9; /* Panel / sidebar */
+  --bg-tertiary: #eae4db; /* Elevated surfaces (cards, tooltips) */
+  --bg-input: rgba(140, 106, 74, 0.04); /* Input fields */
+  --bg-tool: rgba(234, 228, 219, 0.85); /* Tool/code bubble background */
 
   /* ── Surface Elevation System ────────────────────────────── */
-  --surface-0: #FAF9F5;
-  --surface-1: #F3EFE9;
-  --surface-2: #EAE4DB;
-  --surface-3: #DFD7CB;
-  --surface-4: #D2C9BA;
+  --surface-0: #faf9f5;
+  --surface-1: #f3efe9;
+  --surface-2: #eae4db;
+  --surface-3: #dfd7cb;
+  --surface-4: #d2c9ba;
   --surface-hover: rgba(140, 106, 74, 0.04);
   --surface-active: rgba(140, 106, 74, 0.06);
   --surface-selected: rgba(140, 106, 74, 0.09);
   --surface-inset: rgba(0, 0, 0, 0.05);
 
   /* ── Typography ──────────────────────────────────────────── */
-  --text-primary: #1F1E1B;                     /* Dark warm ink */
-  --text-secondary: #5C5349;                   /* Medium warm brown */
-  --text-muted: #9E9890;                       /* Warm gray */
+  --text-primary: #1f1e1b; /* Dark warm ink */
+  --text-secondary: #5c5349; /* Medium warm brown */
+  --text-muted: #9e9890; /* Warm gray */
 
   /* ── Accent — Taupe Mocha ────────────────────────────────── */
-  --accent: #8C6A4A;                           /* Taupe Mocha — rgb(140,106,74); mirrored as --hz-line-rgb in horizon.css */
-  --accent-hover: #73553A;                     /* Darker on hover */
-  --accent-dim: rgba(140, 106, 74, 0.10);
+  --accent: #8c6a4a; /* Taupe Mocha — rgb(140,106,74); mirrored as --hz-line-rgb in horizon.css */
+  --accent-hover: #73553a; /* Darker on hover */
+  --accent-dim: rgba(140, 106, 74, 0.1);
   --accent-border: rgba(140, 106, 74, 0.25);
   --accent-glow: rgba(140, 106, 74, 0.08);
   --accent-faint: rgba(140, 106, 74, 0.04);
   --accent-subtle: rgba(140, 106, 74, 0.06);
-  --accent-light: rgba(140, 106, 74, 0.10);
+  --accent-light: rgba(140, 106, 74, 0.1);
   --accent-medium: rgba(140, 106, 74, 0.18);
   --accent-strong: rgba(140, 106, 74, 0.25);
   --accent-vivid: rgba(140, 106, 74, 0.38);
@@ -594,7 +602,11 @@ h1, h2, h3, h4, h5, h6, .u-display {
 
   /* ── Gradient Accents ────────────────────────────────────── */
   --gradient-gold: linear-gradient(135deg, rgba(140, 106, 74, 0.06), rgba(140, 106, 74, 0.02));
-  --gradient-gold-strong: linear-gradient(135deg, rgba(140, 106, 74, 0.12), rgba(140, 106, 74, 0.04));
+  --gradient-gold-strong: linear-gradient(
+    135deg,
+    rgba(140, 106, 74, 0.12),
+    rgba(140, 106, 74, 0.04)
+  );
   --gradient-crimson: linear-gradient(135deg, rgba(184, 92, 92, 0.08), rgba(184, 92, 92, 0.02));
   --gradient-emerald: linear-gradient(135deg, rgba(92, 154, 110, 0.08), rgba(92, 154, 110, 0.02));
   --gradient-surface: linear-gradient(180deg, rgba(0, 0, 0, 0.01) 0%, transparent 100%);
@@ -605,11 +617,11 @@ h1, h2, h3, h4, h5, h6, .u-display {
   --thinking-border: var(--accent-border);
 
   /* ── Focus Ring ──────────────────────────────────────────── */
-  --focus-ring-color: rgba(140, 106, 74, 0.50);
+  --focus-ring-color: rgba(140, 106, 74, 0.5);
   --focus-ring-shadow: none;
 
   /* ── Legacy compat ───────────────────────────────────────── */
-  --color-background-mute: #EAE4DB;
+  --color-background-mute: #eae4db;
 
   /* ── Branding Assets ─────────────────────────────────────── */
   --brand-alce-logo: url('../logos/brand/alice_logo_dark.webp');
@@ -621,7 +633,7 @@ h1, h2, h3, h4, h5, h6, .u-display {
 }
 
 /* ── Light theme: selection highlight ───────────────────────── */
-[data-theme="light"] ::selection {
+[data-theme='light'] ::selection {
   background: rgba(140, 106, 74, 0.18);
   color: var(--text-primary);
 }
@@ -639,27 +651,27 @@ h1, h2, h3, h4, h5, h6, .u-display {
 /* ── Text Hierarchy (semantic extensions) ──────────────────── */
 :root {
   /* --text-primary / --text-secondary / --text-muted already defined above */
-  --text-tertiary: var(--text-muted);           /* Alias: least prominent readable text */
-  --text-disabled: rgba(236, 234, 229, 0.28);   /* Disabled form labels/buttons */
-  --text-inverse: #1A1A19;                      /* For text on accent-filled surfaces */
-  --text-on-accent: #1A1A19;                    /* Text rendered on accent bg (cream is light) */
+  --text-tertiary: var(--text-muted); /* Alias: least prominent readable text */
+  --text-disabled: rgba(236, 234, 229, 0.28); /* Disabled form labels/buttons */
+  --text-inverse: #1a1a19; /* For text on accent-filled surfaces */
+  --text-on-accent: #1a1a19; /* Text rendered on accent bg (cream is light) */
   --text-link: var(--accent);
   --text-link-hover: var(--accent-hover);
-  --selection-bg: rgba(232, 220, 200, 0.20);    /* Drives ::selection — cream-on-dark */
+  --selection-bg: rgba(232, 220, 200, 0.2); /* Drives ::selection — cream-on-dark */
 }
 
 /* ── Border Hierarchy (semantic aliases) ───────────────────── */
 :root {
-  --border-subtle: var(--white-subtle);         /* Very faint dividers */
-  --border-default: var(--border);              /* Default 1px borders */
-  --border-strong: var(--border-hover);         /* Emphasized borders */
-  --border-focus: var(--focus-ring-color);      /* Focused input border */
+  --border-subtle: var(--white-subtle); /* Very faint dividers */
+  --border-default: var(--border); /* Default 1px borders */
+  --border-strong: var(--border-hover); /* Emphasized borders */
+  --border-focus: var(--focus-ring-color); /* Focused input border */
 }
 
 /* ── State Colors — Info (new) + semantic aliases ──────────── */
 :root {
-  --info: #5C8AB8;                              /* Muted blue — informational */
-  --info-bg: rgba(92, 138, 184, 0.10);
+  --info: #5c8ab8; /* Muted blue — informational */
+  --info-bg: rgba(92, 138, 184, 0.1);
   --info-border: rgba(92, 138, 184, 0.25);
   --info-glow: rgba(92, 138, 184, 0.35);
 
@@ -674,13 +686,13 @@ h1, h2, h3, h4, h5, h6, .u-display {
 /* ── Motion — Canonical easing & duration aliases ──────────── */
 :root {
   /* Short, memorable names alongside the existing -expo/-quart/-back set */
-  --ease-out: var(--ease-out-quart);            /* Default "out" curve */
+  --ease-out: var(--ease-out-quart); /* Default "out" curve */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: var(--ease-in-out-quint);
   --ease-linear: linear;
 
   /* Canonical fast/base/slow (aligned with existing fast/normal/slow) */
-  --duration-base: var(--duration-normal);      /* Alias for default 200ms */
+  --duration-base: var(--duration-normal); /* Alias for default 200ms */
 }
 
 /* ── Spacing Scale — Upper-range extensions ────────────────── */
@@ -696,22 +708,22 @@ h1, h2, h3, h4, h5, h6, .u-display {
 
 /* ── Typography — Modular scale additions ──────────────────── */
 :root {
-  --text-4xl: 4rem;                             /* 64px — extra-large hero */
-  --text-5xl: 5rem;                             /* 80px — splash displays */
+  --text-4xl: 4rem; /* 64px — extra-large hero */
+  --text-5xl: 5rem; /* 80px — splash displays */
 
   /* Optical line-height helper for headings */
   --leading-none: 1;
-  --leading-heading: 1.15;                      /* For h1–h3 style display text */
+  --leading-heading: 1.15; /* For h1–h3 style display text */
 }
 
 /* ── Z-Index — Extended UI layer stack ─────────────────────── */
 :root {
   /* Canonical layer stack. Order matters; higher = closer to viewer. */
-  --z-below: -1;                                /* Behind normal flow */
-  --z-popover: 10001;                           /* Transient popovers/menus/selects — above modals (a select can open inside a dialog) */
-  --z-tooltip: 1100;                            /* Above overlays, below modals */
-  --z-toast: 10000;                             /* Above modals, notifications */
-  --z-max: 2147483647;                          /* Absolute top — OS-level overlays */
+  --z-below: -1; /* Behind normal flow */
+  --z-popover: 10001; /* Transient popovers/menus/selects — above modals (a select can open inside a dialog) */
+  --z-tooltip: 1100; /* Above overlays, below modals */
+  --z-toast: 10000; /* Above modals, notifications */
+  --z-max: 2147483647; /* Absolute top — OS-level overlays */
 }
 
 /* ── Breakpoints — Media query reference values ────────────── */
@@ -731,18 +743,18 @@ h1, h2, h3, h4, h5, h6, .u-display {
 }
 
 /* ── Light Theme Parallels for Extensions ──────────────────── */
-[data-theme="light"] {
+[data-theme='light'] {
   --text-disabled: rgba(31, 30, 27, 0.32);
-  --text-inverse: #FAF9F5;
-  --text-on-accent: #FAF9F5;
+  --text-inverse: #faf9f5;
+  --text-on-accent: #faf9f5;
   --text-link: var(--accent);
   --text-link-hover: var(--accent-hover);
   --selection-bg: rgba(140, 106, 74, 0.18);
 
-  --info: #3B6FA0;
+  --info: #3b6fa0;
   --info-bg: rgba(59, 111, 160, 0.08);
   --info-border: rgba(59, 111, 160, 0.28);
-  --info-glow: rgba(59, 111, 160, 0.30);
+  --info-glow: rgba(59, 111, 160, 0.3);
 }
 
 /* ── Global Link Defaults ──────────────────────────────────── */
@@ -758,7 +770,7 @@ a:hover {
 }
 
 /* ── Disabled State Utility ────────────────────────────────── */
-[aria-disabled="true"],
+[aria-disabled='true'],
 :disabled {
   cursor: not-allowed;
 }
@@ -783,9 +795,9 @@ canvas {
  *   document.documentElement.dataset.reduceMotion = 'true'
  * without breaking functional animations.
  */
-[data-reduce-motion="true"] *,
-[data-reduce-motion="true"] *::before,
-[data-reduce-motion="true"] *::after {
+[data-reduce-motion='true'] *,
+[data-reduce-motion='true'] *::before,
+[data-reduce-motion='true'] *::after {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;

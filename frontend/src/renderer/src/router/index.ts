@@ -1,12 +1,6 @@
 /**
  * Application router.
  *
- * Concerns are split:
- * - **Wiring layer** (MODE_ROUTES sync, lazy-import retry) — owned by the
- *   wiring/auth agent. Stable; only audit tweaks.
- * - **UX layer** (route meta, scrollBehavior, document.title, page transition)
- *   — owned by the frontend/layout agent.
- *
  * Route `meta` contract:
  *   - `title`    string — human-readable page title, used as the window title
  *                         suffix ("<Title> — AL\\CE"). Also usable as a
@@ -18,13 +12,12 @@
  *   - `/email/:id?` — optional email uid, consumed by EmailPageView.
  *   - `/calendar`   — optional `?date=YYYY-MM-DD` query (delegated to the
  *                     CalendarView component).
+ *
+ * Since Fase 6 Horizon (`/assistant`) is the only chat surface: the retired
+ * Workspace/Hybrid routes redirect there so old deep links keep resolving.
  */
 import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteLocationNormalized, RouterScrollBehavior } from 'vue-router'
-import { useUIStore, type UIMode } from '../stores/ui'
-
-/** Route names that correspond to a UI mode (the primary chat surfaces). */
-const MODE_ROUTES = new Set<string>(['assistant', 'workspace'])
 
 /** Window-title suffix shared by every page. */
 const TITLE_SUFFIX = 'AL\\CE'
@@ -54,21 +47,19 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/workspace'
+      redirect: '/assistant'
     },
     {
-      // The Home is no longer a standalone page — it is the empty-conversation
-      // state of the Workspace (see WorkspaceView). This named redirect keeps
-      // old `#/home` deep links and `{ name: 'home' }` fallbacks resolving.
+      // Legacy named redirect: keeps old `#/home` deep links and
+      // `{ name: 'home' }` fallbacks resolving to the primary surface.
       path: '/home',
       name: 'home',
-      redirect: '/workspace'
+      redirect: '/assistant'
     },
     {
+      // Workspace retired (Fase 6) — Horizon is the only chat surface.
       path: '/workspace',
-      name: 'workspace',
-      component: () => import('../views/WorkspaceView.vue'),
-      meta: { title: 'Workspace', transition: DEFAULT_PAGE_TRANSITION }
+      redirect: '/assistant'
     },
     {
       path: '/assistant',
@@ -77,9 +68,9 @@ const router = createRouter({
       meta: { title: 'Assistente', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
-      // HybridView retired — redirect to Workspace (the new primary surface).
+      // HybridView retired — redirect to the primary surface.
       path: '/hybrid',
-      redirect: '/workspace'
+      redirect: '/assistant'
     },
     {
       path: '/calendar',
@@ -113,6 +104,12 @@ const router = createRouter({
       meta: { title: 'Bacheca', transition: DEFAULT_PAGE_TRANSITION }
     },
     {
+      path: '/terminal',
+      name: 'terminal',
+      component: () => import('../views/TerminalPageView.vue'),
+      meta: { title: 'Terminale', transition: DEFAULT_PAGE_TRANSITION }
+    },
+    {
       path: '/services',
       name: 'services',
       component: () => import('../views/ServicesView.vue'),
@@ -120,22 +117,9 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/workspace'
+      redirect: '/assistant'
     }
   ]
-})
-
-// Keep UI mode store in sync with the current route.
-// This ensures that navigating via sidebar <router-link>, browser back/forward,
-// or programmatic router.push all update the mode — not just the ModeSwitcher.
-router.afterEach((to) => {
-  const name = to.name as string | undefined
-  if (name && MODE_ROUTES.has(name)) {
-    const uiStore = useUIStore()
-    if (uiStore.mode !== name) {
-      uiStore.setMode(name as UIMode)
-    }
-  }
 })
 
 // Mirror the active route meta into the window/document title so the Electron

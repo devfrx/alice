@@ -11,86 +11,88 @@
  */
 
 export interface UiTooltipProps {
-    text: string
-    position?: 'top' | 'bottom' | 'left' | 'right'
-    /** Show delay in ms (default: 300). Hide is always immediate. */
-    delay?: number
-    /** Hide the tooltip entirely (useful for conditional disabling). */
-    disabled?: boolean
+  text: string
+  position?: 'top' | 'bottom' | 'left' | 'right'
+  /** Show delay in ms (default: 300). Hide is always immediate. */
+  delay?: number
+  /** Hide the tooltip entirely (useful for conditional disabling). */
+  disabled?: boolean
 }
 
 withDefaults(defineProps<UiTooltipProps>(), {
-    position: 'top',
-    delay: 300,
-    disabled: false,
+  position: 'top',
+  delay: 300,
+  disabled: false
 })
 </script>
 
 <template>
-    <div class="ui-tooltip-wrapper"
-        :class="[`ui-tooltip-wrapper--${position}`, { 'ui-tooltip-wrapper--disabled': disabled }]"
-        :style="{ '--tooltip-delay': `${delay}ms` }">
-        <slot />
-        <div v-if="!disabled && text" class="ui-tooltip" role="tooltip">{{ text }}</div>
-    </div>
+  <div
+    class="ui-tooltip-wrapper"
+    :class="[`ui-tooltip-wrapper--${position}`, { 'ui-tooltip-wrapper--disabled': disabled }]"
+    :style="{ '--tooltip-delay': `${delay}ms` }"
+  >
+    <slot />
+    <div v-if="!disabled && text" class="ui-tooltip" role="tooltip">{{ text }}</div>
+  </div>
 </template>
 
 <style scoped>
 .ui-tooltip-wrapper {
-    position: relative;
-    display: inline-flex;
+  position: relative;
+  display: inline-flex;
 }
 
 .ui-tooltip {
-    position: absolute;
-    z-index: var(--z-dropdown);
-    padding: var(--space-1) var(--space-2);
-    background: var(--surface-2);
-    color: var(--text-primary);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-medium);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-dropdown);
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity var(--duration-fast) var(--ease-out-quart);
-    transition-delay: 0ms;
+  position: absolute;
+  z-index: var(--z-dropdown);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out-quart);
+  transition-delay: 0ms;
 }
 
 .ui-tooltip-wrapper:hover .ui-tooltip,
 .ui-tooltip-wrapper:focus-within .ui-tooltip {
-    opacity: 1;
-    transition-delay: var(--tooltip-delay);
+  opacity: 1;
+  transition-delay: var(--tooltip-delay);
 }
 
 .ui-tooltip-wrapper--disabled .ui-tooltip {
-    display: none;
+  display: none;
 }
 
 /* ── Positions ─── */
 .ui-tooltip-wrapper--top .ui-tooltip {
-    bottom: calc(100% + var(--space-1-5));
-    left: 50%;
-    transform: translateX(-50%);
+  bottom: calc(100% + var(--space-1-5));
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .ui-tooltip-wrapper--bottom .ui-tooltip {
-    top: calc(100% + var(--space-1-5));
-    left: 50%;
-    transform: translateX(-50%);
+  top: calc(100% + var(--space-1-5));
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .ui-tooltip-wrapper--left .ui-tooltip {
-    right: calc(100% + var(--space-1-5));
-    top: 50%;
-    transform: translateY(-50%);
+  right: calc(100% + var(--space-1-5));
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .ui-tooltip-wrapper--right .ui-tooltip {
-    left: calc(100% + var(--space-1-5));
-    top: 50%;
-    transform: translateY(-50%);
+  left: calc(100% + var(--space-1-5));
+  top: 50%;
+  transform: translateY(-50%);
 }
 </style>

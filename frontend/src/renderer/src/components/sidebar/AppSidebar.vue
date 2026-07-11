@@ -11,20 +11,20 @@
  * and delegates mutations back through events / store actions.
  */
 import { computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import { useChatStore } from '../../stores/chat'
 import { useUIStore } from '../../stores/ui'
 import { useEmailStore } from '../../stores/email'
 import { useModal } from '../../composables/useModal'
 import { useToast } from '../../composables/useToast'
-import { api } from '../../services/api'
+import { chatApi } from '../../services/api'
+import { commandRegistry } from '../../commands'
 import BrandThemeToggle from '../branding/BrandThemeToggle.vue'
 import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
-import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 /**
  * When `docked` is true the sidebar renders inline inside its parent frame
@@ -38,61 +38,25 @@ const props = withDefaults(defineProps<{ docked?: boolean }>(), { docked: false 
 const chatStore = useChatStore()
 const uiStore = useUIStore()
 const emailStore = useEmailStore()
-const router = useRouter()
 const route = useRoute()
 const { confirm } = useModal()
 const toast = useToast()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
 
-/**
- * Mode-tab active state is derived from the ROUTE (not `uiStore.mode`, which
- * defaults to 'assistant' and would falsely mark Assistente active while on
- * /workspace). Each tab is active only for its own surface, mutually exclusive.
- */
+/** True while Horizon (`/assistant`), the only chat surface, is on screen. */
 const isAssistantActive = computed(() => route.name === 'assistant')
-const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
 /**
- * The Home surface is the empty-conversation state of the Workspace, so the
- * Home nav item is "active" exactly when that surface is on screen: we're on
- * the workspace route and the active conversation holds no messages.
+ * The Home affordance is "fresh conversation on the primary surface": active
+ * exactly when Horizon is on screen with an empty conversation.
  */
 const isHomeActive = computed(
   () =>
-    isWorkspaceActive.value &&
+    isAssistantActive.value &&
     chatStore.messages.length === 0 &&
     !chatStore.isStreamingCurrentConversation
 )
-
-/** The two primary-surface options for the shared segmented control. */
-const modeTabOptions: UiSegmentedOption[] = [
-  { value: 'assistant', label: 'Assistente', icon: 'orb' },
-  { value: 'workspace', label: 'Workspace', icon: 'hybrid-panel' },
-]
-
-/** Active segment value derived from the route (null on other surfaces). */
-const activeModeValue = computed<string | null>(() => {
-  if (isAssistantActive.value) return 'assistant'
-  if (isWorkspaceActive.value) return 'workspace'
-  return null
-})
-
-/**
- * Route to the chosen surface. Navigation is the source of truth — the
- * router's afterEach guard syncs `uiStore.mode` from the active route — so
- * BOTH segments must actually push their route (previously only Workspace did,
- * which is why the Assistente tab appeared dead).
- */
-async function onModeSelect(value: string | number): Promise<void> {
-  toggle() // close the floating overlay (no-op when docked)
-  if (activeModeValue.value === value) return
-  try {
-    await router.push(value === 'workspace' ? '/workspace' : '/assistant')
-  } catch (err) {
-    console.error('[AppSidebar] Mode navigation failed:', err)
-  }
-}
 
 /**
  * Whether the sidebar body is shown.
@@ -118,64 +82,50 @@ function toggle(): void {
 // Conversation actions (delegated to store)
 // -----------------------------------------------------------------------
 
-/** Select an existing conversation — stay in the current mode. */
+/** Select an existing conversation via the command layer. */
 async function onSelect(id: string): Promise<void> {
   try {
-    await chatStore.loadConversation(id)
+    await commandRegistry.execute('conversation.open', { conversation_id: id })
   } catch (err) {
-    console.error(`[AppSidebar] Failed to load conversation ${id}:`, err)
-    return
-  }
-  const current = router.currentRoute.value.name as string
-  // 'workspace' and 'assistant' are the active chat surfaces; navigate there if not already on one.
-  if (current !== 'assistant' && current !== 'workspace') {
-    try {
-      await router.push({ name: uiStore.mode })
-    } catch (err) {
-      console.error('[AppSidebar] Navigation failed, falling back to home:', err)
-      await router.replace({ name: 'home' }).catch(() => { })
-    }
+    console.error(`[AppSidebar] Failed to open conversation ${id}:`, err)
   }
 }
 
 /**
- * Go to the Home surface (the empty Workspace). Only spin up a fresh draft
- * when the current conversation already has content, so we never leave a trail
- * of empty chats; an already-empty conversation is reused as-is.
+ * Go to the Home affordance — a fresh conversation on Horizon via the command
+ * layer; reuses an already-empty conversation by only creating when the
+ * current one has content.
  */
 async function onHome(): Promise<void> {
   toggle()
-  if (chatStore.messages.length > 0) {
-    try {
-      await chatStore.createConversation()
-    } catch (err) {
-      console.error('[AppSidebar] Failed to start a new conversation:', err)
+  try {
+    if (chatStore.messages.length > 0) {
+      await commandRegistry.execute('conversation.new', {})
+    } else {
+      await commandRegistry.execute('view.switch', { view: 'assistant' })
     }
-  }
-  if (router.currentRoute.value.name !== 'workspace') {
-    try {
-      await router.push('/workspace')
-    } catch (err) {
-      console.error('[AppSidebar] Home navigation failed:', err)
-    }
+  } catch (err) {
+    console.error('[AppSidebar] Home action failed:', err)
+    // Parity with the pre-command behavior: even when creating the fresh
+    // conversation fails, still land the user on the primary surface.
+    await commandRegistry
+      .execute('view.switch', { view: 'assistant' })
+      .catch((navErr) => console.error('[AppSidebar] Home navigation failed:', navErr))
   }
 }
 
 /**
- * Start a new conversation on the Home — the empty-conversation state of the
- * Workspace. A fresh conversation always opens as the Home (never the assistant
- * orb, never a stale secondary route); typing the first message then cross-fades
- * it into the live Workspace chat. `createConversation` reuses any existing
- * empty conversation, so this never leaves a trail of blank chats.
+ * Start a new conversation on the Home — the empty-conversation state of
+ * Horizon. A fresh conversation always opens as the Home (never a stale
+ * secondary route); typing the first message then cross-fades it into the
+ * live conversation. `createConversation` reuses any existing empty
+ * conversation, so this never leaves a trail of blank chats.
  */
 async function onCreate(): Promise<void> {
-  await chatStore.createConversation()
-  if (router.currentRoute.value.name !== 'workspace') {
-    try {
-      await router.push('/workspace')
-    } catch (err) {
-      console.error('[AppSidebar] New-conversation navigation failed:', err)
-    }
+  try {
+    await commandRegistry.execute('conversation.new', {})
+  } catch (err) {
+    console.error('[AppSidebar] Failed to start a new conversation:', err)
   }
 }
 
@@ -194,7 +144,7 @@ async function onDeleteAll(): Promise<void> {
       title: 'Elimina tutte le conversazioni',
       message: 'Eliminare tutte le conversazioni? Questa azione è irreversibile.',
       type: 'danger',
-      confirmText: 'Elimina tutto',
+      confirmText: 'Elimina tutto'
     })
     if (!confirmed) return
     await chatStore.deleteAllConversations()
@@ -215,7 +165,7 @@ async function onExportConversation(id: string): Promise<void> {
   try {
     const dir = await window.electron.fileOps.selectDirectory()
     if (!dir) return
-    const res = await api.backupConversations(dir, [id])
+    const res = await chatApi.backupConversations(dir, [id])
     if (res.exported === 0) {
       toast.warning('Conversazione non trovata sul backend: nessun file esportato')
       return
@@ -232,7 +182,7 @@ async function onBackupAll(): Promise<void> {
   try {
     const dir = await window.electron.fileOps.selectDirectory()
     if (!dir) return
-    const res = await api.backupConversations(dir)
+    const res = await chatApi.backupConversations(dir)
     if (res.exported === 0) {
       toast.warning('Nessuna conversazione da esportare')
       return
@@ -241,7 +191,7 @@ async function onBackupAll(): Promise<void> {
     window.electron.fileOps.showInFolder(res.path)
   } catch (err) {
     console.error('[AppSidebar] Failed to backup conversations:', err)
-    toast.error('Backup fallito: impossibile completare l\'export')
+    toast.error("Backup fallito: impossibile completare l'export")
   }
 }
 </script>
@@ -261,43 +211,77 @@ async function onBackupAll(): Promise<void> {
           <span class="sidebar__brand">
             <BrandWordmark brand="alce" />
           </span>
-          <button v-if="!props.docked" class="sidebar__close" aria-label="Chiudi sidebar" @click="toggle">
+          <button
+            v-if="!props.docked"
+            class="sidebar__close"
+            aria-label="Chiudi sidebar"
+            @click="toggle"
+          >
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
         </div>
 
-        <!-- Primary surface tabs: Assistente (voice) | Workspace (chat+modules) -->
-        <UiSegmented class="sidebar__mode-seg" :model-value="activeModeValue" :options="modeTabOptions"
-          aria-label="Modalità primaria" @update:model-value="(v) => void onModeSelect(v)" />
-
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
-          <button type="button" class="sidebar__link" :class="{ 'sidebar__link--active': isHomeActive }"
-            title="Home" @click="onHome">
+          <button
+            type="button"
+            class="sidebar__link"
+            :class="{ 'sidebar__link--active': isHomeActive }"
+            title="Home"
+            @click="onHome"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="home" :size="15" />
             </span>
             <span class="sidebar__link-label">Home</span>
           </button>
 
-          <router-link to="/whiteboard" class="sidebar__link" active-class="sidebar__link--active" title="Lavagna"
-            @click="toggle">
+          <router-link
+            to="/whiteboard"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Lavagna"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="whiteboard-card" :size="15" />
             </span>
             <span class="sidebar__link-label">Lavagna</span>
           </router-link>
 
-          <router-link to="/board" class="sidebar__link" active-class="sidebar__link--active" title="Bacheca artefatti"
-            @click="toggle">
+          <router-link
+            to="/board"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Bacheca artefatti"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="bookmark" :size="15" />
             </span>
             <span class="sidebar__link-label">Bacheca</span>
           </router-link>
 
-          <router-link to="/email" class="sidebar__link" active-class="sidebar__link--active" title="Email"
-            @click="toggle">
+          <router-link
+            to="/terminal"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Terminale"
+            @click="toggle"
+          >
+            <span class="sidebar__link-icon" aria-hidden="true">
+              <AppIcon name="terminal" :size="15" />
+            </span>
+            <span class="sidebar__link-label">Terminale</span>
+          </router-link>
+
+          <router-link
+            to="/email"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Email"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="email" :size="15" />
             </span>
@@ -305,8 +289,13 @@ async function onBackupAll(): Promise<void> {
             <span v-if="unreadBadge" class="sidebar__badge">{{ unreadBadge }}</span>
           </router-link>
 
-          <router-link to="/services" class="sidebar__link" active-class="sidebar__link--active" title="Servizi"
-            @click="toggle">
+          <router-link
+            to="/services"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            title="Servizi"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="server" :size="15" />
             </span>
@@ -319,10 +308,18 @@ async function onBackupAll(): Promise<void> {
 
         <!-- Conversations section -->
         <div class="sidebar__conversations">
-          <ConversationList :conversations="chatStore.conversations"
-            :active-id="chatStore.currentConversation?.id ?? null" :streaming-id="chatStore.streamingConversationId"
-            @select="onSelect" @create="onCreate" @delete="onDelete" @delete-all="onDeleteAll" @rename="onRename"
-            @export="onExportConversation" @backup-all="onBackupAll" />
+          <ConversationList
+            :conversations="chatStore.conversations"
+            :active-id="chatStore.currentConversation?.id ?? null"
+            :streaming-id="chatStore.streamingConversationId"
+            @select="onSelect"
+            @create="onCreate"
+            @delete="onDelete"
+            @delete-all="onDeleteAll"
+            @rename="onRename"
+            @export="onExportConversation"
+            @backup-all="onBackupAll"
+          />
         </div>
 
         <!-- Footer: settings -->
@@ -332,8 +329,12 @@ async function onBackupAll(): Promise<void> {
             <BrandThemeToggle />
           </div>
 
-          <router-link to="/settings" class="sidebar__link sidebar__link--footer" active-class="sidebar__link--active"
-            @click="toggle">
+          <router-link
+            to="/settings"
+            class="sidebar__link sidebar__link--footer"
+            active-class="sidebar__link--active"
+            @click="toggle"
+          >
             <span class="sidebar__link-icon" aria-hidden="true">
               <AppIcon name="settings" :size="15" />
             </span>
@@ -476,12 +477,6 @@ async function onBackupAll(): Promise<void> {
   flex-direction: column;
   gap: var(--space-0-5);
   padding: 0 var(--space-3) var(--space-2);
-  flex-shrink: 0;
-}
-
-/* ── Mode tabs (Assistente / Workspace) — shared UiSegmented ────── */
-.sidebar__mode-seg {
-  margin: 0 var(--space-3) var(--space-3);
   flex-shrink: 0;
 }
 
@@ -628,7 +623,6 @@ async function onBackupAll(): Promise<void> {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-
   .sidebar,
   .sidebar__backdrop,
   .sidebar__link,

@@ -91,17 +91,32 @@ function subjectPreview(subject: string): string {
     <div class="inbox__search">
       <div class="inbox__search-wrapper">
         <AppIcon class="inbox__search-icon" name="search" />
-        <input v-model="searchQuery" type="text" class="inbox__search-input" placeholder="Cerca email…" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          class="inbox__search-input"
+          placeholder="Cerca email…"
+        />
       </div>
     </div>
 
     <!-- Toolbar: count + filters + refresh -->
     <div class="inbox__toolbar">
-      <UiSegmented size="sm" :equal="false" :model-value="filterMode" :options="filterOptions"
-        aria-label="Filtro email" @update:model-value="(v) => filterMode = v as 'all' | 'unread'" />
-      <button class="inbox__refresh" :disabled="emailStore.loading"
-        :class="{ 'inbox__refresh--spinning': emailStore.loading }" title="Aggiorna"
-        @click="emailStore.fetchInbox(emailStore.currentFolder)">
+      <UiSegmented
+        size="sm"
+        :equal="false"
+        :model-value="filterMode"
+        :options="filterOptions"
+        aria-label="Filtro email"
+        @update:model-value="(v) => (filterMode = v as 'all' | 'unread')"
+      />
+      <button
+        class="inbox__refresh"
+        :disabled="emailStore.loading"
+        :class="{ 'inbox__refresh--spinning': emailStore.loading }"
+        title="Aggiorna"
+        @click="emailStore.fetchInbox(emailStore.currentFolder)"
+      >
         <AppIcon name="refresh-ccw" />
       </button>
     </div>
@@ -119,7 +134,11 @@ function subjectPreview(subject: string): string {
 
     <!-- Error state -->
     <div v-else-if="emailStore.error" class="inbox__state">
-      <AppIcon class="inbox__state-icon inbox__state-icon--error" name="alert-circle" :stroke-width="1.5" />
+      <AppIcon
+        class="inbox__state-icon inbox__state-icon--error"
+        name="alert-circle"
+        :stroke-width="1.5"
+      />
       <span class="inbox__state-text inbox__state-text--error">{{ emailStore.error }}</span>
     </div>
 
@@ -133,10 +152,16 @@ function subjectPreview(subject: string): string {
 
     <!-- Email list -->
     <div v-else class="inbox__list">
-      <button v-for="mail in filteredInbox" :key="mail.uid" class="inbox__item" :class="{
-        'inbox__item--unread': !mail.is_read,
-        'inbox__item--selected': isSelected(mail.uid),
-      }" @click="emailStore.fetchEmail(mail.uid, emailStore.currentFolder)">
+      <button
+        v-for="mail in filteredInbox"
+        :key="mail.uid"
+        class="inbox__item"
+        :class="{
+          'inbox__item--unread': !mail.is_read,
+          'inbox__item--selected': isSelected(mail.uid)
+        }"
+        @click="emailStore.fetchEmail(mail.uid, emailStore.currentFolder)"
+      >
         <!-- Unread dot -->
         <span v-if="!mail.is_read" class="inbox__unread-dot" />
 
@@ -185,7 +210,9 @@ function subjectPreview(subject: string): string {
   border-radius: var(--radius-sm);
   padding: 0 var(--space-3);
   height: 32px;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .inbox__search-wrapper:focus-within {
@@ -234,7 +261,9 @@ function subjectPreview(subject: string): string {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .inbox__refresh:hover:not(:disabled) {

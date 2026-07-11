@@ -5,7 +5,9 @@ import eslintPluginVue from 'eslint-plugin-vue'
 import vueParser from 'vue-eslint-parser'
 
 export default defineConfig(
-  { ignores: ['**/node_modules', '**/dist', '**/out', 'src/renderer/src/types/generated/api.d.ts'] },
+  {
+    ignores: ['**/node_modules', '**/dist', '**/out', 'src/renderer/src/types/generated/api.d.ts']
+  },
   tseslint.configs.recommended,
   eslintPluginVue.configs['flat/recommended'],
   {
@@ -34,6 +36,12 @@ export default defineConfig(
           }
         }
       ]
+    }
+  },
+  {
+    files: ['**/*.d.ts'],
+    rules: {
+      '@typescript-eslint/triple-slash-reference': 'off'
     }
   },
   eslintConfigPrettier

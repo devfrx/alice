@@ -11,9 +11,13 @@ const windowControls = {
   close: (): void => ipcRenderer.send('window-close'),
   /** Register a callback for maximize/unmaximize state changes. Returns cleanup fn. */
   onMaximizeChange: (callback: (maximized: boolean) => void): (() => void) => {
-    const handler = (_e: IpcRendererEvent, maximized: boolean): void => { callback(maximized) }
+    const handler = (_e: IpcRendererEvent, maximized: boolean): void => {
+      callback(maximized)
+    }
     ipcRenderer.on('window-maximized-change', handler)
-    return (): void => { ipcRenderer.removeListener('window-maximized-change', handler) }
+    return (): void => {
+      ipcRenderer.removeListener('window-maximized-change', handler)
+    }
   }
 }
 

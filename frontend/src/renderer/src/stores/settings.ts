@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
-import { api } from '../services/api'
+import { configApi, modelsApi, settingsApi } from '../services/api'
 import type {
   AgentPrompts,
   AgentTier,
   DownloadStatusResponse,
   LMStudioModel,
   ModelOperationResponse,
-  ToolCatalogPlugin,
+  ToolCatalogPlugin
 } from '../types/settings'
 import { emptyTierGuidance, normaliseTierGuidance, pruneTierGuidance } from '../utils/agentPrompts'
 import { useChatStore } from './chat'
@@ -120,17 +120,17 @@ export const useSettingsStore = defineStore('settings', () => {
 
   watch(toolConfirmations, (val) => {
     if (_loadingToggles) return
-    api.setToolConfirmations(val).catch(console.error)
+    settingsApi.setToolConfirmations(val).catch(console.error)
   })
 
   watch(systemPromptEnabled, (val) => {
     if (_loadingToggles) return
-    api.setSystemPrompt(val).catch(console.error)
+    settingsApi.setSystemPrompt(val).catch(console.error)
   })
 
   watch(toolsEnabled, (val) => {
     if (_loadingToggles) return
-    api.setTools(val).catch(console.error)
+    settingsApi.setTools(val).catch(console.error)
   })
 
   /** Load toggle states from the backend (persisted preferences). */
@@ -138,9 +138,9 @@ export const useSettingsStore = defineStore('settings', () => {
     _loadingToggles = true
     try {
       const [tc, sp, t] = await Promise.all([
-        api.getToolConfirmations(),
-        api.getSystemPrompt(),
-        api.getTools(),
+        settingsApi.getToolConfirmations(),
+        settingsApi.getSystemPrompt(),
+        settingsApi.getTools()
       ])
       toolConfirmations.value = tc.confirmations_enabled
       systemPromptEnabled.value = sp.system_prompt_enabled
@@ -172,7 +172,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * when Tool RAG is on (tools are auto-selected per message).
    */
   const toolSelectionAvailable = computed(
-    () => toolsEnabled.value && !settings.value.llm.toolRagEnabled,
+    () => toolsEnabled.value && !settings.value.llm.toolRagEnabled
   )
 
   /** Number of tools currently turned off (for badge display). */
@@ -186,7 +186,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Load the tool catalog and the persisted selection from the backend. */
   async function loadToolCatalog(): Promise<void> {
     try {
-      const catalog = await api.getToolCatalog()
+      const catalog = await settingsApi.getToolCatalog()
       toolCatalog.value = catalog.plugins
       disabledTools.value = new Set(catalog.disabled_tools)
     } catch (err) {
@@ -197,7 +197,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Persist the current disabled-tools set to the backend. */
   async function _persistDisabledTools(): Promise<void> {
     try {
-      const result = await api.setActiveTools([...disabledTools.value])
+      const result = await settingsApi.setActiveTools([...disabledTools.value])
       toolCatalog.value = result.plugins
       disabledTools.value = new Set(result.disabled_tools)
     } catch (err) {
@@ -215,9 +215,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /** Enable or disable every tool of a plugin at once, then persist. */
-  async function setPluginEnabled(
-    plugin: string, enabled: boolean,
-  ): Promise<void> {
+  async function setPluginEnabled(plugin: string, enabled: boolean): Promise<void> {
     const group = toolCatalog.value.find((p) => p.plugin === plugin)
     if (!group) return
     const next = new Set(disabledTools.value)
@@ -246,20 +244,20 @@ export const useSettingsStore = defineStore('settings', () => {
    */
   const agentPrompts = ref<AgentPrompts>({
     persona: '',
-    tier_guidance: emptyTierGuidance(),
+    tier_guidance: emptyTierGuidance()
   })
 
   /** Load persona + per-tier guidance from the resolved backend config. */
   async function loadAgentPrompts(): Promise<void> {
     try {
-      const cfg = await api.getResolvedConfig()
+      const cfg = await configApi.getResolvedConfig()
       const agent = (cfg.agent ?? {}) as Record<string, unknown>
       const prompts = (agent.prompts ?? {}) as Record<string, unknown>
       agentPrompts.value = {
         persona: typeof prompts.persona === 'string' ? prompts.persona : '',
         tier_guidance: normaliseTierGuidance(
-          prompts.tier_guidance as Record<string, unknown> | null | undefined,
-        ),
+          prompts.tier_guidance as Record<string, unknown> | null | undefined
+        )
       }
     } catch (err) {
       console.warn('[settings store] loadAgentPrompts failed:', err)
@@ -269,7 +267,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Persist the global persona override (empty clears it). */
   async function saveAgentPersona(): Promise<void> {
     try {
-      await api.patchConfig('agent.prompts.persona', agentPrompts.value.persona)
+      await configApi.patchConfig('agent.prompts.persona', agentPrompts.value.persona)
     } catch (err) {
       console.warn('[settings store] saveAgentPersona failed:', err)
     }
@@ -281,9 +279,9 @@ export const useSettingsStore = defineStore('settings', () => {
    */
   async function saveAgentTierGuidance(): Promise<void> {
     try {
-      await api.patchConfig(
+      await configApi.patchConfig(
         'agent.prompts.tier_guidance',
-        pruneTierGuidance(agentPrompts.value.tier_guidance),
+        pruneTierGuidance(agentPrompts.value.tier_guidance)
       )
     } catch (err) {
       console.warn('[settings store] saveAgentTierGuidance failed:', err)
@@ -300,19 +298,24 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadSettings(): Promise<void> {
     _loadingSettings = true
     try {
-      const config = await api.getConfig()
+      const config = await configApi.getConfig()
       if (config.llm) {
         const llm = config.llm as Record<string, unknown>
         settings.value.llm.model = (llm.model as string) ?? settings.value.llm.model
-        settings.value.llm.temperature = (llm.temperature as number) ?? settings.value.llm.temperature
+        settings.value.llm.temperature =
+          (llm.temperature as number) ?? settings.value.llm.temperature
         settings.value.llm.maxTokens = (llm.max_tokens as number) ?? settings.value.llm.maxTokens
-        settings.value.llm.maxToolIterations = (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
+        settings.value.llm.maxToolIterations =
+          (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
         settings.value.llm.contextCompressionEnabled =
-          (llm.context_compression_enabled as boolean) ?? settings.value.llm.contextCompressionEnabled
+          (llm.context_compression_enabled as boolean) ??
+          settings.value.llm.contextCompressionEnabled
         settings.value.llm.contextCompressionThreshold =
-          (llm.context_compression_threshold as number) ?? settings.value.llm.contextCompressionThreshold
+          (llm.context_compression_threshold as number) ??
+          settings.value.llm.contextCompressionThreshold
         settings.value.llm.contextCompressionReserve =
-          (llm.context_compression_reserve as number) ?? settings.value.llm.contextCompressionReserve
+          (llm.context_compression_reserve as number) ??
+          settings.value.llm.contextCompressionReserve
         settings.value.llm.toolRagEnabled =
           (llm.tool_rag_enabled as boolean) ?? settings.value.llm.toolRagEnabled
         settings.value.llm.toolRagTopK =
@@ -345,11 +348,15 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value.email.smtpPort = (email.smtp_port as number) ?? settings.value.email.smtpPort
         settings.value.email.smtpSsl = (email.smtp_ssl as boolean) ?? settings.value.email.smtpSsl
         settings.value.email.username = (email.username as string) ?? settings.value.email.username
-        settings.value.email.useKeyring = (email.use_keyring as boolean) ?? settings.value.email.useKeyring
-        settings.value.email.fetchLastN = (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
+        settings.value.email.useKeyring =
+          (email.use_keyring as boolean) ?? settings.value.email.useKeyring
+        settings.value.email.fetchLastN =
+          (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
         settings.value.email.maxFetch = (email.max_fetch as number) ?? settings.value.email.maxFetch
-        settings.value.email.imapIdleEnabled = (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
-        settings.value.email.archiveFolder = (email.archive_folder as string) ?? settings.value.email.archiveFolder
+        settings.value.email.imapIdleEnabled =
+          (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
+        settings.value.email.archiveFolder =
+          (email.archive_folder as string) ?? settings.value.email.archiveFolder
         settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? false
         settings.value.email.serviceRunning = (email.service_running as boolean) ?? false
         settings.value.email.password = ''
@@ -369,7 +376,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function saveSettings(): Promise<void> {
     const emailPassword = settings.value.email.password.trim()
     try {
-      const updated = await api.updateConfig({
+      const updated = await configApi.updateConfig({
         llm: {
           temperature: settings.value.llm.temperature,
           max_tokens: settings.value.llm.maxTokens,
@@ -412,8 +419,10 @@ export const useSettingsStore = defineStore('settings', () => {
       })
       const email = updated.email as Record<string, unknown> | undefined
       if (email) {
-        settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? settings.value.email.passwordConfigured
-        settings.value.email.serviceRunning = (email.service_running as boolean) ?? settings.value.email.serviceRunning
+        settings.value.email.passwordConfigured =
+          (email.password_configured as boolean) ?? settings.value.email.passwordConfigured
+        settings.value.email.serviceRunning =
+          (email.service_running as boolean) ?? settings.value.email.serviceRunning
       }
       if (emailPassword) {
         _loadingSettings = true
@@ -427,11 +436,15 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(settings, () => {
-    if (_loadingSettings) return
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => saveSettings(), 1000)
-  }, { deep: true })
+  watch(
+    settings,
+    () => {
+      if (_loadingSettings) return
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => saveSettings(), 1000)
+    },
+    { deep: true }
+  )
 
   // NOTE: loadSettings() is deferred — called by initialize() after backend is ready.
 
@@ -479,8 +492,8 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   /** The active embedding model (if any). */
-  const activeEmbeddingModel = computed(() =>
-    models.value.find((m) => m.loaded && m.type === 'embedding') ?? null
+  const activeEmbeddingModel = computed(
+    () => models.value.find((m) => m.loaded && m.type === 'embedding') ?? null
   )
 
   /** All LLM models (excludes embedding). */
@@ -496,16 +509,20 @@ export const useSettingsStore = defineStore('settings', () => {
   const unloadedModels = computed(() => models.value.filter((m) => !m.loaded))
 
   /** Whether ANY model operation is in progress (global lock). */
-  const isAnyOperationInProgress = computed(() =>
-    currentOperation.value !== null &&
-    currentOperation.value.status === 'in_progress'
+  const isAnyOperationInProgress = computed(
+    () => currentOperation.value !== null && currentOperation.value.status === 'in_progress'
   )
 
   /** Description of the current operation for UI display. */
   const operationDescription = computed(() => {
     const op = currentOperation.value
     if (!op || op.status === 'idle') return null
-    const typeLabel = op.type === 'load' ? 'Caricamento' : op.type === 'unload' ? 'Rimozione dalla memoria' : 'Cambio modello'
+    const typeLabel =
+      op.type === 'load'
+        ? 'Caricamento'
+        : op.type === 'unload'
+          ? 'Rimozione dalla memoria'
+          : 'Cambio modello'
     return `${typeLabel}: ${op.model ?? '...'}`
   })
 
@@ -528,7 +545,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Check LM Studio connection and update status. */
   async function checkConnection(): Promise<void> {
     try {
-      const status = await api.getModelsStatus()
+      const status = await modelsApi.getModelsStatus()
       lmStudioConnected.value = status.connected
       loadedModelCount.value = status.loaded_model_count
     } catch {
@@ -540,7 +557,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Sync config model with the model currently loaded in LM Studio. */
   async function syncModel(): Promise<void> {
     try {
-      const result = await api.syncModel()
+      const result = await configApi.syncModel()
       if (result.synced && result.model) {
         settings.value.llm.model = result.model
       }
@@ -565,11 +582,11 @@ export const useSettingsStore = defineStore('settings', () => {
     }
     _loadModelsInFlight = (async () => {
       try {
-        models.value = await api.getModels()
+        models.value = await modelsApi.getModels()
         // Derive connection state from the freshly-fetched model list instead
         // of making a redundant /models/status round-trip via checkConnection().
         lmStudioConnected.value = true
-        loadedModelCount.value = models.value.filter(m => m.loaded).length
+        loadedModelCount.value = models.value.filter((m) => m.loaded).length
       } finally {
         isLoadingModels.value = false
         _loadModelsInFlight = null
@@ -583,7 +600,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (operationPollTimer.value !== null || _isResumingOperation) return
     _isResumingOperation = true
     try {
-      const op = await api.getModelOperation()
+      const op = await modelsApi.getModelOperation()
       if (op.status === 'in_progress') {
         currentOperation.value = op
         if (op.model && op.type !== 'unload') {
@@ -607,7 +624,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const clientType = currentOperation.value?.type ?? null
     const poll = async (): Promise<void> => {
       try {
-        const op = await api.getModelOperation()
+        const op = await modelsApi.getModelOperation()
         // Preserve client-side 'switch' type — backend only knows 'load'
         if (clientType === 'switch' && op.type === 'load') {
           op.type = 'switch'
@@ -644,12 +661,12 @@ export const useSettingsStore = defineStore('settings', () => {
     modelKey: string,
     config?: { context_length?: number; flash_attention?: boolean }
   ): Promise<void> {
-    if (isAnyOperationInProgress.value) throw new Error('Un\'altra operazione è in corso')
+    if (isAnyOperationInProgress.value) throw new Error("Un'altra operazione è in corso")
     loadingModelKeys.value = new Set([...loadingModelKeys.value, modelKey])
     currentOperation.value = { status: 'in_progress', type: 'load', model: modelKey }
     startOperationPolling()
     try {
-      await api.loadModel(modelKey, config)
+      await modelsApi.loadModel(modelKey, config)
       await loadModels()
       // Sync backend config with the newly loaded model.
       await syncModel()
@@ -666,12 +683,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Unload a model instance from LM Studio. */
   async function unloadModel(instanceId: string): Promise<void> {
-    if (isAnyOperationInProgress.value) throw new Error('Un\'altra operazione è in corso')
+    if (isAnyOperationInProgress.value) throw new Error("Un'altra operazione è in corso")
     unloadingInstanceIds.value = new Set([...unloadingInstanceIds.value, instanceId])
     currentOperation.value = { status: 'in_progress', type: 'unload', model: instanceId }
     startOperationPolling()
     try {
-      await api.unloadModel(instanceId)
+      await modelsApi.unloadModel(instanceId)
       await loadModels()
       // Sync backend config after unload.
       await syncModel()
@@ -688,7 +705,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Start downloading a model and begin polling for status. */
   async function downloadModel(model: string, quantization?: string): Promise<void> {
-    const response = await api.downloadModel(model, quantization)
+    const response = await modelsApi.downloadModel(model, quantization)
     if (response.job_id && response.status === 'downloading') {
       pollDownloadStatus(response.job_id)
     } else if (response.status === 'already_downloaded') {
@@ -700,7 +717,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function pollDownloadStatus(jobId: string): void {
     const poll = async (): Promise<void> => {
       try {
-        const status = await api.getDownloadStatus(jobId)
+        const status = await modelsApi.getDownloadStatus(jobId)
         activeDownloads.value = new Map(activeDownloads.value.set(jobId, status))
         if (status.status === 'downloading' || status.status === 'paused') {
           const tid = setTimeout(poll, 2000)

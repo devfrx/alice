@@ -45,12 +45,20 @@ function formatDate(iso: string): string {
     </div>
 
     <ul v-else class="wb-sidebar__list">
-      <li v-for="board in boards" :key="board.boardId" class="wb-sidebar__item"
+      <li
+        v-for="board in boards"
+        :key="board.boardId"
+        class="wb-sidebar__item"
         :class="{ 'wb-sidebar__item--active': board.boardId === activeBoardId }"
-        @click="emit('select', board.boardId)">
+        @click="emit('select', board.boardId)"
+      >
         <div class="wb-sidebar__item-top">
           <span class="wb-sidebar__item-title">{{ board.title }}</span>
-          <button class="wb-sidebar__item-delete" title="Elimina lavagna" @click.stop="emit('delete', board.boardId)">
+          <button
+            class="wb-sidebar__item-delete"
+            title="Elimina lavagna"
+            @click.stop="emit('delete', board.boardId)"
+          >
             <AppIcon name="x" :size="12" />
           </button>
         </div>
@@ -158,7 +166,9 @@ function formatDate(iso: string): string {
   padding: 2px;
   border-radius: var(--radius-sm);
   opacity: 0;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
+  transition:
+    opacity var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .wb-sidebar__item:hover .wb-sidebar__item-delete {

@@ -21,7 +21,9 @@
           @blur="savePersona"
         />
       </div>
-      <span class="ap__hint">Aggiunta in fondo al system prompt di base, in ogni conversazione.</span>
+      <span class="ap__hint"
+        >Aggiunta in fondo al system prompt di base, in ogni conversazione.</span
+      >
     </label>
   </div>
 
@@ -65,8 +67,8 @@
   <div class="ap__subhead">
     <h4 class="ap__subtitle">Strumenti disponibili</h4>
     <p class="ap__subdesc">
-      Interruttori globali on/off per ogni plugin e strumento. Sono indipendenti dal whitelist
-      per livello: uno strumento disattivato qui non è mai offerto al modello.
+      Interruttori globali on/off per ogni plugin e strumento. Sono indipendenti dal whitelist per
+      livello: uno strumento disattivato qui non è mai offerto al modello.
     </p>
   </div>
 
@@ -96,7 +98,10 @@
             :aria-label="expanded.has(group.plugin) ? 'Comprimi' : 'Espandi'"
             @click="toggleExpand(group.plugin)"
           >
-            <AppIcon :name="expanded.has(group.plugin) ? 'chevron-down' : 'chevron-right'" :size="14" />
+            <AppIcon
+              :name="expanded.has(group.plugin) ? 'chevron-down' : 'chevron-right'"
+              :size="14"
+            />
           </button>
           <span class="ap__plugin">{{ group.plugin }}</span>
           <span class="ap__count">{{ group.tools.length }}</span>
@@ -155,13 +160,21 @@ const settingsStore = useSettingsStore()
 /* ── Persona + tier guidance (two-way bound to the store) ───────── */
 const persona = computed({
   get: () => settingsStore.agentPrompts.persona,
-  set: (v: string) => { settingsStore.agentPrompts.persona = v },
+  set: (v: string) => {
+    settingsStore.agentPrompts.persona = v
+  }
 })
 const tierGuidance = computed(() => settingsStore.agentPrompts.tier_guidance)
 
-function savePersona(): void { void settingsStore.saveAgentPersona() }
-function saveTier(): void { void settingsStore.saveAgentTierGuidance() }
-function resetTier(tier: AgentTier): void { void settingsStore.resetAgentTier(tier) }
+function savePersona(): void {
+  void settingsStore.saveAgentPersona()
+}
+function saveTier(): void {
+  void settingsStore.saveAgentTierGuidance()
+}
+function resetTier(tier: AgentTier): void {
+  void settingsStore.resetAgentTier(tier)
+}
 
 /* ── Tool master switches ───────────────────────────────────────── */
 const expanded = ref<Set<string>>(new Set())
@@ -185,7 +198,9 @@ const summary = computed(() => {
   return off > 0 ? `${off} strumenti disattivati` : 'Tutti gli strumenti attivi'
 })
 
-onMounted(() => { void settingsStore.loadAgentPrompts() })
+onMounted(() => {
+  void settingsStore.loadAgentPrompts()
+})
 </script>
 
 <style src="../../assets/styles/settings-controls.css"></style>

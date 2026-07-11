@@ -13,10 +13,9 @@ import { useServicesStore } from '../../stores/services'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import AppIcon from '../ui/AppIcon.vue'
 
-const props = withDefaults(
-  defineProps<{ service?: 'trellis2' | 'trellis2multiview' }>(),
-  { service: 'trellis2' },
-)
+const props = withDefaults(defineProps<{ service?: 'trellis2' | 'trellis2multiview' }>(), {
+  service: 'trellis2'
+})
 const emit = defineEmits<{ close: [result: boolean] }>()
 
 const store = useServicesStore()
@@ -25,9 +24,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 const variantTitle = computed(() =>
-  props.service === 'trellis2multiview'
-    ? 'Setup TRELLIS.2 Multi-view'
-    : 'Setup TRELLIS.2',
+  props.service === 'trellis2multiview' ? 'Setup TRELLIS.2 Multi-view' : 'Setup TRELLIS.2'
 )
 
 async function load(): Promise<void> {
@@ -59,9 +56,7 @@ onMounted(() => {
           <h2 id="trellis-guide-title" class="guide-modal__title">
             {{ variantTitle }}
           </h2>
-          <span class="guide-modal__subtitle">
-            Guida passo-passo alla compilazione locale
-          </span>
+          <span class="guide-modal__subtitle"> Guida passo-passo alla compilazione locale </span>
         </div>
       </div>
       <button
@@ -79,21 +74,15 @@ onMounted(() => {
         <AppIcon name="refresh-cw" :size="16" class="is-spinning" />
         <span>Carico la guida…</span>
       </div>
-      <div
-        v-else-if="error"
-        class="guide-modal__state guide-modal__state--error"
-      >
+      <div v-else-if="error" class="guide-modal__state guide-modal__state--error">
         <AppIcon name="alert-triangle" :size="16" />
         <div class="guide-modal__state-body">
           <strong>Impossibile caricare la guida</strong>
           <span>{{ error }}</span>
         </div>
       </div>
-      <article
-        v-else
-        class="guide-modal__markdown"
-        v-html="html"
-      />
+      <!-- eslint-disable-next-line vue/no-v-html -- sanitized markdown render (renderMarkdown uses markdown-it with html:false) -->
+      <article v-else class="guide-modal__markdown" v-html="html" />
     </div>
   </section>
 </template>
@@ -112,8 +101,14 @@ onMounted(() => {
   animation: guide-pop 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 @keyframes guide-pop {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ── Header ──────────────────────────────────────────────────── */
@@ -172,7 +167,10 @@ onMounted(() => {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
 .guide-modal__close:hover {
   background: var(--surface-hover);
@@ -213,7 +211,9 @@ onMounted(() => {
   animation: guide-spin 0.9s linear infinite;
 }
 @keyframes guide-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Markdown content ────────────────────────────────────────── */
@@ -241,8 +241,12 @@ onMounted(() => {
   font-size: var(--text-lg);
   padding-top: var(--space-2);
 }
-.guide-modal__markdown :deep(h3) { font-size: var(--text-md); }
-.guide-modal__markdown :deep(h4) { font-size: var(--text-sm); }
+.guide-modal__markdown :deep(h3) {
+  font-size: var(--text-md);
+}
+.guide-modal__markdown :deep(h4) {
+  font-size: var(--text-sm);
+}
 .guide-modal__markdown :deep(p) {
   margin: 0 0 var(--space-3);
   color: var(--text-secondary);
@@ -253,12 +257,16 @@ onMounted(() => {
   padding-left: var(--space-5);
   color: var(--text-secondary);
 }
-.guide-modal__markdown :deep(li) { margin: var(--space-1) 0; }
+.guide-modal__markdown :deep(li) {
+  margin: var(--space-1) 0;
+}
 .guide-modal__markdown :deep(a) {
   color: var(--accent);
   text-decoration: none;
   border-bottom: 1px solid var(--accent-border);
-  transition: color 120ms ease, border-color 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
 }
 .guide-modal__markdown :deep(a:hover) {
   color: var(--accent-vivid);

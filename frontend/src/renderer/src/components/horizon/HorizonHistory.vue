@@ -91,12 +91,13 @@ function truncateContent(text: string, max = 200): string {
           <div v-if="msg.role === 'tool'" class="hz-history__body hz-history__body--tool">
             {{ truncateContent(msg.content) }}
           </div>
-          <!-- eslint-disable-next-line vue/no-v-html -->
+          <!-- eslint-disable vue/no-v-html -- sanitized markdown render (renderMarkdown uses markdown-it with html:false) -->
           <div
             v-else
             class="hz-history__body markdown-body"
             v-html="renderMarkdown(msg.content ?? '')"
           />
+          <!-- eslint-enable vue/no-v-html -->
 
           <MessageVersionNav
             v-if="

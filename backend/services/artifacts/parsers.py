@@ -145,7 +145,6 @@ def _parse_cad_generate(
         metadata={
             "model_name": model_name,
             "format": payload.get("format"),
-            "export_url": payload.get("export_url"),
             "description": description,
         },
     )
@@ -177,7 +176,6 @@ def _parse_cad_generate_from_image(
         metadata={
             "model_name": model_name,
             "format": payload.get("format"),
-            "export_url": payload.get("export_url"),
             "source_image": source_image,
             "pipeline_type": payload.get("pipeline_type"),
             "seed": payload.get("seed"),

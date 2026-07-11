@@ -42,7 +42,7 @@
   --hz-breath: 6s;
 }
 
-[data-theme="light"] {
+[data-theme='light'] {
   /* --accent (#8C6A4A) decomposed */
   --hz-line-rgb: 140, 106, 74;
 }

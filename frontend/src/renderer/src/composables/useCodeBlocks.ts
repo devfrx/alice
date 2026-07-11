@@ -5,13 +5,13 @@ import { getIconSvgString } from '../assets/icons'
  * Uses event delegation — attach the returned handler to the container
  * element that hosts v-html rendered markdown content.
  */
-const COPY_ICON = getIconSvgString('copy', 16, 2)
-const CHECK_ICON = getIconSvgString('check', 16, 2)
+const COPY_ICON = getIconSvgString('copy', 16)
+const CHECK_ICON = getIconSvgString('check', 16)
 
 /** Tracks pending restore timers per copy button to prevent overlapping feedback. */
 const restoreTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>()
 
-export function useCodeBlocks() {
+export function useCodeBlocks(): { handleCodeBlockClick: (event: MouseEvent) => Promise<void> } {
   async function handleCodeBlockClick(event: MouseEvent): Promise<void> {
     // Find the closest .code-block-copy button from the click target
     const target = (event.target as HTMLElement).closest('.code-block-copy') as HTMLElement | null

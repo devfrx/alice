@@ -10,18 +10,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useTasksStore } from './tasks'
-import { api } from '../services/api'
+import { tasksApi } from '../services/api'
 import type { TaskStep } from '../types/tasks'
 
-// The store imports `{ api }` from services/api; stub just the getTasks method
-// so ensureForConversation/fetch resolve without reaching a backend.
+// The store imports `{ tasksApi }` from services/api; stub just the getTasks
+// method so ensureForConversation/fetch resolve without reaching a backend.
 vi.mock('../services/api', () => ({
-  api: {
-    getTasks: vi.fn(),
-  },
+  tasksApi: {
+    getTasks: vi.fn()
+  }
 }))
 
-const getTasksMock = vi.mocked(api.getTasks)
+const getTasksMock = vi.mocked(tasksApi.getTasks)
 
 function step(text: string, status = 'pending'): TaskStep {
   return { step: text, status }
@@ -43,12 +43,12 @@ describe('applyTasksUpdated', () => {
 
     s.applyTasksUpdated({
       conversation_id: 'c1',
-      steps: [step('research', 'in_progress'), step('write')],
+      steps: [step('research', 'in_progress'), step('write')]
     })
 
     expect(s.tasksFor('c1')).toEqual([
       { step: 'research', status: 'in_progress' },
-      { step: 'write', status: 'pending' },
+      { step: 'write', status: 'pending' }
     ])
   })
 
@@ -57,12 +57,12 @@ describe('applyTasksUpdated', () => {
     s.applyTasksUpdated({ conversation_id: 'c1', steps: [step('a')] })
     s.applyTasksUpdated({
       conversation_id: 'c1',
-      steps: [step('x', 'completed'), step('y', 'in_progress')],
+      steps: [step('x', 'completed'), step('y', 'in_progress')]
     })
 
     expect(s.tasksFor('c1')).toEqual([
       { step: 'x', status: 'completed' },
-      { step: 'y', status: 'in_progress' },
+      { step: 'y', status: 'in_progress' }
     ])
   })
 
@@ -95,7 +95,7 @@ describe('ensureForConversation', () => {
   it('calls api.getTasks once and dedupes on the second call', async () => {
     getTasksMock.mockResolvedValue({
       conversation_id: 'c1',
-      steps: [step('a', 'completed')],
+      steps: [step('a', 'completed')]
     })
     const s = useTasksStore()
 
@@ -117,7 +117,7 @@ describe('ensureForConversation', () => {
 
     getTasksMock.mockResolvedValueOnce({
       conversation_id: 'c1',
-      steps: [step('a')],
+      steps: [step('a')]
     })
     await s.ensureForConversation('c1')
     expect(getTasksMock).toHaveBeenCalledTimes(2)

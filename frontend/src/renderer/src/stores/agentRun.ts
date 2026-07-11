@@ -27,7 +27,7 @@ import type {
   WsTurnFinishedMessage,
   WsTurnLlmStepMessage,
   WsTurnStartedMessage,
-  WsTurnUsageMessage,
+  WsTurnUsageMessage
 } from '../types/turn'
 
 /**
@@ -47,7 +47,7 @@ const PENDING_RUN: AgentRun = Object.freeze({
   inputTokens: 0,
   outputTokens: 0,
   toolCalls: 0,
-  finishReason: null,
+  finishReason: null
 }) as AgentRun
 
 export const useAgentRunStore = defineStore('agentRun', () => {
@@ -75,7 +75,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
   /** The run for {@link currentTurnId}, or null when none is active. */
   const currentRun = computed<AgentRun | null>(() => {
     if (pendingTurn.value) return PENDING_RUN
-    return currentTurnId.value ? runs.value[currentTurnId.value] ?? null : null
+    return currentTurnId.value ? (runs.value[currentTurnId.value] ?? null) : null
   })
 
   /** Lookup helper: the run for a given turn id, if known. */
@@ -108,7 +108,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       inputTokens: 0,
       outputTokens: 0,
       toolCalls: 0,
-      finishReason: null,
+      finishReason: null
     }
     runs.value = { ...runs.value, [turnId]: run }
     return runs.value[turnId]
@@ -132,7 +132,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       inputTokens: 0,
       outputTokens: 0,
       toolCalls: 0,
-      finishReason: null,
+      finishReason: null
     }
     runs.value = { ...runs.value, [msg.turn_id]: run }
     currentTurnId.value = msg.turn_id
@@ -153,7 +153,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       toolName: msg.tool_name,
       args: msg.args,
       status: 'running',
-      seq: run.tools.length + run.interactions.length,
+      seq: run.tools.length + run.interactions.length
     }
     run.tools = [...run.tools, activity]
   }
@@ -172,7 +172,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         result: msg.result,
         contentType: msg.content_type ?? undefined,
         artifactId: msg.artifact_id ?? undefined,
-        seq: run.tools.length + run.interactions.length,
+        seq: run.tools.length + run.interactions.length
       }
       run.tools = [...run.tools, activity]
       return
@@ -182,7 +182,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       status,
       result: msg.result,
       contentType: msg.content_type ?? undefined,
-      artifactId: msg.artifact_id ?? undefined,
+      artifactId: msg.artifact_id ?? undefined
     }
     run.tools = [...run.tools.slice(0, idx), updated, ...run.tools.slice(idx + 1)]
   }
@@ -201,7 +201,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       kind: msg.kind,
       toolName: msg.tool_name ?? undefined,
       status: 'pending',
-      seq: run.tools.length + run.interactions.length,
+      seq: run.tools.length + run.interactions.length
     }
     run.interactions = [...run.interactions, activity]
   }
@@ -220,7 +220,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         kind: msg.kind,
         status: 'resolved',
         outcome: msg.outcome,
-        seq: run.tools.length + run.interactions.length,
+        seq: run.tools.length + run.interactions.length
       }
       run.interactions = [...run.interactions, activity]
       return
@@ -228,12 +228,12 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     const updated: InteractionActivity = {
       ...run.interactions[idx],
       status: 'resolved',
-      outcome: msg.outcome,
+      outcome: msg.outcome
     }
     run.interactions = [
       ...run.interactions.slice(0, idx),
       updated,
-      ...run.interactions.slice(idx + 1),
+      ...run.interactions.slice(idx + 1)
     ]
   }
 
@@ -293,6 +293,6 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     applyTurnUsage,
     applyTurnFinished,
     beginPendingTurn,
-    reset,
+    reset
   }
 })

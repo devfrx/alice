@@ -26,6 +26,11 @@ type LegacyShapeProps = Record<string, unknown> & {
 
 /**
  * Debounce helper — fires callback after `delay` ms of inactivity.
+ *
+ * The pending timer is cancelled on unmount: a save that has not fired by
+ * the time the editor is torn down (board switch, live reload after an
+ * agent edit) must be DROPPED, or the stale pre-teardown snapshot would be
+ * PATCHed over newer content.
  */
 function useDebouncedCallback<A extends unknown[]>(
   callback: (...args: A) => void,
@@ -34,6 +39,15 @@ function useDebouncedCallback<A extends unknown[]>(
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestCb = useRef(callback)
   latestCb.current = callback
+
+  useEffect(() => {
+    return () => {
+      if (timer.current) {
+        clearTimeout(timer.current)
+        timer.current = null
+      }
+    }
+  }, [])
 
   return useCallback(
     (...args: A) => {

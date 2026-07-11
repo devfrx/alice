@@ -43,8 +43,8 @@ const props = withDefaults(
     placeholder: 'Seleziona…',
     disabled: false,
     size: 'sm',
-    ariaLabel: undefined,
-  },
+    ariaLabel: undefined
+  }
 )
 
 const emit = defineEmits<{
@@ -61,8 +61,8 @@ const baseId = useId()
 const listboxId = `${baseId}-listbox`
 const optionId = (index: number): string => `${baseId}-opt-${index}`
 
-const selectedOption = computed(() =>
-  props.options.find((o) => o.value === props.modelValue) ?? null,
+const selectedOption = computed(
+  () => props.options.find((o) => o.value === props.modelValue) ?? null
 )
 
 const triggerLabel = computed(() => selectedOption.value?.label ?? props.placeholder)
@@ -101,9 +101,7 @@ function open(): void {
   // Highlight the current selection, else the first selectable option.
   const selectedIdx = props.options.findIndex((o) => o.value === props.modelValue)
   activeIndex.value =
-    selectedIdx >= 0 && !props.options[selectedIdx]!.disabled
-      ? selectedIdx
-      : firstEnabledIndex()
+    selectedIdx >= 0 && !props.options[selectedIdx]!.disabled ? selectedIdx : firstEnabledIndex()
 }
 
 function close(focusTrigger = false): void {
@@ -183,7 +181,7 @@ watch(
     if (isOpen.value && (activeIndex.value < 0 || props.options[activeIndex.value]?.disabled)) {
       activeIndex.value = firstEnabledIndex()
     }
-  },
+  }
 )
 
 // Scroll the highlighted option into view. Focus stays on the trigger
@@ -203,7 +201,10 @@ watch(activeIndex, (index) => {
       ref="triggerRef"
       type="button"
       class="ui-select__trigger"
-      :class="{ 'ui-select__trigger--open': isOpen, 'ui-select__trigger--placeholder': !hasSelection }"
+      :class="{
+        'ui-select__trigger--open': isOpen,
+        'ui-select__trigger--placeholder': !hasSelection
+      }"
       :disabled="disabled"
       role="combobox"
       aria-haspopup="listbox"
@@ -242,7 +243,7 @@ watch(activeIndex, (index) => {
           :class="{
             'ui-select__option--active': index === activeIndex,
             'ui-select__option--selected': option.value === modelValue,
-            'ui-select__option--disabled': option.disabled,
+            'ui-select__option--disabled': option.disabled
           }"
           role="option"
           :aria-selected="option.value === modelValue"

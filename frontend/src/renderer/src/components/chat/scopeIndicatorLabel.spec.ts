@@ -17,21 +17,21 @@ describe('scopeChipLabel', () => {
   it('uses the basename for a single POSIX folder', () => {
     expect(scopeChipLabel(['C:/Users/Jays/Desktop'])).toEqual({
       text: 'Desktop',
-      empty: false,
+      empty: false
     })
   })
 
   it('uses the basename for a single Windows folder', () => {
     expect(scopeChipLabel(['C:\\Users\\Jays\\Documents'])).toEqual({
       text: 'Documents',
-      empty: false,
+      empty: false
     })
   })
 
   it('tolerates a trailing slash', () => {
     expect(scopeChipLabel(['/home/jays/projects/'])).toEqual({
       text: 'projects',
-      empty: false,
+      empty: false
     })
     expect(scopeChipLabel(['C:\\a\\b\\'])).toEqual({ text: 'b', empty: false })
   })
@@ -39,11 +39,11 @@ describe('scopeChipLabel', () => {
   it('appends a +N suffix for multiple folders', () => {
     expect(scopeChipLabel(['C:\\a\\Desktop', 'D:\\b\\Docs'])).toEqual({
       text: 'Desktop +1',
-      empty: false,
+      empty: false
     })
     expect(scopeChipLabel(['/a/one', '/b/two', '/c/three'])).toEqual({
       text: 'one +2',
-      empty: false,
+      empty: false
     })
   })
 })
@@ -54,9 +54,7 @@ describe('scopeTooltip', () => {
   })
 
   it('joins full paths with newlines', () => {
-    expect(scopeTooltip(['C:\\a\\Desktop', 'D:\\b\\Docs'])).toBe(
-      'C:\\a\\Desktop\nD:\\b\\Docs',
-    )
+    expect(scopeTooltip(['C:\\a\\Desktop', 'D:\\b\\Docs'])).toBe('C:\\a\\Desktop\nD:\\b\\Docs')
   })
 
   it('returns the single full path unchanged', () => {

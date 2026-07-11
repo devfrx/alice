@@ -14,10 +14,13 @@ import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiPopover from '../ui/UiPopover.vue'
 
-const props = withDefaults(defineProps<{
-  /** Which model type to show: 'llm' (default) or 'embedding'. */
-  modelType?: 'llm' | 'embedding'
-}>(), { modelType: 'llm' })
+const props = withDefaults(
+  defineProps<{
+    /** Which model type to show: 'llm' (default) or 'embedding'. */
+    modelType?: 'llm' | 'embedding'
+  }>(),
+  { modelType: 'llm' }
+)
 
 const settingsStore = useSettingsStore()
 
@@ -28,9 +31,7 @@ const searchQuery = ref('')
 
 /** All models for this selector's type. */
 const typeModels = computed(() =>
-  props.modelType === 'embedding'
-    ? settingsStore.embeddingModels
-    : settingsStore.llmModels
+  props.modelType === 'embedding' ? settingsStore.embeddingModels : settingsStore.llmModels
 )
 
 /** Filter models by search query. */
@@ -51,9 +52,7 @@ const showSearch = computed(() => typeModels.value.length > 5)
 
 /** The active model for the current type. */
 const active = computed(() =>
-  props.modelType === 'embedding'
-    ? settingsStore.activeEmbeddingModel
-    : settingsStore.activeModel
+  props.modelType === 'embedding' ? settingsStore.activeEmbeddingModel : settingsStore.activeModel
 )
 
 /** Label shown on the trigger button. */
@@ -104,7 +103,8 @@ function isModelBusy(model: LMStudioModel): boolean {
     model.loaded &&
     model.loaded_instances.length > 0 &&
     settingsStore.isInstanceUnloading(model.loaded_instances[0].id)
-  ) return true
+  )
+    return true
   return false
 }
 
@@ -116,20 +116,42 @@ onMounted(() => {
 <template>
   <div class="ms">
     <!-- Trigger button -->
-    <button ref="triggerRef" class="ms__trigger" :class="{
-      'ms__trigger--embedding': props.modelType === 'embedding',
-      'ms__trigger--open': isOpen
-    }" aria-haspopup="true" :aria-expanded="isOpen" @click="toggle">
+    <button
+      ref="triggerRef"
+      class="ms__trigger"
+      :class="{
+        'ms__trigger--embedding': props.modelType === 'embedding',
+        'ms__trigger--open': isOpen
+      }"
+      aria-haspopup="true"
+      :aria-expanded="isOpen"
+      @click="toggle"
+    >
       <!-- Type icon -->
-      <AppIcon v-if="props.modelType === 'embedding'" class="ms__type-icon" name="embedding" :size="11"
-        title="Embedding model" />
+      <AppIcon
+        v-if="props.modelType === 'embedding'"
+        class="ms__type-icon"
+        name="embedding"
+        :size="11"
+        title="Embedding model"
+      />
       <!-- Warning icon only when LM Studio is disconnected -->
-      <AppIcon v-else-if="!settingsStore.lmStudioConnected" class="ms__warn-icon" name="alert-triangle" :size="11"
-        title="LM Studio disconnesso" />
+      <AppIcon
+        v-else-if="!settingsStore.lmStudioConnected"
+        class="ms__warn-icon"
+        name="alert-triangle"
+        :size="11"
+        title="LM Studio disconnesso"
+      />
       <span class="ms__label">{{ triggerLabel }}</span>
       <AliceSpinner v-if="settingsStore.isAnyOperationInProgress" size="xs" />
-      <AppIcon class="ms__chevron" :class="{ 'ms__chevron--open': isOpen }" name="chevron-down" :size="9"
-        :stroke-width="2.5" />
+      <AppIcon
+        class="ms__chevron"
+        :class="{ 'ms__chevron--open': isOpen }"
+        name="chevron-down"
+        :size="9"
+        :stroke-width="2.5"
+      />
     </button>
 
     <!-- Dropdown — UiPopover owns teleport/positioning/outside-click/Escape.
@@ -145,8 +167,13 @@ onMounted(() => {
         <!-- Search (only when many models) -->
         <div v-if="showSearch" class="ms__search">
           <AppIcon class="ms__search-icon" name="search" :size="12" />
-          <input v-model="searchQuery" class="ms__search-input" type="text" placeholder="Cerca modello…"
-            @keydown.stop />
+          <input
+            v-model="searchQuery"
+            class="ms__search-input"
+            type="text"
+            placeholder="Cerca modello…"
+            @keydown.stop
+          />
         </div>
 
         <!-- Error -->
@@ -171,12 +198,18 @@ onMounted(() => {
 
           <!-- Empty state -->
           <div v-else-if="typeModels.length === 0" class="ms__state">
-            {{ props.modelType === 'embedding' ? 'Nessun modello embedding disponibile' : 'Nessun modello disponibile'
+            {{
+              props.modelType === 'embedding'
+                ? 'Nessun modello embedding disponibile'
+                : 'Nessun modello disponibile'
             }}
           </div>
 
           <!-- No search results -->
-          <div v-else-if="loadedModels.length === 0 && availableModels.length === 0 && searchQuery" class="ms__state">
+          <div
+            v-else-if="loadedModels.length === 0 && availableModels.length === 0 && searchQuery"
+            class="ms__state"
+          >
             Nessun risultato per "{{ searchQuery }}"
           </div>
 
@@ -187,29 +220,42 @@ onMounted(() => {
                 <span class="ms__section-dot ms__section-dot--on" />
                 Caricati ({{ loadedModels.length }})
               </div>
-              <div v-for="model in loadedModels" :key="'l-' + model.name" class="ms__item ms__item--loaded"
+              <div
+                v-for="model in loadedModels"
+                :key="'l-' + model.name"
+                class="ms__item ms__item--loaded"
                 :class="{ 'ms__item--busy': isModelBusy(model) }"
-                :aria-disabled="settingsStore.isAnyOperationInProgress || undefined">
+                :aria-disabled="settingsStore.isAnyOperationInProgress || undefined"
+              >
                 <span class="ms__accent" />
                 <div class="ms__item-top">
                   <span class="ms__dot ms__dot--on" />
                   <span class="ms__name" :title="model.display_name || model.name">
                     {{ model.display_name || model.name }}
                   </span>
-                  <button class="ms__action-btn" :class="{ 'ms__action-btn--busy': isModelBusy(model) }"
+                  <button
+                    class="ms__action-btn"
+                    :class="{ 'ms__action-btn--busy': isModelBusy(model) }"
                     title="Scarica dalla memoria"
                     :disabled="isModelBusy(model) || settingsStore.isAnyOperationInProgress"
-                    @click="toggleModelLoad(model, $event)">
+                    @click="toggleModelLoad(model, $event)"
+                  >
                     <AliceSpinner v-if="isModelBusy(model)" size="xs" />
                     <AppIcon v-else name="model-unload" :size="11" />
                   </button>
                 </div>
                 <div class="ms__item-meta">
-                  <span v-if="model.params_string" class="ms__tag ms__tag--params">{{ model.params_string }}</span>
-                  <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{ model.quantization.name
+                  <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
+                    model.params_string
+                  }}</span>
+                  <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{
+                    model.quantization.name
                   }}</span>
                   <span class="ms__tag ms__tag--size">{{ formatSize(model.size) }}</span>
-                  <span v-if="model.loaded && model.loaded_instances.length > 0" class="ms__tag ms__tag--ctx">
+                  <span
+                    v-if="model.loaded && model.loaded_instances.length > 0"
+                    class="ms__tag ms__tag--ctx"
+                  >
                     ctx {{ model.loaded_instances[0].config.context_length.toLocaleString() }}
                   </span>
                   <span v-if="model.capabilities.vision" class="ms__cap" title="Vision">
@@ -218,7 +264,11 @@ onMounted(() => {
                   <span v-if="model.capabilities.thinking" class="ms__cap" title="Thinking">
                     <AppIcon name="thinking-cap" :size="11" />
                   </span>
-                  <span v-if="model.capabilities.trained_for_tool_use" class="ms__cap" title="Tool Use">
+                  <span
+                    v-if="model.capabilities.trained_for_tool_use"
+                    class="ms__cap"
+                    title="Tool Use"
+                  >
                     <AppIcon name="tool" :size="11" />
                   </span>
                 </div>
@@ -238,24 +288,35 @@ onMounted(() => {
                 <span class="ms__section-dot ms__section-dot--off" />
                 Disponibili ({{ availableModels.length }})
               </div>
-              <div v-for="model in availableModels" :key="'a-' + model.name" class="ms__item"
+              <div
+                v-for="model in availableModels"
+                :key="'a-' + model.name"
+                class="ms__item"
                 :class="{ 'ms__item--busy': isModelBusy(model) }"
-                :aria-disabled="settingsStore.isAnyOperationInProgress || undefined">
+                :aria-disabled="settingsStore.isAnyOperationInProgress || undefined"
+              >
                 <div class="ms__item-top">
                   <span class="ms__dot ms__dot--off" />
                   <span class="ms__name" :title="model.display_name || model.name">
                     {{ model.display_name || model.name }}
                   </span>
-                  <button class="ms__action-btn" :class="{ 'ms__action-btn--busy': isModelBusy(model) }"
-                    title="Carica in memoria" :disabled="isModelBusy(model) || settingsStore.isAnyOperationInProgress"
-                    @click="toggleModelLoad(model, $event)">
+                  <button
+                    class="ms__action-btn"
+                    :class="{ 'ms__action-btn--busy': isModelBusy(model) }"
+                    title="Carica in memoria"
+                    :disabled="isModelBusy(model) || settingsStore.isAnyOperationInProgress"
+                    @click="toggleModelLoad(model, $event)"
+                  >
                     <AliceSpinner v-if="isModelBusy(model)" size="xs" />
                     <AppIcon v-else name="model-load" :size="11" />
                   </button>
                 </div>
                 <div class="ms__item-meta">
-                  <span v-if="model.params_string" class="ms__tag ms__tag--params">{{ model.params_string }}</span>
-                  <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{ model.quantization.name
+                  <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
+                    model.params_string
+                  }}</span>
+                  <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{
+                    model.quantization.name
                   }}</span>
                   <span class="ms__tag ms__tag--size">{{ formatSize(model.size) }}</span>
                   <span v-if="model.capabilities.vision" class="ms__cap" title="Vision">
@@ -264,7 +325,11 @@ onMounted(() => {
                   <span v-if="model.capabilities.thinking" class="ms__cap" title="Thinking">
                     <AppIcon name="thinking-cap" :size="11" />
                   </span>
-                  <span v-if="model.capabilities.trained_for_tool_use" class="ms__cap" title="Tool Use">
+                  <span
+                    v-if="model.capabilities.trained_for_tool_use"
+                    class="ms__cap"
+                    title="Tool Use"
+                  >
                     <AppIcon name="tool" :size="11" />
                   </span>
                 </div>
@@ -340,7 +405,6 @@ onMounted(() => {
 }
 
 @keyframes ms-warn-blink {
-
   0%,
   100% {
     opacity: 1;
@@ -567,7 +631,6 @@ onMounted(() => {
 }
 
 @keyframes ms-pulse {
-
   0%,
   100% {
     opacity: 1;

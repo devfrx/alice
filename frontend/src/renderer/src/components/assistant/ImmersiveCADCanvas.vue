@@ -25,9 +25,9 @@ const props = withDefaults(
     /** Index of the currently displayed model. */
     activeIndex: number
     /**
-     * Hide the inline prev/next multi-model navigation. Used by the workspace
-     * Cad3dModule, which provides its own ModuleSelectorBar instead; assistant
-     * mode leaves this false to keep the built-in nav.
+     * Hide the inline prev/next multi-model navigation, for hosts that
+     * provide their own model selector. Horizon leaves this false to keep
+     * the built-in nav.
      */
     hideNav?: boolean
   }>(),
@@ -144,13 +144,9 @@ function fitCameraToModel(model: THREE.Object3D): void {
   const size = box.getSize(new THREE.Vector3())
   const maxDim = Math.max(size.x, size.y, size.z)
   const fov = camera.fov * (Math.PI / 180)
-  const dist = maxDim / (2 * Math.tan(fov / 2)) * 2.0
+  const dist = (maxDim / (2 * Math.tan(fov / 2))) * 2.0
 
-  camera.position.set(
-    center.x + dist * 0.55,
-    center.y + dist * 0.3,
-    center.z + dist * 0.55,
-  )
+  camera.position.set(center.x + dist * 0.55, center.y + dist * 0.3, center.z + dist * 0.55)
   controls.target.copy(center)
   camera.near = dist * 0.005
   camera.far = dist * 25
@@ -194,7 +190,7 @@ function loadModel(url: string): void {
       if (myToken !== loadToken) return
       errorMsg.value = err instanceof Error ? err.message : 'Errore caricamento modello 3D'
       loading.value = false
-    },
+    }
   )
 }
 
@@ -203,9 +199,12 @@ function disposeModel(model: THREE.Group): void {
     if (child instanceof THREE.Mesh) {
       child.geometry?.dispose()
       if (Array.isArray(child.material)) {
-        child.material.forEach((m) => { m.map?.dispose(); m.dispose() })
+        child.material.forEach((m) => {
+          m.map?.dispose()
+          m.dispose()
+        })
       } else if (child.material) {
-        ; (child.material as THREE.MeshStandardMaterial).map?.dispose()
+        ;(child.material as THREE.MeshStandardMaterial).map?.dispose()
         child.material.dispose()
       }
     }
@@ -241,13 +240,15 @@ watch(activeModel, (model) => {
   }
 })
 
-function toggleAutoRotate(): void { autoRotate.value = !autoRotate.value }
+function toggleAutoRotate(): void {
+  autoRotate.value = !autoRotate.value
+}
 
 function toggleWireframe(): void {
   wireframe.value = !wireframe.value
   loadedModel?.traverse((child) => {
     if (child instanceof THREE.Mesh && child.material && 'wireframe' in child.material) {
-      ; (child.material as THREE.MeshStandardMaterial).wireframe = wireframe.value
+      ;(child.material as THREE.MeshStandardMaterial).wireframe = wireframe.value
     }
   })
 }
@@ -332,23 +333,41 @@ onUnmounted(() => {
     <div class="side-cad__footer">
       <!-- Multi-model navigation -->
       <div v-if="hasMultiple && !hideNav" class="side-cad__nav">
-        <button class="side-cad__nav-btn" :disabled="!canPrev" title="Modello precedente" @click="goPrev">
+        <button
+          class="side-cad__nav-btn"
+          :disabled="!canPrev"
+          title="Modello precedente"
+          @click="goPrev"
+        >
           <AppIcon name="chevron-left" :size="14" />
         </button>
         <span class="side-cad__nav-label">{{ activeIndex + 1 }} / {{ models.length }}</span>
-        <button class="side-cad__nav-btn" :disabled="!canNext" title="Modello successivo" @click="goNext">
+        <button
+          class="side-cad__nav-btn"
+          :disabled="!canNext"
+          title="Modello successivo"
+          @click="goNext"
+        >
           <AppIcon name="chevron-right" :size="14" />
         </button>
       </div>
 
       <!-- Controls -->
       <div class="side-cad__controls">
-        <button class="side-cad__btn" :class="{ 'side-cad__btn--active': autoRotate }" title="Auto-rotazione"
-          @click="toggleAutoRotate">
+        <button
+          class="side-cad__btn"
+          :class="{ 'side-cad__btn--active': autoRotate }"
+          title="Auto-rotazione"
+          @click="toggleAutoRotate"
+        >
           <AppIcon name="auto-rotate" :size="13" />
         </button>
-        <button class="side-cad__btn" :class="{ 'side-cad__btn--active': wireframe }" title="Wireframe"
-          @click="toggleWireframe">
+        <button
+          class="side-cad__btn"
+          :class="{ 'side-cad__btn--active': wireframe }"
+          title="Wireframe"
+          @click="toggleWireframe"
+        >
           <AppIcon name="wireframe" :size="13" />
         </button>
         <button class="side-cad__btn" title="Reset camera" @click="resetCamera">
@@ -417,7 +436,9 @@ onUnmounted(() => {
   color: var(--text-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .side-cad__close:hover {
@@ -543,7 +564,9 @@ onUnmounted(() => {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .side-cad__nav-btn:hover:not(:disabled) {
@@ -582,7 +605,10 @@ onUnmounted(() => {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .side-cad__btn:hover {

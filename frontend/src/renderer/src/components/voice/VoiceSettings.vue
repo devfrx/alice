@@ -6,7 +6,7 @@
  * from backend on mount and persists changes via PUT /config.
  */
 import { computed, onMounted, ref } from 'vue'
-import { api } from '../../services/api'
+import { configApi, voiceApi } from '../../services/api'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
@@ -43,19 +43,19 @@ const sttModels = [
   { value: 'base', label: 'Base' },
   { value: 'small', label: 'Small (bilanciato)' },
   { value: 'medium', label: 'Medium' },
-  { value: 'large-v3', label: 'Large v3 (preciso, lento)' },
+  { value: 'large-v3', label: 'Large v3 (preciso, lento)' }
 ]
 
 const activationModes = [
   { value: 'push_to_talk', label: 'Premi per parlare' },
   { value: 'wake_word', label: 'Parola di attivazione' },
-  { value: 'always_on', label: 'Sempre attivo' },
+  { value: 'always_on', label: 'Sempre attivo' }
 ]
 
 const ttsEnginesAll = [
   { value: 'piper', label: 'Piper (CPU, veloce)' },
   { value: 'kokoro', label: 'Kokoro (CPU/GPU, alta qualità)' },
-  { value: 'xtts', label: 'XTTS v2 (GPU, clonazione voce)' },
+  { value: 'xtts', label: 'XTTS v2 (GPU, clonazione voce)' }
 ]
 
 /** Filtered to only the engines whose Python library is installed. */
@@ -64,91 +64,97 @@ const ttsEngines = ref(ttsEnginesAll)
 const sttLibAvailable = ref(true)
 
 /** Kokoro voices grouped by language, with auto-language mapping. */
-const kokoroVoices: { group: string; lang: string; voices: { value: string; label: string }[] }[] = [
-  {
-    group: '🇮🇹 Italiano', lang: 'it',
-    voices: [
-      { value: 'if_sara', label: 'Sara (femminile)' },
-      { value: 'im_nicola', label: 'Nicola (maschile)' },
-    ],
-  },
-  {
-    group: '🇺🇸 English (US)', lang: 'en-us',
-    voices: [
-      { value: 'am_michael', label: 'Michael (maschile)' },
-      { value: 'am_fenrir', label: 'Fenrir (maschile)' },
-      { value: 'am_onyx', label: 'Onyx (maschile)' },
-      { value: 'am_echo', label: 'Echo (maschile)' },
-      { value: 'am_eric', label: 'Eric (maschile)' },
-      { value: 'am_liam', label: 'Liam (maschile)' },
-      { value: 'am_adam', label: 'Adam (maschile)' },
-      { value: 'am_puck', label: 'Puck (maschile)' },
-      { value: 'af_heart', label: 'Heart (femminile)' },
-      { value: 'af_sarah', label: 'Sarah (femminile)' },
-      { value: 'af_nova', label: 'Nova (femminile)' },
-      { value: 'af_sky', label: 'Sky (femminile)' },
-      { value: 'af_bella', label: 'Bella (femminile)' },
-      { value: 'af_jessica', label: 'Jessica (femminile)' },
-      { value: 'af_nicole', label: 'Nicole (femminile)' },
-      { value: 'af_river', label: 'River (femminile)' },
-    ],
-  },
-  {
-    group: '🇬🇧 English (UK)', lang: 'en-gb',
-    voices: [
-      { value: 'bm_daniel', label: 'Daniel (maschile)' },
-      { value: 'bm_george', label: 'George (maschile)' },
-      { value: 'bm_lewis', label: 'Lewis (maschile)' },
-      { value: 'bm_fable', label: 'Fable (maschile)' },
-      { value: 'bf_emma', label: 'Emma (femminile)' },
-      { value: 'bf_alice', label: 'Alice (femminile)' },
-      { value: 'bf_isabella', label: 'Isabella (femminile)' },
-      { value: 'bf_lily', label: 'Lily (femminile)' },
-    ],
-  },
-  {
-    group: '🇫🇷 Français', lang: 'fr-fr',
-    voices: [
-      { value: 'ff_siwis', label: 'Siwis (femminile)' },
-    ],
-  },
-  {
-    group: '🇪🇸 Español', lang: 'es',
-    voices: [
-      { value: 'ef_dora', label: 'Dora (femminile)' },
-      { value: 'em_alex', label: 'Alex (maschile)' },
-    ],
-  },
-  {
-    group: '🇯🇵 日本語', lang: 'ja',
-    voices: [
-      { value: 'jf_alpha', label: 'Alpha (femminile)' },
-      { value: 'jf_nezumi', label: 'Nezumi (femminile)' },
-      { value: 'jm_kumo', label: 'Kumo (maschile)' },
-    ],
-  },
-  {
-    group: '🇨🇳 中文', lang: 'zh',
-    voices: [
-      { value: 'zf_xiaoxiao', label: 'Xiaoxiao (femminile)' },
-      { value: 'zf_xiaoyi', label: 'Xiaoyi (femminile)' },
-      { value: 'zm_yunxi', label: 'Yunxi (maschile)' },
-      { value: 'zm_yunyang', label: 'Yunyang (maschile)' },
-    ],
-  },
-]
+const kokoroVoices: { group: string; lang: string; voices: { value: string; label: string }[] }[] =
+  [
+    {
+      group: '🇮🇹 Italiano',
+      lang: 'it',
+      voices: [
+        { value: 'if_sara', label: 'Sara (femminile)' },
+        { value: 'im_nicola', label: 'Nicola (maschile)' }
+      ]
+    },
+    {
+      group: '🇺🇸 English (US)',
+      lang: 'en-us',
+      voices: [
+        { value: 'am_michael', label: 'Michael (maschile)' },
+        { value: 'am_fenrir', label: 'Fenrir (maschile)' },
+        { value: 'am_onyx', label: 'Onyx (maschile)' },
+        { value: 'am_echo', label: 'Echo (maschile)' },
+        { value: 'am_eric', label: 'Eric (maschile)' },
+        { value: 'am_liam', label: 'Liam (maschile)' },
+        { value: 'am_adam', label: 'Adam (maschile)' },
+        { value: 'am_puck', label: 'Puck (maschile)' },
+        { value: 'af_heart', label: 'Heart (femminile)' },
+        { value: 'af_sarah', label: 'Sarah (femminile)' },
+        { value: 'af_nova', label: 'Nova (femminile)' },
+        { value: 'af_sky', label: 'Sky (femminile)' },
+        { value: 'af_bella', label: 'Bella (femminile)' },
+        { value: 'af_jessica', label: 'Jessica (femminile)' },
+        { value: 'af_nicole', label: 'Nicole (femminile)' },
+        { value: 'af_river', label: 'River (femminile)' }
+      ]
+    },
+    {
+      group: '🇬🇧 English (UK)',
+      lang: 'en-gb',
+      voices: [
+        { value: 'bm_daniel', label: 'Daniel (maschile)' },
+        { value: 'bm_george', label: 'George (maschile)' },
+        { value: 'bm_lewis', label: 'Lewis (maschile)' },
+        { value: 'bm_fable', label: 'Fable (maschile)' },
+        { value: 'bf_emma', label: 'Emma (femminile)' },
+        { value: 'bf_alice', label: 'Alice (femminile)' },
+        { value: 'bf_isabella', label: 'Isabella (femminile)' },
+        { value: 'bf_lily', label: 'Lily (femminile)' }
+      ]
+    },
+    {
+      group: '🇫🇷 Français',
+      lang: 'fr-fr',
+      voices: [{ value: 'ff_siwis', label: 'Siwis (femminile)' }]
+    },
+    {
+      group: '🇪🇸 Español',
+      lang: 'es',
+      voices: [
+        { value: 'ef_dora', label: 'Dora (femminile)' },
+        { value: 'em_alex', label: 'Alex (maschile)' }
+      ]
+    },
+    {
+      group: '🇯🇵 日本語',
+      lang: 'ja',
+      voices: [
+        { value: 'jf_alpha', label: 'Alpha (femminile)' },
+        { value: 'jf_nezumi', label: 'Nezumi (femminile)' },
+        { value: 'jm_kumo', label: 'Kumo (maschile)' }
+      ]
+    },
+    {
+      group: '🇨🇳 中文',
+      lang: 'zh',
+      voices: [
+        { value: 'zf_xiaoxiao', label: 'Xiaoxiao (femminile)' },
+        { value: 'zf_xiaoyi', label: 'Xiaoyi (femminile)' },
+        { value: 'zm_yunxi', label: 'Yunxi (maschile)' },
+        { value: 'zm_yunyang', label: 'Yunyang (maschile)' }
+      ]
+    }
+  ]
 
 /** Map voice → its canonical language code. */
 const voiceLangMap = Object.fromEntries(
-  kokoroVoices.flatMap(g => g.voices.map(v => [v.value, g.lang]))
+  kokoroVoices.flatMap((g) => g.voices.map((v) => [v.value, g.lang]))
 )
 
 /** Flattened Kokoro voice options, with non-selectable group headers. */
 const kokoroVoiceOptions = computed<UiSelectOption[]>(() =>
   kokoroVoices.flatMap((g) => [
     { value: `__group__${g.lang}`, label: g.group, disabled: true },
-    ...g.voices,
-  ]),
+    ...g.voices
+  ])
 )
 
 /** Kokoro output-language options. */
@@ -160,7 +166,7 @@ const kokoroLanguages: UiSelectOption[] = [
   { value: 'es', label: 'Español' },
   { value: 'de', label: 'Deutsch' },
   { value: 'ja', label: '日本語' },
-  { value: 'zh', label: '中文' },
+  { value: 'zh', label: '中文' }
 ]
 
 function onKokoroVoiceChange(): void {
@@ -172,8 +178,8 @@ function onKokoroVoiceChange(): void {
 onMounted(async () => {
   try {
     const [cfg, engines] = await Promise.all([
-      api.getConfig(),
-      api.getAvailableVoiceEngines().catch(() => null),
+      configApi.getConfig(),
+      voiceApi.getAvailableVoiceEngines().catch(() => null)
     ])
 
     // Filter TTS engine list to only installed libraries.
@@ -216,11 +222,11 @@ async function save(): Promise<void> {
   saving.value = true
   saveError.value = ''
   try {
-    await api.updateConfig({
+    await configApi.updateConfig({
       stt: {
         enabled: sttEnabled.value,
         model: sttModel.value,
-        language: sttLanguage.value,
+        language: sttLanguage.value
       },
       tts: {
         engine: ttsEngine.value,
@@ -228,13 +234,13 @@ async function save(): Promise<void> {
         speed: ttsSpeed.value,
         enabled: ttsEnabled.value,
         kokoro_voice: kokoroVoice.value,
-        kokoro_language: kokoroLanguage.value,
+        kokoro_language: kokoroLanguage.value
       },
       voice: {
         auto_tts_response: autoTtsResponse.value,
         activation_mode: activationMode.value,
-        wake_word: wakeWord.value,
-      },
+        wake_word: wakeWord.value
+      }
     })
     // Keep settings store in sync
     settingsStore.settings.tts.engine = ttsEngine.value
@@ -247,7 +253,9 @@ async function save(): Promise<void> {
     voiceStore.autoTtsResponse = autoTtsResponse.value
     voiceStore.ttsEngine = ttsEnabled.value ? ttsEngine.value : ''
     voiceStore.ttsVoice = ttsEnabled.value
-      ? (ttsEngine.value === 'kokoro' ? kokoroVoice.value : ttsVoice.value.split('/').pop()?.split('.')[0]?.split('-').slice(1, -1).join('-') ?? '')
+      ? ttsEngine.value === 'kokoro'
+        ? kokoroVoice.value
+        : (ttsVoice.value.split('/').pop()?.split('.')[0]?.split('-').slice(1, -1).join('-') ?? '')
       : ''
     voiceStore.sttEngine = sttEnabled.value ? 'faster-whisper' : ''
     voiceStore.sttModel = sttEnabled.value ? sttModel.value : ''
@@ -274,26 +282,50 @@ async function save(): Promise<void> {
         <h3 id="stt-heading" class="settings-section__title">Riconoscimento Vocale (STT)</h3>
         <div class="settings-section__grid">
           <p v-if="!sttLibAvailable" class="settings-unavailable-hint">
-            ⚠ faster-whisper non installato — STT non disponibile.
-            Installa con: <code>uv sync --extra voice --extra voice-gpu</code>
-
+            ⚠ faster-whisper non installato — STT non disponibile. Installa con:
+            <code>uv sync --extra voice --extra voice-gpu</code>
           </p>
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Abilita STT</span>
             <span class="settings-field__hint">Riconoscimento vocale tramite Whisper</span>
-            <UiToggle :model-value="sttEnabled" :disabled="!sttLibAvailable" aria-label="Abilita STT"
-                @update:model-value="(v) => { sttEnabled = v; save() }" />
+            <UiToggle
+              :model-value="sttEnabled"
+              :disabled="!sttLibAvailable"
+              aria-label="Abilita STT"
+              @update:model-value="
+                (v) => {
+                  sttEnabled = v
+                  save()
+                }
+              "
+            />
           </label>
           <template v-if="sttEnabled && sttLibAvailable">
             <label class="settings-field">
               <span class="settings-field__label">Modello</span>
-              <UiSelect :model-value="sttModel" :options="sttModels" size="md" aria-label="Modello STT"
-                @update:model-value="(v) => { sttModel = String(v); save() }" />
+              <UiSelect
+                :model-value="sttModel"
+                :options="sttModels"
+                size="md"
+                aria-label="Modello STT"
+                @update:model-value="
+                  (v) => {
+                    sttModel = String(v)
+                    save()
+                  }
+                "
+              />
             </label>
             <label class="settings-field">
               <span class="settings-field__label">Lingua</span>
-              <input v-model="sttLanguage" type="text" class="settings-field__input" placeholder="it"
-                aria-label="Lingua STT" @change="save" />
+              <input
+                v-model="sttLanguage"
+                type="text"
+                class="settings-field__input"
+                placeholder="it"
+                aria-label="Lingua STT"
+                @change="save"
+              />
             </label>
           </template>
         </div>
@@ -310,45 +342,108 @@ async function save(): Promise<void> {
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Abilita TTS</span>
             <span class="settings-field__hint">Sintesi vocale delle risposte</span>
-            <UiToggle :model-value="ttsEnabled" :disabled="ttsEngines.length === 0" aria-label="Abilita TTS"
-                @update:model-value="(v) => { ttsEnabled = v; save() }" />
+            <UiToggle
+              :model-value="ttsEnabled"
+              :disabled="ttsEngines.length === 0"
+              aria-label="Abilita TTS"
+              @update:model-value="
+                (v) => {
+                  ttsEnabled = v
+                  save()
+                }
+              "
+            />
           </label>
           <template v-if="ttsEnabled && ttsEngines.length > 0">
             <label class="settings-field">
               <span class="settings-field__label">Motore</span>
-              <UiSelect :model-value="ttsEngine" :options="ttsEngines" size="md" aria-label="Motore TTS"
-                @update:model-value="(v) => { ttsEngine = String(v); save() }" />
+              <UiSelect
+                :model-value="ttsEngine"
+                :options="ttsEngines"
+                size="md"
+                aria-label="Motore TTS"
+                @update:model-value="
+                  (v) => {
+                    ttsEngine = String(v)
+                    save()
+                  }
+                "
+              />
             </label>
             <label v-if="ttsEngine !== 'kokoro'" class="settings-field">
               <span class="settings-field__label">Voce</span>
-              <input v-model="ttsVoice" type="text" class="settings-field__input"
-                placeholder="models/tts/piper/it_IT-paola-medium" aria-label="Percorso voce TTS" @change="save" />
+              <input
+                v-model="ttsVoice"
+                type="text"
+                class="settings-field__input"
+                placeholder="models/tts/piper/it_IT-paola-medium"
+                aria-label="Percorso voce TTS"
+                @change="save"
+              />
             </label>
             <template v-if="ttsEngine === 'kokoro'">
               <label class="settings-field">
                 <span class="settings-field__label">Voce Kokoro</span>
-                <UiSelect :model-value="kokoroVoice" :options="kokoroVoiceOptions" size="md" aria-label="Voce Kokoro"
-                  @update:model-value="(v) => { kokoroVoice = String(v); onKokoroVoiceChange() }" />
+                <UiSelect
+                  :model-value="kokoroVoice"
+                  :options="kokoroVoiceOptions"
+                  size="md"
+                  aria-label="Voce Kokoro"
+                  @update:model-value="
+                    (v) => {
+                      kokoroVoice = String(v)
+                      onKokoroVoiceChange()
+                    }
+                  "
+                />
               </label>
               <label class="settings-field">
                 <span class="settings-field__label">Lingua Kokoro</span>
-                <UiSelect :model-value="kokoroLanguage" :options="kokoroLanguages" size="md" aria-label="Lingua Kokoro"
-                  @update:model-value="(v) => { kokoroLanguage = String(v); save() }" />
+                <UiSelect
+                  :model-value="kokoroLanguage"
+                  :options="kokoroLanguages"
+                  size="md"
+                  aria-label="Lingua Kokoro"
+                  @update:model-value="
+                    (v) => {
+                      kokoroLanguage = String(v)
+                      save()
+                    }
+                  "
+                />
               </label>
             </template>
             <label class="settings-field settings-field--wide">
               <span class="settings-field__label">Velocità</span>
               <div class="vs__range-row">
-                <input v-model.number="ttsSpeed" type="range" min="0.5" max="2.0" step="0.1" class="vs__range"
-                  aria-label="Velocità TTS" @change="save" />
+                <input
+                  v-model.number="ttsSpeed"
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.1"
+                  class="vs__range"
+                  aria-label="Velocità TTS"
+                  @change="save"
+                />
                 <span class="vs__range-value">{{ ttsSpeed.toFixed(1) }}x</span>
               </div>
             </label>
             <label class="settings-field settings-field--toggle">
               <span class="settings-field__label">Rispondi automaticamente a voce</span>
-              <span class="settings-field__hint">L'assistente legge automaticamente le risposte</span>
-              <UiToggle :model-value="autoTtsResponse" aria-label="Rispondi automaticamente a voce"
-                  @update:model-value="(v) => { autoTtsResponse = v; save() }" />
+              <span class="settings-field__hint"
+                >L'assistente legge automaticamente le risposte</span
+              >
+              <UiToggle
+                :model-value="autoTtsResponse"
+                aria-label="Rispondi automaticamente a voce"
+                @update:model-value="
+                  (v) => {
+                    autoTtsResponse = v
+                    save()
+                  }
+                "
+              />
             </label>
           </template>
         </div>
@@ -360,13 +455,18 @@ async function save(): Promise<void> {
         <div class="settings-section__grid">
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Conferma invio trascrizione</span>
-            <span class="settings-field__hint">Mostra Invia/Annulla dopo la trascrizione vocale</span>
+            <span class="settings-field__hint"
+              >Mostra Invia/Annulla dopo la trascrizione vocale</span
+            >
             <UiToggle v-model="voiceStore.confirmTranscript" aria-label="Conferma trascrizione" />
           </label>
           <label class="settings-field settings-field--toggle">
             <span class="settings-field__label">Includi allegati con invio vocale</span>
             <span class="settings-field__hint">Invia anche gli allegati presenti in chat</span>
-            <UiToggle v-model="voiceStore.sttIncludeAttachments" aria-label="Includi allegati STT" />
+            <UiToggle
+              v-model="voiceStore.sttIncludeAttachments"
+              aria-label="Includi allegati STT"
+            />
           </label>
         </div>
       </section>
@@ -375,18 +475,34 @@ async function save(): Promise<void> {
       <section class="settings-section" aria-labelledby="activation-heading">
         <h3 id="activation-heading" class="settings-section__title">Modalità Attivazione</h3>
         <div class="vs__activation-grid">
-          <label v-for="mode in activationModes" :key="mode.value" class="vs__activation-card"
-            :class="{ 'vs__activation-card--active': activationMode === mode.value }">
-            <input v-model="activationMode" type="radio" :value="mode.value" name="activation-mode"
-              class="vs__activation-radio" @change="save" />
+          <label
+            v-for="mode in activationModes"
+            :key="mode.value"
+            class="vs__activation-card"
+            :class="{ 'vs__activation-card--active': activationMode === mode.value }"
+          >
+            <input
+              v-model="activationMode"
+              type="radio"
+              :value="mode.value"
+              name="activation-mode"
+              class="vs__activation-radio"
+              @change="save"
+            />
             <span class="vs__activation-label">{{ mode.label }}</span>
           </label>
         </div>
         <div v-if="activationMode === 'wake_word'" class="vs__wake-word-row">
           <label class="settings-field">
             <span class="settings-field__label">Parola di attivazione</span>
-            <input v-model="wakeWord" type="text" class="settings-field__input" placeholder="alice"
-              aria-label="Parola di attivazione" @change="save" />
+            <input
+              v-model="wakeWord"
+              type="text"
+              class="settings-field__input"
+              placeholder="alice"
+              aria-label="Parola di attivazione"
+              @change="save"
+            />
           </label>
         </div>
       </section>
@@ -446,7 +562,9 @@ async function save(): Promise<void> {
   border: 1px solid var(--border);
   background: var(--surface-2);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
   font-size: var(--text-sm);
 }
 
@@ -558,5 +676,4 @@ async function save(): Promise<void> {
   color: var(--text-muted);
   flex: 1;
 }
-
 </style>

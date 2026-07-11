@@ -872,6 +872,7 @@
       "EventsServerMessage": {
         "discriminator": {
           "mapping": {
+            "artifact.bulk_deleted": "#/components/schemas/WsArtifactBulkDeleted",
             "artifact.created": "#/components/schemas/WsArtifactCreated",
             "artifact.deleted": "#/components/schemas/WsArtifactDeleted",
             "artifact.updated": "#/components/schemas/WsArtifactUpdated",
@@ -946,6 +947,9 @@
           },
           {
             "$ref": "#/components/schemas/WsArtifactDeleted"
+          },
+          {
+            "$ref": "#/components/schemas/WsArtifactBulkDeleted"
           },
           {
             "$ref": "#/components/schemas/WsTasksUpdated"
@@ -2579,6 +2583,64 @@
           "message"
         ],
         "title": "WsAgentWarning",
+        "type": "object"
+      },
+      "WsArtifactBulkDeleted": {
+        "additionalProperties": false,
+        "description": "Bulk artifact deletion (conversation cleanup or full wipe).\n\n``conversation_id`` is ``None`` for the delete-all wipe.  Pinned\nartifacts of a deleted conversation survive detached\n(``conversation_id=NULL``) and are NOT listed in ``artifact_ids``.",
+        "properties": {
+          "artifact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Artifact Ids",
+            "type": "array"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.bulk_deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_ids"
+        ],
+        "title": "WsArtifactBulkDeleted",
         "type": "object"
       },
       "WsArtifactCreated": {

@@ -47,7 +47,7 @@ export interface SentencePacer {
 export function useSentencePacer(
   source: Ref<string>,
   streaming: Ref<boolean>,
-  options: SentencePacerOptions = {},
+  options: SentencePacerOptions = {}
 ): SentencePacer {
   const intervalMs = options.intervalMs ?? 350
   const displayed = ref('')
@@ -103,7 +103,7 @@ export function useSentencePacer(
       if (isStreaming) ensureTimer()
       else flush()
     },
-    { immediate: true },
+    { immediate: true }
   )
 
   function reset(): void {

@@ -95,8 +95,10 @@ export function useEventsWebSocket(): {
     'service.model_download_progress': (msg) => servicesStore.onDownloadProgress(msg),
     'knowledge.status': (msg) => servicesStore.onKnowledgeStatus(msg),
     'artifact.created': (msg) => void artifactsStore.fetchById(msg.artifact_id),
-    'artifact.updated': (msg) => void artifactsStore.refreshById(msg.artifact_id),
+    'artifact.updated': (msg) => void artifactsStore.applyArtifactUpdated(msg.artifact_id),
     'artifact.deleted': (msg) => artifactsStore.removeLocal(msg.artifact_id),
+    'artifact.bulk_deleted': (msg) =>
+      artifactsStore.applyBulkDeleted(msg.conversation_id ?? null, msg.artifact_ids),
     'tasks.updated': (msg) => tasksStore.applyTasksUpdated(msg),
     'plan_document.updated': (msg) => planDocumentStore.applyPlanDocumentUpdated(msg),
     'scope.updated': (msg) => scopeStore.applyScopeUpdated(msg),

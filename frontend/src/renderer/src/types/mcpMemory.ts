@@ -18,6 +18,9 @@ export type KGRelation = ApiSchema<'KGRelationRead'>
 /** The full knowledge graph structure (entities + relations). */
 export type KGGraph = ApiSchema<'KGGraphResponse'>
 
+/** Mutation acknowledgement for the 6 KG mutation endpoints. */
+export type KGMutationResponse = ApiSchema<'KGMutationResponse'>
+
 // ── Request payloads ──────────────────────────────────────────────────────
 
 /** Payload for creating entities. */

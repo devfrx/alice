@@ -86,7 +86,7 @@ export const useServicesStore = defineStore('services', () => {
   })
 
   const hasDegraded = computed(() =>
-    services.value.some((s) => s.status === 'degraded' || s.status === 'down'),
+    services.value.some((s) => s.status === 'degraded' || s.status === 'down')
   )
 
   // ----- Actions ---------------------------------------------------------
@@ -107,7 +107,7 @@ export const useServicesStore = defineStore('services', () => {
 
   async function restart(name: string): Promise<void> {
     const r = await fetch(`${API}/services/${encodeURIComponent(name)}/restart`, {
-      method: 'POST',
+      method: 'POST'
     })
     if (!r.ok) {
       const detail = await r
@@ -121,7 +121,7 @@ export const useServicesStore = defineStore('services', () => {
 
   async function stop(name: string): Promise<void> {
     const r = await fetch(`${API}/services/${encodeURIComponent(name)}/stop`, {
-      method: 'POST',
+      method: 'POST'
     })
     if (!r.ok) {
       const detail = await r
@@ -140,10 +140,7 @@ export const useServicesStore = defineStore('services', () => {
     catalogs.value = { ...catalogs.value, [serviceName]: data.models }
   }
 
-  async function downloadModel(
-    serviceName: 'stt' | 'tts',
-    modelId: string,
-  ): Promise<void> {
+  async function downloadModel(serviceName: 'stt' | 'tts', modelId: string): Promise<void> {
     const key = `${serviceName}:${modelId}`
     downloads.value = {
       ...downloads.value,
@@ -153,12 +150,12 @@ export const useServicesStore = defineStore('services', () => {
         downloaded_bytes: 0,
         total_bytes: 0,
         phase: 'downloading',
-        file: '',
-      },
+        file: ''
+      }
     }
     const r = await fetch(
       `${API}/services/${serviceName}/models/${encodeURIComponent(modelId)}/download`,
-      { method: 'POST' },
+      { method: 'POST' }
     )
     if (!r.ok) {
       delete downloads.value[key]
@@ -171,8 +168,8 @@ export const useServicesStore = defineStore('services', () => {
         ...downloads.value,
         [key]: {
           ...downloads.value[key],
-          phase: 'completed',
-        },
+          phase: 'completed'
+        }
       }
       await loadCatalog(serviceName)
     }
@@ -180,16 +177,13 @@ export const useServicesStore = defineStore('services', () => {
 
   async function configureTrellis(
     serviceName: 'trellis' | 'trellis2' | 'trellis2multiview',
-    payload: Record<string, unknown>,
+    payload: Record<string, unknown>
   ): Promise<void> {
-    const r = await fetch(
-      `${API}/services/${encodeURIComponent(serviceName)}/configure`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      },
-    )
+    const r = await fetch(`${API}/services/${encodeURIComponent(serviceName)}/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
     if (!r.ok) {
       const detail = await r
         .json()
@@ -201,22 +195,18 @@ export const useServicesStore = defineStore('services', () => {
   }
 
   async function loadTrellisConfig(
-    serviceName: 'trellis' | 'trellis2' | 'trellis2multiview',
+    serviceName: 'trellis' | 'trellis2' | 'trellis2multiview'
   ): Promise<Record<string, unknown>> {
-    const r = await fetch(
-      `${API}/services/${encodeURIComponent(serviceName)}/config`,
-    )
+    const r = await fetch(`${API}/services/${encodeURIComponent(serviceName)}/config`)
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const body = (await r.json()) as { config: Record<string, unknown> }
     return body.config
   }
 
   async function loadTrellisGuide(
-    serviceName: 'trellis2' | 'trellis2multiview' = 'trellis2',
+    serviceName: 'trellis2' | 'trellis2multiview' = 'trellis2'
   ): Promise<string> {
-    const r = await fetch(
-      `${API}/services/${encodeURIComponent(serviceName)}/setup-guide`,
-    )
+    const r = await fetch(`${API}/services/${encodeURIComponent(serviceName)}/setup-guide`)
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const body = (await r.json()) as { content: string }
     return body.content
@@ -238,7 +228,7 @@ export const useServicesStore = defineStore('services', () => {
       ...services.value[idx],
       status,
       detail: payload.detail ?? null,
-      last_check: timestamp ?? services.value[idx].last_check,
+      last_check: timestamp ?? services.value[idx].last_check
     }
   }
 
@@ -247,7 +237,7 @@ export const useServicesStore = defineStore('services', () => {
       ready: !!payload.ready,
       reason: payload.reason ?? '',
       memory_enabled: !!payload.memory_enabled,
-      tool_rag_enabled: !!payload.tool_rag_enabled,
+      tool_rag_enabled: !!payload.tool_rag_enabled
     }
   }
 
@@ -261,7 +251,7 @@ export const useServicesStore = defineStore('services', () => {
       total_bytes: payload.total_bytes ?? 0,
       phase: (payload.phase ?? 'downloading') as DownloadProgress['phase'],
       file: payload.file ?? '',
-      error: payload.error ?? undefined,
+      error: payload.error ?? undefined
     }
     downloads.value = { ...downloads.value, [key]: progress }
     if (progress.phase === 'completed') {
@@ -325,6 +315,6 @@ export const useServicesStore = defineStore('services', () => {
     onKnowledgeStatus,
     // poll back-off
     noteStatus,
-    nextPollDelay,
+    nextPollDelay
   }
 })

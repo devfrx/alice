@@ -24,7 +24,7 @@
  *   `DELETE` rejected with {@link ApiError} `status === 409` ("scope_locked") is
  *   caught and surfaced as a transient inline message (~5s auto-clear).
  *
- * Not mounted anywhere yet — it will be embedded in ChatInput in a later task.
+ * Mounted in the Horizon cockpit ({@link HorizonCockpit}) next to the composer.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
@@ -49,7 +49,7 @@ const scopeStore = useScopeStore()
 
 /** Scope folders for the subject conversation (empty when none). */
 const folders = computed<string[]>(() =>
-  props.conversationId ? scopeStore.foldersFor(props.conversationId) : [],
+  props.conversationId ? scopeStore.foldersFor(props.conversationId) : []
 )
 
 /** Compact chip label + empty flag (amber styling when empty). */
@@ -100,7 +100,7 @@ watch(
   (id) => {
     isOpen.value = false
     load(id)
-  },
+  }
 )
 onBeforeUnmount(() => {
   if (errorTimer) clearTimeout(errorTimer)
@@ -142,7 +142,12 @@ async function addFolder(): Promise<void> {
 async function removeFolder(target: string): Promise<void> {
   const id = props.conversationId
   if (!id || !canEdit.value) return
-  await mutate(() => scopeStore.setFolders(id, folders.value.filter((f) => f !== target)))
+  await mutate(() =>
+    scopeStore.setFolders(
+      id,
+      folders.value.filter((f) => f !== target)
+    )
+  )
 }
 
 /** Clear all folders from the scope. */

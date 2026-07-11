@@ -11,20 +11,23 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { usePermissionModeStore, DEFAULT_PERMISSION_MODE } from './permissionMode'
-import { api } from '../services/api'
+import { permissionsApi } from '../services/api'
 import type { PermissionModeResponse } from '../types/permission'
 
 vi.mock('../services/api', () => ({
-  api: {
+  permissionsApi: {
     getPermissionMode: vi.fn(),
-    setPermissionMode: vi.fn(),
-  },
+    setPermissionMode: vi.fn()
+  }
 }))
 
-const getMock = vi.mocked(api.getPermissionMode)
-const setMock = vi.mocked(api.setPermissionMode)
+const getMock = vi.mocked(permissionsApi.getPermissionMode)
+const setMock = vi.mocked(permissionsApi.setPermissionMode)
 
-function res(conversation_id: string, mode: PermissionModeResponse['mode']): PermissionModeResponse {
+function res(
+  conversation_id: string,
+  mode: PermissionModeResponse['mode']
+): PermissionModeResponse {
   return { conversation_id, mode }
 }
 

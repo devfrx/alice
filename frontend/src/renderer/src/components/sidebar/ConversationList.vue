@@ -53,9 +53,7 @@ const containerHeight = ref(0)
 
 const totalHeight = computed(() => props.conversations.length * ITEM_HEIGHT)
 
-const startIndex = computed(() =>
-  Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT) - BUFFER)
-)
+const startIndex = computed(() => Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT) - BUFFER))
 const endIndex = computed(() =>
   Math.min(
     props.conversations.length,
@@ -201,67 +199,128 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
     <div class="conv-list__header">
       <span class="conv-list__title">Conversazioni</span>
       <div class="conv-list__header-actions">
-        <button class="conv-list__header-btn" aria-label="Nuova chat" title="Nuova chat" @click="emit('create')">
+        <button
+          class="conv-list__header-btn"
+          aria-label="Nuova chat"
+          title="Nuova chat"
+          @click="emit('create')"
+        >
           <AppIcon name="plus" :size="12" />
         </button>
-        <button v-if="conversations.length > 0" class="conv-list__header-btn" aria-label="Backup di tutte le conversazioni"
-          title="Backup di tutte le conversazioni" @click="emit('backup-all')">
+        <button
+          v-if="conversations.length > 0"
+          class="conv-list__header-btn"
+          aria-label="Backup di tutte le conversazioni"
+          title="Backup di tutte le conversazioni"
+          @click="emit('backup-all')"
+        >
           <AppIcon name="folder" :size="11" />
         </button>
-        <button v-if="conversations.length > 0" class="conv-list__header-btn conv-list__header-btn--danger"
-          aria-label="Elimina tutte le conversazioni" title="Elimina tutte" @click="emit('delete-all')">
+        <button
+          v-if="conversations.length > 0"
+          class="conv-list__header-btn conv-list__header-btn--danger"
+          aria-label="Elimina tutte le conversazioni"
+          title="Elimina tutte"
+          @click="emit('delete-all')"
+        >
           <AppIcon name="trash" :size="11" />
         </button>
       </div>
     </div>
 
     <!-- Virtual-scrolled conversation list -->
-    <div ref="scrollContainer" class="conv-list__scroller" role="listbox" aria-label="Conversazioni" tabindex="0"
-      @scroll="onScroll" @keydown="handleListKeydown">
+    <div
+      ref="scrollContainer"
+      class="conv-list__scroller"
+      role="listbox"
+      aria-label="Conversazioni"
+      tabindex="0"
+      @scroll="onScroll"
+      @keydown="handleListKeydown"
+    >
       <div class="conv-list__spacer" :style="{ height: totalHeight + 'px' }" role="presentation">
-        <div v-for="{ conv, index, offset } in visibleItems" :key="conv.id" class="conv-item" :class="{
-          'conv-item--active': conv.id === activeId,
-          'conv-item--streaming': conv.id === streamingId,
-          'conv-item--focused': index === focusedIndex
-        }" role="option" :aria-selected="conv.id === activeId" :style="{ transform: `translateY(${offset}px)` }"
-          @click="emit('select', conv.id)">
-
+        <div
+          v-for="{ conv, index, offset } in visibleItems"
+          :key="conv.id"
+          class="conv-item"
+          :class="{
+            'conv-item--active': conv.id === activeId,
+            'conv-item--streaming': conv.id === streamingId,
+            'conv-item--focused': index === focusedIndex
+          }"
+          role="option"
+          :aria-selected="conv.id === activeId"
+          :style="{ transform: `translateY(${offset}px)` }"
+          @click="emit('select', conv.id)"
+        >
           <!-- Normal display -->
           <template v-if="renamingId !== conv.id">
             <span class="conv-item__title">
-              <span v-if="conv.id === streamingId" class="conv-item__streaming-dot" role="img"
-                aria-label="Generazione in corso" />
+              <span
+                v-if="conv.id === streamingId"
+                class="conv-item__streaming-dot"
+                role="img"
+                aria-label="Generazione in corso"
+              />
               {{ conv.title ?? 'Nuova conversazione' }}
             </span>
             <div class="conv-item__meta">
-              <span v-if="conv.message_count > 0" class="conv-item__count">{{ conv.message_count }}</span>
+              <span v-if="conv.message_count > 0" class="conv-item__count">{{
+                conv.message_count
+              }}</span>
               <span class="conv-item__time">{{ timeAgo(conv.updated_at) }}</span>
             </div>
           </template>
 
           <!-- Inline rename -->
           <template v-else>
-            <input :ref="(el) => setRenameInput(el as Element | null)" v-model="renameValue" class="conv-item__rename-input"
-              aria-label="Rinomina conversazione" @keydown.enter.stop="confirmRename(conv.id)"
-              @keydown.escape.stop="cancelRename" @click.stop />
+            <input
+              :ref="(el) => setRenameInput(el as Element | null)"
+              v-model="renameValue"
+              class="conv-item__rename-input"
+              aria-label="Rinomina conversazione"
+              @keydown.enter.stop="confirmRename(conv.id)"
+              @keydown.escape.stop="cancelRename"
+              @click.stop
+            />
           </template>
 
           <!-- Action buttons (slide-in on hover) -->
           <div class="conv-item__actions" @click.stop>
-            <button v-if="renamingId !== conv.id" class="conv-item__action" aria-label="Esporta conversazione"
-              title="Esporta backup JSON" @click="emit('export', conv.id)">
+            <button
+              v-if="renamingId !== conv.id"
+              class="conv-item__action"
+              aria-label="Esporta conversazione"
+              title="Esporta backup JSON"
+              @click="emit('export', conv.id)"
+            >
               <AppIcon name="folder" :size="11" />
             </button>
-            <button v-if="renamingId !== conv.id" class="conv-item__action" aria-label="Rinomina conversazione"
-              title="Rinomina" @click="startRename(conv)">
+            <button
+              v-if="renamingId !== conv.id"
+              class="conv-item__action"
+              aria-label="Rinomina conversazione"
+              title="Rinomina"
+              @click="startRename(conv)"
+            >
               <AppIcon name="pencil" :size="11" />
             </button>
-            <button v-if="renamingId === conv.id" class="conv-item__action conv-item__action--confirm"
-              aria-label="Conferma" title="Conferma" @click="confirmRename(conv.id)">
+            <button
+              v-if="renamingId === conv.id"
+              class="conv-item__action conv-item__action--confirm"
+              aria-label="Conferma"
+              title="Conferma"
+              @click="confirmRename(conv.id)"
+            >
               <AppIcon name="check" :size="11" :stroke-width="2.5" />
             </button>
-            <button class="conv-item__action conv-item__action--danger" aria-label="Elimina conversazione"
-              title="Elimina" :disabled="conv.id === streamingId" @click="emit('delete', conv.id)">
+            <button
+              class="conv-item__action conv-item__action--danger"
+              aria-label="Elimina conversazione"
+              title="Elimina"
+              :disabled="conv.id === streamingId"
+              @click="emit('delete', conv.id)"
+            >
               <AppIcon name="trash" :size="11" />
             </button>
           </div>
@@ -307,7 +366,7 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   flex: 1;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.10em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -523,7 +582,9 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   font-size: var(--text-sm);
   font-family: var(--font-sans);
   outline: none;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .conv-item__rename-input:focus {

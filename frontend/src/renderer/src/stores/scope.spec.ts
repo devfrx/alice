@@ -12,18 +12,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useScopeStore } from './scope'
-import { api, ApiError } from '../services/api'
+import { scopeApi, ApiError } from '../services/api'
 import type { ScopeResponse } from '../types/scope'
 
-// The store imports `{ api }` from services/api; stub just the scope methods so
-// fetch / ensureForConversation / setFolders / clear resolve without reaching a
-// backend. A minimal `ApiError` is also exported from the mock so the 409
-// `scope_locked` conflict can be simulated and asserted on.
+// The store imports `{ scopeApi }` from services/api; stub just the scope
+// methods so fetch / ensureForConversation / setFolders / clear resolve
+// without reaching a backend. A minimal `ApiError` is also exported from the
+// mock so the 409 `scope_locked` conflict can be simulated and asserted on.
 vi.mock('../services/api', () => {
   class ApiError extends Error {
     constructor(
       public status: number,
-      message: string,
+      message: string
     ) {
       super(message)
       this.name = 'ApiError'
@@ -31,17 +31,17 @@ vi.mock('../services/api', () => {
   }
   return {
     ApiError,
-    api: {
+    scopeApi: {
       getScope: vi.fn(),
       setScope: vi.fn(),
-      clearScope: vi.fn(),
-    },
+      clearScope: vi.fn()
+    }
   }
 })
 
-const getScopeMock = vi.mocked(api.getScope)
-const setScopeMock = vi.mocked(api.setScope)
-const clearScopeMock = vi.mocked(api.clearScope)
+const getScopeMock = vi.mocked(scopeApi.getScope)
+const setScopeMock = vi.mocked(scopeApi.setScope)
+const clearScopeMock = vi.mocked(scopeApi.clearScope)
 
 function scopeRes(conversationId: string, folders: string[], isIdle = true): ScopeResponse {
   return { conversation_id: conversationId, folders, is_idle: isIdle }

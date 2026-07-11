@@ -8,7 +8,7 @@
 
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api } from '../services/api'
+import { mcpMemoryApi } from '../services/api'
 import type { KGEntity, KGGraph, KGRelation } from '../types/mcpMemory'
 
 export const useMcpMemoryStore = defineStore('mcpMemory', () => {
@@ -50,7 +50,7 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
     loading.value = true
     error.value = null
     try {
-      const graph = await api.getKnowledgeGraph()
+      const graph = await mcpMemoryApi.getKnowledgeGraph()
       _applyGraph(graph)
     } catch (err) {
       _setError(err)
@@ -64,7 +64,7 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
     loading.value = true
     error.value = null
     try {
-      const graph = await api.searchKnowledgeGraph(query)
+      const graph = await mcpMemoryApi.searchKnowledgeGraph(query)
       searchEntities.value = graph.entities ?? []
       searchRelations.value = graph.relations ?? []
     } catch (err) {
@@ -76,11 +76,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
 
   /** Create new entities and reload the graph. */
   async function createEntities(
-    items: { name: string; entityType: string; observations: string[] }[],
+    items: { name: string; entityType: string; observations: string[] }[]
   ): Promise<void> {
     error.value = null
     try {
-      await api.createKGEntities({ entities: items })
+      await mcpMemoryApi.createKGEntities({ entities: items })
       await loadGraph()
     } catch (err) {
       _setError(err)
@@ -91,7 +91,7 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
   async function deleteEntities(names: string[]): Promise<void> {
     error.value = null
     try {
-      await api.deleteKGEntities({ entityNames: names })
+      await mcpMemoryApi.deleteKGEntities({ entityNames: names })
       await loadGraph()
     } catch (err) {
       _setError(err)
@@ -100,11 +100,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
 
   /** Create relations between entities and reload. */
   async function createRelations(
-    items: { from: string; to: string; relationType: string }[],
+    items: { from: string; to: string; relationType: string }[]
   ): Promise<void> {
     error.value = null
     try {
-      await api.createKGRelations({ relations: items })
+      await mcpMemoryApi.createKGRelations({ relations: items })
       await loadGraph()
     } catch (err) {
       _setError(err)
@@ -113,11 +113,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
 
   /** Delete specific relations and reload. */
   async function deleteRelations(
-    items: { from: string; to: string; relationType: string }[],
+    items: { from: string; to: string; relationType: string }[]
   ): Promise<void> {
     error.value = null
     try {
-      await api.deleteKGRelations({ relations: items })
+      await mcpMemoryApi.deleteKGRelations({ relations: items })
       await loadGraph()
     } catch (err) {
       _setError(err)
@@ -125,14 +125,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
   }
 
   /** Add observations to an existing entity and reload. */
-  async function addObservations(
-    entityName: string,
-    contents: string[],
-  ): Promise<void> {
+  async function addObservations(entityName: string, contents: string[]): Promise<void> {
     error.value = null
     try {
-      await api.addKGObservations({
-        observations: [{ entityName, contents }],
+      await mcpMemoryApi.addKGObservations({
+        observations: [{ entityName, contents }]
       })
       await loadGraph()
     } catch (err) {
@@ -141,14 +138,11 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
   }
 
   /** Remove specific observations from an entity and reload. */
-  async function deleteObservations(
-    entityName: string,
-    observations: string[],
-  ): Promise<void> {
+  async function deleteObservations(entityName: string, observations: string[]): Promise<void> {
     error.value = null
     try {
-      await api.deleteKGObservations({
-        deletions: [{ entityName, observations }],
+      await mcpMemoryApi.deleteKGObservations({
+        deletions: [{ entityName, observations }]
       })
       await loadGraph()
     } catch (err) {
@@ -183,6 +177,6 @@ export const useMcpMemoryStore = defineStore('mcpMemory', () => {
     deleteRelations,
     addObservations,
     deleteObservations,
-    clearSearch,
+    clearSearch
   }
 })

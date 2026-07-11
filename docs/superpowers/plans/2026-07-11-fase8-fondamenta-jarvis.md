@@ -2600,13 +2600,16 @@ git commit -m "docs: fondamenta Jarvis in CLAUDE.md + flag registry (fase 8)"
 
 ## Gate finale di fase (criteri §9)
 
-- [ ] Test mirati fase 8 tutti verdi: `tests/test_background_tasks.py tests/test_attention_service.py tests/test_trigger_service.py tests/test_headless_turn.py tests/test_voice_trim.py tests/test_agent_plugin.py tests/test_permission_service.py tests/contracts/` (da `backend/`).
-- [ ] `tests/test_app.py` verde (app avviabile con stage_jarvis).
-- [ ] `lint-imports` verde dalla repo root.
-- [ ] FE: `npm run typecheck` + `npm run lint` (0/0) + `npm test` verdi.
-- [ ] `check-contracts.ps1` verde DOPO l'ultimo commit.
-- [ ] `git ls-files --eol` senza flip EOL sui file toccati.
-- [ ] Review FINALE di fase (modello top, range intero `main..HEAD`, angolo cross-task) — SEMPRE, anche se i task-review sono verdi.
+> **Verdetto review finale (2026-07-11, modello top, range `32ce1e9..d3e5420`): «Phase ready with notes».**
+> Nessun finding bloccante. Catene cross-task verificate end-to-end: osservabilità (service→bus→bridge→frame→tipi→store, campi/nullabilità coerenti in ogni punto), voce (il campo `source` sopravvive dal FE fino a `_apply_voice_trim`, nessun punto di perdita; `limit_tools` non taglia gli `always_offered`), trigger→headless (firme/kwargs combacianti, `conversation_id: str | None` coerente), interazioni tra fix di review corrette (F1 è sottoinsieme di allow-list+blocklist; M2 non tocca i meta-tool). Copertura spec §8 COMPLETA. Note non bloccanti N1-N3 registrate nel backlog (14-16); N4 = gemello di F6 già a backlog.
+
+- [x] Test mirati fase 8 tutti verdi: **189 passed** (controller) — `tests/test_background_tasks.py tests/test_attention_service.py tests/test_trigger_service.py tests/test_headless_turn.py tests/test_voice_trim.py tests/test_agent_plugin.py tests/test_permission_service.py tests/contracts/`.
+- [x] `tests/test_app.py` verde: **5 passed** (boot con stage_jarvis, 129s).
+- [x] `lint-imports` verde: **6 kept / 0 broken**.
+- [x] FE: typecheck **0 err** + lint **0/0** + vitest **304/304**.
+- [x] `check-contracts.ps1` verde DOPO l'ultimo commit («Contracts are up to date»; doppia verifica read-only del reviewer: entrambi gli artifact FRESH a byte-diff).
+- [x] `git ls-files --eol` senza flip EOL sui file toccati (un incidente CRLF da `Add-Content` su `test_trigger_service.py` rilevato e normalizzato PRIMA del commit).
+- [x] Review FINALE di fase (top, range intero, angolo cross-task): **«Phase ready with notes»**.
 - [ ] Smoke funzionale interattivo (`npm run dev`): PENDENTE anche per fasi 6 e 7 — alla prima apertura eseguire le TRE checklist (gate finale piano 6, step 9.6 piano 7, e per la fase 8: toast attention visibile forzando un `attention.raised` dal backend, store backgroundTasks popolato da uno spawn_subagent, turno voce con toolset ridotto nei log).
 
 ## Backlog fase 8 (fuori scope, registrare nell'handoff)
@@ -2624,3 +2627,6 @@ git commit -m "docs: fondamenta Jarvis in CLAUDE.md + flag registry (fase 8)"
 11. (Review Task 5) `run_headless_turn`: nessun cap lunghezza prompt (il path WS applica `_MAX_USER_MESSAGE_LENGTH`) e nessun `cancel_event`/timeout per-turno esposto — aggiungere quando i trigger diventeranno user-configurabili.
 12. (Review Task 6+8, F6 — PRE-esistente, condiviso col turno normale) Bypass del gate via bare-name: il gate risolve `get_tool_definition(name)` senza fallback suffisso ma `execute_tool` risolve i bare-name per suffisso unico → `tool_def=None` al gate (ALLOW) con esecuzione del tool reale. Risolvere il nome PRIMA del gate (tool_loop.py:632 e _subagent) o gateare post-risoluzione dentro execute_tool.
 13. (Review Task 6+8, F4 nota) L'anti-eco sugli eventi bus dipende dalla disciplina degli emettitori: oggi solo BackgroundTaskService tagga `origin="agent"`; gli eventi emessi dai tool durante un turno autonomo (email.sent, note.created, …) non portano origin — estendere la convenzione agli emettitori quando i trigger event-driven verranno usati davvero.
+14. (Review finale N1) Subagent con `stop_reason` timeout/max_steps → `bts.complete(detail=stop_reason)`: un timeout appare «completed» nello store FE (info solo nel detail) — rivedere con la UI dedicata (voce 6).
+15. (Review finale N2, cosmetic) Asimmetria di bookkeeping in `_subagent.py`: il ramo denial appende a `tools_called`, il ramo unoffered no.
+16. (Review finale N3) `_fire`: `run_headless_turn` che ritorna `None` (assembly fallita, es. conversation_id invalido nella TriggerSpec) marca il task «completed» e l'attention annuncia un turno riuscito — distinguere quando i trigger diventeranno user-configurabili (si aggancia alla voce 11).

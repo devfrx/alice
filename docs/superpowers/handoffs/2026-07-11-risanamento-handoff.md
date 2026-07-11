@@ -79,6 +79,11 @@
 
 ## Prossimo lavoro: Fase 7 — Command Bridge (spec §7, riga 216)
 
+> **ATTENZIONE, collisione di nomi**: nel codice e nelle memorie esiste un ALTRO "Fase 7" — la
+> fase 7 del VECCHIO programma agent-rework (tiered permissions + scope + PTY terminal), GIÀ
+> MERGIATA in main via `20c952d` e ampiamente citata nei commenti ("Fase 7", "Fase 7 E1").
+> Qui "Fase 7" = la fase 7 del RISANAMENTO (Command Bridge). Non confonderle.
+
 Da scrivere con `writing-plans` su branch `arch/fase7-command-bridge` (figlio di
 `arch/fase6-frontend`). Requisiti spec: tool `app_command(name, args)` di proprietà del kernel;
 manifest dei comandi come TERZO contratto (stessa pipeline di generazione/validazione); RPC

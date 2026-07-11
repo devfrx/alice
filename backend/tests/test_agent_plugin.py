@@ -740,6 +740,55 @@ class TestSpawnSubagent:
         assert result.stop_reason == "completed"
         assert progress == [(1, 3, "step 1/3")]
 
+    @pytest.mark.asyncio
+    async def test_subagent_never_executes_unoffered_tool(self):
+        """A hallucinated tool name (e.g. a blocked meta-tool) is refused at
+        the execution point, not just filtered from the offer (review F1)."""
+        ctx = _make_ctx_with_services(
+            chat_scripts=[
+                [
+                    {
+                        "type": "tool_call",
+                        "id": "call_1",
+                        "function": {
+                            "name": "agent_spawn_subagent",
+                            "arguments": "{}",
+                        },
+                    },
+                    {"type": "done", "finish_reason": "tool_calls"},
+                ],
+                [
+                    {"type": "token", "content": "could not delegate"},
+                    {"type": "done", "finish_reason": "stop"},
+                ],
+            ],
+            tools=[_tool_entry("web_search_search")],
+        )
+        executed: list[str] = []
+        original_execute = ctx.tool_registry.execute_tool
+
+        async def _spy_execute(name, args, exec_ctx):
+            executed.append(name)
+            return await original_execute(name, args, exec_ctx)
+
+        ctx.tool_registry.execute_tool = _spy_execute  # type: ignore[method-assign]
+
+        result = await run_subagent(
+            ctx=ctx,
+            task="delegate something",
+            context=None,
+            allowed_tools=None,
+            max_steps=3,
+            max_output_tokens=128,
+            timeout_seconds=10.0,
+            max_tools=8,
+            conversation_id="c",
+            session_id="s",
+        )
+        assert result.stop_reason == "completed"
+        assert executed == []
+        assert "agent_spawn_subagent" not in result.tools_called
+
 
 # ===========================================================================
 # 5.  update_tasks persistence via a wired PlanService

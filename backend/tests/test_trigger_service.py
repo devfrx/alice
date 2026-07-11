@@ -205,3 +205,57 @@ async def test_fire_emits_trigger_fired_on_bus() -> None:
     await svc.fire("t1")
     assert seen and seen[0]["trigger_id"] == "t1"
     await svc.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_schedule_loop_survives_failing_collaborator() -> None:
+    """A raising background_tasks.start must not kill the schedule loop (F3)."""
+
+    class _FailingBackgroundTasks:
+        async def start(self, **kwargs: Any) -> str:
+            raise RuntimeError("bts down")
+
+        async def complete(self, task_id: str, **kwargs: Any) -> None:
+            pass
+
+        async def fail(self, task_id: str, **kwargs: Any) -> None:
+            pass
+
+    bus = EventBus()
+    fired: list[dict[str, Any]] = []
+
+    async def _handler(**kwargs: Any) -> None:
+        fired.append(kwargs)
+
+    bus.subscribe(AliceEvent.TRIGGER_FIRED, _handler)
+    svc = _service(bus, FakeRunner(), bts=_FailingBackgroundTasks())
+    svc.register(
+        TriggerSpec(
+            trigger_id="t-tick",
+            kind="schedule",
+            conversation_id=None,
+            prompt="tick",
+            interval_s=0.05,
+        ),
+    )
+    await svc.start()
+    await asyncio.sleep(0.25)
+    await svc.shutdown()
+    # The first fire raised inside start(); the loop must have kept ticking.
+    assert len(fired) >= 2
+
+
+@pytest.mark.asyncio
+async def test_register_rejects_trigger_fired_event() -> None:
+    """Listening to trigger.fired would self-echo (F4)."""
+    svc = _service(EventBus(), FakeRunner())
+    with pytest.raises(ValueError):
+        svc.register(
+            TriggerSpec(
+                trigger_id="echo",
+                kind="event",
+                conversation_id=None,
+                prompt="x",
+                event_name="trigger.fired",
+            ),
+        )

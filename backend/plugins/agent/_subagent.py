@@ -167,6 +167,11 @@ async def _run_loop(
         {"role": "user", "content": user_block},
     ]
 
+    # Enforcement companion of _resolve_subagent_tools: the offer filter
+    # only shapes what the model SEES — a hallucinated name (e.g. a blocked
+    # meta-tool) must also be refused at the execution point.
+    offered_names = {entry["function"]["name"] for entry in tools}
+
     for step in range(max_steps):
         result.steps_used = step + 1
         if progress_cb is not None:
@@ -229,6 +234,19 @@ async def _run_loop(
                     args = {}
             except json.JSONDecodeError:
                 args = {}
+
+            if name not in offered_names:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": (
+                            f"ERROR: Tool '{name}' is not available to "
+                            "sub-agents."
+                        ),
+                    },
+                )
+                continue
 
             denial = _gate_tool_call(ctx, name, args, conversation_id)
             if denial is not None:

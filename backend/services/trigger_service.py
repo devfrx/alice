@@ -106,6 +106,10 @@ class TriggerService:
             raise ValueError("schedule triggers require a positive interval_s")
         if spec.kind == "event" and not spec.event_name:
             raise ValueError("event triggers require event_name")
+        if spec.kind == "event" and spec.event_name == AliceEvent.TRIGGER_FIRED:
+            raise ValueError(
+                "event triggers cannot listen to trigger.fired (self-echo)",
+            )
         self._triggers[spec.trigger_id] = spec
         if self._started:
             self._activate(spec)
@@ -185,7 +189,16 @@ class TriggerService:
         interval = spec.interval_s or 0.0
         while True:
             await asyncio.sleep(interval)
-            await self._fire(spec)
+            try:
+                await self._fire(spec)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A failing collaborator (background_tasks, attention, bus)
+                # must not silently kill the schedule loop.
+                logger.exception(
+                    "Trigger '{}': fire failed; loop continues", spec.trigger_id,
+                )
 
     async def _fire(self, spec: TriggerSpec) -> None:
         if not self._enabled:
@@ -222,6 +235,12 @@ class TriggerService:
                     prompt=spec.prompt,
                     origin="system",
                 )
+            except asyncio.CancelledError:
+                # unregister()/shutdown() mid-turn: the background task must
+                # still reach a terminal state (running is never pruned).
+                if self._background_tasks is not None and task_id is not None:
+                    await self._background_tasks.fail(task_id, error="cancelled")
+                raise
             except Exception as exc:
                 logger.exception(
                     "Trigger '{}': autonomous turn failed", spec.trigger_id,

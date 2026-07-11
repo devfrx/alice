@@ -18,6 +18,7 @@ flags in :class:`~backend.core.config.AgentConfig`.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -474,19 +475,26 @@ class AgentPlugin(BasePlugin):
                     bg_task_id, progress=step / max(total, 1), detail=note,
                 )
 
-        result = await run_subagent(
-            ctx=self._ctx,
-            task=task,
-            context=extra_context,
-            allowed_tools=allowed_tools,
-            max_steps=cfg.max_steps,
-            max_output_tokens=cfg.max_output_tokens,
-            timeout_seconds=cfg.timeout_seconds,
-            max_tools=cfg.max_tools,
-            conversation_id=context.conversation_id,
-            session_id=context.session_id,
-            progress_cb=_report if bts is not None else None,
-        )
+        try:
+            result = await run_subagent(
+                ctx=self._ctx,
+                task=task,
+                context=extra_context,
+                allowed_tools=allowed_tools,
+                max_steps=cfg.max_steps,
+                max_output_tokens=cfg.max_output_tokens,
+                timeout_seconds=cfg.timeout_seconds,
+                max_tools=cfg.max_tools,
+                conversation_id=context.conversation_id,
+                session_id=context.session_id,
+                progress_cb=_report if bts is not None else None,
+            )
+        except asyncio.CancelledError:
+            # Parent turn cancelled mid-run: the background task must still
+            # reach a terminal state (running tasks are never pruned).
+            if bts is not None and bg_task_id is not None:
+                await bts.fail(bg_task_id, error="cancelled")
+            raise
         elapsed = (time.perf_counter() - start) * 1000.0
 
         if bts is not None and bg_task_id is not None:

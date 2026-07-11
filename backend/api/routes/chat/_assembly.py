@@ -130,7 +130,7 @@ class TurnAssembler:
         self,
         *,
         session: Any,
-        websocket: WebSocket,
+        websocket: WebSocket | None,
         data: dict[str, Any],
         user_content: str,
     ) -> AssemblyResult | None:
@@ -140,6 +140,9 @@ class TurnAssembler:
         method sends a WS ``error`` frame and returns ``None`` — the caller
         should ``continue`` to the next message, mirroring the legacy
         inline branches exactly.
+
+        When ``websocket`` is ``None`` (headless turns) validation-failure
+        frames are skipped and the method just returns ``None``.
         """
         ctx = self._ctx
         llm = self._llm
@@ -155,9 +158,10 @@ class TurnAssembler:
             try:
                 conv_id = uuid.UUID(conv_id_raw)
             except ValueError:
-                await websocket.send_json(
-                    {"type": "error", "content": "Invalid conversation_id"}
-                )
+                if websocket is not None:
+                    await websocket.send_json(
+                        {"type": "error", "content": "Invalid conversation_id"}
+                    )
                 return None
             conv = await session.get(Conversation, conv_id)
             if conv is None:
@@ -176,9 +180,10 @@ class TurnAssembler:
             try:
                 original_msg_id = uuid.UUID(edit_message_id)
             except ValueError:
-                await websocket.send_json(
-                    {"type": "error", "content": "Invalid edit_message_id"},
-                )
+                if websocket is not None:
+                    await websocket.send_json(
+                        {"type": "error", "content": "Invalid edit_message_id"},
+                    )
                 return None
             original_msg = await session.get(Message, original_msg_id)
             if (
@@ -186,9 +191,10 @@ class TurnAssembler:
                 or original_msg.conversation_id != conv_id
                 or original_msg.role != "user"
             ):
-                await websocket.send_json(
-                    {"type": "error", "content": "Invalid edit target"},
-                )
+                if websocket is not None:
+                    await websocket.send_json(
+                        {"type": "error", "content": "Invalid edit target"},
+                    )
                 return None
 
             # Assign a version_group_id to the original if it
@@ -618,9 +624,10 @@ class TurnAssembler:
                 ctx.config.llm.context_compression_enabled
                 and ctx.context_manager.should_compress(usage_est)
             ):
-                await websocket.send_json(
-                    {"type": "context_compression_start"},
-                )
+                if websocket is not None:
+                    await websocket.send_json(
+                        {"type": "context_compression_start"},
+                    )
                 try:
                     comp = await ctx.context_manager.compress(
                         messages,
@@ -653,40 +660,43 @@ class TurnAssembler:
                     session.add(summary_msg)
                     await session.flush()
 
-                    await websocket.send_json({
-                        "type": "context_compression_done",
-                        "messages_summarized": (
-                            comp.usage.messages_summarized
-                        ),
-                        "summary_message_id": str(summary_msg.id),
-                    })
+                    if websocket is not None:
+                        await websocket.send_json({
+                            "type": "context_compression_done",
+                            "messages_summarized": (
+                                comp.usage.messages_summarized
+                            ),
+                            "summary_message_id": str(summary_msg.id),
+                        })
                     # Re-estimate after compression.
                     usage_est = comp.usage
                 except Exception as exc:
                     logger.warning(
                         "Context compression failed: {}", exc,
                     )
-                    await websocket.send_json(
-                        {"type": "context_compression_failed"},
-                    )
+                    if websocket is not None:
+                        await websocket.send_json(
+                            {"type": "context_compression_failed"},
+                        )
                     comp = None
 
             # Send initial context_info.
-            await websocket.send_json({
-                "type": "context_info",
-                "used": usage_est.used_tokens,
-                "available": usage_est.available_tokens,
-                "context_window": context_window,
-                "percentage": usage_est.percentage,
-                "was_compressed": comp is not None,
-                "messages_summarized": (
-                    comp.usage.messages_summarized if comp else 0
-                ),
-                "is_estimated": usage_est.is_estimated,
-                "breakdown": _compute_context_breakdown(
-                    messages, _tool_tokens, ctx.context_manager,
-                ),
-            })
+            if websocket is not None:
+                await websocket.send_json({
+                    "type": "context_info",
+                    "used": usage_est.used_tokens,
+                    "available": usage_est.available_tokens,
+                    "context_window": context_window,
+                    "percentage": usage_est.percentage,
+                    "was_compressed": comp is not None,
+                    "messages_summarized": (
+                        comp.usage.messages_summarized if comp else 0
+                    ),
+                    "is_estimated": usage_est.is_estimated,
+                    "breakdown": _compute_context_breakdown(
+                        messages, _tool_tokens, ctx.context_manager,
+                    ),
+                })
 
         # Resolve max_output_tokens once when the global cap is
         # unset — mirrors the legacy ``_stream_and_collect`` logic.

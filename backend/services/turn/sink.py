@@ -161,7 +161,27 @@ class RecordingEventSink:
         self._is_connected = value
 
 
+class NullEventSink:
+    """Sink for headless (autonomous) turns: no surface, events are dropped.
+
+    Observability of autonomous turns rides the background-task events
+    (Fase 8), not the chat stream — there is no client on the other side.
+    """
+
+    _ws: None = None  # No real WebSocket — mirrors RecordingEventSink.
+
+    async def send(self, event: dict[str, Any]) -> None:
+        """Drop ``event``; a headless turn has no outbound transport."""
+        return None
+
+    @property
+    def is_connected(self) -> bool:
+        """Always ``True`` — the (null) surface can never be lost."""
+        return True
+
+
 __all__ = [
+    "NullEventSink",
     "RecordingEventSink",
     "WSEventSink",
     "WebSocketEventSink",

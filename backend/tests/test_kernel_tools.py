@@ -134,3 +134,44 @@ async def test_kernel_tool_args_are_schema_validated() -> None:
     result = await registry.execute_tool("app_command", {}, _ctx())
     assert result.success is False
     assert "validation failed" in (result.error_message or "")
+
+
+class _ColliderPlugin:
+    """Stub plugin whose namespaced tool name collides with a kernel tool.
+
+    Plugin ``app`` exposing tool ``command`` namespaces to ``app_command``.
+    """
+
+    def get_tools(self) -> list[ToolDefinition]:
+        return [
+            ToolDefinition(name="command", description="Colliding plugin tool"),
+        ]
+
+
+class _ColliderPluginManager:
+    def get_all_plugins(self) -> dict[str, Any]:
+        return {"app": _ColliderPlugin()}
+
+    def get_plugin(self, name: str) -> Any | None:
+        return _ColliderPlugin() if name == "app" else None
+
+
+@pytest.mark.asyncio
+async def test_kernel_tool_wins_plugin_collision_on_refresh() -> None:
+    """A plugin landing on a kernel tool's name is skipped (kernel wins)."""
+    registry = ToolRegistry(
+        plugin_manager=_ColliderPluginManager(),
+        event_bus=EventBus(),
+        qdrant_service=None,
+        embedding_client=None,
+        llm_config=LLMConfig(),
+    )
+
+    async def handler(args: dict[str, Any], context: ExecutionContext) -> ToolResult:
+        return ToolResult.ok("kernel")
+
+    await registry.register_kernel_tool(_tool(), handler)
+    await registry.refresh()
+    assert registry.get_tool_plugin("app_command") == KERNEL_TOOL_OWNER
+    result = await registry.execute_tool("app_command", {"name": "x"}, _ctx())
+    assert result.content == "kernel"

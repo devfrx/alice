@@ -112,8 +112,22 @@ class ToolCatalog:
         and survive :meth:`refresh`. Re-registration replaces definition and
         handler in place (the Command Bridge re-registers ``app_command`` on
         every manifest update to refresh the name enum).
+
+        Note: registration does NOT re-embed for tool-RAG (only ``refresh``
+        does) — fine for ``always_offered`` tools, which bypass retrieval; a
+        future non-always-offered kernel tool would get stale retrieval.
         """
         async with self._lock:
+            if (
+                tool_def.name in self._tools
+                and tool_def.name not in self._kernel_handlers
+            ):
+                self._logger.warning(
+                    "Kernel tool '{}' overrides an existing plugin tool "
+                    "(owner '{}') — the plugin tool becomes unreachable",
+                    tool_def.name,
+                    self._tool_to_plugin.get(tool_def.name),
+                )
             self._kernel_tools[tool_def.name] = tool_def
             self._kernel_handlers[tool_def.name] = handler
             self._tools[tool_def.name] = tool_def
@@ -248,8 +262,10 @@ class ToolCatalog:
         Returns:
             List of tool dicts (shallow copy).
         """
-        # _openai_cache is replaced atomically in refresh(); a snapshot
-        # via list() is safe without the async lock in sync context.
+        # _openai_cache is replaced atomically in refresh() and mutated
+        # in place by register_kernel_tool — but only under the lock and
+        # never across an await, so a list() snapshot is safe without the
+        # async lock in sync context.
         return list(self._openai_cache)
 
     def get_tool_plugin(self, tool_name: str) -> str | None:

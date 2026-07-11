@@ -243,6 +243,10 @@ class PermissionService:
 
         1. forbidden risk → DENY (breaker).
         2. explicit ``deny`` rule → DENY (a user prohibition wins everywhere).
+        2-bis. ``ui_command`` tool without fs/exec capabilities → the §7
+           matrix on the invoked command's manifest tag
+           (:meth:`_decide_ui_command`); a hybrid with fs/exec capabilities
+           falls through to the scope guard below.
         3. fs tool with no scope set → DENY (scope is the workspace boundary —
            holds even in autopilot).
         4. fs tool whose path is out of scope → DENY (a session grant or an

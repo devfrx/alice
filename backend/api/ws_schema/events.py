@@ -8,7 +8,10 @@ emit sites on 2026-06-11:
 * model downloads — ``services/model_downloader.py`` (dynamic payload);
 * service callbacks — artifacts registry, plan/plan-document/scope/
   permission-mode services, terminal manager;
-* REST side-effects — ``api/routes/calendar.py``, ``api/routes/config.py``.
+* REST side-effects — ``api/routes/calendar.py``, ``api/routes/config.py``;
+* Command Layer RPC (Fase 7) — ``services/command_bridge.py`` broadcasts
+  ``command.request``; the client answers with ``command.result`` and
+  declares its manifest via ``command.manifest``.
 
 Bridges forward ``kwargs.get(...)`` values, so most payload fields are
 typed Optional with ``None`` defaults: absent-on-the-wire must validate.

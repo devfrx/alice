@@ -201,6 +201,20 @@ async def test_disabled_bridge_refuses() -> None:
 
 
 @pytest.mark.asyncio
+async def test_disabled_bridge_ignores_manifest_and_never_registers_tool() -> None:
+    """The master switch removes the whole surface: no ingestion, no tool.
+
+    Without this, every FE connect would re-register an always-offered
+    app_command whose every call errors (final phase review, Important 1).
+    """
+    registry = FakeToolRegistry()
+    bridge = _bridge(FakeWSManager(), registry, enabled=False)
+    await bridge.set_manifest([_entry("view.switch")])
+    assert registry.registered == []
+    assert bridge.capability_of("view.switch") is None
+
+
+@pytest.mark.asyncio
 async def test_execute_app_command_maps_to_tool_result() -> None:
     ws = FakeWSManager()
     bridge = _bridge(ws, FakeToolRegistry())
@@ -244,3 +258,58 @@ def test_build_app_command_definition_bakes_manifest() -> None:
 
     empty = build_app_command_definition([])
     assert "enum" not in empty.parameters["properties"]["name"]
+
+
+@pytest.mark.asyncio
+async def test_app_command_through_real_executor_enforces_manifest_enum() -> None:
+    """Integration seam: real ToolRegistry executor × real bridge (Q7a).
+
+    The manifest-baked enum must reject an off-manifest name inside the
+    REAL executor's JSON-Schema validation, and the happy path must flow
+    executor → kernel handler → RPC roundtrip → ToolResult.
+    """
+    from backend.core.config import LLMConfig
+    from backend.core.event_bus import EventBus
+    from backend.core.tool_registry import ToolRegistry
+
+    class _NoPlugins:
+        def get_all_plugins(self) -> dict[str, Any]:
+            return {}
+
+        def get_plugin(self, name: str) -> Any | None:
+            return None
+
+    registry = ToolRegistry(
+        plugin_manager=_NoPlugins(),
+        event_bus=EventBus(),
+        qdrant_service=None,
+        embedding_client=None,
+        llm_config=LLMConfig(),
+    )
+    ws = FakeWSManager()
+    bridge = CommandBridgeService(
+        ws_manager=ws,
+        tool_registry=registry,
+        enabled=True,
+        rpc_timeout_s=0.2,
+        disabled_commands=[],
+    )
+    await bridge.set_manifest([_entry("view.switch")])
+
+    off_manifest = await registry.execute_tool(
+        "app_command", {"name": "not.in.manifest"}, _ctx(),
+    )
+    assert off_manifest.success is False
+    assert "validation failed" in (off_manifest.error_message or "")
+
+    async def respond() -> None:
+        while not ws.sent:
+            await asyncio.sleep(0.01)
+        bridge.resolve(ws.sent[0]["correlation_id"], {"ok": True, "result": None})
+
+    task = asyncio.create_task(respond())
+    happy = await registry.execute_tool(
+        "app_command", {"name": "view.switch", "args": {}}, _ctx(),
+    )
+    await task
+    assert happy.success is True

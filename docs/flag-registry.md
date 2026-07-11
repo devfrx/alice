@@ -24,7 +24,7 @@ feature servono ENTRAMBI.
 | `stt.enabled` | true | bootstrap (`stage_senses`) | avvia STTService |
 | `tts.enabled` | true | bootstrap (`stage_senses`) | avvia TTSService |
 | `permissions.confirmations_enabled` | true | `turn/tool_loop.py`, `turn/pipeline.py` | conferme tool pericolosi |
-| `commands.enabled` | true | `bootstrap/workspace.py`, `services/command_bridge.py`, route events | spegne app_command + ingestione manifest |
+| `commands.enabled` | true | `bootstrap/workspace.py`, `services/command_bridge.py` | spegne app_command + ingestione manifest (early-return nel bridge) |
 | `terminal.enabled` | true | plugin terminal, route terminal/events | doppio gate col plugin |
 | `vram.monitoring_enabled` | true | bootstrap (`stage_senses`) | |
 | `memory.enabled` | true | bootstrap (`stage_knowledge`), `knowledge_init.py` | doppio gate col plugin `memory` |

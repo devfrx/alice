@@ -2,7 +2,9 @@
 
 Clients connect once at startup to ``/api/events/ws`` and receive
 push notifications whenever a background task completes, fails,
-or changes status.
+or changes status. Since Fase 7 the channel also carries inbound
+control frames: live terminal input/resize and the Command Layer RPC
+(``command.manifest`` ingestion + ``command.result`` correlation).
 """
 
 from __future__ import annotations

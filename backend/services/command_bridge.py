@@ -182,6 +182,14 @@ class CommandBridgeService:
             entries: Plain-dict manifest entries (validated upstream by the
                 events route against ``ws_schema``).
         """
+        if not self._enabled:
+            # Single authority for the master switch: a disabled bridge must
+            # neither ingest manifests nor (re-)register the tool — otherwise
+            # every FE connect would re-arm the surface the flag removes.
+            logger.info(
+                "Command Bridge disabled (commands.enabled=false): manifest ignored",
+            )
+            return
         accepted: dict[str, CommandSpec] = {}
         for entry in entries:
             raw_name = str(entry.get("name", ""))

@@ -75,6 +75,10 @@ class AliceEvent(StrEnum):
     TASKS_UPDATED = "tasks.updated"
     # -- Agent plan document (free-form markdown plan) --
     PLAN_DOCUMENT_UPDATED = "plan_document.updated"
+    # -- Fase 8 — Fondamenta Jarvis (spec §8) --
+    BACKGROUND_TASK_UPDATED = "background_task.updated"
+    ATTENTION_RAISED = "attention.raised"
+    TRIGGER_FIRED = "trigger.fired"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

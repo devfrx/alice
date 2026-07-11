@@ -135,6 +135,11 @@ commands:
   enabled: true
   rpc_timeout_s: 10.0
 
+# Fondamenta Jarvis (spec §8): agent-initiated attention towards the user.
+attention:
+  enabled: true
+  cooldown_s: 30.0                # min seconds between non-urgent notifications
+
 agent:
   # Single model-driven loop: the model decides step-by-step, with the
   # update_plan / spawn_subagent meta-tools for structure and an optional

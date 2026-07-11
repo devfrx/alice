@@ -392,6 +392,17 @@ class CommandsConfig(BaseSettings):
     """Command names never callable by the agent, regardless of manifest."""
 
 
+class AttentionConfig(BaseSettings):
+    """AttentionService policy (Fase 8, spec §8)."""
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_ATTENTION__")
+
+    enabled: bool = True
+    """Master switch for agent-initiated attention towards the user."""
+    cooldown_s: float = 30.0
+    """Minimum seconds between two non-urgent notifications (anti-spam)."""
+
+
 class WorkspaceScopeConfig(BaseSettings):
     """Workspace-scope policy for tool filesystem confinement (Fase 6)."""
 
@@ -1342,6 +1353,8 @@ class AliceConfig(BaseSettings):
         default_factory=PermissionsConfig
     )
     commands: CommandsConfig = Field(default_factory=CommandsConfig)
+    attention: AttentionConfig = Field(default_factory=AttentionConfig)
+    """Agent→user initiative policy (Fase 8)."""
     scope: WorkspaceScopeConfig = Field(default_factory=WorkspaceScopeConfig)
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)

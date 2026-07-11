@@ -39,6 +39,7 @@ feature servono ENTRAMBI.
 | `agent.reflection.enabled` | false | `turn/factory.py` | ReflectiveTurnExecutor |
 | `agent.reflection.degeneration_detector_enabled` | true | `turn/_reflection.py` | |
 | `mcp.servers[].enabled` | true (per server) | plugin `mcp_client`, `chat/_helpers.py`, route mcp | per-server |
+| `attention.enabled` | true | `bootstrap/jarvis.py`, `services/attention_service.py` | spegne OGNI iniziativa dell'agente verso l'utente (decision point unico §8) |
 
 Affini fuori convenzione: `agent.planning` / `agent.delegation` /
 `agent.clarification` (gate dei meta-tool; rinominati dai legacy `*_enabled`).

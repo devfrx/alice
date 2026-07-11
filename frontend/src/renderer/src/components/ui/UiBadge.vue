@@ -161,8 +161,4 @@ const emit = defineEmits<{
   background: var(--surface-hover);
   opacity: 1;
 }
-
-.ui-badge__remove:focus-visible {
-  outline: none;
-}
 </style>

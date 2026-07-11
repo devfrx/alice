@@ -418,10 +418,6 @@ onMounted(() => {
   border-color: var(--border-hover);
 }
 
-.mcp-btn:focus-visible {
-  outline: none;
-}
-
 .mcp-btn:disabled {
   opacity: var(--opacity-dim);
   cursor: not-allowed;

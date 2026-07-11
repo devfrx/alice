@@ -314,7 +314,6 @@ watch(activeIndex, (index) => {
 }
 
 .ui-select__trigger:focus-visible {
-  outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--focus-ring-color);
 }

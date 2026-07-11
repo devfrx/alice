@@ -113,10 +113,6 @@ defineEmits<{
   pointer-events: none;
 }
 
-.ui-btn:focus-visible {
-  outline: none;
-}
-
 /* ── Sizes ─────────────────────────── */
 .ui-btn--sm {
   height: var(--input-height-sm);

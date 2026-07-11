@@ -404,10 +404,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   background: var(--danger-hover);
 }
 
-.conv-list__header-btn:focus-visible {
-  outline: none;
-}
-
 /* ─── Scroller ──────────────────────────────────────────────── */
 .conv-list__scroller {
   flex: 1;
@@ -636,10 +632,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
 .conv-item__action:hover {
   background: var(--surface-hover);
   color: var(--text-primary);
-}
-
-.conv-item__action:focus-visible {
-  outline: none;
 }
 
 .conv-item__action--confirm:hover {

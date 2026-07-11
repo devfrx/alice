@@ -245,10 +245,6 @@ const ringOuterStyle = computed(() => ({
   border-color: var(--border-hover);
 }
 
-.mic-btn:focus-visible {
-  outline: none;
-}
-
 /* Recording state */
 .mic-btn--active {
   color: var(--listening);

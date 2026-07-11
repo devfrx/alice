@@ -243,7 +243,6 @@ onBeforeUnmount(() => {
 }
 
 .ui-seg__tab:focus-visible {
-  outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring-color);
 }
 

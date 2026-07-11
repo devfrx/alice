@@ -610,10 +610,6 @@ async function onBackupAll(): Promise<void> {
   color: var(--text-primary);
 }
 
-.sidebar__link:focus-visible {
-  outline: none;
-}
-
 /* Icon */
 .sidebar__link-icon {
   display: flex;

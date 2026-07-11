@@ -464,7 +464,6 @@ async function refreshAll(): Promise<void> {
   color: var(--text-primary);
 }
 .rail-row:focus-visible {
-  outline: none;
   box-shadow: 0 0 0 2px var(--accent-border);
 }
 .rail-row__dot {

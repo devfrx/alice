@@ -201,10 +201,6 @@ onBeforeUnmount(() => {
   border-color: var(--border-hover);
 }
 
-.error-boundary__btn:focus-visible {
-  outline: none;
-}
-
 .error-boundary__btn--ghost {
   color: var(--text-muted);
 }

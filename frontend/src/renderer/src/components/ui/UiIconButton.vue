@@ -105,10 +105,6 @@ const nativeTitle = (): string | undefined => {
   pointer-events: none;
 }
 
-.ui-icon-btn:focus-visible {
-  outline: none;
-}
-
 .ui-icon-btn__content {
   display: inline-flex;
   align-items: center;

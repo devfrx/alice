@@ -154,10 +154,6 @@ onUnmounted(() => {
   /* NO glass / NO backdrop-filter — solid surface only (unified recipe). */
 }
 
-.ctx-menu:focus-visible {
-  outline: none;
-}
-
 .ctx-menu__title {
   padding: var(--space-2) var(--space-3) var(--space-1-5);
   font-size: var(--text-2xs);

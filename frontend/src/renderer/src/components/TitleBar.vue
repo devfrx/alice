@@ -860,13 +860,6 @@ onUnmounted(() => {
   filter: brightness(0.9);
 }
 
-.titlebar__btn:focus-visible,
-.titlebar__menu-btn:focus-visible,
-.titlebar__service-trigger:focus-visible,
-.titlebar__refresh-btn:focus-visible {
-  outline: none;
-}
-
 .is-spinning {
   animation: titlebar-spin 0.9s linear infinite;
 }

@@ -112,10 +112,6 @@ function onKeydown(e: KeyboardEvent): void {
   transform: scale(0.995);
 }
 
-.ui-card--interactive:focus-visible {
-  outline: none;
-}
-
 /* ── No padding ── */
 .ui-card--no-padding {
   padding: 0;

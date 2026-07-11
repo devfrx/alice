@@ -41,6 +41,8 @@
 
 ### Task 1: Contratto WS — frame `command.request` / `command.result` / `command.manifest`
 
+> **Esito (2026-07-11):** DONE. Commit `823879e` (implementer, verbatim dal piano; 90 contract test verdi al primo giro). Spec review: controller (diff == testo del piano, gate auto-verificante). Quality review (top): «Ready to merge» con verifiche empiriche (hoisting OpenAPI in-memory senza collisioni, guard/envelope validati); 1 Important + 1 Minor applicati dal controller in `76f18dc`: `correlation_id` RESO OBBLIGATORIO su `WsCommandRequest`/`WsCommandResult` (narrowing dall'envelope, prima che la regen congeli il tipo TS) + 3 test negativi (vocabolario `capability` congelato, extra-field nell'entry nested, result senza correlation_id). 93/93 contract test verdi. Nota del reviewer registrata: gli artifact generati committati restano stale fino al Task 7 (atteso, non pushare prima).
+
 **Files:**
 - Modify: `backend/api/ws_schema/events.py`
 - Test: `backend/tests/contracts/test_ws_schema_events.py`
@@ -214,6 +216,8 @@ git commit -m "feat(ws): command.request/result/manifest frames on the events ch
 
 ### Task 2: Config `commands.*` + default.yaml + flag-registry
 
+> **Esito (2026-07-11):** DONE. Commit `3a7d20d` (implementer, verbatim; 26 test config verdi + il rosso EREDITATO `test_plugins_enabled_list` 21-vs-20, gotcha noto dell'handoff, non regressione). Spec review: controller (diff == piano, 4 file, YAML e flag-registry al posto giusto). Quality review: coperta dalla review finale di fase (task dichiarativo con gate auto-verificante).
+
 **Files:**
 - Modify: `backend/core/config.py`, `config/default.yaml`, `docs/flag-registry.md`
 - Test: `backend/tests/test_config.py` (append)
@@ -303,6 +307,8 @@ git commit -m "feat(config): commands.* section for the Command Bridge (spec §7
 ---
 
 ### Task 3: Kernel tools nel catalogo (registrazione, availability, dispatch)
+
+> **Esito (2026-07-11):** DONE. Commit `e4edee2` (implementer, verbatim; 53/53 verdi su kernel_tools+tool_registry+status_caching; unico adattamento dichiarato: anchor `clear_status_cache` nella facade). Spec review: controller (diff == piano). Quality review (top): «Ready to merge», 0 Critical/Important; verifiche esplicite su concorrenza (mutazione sotto lock senza await → snapshot list() sicuri), tutti i percorsi availability/RAG/get_tools_for_plugins, picker UI (gruppo "kernel" innocuo, opt-out per-tool funziona). 6 Minor applicati dal controller in `39b654f`: warning di collisione a registrazione-time, `tool_def: ToolDefinition` nel protocol, commento get_all_tools aggiornato, nota RAG-staleness nel docstring, test kernel-wins-collision su refresh (stub plugin `app`+`command`). Nota registrata: `timeout_ms` di app_command (30s) > `rpc_timeout_s` (10s) ✓ già nel design.
 
 **Files:**
 - Modify: `backend/core/plugin_models.py`, `backend/core/tools/catalog.py`, `backend/core/tools/availability.py`, `backend/core/tools/execution.py`, `backend/core/tool_registry.py`, `backend/core/protocols.py`
@@ -630,6 +636,8 @@ git commit -m "feat(kernel): kernel-owned tools in the catalog with dedicated di
 ---
 
 ### Task 4: `CommandBridgeService` (manifest, anti-escalation, RPC, tool app_command)
+
+> **Esito (2026-07-11):** DONE. Commit `62e767e` (implementer, byte-for-byte dal piano; 10/10 verdi — il conteggio "11" nel piano era errato, i test sono 10). Spec review: controller (diff == piano; layering verificato: nessun import `backend.api.*`). Fix controller in `39b654f`: I001 nel file di test nuovo. Quality review (top): «With fixes» — lifecycle future/`finally` giudicato corretto (niente leak, `CancelledError` coperto, late-resolve no-op), layering e clean-outcome solidi; 2 Important applicati dal controller in `e3301a1`: (1) grammatica stretta dei nomi comando (`_COMMAND_NAME_PATTERN` + NFKC + strip PRIMA del check guardrail — chiude il trick-space unicode/case/whitespace, il gate backend regge da solo) e (2) assert `validate_events_server(frame)` sul frame broadcast nel test roundtrip (drift del dict raw = test rosso, non warning prod). Minor applicati: guard `args` senza coercizione dei falsy, log separato per nome vuoto + debug sui duplicati, `:g` nel messaggio timeout, test aggiunti (nomi mascherati incl. fullwidth, `_pending` vuoto dopo timeout/resolve, percorso errore del roundtrip). A backlog: cap su `usage_guidance`, clamp `rpc_timeout_s` vs `timeout_ms`.
 
 **Files:**
 - Create: `backend/services/command_bridge.py`
@@ -1201,6 +1209,8 @@ git commit -m "feat(services): CommandBridgeService - manifest, anti-escalation,
 
 ### Task 5: gating `ui_command` in `PermissionService.decide`
 
+> **Esito (2026-07-11):** DONE. Commit `475d68b` (implementer, verbatim; 65/65 verdi sull'intera famiglia di test permessi, zero regressioni; assunzione strutturale su `rule`/`granted` verificata prima dell'inserimento; unico delta: blank line negli import del test per ruff I001). Spec review: controller (diff == piano). Security review dedicata (top): «With fixes» — precedenza 2-bis giudicata corretta, fail-conservative su ogni input crafted, matrice conforme a §7; 1 Important applicato dal controller in `e3301a1`: il ramo 2-bis si prende SOLO se il tool non ha capability fs/exec (un ibrido `ui_command`+`fs_write` cade nel confinamento scope — il tag non può mai scavalcare il guard by-construction; test di regressione con AUTOPILOT+no-scope→DENY). Minor applicati: log sul deny plan-mode, commento sull'invariante di vocabolario, commento TOCTOU in `execute_app_command`, 3 test (plan-deny batte grant/allow-rule, ask-rule mai prompt su navigation/read, crafted args). A backlog: granularità grant per-COMANDO (`app_command:{name}` — oggi un grant/allow-rule sul tool copre tutti i comandi, destructive inclusi).
+
 **Files:**
 - Modify: `backend/services/permission_service.py`
 - Test: `backend/tests/test_permission_ui_commands.py` (nuovo)
@@ -1452,6 +1462,8 @@ git commit -m "feat(permissions): per-call ui_command gating for app_command (sp
 ---
 
 ### Task 6: wiring — service group, context, bootstrap, route events
+
+> **Esito (2026-07-11):** DONE. Commit `a09abab` (implementer, verbatim; 47/47 verdi su route+context+groups+bootstrap; `test_context_groups` non ha richiesto aggiornamenti — roundtrip introspettivo, non lista esplicita; boot-check `boot ok`; lint-imports 6 kept / 0 broken). Spec review: controller (diff == piano). Quality: coperto dalle review Task 4/5 (il wiring è colla dichiarativa) + review finale di fase.
 
 **Files:**
 - Modify: `backend/core/service_groups.py`, `backend/core/context.py`, `backend/core/bootstrap/workspace.py`, `backend/api/routes/events.py`
@@ -2223,6 +2235,7 @@ Checklist (con backend + `npm run dev` attivi, LM Studio/Ollama su):
 
 ## Backlog emerso in pianificazione
 
+0-bis. **Da review Task 4/5 (2026-07-11):** (a) granularità dei grant per-COMANDO — oggi "always allow" su `app_command` copre TUTTI i comandi del manifest, destructive inclusi; chiave composta `app_command:{name}` in ConfirmationMiddleware; (b) cap morbido su `usage_guidance` (cresce linearmente col manifest, nessun limite come per `description`); (c) clamp/log su `rpc_timeout_s >= timeout_ms/1000` alla costruzione del bridge; (d) TOCTOU capability tra decide() ed esecuzione su manifest update (finestra accettata, solo FE fidato — commentata nel codice); (e) multi-window: `command.request` è broadcast, TUTTE le finestre eseguono (oggi single-window; con multi-window servirà target di sessione o focus-guard FE).
 1. `commandRegistry.execute` resta non-validante per i call-site UI (la validazione è solo sul percorso agente): valutare estenderla anche alla UI.
 2. Manifest non persistito: dopo un riavvio backend con UI già connessa il manifest arriva solo alla riconnessione WS (il reconnect FE lo ri-invia: accettabile; verificare in smoke).
 3. `resolve()` accetta il primo `command.result` per `correlation_id`: con più finestre il comando è eseguito da TUTTE (broadcast) — oggi non è un problema (single-window); se arriverà il multi-window servirà un target di sessione (`send_to`).

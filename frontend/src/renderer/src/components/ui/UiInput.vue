@@ -60,6 +60,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
   focus: [event: FocusEvent]
   blur: [event: FocusEvent]
+  keydown: [event: KeyboardEvent]
 }>()
 
 const autoId = useId()
@@ -113,6 +114,7 @@ function onInput(e: Event): void {
         @input="onInput"
         @focus="emit('focus', $event)"
         @blur="emit('blur', $event)"
+        @keydown="emit('keydown', $event)"
       />
       <span v-if="loading" class="ui-input__spinner" aria-hidden="true" />
       <span v-else-if="$slots.suffix" class="ui-input__suffix">

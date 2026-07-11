@@ -8,15 +8,17 @@
 ## Stato del programma
 
 - **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9. È LA fonte di verità.
-- **Fasi 1a, 1b, 2, 3, 4, 5, 6: COMPLETE** — branch impilati NON mergiati e NON pushati per decisione
-  utente (6 su 5 su 4 su 3 su 2 su 1b su 1a): `arch/fase1a-contratti-rest` → `arch/fase1b-ws-schema`
-  → `arch/fase2-persistenza` → `arch/fase3-contenuti` → `arch/fase4-conoscenza` →
-  `arch/fase5-kernel` → `arch/fase6-frontend`.
+- **Fasi 1a, 1b, 2, 3, 4, 5, 6: COMPLETE, PUSHATE e MERGIATE in `main`** (2026-07-11, richiesta
+  utente): merge sequenziali `--no-ff` uno per fase — `f0b0e94` (1a) → `6d250c3` (1b) → `9d24717`
+  (2) → `a5197d4` (3) → `921dd02` (4) → `e90f166` (5) → `5aa2660` (6, HEAD di main; contenuto
+  identico a `arch/fase6-frontend`, diff vuoto verificato). I branch `arch/fase*` esistono anche
+  su origin.
 - **Fase 6 (Frontend): COMPLETATA** — review finale di fase «Phase ready with notes», finding
   applicati sul branch. Piano chiuso e veritiero con esiti review per task + verdetto finale +
   backlog consolidato: `docs/superpowers/plans/2026-07-10-fase6-frontend.md`.
-- Pending esterni: chip/task `task_6c67e5a8` (fix suite lenta); CI `contracts.yml` MAI eseguita
-  (parte al primo push) — ora include anche `npm run lint` e `npm test` per il FE.
+- Pending esterni: chip/task `task_6c67e5a8` (fix suite lenta); CI `contracts.yml` partita per la
+  PRIMA volta coi push su main del 2026-07-11 (7 run, windows-latest) — VERIFICARE su GitHub che
+  siano verdi (contratti backend, import-linter, check-contracts, typecheck + lint + vitest FE).
 - **Smoke funzionale interattivo (npm run dev) NON eseguito in fase 6** — da fare alla prima
   apertura dell'app (checklist nel gate finale del piano: apre su /assistant, /terminal funziona,
   deep-link legacy redirigono, conversazione dalla sidebar via command layer).
@@ -84,8 +86,8 @@
 > MERGIATA in main via `20c952d` e ampiamente citata nei commenti ("Fase 7", "Fase 7 E1").
 > Qui "Fase 7" = la fase 7 del RISANAMENTO (Command Bridge). Non confonderle.
 
-Da scrivere con `writing-plans` su branch `arch/fase7-command-bridge` (figlio di
-`arch/fase6-frontend`). Requisiti spec: tool `app_command(name, args)` di proprietà del kernel;
+Da scrivere con `writing-plans` su branch `arch/fase7-command-bridge` (figlio di `main`, che dal
+2026-07-11 contiene tutte le fasi mergiate). Requisiti spec: tool `app_command(name, args)` di proprietà del kernel;
 manifest dei comandi come TERZO contratto (stessa pipeline di generazione/validazione); RPC
 backend→frontend con correlation_id + timeout + "UI non disponibile" come risultato pulito;
 gating permission-mode sui capability tag; **invariante anti-escalation strutturale** (comandi
@@ -184,5 +186,6 @@ Messaggio di kickoff della sessione (copiare tale e quale):
   2026-07-10 "la soluzione più professionale, senza debiti"); lint sanato A FONDO con reformat
   completo e gate CI (stessa decisione); codegen completo; visione = runtime agentico locale con
   Command Layer (invariante anti-escalation non negoziabile, spec §7).
-- I branch di fase restano NON mergiati e NON pushati finché l'utente non decide diversamente;
-  si impilano (6 sopra 5 sopra 4 sopra 3 sopra 2 sopra 1b sopra 1a).
+- I branch di fase sono restati impilati e locali fino al 2026-07-11, quando l'utente ha chiesto
+  push + merge sequenziale in `main` (fatto, vedi Stato). Le prossime fasi partono da `main`; la
+  politica di merge la decide l'utente volta per volta (mai push/merge senza richiesta).

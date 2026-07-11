@@ -1,8 +1,6 @@
 DELETE /api/artifacts/{artifact_id}
 DELETE /api/calendar/events/{event_id}
 DELETE /api/charts/{chart_id}
-DELETE /api/chat/conversations
-DELETE /api/chat/conversations/{conversation_id}
 DELETE /api/mcp/memory/entities
 DELETE /api/mcp/memory/observations
 DELETE /api/mcp/memory/relations
@@ -23,10 +21,7 @@ GET /api/calendar/today
 GET /api/calendar/upcoming
 GET /api/charts
 GET /api/charts/{chart_id}
-GET /api/chat/conversations
 GET /api/chat/conversations/{conversation_id}
-GET /api/chat/conversations/{conversation_id}/export
-GET /api/chat/conversations/{conversation_id}/file-path
 GET /api/config
 GET /api/config/layers
 GET /api/config/models
@@ -63,10 +58,6 @@ PATCH /api/config
 PATCH /api/plugins/{plugin_name}
 PATCH /api/whiteboards/{board_id}/snapshot
 POST /api/calendar/events
-POST /api/chat/conversations
-POST /api/chat/conversations/import
-POST /api/chat/conversations/{conversation_id}/switch-version
-POST /api/chat/conversations/{conversation_id}/title
 POST /api/chat/upload
 POST /api/config/reload
 POST /api/config/sync-model

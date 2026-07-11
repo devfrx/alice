@@ -27,7 +27,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import uuid
-from collections.abc import Callable, Coroutine
 from typing import Any
 
 from fastapi import WebSocketDisconnect
@@ -43,11 +42,6 @@ from backend.services.turn.sink import (
     is_websocket_closed_runtime_error,
 )
 
-# Type alias for the "sync conversation to file" callback used by
-# run_tool_loop.  Provided by the caller to avoid a circular import
-# between ``turn`` and ``api.routes.chat``.
-SyncFn = Callable[..., Coroutine[Any, Any, None]]
-
 
 class DirectTurnExecutor:
     """Executes a turn using the legacy stream + tool-loop pipeline.
@@ -55,20 +49,15 @@ class DirectTurnExecutor:
     Args:
         ctx: Application context (config, tool registry, services).
         llm: Active :class:`LLMService` instance.
-        sync_fn: Optional ``_sync_conversation_to_file`` callback handed
-            down to :func:`run_tool_loop`. ``None`` disables the
-            per-iteration JSON sync (e.g. in unit tests).
     """
 
     def __init__(
         self,
         ctx: AppContext,
         llm: LLMService,
-        sync_fn: SyncFn | None = None,
     ) -> None:
         self.ctx = ctx
         self.llm = llm
-        self._sync_fn = sync_fn
 
     async def execute(
         self,
@@ -248,7 +237,6 @@ class DirectTurnExecutor:
                         self.ctx.config.permissions.confirmation_timeout_s
                     ),
                     client_ip=turn.client_ip,
-                    sync_fn=self._sync_fn,
                     cancel_event=cancel_event,
                     memory_context=turn.memory_context,
                     tools=turn.tools,

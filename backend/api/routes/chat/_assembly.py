@@ -54,7 +54,6 @@ from ._helpers import (
     _compute_context_breakdown,
     _filter_history_for_llm,
     _format_memory_context,
-    _sync_conversation_to_file,
 )
 
 
@@ -309,10 +308,6 @@ class TurnAssembler:
         # other sessions (REST endpoints) immediately.  The session
         # uses expire_on_commit=False so `conv` stays usable.
         await session.commit()
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conv_id, ctx.conversation_file_manager,
-            )
 
         # --- fetch history for context ----------------------------
         stmt = (

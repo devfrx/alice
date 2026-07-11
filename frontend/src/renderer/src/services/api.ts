@@ -6,10 +6,12 @@
  */
 
 import type {
+  BackupResult,
   BranchConversationRequest,
   BranchConversationResponse,
   ConversationDetail,
   ConversationExport,
+  ConversationListResponse,
   ConversationSummary,
   DeleteAllConversationsResponse,
   DeleteConversationResponse,
@@ -250,8 +252,8 @@ export const api = {
   // -- Chat conversations ---------------------------------------------------
 
   /** List all conversations (most recent first). */
-  getConversations: (): Promise<ConversationSummary[]> =>
-    request<ConversationSummary[]>('/chat/conversations'),
+  getConversations: (): Promise<ConversationListResponse> =>
+    request<ConversationListResponse>('/chat/conversations'),
 
   /** Create a new empty conversation on the backend. */
   createConversation: (id: string, title?: string): Promise<ConversationSummary> =>
@@ -264,16 +266,22 @@ export const api = {
   exportConversation: (id: string): Promise<ConversationExport> =>
     request<ConversationExport>(`/chat/conversations/${encodeURIComponent(id)}/export`),
 
+  /** Export conversations as JSON files to a directory (explicit backup). */
+  backupConversations: (destDir?: string, conversationIds?: string[]): Promise<BackupResult> =>
+    request<BackupResult>('/chat/conversations/backup', {
+      method: 'POST',
+      body: JSON.stringify({
+        dest_dir: destDir ?? null,
+        conversation_ids: conversationIds ?? null
+      })
+    }),
+
   /** Import a conversation from JSON. */
   importConversation: (data: ConversationExport): Promise<ConversationSummary> =>
     request<ConversationSummary>('/chat/conversations/import', {
       method: 'POST',
       body: JSON.stringify(data)
     }),
-
-  /** Get the absolute filesystem path of a conversation's JSON file. */
-  getConversationFilePath: (id: string): Promise<{ path: string }> =>
-    request<{ path: string }>(`/chat/conversations/${encodeURIComponent(id)}/file-path`),
 
   /** Fetch a single conversation with its full message list. */
   getConversation: (id: string, signal?: AbortSignal): Promise<ConversationDetail> =>

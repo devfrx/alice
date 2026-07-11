@@ -16,37 +16,29 @@ There are exactly two outcomes:
 
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine
-from typing import Any
-
 from backend.core.context import AppContext
 from backend.services.llm_service import LLMService
 from backend.services.turn._reflection import ReflectionCritic
 from backend.services.turn.direct_executor import DirectTurnExecutor
 from backend.services.turn.reflective_executor import ReflectiveTurnExecutor
 
-SyncFn = Callable[..., Coroutine[Any, Any, None]]
-
 
 def create_turn_executor(
     ctx: AppContext,
     llm: LLMService,
-    sync_fn: SyncFn | None = None,
-) -> Any:
+) -> DirectTurnExecutor | ReflectiveTurnExecutor:
     """Return the executor strategy for the current configuration.
 
     Args:
         ctx: Application context (config + services).
         llm: Active LLM service.
-        sync_fn: Optional ``_sync_conversation_to_file`` callback handed
-            down to the tool loop. ``None`` disables file sync.
 
     Returns:
         A :class:`DirectTurnExecutor` (default), or a
         :class:`~backend.services.turn.reflective_executor.ReflectiveTurnExecutor`
         wrapping it when ``agent.reflection.enabled`` is set.
     """
-    direct = DirectTurnExecutor(ctx, llm, sync_fn=sync_fn)
+    direct = DirectTurnExecutor(ctx, llm)
 
     refl = ctx.config.agent.reflection
     if getattr(refl, "enabled", False):

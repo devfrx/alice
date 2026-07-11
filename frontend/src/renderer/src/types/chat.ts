@@ -1,11 +1,13 @@
-﻿/**
+/**
  * Chat-related types aligned with the AL\CE backend API.
  *
  * WebSocket frame types (WsToken, WsDone, WsError, etc.) are re-exported from
  * the generated contract (`./generated`, regenerated via `scripts/gen-contracts.ps1`).
- * Only view-models and REST conversation types (ChatMessage, ConversationSummary,
- * ConversationDetail, etc.) are hand-written here.
+ * REST conversation response types are also re-exported from generated contracts.
+ * Only view-models (ChatMessage, ConversationDetail, etc.) are hand-written here.
  */
+
+import type { ApiSchema, ChatServerMessage } from './generated'
 
 // ---------------------------------------------------------------------------
 // Message
@@ -61,18 +63,6 @@ export interface ChatMessage {
 // ---------------------------------------------------------------------------
 
 /**
- * Conversation summary returned by `GET /api/chat/conversations`.
- * Does NOT include the `messages` array — only a count.
- */
-export interface ConversationSummary {
-  id: string
-  title: string | null
-  created_at: string
-  updated_at: string
-  message_count: number
-}
-
-/**
  * Full conversation returned by `GET /api/chat/conversations/{id}`.
  * Includes the ordered list of messages.
  */
@@ -98,32 +88,45 @@ export interface ConversationDetail {
 }
 
 // ---------------------------------------------------------------------------
-// REST response helpers
+// REST response helpers (generated re-exports)
 // ---------------------------------------------------------------------------
 
+/**
+ * Conversation summary returned by `GET /api/chat/conversations`.
+ * Does NOT include the `messages` array — only a count.
+ */
+export type ConversationSummary = ApiSchema<'ConversationSummaryResponse'>
+
+/** Paginated list of conversation summaries (items + total). */
+export type ConversationListResponse = ApiSchema<'ConversationListResponse'>
+
+/** Full conversation export format (for backup/import). */
+export type ConversationExport = ApiSchema<'ConversationExport'>
+
+/** Response from `POST /api/chat/conversations/{id}/switch-version`. */
+export type SwitchVersionResponse = ApiSchema<'SwitchVersionResponse'>
+
+/** Response from `POST /api/chat/conversations/{id}/branch`. */
+export type BranchConversationResponse = ApiSchema<'ConversationSummaryResponse'>
+
 /** Response from `DELETE /api/chat/conversations/{id}`. */
-export interface DeleteConversationResponse {
-  status: 'deleted'
-}
+export type DeleteConversationResponse = ApiSchema<'DeleteConversationResponse'>
 
 /** Response from `DELETE /api/chat/conversations` (delete all). */
-export interface DeleteAllConversationsResponse {
-  status: 'deleted'
-  deleted_files: number
-}
+export type DeleteAllConversationsResponse = ApiSchema<'DeleteAllConversationsResponse'>
+
+/** Result from `POST /api/chat/conversations/backup` (explicit JSON backup). */
+export type BackupResult = ApiSchema<'BackupResult'>
 
 /** Response from `POST /api/chat/conversations/{id}/title`. */
-export interface RenameConversationResponse {
-  id: string
-  title: string
-  updated_at: string
-}
+export type RenameConversationResponse = ApiSchema<'TitleUpdateResponse'>
+
+/** Request body for `POST /api/chat/conversations/{id}/branch`. */
+export type BranchConversationRequest = ApiSchema<'BranchConversationRequest'>
 
 // ---------------------------------------------------------------------------
 // WebSocket
 // ---------------------------------------------------------------------------
-
-import type { ApiSchema, ChatServerMessage } from './generated'
 
 /** Generated from the backend WS contract — do not redefine locally. */
 export type WsSendPayload = ApiSchema<'WsUserMessage'>
@@ -280,39 +283,3 @@ export interface ContextInfo {
 
 /** Discriminated union of all server→client chat frames (generated). */
 export type WsMessage = ChatServerMessage
-
-// ---------------------------------------------------------------------------
-// Export / Import
-// ---------------------------------------------------------------------------
-
-/** Full conversation export format (for backup/import). */
-export interface ConversationExport {
-  id: string
-  title: string | null
-  created_at: string
-  updated_at: string
-  messages: ChatMessage[]
-  active_versions?: Record<string, number>
-}
-
-/** Response from `POST /api/chat/conversations/{id}/switch-version`. */
-export interface SwitchVersionResponse {
-  id: string
-  active_versions: Record<string, number>
-  updated_at: string
-}
-
-/** Request body for `POST /api/chat/conversations/{id}/branch`. */
-export interface BranchConversationRequest {
-  from_message_id: string
-  title?: string
-}
-
-/** Response from `POST /api/chat/conversations/{id}/branch`. */
-export interface BranchConversationResponse {
-  id: string
-  title: string | null
-  created_at: string
-  updated_at: string
-  message_count: number
-}

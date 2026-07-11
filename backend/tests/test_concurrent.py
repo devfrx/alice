@@ -13,8 +13,6 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from starlette.testclient import TestClient
 
-from backend.services.llm_service import LLMService
-
 # ---------------------------------------------------------------------------
 # Mock LLM helpers (same as test_websocket.py)
 # ---------------------------------------------------------------------------
@@ -304,7 +302,9 @@ class TestConcurrentREST:
             # Verify all are gone.
             resp = await ac.get("/api/chat/conversations")
             assert resp.status_code == 200
-            assert len(resp.json()) == 0
+            data = resp.json()
+            assert data["items"] == []
+            assert data["total"] == 0
 
     async def test_concurrent_list_is_consistent(
         self, concurrent_app: FastAPI,
@@ -320,4 +320,6 @@ class TestConcurrentREST:
             responses = await asyncio.gather(*tasks)
             for resp in responses:
                 assert resp.status_code == 200
-                assert isinstance(resp.json(), list)
+                data = resp.json()
+                assert isinstance(data["items"], list)
+                assert isinstance(data["total"], int)

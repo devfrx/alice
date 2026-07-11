@@ -365,6 +365,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/conversations/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Backup Conversations
+         * @description Export conversations as JSON files to an explicit destination.
+         *
+         *     This is the user-facing replacement of the removed automatic JSON
+         *     mirror (spec §5.2): SQLite is the single source of truth and backups
+         *     happen only on explicit command (UI entry or agent tool).
+         */
+        post: operations["backup_conversations_api_chat_conversations_backup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/conversations/import": {
         parameters: {
             query?: never;
@@ -475,28 +499,6 @@ export interface paths {
          *         The complete conversation JSON including messages and attachments.
          */
         get: operations["export_conversation_api_chat_conversations__conversation_id__export_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/chat/conversations/{conversation_id}/file-path": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Conversation File Path
-         * @description Return the absolute filesystem path of the conversation JSON file.
-         *
-         *     Used by the Electron frontend to open the file in the system explorer.
-         */
-        get: operations["get_conversation_file_path_api_chat_conversations__conversation_id__file_path_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2467,6 +2469,26 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * BackupRequest
+         * @description Request body for the explicit conversation backup command.
+         */
+        BackupRequest: {
+            /** Conversation Ids */
+            conversation_ids?: string[] | null;
+            /** Dest Dir */
+            dest_dir?: string | null;
+        };
+        /**
+         * BackupResult
+         * @description Outcome of an explicit conversation backup.
+         */
+        BackupResult: {
+            /** Exported */
+            exported: number;
+            /** Path */
+            path: string;
+        };
         /** Body_upload_image_api_chat_upload_post */
         Body_upload_image_api_chat_upload_post: {
             /**
@@ -2496,18 +2518,43 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        ChatClientMessage: components["schemas"]["WsCancel"] | components["schemas"]["WsToolConfirmationResponse"] | components["schemas"]["WsClientToolResult"] | components["schemas"]["WsAskUserResponse"];
+        ChatServerMessage: components["schemas"]["WsToken"] | components["schemas"]["WsThinking"] | components["schemas"]["WsToolCallStream"] | components["schemas"]["WsError"] | components["schemas"]["WsDone"] | components["schemas"]["WsToolExecutionStart"] | components["schemas"]["WsToolExecutionDone"] | components["schemas"]["WsToolProgress"] | components["schemas"]["WsContextInfo"] | components["schemas"]["WsContextCompressionStart"] | components["schemas"]["WsContextCompressionDone"] | components["schemas"]["WsContextCompressionFailed"] | components["schemas"]["WsLlmRequery"] | components["schemas"]["WsWarning"] | components["schemas"]["WsToolConfirmationRequired"] | components["schemas"]["WsClientToolCall"] | components["schemas"]["WsAskUserRequired"] | components["schemas"]["WsTurnStarted"] | components["schemas"]["WsTurnLlmStep"] | components["schemas"]["WsTurnToolCall"] | components["schemas"]["WsTurnToolResult"] | components["schemas"]["WsInteractionRequested"] | components["schemas"]["WsInteractionResolved"] | components["schemas"]["WsTurnUsage"] | components["schemas"]["WsTurnFinished"] | components["schemas"]["WsAgentCriticInvoked"] | components["schemas"]["WsAgentWarning"];
         /**
-         * BranchConversationResponse
-         * @description Response from the branch-conversation endpoint.
-         *
-         *     Args:
-         *         id: UUID of the newly created conversation.
-         *         title: Title of the new conversation.
-         *         created_at: ISO 8601 timestamp of creation.
-         *         updated_at: ISO 8601 timestamp of last update.
-         *         message_count: Number of messages copied into the new conversation.
+         * ConversationExport
+         * @description Full conversation export (REST response body and backup file schema).
          */
-        BranchConversationResponse: {
+        ConversationExport: {
+            /** Active Versions */
+            active_versions?: {
+                [key: string]: number;
+            };
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Messages */
+            messages: components["schemas"]["ExportedMessage"][];
+            /** Title */
+            title: string | null;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * ConversationListResponse
+         * @description List-endpoint envelope (convention: ``{items, total}``, spec §6).
+         */
+        ConversationListResponse: {
+            /** Items */
+            items: components["schemas"]["ConversationSummaryResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * ConversationSummaryResponse
+         * @description Summary of a conversation (list items, create/import/branch responses).
+         */
+        ConversationSummaryResponse: {
             /** Created At */
             created_at: string;
             /** Id */
@@ -2519,8 +2566,6 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
-        ChatClientMessage: components["schemas"]["WsCancel"] | components["schemas"]["WsToolConfirmationResponse"] | components["schemas"]["WsClientToolResult"] | components["schemas"]["WsAskUserResponse"];
-        ChatServerMessage: components["schemas"]["WsToken"] | components["schemas"]["WsThinking"] | components["schemas"]["WsToolCallStream"] | components["schemas"]["WsError"] | components["schemas"]["WsDone"] | components["schemas"]["WsToolExecutionStart"] | components["schemas"]["WsToolExecutionDone"] | components["schemas"]["WsToolProgress"] | components["schemas"]["WsContextInfo"] | components["schemas"]["WsContextCompressionStart"] | components["schemas"]["WsContextCompressionDone"] | components["schemas"]["WsContextCompressionFailed"] | components["schemas"]["WsLlmRequery"] | components["schemas"]["WsWarning"] | components["schemas"]["WsToolConfirmationRequired"] | components["schemas"]["WsClientToolCall"] | components["schemas"]["WsAskUserRequired"] | components["schemas"]["WsTurnStarted"] | components["schemas"]["WsTurnLlmStep"] | components["schemas"]["WsTurnToolCall"] | components["schemas"]["WsTurnToolResult"] | components["schemas"]["WsInteractionRequested"] | components["schemas"]["WsInteractionResolved"] | components["schemas"]["WsTurnUsage"] | components["schemas"]["WsTurnFinished"] | components["schemas"]["WsAgentCriticInvoked"] | components["schemas"]["WsAgentWarning"];
         /**
          * CreateEntitiesRequest
          * @description Request body for creating entities.
@@ -2554,6 +2599,22 @@ export interface components {
         CreateRelationsRequest: {
             /** Relations */
             relations: components["schemas"]["RelationInput"][];
+        };
+        /**
+         * DeleteAllConversationsResponse
+         * @description Response of the delete-all endpoint.
+         */
+        DeleteAllConversationsResponse: {
+            /** Status */
+            status: string;
+        };
+        /**
+         * DeleteConversationResponse
+         * @description Response of the single-conversation delete endpoint.
+         */
+        DeleteConversationResponse: {
+            /** Status */
+            status: string;
         };
         /**
          * DeleteEntitiesRequest
@@ -2616,6 +2677,63 @@ export interface components {
         };
         EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"];
         EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"];
+        /**
+         * ExportedAttachment
+         * @description One attachment inside an exported message.
+         */
+        ExportedAttachment: {
+            /** Content Type */
+            content_type: string;
+            /** File Id */
+            file_id: string;
+            /** File Path */
+            file_path: string;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * ExportedMessage
+         * @description One message inside a conversation export.
+         */
+        ExportedMessage: {
+            /** Attachments */
+            attachments?: components["schemas"]["ExportedAttachment"][] | null;
+            /** Content */
+            content: string;
+            /**
+             * Context Excluded
+             * @default false
+             */
+            context_excluded?: boolean;
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /**
+             * Is Context Summary
+             * @default false
+             */
+            is_context_summary?: boolean;
+            /** Role */
+            role: string;
+            /** Thinking Content */
+            thinking_content?: string | null;
+            /** Tool Call Id */
+            tool_call_id?: string | null;
+            /** Tool Calls */
+            tool_calls?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Version Group Id */
+            version_group_id?: string | null;
+            /**
+             * Version Index
+             * @default 0
+             */
+            version_index?: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2806,6 +2924,20 @@ export interface components {
             folders?: string[];
         };
         /**
+         * SwitchVersionResponse
+         * @description Response of the switch-version endpoint.
+         */
+        SwitchVersionResponse: {
+            /** Active Versions */
+            active_versions: {
+                [key: string]: number;
+            };
+            /** Id */
+            id: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
          * SystemPromptRequest
          * @description Body for the system-prompt toggle.
          */
@@ -2910,6 +3042,18 @@ export interface components {
             assign_to_agent?: boolean | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * TitleUpdateResponse
+         * @description Response of the title-update endpoint.
+         */
+        TitleUpdateResponse: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
         };
         /**
          * TogglePluginRequest
@@ -5629,9 +5773,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ConversationListResponse"];
                 };
             };
         };
@@ -5651,9 +5793,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationSummaryResponse"];
                 };
             };
         };
@@ -5673,9 +5813,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DeleteAllConversationsResponse"];
+                };
+            };
+        };
+    };
+    backup_conversations_api_chat_conversations_backup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5695,9 +5866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationSummaryResponse"];
                 };
             };
         };
@@ -5752,9 +5921,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["DeleteConversationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5789,7 +5956,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BranchConversationResponse"];
+                    "application/json": components["schemas"]["ConversationSummaryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5820,42 +5987,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_conversation_file_path_api_chat_conversations__conversation_id__file_path_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                conversation_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["ConversationExport"];
                 };
             };
             /** @description Validation Error */
@@ -5886,9 +6018,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SwitchVersionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5919,9 +6049,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TitleUpdateResponse"];
                 };
             };
             /** @description Validation Error */

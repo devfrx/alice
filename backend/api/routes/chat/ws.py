@@ -28,7 +28,6 @@ from backend.services.turn import (
 from backend.services.turn.channel import MALFORMED_FRAME_KEY
 
 from ._assembly import TurnAssembler
-from ._helpers import _sync_conversation_to_file
 from ._persist import _persist_final_turn
 from ._shared import (
     _ctx,
@@ -159,9 +158,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                 finish_reason = "stop"
                 cancel_event = channel.begin_turn()
 
-                executor = create_turn_executor(
-                    ctx, llm, sync_fn=_sync_conversation_to_file,
-                )
+                executor = create_turn_executor(ctx, llm)
                 sink = WebSocketEventSink(websocket, frame_validator=chat_frame_validator)
 
                 executor_task = asyncio.create_task(
@@ -212,12 +209,6 @@ async def ws_chat(websocket: WebSocket) -> None:
                         conv.updated_at = _utcnow()
                         with contextlib.suppress(Exception):
                             await session.commit()
-                        if ctx.conversation_file_manager:
-                            with contextlib.suppress(Exception):
-                                await _sync_conversation_to_file(
-                                    session, conv_id,
-                                    ctx.conversation_file_manager,
-                                )
                     raise WebSocketDisconnect()
 
                 await _persist_final_turn(

@@ -240,7 +240,6 @@ class _Ctx:
 
     def __init__(self, registry: MockToolRegistry) -> None:
         self.tool_registry = registry
-        self.conversation_file_manager = None
         self.config = _Cfg()
         self.event_bus = _EventBus()
 
@@ -287,7 +286,6 @@ async def _run(
         max_iterations=max_iterations,
         confirmation_timeout_s=2,
         client_ip="127.0.0.1",
-        sync_fn=None,
         cancel_event=cancel_event,
     )
     return websocket, session, reg

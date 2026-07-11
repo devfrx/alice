@@ -24,16 +24,15 @@ from sqlmodel import select
 
 from backend.core.config import PROJECT_ROOT
 from backend.db.models import Artifact, Attachment, Conversation, Message
-from backend.services.conversation_file_manager import ConversationFileManager
+from backend.services.conversation_export import attachment_url
 
 from ._helpers import (
     _build_mcp_context,
     _build_whiteboard_context,
     _filter_history_for_llm,
     _filter_messages_by_active_versions,
-    _sync_conversation_to_file,
 )
-from ._shared import _attachment_url, _ctx, _utcnow, router
+from ._shared import _ctx, _utcnow, router
 
 # ---------------------------------------------------------------------------
 # Pydantic request/response models
@@ -54,16 +53,8 @@ class BranchConversationRequest(BaseModel):
     title: str | None = Field(None, max_length=500)
 
 
-class BranchConversationResponse(BaseModel):
-    """Response from the branch-conversation endpoint.
-
-    Args:
-        id: UUID of the newly created conversation.
-        title: Title of the new conversation.
-        created_at: ISO 8601 timestamp of creation.
-        updated_at: ISO 8601 timestamp of last update.
-        message_count: Number of messages copied into the new conversation.
-    """
+class ConversationSummaryResponse(BaseModel):
+    """Summary of a conversation (list items, create/import/branch responses)."""
 
     id: str
     title: str | None
@@ -72,13 +63,48 @@ class BranchConversationResponse(BaseModel):
     message_count: int
 
 
+class ConversationListResponse(BaseModel):
+    """List-endpoint envelope (convention: ``{items, total}``, spec §6)."""
+
+    items: list[ConversationSummaryResponse]
+    total: int
+
+
+class TitleUpdateResponse(BaseModel):
+    """Response of the title-update endpoint."""
+
+    id: str
+    title: str
+    updated_at: str
+
+
+class SwitchVersionResponse(BaseModel):
+    """Response of the switch-version endpoint."""
+
+    id: str
+    active_versions: dict[str, int]
+    updated_at: str
+
+
+class DeleteConversationResponse(BaseModel):
+    """Response of the single-conversation delete endpoint."""
+
+    status: str
+
+
+class DeleteAllConversationsResponse(BaseModel):
+    """Response of the delete-all endpoint."""
+
+    status: str
+
+
 # ---------------------------------------------------------------------------
 # REST — conversation history
 # ---------------------------------------------------------------------------
 
 
-@router.get("/chat/conversations")
-async def list_conversations(request: Request) -> list[dict[str, Any]]:
+@router.get("/chat/conversations", response_model=ConversationListResponse)
+async def list_conversations(request: Request) -> dict[str, Any]:
     """List all conversations ordered by most recently updated."""
     ctx = _ctx(request)
     async with ctx.db() as session:
@@ -98,7 +124,7 @@ async def list_conversations(request: Request) -> list[dict[str, Any]]:
         results = await session.exec(stmt)
         rows = results.all()
 
-        return [
+        items = [
             {
                 "id": str(conv.id),
                 "title": conv.title,
@@ -108,6 +134,7 @@ async def list_conversations(request: Request) -> list[dict[str, Any]]:
             }
             for conv, msg_count in rows
         ]
+        return {"items": items, "total": len(items)}
 
 
 @router.get("/chat/conversations/{conversation_id}")
@@ -141,7 +168,7 @@ async def get_conversation(
                 att_map.setdefault(att.message_id, []).append(
                     {
                         "file_id": str(att.id),
-                        "url": _attachment_url(att.file_path),
+                        "url": attachment_url(att.file_path),
                         "filename": att.filename,
                         "content_type": att.content_type,
                     }
@@ -384,7 +411,7 @@ async def get_conversation(
         }
 
 
-@router.delete("/chat/conversations")
+@router.delete("/chat/conversations", response_model=DeleteAllConversationsResponse)
 async def delete_all_conversations(request: Request) -> dict[str, Any]:
     """Delete ALL conversations, messages, attachments, and associated files."""
     ctx = _ctx(request)
@@ -422,12 +449,6 @@ async def delete_all_conversations(request: Request) -> dict[str, Any]:
                 "Failed to unlink artifact file {}: {}", file_path, exc,
             )
 
-    # Remove all JSON conversation files.
-    file_manager: ConversationFileManager | None = ctx.conversation_file_manager
-    deleted_files = 0
-    if file_manager:
-        deleted_files = await file_manager.delete_all()
-
     # Remove all upload directories.
     uploads_base = PROJECT_ROOT / "data" / "uploads"
     if uploads_base.exists():
@@ -438,11 +459,11 @@ async def delete_all_conversations(request: Request) -> dict[str, Any]:
                 removed_dirs += 1
         logger.debug("Removed {} upload directories", removed_dirs)
 
-    logger.info("Deleted all conversations ({} files)", deleted_files)
-    return {"status": "deleted", "deleted_files": deleted_files}
+    logger.info("Deleted all conversations")
+    return {"status": "deleted"}
 
 
-@router.delete("/chat/conversations/{conversation_id}")
+@router.delete("/chat/conversations/{conversation_id}", response_model=DeleteConversationResponse)
 async def delete_conversation(
     conversation_id: uuid.UUID, request: Request
 ) -> dict[str, str]:
@@ -533,13 +554,6 @@ async def delete_conversation(
                     "Failed to unlink artifact file {}: {}", file_path, exc,
                 )
 
-        # Remove JSON conversation file.
-        file_manager: ConversationFileManager | None = (
-            ctx.conversation_file_manager
-        )
-        if file_manager:
-            await file_manager.delete(str(conversation_id))
-
         # Clean up uploaded files for this conversation.
         upload_dir = PROJECT_ROOT / "data" / "uploads" / str(conversation_id)
         if upload_dir.exists():
@@ -560,7 +574,7 @@ async def delete_conversation(
         return {"status": "deleted"}
 
 
-@router.post("/chat/conversations/{conversation_id}/title")
+@router.post("/chat/conversations/{conversation_id}/title", response_model=TitleUpdateResponse)
 async def update_conversation_title(
     conversation_id: uuid.UUID,
     request: Request,
@@ -597,12 +611,6 @@ async def update_conversation_title(
         conv.updated_at = _utcnow()
         await session.commit()
 
-        # Sync to JSON file.
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conversation_id, ctx.conversation_file_manager,
-            )
-
         return {
             "id": str(conv.id),
             "title": conv.title,
@@ -610,7 +618,10 @@ async def update_conversation_title(
         }
 
 
-@router.post("/chat/conversations/{conversation_id}/switch-version")
+@router.post(
+    "/chat/conversations/{conversation_id}/switch-version",
+    response_model=SwitchVersionResponse,
+)
 async def switch_version(
     conversation_id: uuid.UUID,
     request: Request,
@@ -680,11 +691,6 @@ async def switch_version(
         conv.updated_at = _utcnow()
         await session.commit()
 
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conversation_id, ctx.conversation_file_manager,
-            )
-
         return {
             "id": str(conv.id),
             "active_versions": conv.active_versions,
@@ -697,12 +703,15 @@ async def switch_version(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/chat/conversations/{conversation_id}/branch")
+@router.post(
+    "/chat/conversations/{conversation_id}/branch",
+    response_model=ConversationSummaryResponse,
+)
 async def branch_conversation(
     conversation_id: str,
     body: BranchConversationRequest,
     request: Request,
-) -> BranchConversationResponse:
+) -> ConversationSummaryResponse:
     """Create a new conversation by branching from a specific message.
 
     Copies all messages from the beginning of the source conversation
@@ -854,12 +863,7 @@ async def branch_conversation(
         new_conv.updated_at = _utcnow()
         await session.commit()
 
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, new_conv.id, ctx.conversation_file_manager
-            )
-
-        return BranchConversationResponse(
+        return ConversationSummaryResponse(
             id=str(new_conv.id),
             title=new_conv.title,
             created_at=new_conv.created_at.isoformat(),
@@ -873,7 +877,7 @@ async def branch_conversation(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/chat/conversations")
+@router.post("/chat/conversations", response_model=ConversationSummaryResponse)
 async def create_conversation(request: Request) -> dict[str, Any]:
     """Create a new empty conversation and persist it immediately.
 
@@ -957,11 +961,6 @@ async def create_conversation(request: Request) -> dict[str, Any]:
                 "message_count": message_count,
             }
         await session.refresh(conv)
-
-        if ctx.conversation_file_manager:
-            await _sync_conversation_to_file(
-                session, conv.id, ctx.conversation_file_manager,
-            )
 
         return {
             "id": str(conv.id),

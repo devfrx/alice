@@ -33,5 +33,5 @@ async def test_conversations_list_empty(client: AsyncClient) -> None:
     resp = await client.get("/api/chat/conversations")
     assert resp.status_code == 200
     data = resp.json()
-    assert isinstance(data, list)
-    assert len(data) == 0
+    assert data["items"] == []
+    assert data["total"] == 0

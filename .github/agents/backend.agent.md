@@ -19,7 +19,7 @@ context:
 
 structure:
   core: "app.py/config.py/context.py/event_bus.py/plugin_base.py/plugin_manager.py/plugin_models.py/protocols.py/tool_registry.py/http_security.py"
-  services: "llm_service.py/lmstudio_service.py/stt_service.py/tts_service.py/audio_utils.py/vram_monitor.py/preferences_service.py/conversation_file_manager.py/thinking_parser.py"
+  services: "llm_service.py/lmstudio_service.py/stt_service.py/tts_service.py/audio_utils.py/vram_monitor.py/preferences_service.py/conversation_export.py/thinking_parser.py"
   api_routes: chat/voice/models/config/settings/plugins/audit
   api_middleware: exception_handler/origin_guard/rate_limit
   plugins[11]: calendar,clipboard,file_search,home_automation,media_control,news,notifications,pc_automation,system_info,weather,web_search

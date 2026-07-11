@@ -1,7 +1,7 @@
 ﻿import { app, shell, BrowserWindow, ipcMain, Menu, MenuItem, dialog, session, type WebContents } from 'electron'
 import { spawn, spawnSync, ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, appendFileSync } from 'fs'
-import { basename, join } from 'path'
+import { basename, join, normalize } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
@@ -453,7 +453,7 @@ app.whenReady().then(async () => {
   ipcMain.on('window-close', () => mainWindow?.close())
   ipcMain.on('show-in-folder', (_event, filePath: unknown) => {
     if (typeof filePath === 'string' && filePath.length > 0) {
-      shell.showItemInFolder(filePath)
+      shell.showItemInFolder(normalize(filePath))
     }
   })
 

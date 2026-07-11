@@ -183,6 +183,58 @@
         "title": "ArtifactRead",
         "type": "object"
       },
+      "BackupRequest": {
+        "description": "Request body for the explicit conversation backup command.",
+        "properties": {
+          "conversation_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Ids"
+          },
+          "dest_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dest Dir"
+          }
+        },
+        "title": "BackupRequest",
+        "type": "object"
+      },
+      "BackupResult": {
+        "description": "Outcome of an explicit conversation backup.",
+        "properties": {
+          "exported": {
+            "title": "Exported",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "exported",
+          "path"
+        ],
+        "title": "BackupResult",
+        "type": "object"
+      },
       "Body_upload_image_api_chat_upload_post": {
         "properties": {
           "conversation_id": {
@@ -228,47 +280,6 @@
           "from_message_id"
         ],
         "title": "BranchConversationRequest",
-        "type": "object"
-      },
-      "BranchConversationResponse": {
-        "description": "Response from the branch-conversation endpoint.\n\nArgs:\n    id: UUID of the newly created conversation.\n    title: Title of the new conversation.\n    created_at: ISO 8601 timestamp of creation.\n    updated_at: ISO 8601 timestamp of last update.\n    message_count: Number of messages copied into the new conversation.",
-        "properties": {
-          "created_at": {
-            "title": "Created At",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "message_count": {
-            "title": "Message Count",
-            "type": "integer"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "updated_at": {
-            "title": "Updated At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "created_at",
-          "updated_at",
-          "message_count"
-        ],
-        "title": "BranchConversationResponse",
         "type": "object"
       },
       "ChatClientMessage": {
@@ -413,6 +424,120 @@
           }
         ]
       },
+      "ConversationExport": {
+        "description": "Full conversation export (REST response body and backup file schema).",
+        "properties": {
+          "active_versions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Active Versions",
+            "type": "object"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "messages"
+        ],
+        "title": "ConversationExport",
+        "type": "object"
+      },
+      "ConversationListResponse": {
+        "description": "List-endpoint envelope (convention: ``{items, total}``, spec §6).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ConversationListResponse",
+        "type": "object"
+      },
+      "ConversationSummaryResponse": {
+        "description": "Summary of a conversation (list items, create/import/branch responses).",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message_count": {
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "message_count"
+        ],
+        "title": "ConversationSummaryResponse",
+        "type": "object"
+      },
       "CreateEntitiesRequest": {
         "description": "Request body for creating entities.",
         "properties": {
@@ -505,6 +630,34 @@
           "relations"
         ],
         "title": "CreateRelationsRequest",
+        "type": "object"
+      },
+      "DeleteAllConversationsResponse": {
+        "description": "Response of the delete-all endpoint.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DeleteAllConversationsResponse",
+        "type": "object"
+      },
+      "DeleteConversationResponse": {
+        "description": "Response of the single-conversation delete endpoint.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DeleteConversationResponse",
         "type": "object"
       },
       "DeleteEntitiesRequest": {
@@ -757,6 +910,146 @@
             "$ref": "#/components/schemas/WsTerminalAssigned"
           }
         ]
+      },
+      "ExportedAttachment": {
+        "description": "One attachment inside an exported message.",
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id",
+          "url",
+          "filename",
+          "content_type",
+          "file_path"
+        ],
+        "title": "ExportedAttachment",
+        "type": "object"
+      },
+      "ExportedMessage": {
+        "description": "One message inside a conversation export.",
+        "properties": {
+          "attachments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExportedAttachment"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachments"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "context_excluded": {
+            "default": false,
+            "title": "Context Excluded",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_context_summary": {
+            "default": false,
+            "title": "Is Context Summary",
+            "type": "boolean"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "thinking_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking Content"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls"
+          },
+          "version_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Group Id"
+          },
+          "version_index": {
+            "default": 0,
+            "title": "Version Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "ExportedMessage",
+        "type": "object"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1115,6 +1408,33 @@
         "title": "ScopeUpdateRequest",
         "type": "object"
       },
+      "SwitchVersionResponse": {
+        "description": "Response of the switch-version endpoint.",
+        "properties": {
+          "active_versions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Active Versions",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "active_versions",
+          "updated_at"
+        ],
+        "title": "SwitchVersionResponse",
+        "type": "object"
+      },
       "SystemPromptRequest": {
         "description": "Body for the system-prompt toggle.",
         "properties": {
@@ -1329,6 +1649,30 @@
           }
         },
         "title": "TerminalUpdateRequest",
+        "type": "object"
+      },
+      "TitleUpdateResponse": {
+        "description": "Response of the title-update endpoint.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "updated_at"
+        ],
+        "title": "TitleUpdateResponse",
         "type": "object"
       },
       "TogglePluginRequest": {
@@ -6393,9 +6737,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete All Conversations Api Chat Conversations Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteAllConversationsResponse"
                 }
               }
             },
@@ -6415,12 +6757,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "title": "Response List Conversations Api Chat Conversations Get",
-                  "type": "array"
+                  "$ref": "#/components/schemas/ConversationListResponse"
                 }
               }
             },
@@ -6440,9 +6777,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Conversation Api Chat Conversations Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationSummaryResponse"
                 }
               }
             },
@@ -6450,6 +6785,48 @@
           }
         },
         "summary": "Create Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/conversations/backup": {
+      "post": {
+        "description": "Export conversations as JSON files to an explicit destination.\n\nThis is the user-facing replacement of the removed automatic JSON\nmirror (spec §5.2): SQLite is the single source of truth and backups\nhappen only on explicit command (UI entry or agent tool).",
+        "operationId": "backup_conversations_api_chat_conversations_backup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Backup Conversations",
         "tags": [
           "chat"
         ]
@@ -6464,9 +6841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Conversation Api Chat Conversations Import Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationSummaryResponse"
                 }
               }
             },
@@ -6500,11 +6875,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Conversation Api Chat Conversations  Conversation Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteConversationResponse"
                 }
               }
             },
@@ -6601,7 +6972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BranchConversationResponse"
+                  "$ref": "#/components/schemas/ConversationSummaryResponse"
                 }
               }
             },
@@ -6645,9 +7016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Export Conversation Api Chat Conversations  Conversation Id  Export Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationExport"
                 }
               }
             },
@@ -6665,54 +7034,6 @@
           }
         },
         "summary": "Export Conversation",
-        "tags": [
-          "chat"
-        ]
-      }
-    },
-    "/api/chat/conversations/{conversation_id}/file-path": {
-      "get": {
-        "description": "Return the absolute filesystem path of the conversation JSON file.\n\nUsed by the Electron frontend to open the file in the system explorer.",
-        "operationId": "get_conversation_file_path_api_chat_conversations__conversation_id__file_path_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "conversation_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Conversation Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Get Conversation File Path Api Chat Conversations  Conversation Id  File Path Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Conversation File Path",
         "tags": [
           "chat"
         ]
@@ -6739,9 +7060,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Switch Version Api Chat Conversations  Conversation Id  Switch Version Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SwitchVersionResponse"
                 }
               }
             },
@@ -6785,9 +7104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Conversation Title Api Chat Conversations  Conversation Id  Title Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TitleUpdateResponse"
                 }
               }
             },

@@ -20,6 +20,7 @@ exception to the ``core ↛ services`` layering contract (see
 from backend.core.bootstrap.conversation import stage_conversation
 from backend.core.bootstrap.database import stage_database
 from backend.core.bootstrap.inference import stage_inference
+from backend.core.bootstrap.jarvis import stage_jarvis
 from backend.core.bootstrap.knowledge import stage_knowledge
 from backend.core.bootstrap.platform import stage_platform
 from backend.core.bootstrap.plugins import stage_plugins
@@ -33,6 +34,7 @@ __all__ = [
     "stage_conversation",
     "stage_database",
     "stage_inference",
+    "stage_jarvis",
     "stage_knowledge",
     "stage_platform",
     "stage_plugins",

@@ -19,6 +19,7 @@ from backend.core.bootstrap import (
     stage_conversation,
     stage_database,
     stage_inference,
+    stage_jarvis,
     stage_knowledge,
     stage_platform,
     stage_plugins,
@@ -57,6 +58,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         await stage_surfaces(ctx)
         await stage_conversation(ctx)
         await stage_workspace(ctx)
+        await stage_jarvis(ctx)
 
         app.state.context = ctx
         app.state.engine = ctx.engine

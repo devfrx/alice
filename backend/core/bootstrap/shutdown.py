@@ -22,6 +22,14 @@ async def shutdown_services(ctx: AppContext | None) -> None:
     if ctx is None:
         return
 
+    # Stop autonomous-turn triggers first: nothing new should fire while
+    # the rest of the platform is tearing down.
+    if ctx.trigger_service is not None:
+        try:
+            await ctx.trigger_service.shutdown()
+        except Exception as exc:
+            logger.error("Trigger service shutdown error: {}", exc)
+
     # Stop orchestrator polling first so health probes don't race with
     # the legacy per-service shutdown calls below.
     if ctx.orchestrator is not None:

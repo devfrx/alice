@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.plugins.terminal.security import (
+from backend.services.terminal.security import (
     build_argv,
     ensure_sandbox,
     validate_cwd_within_scope,

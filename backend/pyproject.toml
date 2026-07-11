@@ -73,6 +73,7 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.8",
     "mypy>=1.13",
+    "import-linter>=2.1",
 ]
 # STT
 stt = [
@@ -189,3 +190,60 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
+
+[tool.importlinter]
+root_packages = ["backend"]
+include_external_packages = true
+
+# §4.1 — a plugin never imports another plugin.
+[[tool.importlinter.contracts]]
+name = "plugins are independent"
+type = "independence"
+modules = ["backend.plugins.*"]
+
+# §4.2 — routes never import plugin internals (they go through
+# ctx.plugin_manager / services-layer protocols).
+[[tool.importlinter.contracts]]
+name = "api does not import plugins"
+type = "forbidden"
+source_modules = ["backend.api"]
+forbidden_modules = ["backend.plugins"]
+
+# §4.3 — services never import the api layer.
+[[tool.importlinter.contracts]]
+name = "services do not import api"
+type = "forbidden"
+source_modules = ["backend.services"]
+forbidden_modules = ["backend.api"]
+
+# §4 (dipendenze solo verso il basso) — services never import plugins.
+[[tool.importlinter.contracts]]
+name = "services do not import plugins"
+type = "forbidden"
+source_modules = ["backend.services"]
+forbidden_modules = ["backend.plugins"]
+
+# §4.4 — Continuum is a separate project consumed over HTTP only.
+[[tool.importlinter.contracts]]
+name = "no imports from the continuum project"
+type = "forbidden"
+source_modules = ["backend"]
+forbidden_modules = ["continuum"]
+
+# §4 — core depends only on protocols; the composition root
+# (app + bootstrap stages), the managed-service adapters and two
+# documented protocol re-exports are the sanctioned exceptions.
+[[tool.importlinter.contracts]]
+name = "core does not import services or api"
+type = "forbidden"
+source_modules = ["backend.core"]
+forbidden_modules = ["backend.services", "backend.api"]
+ignore_imports = [
+    "backend.core.app -> backend.api.**",
+    "backend.core.bootstrap.* -> backend.services.**",
+    "backend.core.bootstrap.* -> backend.api.**",
+    "backend.core.managed_services.* -> backend.services.*",
+    "backend.core.protocols -> backend.services.knowledge.protocol",
+    "backend.core.context -> backend.services.rag_readiness",
+    "backend.core.service_groups -> backend.services.rag_readiness",
+]

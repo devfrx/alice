@@ -8,9 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-import uuid
 from pathlib import Path
-from typing import Any
 
 from loguru import logger
 from qdrant_client import models
@@ -18,18 +16,15 @@ from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
 from backend.core.config import QdrantConfig
 
+# Re-export: kept for pre-Fase 5 import sites (`from ...qdrant_service import ...`).
+from backend.core.vector_collections import COLLECTION_TOOLS, PROJECT_NS  # noqa: F401
+
 # ---------------------------------------------------------------------------
 # Collection constants
 # ---------------------------------------------------------------------------
 
 COLLECTION_MEMORY = "alice_memory"
 """Memory entries (Phase 9)."""
-
-COLLECTION_TOOLS = "alice_tools"
-"""Tool definition embeddings (Tool RAG)."""
-
-PROJECT_NS = uuid.UUID("a1c3e5f7-0000-4000-8000-000000000000")
-"""Namespace UUID for deterministic tool IDs via uuid5."""
 
 _log = logger.bind(component="QdrantService")
 

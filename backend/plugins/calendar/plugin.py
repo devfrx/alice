@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from dateutil import parser as dt_parser
 from dateutil.rrule import rrulestr
 from loguru import logger
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import select
 from zoneinfo import ZoneInfo
 
 from backend.core.event_bus import AliceEvent
@@ -28,45 +28,14 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
-from backend.plugins.calendar.utils import (
+from backend.services.calendar_events import (
     MAX_OCCURRENCES,
+    CalendarEvent,
     validate_rrule,
 )
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
-
-
-# ---------------------------------------------------------------------------
-# DB Model
-# ---------------------------------------------------------------------------
-
-
-class CalendarEvent(SQLModel, table=True):
-    """A single calendar event stored locally."""
-
-    __tablename__ = "calendar_events"
-    __table_args__ = (
-        sa.Index("ix_calendar_events_start_time", "start_time"),
-    )
-
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    title: str = Field(max_length=256)
-    description: str | None = Field(default=None, max_length=2000)
-    start_time: datetime = Field(
-        sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False),
-    )
-    end_time: datetime = Field(
-        sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False),
-    )
-    recurrence_rule: str | None = Field(default=None, max_length=512)
-    reminder_minutes: int | None = Field(default=None)
-    external_id: str | None = Field(default=None, max_length=256)
-    external_source: str | None = Field(default=None, max_length=128)
-    created_by: str = Field(default="user", max_length=64)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-    )
 
 
 # ---------------------------------------------------------------------------

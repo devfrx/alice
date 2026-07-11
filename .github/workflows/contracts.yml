@@ -47,6 +47,11 @@ jobs:
           ..\.venv\Scripts\python.exe -m pytest tests/contracts/ -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Import layering (import-linter)
+        run: |
+          .\.venv\Scripts\lint-imports --config backend/pyproject.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Generated artifacts are fresh
         run: .\scripts\check-contracts.ps1
 

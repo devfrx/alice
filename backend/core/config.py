@@ -327,8 +327,6 @@ class VoiceConfig(BaseSettings):
     silence_timeout_ms: int = 1500
     auto_tts_response: bool = True
     """Automatically speak LLM responses when voice mode is active."""
-    voice_confirmation_enabled: bool = True
-    """Use voice for tool confirmation (say 'sì'/'no')."""
 
 
 class PcAutomationConfig(BaseSettings):
@@ -344,8 +342,6 @@ class PcAutomationConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ALICE_PC_AUTOMATION__")
 
-    enabled: bool = False
-    """Whether PC automation tools are available."""
     screenshot_lockout_s: int = 60
     """Seconds to block dangerous tools after a screenshot."""
     command_timeout_s: int = 30
@@ -517,7 +513,6 @@ class NotificationsConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_NOTIFICATIONS__")
 
     app_id: str = "AL\\CE"
-    sound_enabled: bool = True
     default_timeout_s: int = 5
     max_active_timers: int = 20
 
@@ -1199,6 +1194,27 @@ def _migrate_pc_automation_permissions(data: dict[str, Any]) -> None:
     )
 
 
+# Dead flags removed in Fase 5 (never read by any consumer).  Stale keys
+# persisted in system.yaml/user.yaml must be dropped per layer because
+# every config model forbids unknown fields.
+_REMOVED_LEGACY_KEYS: tuple[tuple[str, str], ...] = (
+    ("voice", "voice_confirmation_enabled"),
+    ("pc_automation", "enabled"),
+    ("notifications", "sound_enabled"),
+)
+
+
+def _strip_removed_legacy_keys(data: dict[str, Any]) -> None:
+    """Drop config keys removed in Fase 5 from a raw layer dict, in place."""
+    for section, key in _REMOVED_LEGACY_KEYS:
+        block = data.get(section)
+        if isinstance(block, dict) and key in block:
+            block.pop(key)
+            logger.info(
+                "Dropped removed legacy config key '{}.{}'", section, key,
+            )
+
+
 def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
     """Fold renamed legacy config keys into their current location, in place.
 
@@ -1232,6 +1248,7 @@ def migrate_legacy_config_keys(data: dict[str, Any]) -> dict[str, Any]:
 
     # pc_automation → permissions (independent of the agent_tools block below).
     _migrate_pc_automation_permissions(data)
+    _strip_removed_legacy_keys(data)
 
     legacy = data.pop("agent_tools", None)
     if not isinstance(legacy, dict):

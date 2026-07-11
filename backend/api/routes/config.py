@@ -299,12 +299,10 @@ async def get_config(request: Request) -> dict[str, Any]:
         },
         "voice": {
             "auto_tts_response": cfg.voice.auto_tts_response,
-            "voice_confirmation_enabled": cfg.voice.voice_confirmation_enabled,
             "activation_mode": cfg.voice.activation_mode,
             "wake_word": cfg.voice.wake_word,
         },
         "pc_automation": {
-            "enabled": cfg.pc_automation.enabled,
             # Storage moved to the neutral ``permissions`` block in Fase 2;
             # the response keeps the historical shape for the settings UI.
             "confirmations_enabled": cfg.permissions.confirmations_enabled,
@@ -605,13 +603,6 @@ async def update_config(request: Request) -> dict[str, Any]:
                 cfg.voice, "auto_tts_response",
                 voice_updates["auto_tts_response"],
             )
-        if "voice_confirmation_enabled" in voice_updates:
-            if not isinstance(voice_updates["voice_confirmation_enabled"], bool):
-                raise HTTPException(400, "voice_confirmation_enabled must be a boolean")
-            object.__setattr__(
-                cfg.voice, "voice_confirmation_enabled",
-                voice_updates["voice_confirmation_enabled"],
-            )
         if "activation_mode" in voice_updates:
             mode = str(voice_updates["activation_mode"]).strip()
             if mode not in ("push_to_talk", "wake_word", "always_on"):
@@ -631,13 +622,6 @@ async def update_config(request: Request) -> dict[str, Any]:
 
     if "pc_automation" in body:
         pc_updates = body["pc_automation"]
-        if "enabled" in pc_updates:
-            if not isinstance(pc_updates["enabled"], bool):
-                raise HTTPException(400, "pc_automation.enabled must be a boolean")
-            object.__setattr__(
-                cfg.pc_automation, "enabled",
-                pc_updates["enabled"],
-            )
         if "confirmations_enabled" in pc_updates:
             if not isinstance(pc_updates["confirmations_enabled"], bool):
                 raise HTTPException(400, "confirmations_enabled must be a boolean")

@@ -14,9 +14,9 @@ from sqlmodel import select
 from zoneinfo import ZoneInfo
 
 from backend.core.context import AppContext
-from backend.plugins.calendar.plugin import CalendarEvent
-from backend.plugins.calendar.utils import (
+from backend.services.calendar_events import (
     MAX_OCCURRENCES,
+    CalendarEvent,
     validate_rrule,
 )
 

@@ -15,7 +15,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.db.models import ConversationPlan
 
@@ -77,7 +78,7 @@ class PlanService:
     def __init__(
         self,
         *,
-        session_factory: async_sessionmaker[AsyncSession],
+        session_factory: async_sessionmaker[SQLModelAsyncSession],
         event_callback: EventCallback | None = None,
     ) -> None:
         """Build a new plan service.

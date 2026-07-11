@@ -18,7 +18,7 @@ from loguru import logger
 
 def create_engine_and_session(
     db_url: str,
-) -> tuple[AsyncEngine, async_sessionmaker]:
+) -> tuple[AsyncEngine, async_sessionmaker[SQLModelAsyncSession]]:
     """Create an async engine and a session factory.
 
     Args:

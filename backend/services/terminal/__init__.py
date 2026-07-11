@@ -10,7 +10,7 @@ Layering mirrors :mod:`backend.services.scope_service`: an in-memory,
 per-conversation registry (:class:`~backend.services.terminal.manager.TerminalSessionManager`)
 with synchronous reads for the engine and async mutations that emit events onto
 the events WebSocket.  Confinement reuses the proven primitives in
-:mod:`backend.plugins.terminal.security` (``validate_cwd_within_scope`` /
+:mod:`backend.services.terminal.security` (``validate_cwd_within_scope`` /
 ``ensure_sandbox``); process-tree teardown uses a Win32 Job Object
 (:mod:`backend.services.terminal.job`).  The PTY itself is abstracted behind the
 :class:`~backend.services.terminal.pty_backend.PtyProcess` protocol so the

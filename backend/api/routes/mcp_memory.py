@@ -15,9 +15,9 @@ from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.core.context import AppContext
+from backend.services.mcp_gateway import require_mcp_session
 
 if TYPE_CHECKING:
-    from backend.plugins.mcp_client.plugin import McpClientPlugin
     from backend.services.mcp_session import McpSession
 
 router = APIRouter(prefix="/mcp/memory", tags=["mcp-memory"])
@@ -29,25 +29,9 @@ _SERVER_NAME = "memory"
 
 
 def _get_memory_session(request: Request) -> McpSession:
-    """Retrieve the live MCP 'memory' session.
-
-    Raises:
-        HTTPException 503: MCP client plugin or memory session unavailable.
-    """
+    """Retrieve the live MCP 'memory' session (503 when unavailable)."""
     ctx: AppContext = request.app.state.context
-    if ctx.plugin_manager is None:
-        raise HTTPException(503, "Plugin manager not available")
-
-    plugin: McpClientPlugin | None = ctx.plugin_manager.get_plugin("mcp_client")
-    if plugin is None:
-        raise HTTPException(503, "MCP client plugin not loaded")
-
-    # Use the plugin's public accessor to fetch the live session.
-    session = plugin.get_session(_SERVER_NAME)
-    if session is None:
-        raise HTTPException(503, f"MCP server '{_SERVER_NAME}' not connected")
-
-    return session
+    return require_mcp_session(ctx, _SERVER_NAME)
 
 
 async def _call(session: McpSession, tool: str, args: dict[str, Any]) -> Any:

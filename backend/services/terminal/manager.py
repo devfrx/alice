@@ -16,7 +16,7 @@ Design (mirrors ``ScopeService``):
 * **exactly one** ``agent_assigned`` session per conversation — assigning a new
   one clears the previous;
 * working-directory confinement reuses the proven, separately-reviewed
-  primitives in :mod:`backend.plugins.terminal.security`
+  primitives in :mod:`backend.services.terminal.security`
   (``validate_cwd_within_scope`` / ``ensure_sandbox``) — the single tested copy
   rather than a third replica;
 * process-tree teardown via a Win32 :class:`~backend.services.terminal.job.ProcessJob`.
@@ -39,9 +39,9 @@ from typing import Any
 from loguru import logger
 
 from backend.core.config import WorkspaceScopeConfig
-from backend.plugins.terminal.security import ensure_sandbox, validate_cwd_within_scope
 from backend.services.terminal.job import ProcessJob
 from backend.services.terminal.pty_backend import PtyProcess, spawn_pty
+from backend.services.terminal.security import ensure_sandbox, validate_cwd_within_scope
 from backend.services.terminal.session import TerminalSession
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None]]

@@ -291,8 +291,11 @@ class PermissionService:
         # 2-bis. UI commands (Fase 7, spec §7): the EFFECTIVE capability is
         # the invoked command's manifest tag, not the tool's own — resolve it
         # per-call and apply the §7 matrix. Grants and allow/ask rules keep
-        # their usual precedence; the deny rule above already won.
-        if UI_COMMAND_CAPABILITY in caps:
+        # their usual precedence; the deny rule above already won. A hybrid
+        # declaring ui_command TOGETHER with fs/exec capabilities does NOT
+        # take this branch: it falls through to scope confinement below, so
+        # the tag can never be used to skip the by-construction fs guard.
+        if UI_COMMAND_CAPABILITY in caps and not (is_fs or is_exec):
             return self._decide_ui_command(args, mode, granted=granted, rule=rule)
 
         # 3 + 4. filesystem scope confinement (by construction).
@@ -368,6 +371,9 @@ class PermissionService:
         clean "unknown command" / "UI not available" result.
         """
         command = str(args.get("name", ""))
+        # The provider only ever returns manifest-validated tags (the bridge
+        # rejects out-of-vocabulary capabilities at ingestion); any other
+        # non-falsy string still lands in the destructive-equivalent branch.
         capability = (
             self._command_capability_provider(command)
             if self._command_capability_provider is not None
@@ -376,6 +382,10 @@ class PermissionService:
         if capability in ("navigation", "read"):
             return GateDecision.allow()
         if mode is PermissionMode.PLAN:
+            logger.info(
+                "Permission: ui command '{}' denied in plan mode (capability {})",
+                command, capability,
+            )
             return GateDecision.deny(PermissionOutcome.DENY_PLAN_MODE, "plan_mode")
         if granted or rule is RuleEffect.ALLOW:
             return GateDecision.allow()

@@ -16,6 +16,8 @@ connection manager; inbound frames are validated by the events route.
 from __future__ import annotations
 
 import asyncio
+import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -41,6 +43,14 @@ GUARDRAIL_COMMAND_DOMAINS: frozenset[str] = frozenset({
 _VALID_CAPABILITIES: frozenset[str] = frozenset({
     "navigation", "read", "mutate", "destructive",
 })
+
+#: Strict grammar for agent-callable command names: lowercase dotted
+#: ``domain.action`` segments. Ingestion NFKC-normalizes, strips, then
+#: rejects anything outside this grammar BEFORE the guardrail-domain check,
+#: collapsing the whole unicode/whitespace/case trick space — the backend
+#: leg of the anti-escalation gate must hold on its own against a
+#: misbehaving frontend.
+_COMMAND_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,10 +184,22 @@ class CommandBridgeService:
         """
         accepted: dict[str, CommandSpec] = {}
         for entry in entries:
-            name = str(entry.get("name", ""))
+            raw_name = str(entry.get("name", ""))
+            name = unicodedata.normalize("NFKC", raw_name).strip()
             capability = str(entry.get("capability", ""))
-            domain = name.split(".", 1)[0].lower()
-            if not name or domain in GUARDRAIL_COMMAND_DOMAINS:
+            if not name:
+                logger.warning(
+                    "Command Bridge: rejected manifest entry with empty name",
+                )
+                continue
+            if not _COMMAND_NAME_PATTERN.match(name):
+                logger.warning(
+                    "Command Bridge: rejected command with invalid name {!r}",
+                    raw_name,
+                )
+                continue
+            domain = name.split(".", 1)[0]
+            if domain in GUARDRAIL_COMMAND_DOMAINS:
                 logger.warning(
                     "Command Bridge: rejected guardrail command '{}' from manifest",
                     name,
@@ -194,6 +216,10 @@ class CommandBridgeService:
                     "Command Bridge: command '{}' disabled by configuration", name,
                 )
                 continue
+            if name in accepted:
+                logger.debug(
+                    "Command Bridge: duplicate manifest entry '{}' (last wins)", name,
+                )
             args_schema = entry.get("args_schema")
             accepted[name] = CommandSpec(
                 name=name,
@@ -294,7 +320,7 @@ class CommandBridgeService:
             return {
                 "ok": False,
                 "error": (
-                    f"UI did not respond to '{name}' within {self._timeout_s:.0f}s"
+                    f"UI did not respond to '{name}' within {self._timeout_s:g}s"
                 ),
             }
         except Exception as exc:  # noqa: BLE001 — a clean result, never an exception
@@ -329,9 +355,15 @@ class CommandBridgeService:
             ``ToolResult.error``.
         """
         name = str(args.get("name", ""))
-        command_args = args.get("args") or {}
+        command_args = args.get("args")
+        if command_args is None:
+            command_args = {}
         if not isinstance(command_args, dict):
             return ToolResult.error("app_command: 'args' must be an object")
+        # NB: the permission gate resolved this command's capability at
+        # decide() time; a manifest update in between could re-tag it (TOCTOU).
+        # Only the trusted frontend can push manifests, and call_command still
+        # re-checks membership — accepted window.
         outcome = await self.call_command(
             name, command_args, conversation_id=context.conversation_id,
         )

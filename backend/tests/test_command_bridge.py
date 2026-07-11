@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from backend.api.ws_schema import validate_events_server
 from backend.core.plugin_models import ExecutionContext
 from backend.services.command_bridge import (
     CommandBridgeService,
@@ -88,6 +89,23 @@ async def test_manifest_rejects_guardrail_domains() -> None:
 
 
 @pytest.mark.asyncio
+async def test_manifest_rejects_malformed_and_disguised_names() -> None:
+    """Name grammar + NFKC normalization close the unicode/case trick space."""
+    bridge = _bridge(FakeWSManager(), FakeToolRegistry())
+    await bridge.set_manifest([
+        _entry("Permission.set", "mutate"),  # uppercase → invalid grammar
+        _entry(" permission.set", "mutate"),  # strips to a guardrail domain
+        _entry("ｐermission.set", "mutate"),  # fullwidth p, NFKC-folds to guardrail
+        _entry("view", "navigation"),  # no dot → invalid grammar
+        _entry("", "navigation"),  # empty name
+    ])
+    assert bridge.capability_of("Permission.set") is None
+    assert bridge.capability_of("permission.set") is None
+    assert bridge.capability_of("view") is None
+    assert bridge.capability_of("") is None
+
+
+@pytest.mark.asyncio
 async def test_manifest_drops_disabled_commands_and_reregisters_tool() -> None:
     registry = FakeToolRegistry()
     bridge = _bridge(FakeWSManager(), registry, disabled=["conversation.new"])
@@ -131,6 +149,9 @@ async def test_call_roundtrip_resolves_on_command_result() -> None:
         assert frame["type"] == "command.request"
         assert frame["origin"] == "agent"
         assert frame["name"] == "view.switch"
+        # The bridge builds the frame as a raw dict (layering): pin it to the
+        # ws_schema contract so drift fails HERE, not as a prod warning.
+        validate_events_server(frame)
         bridge.resolve(frame["correlation_id"], {"ok": True, "result": {"view": "board"}})
 
     task = asyncio.create_task(respond())
@@ -139,6 +160,25 @@ async def test_call_roundtrip_resolves_on_command_result() -> None:
     )
     await task
     assert outcome == {"ok": True, "result": {"view": "board"}}
+    assert bridge._pending == {}
+
+
+@pytest.mark.asyncio
+async def test_roundtrip_error_payload_maps_to_clean_error() -> None:
+    ws = FakeWSManager()
+    bridge = _bridge(ws, FakeToolRegistry())
+    await bridge.set_manifest([_entry("view.switch")])
+
+    async def respond() -> None:
+        while not ws.sent:
+            await asyncio.sleep(0.01)
+        bridge.resolve(ws.sent[0]["correlation_id"], {"ok": False, "error": "boom"})
+
+    task = asyncio.create_task(respond())
+    outcome = await bridge.call_command("view.switch", {}, conversation_id="c1")
+    await task
+    assert outcome == {"ok": False, "error": "boom"}
+    assert bridge._pending == {}
 
 
 @pytest.mark.asyncio
@@ -148,6 +188,7 @@ async def test_call_times_out_cleanly() -> None:
     outcome = await bridge.call_command("view.switch", {}, conversation_id="c1")
     assert outcome["ok"] is False
     assert "did not respond" in outcome["error"]
+    assert bridge._pending == {}
 
 
 @pytest.mark.asyncio

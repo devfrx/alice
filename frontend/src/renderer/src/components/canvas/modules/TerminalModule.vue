@@ -25,9 +25,9 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import AppIcon from '../../ui/AppIcon.vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
-import { useChatStore } from '../../../stores/chat'
-import { useTerminalSessionsStore } from '../../../stores/terminalSessions'
-import type { TerminalSession } from '../../../types/terminal'
+import { useChatStore } from '@renderer/stores/chat'
+import { useTerminalSessionsStore } from '@renderer/stores/terminalSessions'
+import type { TerminalSession } from '@renderer/types/terminal'
 
 defineProps<{
   params?: Record<string, unknown>

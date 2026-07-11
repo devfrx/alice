@@ -24,9 +24,9 @@
 import { computed, onMounted, watch } from 'vue'
 
 import UiEmptyState from '../../ui/UiEmptyState.vue'
-import { useChatStore } from '../../../stores/chat'
-import { usePlanDocumentStore } from '../../../stores/planDocument'
-import { renderMarkdown } from '../../../composables/useMarkdown'
+import { useChatStore } from '@renderer/stores/chat'
+import { usePlanDocumentStore } from '@renderer/stores/planDocument'
+import { renderMarkdown } from '@renderer/composables/useMarkdown'
 
 defineProps<{
   params?: Record<string, unknown>

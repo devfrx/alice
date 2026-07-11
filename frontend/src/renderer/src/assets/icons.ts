@@ -171,9 +171,6 @@ const _ICONS = {
   /** Sidebar-only layout */
   'hybrid-sidebar': { icon: 'solar:sidebar-minimalistic-bold' },
 
-  /** Home / full-screen layout */
-  'hybrid-home': { icon: 'solar:home-2-bold' },
-
   /** Terminal / code console */
   terminal: { icon: 'solar:code-square-bold' },
 

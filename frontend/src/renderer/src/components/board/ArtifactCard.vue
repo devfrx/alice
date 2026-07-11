@@ -7,11 +7,11 @@
  * back to the parent for store mutation and routing.
  */
 import { computed, defineAsyncComponent } from 'vue'
-import { useRouter } from 'vue-router'
 import AppIcon from '../ui/AppIcon.vue'
 import UiBadge from '../ui/UiBadge.vue'
 import UiCard from '../ui/UiCard.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
+import { commandRegistry } from '../../commands'
 import { resolveBackendUrl } from '../../services/api'
 import { useChatStore } from '../../stores/chat'
 import type { Artifact, ArtifactKind } from '../../types/artifacts'
@@ -27,7 +27,6 @@ const emit = defineEmits<{
   delete: [id: string]
 }>()
 
-const router = useRouter()
 const chatStore = useChatStore()
 
 const KIND_LABEL: Record<ArtifactKind, string> = {
@@ -69,22 +68,14 @@ const formattedSize = computed(() => {
 const downloadHref = computed(() => resolveBackendUrl(props.artifact.download_url))
 
 async function openConversation(): Promise<void> {
-  // Load the artifact's conversation into the chat store, then land on
-  // Horizon — the only chat surface since Fase 6.
+  // Open the artifact's conversation on Horizon via the command layer —
+  // one implementation per capability (spec §4.1/§7).
   const convId = props.artifact.conversation_id
   if (!convId) return
   try {
-    await chatStore.loadConversation(convId)
+    await commandRegistry.execute('conversation.open', { conversation_id: convId })
   } catch (err) {
-    console.error(`[ArtifactCard] Failed to load conversation ${convId}:`, err)
-    return
-  }
-  if (router.currentRoute.value.name !== 'assistant') {
-    try {
-      await router.push('/assistant')
-    } catch (err) {
-      console.error('[ArtifactCard] Navigation failed:', err)
-    }
+    console.error(`[ArtifactCard] Failed to open conversation ${convId}:`, err)
   }
 }
 </script>

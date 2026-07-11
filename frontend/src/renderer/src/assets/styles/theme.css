@@ -27,10 +27,6 @@
   --surface-active: rgba(232, 220, 200, 0.06); /* Interactive surface active/pressed */
   --surface-selected: rgba(232, 220, 200, 0.08); /* Selected item background */
   --surface-inset: rgba(0, 0, 0, 0.2); /* Inset surfaces (well, trough) */
-
-  /* Chat edge fades (used by ChatPanel message columns) */
-  --chat-edge-fade-top: 20px;
-  --chat-edge-fade-bottom: 28px;
 }
 
 /* ── Typography ────────────────────────────────────────────── */

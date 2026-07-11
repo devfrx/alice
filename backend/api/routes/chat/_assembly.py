@@ -88,6 +88,29 @@ def _coerce_tier_guidance(
     return result
 
 
+def _apply_voice_trim(
+    ctx: Any, tools: list[dict[str, Any]] | None, *, source: str | None,
+) -> list[dict[str, Any]] | None:
+    """Trim the toolset for voice turns (Fase 8, ``agent.voice.max_tools``).
+
+    Voice favours a fast first token over broad tool coverage; the gating
+    policy stays identical — only the offered surface shrinks. ``0``
+    disables the trim.
+    """
+    if source != "voice" or not tools:
+        return tools
+    voice_cap = ctx.config.agent.voice.max_tools
+    if voice_cap <= 0 or len(tools) <= voice_cap:
+        return tools
+    if ctx.tool_registry is None:
+        return tools
+    return ctx.tool_registry.limit_tools(
+        tools,
+        max_tools=voice_cap,
+        priority_plugins=ctx.config.llm.priority_plugins,
+    )
+
+
 @dataclass(slots=True)
 class AssemblyResult:
     """Bundle returned by :meth:`TurnAssembler.assemble`.
@@ -419,6 +442,10 @@ class TurnAssembler:
                         max_tools=ctx.config.llm.max_tools,
                         priority_plugins=ctx.config.llm.priority_plugins,
                     )
+
+            # Fase 8: voice turns get a trimmed toolset for latency
+            # (same gating policy, smaller offered surface).
+            tools = _apply_voice_trim(ctx, tools, source=data.get("source"))
 
             # Align the offered toolset with the active permission tier.
             # Presence of the meta-tools is guaranteed by ``always_offered``

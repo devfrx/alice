@@ -2652,7 +2652,7 @@ export interface components {
             observations?: string[];
         };
         EventsClientMessage: components["schemas"]["WsPing"] | components["schemas"]["WsTerminalInput"] | components["schemas"]["WsTerminalResize"] | components["schemas"]["WsCommandManifest"] | components["schemas"]["WsCommandResult"];
-        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsArtifactBulkDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"] | components["schemas"]["WsCommandRequest"];
+        EventsServerMessage: components["schemas"]["WsPong"] | components["schemas"]["WsHeartbeat"] | components["schemas"]["WsMcpServerConnected"] | components["schemas"]["WsMcpServerDisconnected"] | components["schemas"]["WsEmailReceived"] | components["schemas"]["WsEmailSent"] | components["schemas"]["WsNoteCreated"] | components["schemas"]["WsNoteUpdated"] | components["schemas"]["WsNoteDeleted"] | components["schemas"]["WsServiceStatus"] | components["schemas"]["WsKnowledgeStatus"] | components["schemas"]["WsModelDownloadProgress"] | components["schemas"]["WsArtifactCreated"] | components["schemas"]["WsArtifactUpdated"] | components["schemas"]["WsArtifactDeleted"] | components["schemas"]["WsArtifactBulkDeleted"] | components["schemas"]["WsTasksUpdated"] | components["schemas"]["WsPlanDocumentUpdated"] | components["schemas"]["WsScopeUpdated"] | components["schemas"]["WsPermissionModeUpdated"] | components["schemas"]["WsCalendarChanged"] | components["schemas"]["WsConfigChanged"] | components["schemas"]["WsTerminalSessionOpened"] | components["schemas"]["WsTerminalOutput"] | components["schemas"]["WsTerminalClosed"] | components["schemas"]["WsTerminalRenamed"] | components["schemas"]["WsTerminalAssigned"] | components["schemas"]["WsCommandRequest"] | components["schemas"]["WsBackgroundTaskUpdated"] | components["schemas"]["WsAttentionRaised"];
         /**
          * ExportedAttachment
          * @description One attachment inside an exported message.
@@ -3616,6 +3616,96 @@ export interface components {
              * @enum {string}
              */
             type: "ask_user_response";
+        };
+        /**
+         * WsAttentionRaised
+         * @description The AttentionService decided to surface initiative to the user.
+         */
+        WsAttentionRaised: {
+            /**
+             * Conversation Id
+             * @default null
+             */
+            conversation_id?: string | null;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /** Message */
+            message: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Priority
+             * @default normal
+             * @enum {string}
+             */
+            priority?: "low" | "normal" | "urgent";
+            /** Source */
+            source: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "attention.raised";
+        };
+        /**
+         * WsBackgroundTaskUpdated
+         * @description A background task was created or changed state (Fase 8, spec §8).
+         *
+         *     Carries the FULL task snapshot so the FE store can fold it directly
+         *     (same philosophy as ``tasks.updated``).
+         */
+        WsBackgroundTaskUpdated: {
+            /**
+             * Conversation Id
+             * @default null
+             */
+            conversation_id?: string | null;
+            /**
+             * Correlation Id
+             * @default null
+             */
+            correlation_id?: string | null;
+            /**
+             * Detail
+             * @default null
+             */
+            detail?: string | null;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /**
+             * Origin
+             * @default system
+             * @enum {string}
+             */
+            origin?: "user" | "agent" | "system";
+            /**
+             * Progress
+             * @default null
+             */
+            progress?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed";
+            /** Task Id */
+            task_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "background_task.updated";
+            /** Updated At */
+            updated_at: string;
         };
         /**
          * WsCalendarChanged
@@ -5438,6 +5528,11 @@ export interface components {
              * @enum {string}
              */
             origin?: "user" | "agent" | "system";
+            /**
+             * Source
+             * @default null
+             */
+            source?: ("text" | "voice") | null;
         };
         /**
          * WsWarning

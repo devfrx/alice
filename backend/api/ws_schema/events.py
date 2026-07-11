@@ -348,14 +348,16 @@ class WsTerminalAssigned(EventsServerFrame):
 class WsCommandRequest(EventsServerFrame):
     """Command Layer RPC (spec §7): the kernel asks the UI to run a command.
 
-    First real consumer of the envelope's ``correlation_id``: the bridge
-    always sets it and the client MUST echo it verbatim on the matching
+    First real consumer of the envelope's ``correlation_id``: REQUIRED here
+    (narrowed from the envelope's optional default) — the bridge always sets
+    it and the client MUST echo it verbatim on the matching
     ``command.result`` frame. ``origin`` defaults to ``agent`` because the
     request is issued on the agent's behalf inside a turn.
     """
 
     type: Literal["command.request"]
     origin: Origin = "agent"
+    correlation_id: str
     name: str
     args: dict[str, Any] = Field(default_factory=dict)
     conversation_id: str | None = None
@@ -420,11 +422,13 @@ class WsCommandManifest(ClientFrame):
 class WsCommandResult(ClientFrame):
     """The UI's response to a ``command.request``.
 
-    ``correlation_id`` (envelope) must echo the request's id; a frame
-    without it is dropped by the route.
+    ``correlation_id`` must echo the request's id verbatim — REQUIRED here
+    (narrowed from the envelope's optional default) so a missing echo is a
+    validation error, not a silently dropped frame.
     """
 
     type: Literal["command.result"]
+    correlation_id: str
     ok: bool
     result: Any = None
     error: str | None = None

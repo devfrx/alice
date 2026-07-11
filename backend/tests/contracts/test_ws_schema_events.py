@@ -223,6 +223,41 @@ def test_extra_field_is_rejected() -> None:
         validate_events_server({"type": "pong", "surprise": 1})
 
 
+def test_command_manifest_capability_vocabulary_is_frozen() -> None:
+    """The capability Literal is security-relevant (gating + anti-escalation)."""
+    with pytest.raises(ValidationError):
+        validate_events_client({
+            "type": "command.manifest",
+            "commands": [{
+                "name": "x.y",
+                "description": "d",
+                "capability": "admin",
+                "args_schema": {"type": "object"},
+            }],
+        })
+
+
+def test_command_manifest_entry_rejects_extra_fields() -> None:
+    """extra='forbid' holds inside the nested manifest entry too."""
+    with pytest.raises(ValidationError):
+        validate_events_client({
+            "type": "command.manifest",
+            "commands": [{
+                "name": "x.y",
+                "description": "d",
+                "capability": "read",
+                "args_schema": {"type": "object"},
+                "surprise": 1,
+            }],
+        })
+
+
+def test_command_result_requires_correlation_id() -> None:
+    """A result that cannot be correlated is a contract violation, not a drop."""
+    with pytest.raises(ValidationError):
+        validate_events_client({"type": "command.result", "ok": True})
+
+
 def test_model_download_progress_allows_extra_fields() -> None:
     """The one intentional extra='allow' escape hatch must keep working."""
     validate_events_server({

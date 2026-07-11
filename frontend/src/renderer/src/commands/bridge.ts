@@ -34,7 +34,13 @@ export function buildCommandManifest(): CommandManifestEntry[] {
     }))
 }
 
-/** Send the current manifest to the backend (on WS open and on changes). */
+/**
+ * Send the current manifest to the backend (on WS open and on changes).
+ *
+ * NB: the registry has no change-notification hook yet — the exposed set is
+ * static after install, so `onopen` is the only caller. The first dynamic
+ * registration of an exposed command MUST call this too (backlog seam).
+ */
 export function sendCommandManifest(send: SendFrame): boolean {
   return send({ type: 'command.manifest', commands: buildCommandManifest() })
 }
@@ -42,13 +48,17 @@ export function sendCommandManifest(send: SendFrame): boolean {
 /** Execute a backend `command.request` and reply with `command.result`. */
 export async function handleCommandRequest(msg: WsCommandRequest, send: SendFrame): Promise<void> {
   const reply = (ok: boolean, result?: unknown, error?: string): void => {
-    void send({
+    const sent = send({
       type: 'command.result',
       correlation_id: msg.correlation_id,
       ok,
       result: result ?? null,
       error: error ?? null
     })
+    if (!sent) {
+      // The backend recovers via its RPC timeout; log so the drop is diagnosable.
+      console.warn('[Command Bridge] reply dropped (socket closed):', msg.correlation_id)
+    }
   }
   const def = commandRegistry.list().find((d) => d.name === msg.name)
   if (!def || def.exposeToAgent !== true) {
@@ -56,7 +66,12 @@ export async function handleCommandRequest(msg: WsCommandRequest, send: SendFram
     return
   }
   const args = (msg.args ?? {}) as Record<string, unknown>
-  const validationError = validateCommandArgs(def.argsSchema, args)
+  // Validate against the SAME fallback the manifest advertises: a schema-less
+  // exposed command is declared as "no args" and must reject any arg.
+  const validationError = validateCommandArgs(
+    def.argsSchema ?? { type: 'object', properties: {} },
+    args
+  )
   if (validationError) {
     reply(false, undefined, validationError)
     return

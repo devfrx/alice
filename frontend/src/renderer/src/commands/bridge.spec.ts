@@ -142,4 +142,23 @@ describe('handleCommandRequest', () => {
     expect(reply.ok).toBe(false)
     expect(reply.error).toBe('boom')
   })
+
+  it('rejects args for a schema-less exposed command (advertised as no-args)', async () => {
+    let ran = false
+    commandRegistry.register({
+      name: 'a.noargs',
+      title: 'A',
+      capability: 'navigation',
+      exposeToAgent: true,
+      run: () => {
+        ran = true
+      }
+    })
+    const { frames, send } = makeSender()
+    await handleCommandRequest(request('a.noargs', { sneaky: 1 }), send)
+    const reply = frames[0] as CommandResultFrame
+    expect(ran).toBe(false)
+    expect(reply.ok).toBe(false)
+    expect(reply.error).toMatch(/Unknown arg: sneaky/)
+  })
 })

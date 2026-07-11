@@ -22,11 +22,14 @@ export function validateCommandArgs(
   if (!schema || schema.type !== 'object') return null
   const properties = (schema.properties ?? {}) as Record<string, PropertySchema>
   const required = Array.isArray(schema.required) ? (schema.required as string[]) : []
+  // Own-property semantics everywhere: `key in args` / plain lookups would
+  // traverse the prototype chain, letting arg names like `constructor` or
+  // `toString` satisfy required keys or dodge the unknown-arg rejection.
   for (const key of required) {
-    if (!(key in args)) return `Missing required arg: ${key}`
+    if (!Object.hasOwn(args, key)) return `Missing required arg: ${key}`
   }
   for (const [key, value] of Object.entries(args)) {
-    const prop = properties[key]
+    const prop = Object.hasOwn(properties, key) ? properties[key] : undefined
     if (!prop) return `Unknown arg: ${key}`
     const error = validateValue(key, value, prop)
     if (error) return error

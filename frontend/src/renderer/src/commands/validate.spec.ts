@@ -38,4 +38,22 @@ describe('validateCommandArgs', () => {
     expect(validateCommandArgs(undefined, { anything: 1 })).toBeNull()
     expect(validateCommandArgs({ type: 'string' }, { anything: 1 })).toBeNull()
   })
+
+  it('rejects prototype-chain arg names (own-property semantics)', () => {
+    expect(validateCommandArgs(schema, { view: 'board', constructor: 1 })).toMatch(
+      /Unknown arg: constructor/
+    )
+    expect(validateCommandArgs(schema, { view: 'board', toString: 1 })).toMatch(
+      /Unknown arg: toString/
+    )
+  })
+
+  it('does not satisfy required keys via the prototype chain', () => {
+    const protoSchema = {
+      type: 'object',
+      properties: { constructor: { type: 'string' } },
+      required: ['constructor']
+    }
+    expect(validateCommandArgs(protoSchema, {})).toMatch(/Missing required arg: constructor/)
+  })
 })

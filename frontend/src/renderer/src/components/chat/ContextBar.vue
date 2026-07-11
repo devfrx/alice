@@ -286,10 +286,12 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
   justify-content: center;
   opacity: 0.8;
 }
-</style>
 
-<!-- Tooltip styles are NOT scoped (teleported outside component DOM) -->
-<style>
+/* ── Breakdown tooltip ── teleported to <body> to escape overflow:hidden,
+   but the markup is defined directly in THIS component's own template (not
+   handed to a child via a slot), so the compiler still stamps it with this
+   component's scope attribute — scoped rules keep matching it wherever
+   Teleport relocates the DOM node. */
 .alice-ctx-tip {
   position: fixed;
   z-index: var(--z-tooltip);

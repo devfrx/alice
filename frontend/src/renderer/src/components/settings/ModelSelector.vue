@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * ModelSelector.vue — Compact dropdown for switching models.
  *
@@ -70,7 +70,7 @@ function formatSize(bytes: number): string {
 }
 
 function truncateName(name: string, maxLen = 24): string {
-  return name.length > maxLen ? name.slice(0, maxLen) + '\u2026' : name
+  return name.length > maxLen ? name.slice(0, maxLen) + '…' : name
 }
 
 function toggle(): void {
@@ -437,13 +437,13 @@ onMounted(() => {
 .ms__chevron--open {
   transform: rotate(180deg);
 }
-</style>
 
-<!-- Dropdown content lives inside UiPopover's teleported slot, so these
-     rules are NOT scoped. Panel chrome (surface/border/radius/shadow/position/
-     z-index/transition) is owned by UiPopover — only content layout lives here. -->
-<style>
-/* ── Dropdown content (chrome comes from UiPopover) ───────────── */
+/* ── Dropdown content ── slot content teleported to <body> by UiPopover.
+   No `panel-class` is passed here, so unlike ChatToolControls/ScopeIndicator
+   there is no UiPopover-owned wrapper to reach: the entire dropdown
+   (`.ms__dropdown` and everything inside it) is written in THIS component's
+   own template as UiPopover's default slot, so it keeps this component's
+   scope attribute wherever Teleport relocates the DOM node. ─────────────── */
 .ms__dropdown {
   min-width: 340px;
   max-width: min(440px, calc(100vw - 32px));

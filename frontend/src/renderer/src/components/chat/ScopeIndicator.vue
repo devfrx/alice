@@ -306,15 +306,14 @@ function folderName(path: string): string {
 .scope-ind__chip-label {
   display: inline;
 }
-</style>
 
-<!-- Popover content styles are NOT scoped (slot is teleported with UiPopover) -->
-<style>
-.scope-ind__pop {
-  max-height: 360px;
-  overflow-y: auto;
-}
-
+/* ── Popover content ── slot content teleported to <body> by UiPopover.
+   These elements are written in THIS component's own template (as the
+   default slot passed to UiPopover), so the Vue compiler still stamps them
+   with this component's scope attribute — scoped rules keep matching them
+   no matter where Teleport relocates the DOM node. Only the popover's own
+   root wrapper (owned by UiPopover, see the global block below) is out of
+   reach. */
 .scope-ind__pop-head {
   display: flex;
   align-items: center;
@@ -483,5 +482,17 @@ function folderName(path: string): string {
 .scope-ind__add:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+</style>
+
+<!-- global: .scope-ind__pop is applied via UiPopover's `panel-class` prop
+     onto UiPopover's OWN root element (created by UiPopover's own template,
+     then teleported to <body>) — it carries UiPopover's scope attribute, not
+     this component's, so scoped CSS (with or without :deep()) cannot reach
+     it. -->
+<style>
+.scope-ind__pop {
+  max-height: 360px;
+  overflow-y: auto;
 }
 </style>

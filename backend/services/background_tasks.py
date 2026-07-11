@@ -44,6 +44,11 @@ class BackgroundTask:
 class BackgroundTaskService:
     """Registry + event emitter for observable background tasks.
 
+    Callers MUST reach a terminal state — wrap the work in ``try/except``
+    and call :meth:`fail` on error: running tasks are never pruned. Each
+    task is expected to have a single owner coroutine; concurrent mutators
+    may reorder the WS frames observers receive.
+
     Args:
         event_bus: Bus the per-change ``background_task.updated`` events are
             emitted on (bridged to the events WS in ``stage_surfaces``).
@@ -81,7 +86,10 @@ class BackgroundTaskService:
         progress: float | None = None,
         detail: str | None = None,
     ) -> None:
-        """Report progress on a running task; unknown/terminal ids are no-ops."""
+        """Report progress on a running task; unknown/terminal ids are no-ops.
+
+        ``None`` keeps the previous value (fields cannot be reset to ``None``).
+        """
         task = self._tasks.get(task_id)
         if task is None or task.status in _TERMINAL_STATUSES:
             return

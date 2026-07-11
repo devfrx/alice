@@ -5,18 +5,18 @@
 > verità nel repo: spec e piani citati sotto. Questo file SOSTITUISCE la versione precedente
 > (post-fase-7, stesso path); la storia è in git.
 
-## Stato del programma: TUTTE LE 8 FASI IMPLEMENTATE
+## Stato del programma: TUTTE LE 8 FASI COMPLETE E MERGIATE IN MAIN
 
 - **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9.
-- **Fasi 1a-7: COMPLETE, PUSHATE e MERGIATE in `main`** (fase 7 Command Bridge: merge `1e91a00`; docs allineate in `5b0cb8b`).
-- **Fase 8 «Fondamenta Jarvis»: COMPLETA su branch `arch/fase8-fondamenta-jarvis`** (17 commit,
-  `32ce1e9..d3e5420` + chiusura docs; figlio di `main` @ `5b0cb8b`). **NON mergiata, NON pushata**
-  — push e merge SOLO su richiesta esplicita dell'utente (decisione permanente).
+- **Fasi 1a-8: COMPLETE, MERGIATE e PUSHATE in `main`** (fase 7 Command Bridge: merge `1e91a00`;
+  **fase 8 Fondamenta Jarvis: merge `17035ac` su richiesta utente, 2026-07-11 notte**; branch
+  `arch/fase8-fondamenta-jarvis` anche su origin).
 - Review finale fase 8: **«Phase ready with notes»** (nessun finding bloccante; note N1-N4 nel
   backlog del piano). Piano chiuso e veritiero con esiti review per task + verdetto + backlog:
   `docs/superpowers/plans/2026-07-11-fase8-fondamenta-jarvis.md`.
-- **Era l'ULTIMA fase del programma.** Il seguito naturale è il backlog del piano fase 8 (16 voci,
-  molte ereditate dalle fasi precedenti) e le implementazioni ricche sopra le interfacce Jarvis.
+- **Il programma di risanamento è CONCLUSO.** Il seguito naturale è il backlog del piano fase 8
+  (16 voci, molte ereditate dalle fasi precedenti) e le implementazioni ricche sopra le
+  interfacce Jarvis (trigger user-configurabili, AttentionService ricco, UI background task).
 
 ## Pending esterni (verificare alla prossima occasione)
 
@@ -24,8 +24,8 @@
    apertura fare le TRE checklist (gate finale piano 6; step 9.6 piano 7; fase 8: toast attention
    forzando un `attention.raised` dal backend, store `backgroundTasks` popolato da uno
    spawn_subagent, turno voce con toolset ridotto nei log).
-2. CI `contracts.yml` sui push di main del 2026-07-11 (fasi 1-6 + fase 7 `1e91a00`): esito mai
-   verificato su GitHub. Il branch fase 8 non è pushato, quindi nessuna CI per ora.
+2. CI `contracts.yml` su GitHub: esito mai verificato per NESSUN push di main del 2026-07-11
+   (fasi 1-6, fase 7 `1e91a00`, fase 8 `17035ac`) — controllare le run alla prossima occasione.
 3. Chip/task `task_6c67e5a8` (fix suite lenta) ancora aperto.
 
 ## Cosa ha consegnato la Fase 8 (mappa rapida; dettagli nel piano)
@@ -148,5 +148,5 @@
   (Workspace `/workspace` primaria + Horizon `/assistant`) — il Workspace NON si rimuove MAI;
   visione = runtime agentico locale con Command Layer (invariante anti-escalation §7) e
   fondamenta Jarvis §8 (autonomia SEMPRE dentro i guardrail, §4.5).
-- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta. Il branch
-  `arch/fase8-fondamenta-jarvis` attende la decisione dell'utente.
+- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta (fase 8: richiesto e
+  fatto il 2026-07-11 notte, merge `17035ac`).

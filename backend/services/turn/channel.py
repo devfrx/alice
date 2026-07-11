@@ -473,8 +473,53 @@ class ScriptedInteractionChannel:
         self._connected = value
 
 
+class HeadlessInteractionChannel:
+    """Interaction channel for autonomous turns (Fase 8, spec §8).
+
+    There is no user on the other side: every interactive request resolves
+    to ``None`` immediately, which the middlewares already collapse into
+    clean, non-exceptional outcomes (tool confirmation → rejected, ask_user
+    → unanswered). Mirrors the Fase 7 "UI not available" philosophy: a
+    missing surface is a clean result, never an exception.
+    """
+
+    def __init__(self) -> None:
+        self._cancel_event = asyncio.Event()
+
+    async def request(
+        self,
+        kind: str,
+        payload: dict[str, Any],
+        *,
+        execution_id: str,
+        timeout_s: float,
+        cancel_event: asyncio.Event | None = None,
+    ) -> dict[str, Any] | None:
+        """Auto-decline: no user is available to answer ``kind``."""
+        logger.debug(
+            "Headless turn: interactive request '{}' auto-declined (exec_id={})",
+            kind, execution_id,
+        )
+        return None
+
+    @property
+    def cancelled(self) -> bool:
+        """Whether the internal cancel flag is up (never set by this class).
+
+        Headless turns are cancelled from outside via the runner's asyncio
+        task (e.g. ``TriggerService.shutdown``), not through this channel.
+        """
+        return self._cancel_event.is_set()
+
+    @property
+    def connected(self) -> bool:
+        """Always ``True``: the channel exists, its answers are just ``None``."""
+        return True
+
+
 __all__ = [
     "MALFORMED_FRAME_KEY",
+    "HeadlessInteractionChannel",
     "InteractionChannel",
     "ScriptedInteractionChannel",
     "WebSocketInteractionChannel",

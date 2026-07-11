@@ -14,8 +14,10 @@ context-isolation pattern used by Claude/GPT "task" tools.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -25,6 +27,9 @@ from backend.core.plugin_models import ExecutionContext
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
+
+ProgressCallback = Callable[[int, int, str], Awaitable[None]]
+"""(step, max_steps, note) — reports sub-agent progress (Fase 8)."""
 
 #: Tools a sub-agent may never call (prevents unbounded recursion).
 BLOCKED_TOOL_NAMES: frozenset[str] = frozenset(
@@ -105,6 +110,35 @@ def _resolve_subagent_tools(
     return selected
 
 
+def _gate_tool_call(
+    ctx: AppContext, name: str, args: dict[str, Any], conversation_id: str,
+) -> str | None:
+    """Consult the central permission gate for one sub-agent tool call.
+
+    Same policy as a normal turn (spec §4.5/§8: no privileged path): the
+    PARENT conversation's permission mode and scope apply. Accessed via
+    ``ctx`` duck-typed — plugins never import services classes directly.
+
+    Returns:
+        ``None`` when allowed, else the human-readable denial.
+    """
+    permission_service = getattr(ctx, "permission_service", None)
+    if permission_service is None:
+        return None
+    registry = ctx.tool_registry
+    tool_def = registry.get_tool_definition(name) if registry is not None else None
+    mode_service = getattr(ctx, "permission_mode_service", None)
+    mode = mode_service.get_mode(conversation_id) if mode_service is not None else None
+    denial: str | None = permission_service.explain_denial(
+        tool_name=name,
+        args=args,
+        tool_def=tool_def,
+        conversation_id=conversation_id,
+        mode=mode,
+    )
+    return denial
+
+
 async def _run_loop(
     *,
     ctx: AppContext,
@@ -117,6 +151,7 @@ async def _run_loop(
     session_id: str,
     cancel_event: asyncio.Event,
     result: SubagentResult,
+    progress_cb: ProgressCallback | None = None,
 ) -> None:
     """Drive the sub-agent tool-loop, mutating *result* in place."""
     llm = ctx.llm_service
@@ -132,8 +167,16 @@ async def _run_loop(
         {"role": "user", "content": user_block},
     ]
 
+    # Enforcement companion of _resolve_subagent_tools: the offer filter
+    # only shapes what the model SEES — a hallucinated name (e.g. a blocked
+    # meta-tool) must also be refused at the execution point.
+    offered_names = {entry["function"]["name"] for entry in tools}
+
     for step in range(max_steps):
         result.steps_used = step + 1
+        if progress_cb is not None:
+            with contextlib.suppress(Exception):
+                await progress_cb(step + 1, max_steps, f"step {step + 1}/{max_steps}")
         content_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         errored: str | None = None
@@ -192,6 +235,31 @@ async def _run_loop(
             except json.JSONDecodeError:
                 args = {}
 
+            if name not in offered_names:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": (
+                            f"ERROR: Tool '{name}' is not available to "
+                            "sub-agents."
+                        ),
+                    },
+                )
+                continue
+
+            denial = _gate_tool_call(ctx, name, args, conversation_id)
+            if denial is not None:
+                result.tools_called.append(name)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": f"ERROR: {denial}",
+                    },
+                )
+                continue
+
             exec_ctx = ExecutionContext(
                 session_id=session_id,
                 conversation_id=conversation_id,
@@ -234,6 +302,7 @@ async def run_subagent(
     max_tools: int,
     conversation_id: str,
     session_id: str,
+    progress_cb: ProgressCallback | None = None,
 ) -> SubagentResult:
     """Run a sub-agent to completion and return its result.
 
@@ -248,6 +317,7 @@ async def run_subagent(
         max_tools: Maximum number of tools to expose to the sub-agent.
         conversation_id: Parent conversation id (for tool execution context).
         session_id: Parent session id (for tool execution context).
+        progress_cb: Optional per-step progress reporter (Fase 8 observability).
 
     Returns:
         A :class:`SubagentResult` — never raises.
@@ -275,6 +345,7 @@ async def run_subagent(
                 session_id=session_id,
                 cancel_event=cancel_event,
                 result=result,
+                progress_cb=progress_cb,
             ),
             timeout=timeout_seconds,
         )

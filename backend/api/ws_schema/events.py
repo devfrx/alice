@@ -366,6 +366,34 @@ class WsCommandRequest(EventsServerFrame):
     conversation_id: str | None = None
 
 
+class WsBackgroundTaskUpdated(EventsServerFrame):
+    """A background task was created or changed state (Fase 8, spec §8).
+
+    Carries the FULL task snapshot so the FE store can fold it directly
+    (same philosophy as ``tasks.updated``).
+    """
+
+    type: Literal["background_task.updated"]
+    task_id: str
+    kind: str
+    label: str
+    status: Literal["running", "completed", "failed"]
+    progress: float | None = None
+    detail: str | None = None
+    conversation_id: str | None = None
+    updated_at: str
+
+
+class WsAttentionRaised(EventsServerFrame):
+    """The AttentionService decided to surface initiative to the user."""
+
+    type: Literal["attention.raised"]
+    source: str
+    message: str
+    priority: Literal["low", "normal", "urgent"] = "normal"
+    conversation_id: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Client→server frames
 # ---------------------------------------------------------------------------
@@ -469,7 +497,9 @@ EventsServerMessage = Annotated[
     | WsTerminalClosed
     | WsTerminalRenamed
     | WsTerminalAssigned
-    | WsCommandRequest,
+    | WsCommandRequest
+    | WsBackgroundTaskUpdated
+    | WsAttentionRaised,
     Field(discriminator="type"),
 ]
 

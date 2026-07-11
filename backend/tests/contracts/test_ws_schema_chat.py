@@ -252,6 +252,19 @@ def test_user_message_has_no_type_discriminant() -> None:
     assert "type" not in WsUserMessage.model_fields
 
 
+def test_user_message_accepts_optional_voice_source() -> None:
+    """Fase 8: per-message input modality drives the voice tool trim."""
+    from backend.api.ws_schema.chat import WsUserMessage
+
+    msg = WsUserMessage.model_validate(
+        {"content": "ciao", "conversation_id": "c1", "source": "voice"},
+    )
+    assert msg.source == "voice"
+    assert WsUserMessage.model_validate({"content": "hey"}).source is None
+    with pytest.raises(ValidationError):
+        WsUserMessage.model_validate({"content": "x", "source": "telepathy"})
+
+
 def test_unknown_chat_type_is_rejected() -> None:
     with pytest.raises(ValidationError):
         validate_chat_server({"type": "usage", "input_tokens": 1, "output_tokens": 2})

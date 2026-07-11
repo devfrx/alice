@@ -17,7 +17,9 @@ import { usePlanDocumentStore } from '../stores/planDocument'
 import { useScopeStore } from '../stores/scope'
 import { usePermissionModeStore } from '../stores/permissionMode'
 import { useTerminalSessionsStore } from '../stores/terminalSessions'
+import { useBackgroundTasksStore } from '../stores/backgroundTasks'
 import { handleCommandRequest, sendCommandManifest } from '../commands/bridge'
+import { useToast } from './useToast'
 import type { EventsClientMessage, EventsServerMessage } from '../types/generated'
 import { BACKEND_HOST } from '../services/api'
 
@@ -72,6 +74,7 @@ export function useEventsWebSocket(): {
   const scopeStore = useScopeStore()
   const permissionModeStore = usePermissionModeStore()
   const terminalStore = useTerminalSessionsStore()
+  const backgroundTasksStore = useBackgroundTasksStore()
 
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let reconnectAttempts = 0
@@ -110,7 +113,13 @@ export function useEventsWebSocket(): {
     'terminal.output': (msg) => terminalStore.applyOutput(msg),
     'terminal.closed': (msg) => terminalStore.applyClosed(msg),
     'terminal.renamed': (msg) => terminalStore.applyRenamed(msg),
-    'terminal.assigned': (msg) => terminalStore.applyAssigned(msg)
+    'terminal.assigned': (msg) => terminalStore.applyAssigned(msg),
+    'background_task.updated': (msg) => backgroundTasksStore.applyBackgroundTaskUpdated(msg),
+    'attention.raised': (msg) => {
+      const toast = useToast()
+      if (msg.priority === 'urgent') toast.warning(msg.message)
+      else toast.info(msg.message)
+    }
   }
 
   function connect(): void {

@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from backend.core.plugin_models import ToolDefinition
+from backend.services.permission_mode_service import PermissionMode
 from backend.services.permission_service import (
     PermissionDecision,
     PermissionOutcome,
@@ -233,3 +234,79 @@ class TestGrants:
         decision = _evaluate(svc, _tool("danger", risk_level="forbidden"))
         assert decision.allowed is False
         assert decision.outcome is PermissionOutcome.DENY_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# explain_denial (Fase 8 — subagent / headless surfaces)
+# ---------------------------------------------------------------------------
+
+
+def test_explain_denial_allow_returns_none() -> None:
+    svc = PermissionService()
+    assert (
+        svc.explain_denial(
+            tool_name="calendar_list",
+            args={},
+            tool_def=None,
+            conversation_id="c1",
+            mode=PermissionMode.AUTOPILOT,
+        )
+        is None
+    )
+
+
+def test_explain_denial_needs_confirmation_is_clean_denial() -> None:
+    """A confirmation verdict is a denial on surfaces with no user to ask."""
+    svc = PermissionService()
+    tool_def = ToolDefinition(
+        name="danger_tool",
+        description="Confirmation-gated test tool",
+        requires_confirmation=True,
+        risk_level="dangerous",
+    )
+    message = svc.explain_denial(
+        tool_name="danger_tool",
+        args={},
+        tool_def=tool_def,
+        conversation_id="c1",
+        mode=PermissionMode.STRICT,
+    )
+    assert message is not None
+    assert "confirmation" in message
+
+
+def test_explain_denial_forbidden_is_denied_with_reason() -> None:
+    svc = PermissionService()
+    tool_def = ToolDefinition(
+        name="forbidden_tool",
+        description="Forbidden test tool",
+        risk_level="forbidden",
+    )
+    message = svc.explain_denial(
+        tool_name="forbidden_tool",
+        args={},
+        tool_def=tool_def,
+        conversation_id="c1",
+        mode=PermissionMode.AUTOPILOT,
+    )
+    assert message is not None
+    assert "denied" in message
+
+
+def test_explain_denial_none_mode_falls_back_to_strict() -> None:
+    svc = PermissionService()
+    tool_def = ToolDefinition(
+        name="danger_tool",
+        description="Confirmation-gated test tool",
+        requires_confirmation=True,
+        risk_level="dangerous",
+    )
+    # None mode is coerced to STRICT (fail-conservative) → clean denial.
+    message = svc.explain_denial(
+        tool_name="danger_tool",
+        args={},
+        tool_def=tool_def,
+        conversation_id="c1",
+        mode=None,
+    )
+    assert message is not None

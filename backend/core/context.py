@@ -71,7 +71,8 @@ class AppContext:
         "plan_document_service", "scope_service", "permission_mode_service",
         "permission_rule_service", "terminal_session_manager",
         "plugin_local_state", "orchestrator", "model_downloader",
-        "event_bus",
+        "event_bus", "background_task_service", "attention_service",
+        "trigger_service",
     )
 
     def __init__(
@@ -398,6 +399,30 @@ class AppContext:
     @plugin_local_state.setter
     def plugin_local_state(self, value: dict[str, dict[str, Any]]) -> None:
         self.platform.plugin_local_state = value
+
+    @property
+    def background_task_service(self) -> Any:
+        return self.platform.background_task_service
+
+    @background_task_service.setter
+    def background_task_service(self, value: Any) -> None:
+        self.platform.background_task_service = value
+
+    @property
+    def attention_service(self) -> Any:
+        return self.platform.attention_service
+
+    @attention_service.setter
+    def attention_service(self, value: Any) -> None:
+        self.platform.attention_service = value
+
+    @property
+    def trigger_service(self) -> Any:
+        return self.platform.trigger_service
+
+    @trigger_service.setter
+    def trigger_service(self, value: Any) -> None:
+        self.platform.trigger_service = value
 
     # ------------------------------------------------------------------
     # Plugin state helpers

@@ -39,6 +39,9 @@ feature servono ENTRAMBI.
 | `agent.reflection.enabled` | false | `turn/factory.py` | ReflectiveTurnExecutor |
 | `agent.reflection.degeneration_detector_enabled` | true | `turn/_reflection.py` | |
 | `mcp.servers[].enabled` | true (per server) | plugin `mcp_client`, `chat/_helpers.py`, route mcp | per-server |
+| `attention.enabled` | true | `bootstrap/jarvis.py`, `services/attention_service.py` | spegne OGNI iniziativa dell'agente verso l'utente (decision point unico §8) |
+| `triggers.enabled` | true | `bootstrap/jarvis.py`, `services/trigger_service.py` | spegne i turni autonomi (nessun trigger registrato di default) |
+| `agent.voice.max_tools` | 8 | `api/routes/chat/_assembly.py` | trim del toolset per turni voce (source=voice), attivato in fase 8 |
 
 Affini fuori convenzione: `agent.planning` / `agent.delegation` /
 `agent.clarification` (gate dei meta-tool; rinominati dai legacy `*_enabled`).

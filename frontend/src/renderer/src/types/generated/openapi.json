@@ -920,6 +920,8 @@
             "artifact.created": "#/components/schemas/WsArtifactCreated",
             "artifact.deleted": "#/components/schemas/WsArtifactDeleted",
             "artifact.updated": "#/components/schemas/WsArtifactUpdated",
+            "attention.raised": "#/components/schemas/WsAttentionRaised",
+            "background_task.updated": "#/components/schemas/WsBackgroundTaskUpdated",
             "calendar.changed": "#/components/schemas/WsCalendarChanged",
             "command.request": "#/components/schemas/WsCommandRequest",
             "config.changed": "#/components/schemas/WsConfigChanged",
@@ -1031,6 +1033,12 @@
           },
           {
             "$ref": "#/components/schemas/WsCommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/WsBackgroundTaskUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsAttentionRaised"
           }
         ]
       },
@@ -3024,6 +3032,180 @@
           "answers"
         ],
         "title": "WsAskUserResponse",
+        "type": "object"
+      },
+      "WsAttentionRaised": {
+        "additionalProperties": false,
+        "description": "The AttentionService decided to surface initiative to the user.",
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "priority": {
+            "default": "normal",
+            "enum": [
+              "low",
+              "normal",
+              "urgent"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "type": {
+            "const": "attention.raised",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "source",
+          "message"
+        ],
+        "title": "WsAttentionRaised",
+        "type": "object"
+      },
+      "WsBackgroundTaskUpdated": {
+        "additionalProperties": false,
+        "description": "A background task was created or changed state (Fase 8, spec §8).\n\nCarries the FULL task snapshot so the FE store can fold it directly\n(same philosophy as ``tasks.updated``).",
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Progress"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "background_task.updated",
+            "title": "Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "task_id",
+          "kind",
+          "label",
+          "status",
+          "updated_at"
+        ],
+        "title": "WsBackgroundTaskUpdated",
         "type": "object"
       },
       "WsCalendarChanged": {
@@ -6452,6 +6634,22 @@
             ],
             "title": "Origin",
             "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "text",
+                  "voice"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source"
           }
         },
         "required": [

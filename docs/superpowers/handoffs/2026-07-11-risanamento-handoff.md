@@ -1,174 +1,152 @@
-# Handoff — Risanamento architetturale AL\CE (stato al 2026-07-11, post-Fase 7)
+# Handoff — Risanamento architetturale AL\CE (stato al 2026-07-11, post-Fase 8)
 
 > Per la sessione che continua questo lavoro a contesto fresco/compattato. Contiene SOLO ciò che
-> non è ricostruibile dal repo: stato, decisioni, gotchas pagati sul campo, recon da fare.
-> Fonti di verità nel repo: spec e piani citati sotto. Questo file SOSTITUISCE la versione
-> precedente (post-fase6, stesso path); la storia è in git.
+> non è ricostruibile dal repo: stato, decisioni, gotchas pagati sul campo, pending. Fonti di
+> verità nel repo: spec e piani citati sotto. Questo file SOSTITUISCE la versione precedente
+> (post-fase-7, stesso path); la storia è in git.
 
-## Stato del programma
+## Stato del programma: TUTTE LE 8 FASI IMPLEMENTATE
 
-- **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9. È LA fonte di verità.
-- **Fasi 1a, 1b, 2, 3, 4, 5, 6, 7: COMPLETE, PUSHATE e MERGIATE in `main`** (merge sequenziali
-  `--no-ff`; fase 7 mergiata il 2026-07-11 su richiesta utente: merge `1e91a00` = HEAD di main,
-  branch `arch/fase7-command-bridge` anche su origin). Review finale fase 7: «Phase ready with
-  notes», note applicate. Piano chiuso e veritiero con esiti review per task + verdetto finale
-  + backlog: `docs/superpowers/plans/2026-07-11-fase7-command-bridge.md`.
-- Pending esterni: CI `contracts.yml` da verificare su GitHub per i push di main del 2026-07-11
-  (fasi 1-6 al mattino + fase 7 `1e91a00` alla sera); chip/task `task_6c67e5a8` (fix suite
-  lenta); **smoke funzionale interattivo MAI eseguito** (né fase 6 né 7): alla prima
-  `npm run dev` fare ENTRAMBE le checklist (gate finale piano fase 6 + step 9.6 piano fase 7).
+- **Spec normativa** (approvata): `docs/superpowers/specs/2026-06-10-risanamento-architetturale-design.md` — 8 fasi, principi §4, criteri §9.
+- **Fasi 1a-7: COMPLETE, PUSHATE e MERGIATE in `main`** (fase 7 Command Bridge: merge `1e91a00`; docs allineate in `5b0cb8b`).
+- **Fase 8 «Fondamenta Jarvis»: COMPLETA su branch `arch/fase8-fondamenta-jarvis`** (17 commit,
+  `32ce1e9..d3e5420` + chiusura docs; figlio di `main` @ `5b0cb8b`). **NON mergiata, NON pushata**
+  — push e merge SOLO su richiesta esplicita dell'utente (decisione permanente).
+- Review finale fase 8: **«Phase ready with notes»** (nessun finding bloccante; note N1-N4 nel
+  backlog del piano). Piano chiuso e veritiero con esiti review per task + verdetto + backlog:
+  `docs/superpowers/plans/2026-07-11-fase8-fondamenta-jarvis.md`.
+- **Era l'ULTIMA fase del programma.** Il seguito naturale è il backlog del piano fase 8 (16 voci,
+  molte ereditate dalle fasi precedenti) e le implementazioni ricche sopra le interfacce Jarvis.
 
-## Cosa ha consegnato la Fase 7 (mappa rapida, dettagli e esiti review nel piano)
+## Pending esterni (verificare alla prossima occasione)
 
-- **Contratto WS Command Layer**: frame `command.request` (server→client, `origin="agent"`,
-  `correlation_id` OBBLIGATORIO — primo consumatore reale del campo riservato in 1b),
-  `command.result` e `command.manifest` (client→server) + `CommandManifestEntry` in
-  `api/ws_schema/events.py`; vocabolari congelati aggiornati; il manifest è il TERZO contratto
-  e viaggia nella stessa pipeline codegen (nessuna modifica alla pipeline: hoisting automatico
-  via unioni).
-- **Kernel tools**: meccanismo generico in `core/tools/` — `ToolCatalog.register_kernel_tool`
-  (nome BARE, owner fittizio `KERNEL_TOOL_OWNER="kernel"` in `plugin_models.py`, sopravvive ai
-  refresh e vince le collisioni), probe availability short-circuit su owner kernel, dispatch
-  dedicato nell'executor (stessa pipeline timeout/validazione/sanitizzazione), facade+protocol.
-- **`CommandBridgeService`** (`services/command_bridge.py`, gruppo `workspace`): manifest store
-  con **anti-escalation STRUTTURALE** (grammatica `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$` +
-  NFKC+strip PRIMA del check sui domini guardrail `permission|permissions|permission_mode|scope|
-  guardrail|guardrails`; capability fuori vocabolario respinte; `commands.disabled_commands`);
-  RPC pending-future su `correlation_id` (broadcast → `wait_for` con `commands.rpc_timeout_s`,
-  default 10s < `timeout_ms` 30s del tool); OGNI fallimento è un risultato pulito ("UI not
-  available", "Unknown command…", timeout) — mai eccezioni; a bridge disabilitato il manifest è
-  IGNORATO (early-return: niente ingestione né registrazione tool). A ogni manifest il tool
-  `app_command` viene RI-registrato con enum dei nomi nei parameters (l'executor valida gratis)
-  e `usage_guidance` che elenca i comandi.
-- **Gating**: `PermissionService.decide` step "2-bis" — tag statico `ui_command`, capability
-  EFFETTIVA per-call risolta via `command_capability_provider` (= `bridge.capability_of`).
-  Matrice §7: navigation/read ALLOW ovunque (plan incluso); mutate/destructive DENY in plan,
-  CONFIRM in strict; auto_edits ALLOW mutate / CONFIRM destructive; autopilot ALLOW; ignoto →
-  destructive (fail-conservative). Un IBRIDO `ui_command`+fs/exec NON prende il ramo: cade nel
-  confinamento scope (il tag non scavalca mai il guard by-construction).
-- **Wiring**: `WorkspaceServices.command_bridge_service` + property ctx; bridge creato in
-  `stage_workspace` PRIMA di PermissionService; `app_command` registrato al boot con manifest
-  vuoto se `commands.enabled`; route events valida l'inbound con `validate_events_client` e
-  smista manifest/result al bridge (frame invalidi = drop loggato, mai socket giù).
-- **Frontend**: `commands/bridge.ts` (proiezione manifest SOLO `exposeToAgent===true` + doppio
-  check a esecuzione — anti-escalation su entrambi i lati), `commands/validate.ts` (validatore
-  JSON-Schema-subset senza dipendenze, semantica own-property contro prototype-chain tricks,
-  fallback "no-args" per comandi senza schema), handler `command.request` nel dispatcher
-  esaustivo, manifest inviato a OGNI onopen. 4 comandi core esposti con `description`
-  machine-facing: `view.switch`, `conversation.open`, `conversation.new`, `artifact.show`
-  (`sidebar.toggle` resta UI-only). Config: `commands.{enabled,rpc_timeout_s,disabled_commands}`.
+1. **Smoke funzionale interattivo (`npm run dev`) MAI eseguito per le fasi 6, 7 E 8**: alla prima
+   apertura fare le TRE checklist (gate finale piano 6; step 9.6 piano 7; fase 8: toast attention
+   forzando un `attention.raised` dal backend, store `backgroundTasks` popolato da uno
+   spawn_subagent, turno voce con toolset ridotto nei log).
+2. CI `contracts.yml` sui push di main del 2026-07-11 (fasi 1-6 + fase 7 `1e91a00`): esito mai
+   verificato su GitHub. Il branch fase 8 non è pushato, quindi nessuna CI per ora.
+3. Chip/task `task_6c67e5a8` (fix suite lenta) ancora aperto.
 
-## Decisioni registrate in Fase 7 (non rilitigare)
+## Cosa ha consegnato la Fase 8 (mappa rapida; dettagli nel piano)
 
-1. **Tool kernel via catalogo, non plugin**: la spec impone "di proprietà del kernel"; nessun
-   plugin fittizio — meccanismo kernel-tools nel catalogo con owner `kernel`.
-2. **Gating dinamico dentro `decide()`** (provider iniettato), NON middleware dedicato; la
-   conferma riusa ConfirmationMiddleware standard.
-3. **RPC via broadcast** sul canale events (app single-window; primo `command.result` vince,
-   duplicati no-op). `origin` di `command.result` resta default `user` (decisione contratto).
-4. **Validatore FE fatto in casa** (subset noto, zero dipendenze — niente ajv).
-5. Il test fase-6 "tutti exposeToAgent false" è stato DELIBERATAMENTE sostituito dal test
-   "insieme esposto == {i 4 core}" (fase 7 è la fase che espone).
-6. `always_offered=True` su `app_command`: superficie di protocollo; a manifest vuoto il tool
-   esiste e risponde pulito.
+- **Contratti WS**: frame events `background_task.updated` (snapshot COMPLETO del task,
+  `origin="agent"`) e `attention.raised` (origin default `system`); campo opzionale
+  `source: "text"|"voice"` su `WsUserMessage` (per-messaggio, NON query param). Regen committata.
+- **`BackgroundTaskService`** (`services/background_tasks.py`, gruppo `platform`): registry
+  in-memory di task osservabili (start/update/complete/fail → emit bus → bridge in
+  `surfaces.py` → frame WS → store FE `backgroundTasks`). I chiamanti DEVONO raggiungere uno
+  stato terminale (i running non vengono mai prunati). Subagent e turni autonomi vi transitano.
+- **`AttentionService`** (`services/attention_service.py`): punto unico disattivabile
+  dell'iniziativa agente→utente; enum `interrupt|notify|queue|drop` (v1 emette solo NOTIFY/DROP,
+  cooldown anti-spam, urgent bypassa); `attention.raised` → toast FE (`useToast`).
+- **`TriggerService`** (`services/trigger_service.py`): `TriggerSpec(kind=schedule|event|manual)`;
+  schedule = interval loop asyncio (NESSUNA dipendenza nuova); event = subscribe bus con
+  anti-eco `origin=="agent"` di default (+ rifiuto strutturale di trigger su `trigger.fired`);
+  manual/`fire()` = seam hotword futuro. Ogni fire = background task osservabile + attention a
+  fine turno. NESSUN trigger registrato di default e NESSUNA superficie di registrazione
+  (tool/REST) — interfacce, non comportamenti (spec §8).
+- **Turno headless** (`api/routes/chat/headless.py::run_headless_turn`): un turno autonomo È un
+  turno normale — riusa `TurnAssembler` (reso `websocket: WebSocket | None`, 7 send guardate) +
+  executor + `_persist_final_turn`, stessa pipeline/mode/scope. `NullEventSink` (sink.py) +
+  `HeadlessInteractionChannel` (channel.py: `request()`→None ⇒ conferme REJECTED, `connected=True`);
+  `_strip_ui_tools` toglie `client_execution` E `user_interaction` (ask_user) dall'offerta.
+  Iniettato nel TriggerService da `bootstrap/jarvis.py` (`stage_jarvis`, DECIMO e ultimo stage;
+  shutdown del trigger PRIMO in `shutdown.py`).
+- **Subagent nella policy centrale**: `PermissionService.explain_denial(...)` (ALLOW→None,
+  NEEDS_CONFIRMATION→negazione pulita, mode None→STRICT); `_subagent.py` gate per-call via ctx
+  duck-typed (plugin non importa services) + **enforcement `offered_names` al punto di
+  esecuzione** (fix F1: un nome allucinato, incl. i meta-tool bloccati, viene rifiutato anche se
+  il modello lo emette) + `progress_cb` → background task in `_spawn_subagent`.
+- **Voce**: seam morto `agent.voice.max_tools` ATTIVATO — `_apply_voice_trim` in `_assembly.py`
+  quando `data["source"]=="voice"`; FE invia `{source:'voice'}` SOLO sull'auto-send del
+  transcript STT (HorizonView:317). Stessa policy di gating, superficie ridotta.
+- **Config**: `attention.{enabled,cooldown_s}`, `triggers.{enabled,max_concurrent_turns}`;
+  flag censiti in `docs/flag-registry.md`. Default tutti true ma zero comportamento nuovo
+  out-of-the-box (nessun trigger registrato).
 
-## Prossimo lavoro: Fase 8 — Fondamenta Jarvis (spec §8, riga 217)
+## Decisioni registrate in Fase 8 (non rilitigare — dettagli nel piano, sez. «Decisioni di design»)
 
-Da scrivere con `writing-plans` su branch `arch/fase8-fondamenta-jarvis` figlio di `main`
-(che dal 2026-07-11 sera contiene TUTTE le fasi 1-7 mergiate). Requisiti spec: `TriggerService`
-(turni autonomi da cron/eventi bus/hotword; filtro default su `origin=agent` contro
-l'auto-innesco), `AttentionService` (punto unico di decisione dell'iniziativa verso l'utente),
-task in background osservabili (eventi tipizzati di avanzamento, store `tasks`); voce e
-subagent ricondotti alla stessa policy di gating. Si posano INTERFACCE, non implementazioni
-ricche. Dipende da fasi 5 e 7 (entrambe complete).
+1. Tre service kernel in `services/`, campi `Any` in `PlatformServices` (niente Protocol dedicati).
+2. Runner headless in api (l'assembly vive lì); iniettato via bootstrap (eccezione whitelisted
+   `backend.core.bootstrap.* -> backend.api.**`). Spostare assembly in services = backlog 4.
+3. Superfici mancanti = esiti puliti (filosofia fase 7), mai eccezioni.
+4. NESSUNA dipendenza nuova (niente APScheduler); cron/RRULE ricchi = backlog.
+5. Convenzione kwarg `origin` sugli eventi bus posata ORA; disciplina degli emettitori = backlog 13.
+6. Osservabilità unificata: turni autonomi e subagent = background task; store FE nuovo
+   `backgroundTasks` (WS-only, niente REST = backlog 2).
+7. AttentionService v1 minimale; interrupt/queue riservati.
+8. Voce per-messaggio (`source` su WsUserMessage), non per-connessione.
 
-### Recon fase 8 — note utili già verificate in fase 7
+## Workflow collaudato (riusare così; raffinamenti fase 8 inclusi)
 
-- L'`origin` è su OGNI frame di entrambi i canali (default per classe base); `command.request`
-  porta già `origin="agent"` — il filtro anti-eco del TriggerService ha il dato che gli serve.
-- Lo store FE `tasks` + frame `tasks.updated` esistono già (agent run); il "task in background
-  osservabile" formalizzato è da disegnare sopra.
-- L'event bus (`core/event_bus.py`, `AliceEvent`) è il punto di aggancio dei trigger; i bridge
-  bus→WS vivono in `bootstrap/surfaces.py`, i callback di servizio in conversation/workspace.
-- Un turno autonomo "è un turno normale": l'ingresso oggi è solo il WS chat
-  (`api/routes/chat/ws.py` + `_assembly.py`); serve un seam per avviare turni senza socket chat
-  (l'`InteractionChannel` ha semantica di disconnessione — attenzione a conferme/ask_user in
-  turni headless: oggi la conferma richiede il canale chat; la fase 7 ha già il precedente
-  "UI not available" come risultato pulito).
-- Backlog fase 7 rilevante per fase 8: grant per-COMANDO, capability nel frame di conferma,
-  esenzione dedup per ui_command, hook change-notification del registry per il manifest.
+- Per fase: branch dedicato → `writing-plans` (codice VERBATIM) → `subagent-driven-development`:
+  implementer (sonnet) per task; spec review = CONTROLLER su diff verbatim; quality review (top)
+  per i task core/security; review FINALE di fase (top, range intero, angolo cross-task) SEMPRE.
+- **Raffinamento fase 8 (anti-race, più forte della regola fase 7): gli implementer NON toccano
+  git** (nessun add/commit) — committa SOLO il controller, con path espliciti, al rientro di ogni
+  agente, dopo spec-check del diff. Così più implementer girano in parallelo su file disgiunti
+  senza race sull'index, e il controller può committare mentre altri lavorano.
+- **Agente morto (session-limit/API error) → SendMessage per COMPLETARE dal transcript, non
+  ripartire** (fase 8: 4 agenti interrotti dal limite sessione, tutti ripresi con successo).
+- I fix di review enumerati con precisione li applica il CONTROLLER (con test di regressione se
+  behavioral: fase 8 → F1/F3/F4 hanno test dedicati); i fix che richiedono giudizio tornano
+  all'implementer. Ogni esito/fix aggiorna ANCHE il piano; finding fuori task → backlog.
+- Le review trovano cose VERE anche a fase matura — fase 8: subagent eseguiva tool MAI offerti
+  (bypass del blocklist anti-ricorsione via nome allucinato), schedule loop che moriva in
+  silenzio, task fantasma su CancelledError. NON saltare i cicli né la review finale.
+- Commit convenzionali + trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
+  Mai push/merge senza richiesta esplicita.
 
-## Workflow collaudato (riusare così; raffinamenti fase 7 inclusi)
+## Gotchas (aggiornati post-fase 8)
 
-- Per fase: branch dedicato → `writing-plans` (codice VERBATIM, comandi esatti) →
-  `subagent-driven-development`: implementer (sonnet) per task; spec review = CONTROLLER quando
-  il diff è verbatim-dal-piano (gate auto-verificanti); quality review (modello top) per i task
-  core/security; review FINALE di fase (top, range intero, angolo cross-task) SEMPRE.
-- I fix enumerati con precisione li applica il CONTROLLER direttamente; i fix che richiedono
-  giudizio tornano all'implementer via SendMessage. Task di pura configurazione con gate
-  auto-verificante → controller direttamente (fase 7: Task 7 regen).
-- **Raffinamento fase 7**: implementer e reviewer possono girare IN PARALLELO se su file
-  disgiunti; ma il controller NON committa mentre un implementer è attivo nello stesso worktree
-  (race sull'index git: un `git add` concorrente può far inghiottire file altrui al commit) —
-  applicare gli edit subito, DIFFERIRE il commit al rientro dell'agente. Dire agli agent di
-  IGNORARE (mai stage-are) i file altrui modificati nel working tree, e al reviewer di ignorare
-  le modifiche uncommitted.
-- Ogni fix di review aggiorna ANCHE il piano (esito per task, sempre); finding fuori task → backlog.
-- Le review trovano cose VERE anche in fase matura — fase 7: bypass unicode/prototype-chain su
-  ENTRAMTI i validatori (BE nomi manifest, FE args), ibrido `ui_command`+fs che saltava il
-  confinamento scope, master-switch che non spegneva davvero il tool. NON saltare i cicli né la
-  review finale.
-- Commit convenzionali + trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`. Mai push/merge senza richiesta.
-
-## Gotchas (validi anche dopo la fase 7)
-
-1. **Suite backend completa IMPRATICABILE** (fixture `app` ~25s/test). Verifica di fase = test
-   mirati per dominio + `tests/contracts/`. Subagent avvisati di NON killare run lente.
-2. **Gate FE completo = typecheck + lint (0 err/0 warn) + vitest** (ora 29 file / 301 test, <1s).
-3. **ruff/mypy con errori pre-esistenti** → scoped; file NUOVI puliti (`ruff --fix` sui test
-   nuovi); `protocols.py` ha 3 errori storici (A002 ×2, I001) fuori dal codice fase 7.
-4. **EOL**: nessun incidente in fase 7 (prima fase pulita). SEMPRE `git ls-files --eol` /
-   `git diff --stat` prima dei commit; `.gitignore` è `i/mixed` STORICO (pre-programma).
-5. **Subagent**: prescrizioni ESATTE e VERIFICARE IL DIFF al ritorno; reviewer READ-ONLY
-   espliciti (mai npm install/ci); un agente morto → SendMessage per COMPLETARE, non ripartire.
-6. **`check-contracts.ps1` DOPO il commit** (untracked = dirty). Regen SOLO nel task previsto.
+1. **Suite backend completa IMPRATICABILE** (fixture `app` ~25s/test; `test_app.py` = 129s per
+   5 test). Verifica di fase = test mirati + `tests/contracts/`. NON killare run lenti.
+2. **Gate FE completo = typecheck + lint (0/0) + vitest** (ora 30 file / 304 test, <1s).
+3. **ruff/mypy pre-esistenti** → scoped sui file toccati; `core/event_bus.py` ha 2 errori storici
+   (UP035, B905 — backlog 8); file NUOVI puliti.
+4. **EOL**: MAI usare `Add-Content`/`Out-File` PowerShell per appendere a file di codice — scrive
+   CRLF (incidente fase 8 su `test_trigger_service.py`, rilevato con `git ls-files --eol`
+   [`w/mixed`] e normalizzato con `sed -i 's/\r$//'` PRIMA del commit). Usare gli edit tool.
+   SEMPRE `git ls-files --eol` prima dei commit.
+5. **Subagent**: prescrizioni ESATTE, perimetro file esplicito, «ignora le modifiche uncommitted
+   altrui», e VERIFICARE IL DIFF al ritorno; reviewer READ-ONLY espliciti (mai npm install).
+6. **`check-contracts.ps1` DOPO il commit** (untracked = dirty). Regen SOLO nel task previsto;
+   tra regen e task FE il typecheck FE fallisce BY DESIGN (dispatcher esaustivo).
 7. **PowerShell 5.1**: niente `&&`; pytest da `backend/` con `..\.venv\Scripts\python.exe -m pytest`;
-   boot-check e lint-imports dalla REPO ROOT (`.\.venv\Scripts\lint-imports.exe --config backend/pyproject.toml`).
+   lint-imports dalla REPO ROOT. Occhio alla cwd persistente tra chiamate (un `cd backend` resta).
 8. **Il venv NON ha pip** → `uv pip install`.
-9. **`ToolResult.error()` riempie `error_message`, NON `content`** (il loop rende error_message al modello).
-10. **Campi generati opzionali**: fallback `??` nei consumer; ma i campi narrowed-required
-    (es. `correlation_id` sui frame RPC) sono REQUIRED anche nel TS — narrowing pydantic
-    sull'envelope è il pattern giusto PRIMA della regen.
-11. **Contratti WS**: frame server nuovo = 4 punti (classe, union, frozen vocab test, handler FE
-    post-regen — il typecheck FORZA il quarto). Frame client nuovo = classe + union + frozen
-    vocab + branch nel receive loop della route (validare con `validate_events_client`).
-12. **`test_plugins_enabled_list` è ROSSO ereditato** (21 vs 20): non è una regressione.
-13. **File "modified since read"**: dopo che un subagent tocca un file letto dal controller,
+9. **`ToolResult.error()` riempie `error_message`, NON `content`**.
+10. **Contratti WS**: frame server nuovo = 4 punti (classe, union, frozen vocab test, handler FE
+    post-regen). `WsUserMessage` è UNTAGGED (fuori dall'union client): il pump chat NON valida
+    Pydantic i frame utente inbound a runtime — i campi extra sopravvivono nel dict raw (è così
+    che `source` arriva all'assembler).
+11. **`test_plugins_enabled_list` rosso ereditato** (21 vs 20): non è una regressione.
+12. **File "modified since read"**: dopo che un subagent tocca un file letto dal controller,
     ri-Read prima di Edit.
-14. **`Object.hasOwn` / semantica own-property** nei validatori TS di input non fidato — `in` e
-    lookup nudi attraversano la prototype chain.
+13. **pytest asyncio_mode=auto** nel backend: i marker `@pytest.mark.asyncio` sono ridondanti ma
+    innocui e coerenti coi test esistenti.
 
-## Backlog (in fondo al piano fase 7 le voci complete; principali)
+## Backlog (voci complete in fondo al piano fase 8; principali)
 
-1. **Fase 7 → fase 8**: grant per-COMANDO (`app_command:{name}` in ConfirmationMiddleware);
-   capability per-call nei metadata del frame di conferma (oggi mostra `safe` anche per
-   destructive); esenzione DedupMiddleware per tool `ui_command`; short-circuit del confirm
-   nella finestra manifest-vuoto; hook change-notification sul registry FE → re-invio manifest;
-   cap su `usage_guidance`; clamp `rpc_timeout_s` vs `timeout_ms`; multi-window (broadcast
-   esegue ovunque) se mai arriverà.
-2. Ereditati fase 6: migrare useVoice a pattern tipizzato e ritirare l'emitter generico;
-   `.gitattributes` + normalizzare i 4 file `w/crlf` storici; `auditApi` morto; CAD payload
-   live su artifacts; TldrawCanvas orphan/camera; workspace store: stato sidebar morto;
-   dedup GET whiteboard; `/` → `/workspace` vs `alice_ui_mode` persistito.
-3. Ereditati fasi 1-5: migrazione consumer ai gruppi ctx; guardia anti-drift flag-registry;
-   route MCP tipizzate + ratchet; 500→503 search; offset O(n); export conversazioni a modello;
-   dedup broadcaster.
+1. Superficie di registrazione trigger (tool + REST + persistenza) e cron/RRULE reali.
+2. REST `GET /api/background-tasks` per idratazione store (oggi WS-only).
+3. Provenance/origin su `Message` (DB) per distinguere i turni autonomi in UI.
+4. Spostare `TurnAssembler`/`_persist_final_turn` da api a services/turn.
+5. AttentionService ricco (code+drain, INTERRUPT reale, preferenze per-sorgente); UI Horizon per
+   i background task.
+6. **(Sicurezza, PRE-esistente, condiviso col turno normale)** bypass bare-name del gate: risolvere
+   il nome tool PRIMA di `decide()` o gateare post-risoluzione in `execute_tool` (piano, voce 12).
+7. Test integrato «headless + confirmation-required → REJECTED» che inchioda §4.5 (voce 10).
+8. Ereditati fasi 1-7: grant per-comando, capability nel frame di conferma, esenzione dedup
+   ui_command, hook change-notification manifest; migrare useVoice a pattern tipizzato;
+   `.gitattributes`; migrazione consumer ai gruppi ctx; ecc. (vedi piani fase 6/7).
 
 ## Decisioni utente registrate (non rilitigare)
 
-- Refactor incrementale, app sempre funzionante; dati azzerabili (no migrazioni); DUE superfici
-  chat di prodotto (Workspace `/workspace` primaria + Horizon `/assistant`) — il Workspace NON
-  si rimuove MAI (visione Jarvis); lint sanato a fondo con gate CI; codegen completo; visione =
-  runtime agentico locale con Command Layer (invariante anti-escalation non negoziabile, §7).
-- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta (fase 7: richiesto e
-  fatto il 2026-07-11 sera, merge `1e91a00`). Le prossime fasi partono da `main`.
+- Refactor incrementale, app sempre funzionante; dati azzerabili; DUE superfici chat di prodotto
+  (Workspace `/workspace` primaria + Horizon `/assistant`) — il Workspace NON si rimuove MAI;
+  visione = runtime agentico locale con Command Layer (invariante anti-escalation §7) e
+  fondamenta Jarvis §8 (autonomia SEMPRE dentro i guardrail, §4.5).
+- Push e merge SOLO su richiesta esplicita dell'utente, volta per volta. Il branch
+  `arch/fase8-fondamenta-jarvis` attende la decisione dell'utente.

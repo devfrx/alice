@@ -127,3 +127,9 @@ class PlatformServices:
     email_service: EmailServiceProtocol | None = None
     plugin_local_state: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
+    background_task_service: Any = None
+    """Observable background-task registry (Fase 8, spec §8)."""
+    attention_service: Any = None
+    """Single decision point for agent-initiated user attention (Fase 8)."""
+    trigger_service: Any = None
+    """Autonomous-turn trigger sources: schedule/event/manual (Fase 8)."""

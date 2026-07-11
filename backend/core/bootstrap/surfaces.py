@@ -133,3 +133,37 @@ async def stage_surfaces(ctx: AppContext) -> None:
             })
 
     ctx.event_bus.subscribe("knowledge.status", _forward_knowledge_status)
+
+    # -- Bridge Fase 8 (Fondamenta Jarvis) events to the events WS -------
+    async def _forward_background_task(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "background_task.updated",
+                "origin": "agent",
+                "task_id": kwargs.get("task_id"),
+                "kind": kwargs.get("kind"),
+                "label": kwargs.get("label"),
+                "status": kwargs.get("status"),
+                "progress": kwargs.get("progress"),
+                "detail": kwargs.get("detail"),
+                "conversation_id": kwargs.get("conversation_id"),
+                "updated_at": kwargs.get("updated_at"),
+            })
+
+    ctx.event_bus.subscribe(
+        AliceEvent.BACKGROUND_TASK_UPDATED, _forward_background_task,
+    )
+
+    async def _forward_attention_raised(**kwargs):
+        if ctx.ws_connection_manager:
+            await ctx.ws_connection_manager.broadcast({
+                "type": "attention.raised",
+                "source": kwargs.get("source"),
+                "message": kwargs.get("message"),
+                "priority": kwargs.get("priority", "normal"),
+                "conversation_id": kwargs.get("conversation_id"),
+            })
+
+    ctx.event_bus.subscribe(
+        AliceEvent.ATTENTION_RAISED, _forward_attention_raised,
+    )

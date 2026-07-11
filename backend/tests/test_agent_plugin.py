@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,13 +31,11 @@ from backend.plugins.agent._plan import (
 )
 from backend.plugins.agent._subagent import (
     BLOCKED_TOOL_NAMES,
-    SubagentResult,
     run_subagent,
 )
 from backend.plugins.agent.plugin import AgentPlugin
 from backend.services.plan_document_service import PlanDocumentService
 from backend.services.plan_service import PlanService
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -615,6 +612,182 @@ class TestSpawnSubagent:
         )
         passed = {t["function"]["name"] for t in (captured["tools"] or [])}
         assert passed == {"web_search_search"}
+
+    @pytest.mark.asyncio
+    async def test_subagent_denied_tool_is_not_executed(self):
+        """A gate denial becomes an ERROR tool-result; execute_tool never runs."""
+        ctx = _make_ctx_with_services(
+            chat_scripts=[
+                [
+                    {
+                        "type": "tool_call",
+                        "id": "call_1",
+                        "function": {"name": "system_info_get", "arguments": "{}"},
+                    },
+                    {"type": "done", "finish_reason": "tool_calls"},
+                ],
+                [
+                    {"type": "token", "content": "could not use the tool"},
+                    {"type": "done", "finish_reason": "stop"},
+                ],
+            ],
+            tools=[_tool_entry("system_info_get")],
+        )
+
+        class _DenyingGate:
+            calls: list[str] = []
+
+            def explain_denial(self, *, tool_name, args, tool_def,
+                               conversation_id, mode):
+                self.calls.append(tool_name)
+                return f"Tool '{tool_name}' denied by permission policy (test)."
+
+        _DenyingGate.calls = []
+        ctx.permission_service = _DenyingGate()
+        executed: list[str] = []
+        original_execute = ctx.tool_registry.execute_tool
+
+        async def _spy_execute(name, args, exec_ctx):
+            executed.append(name)
+            return await original_execute(name, args, exec_ctx)
+
+        ctx.tool_registry.execute_tool = _spy_execute  # type: ignore[method-assign]
+
+        result = await run_subagent(
+            ctx=ctx,
+            task="get system info",
+            context=None,
+            allowed_tools=None,
+            max_steps=3,
+            max_output_tokens=128,
+            timeout_seconds=10.0,
+            max_tools=8,
+            conversation_id="c",
+            session_id="s",
+        )
+        assert result.stop_reason == "completed"
+        assert executed == []
+        assert _DenyingGate.calls == ["system_info_get"]
+
+    @pytest.mark.asyncio
+    async def test_subagent_allowed_by_gate_executes(self):
+        """explain_denial → None lets the call through to execute_tool."""
+        ctx = _make_ctx_with_services(
+            chat_scripts=[
+                [
+                    {
+                        "type": "tool_call",
+                        "id": "call_1",
+                        "function": {"name": "system_info_get", "arguments": "{}"},
+                    },
+                    {"type": "done", "finish_reason": "tool_calls"},
+                ],
+                [
+                    {"type": "token", "content": "done"},
+                    {"type": "done", "finish_reason": "stop"},
+                ],
+            ],
+            tools=[_tool_entry("system_info_get")],
+        )
+
+        class _AllowingGate:
+            def explain_denial(self, **kwargs):
+                return None
+
+        ctx.permission_service = _AllowingGate()
+        result = await run_subagent(
+            ctx=ctx,
+            task="get system info",
+            context=None,
+            allowed_tools=None,
+            max_steps=3,
+            max_output_tokens=128,
+            timeout_seconds=10.0,
+            max_tools=8,
+            conversation_id="c",
+            session_id="s",
+        )
+        assert result.tools_called == ["system_info_get"]
+
+    @pytest.mark.asyncio
+    async def test_subagent_progress_cb_called_per_step(self):
+        ctx = _make_ctx_with_services(
+            chat_scripts=[
+                [
+                    {"type": "token", "content": "the answer"},
+                    {"type": "done", "finish_reason": "stop"},
+                ],
+            ],
+        )
+        progress: list[tuple[int, int, str]] = []
+
+        async def _cb(step: int, total: int, note: str) -> None:
+            progress.append((step, total, note))
+
+        result = await run_subagent(
+            ctx=ctx,
+            task="quick",
+            context=None,
+            allowed_tools=None,
+            max_steps=3,
+            max_output_tokens=128,
+            timeout_seconds=10.0,
+            max_tools=8,
+            conversation_id="c",
+            session_id="s",
+            progress_cb=_cb,
+        )
+        assert result.stop_reason == "completed"
+        assert progress == [(1, 3, "step 1/3")]
+
+    @pytest.mark.asyncio
+    async def test_subagent_never_executes_unoffered_tool(self):
+        """A hallucinated tool name (e.g. a blocked meta-tool) is refused at
+        the execution point, not just filtered from the offer (review F1)."""
+        ctx = _make_ctx_with_services(
+            chat_scripts=[
+                [
+                    {
+                        "type": "tool_call",
+                        "id": "call_1",
+                        "function": {
+                            "name": "agent_spawn_subagent",
+                            "arguments": "{}",
+                        },
+                    },
+                    {"type": "done", "finish_reason": "tool_calls"},
+                ],
+                [
+                    {"type": "token", "content": "could not delegate"},
+                    {"type": "done", "finish_reason": "stop"},
+                ],
+            ],
+            tools=[_tool_entry("web_search_search")],
+        )
+        executed: list[str] = []
+        original_execute = ctx.tool_registry.execute_tool
+
+        async def _spy_execute(name, args, exec_ctx):
+            executed.append(name)
+            return await original_execute(name, args, exec_ctx)
+
+        ctx.tool_registry.execute_tool = _spy_execute  # type: ignore[method-assign]
+
+        result = await run_subagent(
+            ctx=ctx,
+            task="delegate something",
+            context=None,
+            allowed_tools=None,
+            max_steps=3,
+            max_output_tokens=128,
+            timeout_seconds=10.0,
+            max_tools=8,
+            conversation_id="c",
+            session_id="s",
+        )
+        assert result.stop_reason == "completed"
+        assert executed == []
+        assert "agent_spawn_subagent" not in result.tools_called
 
 
 # ===========================================================================

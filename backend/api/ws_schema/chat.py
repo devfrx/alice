@@ -361,6 +361,8 @@ class WsUserMessage(ClientFrame):
     conversation_id: str | None = None
     attachments: list[str] | None = None
     edit_message_id: str | None = None
+    source: Literal["text", "voice"] | None = None
+    """Input modality; ``voice`` turns get a trimmed toolset (Fase 8)."""
 
 
 class WsCancel(ClientFrame):

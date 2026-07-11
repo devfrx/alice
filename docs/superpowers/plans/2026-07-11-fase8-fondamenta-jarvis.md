@@ -45,6 +45,8 @@
 
 ### Task 1: Contratto WS events — frame `background_task.updated` e `attention.raised`
 
+> **Esito (2026-07-11):** DONE. Commit `2711b8a` (implementer sonnet, verbatim dal piano; contract test tutti verdi, ruff pulito). Spec review: controller (diff == testo del piano, gate auto-verificante frozen-vocab). Nessuna deviazione.
+
 **Files:**
 - Modify: `backend/api/ws_schema/events.py`
 - Test: `backend/tests/contracts/test_ws_schema_events.py`
@@ -185,6 +187,8 @@ NOTA: gli artifact generati committati restano stale fino al Task 10 (atteso: NO
 
 ### Task 2: Contratto WS chat — campo `source` su `WsUserMessage`
 
+> **Esito (2026-07-11):** DONE. Commit `2730db8` (implementer sonnet, verbatim; 98 contract test verdi, ruff pulito, import già presenti). Spec review: controller. Nessuna deviazione.
+
 **Files:**
 - Modify: `backend/api/ws_schema/chat.py:352-363`
 - Test: `backend/tests/contracts/test_ws_schema_chat.py`
@@ -236,6 +240,8 @@ git commit -m "feat(ws): optional source field on WsUserMessage for voice turns 
 ---
 
 ### Task 3: `AliceEvent` nuovi valori + `BackgroundTaskService` + bridge + campi gruppi
+
+> **Esito (2026-07-11):** DONE. Commit `ad9a89f` (implementer sonnet; 5/5 test nuovi + contracts verdi, lint-imports 6/0). Quality review (top): «Ready with notes» con verifica empirica della catena service→bus→bridge→validator strict; 3 Minor applicati dal controller in `c556372` (docstring: i chiamanti DEVONO raggiungere uno stato terminale — i running non vengono mai prunati; single-owner per task; `update(None)` mantiene il valore). Note fuori-commit registrate nel backlog: ruff pre-esistenti in `event_bus.py` (UP035/B905), `command_bridge_service` assente da `FLAT_FIELDS` (incoerenza ereditata fase 7).
 
 **Files:**
 - Modify: `backend/core/event_bus.py` (enum `AliceEvent`, righe ~28-77)
@@ -598,6 +604,8 @@ git commit -m "feat(jarvis): BackgroundTaskService - observable background tasks
 
 ### Task 4: `AttentionService` + config `attention.*`
 
+> **Esito (2026-07-11):** DONE. Commit `3551b5e` (implementer sonnet, verbatim; 3/3 test verdi, ruff pulito). Spec review: controller. Nessuna deviazione (solo posizionamenti meccanici in config.py/default.yaml).
+
 **Files:**
 - Create: `backend/services/attention_service.py`
 - Modify: `backend/core/config.py` (nuovo `AttentionConfig`, aggancio in `AliceConfig`)
@@ -834,6 +842,8 @@ git commit -m "feat(jarvis): AttentionService - central disableable initiative d
 ---
 
 ### Task 5: Seam del turno headless — sink, channel, assembler opzionale, runner
+
+> **Esito (2026-07-11):** DONE. Commit `f6fa08d` (implementer sonnet, ripreso dopo interruzione per session-limit e completato via SendMessage; 4/4 test nuovi + 16/16 executor/tool_loop invariati, ruff, lint-imports 6/0). Adattamenti meccanici previsti dal piano: `conversation_active` importato da `api/routes/chat/_shared` (fonte reale), `StreamingMockLLM` prende eventi FLAT (non annidati) → sottoclasse `_AssemblingMockLLM` con `get_system_prompt`/`build_messages`, engine sqlite in-memory con `StaticPool`. Le 7 send in `_assembly.py` tutte guardate. **Quality review (top, sicurezza): «Ready with notes»** — proprietà §4.5 verificata EMPIRICAMENTE (conferme headless → REJECTED via `tier_mandated`; `connected=True` evita il raise di WebSocketDisconnect; stesso `ToolPipeline`/`decide`/scope del path WS; nessun ramo canale-sensibile). 4 Minor: M1 (robustezza estrazione nome in `_strip_client_tools`) e M2 (estensione del filtro ai tool `user_interaction` → rinominato `_strip_ui_tools`) e M3 (docstring `cancelled` fuorviante) applicati dal controller; M4 (test integrato "confirmation-required → REJECTED" che inchioda §4.5) e nota `_MAX_USER_MESSAGE_LENGTH` non applicato al path headless → backlog.
 
 **Files:**
 - Modify: `backend/services/turn/sink.py` (nuova classe `NullEventSink` in coda)
@@ -1178,6 +1188,8 @@ git commit -m "feat(jarvis): headless turn seam - NullEventSink, HeadlessInterac
 ---
 
 ### Task 6: `TriggerService` + config `triggers.*`
+
+> **Esito (2026-07-11):** DONE. Commit `02af971` (implementer sonnet, ripartito da zero dopo session-limit; verbatim; 7/7 test verdi, ruff, lint-imports 6/0, smoke `AliceConfig().triggers` ok). **Quality review (top, congiunta con Task 8): «Changes required»** — fix applicati dal controller con test di regressione: F3 (Important: `_schedule_loop` moriva in silenzio se un collaboratore duck-typed sollevava → try/except con log, loop continua), F4 (Minor: `register()` rifiuta trigger su `trigger.fired`, anti self-echo), F5 (Minor: `CancelledError` a metà fire → `bts.fail("cancelled")` prima del re-raise). Verificati OK dalla review: anti-eco, TOCTOU semaforo (race-free su singolo loop), config/env prefix.
 
 **Files:**
 - Create: `backend/services/trigger_service.py`
@@ -1816,6 +1828,8 @@ git commit -m "feat(jarvis): stage_jarvis bootstrap - wire background tasks, att
 ---
 
 ### Task 8: Subagent nella policy centrale + osservabilità
+
+> **Esito (2026-07-11):** DONE. Commit `620cd3d` (implementer sonnet, ripreso dopo session-limit; TDD rispettato con RED verificato; 64 test verdi sui 2 file — pre-esistenti inclusi, gate no-op senza permission_service; ruff, lint-imports 6/0). Deviazione registrata: fix ruff PRE-ESISTENTI in `test_agent_plugin.py` (2 import morti + I001) applicati per rispettare il gate "ruff pulito sui file toccati". La factory `ToolDefinition` keyword del piano era valida senza adattamenti. **Quality review (top, congiunta con Task 6): «Changes required»** — fix applicati dal controller con test di regressione: F1 (Important: il runner eseguiva qualunque nome di tool emesso dal modello, anche MAI offerti — un `agent_spawn_subagent` allucinato scavalcava il blocklist anti-ricorsione → enforcement `offered_names` al punto di esecuzione + test `test_subagent_never_executes_unoffered_tool`), F2 (Important: `CancelledError` durante `run_subagent` lasciava il background task «running» per sempre → try/except in `_spawn_subagent` con `bts.fail("cancelled")` + re-raise). Verificati OK dalla review: `explain_denial` delega integralmente a `decide()` (mode None→STRICT fail-conservative; NESSUN percorso in cui il subagent ottiene ALLOW dove il turno normale avrebbe confermato); gate su tutte le call inclusi args malformati; grant di sessione estesi al subagent = semantica pre-esistente per conversazione, non escalation. F6 (bypass bare-name del gate, PRE-esistente e condiviso col turno normale) → backlog.
 
 **Files:**
 - Modify: `backend/services/permission_service.py` (nuovo metodo `explain_denial`)
@@ -2604,3 +2618,9 @@ git commit -m "docs: fondamenta Jarvis in CLAUDE.md + flag registry (fase 8)"
 5. AttentionService ricco: code con drain, INTERRUPT reale (voce/focus), preferenze per-sorgente.
 6. UI Horizon dedicata per i background task (oggi solo store + toast).
 7. Ereditati fase 7: grant per-comando, capability nel frame di conferma, esenzione dedup ui_command, hook change-notification manifest, cap usage_guidance, clamp rpc_timeout_s.
+8. (Review Task 3) ruff pre-esistenti in `core/event_bus.py` (UP035 riga ~9, B905 riga ~234) — commit di cleanup separato.
+9. (Review Task 3) `command_bridge_service` ha la property in `context.py` ma manca da `FLAT_FIELDS` — allineare (incoerenza ereditata fase 7).
+10. (Review Task 5) Test integrato «turno headless + tool confirmation-required termina REJECTED» per inchiodare la proprietà §4.5 contro regressioni.
+11. (Review Task 5) `run_headless_turn`: nessun cap lunghezza prompt (il path WS applica `_MAX_USER_MESSAGE_LENGTH`) e nessun `cancel_event`/timeout per-turno esposto — aggiungere quando i trigger diventeranno user-configurabili.
+12. (Review Task 6+8, F6 — PRE-esistente, condiviso col turno normale) Bypass del gate via bare-name: il gate risolve `get_tool_definition(name)` senza fallback suffisso ma `execute_tool` risolve i bare-name per suffisso unico → `tool_def=None` al gate (ALLOW) con esecuzione del tool reale. Risolvere il nome PRIMA del gate (tool_loop.py:632 e _subagent) o gateare post-risoluzione dentro execute_tool.
+13. (Review Task 6+8, F4 nota) L'anti-eco sugli eventi bus dipende dalla disciplina degli emettitori: oggi solo BackgroundTaskService tagga `origin="agent"`; gli eventi emessi dai tool durante un turno autonomo (email.sent, note.created, …) non portano origin — estendere la convenzione agli emettitori quando i trigger event-driven verranno usati davvero.

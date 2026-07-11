@@ -13,13 +13,12 @@ import { renderMarkdown } from '../../composables/useMarkdown'
 import { useCodeBlocks } from '../../composables/useCodeBlocks'
 import { useGenerationState } from '../../composables/useGenerationState'
 import { useArtifactsStore } from '../../stores/artifacts'
-import { isChartPayload } from '../../stores/charts'
 import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import type { ChatMessage, CadModelPayload, ChartPayload, WhiteboardPayload } from '../../types/chat'
-import { isWhiteboardPayload } from '../../types/chat'
+import { isChartPayload, isWhiteboardPayload } from '../../types/chat'
 
 const CADViewer = defineAsyncComponent(() => import('./CADViewer.vue'))
 const ChartViewer = defineAsyncComponent(() => import('./ChartViewer.vue'))

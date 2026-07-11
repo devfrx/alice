@@ -10,7 +10,7 @@ import CADGenerationPlaceholder from '../chat/CADGenerationPlaceholder.vue'
 import { toRoman } from '../../composables/horizon/horizonScene'
 import type { HorizonArtifact } from '../../composables/horizon/horizonArtifacts'
 import type { CadGenerationInfo } from '../../composables/useGenerationState'
-import { api } from '../../services/api'
+import { useArtifactsStore } from '../../stores/artifacts'
 
 const ImmersiveCADCanvas = defineAsyncComponent(() => import('../assistant/ImmersiveCADCanvas.vue'))
 const ChartViewer = defineAsyncComponent(() => import('../chat/ChartViewer.vue'))
@@ -27,6 +27,8 @@ const emit = defineEmits<{
   'update:activeIndex': [i: number]
   close: []
 }>()
+
+const artifactsStore = useArtifactsStore()
 
 const active = computed(() => props.artifacts[props.activeIndex] ?? null)
 
@@ -53,9 +55,7 @@ function next(): void {
 }
 
 function saveBoard(boardId: string, snapshot: Record<string, unknown>): void {
-  api.saveWhiteboardSnapshot(boardId, snapshot).catch(() => {
-    /* best-effort, mirrors the legacy behaviour */
-  })
+  void artifactsStore.saveContent(boardId, { snapshot })
 }
 </script>
 

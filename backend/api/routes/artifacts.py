@@ -11,6 +11,7 @@ Endpoints (mounted under ``/api/artifacts``):
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from pathlib import Path
@@ -22,6 +23,9 @@ from loguru import logger
 from backend.core.config import PROJECT_ROOT
 from backend.db.models import Artifact, ArtifactKind
 from backend.services.artifacts import (
+    ArtifactContentResponse,
+    ArtifactContentUpdate,
+    ArtifactContentUpdateResponse,
     ArtifactListResponse,
     ArtifactPinUpdate,
     ArtifactRead,
@@ -162,6 +166,70 @@ async def pin_artifact(
             detail=f"Artifact not found: {artifact_id}",
         )
     return ArtifactRead.from_orm_artifact(artifact)
+
+
+_MAX_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MiB (same guard as the old whiteboard PATCH)
+
+
+@router.get(
+    "/{artifact_id}/content",
+    response_model=ArtifactContentResponse,
+    summary="Get the JSON content of an artifact",
+)
+async def get_artifact_content(
+    artifact_id: str, request: Request,
+) -> ArtifactContentResponse:
+    """Return the JSON blob for chart/whiteboard artifacts (404 otherwise)."""
+    registry = _get_registry(request)
+    result = await registry.read_json_content(_to_uuid(artifact_id))
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact has no JSON content: {artifact_id}",
+        )
+    artifact, content = result
+    return ArtifactContentResponse(
+        artifact_id=artifact.id, kind=artifact.kind, content=content,
+    )
+
+
+@router.patch(
+    "/{artifact_id}/content",
+    response_model=ArtifactContentUpdateResponse,
+    summary="Merge top-level keys into the JSON content of an artifact",
+)
+async def update_artifact_content(
+    artifact_id: str, body: ArtifactContentUpdate, request: Request,
+) -> ArtifactContentUpdateResponse:
+    """Top-level merge into the blob (used by the whiteboard editor)."""
+    registry = _get_registry(request)
+    try:
+        size = len(json.dumps(body.content, ensure_ascii=False).encode("utf-8"))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Content non serializzabile: {exc}",
+        ) from exc
+    # NOTE: this bounds the PATCH body, not the merged on-disk blob.
+    if size > _MAX_CONTENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                f"Content troppo grande ({size} bytes). "
+                f"Massimo consentito: {_MAX_CONTENT_BYTES} bytes."
+            ),
+        )
+    artifact = await registry.update_json_artifact(
+        _to_uuid(artifact_id), content_patch=body.content,
+    )
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact has no JSON content: {artifact_id}",
+        )
+    return ArtifactContentUpdateResponse(
+        artifact_id=artifact.id, updated_at=artifact.updated_at,
+    )
 
 
 @router.delete(

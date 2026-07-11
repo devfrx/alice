@@ -23,10 +23,9 @@ import { useArtifactsStore } from '../../stores/artifacts'
 import { useChatStore } from '../../stores/chat'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { usePlanDocumentStore } from '../../stores/planDocument'
-import { extractCharts } from '../../stores/charts'
 import { emitOpenModule } from './moduleIntents'
 import type { ChatMessage, ChartPayload } from '../../types/chat'
-import { isWhiteboardPayload } from '../../types/chat'
+import { extractCharts, isWhiteboardPayload } from '../../types/chat'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (also used in tests)

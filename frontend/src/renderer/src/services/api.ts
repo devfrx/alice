@@ -50,12 +50,9 @@ import type {
 } from '../types/mcpMemory'
 import type { EmailHeader, EmailDetail, EmailSearchRequest } from '../types/email'
 import type {
-  WhiteboardSpec,
-  WhiteboardListResponse,
-  WhiteboardSnapshotUpdateResponse
-} from '../types/whiteboard'
-import type {
   Artifact,
+  ArtifactContentResponse,
+  ArtifactContentUpdateResponse,
   ArtifactKind,
   ArtifactListResponse,
 } from '../types/artifacts'
@@ -792,43 +789,6 @@ export const api = {
   /** List IMAP folders. */
   getEmailFolders: (): Promise<string[]> => request<string[]>('/email/folders'),
 
-  // -- Whiteboards (Phase 16) ---------------------------------------------
-
-  /** Fetch paginated whiteboard list, optionally filtered by conversation. */
-  getWhiteboards: (params?: {
-    conversation_id?: string
-    limit?: number
-    offset?: number
-  }): Promise<WhiteboardListResponse> => {
-    const qs = new URLSearchParams()
-    if (params?.conversation_id) qs.set('conversation_id', params.conversation_id)
-    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
-    if (params?.offset !== undefined) qs.set('offset', String(params.offset))
-    const q = qs.toString()
-    return request<WhiteboardListResponse>(`/whiteboards${q ? `?${q}` : ''}`)
-  },
-
-  /** Fetch a single whiteboard spec (including tldraw snapshot). */
-  getWhiteboard: (boardId: string): Promise<WhiteboardSpec> =>
-    request<WhiteboardSpec>(`/whiteboards/${encodeURIComponent(boardId)}`),
-
-  /** Delete a whiteboard by ID. */
-  deleteWhiteboard: (boardId: string): Promise<{ status: string; board_id: string }> =>
-    request<{ status: string; board_id: string }>(
-      `/whiteboards/${encodeURIComponent(boardId)}`,
-      { method: 'DELETE' }
-    ),
-
-  /** Save the tldraw snapshot for an existing whiteboard. */
-  saveWhiteboardSnapshot: (
-    boardId: string,
-    snapshot: Record<string, unknown>
-  ): Promise<WhiteboardSnapshotUpdateResponse> =>
-    request<WhiteboardSnapshotUpdateResponse>(
-      `/whiteboards/${encodeURIComponent(boardId)}/snapshot`,
-      { method: 'PATCH', body: JSON.stringify({ snapshot }) }
-    ),
-
   // -- Qdrant Vector Store --------------------------------------------------
 
   /** Fetch Qdrant vector store statistics. */
@@ -869,6 +829,20 @@ export const api = {
   /** Fetch a single artifact by id. */
   getArtifact: (id: string): Promise<Artifact> =>
     request<Artifact>(`/artifacts/${encodeURIComponent(id)}`),
+
+  /** Fetch the JSON content of a chart/whiteboard artifact. */
+  getArtifactContent: (id: string): Promise<ArtifactContentResponse> =>
+    request<ArtifactContentResponse>(`/artifacts/${encodeURIComponent(id)}/content`),
+
+  /** Merge top-level keys into the JSON content of an artifact. */
+  updateArtifactContent: (
+    id: string,
+    content: Record<string, unknown>,
+  ): Promise<ArtifactContentUpdateResponse> =>
+    request<ArtifactContentUpdateResponse>(
+      `/artifacts/${encodeURIComponent(id)}/content`,
+      { method: 'PATCH', body: JSON.stringify({ content }) },
+    ),
 
   /** Pin or unpin an artifact. */
   setArtifactPinned: (id: string, pinned: boolean): Promise<Artifact> =>

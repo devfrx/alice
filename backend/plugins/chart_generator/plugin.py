@@ -1,22 +1,22 @@
-﻿"""Plugin chart_generator — genera, aggiorna e gestisce grafici ECharts."""
+"""Plugin chart_generator — genera, aggiorna e gestisce grafici ECharts."""
 
 from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
-from uuid import uuid4
+from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID, uuid4
 
-from backend.core.config import PROJECT_ROOT
 from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
+from backend.db.models import ArtifactKind
 
-from .chart_store import ChartStore
-from .models import ChartPayload, ChartSpec
+from .models import ChartListItem, ChartPayload, ChartSpec
 from .option_validator import ChartOptionError, validate_and_normalize_option
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
+    from backend.services.artifacts import ArtifactRegistry
 
 _GENERATE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -130,6 +130,14 @@ _DELETE_SCHEMA: dict[str, Any] = {
 }
 
 
+def _parse_artifact_id(value: str) -> UUID | None:
+    """Parse *value* as an artifact UUID; ``None`` when malformed."""
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 class ChartGeneratorPlugin(BasePlugin):
     """Plugin per la generazione di grafici interattivi Apache ECharts."""
 
@@ -139,27 +147,20 @@ class ChartGeneratorPlugin(BasePlugin):
     plugin_dependencies: list[str] = []
     plugin_priority: int = 25
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._store: ChartStore | None = None
-
-    @property
-    def store(self) -> ChartStore | None:
-        """Public access to the chart store."""
-        return self._store
+    def _registry(self) -> ArtifactRegistry:
+        registry = getattr(self.ctx, "artifact_registry", None)
+        if registry is None:
+            raise RuntimeError("Artifact registry non inizializzato.")
+        return cast("ArtifactRegistry", registry)
 
     async def initialize(self, ctx: "AppContext") -> None:
         await super().initialize(ctx)
-        cfg = ctx.config.chart
-        if not cfg.enabled:
+        if not ctx.config.chart.enabled:
             self.logger.info("Plugin chart_generator disabilitato dalla configurazione.")
             return
-        chart_dir = PROJECT_ROOT / cfg.chart_output_dir
-        self._store = ChartStore(chart_dir)
-        self.logger.info(f"ChartGeneratorPlugin inizializzato (dir={chart_dir})")
+        self.logger.info("ChartGeneratorPlugin inizializzato (registry-backed)")
 
     async def cleanup(self) -> None:
-        self._store = None
         await super().cleanup()
 
     def get_tools(self) -> list[ToolDefinition]:
@@ -240,8 +241,10 @@ class ChartGeneratorPlugin(BasePlugin):
         if not self.ctx.config.chart.enabled:
             return ToolResult.error("Plugin chart_generator non abilitato.")
 
-        if self._store is None:
-            return ToolResult.error("Chart store not initialized.")
+        try:
+            self._registry()
+        except RuntimeError as exc:
+            return ToolResult.error(str(exc))
 
         handlers = {
             "generate_chart": self._generate_chart,
@@ -253,9 +256,11 @@ class ChartGeneratorPlugin(BasePlugin):
         handler = handlers.get(tool_name)
         if handler is None:
             return ToolResult.error(f"Tool sconosciuto: {tool_name}")
-        return await handler(args)
+        return await handler(args, context)
 
-    async def _generate_chart(self, args: dict[str, Any]) -> ToolResult:
+    async def _generate_chart(
+        self, args: dict[str, Any], context: ExecutionContext,
+    ) -> ToolResult:
         title = (args.get("title") or "").strip()
         if not title:
             return ToolResult.error("Missing required parameter: title")
@@ -277,22 +282,21 @@ class ChartGeneratorPlugin(BasePlugin):
         try:
             option = validate_and_normalize_option(option, chart_type)
         except ChartOptionError as exc:
-            self.logger.warning(
-                f"echarts_option non valida per '{title}': {exc}"
-            )
+            self.logger.warning(f"echarts_option non valida per '{title}': {exc}")
             return ToolResult.error(str(exc))
 
-        count = await self._store.count()
+        registry = self._registry()
+        count = await registry.count_artifacts(kind=ArtifactKind.CHART)
         if count >= cfg.max_charts:
             return ToolResult.error(
                 f"Limite massimo di grafici raggiunto ({cfg.max_charts}). "
                 "Usa `delete_chart` per eliminare grafici non più necessari."
             )
 
-        chart_id = str(uuid4())
+        aid = uuid4()
         now = datetime.now(timezone.utc)
         spec = ChartSpec(
-            chart_id=chart_id,
+            chart_id=str(aid),
             title=title,
             chart_type=chart_type,
             description=args.get("description", ""),
@@ -300,14 +304,21 @@ class ChartGeneratorPlugin(BasePlugin):
             created_at=now,
             updated_at=now,
         )
-        await self._store.save(spec)
-        self.logger.info(f"Grafico '{spec.title}' generato (id={chart_id}, type={spec.chart_type})")
+        await registry.create_json_artifact(
+            kind=ArtifactKind.CHART,
+            title=title,
+            content=spec.model_dump(mode="json"),
+            conversation_id=_parse_artifact_id(context.conversation_id or ""),
+            metadata={"chart_type": chart_type, "description": spec.description},
+            artifact_id=aid,
+        )
+        self.logger.info(f"Grafico '{title}' generato (id={aid}, type={chart_type})")
 
         payload = ChartPayload(
-            chart_id=chart_id,
-            title=spec.title,
-            chart_type=spec.chart_type,
-            chart_url=f"/api/charts/{chart_id}",
+            chart_id=str(aid),
+            title=title,
+            chart_type=chart_type,
+            chart_url=f"/api/artifacts/{aid}/content",
             created_at=now,
         )
         return ToolResult.ok(
@@ -315,23 +326,28 @@ class ChartGeneratorPlugin(BasePlugin):
             content_type="application/vnd.alice.chart+json",
         )
 
-    async def _update_chart(self, args: dict[str, Any]) -> ToolResult:
+    async def _update_chart(
+        self, args: dict[str, Any], _context: ExecutionContext,
+    ) -> ToolResult:
         chart_id = (args.get("chart_id") or "").strip()
-        if not chart_id:
-            return ToolResult.error("Missing required parameter: chart_id")
+        aid = _parse_artifact_id(chart_id)
+        if aid is None:
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
         option = args.get("echarts_option")
         if not isinstance(option, dict):
             return ToolResult.error("Missing required parameter: echarts_option")
-        existing = await self._store.load(chart_id)
+
+        registry = self._registry()
+        existing = await registry.read_json_content(aid)
         if existing is None:
             return ToolResult.error(f"Grafico non trovato: {chart_id}")
+        artifact, content = existing
 
+        chart_type = str(content.get("chart_type") or "")
         try:
-            option = validate_and_normalize_option(option, existing.chart_type)
+            option = validate_and_normalize_option(option, chart_type)
         except ChartOptionError as exc:
-            self.logger.warning(
-                f"echarts_option non valida per update {chart_id}: {exc}"
-            )
+            self.logger.warning(f"echarts_option non valida per update {chart_id}: {exc}")
             return ToolResult.error(str(exc))
 
         cfg = self.ctx.config.chart
@@ -341,55 +357,82 @@ class ChartGeneratorPlugin(BasePlugin):
                 f"echarts_option supera il limite di {cfg.max_option_chars} caratteri."
             )
 
-        existing.echarts_option = option
-        existing.updated_at = datetime.now(timezone.utc)
-        if "title" in args:
-            existing.title = args["title"]
-
-        await self._store.update(chart_id, existing)
+        patch: dict[str, Any] = {"echarts_option": option}
+        new_title = args.get("title") if "title" in args else None
+        if new_title is not None:
+            patch["title"] = new_title
+        updated = await registry.update_json_artifact(
+            aid, content_patch=patch, title=new_title,
+        )
+        if updated is None:
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
         self.logger.info(f"Grafico aggiornato: {chart_id}")
 
         payload = ChartPayload(
             chart_id=chart_id,
-            title=existing.title,
-            chart_type=existing.chart_type,
-            chart_url=f"/api/charts/{chart_id}",
-            created_at=existing.created_at,
+            title=updated.title,
+            chart_type=chart_type,
+            chart_url=f"/api/artifacts/{chart_id}/content",
+            created_at=artifact.created_at,
         )
         return ToolResult.ok(
             payload.model_dump_json(),
             content_type="application/vnd.alice.chart+json",
         )
 
-    async def _get_chart(self, args: dict[str, Any]) -> ToolResult:
+    async def _get_chart(
+        self, args: dict[str, Any], _context: ExecutionContext,
+    ) -> ToolResult:
         chart_id = (args.get("chart_id") or "").strip()
-        if not chart_id:
-            return ToolResult.error("Missing required parameter: chart_id")
-        spec = await self._store.load(chart_id)
-        if spec is None:
+        aid = _parse_artifact_id(chart_id)
+        if aid is None:
             return ToolResult.error(f"Grafico non trovato: {chart_id}")
-        return ToolResult.ok(spec.model_dump_json())
+        result = await self._registry().read_json_content(aid)
+        if result is None:
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
+        _artifact, content = result
+        return ToolResult.ok(json.dumps(content, ensure_ascii=False, default=str))
 
-    async def _list_charts(self, args: dict[str, Any]) -> ToolResult:
+    async def _list_charts(
+        self, args: dict[str, Any], _context: ExecutionContext,
+    ) -> ToolResult:
         limit = min(int(args.get("limit", 20)), 100)
         offset = max(int(args.get("offset", 0)), 0)
-        items = await self._store.list(limit=limit, offset=offset)
-        total = await self._store.count()
+        registry = self._registry()
+        items, total = await registry.list_artifacts(
+            kind=ArtifactKind.CHART, limit=limit, offset=offset,
+        )
+        charts = [
+            ChartListItem(
+                chart_id=str(a.id),
+                title=a.title,
+                chart_type=str(a.artifact_metadata.get("chart_type") or ""),
+                description=str(a.artifact_metadata.get("description") or ""),
+                created_at=a.created_at,
+                updated_at=a.updated_at,
+            )
+            for a in items
+        ]
         payload = {
-            "charts": [item.model_dump(mode="json") for item in items],
+            "charts": [c.model_dump(mode="json") for c in charts],
             "total": total,
             "limit": limit,
             "offset": offset,
         }
-        return ToolResult.ok(
-            json.dumps(payload, ensure_ascii=False, default=str),
-        )
+        return ToolResult.ok(json.dumps(payload, ensure_ascii=False, default=str))
 
-    async def _delete_chart(self, args: dict[str, Any]) -> ToolResult:
+    async def _delete_chart(
+        self, args: dict[str, Any], _context: ExecutionContext,
+    ) -> ToolResult:
         chart_id = (args.get("chart_id") or "").strip()
-        if not chart_id:
-            return ToolResult.error("Missing required parameter: chart_id")
-        deleted = await self._store.delete(chart_id)
+        aid = _parse_artifact_id(chart_id)
+        if aid is None:
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
+        registry = self._registry()
+        artifact = await registry.get_artifact(aid)
+        if artifact is None or artifact.kind is not ArtifactKind.CHART:
+            return ToolResult.error(f"Grafico non trovato: {chart_id}")
+        deleted = await registry.delete_artifact(aid, delete_file=True)
         if not deleted:
             return ToolResult.error(f"Grafico non trovato: {chart_id}")
         return ToolResult.ok(f"Grafico eliminato: {chart_id}")

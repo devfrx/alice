@@ -6,16 +6,16 @@
  *
  * - `params.chartPayload` — a full {@link ChartPayload} object
  *   `{ chart_id, chart_url, title, chart_type, created_at }`.
- *   ChartViewer fetches the ECharts spec from `chart_url` itself, so the
- *   adapter only needs to forward this object. useArtifactAutoOpen supplies
- *   this key when auto-opening the tile for a freshly-generated chart.
+ *   ChartViewer fetches the ECharts spec via the artifacts content API,
+ *   so the adapter only needs to forward this object. useArtifactAutoOpen
+ *   supplies this key when auto-opening the tile for a freshly-generated chart.
  *
  * ## Multi-chart handling
  * When a conversation contains several charts, a {@link ModuleSelectorBar} lets
  * the user switch between them. Selection is resolved by
  * {@link useModuleItemSelection}: manual pick → `chartPayload` param →
- * most-recent chart. The chart list comes from {@link useChartsStore} (derived
- * from the conversation messages), mirroring WhiteboardModule/Cad3dModule.
+ * most-recent chart. The chart list derives from messages (extractCharts),
+ * not from a dedicated store.
  *
  * ## Fallback
  * Only when no chart exists at all is a UiEmptyState rendered.
@@ -23,7 +23,8 @@
 import { computed, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import ModuleSelectorBar from '../ModuleSelectorBar.vue'
-import { useChartsStore, isChartPayload } from '../../../stores/charts'
+import { useChatStore } from '../../../stores/chat'
+import { extractCharts, isChartPayload } from '../../../types/chat'
 import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
 import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
 import type { ChartPayload } from '../../../types/chat'
@@ -34,10 +35,13 @@ const props = defineProps<{
   params?: Record<string, unknown>
 }>()
 
-const chartsStore = useChartsStore()
+const chatStore = useChatStore()
+
+/** Charts in the active conversation, oldest → newest (derived from messages). */
+const charts = computed<ChartPayload[]>(() => extractCharts(chatStore.messages))
 
 const { current, currentId, select } = useModuleItemSelection<ChartPayload>({
-  items: () => chartsStore.charts,
+  items: () => charts.value,
   getId: (c) => c.chart_id,
   preferredId: () => {
     const p = props.params?.chartPayload
@@ -47,7 +51,7 @@ const { current, currentId, select } = useModuleItemSelection<ChartPayload>({
 
 /**
  * Chart to display: the resolved selection, falling back to the raw param
- * payload if the store list hasn't populated yet (initial-load race).
+ * payload if the message list hasn't populated yet (initial-load race).
  */
 const chartPayload = computed<ChartPayload | null>(() => {
   if (current.value) return current.value
@@ -57,7 +61,7 @@ const chartPayload = computed<ChartPayload | null>(() => {
 
 /** One selector option per chart in the conversation. */
 const options = computed<UiSegmentedOption[]>(() =>
-  chartsStore.charts.map((c, i) => ({ value: c.chart_id, label: c.title || `Grafico ${i + 1}` })),
+  charts.value.map((c, i) => ({ value: c.chart_id, label: c.title || `Grafico ${i + 1}` })),
 )
 </script>
 

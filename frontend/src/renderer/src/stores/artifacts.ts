@@ -34,6 +34,9 @@ export const useArtifactsStore = defineStore('artifacts', () => {
   /** Conversation ids whose artifacts have been fetched at least once. */
   const fetchedConversations = ref<Set<string>>(new Set())
 
+  /** Cache of fetched JSON contents (chart/whiteboard), keyed by artifact id. */
+  const contents = ref<Record<string, Record<string, unknown>>>({})
+
   // -----------------------------------------------------------------------
   // Getters
   // -----------------------------------------------------------------------
@@ -43,6 +46,8 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     const map: Record<ArtifactKind, Artifact[]> = {
       cad_3d_text: [],
       cad_3d_image: [],
+      chart: [],
+      whiteboard: [],
     }
     for (const a of items.value) {
       const bucket = map[a.kind]
@@ -147,6 +152,55 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     }
   }
 
+  /** Force-refresh a single artifact row from the backend (upsert). */
+  async function refreshById(id: string): Promise<void> {
+    try {
+      const artifact = await api.getArtifact(id)
+      addArtifact(artifact)
+    } catch (err) {
+      console.warn('[artifacts] refreshById failed:', err)
+    }
+  }
+
+  /** Fetch (and cache) the JSON content of a chart/whiteboard artifact. */
+  async function fetchContent(
+    id: string,
+    force = false,
+  ): Promise<Record<string, unknown> | null> {
+    if (!force && contents.value[id]) return contents.value[id]
+    try {
+      const res = await api.getArtifactContent(id)
+      contents.value[id] = res.content
+      return res.content
+    } catch (err) {
+      console.warn('[artifacts] fetchContent failed:', err)
+      return null
+    }
+  }
+
+  /** Merge top-level keys into an artifact's JSON content (PATCH + local cache). */
+  async function saveContent(
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<boolean> {
+    try {
+      await api.updateArtifactContent(id, patch)
+      const cached = contents.value[id]
+      if (cached) contents.value[id] = { ...cached, ...patch }
+      return true
+    } catch (err) {
+      console.warn('[artifacts] saveContent failed:', err)
+      return false
+    }
+  }
+
+  /** Remove an artifact from local state (the server already deleted it). */
+  function removeLocal(id: string): void {
+    delete contents.value[id]
+    const idx = items.value.findIndex((a) => a.id === id)
+    if (idx !== -1) items.value.splice(idx, 1)
+  }
+
   /** Toggle the pin flag for an artifact and persist server-side. */
   async function togglePin(id: string): Promise<void> {
     const current = findById(id)
@@ -168,6 +222,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     await api.deleteArtifact(id, deleteFile)
     const idx = items.value.findIndex((a) => a.id === id)
     if (idx !== -1) items.value.splice(idx, 1)
+    delete contents.value[id]
   }
 
   return {
@@ -175,6 +230,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     items,
     loading,
     total,
+    contents,
     // getters
     byKind,
     pinnedItems,
@@ -185,6 +241,10 @@ export const useArtifactsStore = defineStore('artifacts', () => {
     fetch,
     ensureForConversation,
     fetchById,
+    refreshById,
+    fetchContent,
+    saveContent,
+    removeLocal,
     togglePin,
     remove,
     addArtifact,

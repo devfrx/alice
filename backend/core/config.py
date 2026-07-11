@@ -721,9 +721,6 @@ class ChartConfig(BaseSettings):
     enabled: bool = False
     """Abilita il plugin chart_generator (opt-in, come tutti i plugin AL\\CE)."""
 
-    chart_output_dir: str = "data/charts"
-    """Directory dove vengono salvati i chart spec JSON."""
-
     max_option_chars: int = 10_000
     """Dimensione massima della echarts_option serializzata (in caratteri)."""
 
@@ -738,9 +735,6 @@ class WhiteboardConfig(BaseSettings):
 
     enabled: bool = False
     """Abilita il plugin whiteboard (opt-in)."""
-
-    whiteboard_output_dir: str = "data/whiteboards"
-    """Directory dove vengono salvati i board spec JSON."""
 
     max_boards: int = 500
     """Numero massimo di lavagne persistite."""

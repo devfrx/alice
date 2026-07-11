@@ -1,14 +1,14 @@
 /**
- * charts.spec.ts
+ * chat.spec.ts
  *
- * Unit tests for the chart-extraction helpers backing the charts store.
+ * Unit tests for the chart-extraction helpers in types/chat.ts.
  * These are pure functions (no Pinia / Vue reactivity required), so they are
- * exercised in isolation. The store's `charts`/`currentChart` getters are thin
- * computed wrappers over `extractCharts`, covered transitively here.
+ * exercised in isolation. The isChartPayload and extractCharts helpers are
+ * tested exhaustively here.
  */
 import { describe, it, expect } from 'vitest'
-import { isChartPayload, extractCharts } from './charts'
-import type { ChatMessage, ChartPayload } from '../types/chat'
+import { isChartPayload, extractCharts } from './chat'
+import type { ChatMessage, ChartPayload } from './chat'
 
 function toolMsg(id: string, content: string): ChatMessage {
   return {
@@ -77,7 +77,7 @@ describe('extractCharts', () => {
     ]
     const ids = extractCharts(messages).map((c) => c.chart_id)
     expect(ids).toEqual(['first', 'second', 'third'])
-    // The store's `currentChart` is the last element → most-recent chart.
+    // The most-recent chart is the last element.
     expect(ids[ids.length - 1]).toBe('third')
   })
 

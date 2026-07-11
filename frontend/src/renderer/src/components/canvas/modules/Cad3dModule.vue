@@ -57,7 +57,7 @@ const { currentId, select } = useModuleItemSelection<Artifact>({
 
 /** Convert a store Artifact into the CadModelPayload expected by the canvas. */
 function artifactToModel(artifact: Artifact): CadModelPayload {
-  const meta = artifact.artifact_metadata
+  const meta = artifact.artifact_metadata ?? {}
   return {
     model_name:
       typeof meta.model_name === 'string' && meta.model_name.length > 0
@@ -71,6 +71,11 @@ function artifactToModel(artifact: Artifact): CadModelPayload {
     size_bytes: artifact.size_bytes,
     description: typeof meta.description === 'string' ? meta.description : undefined
   }
+}
+
+/** Extract a non-empty model_name from artifact metadata, or ''. */
+function modelNameOf(meta: Record<string, unknown>): string {
+  return typeof meta.model_name === 'string' && meta.model_name.length > 0 ? meta.model_name : ''
 }
 
 /** Full model list handed to the canvas (kept stable so navigation works). */
@@ -87,7 +92,7 @@ const options = computed<UiSegmentedOption[]>(() =>
   cadArtifacts.value.map((a, i) => ({
     value: a.id,
     label:
-      (typeof a.artifact_metadata.model_name === 'string' && a.artifact_metadata.model_name) ||
+      modelNameOf(a.artifact_metadata ?? {}) ||
       a.title ||
       `Modello ${i + 1}`,
   }))

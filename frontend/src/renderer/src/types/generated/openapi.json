@@ -35,11 +35,74 @@
         "title": "AddObservationsRequest",
         "type": "object"
       },
+      "ArtifactContentResponse": {
+        "description": "JSON content of a JSON-kind artifact (chart spec, whiteboard spec).",
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ArtifactKind"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "kind",
+          "content"
+        ],
+        "title": "ArtifactContentResponse",
+        "type": "object"
+      },
+      "ArtifactContentUpdate": {
+        "description": "Body of ``PATCH /api/artifacts/{id}/content`` (top-level merge).",
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "ArtifactContentUpdate",
+        "type": "object"
+      },
+      "ArtifactContentUpdateResponse": {
+        "description": "Outcome of a content merge.",
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "updated_at"
+        ],
+        "title": "ArtifactContentUpdateResponse",
+        "type": "object"
+      },
       "ArtifactKind": {
         "description": "Type of artifact produced by a tool.\n\nExtend with new members when adding new artifact-producing tools\n(e.g. ``IMAGE``, ``AUDIO``, ``CHART``, ``WHITEBOARD``).  The string\nvalue is what gets persisted in SQLite, so values must remain stable.",
         "enum": [
           "cad_3d_text",
-          "cad_3d_image"
+          "cad_3d_image",
+          "chart",
+          "whiteboard"
         ],
         "title": "ArtifactKind",
         "type": "string"
@@ -810,6 +873,8 @@
         "discriminator": {
           "mapping": {
             "artifact.created": "#/components/schemas/WsArtifactCreated",
+            "artifact.deleted": "#/components/schemas/WsArtifactDeleted",
+            "artifact.updated": "#/components/schemas/WsArtifactUpdated",
             "calendar.changed": "#/components/schemas/WsCalendarChanged",
             "config.changed": "#/components/schemas/WsConfigChanged",
             "email.received": "#/components/schemas/WsEmailReceived",
@@ -875,6 +940,12 @@
           },
           {
             "$ref": "#/components/schemas/WsArtifactCreated"
+          },
+          {
+            "$ref": "#/components/schemas/WsArtifactUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/WsArtifactDeleted"
           },
           {
             "$ref": "#/components/schemas/WsTasksUpdated"
@@ -1929,21 +2000,6 @@
         "title": "UpdateEventRequest",
         "type": "object"
       },
-      "UpdateSnapshotRequest": {
-        "description": "Payload for updating a whiteboard snapshot.",
-        "properties": {
-          "snapshot": {
-            "additionalProperties": true,
-            "title": "Snapshot",
-            "type": "object"
-          }
-        },
-        "required": [
-          "snapshot"
-        ],
-        "title": "UpdateSnapshotRequest",
-        "type": "object"
-      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2113,8 +2169,16 @@
             "type": "string"
           },
           "conversation_id": {
-            "title": "Conversation Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
           },
           "correlation_id": {
             "anyOf": [
@@ -2163,10 +2227,95 @@
         "required": [
           "type",
           "artifact_id",
-          "kind",
-          "conversation_id"
+          "kind"
         ],
         "title": "WsArtifactCreated",
+        "type": "object"
+      },
+      "WsArtifactDeleted": {
+        "additionalProperties": false,
+        "description": "An artifact row was deleted.",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id"
+        ],
+        "title": "WsArtifactDeleted",
+        "type": "object"
+      },
+      "WsArtifactUpdated": {
+        "additionalProperties": false,
+        "description": "An existing artifact changed (row metadata or JSON content).",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "origin": {
+            "default": "system",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id"
+        ],
+        "title": "WsArtifactUpdated",
         "type": "object"
       },
       "WsAskUserAnswer": {
@@ -5984,6 +6133,100 @@
         ]
       }
     },
+    "/api/artifacts/{artifact_id}/content": {
+      "get": {
+        "description": "Return the JSON blob for chart/whiteboard artifacts (404 otherwise).",
+        "operationId": "get_artifact_content_api_artifacts__artifact_id__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactContentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get the JSON content of an artifact",
+        "tags": [
+          "artifacts"
+        ]
+      },
+      "patch": {
+        "description": "Top-level merge into the blob (used by the whiteboard editor).",
+        "operationId": "update_artifact_content_api_artifacts__artifact_id__content_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactContentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactContentUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Merge top-level keys into the JSON content of an artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
     "/api/artifacts/{artifact_id}/download": {
       "get": {
         "description": "Stream the artifact file using its stored MIME type.",
@@ -6583,151 +6826,6 @@
         ]
       }
     },
-    "/api/charts": {
-      "get": {
-        "description": "Restituisce la lista paginata dei grafici, ordinata dal più recente.",
-        "operationId": "list_charts_api_charts_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "offset",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "minimum": 0,
-              "title": "Offset",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Charts Api Charts Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Lista grafici salvati",
-        "tags": [
-          "charts"
-        ]
-      }
-    },
-    "/api/charts/{chart_id}": {
-      "delete": {
-        "description": "Elimina il file JSON del grafico dal disco.",
-        "operationId": "delete_chart_api_charts__chart_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "chart_id",
-            "required": true,
-            "schema": {
-              "title": "Chart Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Chart Api Charts  Chart Id  Delete",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Elimina un grafico",
-        "tags": [
-          "charts"
-        ]
-      },
-      "get": {
-        "description": "Restituisce il JSON completo della ChartSpec (inclusa echarts_option).",
-        "operationId": "get_chart_api_charts__chart_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "chart_id",
-            "required": true,
-            "schema": {
-              "title": "Chart Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Recupera la spec completa di un grafico",
-        "tags": [
-          "charts"
-        ]
-      }
-    },
     "/api/chat/conversations": {
       "delete": {
         "description": "Delete ALL conversations, messages, attachments, and associated files.",
@@ -6856,7 +6954,7 @@
     },
     "/api/chat/conversations/{conversation_id}": {
       "delete": {
-        "description": "Delete a conversation and all its messages.\n\nUses bulk SQL DELETE statements to avoid async lazy-loading issues\nwith SQLAlchemy ORM relationships.",
+        "description": "Delete a conversation and all its messages.\n\nUses bulk SQL DELETE statements to avoid async lazy-loading issues\nwith SQLAlchemy ORM relationships.  Artifact cleanup (detach pinned,\ndelete unpinned rows + blobs) is delegated to the unified registry.",
         "operationId": "delete_conversation_api_chat_conversations__conversation_id__delete",
         "parameters": [
           {
@@ -10377,222 +10475,6 @@
         "summary": "Voice Status",
         "tags": [
           "voice"
-        ]
-      }
-    },
-    "/api/whiteboards": {
-      "get": {
-        "description": "Restituisce la lista paginata delle lavagne, con filtro opzionale.\n\nOgni item include ``conversation_title`` (risolto dal DB) quando la\nlavagna è associata a una conversazione.",
-        "operationId": "list_whiteboards_api_whiteboards_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "conversation_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Conversation Id"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "offset",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "minimum": 0,
-              "title": "Offset",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Whiteboards Api Whiteboards Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Lista lavagne salvate",
-        "tags": [
-          "whiteboards"
-        ]
-      }
-    },
-    "/api/whiteboards/{board_id}": {
-      "delete": {
-        "description": "Elimina il file JSON della lavagna dal disco.",
-        "operationId": "delete_whiteboard_api_whiteboards__board_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "board_id",
-            "required": true,
-            "schema": {
-              "title": "Board Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Whiteboard Api Whiteboards  Board Id  Delete",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Elimina una lavagna",
-        "tags": [
-          "whiteboards"
-        ]
-      },
-      "get": {
-        "description": "Restituisce il JSON completo della WhiteboardSpec (incluso snapshot).",
-        "operationId": "get_whiteboard_api_whiteboards__board_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "board_id",
-            "required": true,
-            "schema": {
-              "title": "Board Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Recupera la spec completa di una lavagna",
-        "tags": [
-          "whiteboards"
-        ]
-      }
-    },
-    "/api/whiteboards/{board_id}/snapshot": {
-      "patch": {
-        "description": "Aggiorna lo snapshot tldraw (chiamato dal frontend dopo editing).",
-        "operationId": "update_snapshot_api_whiteboards__board_id__snapshot_patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "board_id",
-            "required": true,
-            "schema": {
-              "title": "Board Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSnapshotRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Snapshot Api Whiteboards  Board Id  Snapshot Patch",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Aggiorna lo snapshot tldraw di una lavagna",
-        "tags": [
-          "whiteboards"
         ]
       }
     }

@@ -34,6 +34,8 @@ EXPECTED_EVENTS_SERVER_TYPES = frozenset({
     "service.model_download_progress",
     "knowledge.status",
     "artifact.created",
+    "artifact.updated",
+    "artifact.deleted",
     "tasks.updated",
     "plan_document.updated",
     "scope.updated",
@@ -93,6 +95,8 @@ REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
         "conversation_id": "c1",
         "title": "tiny cube",
     },
+    {"type": "artifact.updated", "artifact_id": "a1"},
+    {"type": "artifact.deleted", "artifact_id": "a1"},
     {
         "type": "tasks.updated",
         "conversation_id": "c1",

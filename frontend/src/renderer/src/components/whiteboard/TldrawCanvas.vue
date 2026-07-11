@@ -39,9 +39,9 @@ async function mountReact(): Promise<void> {
   let resolvedSnapshot = props.snapshot as Record<string, unknown> | null
   if (!resolvedSnapshot && props.boardId) {
     try {
-      const spec = await api.getWhiteboard(props.boardId)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      resolvedSnapshot = (spec as any).snapshot ?? null
+      const res = await api.getArtifactContent(props.boardId)
+      const snap = res.content?.snapshot
+      resolvedSnapshot = snap && typeof snap === 'object' ? (snap as Record<string, unknown>) : null
     } catch (err: unknown) {
       /* Detect 404 — board was deleted outside this conversation */
       if (err instanceof Error && err.message.includes('API Error 404')) {

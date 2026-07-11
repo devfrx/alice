@@ -25,14 +25,17 @@
 
 ## Cosa ha consegnato la Fase 6 (mappa rapida, dettagli nel piano)
 
-- **Horizon unica superficie**: TUTTO lo stack Workspace rimosso (~5.600 righe: WorkspaceView,
-  home/*, canvas/* + 6 moduli tile, composables/workspace/*, stores/workspace, ChatPanel e la sua
-  catena MessageBubble/ChatInput/StreamingIndicator/ReasoningThread/TaskStrip + terza ondata) +
-  dead code orb (ModeSwitcher, orbVisible/ambientEnabled, keyframes, icone). Il TERMINALE è salvo
-  come route standalone `/terminal` (`views/TerminalPageView.vue`, voce sidebar). Router: tutti i
-  redirect legacy (`/`, `/home`, `/workspace`, `/hybrid`, catch-all) → `/assistant`; niente più
-  `UIMode`/`MODE_ROUTES` — la rotta È la fonte di verità. `stores/ui.ts` = solo
-  sidebarOpen+sidebarWidth; `DockedSidebar` spostato in `components/sidebar/`.
+- **⚠️ CORRETTO IL 2026-07-11**: la fase 6 aveva rimosso TUTTO lo stack Workspace interpretando
+  male "Horizon unica superficie" — **errore**: il Workspace (tiling + moduli per-conversazione)
+  è superficie DI PRODOTTO della visione Jarvis (la spec §7 presuppone `panel.open`); "rimozione
+  orb-era" = SOLO dead code orb. **Ripristinato in `fix/restore-workspace` (`ec3cf1a`)**: file
+  verbatim dal pre-rimozione adattati ai seam di fase 6 — ui.mode+MODE_ROUTES di nuovo vivi
+  ACCANTO a sidebarWidth, `/` → `/workspace`, comandi mode-aware (`conversation.open/new`
+  atterrano su `ui.mode`, `view.switch` include workspace), icone orb/hybrid-panel/modules e CSS
+  chat-edge ripristinati, TaskStrip.spec migrato a `tasksApi`. Review del ripristino: Approved.
+  Restano rimossi SOLO i morti veri (ModeSwitcher, 3 componenti voice orfani, keyframes orb).
+  Della fase 6 restano validi: `/terminal` standalone (convive col TerminalModule del workspace),
+  `DockedSidebar` in `components/sidebar/` su `ui.sidebarWidth`.
 - **Client REST per dominio**: `services/api.ts` (988 righe) → package `services/api/` (`http.ts`
   core + 17 moduli dominio + barrel `index.ts`). 93/93 metodi mossi verbatim, 39 importer migrati
   (spec inclusi, mock per namespace), NESSUN oggetto `api` legacy. Unica modifica: 6 mutazioni KG
@@ -64,8 +67,11 @@
 
 ## Decisioni registrate in Fase 6 (non rilitigare)
 
-1. **La rotta è l'unica fonte di verità della superficie** — niente store `mode`; Horizon è
-   l'unica chat surface, le altre feature sono route standalone (whiteboard, board, terminal…).
+1. **[CORRETTA il 2026-07-11] Due superfici chat di prodotto**: Workspace (`/workspace`, tiling
+   + moduli per-conversazione, primaria: `/` atterra lì, la Home è il suo stato vuoto) e Horizon
+   (`/assistant`, scena assistente). `ui.mode` (route-synced) traccia quale è attiva; le altre
+   feature sono route standalone (whiteboard, board, terminal…). Il Workspace NON è legacy e
+   NON va rimosso: è parte della visione Jarvis-like (decisione utente esplicita).
 2. **Niente barrel di compatibilità `api`**: i consumer usano i namespace di dominio; `BASE_URL`
    e `request` sono interni al package (non nel barrel).
 3. **L'emitter generico di WebSocketManager sopravvive SOLO per il canale voce** (deviazione
@@ -175,6 +181,12 @@ Messaggio di kickoff della sessione (copiare tale e quale):
    loadSnapshot incrementale); copy "deleted" per errori di rete.
 6. `auditApi` morto pre-fase (cablare UI audit o rimuovere modulo+endpoint); ~15 icone senza
    consumatori; a11y tabs terminale.
+6-bis. Dal ripristino Workspace (review Approved, note minori): stato sidebar morto in
+   `stores/workspace.ts` (sidebarMode/sidebarWidth — DockedSidebar usa ui.sidebarWidth) da potare;
+   doppio GET del contenuto whiteboard su cold-open (dedup in-flight in `fetchContent`); param
+   stantio sui tile già aperti in `useModuleItemSelection` (pre-esistente); `/` → `/workspace`
+   hardcoded sovrascrive `alice_ui_mode` persistito al cold start (scelta di prodotto, valutare
+   "riapri sull'ultima superficie").
 7. Ereditati (fasi 1-5): migrazione consumer ai gruppi ctx; test LLM/registry via moduli;
    guardia anti-drift flag-registry; route MCP tipizzate + ratchet; 500→503 search; offset O(n);
    export conversazioni a modello; dedup broadcaster.

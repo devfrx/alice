@@ -17,6 +17,7 @@ import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
 import HorizonShelf from '../components/horizon/HorizonShelf.vue'
 import HorizonStage from '../components/horizon/HorizonStage.vue'
+import { RouterLink } from 'vue-router'
 import HorizonHistory from '../components/horizon/HorizonHistory.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import AskUserPrompt from '../components/chat/AskUserPrompt.vue'
@@ -537,6 +538,9 @@ onBeforeUnmount(() => {
     <!-- ANCHOR: overlays -->
     <nav class="horizon-view__corner" aria-label="Navigazione">
       <button class="horizon-view__affordance" @click="historyOpen = !historyOpen">STORIA</button>
+      <RouterLink class="horizon-view__affordance" :to="{ name: 'workspace' }">
+        WORKSPACE
+      </RouterLink>
     </nav>
 
     <HorizonHistory

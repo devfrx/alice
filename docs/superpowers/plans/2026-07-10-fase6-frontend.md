@@ -1,5 +1,17 @@
 # Fase 6 — Frontend (Horizon unica superficie, client per dominio, dispatcher chat tipizzato, Command Registry) Implementation Plan
 
+> **⚠️ CORREZIONE POST-FASE (2026-07-11):** l'interpretazione "Horizon unica superficie ⇒
+> rimuovere lo stack Workspace" (Task 2) era SBAGLIATA. Il Workspace (tiling + moduli
+> per-conversazione) è una superficie DI PRODOTTO della visione Jarvis-like — la spec stessa lo
+> presuppone (§7 elenca `panel.open` tra i comandi) — e "rimozione orb-era" significava SOLO il
+> dead code dell'era orb. La domanda di perimetro posta all'utente aveva una risposta ambigua e
+> l'opzione aggressiva era stata marcata "Recommended": errore del controller. Lo stack è stato
+> RIPRISTINATO in `fix/restore-workspace` (commit `ec3cf1a`): file verbatim da `84959b8~1`
+> adattati ai seam di fase 6 (client per dominio, command layer mode-aware, ui.mode+MODE_ROUTES,
+> icone/CSS), review "Approved", gate verdi (lint 0/0, typecheck, 27 file/282 test). Restano
+> rimossi SOLO i residui morti veri (ModeSwitcher dormiente, componenti voice orfani, keyframes
+> orb). Gli esiti dei task qui sotto restano il resoconto storico di ciò che fu fatto.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** il frontend diventa coerente con la spec §5 riga 215 (+ §6/§7): **Horizon unica superficie** (rimozione dell'intero stack Workspace + dead code orb, con salvataggio del terminale in route standalone); **client REST per dominio** (`services/api/<dominio>.ts` al posto di `api.ts` da 988 righe); **dispatcher tipizzato anche sul canale chat-WS** (parità con events, fatto in 1b); **Command Registry** frontend con capability tag (§7, fondamenta per il Command Bridge di fase 7); chiusura dei backlog FE ereditati (bulk-delete artifacts, live-update whiteboard, CAD export_url, AgentTier, KGMutationResponse, memory.spec); **lint sanato a fondo** e **lint+vitest come gate CI**.

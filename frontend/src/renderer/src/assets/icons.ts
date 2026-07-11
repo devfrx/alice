@@ -163,13 +163,22 @@ const _ICONS = {
   /** Lightning bolt with flash (intense) */
   'lightning-flash': { icon: 'solar:bolt-circle-bold' },
 
+  /** Abstract orb (assistant surface) */
+  orb: { icon: 'solar:planet-bold' },
+
   // ── Layout / navigation ───────────────────────────────────────────────────
 
   /** Home / dashboard landing */
   home: { icon: 'solar:home-smile-bold' },
 
+  /** Split panel layout (workspace surface) */
+  'hybrid-panel': { icon: 'solar:sidebar-code-bold' },
+
   /** Sidebar-only layout */
   'hybrid-sidebar': { icon: 'solar:sidebar-minimalistic-bold' },
+
+  /** Modules / panels grid (workspace module launcher) */
+  modules: { icon: 'solar:widget-2-bold' },
 
   /** Terminal / code console */
   terminal: { icon: 'solar:code-square-bold' },

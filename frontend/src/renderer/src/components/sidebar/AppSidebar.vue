@@ -25,6 +25,7 @@ import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 /**
  * When `docked` is true the sidebar renders inline inside its parent frame
@@ -44,19 +45,50 @@ const toast = useToast()
 
 const unreadBadge = computed(() => emailStore.unreadCount)
 
-/** True while Horizon (`/assistant`), the only chat surface, is on screen. */
+/**
+ * Mode-tab active state is derived from the ROUTE, so each tab is active
+ * only for its own surface, mutually exclusive.
+ */
 const isAssistantActive = computed(() => route.name === 'assistant')
+const isWorkspaceActive = computed(() => route.path.startsWith('/workspace'))
 
 /**
- * The Home affordance is "fresh conversation on the primary surface": active
- * exactly when Horizon is on screen with an empty conversation.
+ * The Home surface is the empty-conversation state of the Workspace, so the
+ * Home nav item is "active" exactly when that surface is on screen: we're on
+ * the workspace route and the active conversation holds no messages.
  */
 const isHomeActive = computed(
   () =>
-    isAssistantActive.value &&
+    isWorkspaceActive.value &&
     chatStore.messages.length === 0 &&
     !chatStore.isStreamingCurrentConversation
 )
+
+/** The two primary-surface options for the shared segmented control. */
+const modeTabOptions: UiSegmentedOption[] = [
+  { value: 'assistant', label: 'Assistente', icon: 'orb' },
+  { value: 'workspace', label: 'Workspace', icon: 'hybrid-panel' }
+]
+
+/** Active segment value derived from the route (null on other surfaces). */
+const activeModeValue = computed<string | null>(() => {
+  if (isAssistantActive.value) return 'assistant'
+  if (isWorkspaceActive.value) return 'workspace'
+  return null
+})
+
+/** Route to the chosen surface via the command layer. */
+async function onModeSelect(value: string | number): Promise<void> {
+  toggle() // close the floating overlay (no-op when docked)
+  if (activeModeValue.value === value) return
+  try {
+    await commandRegistry.execute('view.switch', {
+      view: value === 'workspace' ? 'workspace' : 'assistant'
+    })
+  } catch (err) {
+    console.error('[AppSidebar] Mode navigation failed:', err)
+  }
+}
 
 /**
  * Whether the sidebar body is shown.
@@ -92,38 +124,43 @@ async function onSelect(id: string): Promise<void> {
 }
 
 /**
- * Go to the Home affordance — a fresh conversation on Horizon via the command
- * layer; reuses an already-empty conversation by only creating when the
- * current one has content.
+ * Go to the Home surface (the empty Workspace) via the command layer. Only
+ * spin up a fresh conversation when the current one already has content, so
+ * we never leave a trail of empty chats.
  */
 async function onHome(): Promise<void> {
   toggle()
   try {
     if (chatStore.messages.length > 0) {
       await commandRegistry.execute('conversation.new', {})
-    } else {
-      await commandRegistry.execute('view.switch', { view: 'assistant' })
+    }
+    if (route.name !== 'workspace') {
+      await commandRegistry.execute('view.switch', { view: 'workspace' })
     }
   } catch (err) {
     console.error('[AppSidebar] Home action failed:', err)
-    // Parity with the pre-command behavior: even when creating the fresh
-    // conversation fails, still land the user on the primary surface.
+    // Even when creating the fresh conversation fails, still land the user
+    // on the Home surface.
     await commandRegistry
-      .execute('view.switch', { view: 'assistant' })
+      .execute('view.switch', { view: 'workspace' })
       .catch((navErr) => console.error('[AppSidebar] Home navigation failed:', navErr))
   }
 }
 
 /**
- * Start a new conversation on the Home — the empty-conversation state of
- * Horizon. A fresh conversation always opens as the Home (never a stale
- * secondary route); typing the first message then cross-fades it into the
- * live conversation. `createConversation` reuses any existing empty
- * conversation, so this never leaves a trail of blank chats.
+ * Start a new conversation on the Home — the empty-conversation state of the
+ * Workspace. Typing the first message then cross-fades it into the live chat.
+ * `createConversation` reuses any existing empty conversation, so this never
+ * leaves a trail of blank chats.
  */
 async function onCreate(): Promise<void> {
   try {
     await commandRegistry.execute('conversation.new', {})
+    // A fresh conversation always opens as the Home (the empty Workspace),
+    // never a stale secondary route or the assistant scene.
+    if (route.name !== 'workspace') {
+      await commandRegistry.execute('view.switch', { view: 'workspace' })
+    }
   } catch (err) {
     console.error('[AppSidebar] Failed to start a new conversation:', err)
   }
@@ -220,6 +257,15 @@ async function onBackupAll(): Promise<void> {
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
           </button>
         </div>
+
+        <!-- Primary surface tabs: Assistente (Horizon) | Workspace (chat+modules) -->
+        <UiSegmented
+          class="sidebar__mode-seg"
+          :model-value="activeModeValue"
+          :options="modeTabOptions"
+          aria-label="Modalità primaria"
+          @update:model-value="(v) => void onModeSelect(v)"
+        />
 
         <!-- Secondary navigation (tools) -->
         <nav class="sidebar__nav" aria-label="Navigazione principale">
@@ -429,6 +475,12 @@ async function onBackupAll(): Promise<void> {
 .sidebar-slide-enter-from,
 .sidebar-slide-leave-to {
   transform: translateX(calc(-100% - 12px));
+}
+
+/* ── Mode tabs (Assistente / Workspace) — shared UiSegmented ────── */
+.sidebar__mode-seg {
+  margin: 0 var(--space-3) var(--space-3);
+  flex-shrink: 0;
 }
 
 /* Header */

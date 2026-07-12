@@ -11,6 +11,9 @@ import { useCalendarStore } from '../../stores/calendar'
 import { useModal } from '../../composables/useModal'
 import type { CalendarEvent, EventFormData } from '../../composables/useCalendar'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiTextarea from '../ui/UiTextarea.vue'
+import UiButton from '../ui/UiButton.vue'
 
 /** Recurrence presets (RRULE strings); empty value means no recurrence. */
 const recurrenceOptions: UiSelectOption[] = [
@@ -116,25 +119,18 @@ async function handleDelete(): Promise<void> {
     </p>
     <p v-if="saveError" class="event-form__error">{{ saveError }}</p>
 
-    <div class="event-form__field">
-      <label>Titolo</label>
-      <input v-model="form.title" type="text" placeholder="Titolo evento" />
-    </div>
+    <UiInput v-model="form.title" label="Titolo" placeholder="Titolo evento" />
 
-    <div class="event-form__field">
-      <label>Descrizione</label>
-      <textarea v-model="form.description" rows="3" placeholder="Descrizione (opzionale)" />
-    </div>
+    <UiTextarea
+      v-model="form.description"
+      label="Descrizione"
+      :rows="3"
+      placeholder="Descrizione (opzionale)"
+    />
 
     <div class="event-form__row">
-      <div class="event-form__field">
-        <label>Inizio</label>
-        <input v-model="form.start" type="datetime-local" />
-      </div>
-      <div class="event-form__field">
-        <label>Fine</label>
-        <input v-model="form.end" type="datetime-local" />
-      </div>
+      <UiInput v-model="form.start" type="datetime-local" label="Inizio" />
+      <UiInput v-model="form.end" type="datetime-local" label="Fine" />
     </div>
 
     <div class="event-form__row">
@@ -155,25 +151,26 @@ async function handleDelete(): Promise<void> {
     </div>
 
     <div class="event-form__actions">
-      <button
+      <UiButton
         v-if="editingEvent"
-        class="event-form__btn event-form__btn--danger"
-        :disabled="saving"
+        variant="danger"
+        size="md"
+        :loading="saving"
         @click="handleDelete"
       >
         Elimina
-      </button>
+      </UiButton>
       <div class="event-form__spacer" />
-      <button class="event-form__btn event-form__btn--secondary" @click="emit('close', false)">
-        Annulla
-      </button>
-      <button
-        class="event-form__btn event-form__btn--primary"
-        :disabled="saving || !form.title || !form.start || !form.end"
+      <UiButton variant="secondary" size="md" @click="emit('close', false)">Annulla</UiButton>
+      <UiButton
+        variant="primary"
+        size="md"
+        :loading="saving"
+        :disabled="!form.title || !form.start || !form.end"
         @click="handleSave"
       >
-        {{ saving ? 'Salvataggio...' : editingEvent ? 'Aggiorna' : 'Crea' }}
-      </button>
+        {{ editingEvent ? 'Aggiorna' : 'Crea' }}
+      </UiButton>
     </div>
   </div>
 </template>
@@ -182,28 +179,29 @@ async function handleDelete(): Promise<void> {
 .event-form {
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
 }
 
 .event-form__warn {
   font-size: var(--text-xs);
   color: var(--accent);
-  margin: 0 0 var(--space-3);
+  margin: 0;
 }
 
 .event-form__error {
   font-size: var(--text-sm);
   color: var(--danger);
-  margin: 0 0 var(--space-3);
+  margin: 0;
   padding: var(--space-2);
   background: var(--danger-light);
   border-radius: var(--radius-sm);
 }
 
+/* Reminder (native number input — number inputs stay native per kit rules). */
 .event-form__field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin-bottom: var(--space-3);
   flex: 1;
 }
 
@@ -215,8 +213,7 @@ async function handleDelete(): Promise<void> {
   letter-spacing: var(--tracking-normal);
 }
 
-.event-form__field input,
-.event-form__field textarea {
+.event-form__field input {
   background: var(--surface-inset);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -228,12 +225,7 @@ async function handleDelete(): Promise<void> {
   transition: border-color var(--transition-fast);
 }
 
-.event-form__field textarea {
-  resize: vertical;
-}
-
-.event-form__field input:focus,
-.event-form__field textarea:focus {
+.event-form__field input:focus {
   border-color: var(--accent-border);
 }
 
@@ -242,62 +234,19 @@ async function handleDelete(): Promise<void> {
   gap: var(--space-3);
 }
 
+.event-form__row > * {
+  flex: 1;
+  min-width: 0;
+}
+
 .event-form__actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  margin-top: var(--space-1);
 }
 
 .event-form__spacer {
   flex: 1;
-}
-
-.event-form__btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  border: 1px solid var(--border);
-  transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.event-form__btn--primary {
-  background: var(--accent);
-  color: var(--text-on-accent);
-  border-color: var(--accent);
-}
-
-.event-form__btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.event-form__btn--primary:disabled {
-  opacity: var(--opacity-dim);
-  cursor: not-allowed;
-}
-
-.event-form__btn--secondary {
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.event-form__btn--secondary:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.event-form__btn--danger {
-  background: transparent;
-  color: var(--danger);
-  border-color: var(--danger-border);
-}
-
-.event-form__btn--danger:hover:not(:disabled) {
-  background: var(--danger-light);
 }
 </style>

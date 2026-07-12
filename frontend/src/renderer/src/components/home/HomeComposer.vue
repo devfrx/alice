@@ -8,6 +8,7 @@
  */
 import { ref } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiButton from '../ui/UiButton.vue'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string]; submit: [] }>()
@@ -44,15 +45,19 @@ defineExpose({ focus: (): void => el.value?.focus() })
       @input="onInput"
       @keydown="onKeydown"
     />
-    <button
+    <UiButton
       class="hc__send"
-      type="button"
+      variant="primary"
+      size="lg"
+      icon
       aria-label="Invia"
       :disabled="!modelValue.trim()"
       @click="submit"
     >
-      <AppIcon name="send" :size="16" />
-    </button>
+      <template #icon>
+        <AppIcon name="send" :size="16" />
+      </template>
+    </UiButton>
   </div>
 </template>
 
@@ -95,29 +100,10 @@ defineExpose({ focus: (): void => el.value?.focus() })
   color: var(--text-muted);
 }
 
-.hc__send {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Preserve the composer's own corner radius — UiButton's kit radius (--radius-sm)
+   reads sharper than this hero CTA warrants at 40px. */
+.hc__send.ui-btn {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border: none;
   border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--text-on-accent);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    opacity var(--transition-fast);
-}
-
-.hc__send:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.hc__send:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: default;
 }
 </style>

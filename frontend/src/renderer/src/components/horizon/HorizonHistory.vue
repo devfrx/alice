@@ -10,7 +10,6 @@ import { nextTick, ref, watch } from 'vue'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import MessageVersionNav from '../chat/MessageVersionNav.vue'
 import AppIcon from '../ui/AppIcon.vue'
-import UiIconButton from '../ui/UiIconButton.vue'
 import type { ChatMessage } from '../../types/chat'
 
 const props = defineProps<{
@@ -60,9 +59,12 @@ function truncateContent(text: string, max = 200): string {
     <aside v-if="open" class="hz-history" aria-label="Conversazione">
       <header class="hz-history__head">
         <span class="hz-history__title">Conversazione</span>
-        <UiIconButton size="xs" variant="ghost" label="Chiudi" @click="emit('close')">
+        <!-- Bespoke (Regola bespoke): content-sized, color-only hover actions —
+             the kit's 24px hover square would weigh down this minimal dossier.
+             Focus-visible comes from the global ring. -->
+        <button class="hz-history__close" aria-label="Chiudi" @click="emit('close')">
           <AppIcon name="x" :size="13" />
-        </UiIconButton>
+        </button>
       </header>
 
       <div ref="scrollRef" class="hz-history__scroll">
@@ -70,24 +72,22 @@ function truncateContent(text: string, max = 200): string {
           <div class="hz-history__rubric">
             <span class="hz-history__role">{{ ROLE_LABELS[msg.role] ?? msg.role }}</span>
             <span class="hz-history__entry-actions">
-              <UiIconButton
+              <button
                 v-if="msg.role === 'user' && !isStreaming"
-                size="xs"
-                variant="ghost"
-                label="Modifica"
+                class="hz-history__action"
+                aria-label="Modifica"
                 @click="emit('edit', msg.id)"
               >
                 <AppIcon name="edit" :size="11" />
-              </UiIconButton>
-              <UiIconButton
+              </button>
+              <button
                 v-if="msg.role === 'assistant' && !branchDisabled"
-                size="xs"
-                variant="ghost"
-                label="Crea ramo"
+                class="hz-history__action"
+                aria-label="Crea ramo"
                 @click="emit('branch', msg.id)"
               >
                 <AppIcon name="branch" :size="11" />
-              </UiIconButton>
+              </button>
             </span>
           </div>
 
@@ -152,6 +152,19 @@ function truncateContent(text: string, max = 200): string {
   color: var(--hz-ink);
 }
 
+.hz-history__close {
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  color: var(--hz-ink-dim);
+  cursor: pointer;
+  transition: color var(--hz-fade) ease;
+}
+
+.hz-history__close:hover {
+  color: var(--hz-ink);
+}
+
 .hz-history__scroll {
   flex: 1;
   min-height: 0;
@@ -182,6 +195,19 @@ function truncateContent(text: string, max = 200): string {
 .hz-history__entry-actions {
   display: inline-flex;
   gap: var(--space-1);
+}
+
+.hz-history__action {
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  color: var(--hz-ink-faint);
+  cursor: pointer;
+  transition: color var(--hz-fade) ease;
+}
+
+.hz-history__action:hover {
+  color: var(--hz-ink);
 }
 
 .hz-history__body {

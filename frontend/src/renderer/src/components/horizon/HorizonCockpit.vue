@@ -222,8 +222,10 @@ defineExpose({
 
 /* hz-cockpit__stop overrides the UiIconButton default color so the icon
    reads danger-red at rest (streaming is happening now); tone="danger" on
-   the component still drives the hover tint. */
-.hz-cockpit__stop {
+   the component still drives the hover tint. The .ui-icon-btn compound
+   (0,3,0 with the scope attribute) beats the kit base deterministically,
+   regardless of CSS chunk-load order. */
+.hz-cockpit__stop.ui-icon-btn {
   color: var(--danger);
 }
 </style>

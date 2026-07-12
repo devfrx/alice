@@ -140,8 +140,8 @@ function submit(): void {
   color: inherit;
   cursor: pointer;
   transition:
-    border-color 0.15s,
-    background 0.15s;
+    border-color var(--duration-fast),
+    background var(--duration-fast);
 }
 
 .ask-card__option--on {

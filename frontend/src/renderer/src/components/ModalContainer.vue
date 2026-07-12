@@ -288,19 +288,19 @@ onUnmounted(() => {
 
 /* ── Transition ──────────────────────────────────────────── */
 .modal-enter-active {
-  animation: overlayIn 0.2s ease;
+  animation: overlayIn var(--duration-normal) ease;
 }
 
 .modal-leave-active {
-  animation: overlayIn 0.15s ease reverse;
+  animation: overlayIn var(--duration-fast) ease reverse;
 }
 
 .modal-enter-active .modal-card {
-  animation: cardIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: cardIn var(--duration-normal) var(--ease-smooth);
 }
 
 .modal-leave-active .modal-card {
-  animation: cardIn 0.15s ease reverse;
+  animation: cardIn var(--duration-fast) ease reverse;
 }
 
 @keyframes overlayIn {

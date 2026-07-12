@@ -206,7 +206,7 @@ onUnmounted(() => {
   background: var(--black-heavy);
   backdrop-filter: blur(var(--blur-sm));
   -webkit-backdrop-filter: blur(var(--blur-sm));
-  animation: modalOverlayIn 200ms ease;
+  animation: modalOverlayIn var(--duration-normal) ease;
 }
 
 .confirm-card {
@@ -219,7 +219,7 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   box-shadow: var(--shadow-floating);
-  animation: modalCardIn 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalCardIn var(--duration-normal) var(--ease-smooth);
 }
 
 .confirm-card__header {

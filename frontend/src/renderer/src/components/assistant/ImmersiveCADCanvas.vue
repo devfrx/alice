@@ -485,7 +485,7 @@ onUnmounted(() => {
   opacity: 0.35;
   pointer-events: none;
   white-space: nowrap;
-  transition: opacity 0.3s;
+  transition: opacity var(--duration-moderate);
 }
 
 .side-cad__canvas:hover .side-cad__hint {

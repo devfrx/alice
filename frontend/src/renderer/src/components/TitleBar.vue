@@ -435,10 +435,10 @@ onUnmounted(() => {
   cursor: pointer;
   box-shadow: var(--shadow-xs);
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    background var(--duration-normal) ease,
+    border-color var(--duration-normal) ease,
+    color var(--duration-normal) ease,
+    box-shadow var(--duration-normal) ease;
 }
 
 .titlebar__service-trigger:hover,
@@ -486,7 +486,7 @@ onUnmounted(() => {
 
 .titlebar__service-chevron {
   opacity: 0.72;
-  transition: transform 160ms ease;
+  transition: transform var(--duration-normal) ease;
 }
 
 .titlebar__service-chevron.is-open {
@@ -778,8 +778,8 @@ onUnmounted(() => {
   color: var(--text-muted);
   cursor: pointer;
   transition:
-    background 100ms ease,
-    color 100ms ease;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 .titlebar__btn:hover {

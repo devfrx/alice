@@ -505,7 +505,7 @@ onUnmounted(() => {
   color: var(--text-muted);
   opacity: 0.5;
   pointer-events: none;
-  transition: opacity 0.3s;
+  transition: opacity var(--duration-moderate);
 }
 
 .cad-viewer__canvas:hover .cad-viewer__hint {

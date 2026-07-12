@@ -164,9 +164,9 @@ onBeforeUnmount(() => {
   pointer-events: none;
   z-index: 0;
   transition:
-    transform 340ms var(--ease-out-expo),
-    width 340ms var(--ease-out-expo),
-    opacity 200ms ease;
+    transform var(--duration-moderate) var(--ease-out-expo),
+    width var(--duration-moderate) var(--ease-out-expo),
+    opacity var(--duration-normal) ease;
 }
 
 /* ── Tab ── */
@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .ui-seg__indicator {
-    transition: opacity 200ms ease;
+    transition: opacity var(--duration-normal) ease;
   }
 }
 </style>

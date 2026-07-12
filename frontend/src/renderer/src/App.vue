@@ -209,15 +209,15 @@ onUnmounted(() => {
 /* ── Route view transition — fluid cross-fade + slight lift ─────── */
 .view-enter-active {
   transition:
-    opacity 280ms var(--ease-out-quart),
-    transform 280ms var(--ease-out-quart);
+    opacity var(--duration-moderate) var(--ease-out-quart),
+    transform var(--duration-moderate) var(--ease-out-quart);
   will-change: opacity, transform;
 }
 
 .view-leave-active {
   transition:
-    opacity 150ms ease,
-    transform 150ms ease;
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
   will-change: opacity, transform;
 }
 
@@ -234,7 +234,7 @@ onUnmounted(() => {
 @media (prefers-reduced-motion: reduce) {
   .view-enter-active,
   .view-leave-active {
-    transition: opacity 120ms ease;
+    transition: opacity var(--duration-fast) ease;
   }
 
   .view-enter-from,

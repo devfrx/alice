@@ -420,8 +420,8 @@ async function refreshAll(): Promise<void> {
   text-align: left;
   color: var(--text-secondary);
   transition:
-    background 120ms ease,
-    color 120ms ease;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 .rail-row:hover {
   background: var(--surface-hover);

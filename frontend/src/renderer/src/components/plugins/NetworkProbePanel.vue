@@ -1184,7 +1184,7 @@ function fmtMs(v: number | null): string {
 
 .panel-slide-enter-active,
 .panel-slide-leave-active {
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-normal) ease;
 }
 
 .panel-slide-enter-from,

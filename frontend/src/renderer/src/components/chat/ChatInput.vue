@@ -400,8 +400,8 @@ defineExpose({
   padding: 0;
   opacity: 0;
   transition:
-    opacity 120ms ease,
-    background 120ms ease;
+    opacity var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 
 .ci__thumb:hover .ci__thumb-rm {
@@ -670,8 +670,8 @@ defineExpose({
 .btn-swap-enter-active,
 .btn-swap-leave-active {
   transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 
 .btn-swap-enter-from {

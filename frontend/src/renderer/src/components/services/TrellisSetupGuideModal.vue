@@ -101,7 +101,7 @@ onMounted(() => {
   flex-direction: column;
   overflow: hidden;
   box-shadow: var(--shadow-floating);
-  animation: guide-pop 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  animation: guide-pop var(--duration-normal) cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 @keyframes guide-pop {
   from {
@@ -240,8 +240,8 @@ onMounted(() => {
   text-decoration: none;
   border-bottom: 1px solid var(--accent-border);
   transition:
-    color 120ms ease,
-    border-color 120ms ease;
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
 }
 .guide-modal__markdown :deep(a:hover) {
   color: var(--accent-vivid);

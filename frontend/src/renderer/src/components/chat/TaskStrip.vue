@@ -208,7 +208,7 @@ watch(
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: background 200ms var(--ease-out-expo);
+  transition: background var(--duration-normal) var(--ease-out-expo);
 }
 
 .task-strip__ticker:hover {
@@ -325,7 +325,7 @@ watch(
   height: 100%;
   border-radius: inherit;
   background: var(--success);
-  transition: width 320ms var(--ease-out-expo);
+  transition: width var(--duration-moderate) var(--ease-out-expo);
 }
 
 @keyframes taskStripPulse {

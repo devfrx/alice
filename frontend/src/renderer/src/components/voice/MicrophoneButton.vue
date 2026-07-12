@@ -313,7 +313,7 @@ const ringOuterStyle = computed(() => ({
 
 /* Click ripple */
 .mic-btn--click {
-  animation: mic-click 0.2s ease;
+  animation: mic-click var(--duration-normal) ease;
 }
 
 @keyframes mic-click {
@@ -336,8 +336,8 @@ const ringOuterStyle = computed(() => ({
   border-radius: var(--radius-md);
   pointer-events: none;
   transition:
-    transform 0.1s ease-out,
-    opacity 0.1s ease-out;
+    transform var(--duration-fast) ease-out,
+    opacity var(--duration-fast) ease-out;
 }
 
 .mic-ring--inner {

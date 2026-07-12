@@ -499,7 +499,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
-  animation: slideInRight 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInRight var(--duration-moderate) var(--ease-smooth) both;
 }
 
 /* Assistant — flowing text directly on the chat background. No bubble chrome:
@@ -513,7 +513,7 @@ onUnmounted(() => {
   padding: 0;
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
-  animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInLeft var(--duration-moderate) var(--ease-smooth) both;
 }
 
 /* Tool result bubble */
@@ -527,7 +527,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
-  animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInLeft var(--duration-moderate) var(--ease-smooth) both;
 }
 
 /* When tool bubble contains a CAD viewer, remove the mono/small styling
@@ -790,7 +790,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: var(--black-overlay);
-  animation: overlayFadeIn 200ms ease both;
+  animation: overlayFadeIn var(--duration-normal) ease both;
 }
 
 .image-overlay__close {
@@ -804,7 +804,7 @@ onUnmounted(() => {
   max-height: 88vh;
   object-fit: contain;
   border-radius: var(--radius-md);
-  animation: overlayZoomIn 250ms ease both;
+  animation: overlayZoomIn var(--duration-normal) ease both;
 }
 
 /* Keyframes */

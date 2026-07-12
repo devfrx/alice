@@ -267,9 +267,9 @@ async function stopService(): Promise<void> {
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
   transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease;
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 .trellis-card:hover {
   background: var(--surface-2);
@@ -286,7 +286,7 @@ async function stopService(): Promise<void> {
   width: 2px;
   border-radius: var(--radius-pill);
   background: transparent;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 .trellis-card.is-up::before {
   background: var(--success);

@@ -685,7 +685,7 @@ onMounted(() => {
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 0.3s ease;
+  transition: width var(--duration-moderate) ease;
 }
 
 .mm-dl__footer {

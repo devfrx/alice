@@ -424,7 +424,7 @@ select:focus {
 
 /* ── Content fade for streaming ────────────────────────── */
 .content-fade-enter-active {
-  transition: opacity 0.4s var(--ease-out-expo, ease);
+  transition: opacity var(--duration-slow) var(--ease-out-expo, ease);
 }
 
 .content-fade-enter-from {

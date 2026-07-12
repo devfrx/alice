@@ -268,13 +268,13 @@ withDefaults(
 /* ── Enter / leave transitions ───────────────────────────────── */
 
 .alice-splash-fade-enter-active {
-  transition: opacity 0.4s ease;
+  transition: opacity var(--duration-slow) ease;
 }
 
 .alice-splash-fade-leave-active {
   transition:
-    opacity 0.6s ease,
-    transform 0.6s ease;
+    opacity var(--duration-slower) ease,
+    transform var(--duration-slower) ease;
   pointer-events: none;
 }
 

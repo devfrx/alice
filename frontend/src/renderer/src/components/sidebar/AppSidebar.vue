@@ -410,7 +410,7 @@ async function onBackupAll(): Promise<void> {
 
 .sidebar-backdrop-enter-active,
 .sidebar-backdrop-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--duration-moderate) ease;
 }
 
 .sidebar-backdrop-enter-from,
@@ -467,11 +467,11 @@ async function onBackupAll(): Promise<void> {
 
 /* Slide animation */
 .sidebar-slide-enter-active {
-  transition: transform 0.3s var(--ease-out-expo);
+  transition: transform var(--duration-moderate) var(--ease-out-expo);
 }
 
 .sidebar-slide-leave-active {
-  transition: transform 0.25s var(--ease-decel);
+  transition: transform var(--duration-normal) var(--ease-decel);
 }
 
 .sidebar-slide-enter-from,

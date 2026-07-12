@@ -235,10 +235,10 @@ function fmtMb(mb: number): string {
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
   transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    transform 140ms ease,
-    box-shadow 140ms ease;
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 .service-card:hover {
   background: var(--surface-2);
@@ -255,7 +255,7 @@ function fmtMb(mb: number): string {
   width: 2px;
   border-radius: var(--radius-pill);
   background: transparent;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 .service-card.is-up::before {
   background: var(--success);
@@ -414,8 +414,8 @@ function fmtMb(mb: number): string {
   border: 1px solid var(--border);
   border-radius: 8px;
   transition:
-    background 120ms ease,
-    border-color 120ms ease;
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
 }
 .model-row:hover {
   border-color: var(--border-hover);
@@ -478,7 +478,7 @@ function fmtMb(mb: number): string {
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 220ms ease;
+  transition: width var(--duration-normal) ease;
 }
 .bar--done .bar__fill {
   background: var(--success);

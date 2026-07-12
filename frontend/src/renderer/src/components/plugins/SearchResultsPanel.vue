@@ -237,7 +237,7 @@ function openUrl(url: string): void {
   padding: 10px;
   border-radius: 6px;
   background: var(--surface-2);
-  transition: background 0.15s;
+  transition: background var(--duration-fast);
 }
 
 .search-panel__card:hover {
@@ -306,7 +306,7 @@ function openUrl(url: string): void {
 /* Slide transition */
 .panel-slide-enter-active,
 .panel-slide-leave-active {
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-normal) ease;
 }
 
 .panel-slide-enter-from,
@@ -318,8 +318,8 @@ function openUrl(url: string): void {
 .scrape-expand-enter-active,
 .scrape-expand-leave-active {
   transition:
-    max-height 0.2s ease,
-    opacity 0.2s;
+    max-height var(--duration-normal) ease,
+    opacity var(--duration-normal);
 }
 
 .scrape-expand-enter-from,

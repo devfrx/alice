@@ -82,7 +82,7 @@ const showHome = computed<boolean>(
 @media (prefers-reduced-motion: reduce) {
   .ws-surface-enter-active,
   .ws-surface-leave-active {
-    transition: opacity 120ms linear;
+    transition: opacity var(--duration-fast) linear;
   }
 
   .ws-surface-enter-from,

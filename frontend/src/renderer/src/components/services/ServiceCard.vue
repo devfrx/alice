@@ -232,7 +232,7 @@ function fmtMb(mb: number): string {
   padding: var(--space-4);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs);
   transition:
     background var(--duration-fast) ease,
@@ -284,7 +284,7 @@ function fmtMb(mb: number): string {
   align-items: center;
   justify-content: center;
   background: var(--surface-2);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
 }
 .service-card__title-block {
@@ -337,7 +337,7 @@ function fmtMb(mb: number): string {
   margin: 0;
   padding: var(--space-2) var(--space-2-5);
   background: var(--surface-0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-xs);
   color: var(--text-secondary);
   line-height: var(--leading-snug);
@@ -392,7 +392,7 @@ function fmtMb(mb: number): string {
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   background: var(--surface-1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── Models panel ────────────────────────────────────────────── */
@@ -412,7 +412,7 @@ function fmtMb(mb: number): string {
   padding: var(--space-2-5) var(--space-3);
   background: var(--surface-0);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition:
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease;

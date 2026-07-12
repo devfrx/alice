@@ -177,7 +177,7 @@ function openUrl(url: string): void {
   border-left: 1px solid var(--border);
   z-index: var(--z-dropdown);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .search-panel__header {
@@ -190,14 +190,14 @@ function openUrl(url: string): void {
 .search-panel__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .search-panel__badge {
   margin-left: 6px;
   padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
   font-weight: 700;
   background: var(--accent);
   color: var(--bg-primary);
@@ -235,7 +235,7 @@ function openUrl(url: string): void {
 
 .search-panel__card {
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   transition: background var(--duration-fast);
 }
@@ -260,7 +260,7 @@ function openUrl(url: string): void {
 
 .search-panel__card-url {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -270,7 +270,7 @@ function openUrl(url: string): void {
 
 .search-panel__card-snippet {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -286,7 +286,7 @@ function openUrl(url: string): void {
 
 .search-panel__scrape-error {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--accent);
 }
 
@@ -295,7 +295,7 @@ function openUrl(url: string): void {
   padding: 8px;
   border-radius: 4px;
   background: var(--bg-primary);
-  font-size: 11px;
+  font-size: var(--text-xs);
   max-height: 200px;
   overflow-y: auto;
   white-space: pre-wrap;

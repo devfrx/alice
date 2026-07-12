@@ -872,7 +872,7 @@ function fmtMs(v: number | null): string {
   border-left: 1px solid var(--border);
   z-index: var(--z-dropdown);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
@@ -887,7 +887,7 @@ function fmtMs(v: number | null): string {
 .net-probe__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--text-md);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -895,8 +895,8 @@ function fmtMs(v: number | null): string {
 
 .net-probe__badge {
   padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
   font-weight: 700;
   background: var(--accent);
   color: var(--bg-primary);
@@ -917,7 +917,7 @@ function fmtMs(v: number | null): string {
   border: none;
   background: none;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-sm);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition:
@@ -963,7 +963,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__label {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   font-weight: 500;
 }
@@ -976,7 +976,7 @@ function fmtMs(v: number | null): string {
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-base);
   font-family: inherit;
   outline: none;
   transition: border-color var(--transition-fast);
@@ -1013,7 +1013,7 @@ function fmtMs(v: number | null): string {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-sm);
   cursor: pointer;
   padding: 4px 0;
   text-align: left;
@@ -1046,7 +1046,7 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__subcard-title {
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
   margin-bottom: 2px;
 }
@@ -1055,12 +1055,12 @@ function fmtMs(v: number | null): string {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.4;
 }
 
 .net-probe__label-sm {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   min-width: 64px;
   flex-shrink: 0;
@@ -1068,7 +1068,7 @@ function fmtMs(v: number | null): string {
 
 .net-probe__mono {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* ── Status indicators ──────────────────────────────────────────────── */
@@ -1106,7 +1106,7 @@ function fmtMs(v: number | null): string {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .net-probe__port-num {
@@ -1117,7 +1117,7 @@ function fmtMs(v: number | null): string {
 
 .net-probe__port-svc {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .net-probe__closed-list {
@@ -1128,28 +1128,28 @@ function fmtMs(v: number | null): string {
 }
 
 .net-probe__closed-port {
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-family: var(--font-mono);
   color: var(--text-muted);
   padding: 1px 5px;
   background: var(--surface-3);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 /* ── Connection specifics ───────────────────────────────────────────── */
 
 .net-probe__conn-proto {
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
   font-family: var(--font-mono);
 }
 
 .net-probe__conn-status {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   padding: 1px 6px;
   background: var(--surface-3);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   margin-left: auto;
 }
 
@@ -1163,20 +1163,20 @@ function fmtMs(v: number | null): string {
 
 .net-probe__sub-title {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-secondary);
   margin-top: 4px;
 }
 
 .net-probe__count {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   font-weight: 500;
 }
 
 .net-probe__error {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--danger);
 }
 

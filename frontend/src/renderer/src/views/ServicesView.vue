@@ -306,7 +306,7 @@ async function refreshAll(): Promise<void> {
   min-height: 30px;
   padding: 0 var(--space-3);
   background: var(--surface-1);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-xs);
   color: var(--text-secondary);
 }
@@ -415,7 +415,7 @@ async function refreshAll(): Promise<void> {
   padding: var(--space-2) var(--space-2-5);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
   color: var(--text-secondary);

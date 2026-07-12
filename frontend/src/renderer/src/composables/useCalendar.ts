@@ -52,7 +52,12 @@ export const MONTH_NAMES = [
 /** Milliseconds in one day. */
 const MS_PER_DAY = 86_400_000
 
-/** Palette for event block backgrounds. */
+/**
+ * Palette for event block backgrounds.
+ * Categorical DATA palette, intentionally hardcoded: category colors don't
+ * map 1:1 onto the UI theme tokens (same sanctioned pattern as the ECharts
+ * palette in ChartViewer.vue).
+ */
 const EVENT_COLORS = [
   '#C9A84C',
   '#E07B53',

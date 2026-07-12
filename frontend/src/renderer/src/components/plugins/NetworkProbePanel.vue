@@ -381,7 +381,9 @@ function fmtMs(v: number | null): string {
         </UiIconButton>
       </header>
 
-      <!-- Tabs -->
+      <!-- Tabs — bespoke per scelta: role="tablist" con glifi emoji; UiSegmented
+           richiederebbe icone AppIcon (cambio di contenuto, fuori scope kit).
+           Gli <input type="number"> sotto restano nativi per regola kit. -->
       <nav class="net-probe__tabs" role="tablist" aria-label="Network probe tabs">
         <button
           v-for="t in tabs"

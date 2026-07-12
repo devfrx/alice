@@ -8,6 +8,7 @@
 import { reactive } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiButton from '../ui/UiButton.vue'
 import UiInput from '../ui/UiInput.vue'
 
 const props = defineProps<{
@@ -60,14 +61,15 @@ async function onCreateRelation(): Promise<void> {
       />
     </label>
     <div class="kg-dialog__actions">
-      <button class="kg-btn kg-btn--secondary" @click="emit('close', false)">Annulla</button>
-      <button
-        class="kg-btn kg-btn--accent"
+      <UiButton variant="secondary" size="sm" @click="emit('close', false)">Annulla</UiButton>
+      <UiButton
+        variant="primary"
+        size="sm"
         :disabled="!form.from || !form.to || !form.relationType.trim()"
         @click="onCreateRelation"
       >
         Crea
-      </button>
+      </UiButton>
     </div>
   </div>
 </template>
@@ -98,42 +100,5 @@ async function onCreateRelation(): Promise<void> {
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-.kg-btn {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
-}
-
-.kg-btn--accent {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.kg-btn--accent:hover:not(:disabled) {
-  background: var(--accent-light);
-  border-color: var(--accent);
-}
-
-.kg-btn--secondary {
-  background: var(--surface-3);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.kg-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.kg-btn:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
 }
 </style>

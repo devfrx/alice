@@ -387,6 +387,27 @@
   --panel-header-height: 28px;
 }
 
+/* ── Code Syntax Tokens ────────────────────────────────────── */
+/* Highlight.js token colors, consumed by code-blocks.css. Dark   */
+/* values match the original hardcoded palette 1:1 (zero visual   */
+/* change); light counterparts live in the [data-theme='light']   */
+/* block below, darkened for AA contrast against the light code   */
+/* block background (--surface-0). */
+:root {
+  --code-fg: #d6d2c8; /* base code foreground */
+  --code-keyword: #ddd0b8; /* keyword, selector-tag, built_in, name, symbol, bullet, section */
+  --code-string: #8db87a; /* string, addition */
+  --code-comment: #71706a; /* comment, quote */
+  --code-number: #c99a62; /* number, literal */
+  --code-type: #c8bfa8; /* type, title */
+  --code-attr: #b8ae9a; /* attr, variable, template-variable */
+  --code-function: #c4b89a; /* function */
+  --code-params: #aca598; /* params */
+  --code-regexp: #b89070; /* regexp, link */
+  --code-meta: #9a9488; /* meta */
+  --code-deletion: #b05c5c; /* deletion */
+}
+
 /*
  * ═══════════════════════════════════════════════════════════════
  *  Global Reset & Base
@@ -622,6 +643,22 @@ h6,
 
   /* ── Focus Ring ──────────────────────────────────────────── */
   --focus-ring-color: rgba(140, 106, 74, 0.55); /* Taupe Mocha ring on ivory */
+
+  /* ── Code Syntax Tokens ──────────────────────────────────── */
+  /* Same hue family as dark, darkened for AA (>=4.5:1) against  */
+  /* --surface-0 (#faf9f5, the light code-block background).     */
+  --code-fg: #2c2820; /* base code foreground — 13.93:1 */
+  --code-keyword: #6b4a2a; /* keyword/selector-tag/built_in/name/symbol/bullet/section — 7.56:1 */
+  --code-string: #3d7a3a; /* string, addition — 4.93:1 */
+  --code-comment: #786f66; /* comment, quote — darkened from #8c8278 (3.57:1) — 4.67:1 */
+  --code-number: #8b5e2a; /* number, literal — 5.34:1 */
+  --code-type: #3a5a7a; /* type, title — 6.82:1 */
+  --code-attr: #5a4030; /* attr, variable, template-variable — 9.02:1 */
+  --code-function: #3a5a7a; /* function (shares type's blue in the light palette) — 6.82:1 */
+  --code-params: #4a3828; /* params — 10.56:1 */
+  --code-regexp: #7a3a20; /* regexp, link — 8.12:1 */
+  --code-meta: #6a6258; /* meta — 5.69:1 */
+  --code-deletion: #8b2020; /* deletion — 8.57:1 */
 
   /* ── Legacy compat ───────────────────────────────────────── */
   --color-background-mute: #eae4db;

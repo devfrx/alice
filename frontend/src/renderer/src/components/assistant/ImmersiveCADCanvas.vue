@@ -319,7 +319,7 @@ onUnmounted(() => {
     <!-- Canvas -->
     <div ref="containerRef" class="side-cad__canvas">
       <div v-if="loading" class="side-cad__overlay">
-        <AliceSpinner size="sm" />
+        <AliceSpinner size="md" />
         <span class="side-cad__overlay-text">Caricamento modello 3Dâ€¦</span>
       </div>
       <div v-if="errorMsg" class="side-cad__overlay side-cad__overlay--error">

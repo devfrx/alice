@@ -142,7 +142,7 @@ function openUrl(url: string): void {
               </UiButton>
               <UiButton
                 v-if="scrapedTexts[i]"
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 @click="emit('use-text', scrapedTexts[i])"
               >

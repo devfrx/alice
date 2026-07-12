@@ -523,6 +523,7 @@ function fmtMs(v: number | null): string {
           <div class="net-probe__field-row">
             <UiInput
               v-model="svcHost"
+              class="np__host-input"
               size="sm"
               placeholder="Host"
               aria-label="Host"
@@ -997,6 +998,13 @@ function fmtMs(v: number | null): string {
 .net-probe__select {
   flex-shrink: 0;
   min-width: 84px;
+}
+
+/* Class falls through to the UiInput root div: fill the remaining row
+   width (the old native input had width:100%). */
+.np__host-input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */

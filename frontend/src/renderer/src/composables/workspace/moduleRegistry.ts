@@ -5,7 +5,7 @@
  * imports are used for the component so the main bundle stays small.
  *
  * To register a new module add an entry to MODULE_REGISTRY and export the
- * stub (or real) adapter SFC from `components/canvas/modules/`.
+ * stub (or real) adapter SFC from `components/workspace/modules/`.
  */
 import type { Component } from 'vue'
 import type { AppIconName } from '../../assets/icons'
@@ -48,7 +48,7 @@ const chat: ModuleDef = {
   id: 'chat',
   label: 'Chat',
   icon: 'message',
-  component: () => import('../../components/canvas/modules/ChatModule.vue'),
+  component: () => import('../../components/workspace/modules/ChatModule.vue'),
   defaultZone: 'fill',
   singleton: true
 }
@@ -57,7 +57,7 @@ const chart: ModuleDef = {
   id: 'chart',
   label: 'Grafico',
   icon: 'bar-chart',
-  component: () => import('../../components/canvas/modules/ChartModule.vue'),
+  component: () => import('../../components/workspace/modules/ChartModule.vue'),
   defaultZone: 'right'
 }
 
@@ -65,7 +65,7 @@ const whiteboard: ModuleDef = {
   id: 'whiteboard',
   label: 'Whiteboard',
   icon: 'edit',
-  component: () => import('../../components/canvas/modules/WhiteboardModule.vue'),
+  component: () => import('../../components/workspace/modules/WhiteboardModule.vue'),
   defaultZone: 'right'
 }
 
@@ -73,7 +73,7 @@ const cad3d: ModuleDef = {
   id: 'cad3d',
   label: '3D',
   icon: 'box-3d',
-  component: () => import('../../components/canvas/modules/Cad3dModule.vue'),
+  component: () => import('../../components/workspace/modules/Cad3dModule.vue'),
   defaultZone: 'right'
 }
 
@@ -81,7 +81,7 @@ const plan: ModuleDef = {
   id: 'plan',
   label: 'Plan',
   icon: 'file-lines',
-  component: () => import('../../components/canvas/modules/PlanModule.vue'),
+  component: () => import('../../components/workspace/modules/PlanModule.vue'),
   defaultZone: 'right',
   singleton: true
 }
@@ -90,7 +90,7 @@ const terminal: ModuleDef = {
   id: 'terminal',
   label: 'Terminal',
   icon: 'embedding',
-  component: () => import('../../components/canvas/modules/TerminalModule.vue'),
+  component: () => import('../../components/workspace/modules/TerminalModule.vue'),
   defaultZone: 'bottom',
   singleton: true
 }

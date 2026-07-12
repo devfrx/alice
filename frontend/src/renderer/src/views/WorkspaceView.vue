@@ -15,7 +15,7 @@
  * it is a state of the workspace, not a separate destination.
  */
 import { computed } from 'vue'
-import PanelWorkspace from '../components/canvas/PanelWorkspace.vue'
+import PanelWorkspace from '../components/workspace/PanelWorkspace.vue'
 import HomeSurface from '../components/home/HomeSurface.vue'
 import { useChatStore } from '../stores/chat'
 

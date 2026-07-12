@@ -13,6 +13,8 @@ import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../../components/ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiPopover from '../ui/UiPopover.vue'
+import UiSearchInput from '../ui/UiSearchInput.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -166,12 +168,11 @@ onMounted(() => {
       <div class="ms__dropdown" role="group">
         <!-- Search (only when many models) -->
         <div v-if="showSearch" class="ms__search">
-          <AppIcon class="ms__search-icon" name="search" :size="12" />
-          <input
+          <UiSearchInput
             v-model="searchQuery"
-            class="ms__search-input"
-            type="text"
             placeholder="Cerca modello…"
+            size="sm"
+            aria-label="Cerca modello"
             @keydown.stop
           />
         </div>
@@ -233,16 +234,18 @@ onMounted(() => {
                   <span class="ms__name" :title="model.display_name || model.name">
                     {{ model.display_name || model.name }}
                   </span>
-                  <button
+                  <UiIconButton
+                    label="Scarica dalla memoria"
+                    variant="outlined"
+                    size="xs"
+                    tone="accent"
+                    :loading="isModelBusy(model)"
+                    :disabled="settingsStore.isAnyOperationInProgress"
                     class="ms__action-btn"
-                    :class="{ 'ms__action-btn--busy': isModelBusy(model) }"
-                    title="Scarica dalla memoria"
-                    :disabled="isModelBusy(model) || settingsStore.isAnyOperationInProgress"
                     @click="toggleModelLoad(model, $event)"
                   >
-                    <AliceSpinner v-if="isModelBusy(model)" size="xs" />
-                    <AppIcon v-else name="model-unload" :size="11" />
-                  </button>
+                    <AppIcon name="model-unload" :size="11" />
+                  </UiIconButton>
                 </div>
                 <div class="ms__item-meta">
                   <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
@@ -300,16 +303,18 @@ onMounted(() => {
                   <span class="ms__name" :title="model.display_name || model.name">
                     {{ model.display_name || model.name }}
                   </span>
-                  <button
+                  <UiIconButton
+                    label="Carica in memoria"
+                    variant="outlined"
+                    size="xs"
+                    tone="accent"
+                    :loading="isModelBusy(model)"
+                    :disabled="settingsStore.isAnyOperationInProgress"
                     class="ms__action-btn"
-                    :class="{ 'ms__action-btn--busy': isModelBusy(model) }"
-                    title="Carica in memoria"
-                    :disabled="isModelBusy(model) || settingsStore.isAnyOperationInProgress"
                     @click="toggleModelLoad(model, $event)"
                   >
-                    <AliceSpinner v-if="isModelBusy(model)" size="xs" />
-                    <AppIcon v-else name="model-load" :size="11" />
-                  </button>
+                    <AppIcon name="model-load" :size="11" />
+                  </UiIconButton>
                 </div>
                 <div class="ms__item-meta">
                   <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
@@ -458,26 +463,6 @@ onMounted(() => {
   gap: var(--space-1-5);
   padding: var(--space-2) var(--space-2-5);
   border-bottom: 1px solid var(--border);
-}
-
-.ms__search-icon {
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
-.ms__search-input {
-  flex: 1;
-  background: none;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  padding: 0;
-}
-
-.ms__search-input::placeholder {
-  color: var(--text-muted);
 }
 
 /* ── Scrollable list ──────────────────────────────────────────── */
@@ -690,35 +675,8 @@ onMounted(() => {
 
 /* ── Action button (load/unload) ──────────────────────────────── */
 .ms__action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
   margin-left: auto;
   flex-shrink: 0;
-  background: var(--white-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.ms__action-btn:hover:not(:disabled) {
-  background: var(--white-medium);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.ms__action-btn:disabled {
-  opacity: var(--opacity-soft);
-  cursor: not-allowed;
-}
-
-.ms__action-btn--busy {
-  border-color: var(--accent-border);
 }
 
 /* ── Item meta row (tags + capabilities) ──────────────────────── */

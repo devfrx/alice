@@ -34,39 +34,36 @@
       />
 
       <div class="mem-search">
-        <input
+        <UiSearchInput
           v-model="searchQuery"
-          type="text"
-          class="mem-search__input"
           placeholder="Ricerca semantica…"
           aria-label="Ricerca semantica"
+          size="sm"
+          class="mem-search__input"
           @keydown.enter="onSearch"
         />
-        <button
-          class="mem-search__btn"
+        <UiButton
+          variant="secondary"
+          size="sm"
           :disabled="!searchQuery.trim() || store.loading"
           @click="onSearch"
         >
           Cerca
-        </button>
+        </UiButton>
       </div>
     </div>
 
     <!-- Actions row -->
     <div class="mem-actions">
-      <button
-        class="mem-btn mem-btn--danger"
-        :disabled="store.loading"
-        @click="confirmClearSession"
-      >
+      <UiButton variant="danger" size="sm" :disabled="store.loading" @click="confirmClearSession">
         Cancella memoria di sessione
-      </button>
-      <button class="mem-btn mem-btn--danger" :disabled="store.loading" @click="confirmClearAll">
+      </UiButton>
+      <UiButton variant="danger" size="sm" :disabled="store.loading" @click="confirmClearAll">
         Cancella tutta la memoria
-      </button>
-      <button class="mem-btn mem-btn--secondary" :disabled="store.loading" @click="onRefresh">
+      </UiButton>
+      <UiButton variant="secondary" size="sm" :disabled="store.loading" @click="onRefresh">
         Aggiorna
-      </button>
+      </UiButton>
     </div>
 
     <!-- Loading -->
@@ -79,7 +76,7 @@
     <div v-if="showSearchResults" class="mem-section">
       <div class="mem-section__header">
         <span class="mem-section__title">Risultati ricerca ({{ store.searchResults.length }})</span>
-        <button class="mem-btn mem-btn--text" @click="clearSearch">Cancella</button>
+        <UiButton variant="ghost" size="sm" @click="clearSearch">Cancella</UiButton>
       </div>
       <div class="mem-list">
         <div v-for="result in store.searchResults" :key="result.entry.id" class="mem-entry">
@@ -102,9 +99,12 @@
       <div class="mem-section__header">
         <span class="mem-section__title">Voci ({{ store.total }})</span>
       </div>
-      <div v-if="store.entries.length === 0 && !store.loading" class="mem-empty">
-        Nessuna memoria trovata
-      </div>
+      <UiEmptyState
+        v-if="store.entries.length === 0 && !store.loading"
+        title="Nessuna memoria trovata"
+        icon="book"
+        compact
+      />
       <div v-else class="mem-list">
         <div v-for="entry in store.entries" :key="entry.id" class="mem-entry">
           <div class="mem-entry__content">{{ entry.content }}</div>
@@ -115,14 +115,15 @@
             </span>
             <span class="mem-badge mem-badge--source">{{ entry.source }}</span>
             <span class="mem-entry__date">{{ formatDate(entry.created_at) }}</span>
-            <button
-              class="mem-entry__delete"
-              title="Elimina memoria"
-              aria-label="Elimina memoria"
+            <UiIconButton
+              label="Elimina memoria"
+              variant="ghost"
+              size="xs"
+              tone="danger"
               @click="confirmDelete(entry)"
             >
               <AppIcon name="x" :size="12" :stroke-width="2" />
-            </button>
+            </UiIconButton>
           </div>
         </div>
       </div>
@@ -136,6 +137,10 @@ import { useMemoryStore } from '../../stores/memory'
 import type { MemoryEntry } from '../../types/memory'
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
+import UiSearchInput from '../ui/UiSearchInput.vue'
 import { useModal } from '../../composables/useModal'
 
 const store = useMemoryStore()
@@ -303,48 +308,6 @@ onMounted(() => {
 
 .mem-search__input {
   flex: 1;
-  padding: var(--space-1) var(--space-2);
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.mem-search__input::placeholder {
-  color: var(--text-muted);
-  opacity: var(--opacity-medium);
-}
-
-.mem-search__input:focus {
-  border-color: var(--accent-border);
-}
-
-.mem-search__btn {
-  padding: var(--space-1) var(--space-3);
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.mem-search__btn:hover:not(:disabled) {
-  background: var(--accent-light);
-  border-color: var(--accent);
-}
-
-.mem-search__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* ── Action buttons ────────────────────────────────────────── */
@@ -354,59 +317,7 @@ onMounted(() => {
   margin-bottom: var(--space-3);
 }
 
-.mem-btn {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.mem-btn--secondary {
-  background: var(--surface-2);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.mem-btn--secondary:hover:not(:disabled) {
-  background: var(--white-light);
-  color: var(--text-primary);
-}
-
-.mem-btn--danger {
-  background: var(--danger-light);
-  border-color: var(--danger-border);
-  color: var(--danger);
-}
-
-.mem-btn--danger:hover:not(:disabled) {
-  background: var(--danger-hover);
-  border-color: var(--danger-strong);
-}
-
-.mem-btn--text {
-  background: none;
-  border: none;
-  color: var(--accent);
-  padding: 0;
-  font-size: var(--text-xs);
-}
-
-.mem-btn--text:hover {
-  text-decoration: underline;
-}
-
-.mem-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* ── Loading / Error / Empty ───────────────────────────────── */
+/* ── Loading / Error ───────────────────────────────────────── */
 .mem-loading {
   color: var(--text-muted);
   padding: var(--space-2);
@@ -420,13 +331,6 @@ onMounted(() => {
   background: var(--danger-faint);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-2);
-}
-
-.mem-empty {
-  color: var(--text-muted);
-  padding: var(--space-4);
-  text-align: center;
-  font-size: var(--text-sm);
 }
 
 /* ── Section header ────────────────────────────────────────── */
@@ -541,29 +445,5 @@ onMounted(() => {
   font-size: var(--text-xs);
   color: var(--text-muted);
   margin-left: auto;
-}
-
-.mem-entry__delete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
-  flex-shrink: 0;
-  margin-left: var(--space-1);
-}
-
-.mem-entry__delete:hover {
-  background: var(--danger-light);
-  color: var(--danger);
 }
 </style>

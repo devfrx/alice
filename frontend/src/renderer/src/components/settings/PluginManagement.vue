@@ -6,9 +6,12 @@
       Attiva o disattiva i plugin per controllare quali capacità sono disponibili.
     </p>
     <div v-if="pluginsStore.loading" class="plugins-loading">Caricamento plugin...</div>
-    <div v-else-if="pluginsStore.plugins.length === 0" class="plugins-empty">
-      Nessun plugin disponibile
-    </div>
+    <UiEmptyState
+      v-else-if="pluginsStore.plugins.length === 0"
+      title="Nessun plugin disponibile"
+      icon="cpu"
+      compact
+    />
     <div v-else class="plugins-list">
       <div
         v-for="plugin in pluginsStore.plugins"
@@ -58,6 +61,7 @@
 import { onMounted } from 'vue'
 import { usePluginsStore } from '../../stores/plugins'
 import UiToggle from '../ui/UiToggle.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 
 const pluginsStore = usePluginsStore()
 
@@ -83,8 +87,7 @@ onMounted(() => {
   line-height: var(--leading-snug);
 }
 
-.plugins-loading,
-.plugins-empty {
+.plugins-loading {
   color: var(--text-muted);
   padding: var(--space-2);
   font-size: var(--text-sm);

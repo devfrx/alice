@@ -11,6 +11,7 @@ import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 import UiToggle from '../ui/UiToggle.vue'
+import UiInput from '../ui/UiInput.vue'
 
 const settingsStore = useSettingsStore()
 const voiceStore = useVoiceStore()
@@ -316,17 +317,13 @@ async function save(): Promise<void> {
                 "
               />
             </label>
-            <label class="settings-field">
-              <span class="settings-field__label">Lingua</span>
-              <input
-                v-model="sttLanguage"
-                type="text"
-                class="settings-field__input"
-                placeholder="it"
-                aria-label="Lingua STT"
-                @change="save"
-              />
-            </label>
+            <UiInput
+              v-model="sttLanguage"
+              label="Lingua"
+              type="text"
+              placeholder="it"
+              @blur="save"
+            />
           </template>
         </div>
       </section>
@@ -370,17 +367,14 @@ async function save(): Promise<void> {
                 "
               />
             </label>
-            <label v-if="ttsEngine !== 'kokoro'" class="settings-field">
-              <span class="settings-field__label">Voce</span>
-              <input
-                v-model="ttsVoice"
-                type="text"
-                class="settings-field__input"
-                placeholder="models/tts/piper/it_IT-paola-medium"
-                aria-label="Percorso voce TTS"
-                @change="save"
-              />
-            </label>
+            <UiInput
+              v-if="ttsEngine !== 'kokoro'"
+              v-model="ttsVoice"
+              label="Voce"
+              type="text"
+              placeholder="models/tts/piper/it_IT-paola-medium"
+              @blur="save"
+            />
             <template v-if="ttsEngine === 'kokoro'">
               <label class="settings-field">
                 <span class="settings-field__label">Voce Kokoro</span>
@@ -493,17 +487,13 @@ async function save(): Promise<void> {
           </label>
         </div>
         <div v-if="activationMode === 'wake_word'" class="vs__wake-word-row">
-          <label class="settings-field">
-            <span class="settings-field__label">Parola di attivazione</span>
-            <input
-              v-model="wakeWord"
-              type="text"
-              class="settings-field__input"
-              placeholder="alice"
-              aria-label="Parola di attivazione"
-              @change="save"
-            />
-          </label>
+          <UiInput
+            v-model="wakeWord"
+            label="Parola di attivazione"
+            type="text"
+            placeholder="alice"
+            @blur="save"
+          />
         </div>
       </section>
 
@@ -641,22 +631,6 @@ async function save(): Promise<void> {
 .settings-field__label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
-}
-
-.settings-field__input {
-  padding: 7px var(--space-3);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.settings-field__input:focus {
-  border-color: var(--accent-border);
 }
 
 .settings-field--toggle {

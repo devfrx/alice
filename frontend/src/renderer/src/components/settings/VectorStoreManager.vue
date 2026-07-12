@@ -36,9 +36,11 @@
       </div>
     </div>
 
-    <div v-if="stats && !stats.connected" class="vs-empty">
-      Qdrant non disponibile. Verifica la configurazione del backend.
-    </div>
+    <UiEmptyState
+      v-if="stats && !stats.connected"
+      title="Qdrant non disponibile. Verifica la configurazione del backend."
+      compact
+    />
 
     <!-- RAG readiness feedback -->
     <div v-if="rag && !rag.ready" class="vs-rag-warn">
@@ -81,20 +83,21 @@
 
     <!-- Actions -->
     <div class="vs-actions">
-      <button class="vs-btn vs-btn--secondary" :disabled="loading" @click="refreshStats">
+      <UiButton variant="secondary" size="sm" :disabled="loading" @click="refreshStats">
         Aggiorna statistiche
-      </button>
-      <button class="vs-btn vs-btn--accent" :disabled="loading || reembedding" @click="onReembed">
+      </UiButton>
+      <UiButton variant="secondary" size="sm" :disabled="loading || reembedding" @click="onReembed">
         {{ reembedding ? 'Reindicizzazione…' : 'Reindicizza strumenti' }}
-      </button>
-      <button
-        class="vs-btn vs-btn--danger"
+      </UiButton>
+      <UiButton
+        variant="danger"
+        size="sm"
         :disabled="loading || repairing"
         title="Cancella e ricrea il vector store embedded (operazione manuale, distruttiva)"
         @click="onRepair"
       >
         {{ repairing ? 'Riparazione…' : 'Ripara / Reset' }}
-      </button>
+      </UiButton>
     </div>
 
     <!-- Loading / Error -->
@@ -110,6 +113,8 @@ import { useSettingsStore } from '../../stores/settings'
 import { useServicesStore } from '../../stores/services'
 import type { VectorStoreStats } from '../../types/settings'
 import UiToggle from '../ui/UiToggle.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 import { useModal } from '../../composables/useModal'
 
 const settingsStore = useSettingsStore()
@@ -357,56 +362,6 @@ onMounted(() => {
   margin-bottom: var(--space-3);
 }
 
-.vs-btn {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.vs-btn--secondary {
-  background: var(--surface-2);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.vs-btn--secondary:hover:not(:disabled) {
-  background: var(--white-light);
-  color: var(--text-primary);
-}
-
-.vs-btn--accent {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.vs-btn--accent:hover:not(:disabled) {
-  background: var(--accent-light);
-  border-color: var(--accent);
-}
-
-.vs-btn--danger {
-  background: transparent;
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.vs-btn--danger:hover:not(:disabled) {
-  background: var(--danger-faint);
-}
-
-.vs-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* ── RAG readiness warning ─────────────────────────────────── */
 .vs-rag-warn {
   padding: var(--space-2) var(--space-3);
@@ -429,14 +384,7 @@ onMounted(() => {
   font-weight: var(--weight-medium);
 }
 
-/* ── Empty / Loading / Error ───────────────────────────────── */
-.vs-empty {
-  color: var(--text-muted);
-  padding: var(--space-4);
-  text-align: center;
-  font-size: var(--text-sm);
-}
-
+/* ── Loading / Error ───────────────────────────────────────── */
 .vs-loading {
   color: var(--text-muted);
   padding: var(--space-2);

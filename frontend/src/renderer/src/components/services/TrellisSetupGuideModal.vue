@@ -12,6 +12,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useServicesStore } from '../../stores/services'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 const props = withDefaults(defineProps<{ service?: 'trellis2' | 'trellis2multiview' }>(), {
   service: 'trellis2'
@@ -59,19 +61,20 @@ onMounted(() => {
           <span class="guide-modal__subtitle"> Guida passo-passo alla compilazione locale </span>
         </div>
       </div>
-      <button
+      <UiIconButton
+        label="Chiudi"
+        variant="ghost"
+        size="sm"
         class="guide-modal__close"
-        type="button"
-        aria-label="Chiudi"
         @click="emit('close', false)"
       >
         <AppIcon name="x" :size="16" />
-      </button>
+      </UiIconButton>
     </header>
 
     <div class="guide-modal__body">
       <div v-if="loading" class="guide-modal__state">
-        <AppIcon name="refresh-cw" :size="16" class="is-spinning" />
+        <AliceSpinner size="xs" />
         <span>Carico la guida…</span>
       </div>
       <div v-else-if="error" class="guide-modal__state guide-modal__state--error">
@@ -157,25 +160,6 @@ onMounted(() => {
 }
 .guide-modal__close {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
-}
-.guide-modal__close:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border);
 }
 
 /* ── Body ────────────────────────────────────────────────────── */
@@ -207,15 +191,6 @@ onMounted(() => {
 .guide-modal__state-body strong {
   font-weight: var(--weight-semibold);
 }
-.is-spinning {
-  animation: guide-spin 0.9s linear infinite;
-}
-@keyframes guide-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* ── Markdown content ────────────────────────────────────────── */
 .guide-modal__markdown {
   font-size: var(--text-sm);

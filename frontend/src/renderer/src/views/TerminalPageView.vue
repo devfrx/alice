@@ -251,120 +251,122 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="terminal-page">
-    <!-- Disabled capability -->
-    <UiEmptyState
-      v-if="!store.enabled"
-      icon="terminal"
-      title="Terminale disabilitato"
-      subtitle="Abilita il terminale nella configurazione (terminal.enabled) per usarlo."
-    />
+  <div class="terminal-page" aria-label="Terminale">
+    <div class="terminal-page__frame">
+      <!-- Disabled capability -->
+      <UiEmptyState
+        v-if="!store.enabled"
+        icon="terminal"
+        title="Terminale disabilitato"
+        subtitle="Abilita il terminale nella configurazione (terminal.enabled) per usarlo."
+      />
 
-    <!-- Standalone page can be reached with no active conversation: the
-         terminal is per-conversation, so ask for one instead of showing a
-         dead-end disabled button. -->
-    <UiEmptyState
-      v-else-if="conversationId === null"
-      icon="terminal"
-      title="Nessuna conversazione attiva"
-      subtitle="Il terminale è legato a una conversazione: aprine una dalla sidebar per usarlo."
-    />
+      <!-- Standalone page can be reached with no active conversation: the
+           terminal is per-conversation, so ask for one instead of showing a
+           dead-end disabled button. -->
+      <UiEmptyState
+        v-else-if="conversationId === null"
+        icon="terminal"
+        title="Nessuna conversazione attiva"
+        subtitle="Il terminale è legato a una conversazione: aprine una dalla sidebar per usarlo."
+      />
 
-    <!-- Enabled -->
-    <template v-else>
-      <!-- Tab strip -->
-      <div class="tm__tabs" role="tablist">
-        <div
-          v-for="s in sessions"
-          :key="s.id"
-          class="tm__tab"
-          :class="{ 'tm__tab--active': s.id === activeId }"
-          role="tab"
-          :aria-selected="s.id === activeId"
-          @click="activate(s.id)"
-          @dblclick="startRename(s)"
-        >
-          <AppIcon
-            v-if="s.agent_assigned"
-            name="lightning"
-            :size="12"
-            class="tm__tab-agent"
-            aria-label="Assegnato all'agente"
-          />
-          <input
-            v-if="editingId === s.id"
-            v-model="editTitle"
-            class="tm__tab-edit"
-            type="text"
-            @click.stop
-            @keydown.enter.prevent="commitRename"
-            @keydown.esc.prevent="editingId = null"
-            @blur="commitRename"
-            @vue:mounted="(vn) => (vn.el as HTMLInputElement | null)?.focus()"
-          />
-          <span v-else class="tm__tab-title">{{ s.title }}</span>
-          <button
-            v-if="!s.agent_assigned"
-            class="tm__tab-action"
-            title="Assegna all'agente"
-            aria-label="Assegna all'agente"
-            @click.stop="assignToAgent(s.id)"
+      <!-- Enabled -->
+      <template v-else>
+        <!-- Tab strip -->
+        <div class="tm__tabs" role="tablist">
+          <div
+            v-for="s in sessions"
+            :key="s.id"
+            class="tm__tab"
+            :class="{ 'tm__tab--active': s.id === activeId }"
+            role="tab"
+            :aria-selected="s.id === activeId"
+            @click="activate(s.id)"
+            @dblclick="startRename(s)"
           >
-            <AppIcon name="lightning" :size="12" />
-          </button>
+            <AppIcon
+              v-if="s.agent_assigned"
+              name="lightning"
+              :size="12"
+              class="tm__tab-agent"
+              aria-label="Assegnato all'agente"
+            />
+            <input
+              v-if="editingId === s.id"
+              v-model="editTitle"
+              class="tm__tab-edit"
+              type="text"
+              @click.stop
+              @keydown.enter.prevent="commitRename"
+              @keydown.esc.prevent="editingId = null"
+              @blur="commitRename"
+              @vue:mounted="(vn) => (vn.el as HTMLInputElement | null)?.focus()"
+            />
+            <span v-else class="tm__tab-title">{{ s.title }}</span>
+            <button
+              v-if="!s.agent_assigned"
+              class="tm__tab-action"
+              title="Assegna all'agente"
+              aria-label="Assegna all'agente"
+              @click.stop="assignToAgent(s.id)"
+            >
+              <AppIcon name="lightning" :size="12" />
+            </button>
+            <button
+              class="tm__tab-close"
+              title="Chiudi (termina i processi)"
+              aria-label="Chiudi terminale"
+              @click.stop="killSession(s.id)"
+            >
+              <AppIcon name="x" :size="12" />
+            </button>
+          </div>
           <button
-            class="tm__tab-close"
-            title="Chiudi (termina i processi)"
-            aria-label="Chiudi terminale"
-            @click.stop="killSession(s.id)"
+            class="tm__new"
+            title="Nuovo terminale"
+            aria-label="Nuovo terminale"
+            :disabled="busy || conversationId === null"
+            @click="openNew"
           >
-            <AppIcon name="x" :size="12" />
+            <AppIcon name="plus" :size="14" />
           </button>
         </div>
-        <button
-          class="tm__new"
-          title="Nuovo terminale"
-          aria-label="Nuovo terminale"
-          :disabled="busy || conversationId === null"
-          @click="openNew"
-        >
-          <AppIcon name="plus" :size="14" />
-        </button>
-      </div>
 
-      <p v-if="errorMsg" class="tm__error">
-        <AppIcon name="alert-triangle" :size="13" :stroke-width="2" />
-        {{ errorMsg }}
-      </p>
+        <p v-if="errorMsg" class="tm__error">
+          <AppIcon name="alert-triangle" :size="13" :stroke-width="2" />
+          {{ errorMsg }}
+        </p>
 
-      <!-- Terminals (one host per session; only the active is shown) -->
-      <div class="tm__body">
-        <div
-          v-for="s in sessions"
-          v-show="s.id === activeId"
-          :key="s.id"
-          :ref="(el) => setHostRef(s.id, el as Element | null)"
-          class="tm__host"
-        />
-        <UiEmptyState
-          v-if="sessions.length === 0"
-          icon="terminal"
-          title="Nessun terminale aperto"
-          subtitle="Apri un terminale per lavorare nella cartella dello scope."
-        >
-          <template #actions>
-            <button
-              class="tm__open-btn"
-              :disabled="busy || conversationId === null"
-              @click="openNew"
-            >
-              <AppIcon name="plus" :size="14" />
-              Apri terminale
-            </button>
-          </template>
-        </UiEmptyState>
-      </div>
-    </template>
+        <!-- Terminals (one host per session; only the active is shown) -->
+        <div class="tm__body">
+          <div
+            v-for="s in sessions"
+            v-show="s.id === activeId"
+            :key="s.id"
+            :ref="(el) => setHostRef(s.id, el as Element | null)"
+            class="tm__host"
+          />
+          <UiEmptyState
+            v-if="sessions.length === 0"
+            icon="terminal"
+            title="Nessun terminale aperto"
+            subtitle="Apri un terminale per lavorare nella cartella dello scope."
+          >
+            <template #actions>
+              <button
+                class="tm__open-btn"
+                :disabled="busy || conversationId === null"
+                @click="openNew"
+              >
+                <AppIcon name="plus" :size="14" />
+                Apri terminale
+              </button>
+            </template>
+          </UiEmptyState>
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -375,9 +377,26 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* --terminal-surface (non-flipping): il wrapper resta scuro come l'xterm
-     anche in light theme — vedi Terminal Tokens in theme.css. */
-  background: var(--terminal-surface);
+  box-sizing: border-box;
+  padding: var(--space-2-5);
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+
+/* Floating panel: detached from the window edges, rounded, bordered —
+   mirrors the EmailPageView / CalendarPageView recipe. The frame itself is a
+   normal theme-aware surface so the tab strip and empty states read in both
+   themes; only the terminal host inside stays dark (--terminal-surface). */
+.terminal-page__frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
 }
 
 /* ── Tab strip ── */
@@ -509,6 +528,10 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   padding: var(--space-2);
+  /* La zona terminale resta scura in entrambi i temi: l'xterm dipinge su
+     --terminal-surface e il gutter di padding lo eguaglia. Il frame attorno
+     (--surface-1) resta invece theme-aware. */
+  background: var(--terminal-surface);
 }
 
 .tm__open-btn {

@@ -19,7 +19,7 @@
  * the events WS. The whole capability is gated by the backend `enabled` flag.
  */
 import '@xterm/xterm/css/xterm.css'
-import { Terminal } from '@xterm/xterm'
+import { Terminal, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
@@ -28,6 +28,8 @@ import UiEmptyState from '../../ui/UiEmptyState.vue'
 import { useChatStore } from '@renderer/stores/chat'
 import { useTerminalSessionsStore } from '@renderer/stores/terminalSessions'
 import type { TerminalSession } from '@renderer/types/terminal'
+import { useThemeTokens } from '@renderer/composables/useThemeTokens'
+import { ANSI_PALETTE } from '@renderer/utils/ansiPalette'
 
 defineProps<{
   params?: Record<string, unknown>
@@ -56,12 +58,34 @@ interface TermHandle {
 const terms = new Map<string, TermHandle>()
 const hostEls = new Map<string, HTMLElement>()
 
-const XTERM_THEME = {
-  background: '#0d1117',
-  foreground: '#c9d1d9',
-  cursor: '#58a6ff',
-  selectionBackground: '#264f78'
+/**
+ * xterm theme, UI-chrome part: background/foreground/cursor/selection follow
+ * the app theme via runtime tokens (xterm renders to <canvas>, which cannot
+ * read var(--…) itself — see useThemeTokens). The 16 ANSI colors are a
+ * separate, deliberately NOT tokenized, shared constant — see
+ * utils/ansiPalette.ts.
+ */
+const TERMINAL_TOKEN_NAMES = ['--surface-0', '--text-primary', '--accent', '--accent-dim'] as const
+const terminalTokens = useThemeTokens(TERMINAL_TOKEN_NAMES)
+
+function buildXtermTheme(): ITheme {
+  const t = terminalTokens.value
+  return {
+    background: t['--surface-0'],
+    foreground: t['--text-primary'],
+    cursor: t['--accent'],
+    selectionBackground: t['--accent-dim'],
+    ...ANSI_PALETTE
+  }
 }
+
+// Re-apply the theme to every live terminal on data-theme change.
+watch(terminalTokens, () => {
+  const theme = buildXtermTheme()
+  for (const handle of terms.values()) {
+    handle.term.options.theme = theme
+  }
+})
 
 function setHostRef(sessionId: string, el: Element | null): void {
   if (el) hostEls.set(sessionId, el as HTMLElement)
@@ -78,7 +102,7 @@ function ensureTerm(session: TerminalSession): void {
     fontFamily: 'var(--font-mono, monospace)',
     fontSize: 13,
     cursorBlink: true,
-    theme: XTERM_THEME,
+    theme: buildXtermTheme(),
     scrollback: 5000,
     convertEol: false
   })
@@ -352,7 +376,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #0d1117;
+  background: var(--surface-0);
 }
 
 /* ── Tab strip ── */
@@ -390,7 +414,7 @@ onBeforeUnmount(() => {
 
 .tm__tab--active {
   color: var(--text-primary);
-  background: #0d1117;
+  background: var(--surface-0);
   border-color: var(--border);
 }
 

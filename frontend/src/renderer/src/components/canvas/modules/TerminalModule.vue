@@ -28,7 +28,7 @@ import UiEmptyState from '../../ui/UiEmptyState.vue'
 import { useChatStore } from '@renderer/stores/chat'
 import { useTerminalSessionsStore } from '@renderer/stores/terminalSessions'
 import type { TerminalSession } from '@renderer/types/terminal'
-import { useThemeTokens } from '@renderer/composables/useThemeTokens'
+import { readTokens } from '@renderer/composables/useThemeTokens'
 import { ANSI_PALETTE } from '@renderer/utils/ansiPalette'
 
 defineProps<{
@@ -59,33 +59,32 @@ const terms = new Map<string, TermHandle>()
 const hostEls = new Map<string, HTMLElement>()
 
 /**
- * xterm theme, UI-chrome part: background/foreground/cursor/selection follow
- * the app theme via runtime tokens (xterm renders to <canvas>, which cannot
- * read var(--…) itself — see useThemeTokens). The 16 ANSI colors are a
- * separate, deliberately NOT tokenized, shared constant — see
- * utils/ansiPalette.ts.
+ * xterm theme from the dedicated `--terminal-*` tokens (xterm renders to
+ * <canvas>, which cannot read var(--…) itself — hence readTokens). These
+ * tokens are deliberately NON-flipping: the terminal stays dark in BOTH
+ * themes, because the ANSI palette is dark-tuned and unreadable on ivory
+ * (see the Terminal Tokens section in theme.css). The tokens are fixed, so
+ * a one-shot read per terminal creation is enough — no theme-change watch.
+ * The 16 ANSI colors are a separate, deliberately NOT tokenized, shared
+ * constant — see utils/ansiPalette.ts.
  */
-const TERMINAL_TOKEN_NAMES = ['--surface-0', '--text-primary', '--accent', '--accent-dim'] as const
-const terminalTokens = useThemeTokens(TERMINAL_TOKEN_NAMES)
+const TERMINAL_TOKEN_NAMES = [
+  '--terminal-surface',
+  '--terminal-fg',
+  '--terminal-cursor',
+  '--terminal-selection'
+] as const
 
 function buildXtermTheme(): ITheme {
-  const t = terminalTokens.value
+  const t = readTokens(TERMINAL_TOKEN_NAMES)
   return {
-    background: t['--surface-0'],
-    foreground: t['--text-primary'],
-    cursor: t['--accent'],
-    selectionBackground: t['--accent-dim'],
+    background: t['--terminal-surface'],
+    foreground: t['--terminal-fg'],
+    cursor: t['--terminal-cursor'],
+    selectionBackground: t['--terminal-selection'],
     ...ANSI_PALETTE
   }
 }
-
-// Re-apply the theme to every live terminal on data-theme change.
-watch(terminalTokens, () => {
-  const theme = buildXtermTheme()
-  for (const handle of terms.values()) {
-    handle.term.options.theme = theme
-  }
-})
 
 function setHostRef(sessionId: string, el: Element | null): void {
   if (el) hostEls.set(sessionId, el as HTMLElement)
@@ -376,7 +375,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface-0);
+  /* --terminal-surface (non-flipping): il wrapper resta scuro come l'xterm
+     anche in light theme — vedi Terminal Tokens in theme.css. */
+  background: var(--terminal-surface);
 }
 
 /* ── Tab strip ── */
@@ -413,8 +414,10 @@ onBeforeUnmount(() => {
 }
 
 .tm__tab--active {
-  color: var(--text-primary);
-  background: var(--surface-0);
+  /* Testo pinnato a --terminal-fg: su sfondo sempre-scuro il --text-primary
+     light (inchiostro scuro) sarebbe illeggibile. */
+  color: var(--terminal-fg);
+  background: var(--terminal-surface);
   border-color: var(--border);
 }
 

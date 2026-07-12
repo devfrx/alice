@@ -387,6 +387,17 @@
   --panel-header-height: 28px;
 }
 
+/* ── Terminal Tokens ───────────────────────────────────────── */
+/* Il terminale NON segue il light theme: le palette ANSI sono
+   dark-tuned e su avorio diventano illeggibili (brightYellow 1.18:1).
+   Superficie sempre scura, identità AL\CE su cursore/selezione. */
+:root {
+  --terminal-surface: #1a1a19; /* = --surface-0 dark, fisso */
+  --terminal-fg: #eceae5; /* = --text-primary dark, fisso */
+  --terminal-cursor: #e8dcc8; /* = --accent dark, fisso */
+  --terminal-selection: rgba(232, 220, 200, 0.1); /* = --accent-dim dark, fisso */
+}
+
 /* ── Code Syntax Tokens ────────────────────────────────────── */
 /* Highlight.js token colors, consumed by code-blocks.css. Dark   */
 /* values match the original hardcoded palette 1:1 (zero visual   */

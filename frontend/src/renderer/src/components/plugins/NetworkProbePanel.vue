@@ -2,6 +2,11 @@
 import { ref, computed } from 'vue'
 import { pluginsApi } from '../../services/api'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
+import AppIcon from '../ui/AppIcon.vue'
 
 /* ── Type definitions ───────────────────────────────────────────────── */
 
@@ -371,7 +376,9 @@ function fmtMs(v: number | null): string {
           🔬 Network Probe
           <span v-if="deviceCount" class="net-probe__badge">{{ deviceCount }}</span>
         </span>
-        <button class="net-probe__close" aria-label="Close panel" @click="emit('close')">✕</button>
+        <UiIconButton label="Close panel" variant="ghost" size="sm" @click="emit('close')">
+          <AppIcon name="x" :size="14" />
+        </UiIconButton>
       </header>
 
       <!-- Tabs -->
@@ -393,16 +400,13 @@ function fmtMs(v: number | null): string {
       <div class="net-probe__body">
         <!-- ─── Ping ─────────────────────────────────────────── -->
         <div v-if="activeTab === 'ping'" class="net-probe__section">
-          <div class="net-probe__field">
-            <label class="net-probe__label">Host</label>
-            <input
-              v-model="pingHost"
-              class="net-probe__input"
-              type="text"
-              placeholder="192.168.1.1"
-              @keydown.enter="doPing"
-            />
-          </div>
+          <UiInput
+            v-model="pingHost"
+            label="Host"
+            size="sm"
+            placeholder="192.168.1.1"
+            @keydown.enter="doPing"
+          />
           <div class="net-probe__field">
             <label class="net-probe__label">Count</label>
             <input
@@ -413,10 +417,13 @@ function fmtMs(v: number | null): string {
               max="10"
             />
           </div>
-          <button class="net-probe__btn" :disabled="pingLoading" @click="doPing">
-            <span v-if="pingLoading" class="net-probe__spinner" />
-            {{ pingLoading ? 'Pinging…' : '🏓 Ping' }}
-          </button>
+          <UiButton variant="secondary" size="sm" :disabled="pingLoading" @click="doPing">
+            <template #icon>
+              <AliceSpinner v-if="pingLoading" size="xs" variant="dots" />
+              <span v-else>🏓</span>
+            </template>
+            {{ pingLoading ? 'Pinging…' : 'Ping' }}
+          </UiButton>
 
           <div v-if="pingError" class="net-probe__error">⚠️ {{ pingError }}</div>
 
@@ -451,30 +458,27 @@ function fmtMs(v: number | null): string {
 
         <!-- ─── Ports ────────────────────────────────────────── -->
         <div v-if="activeTab === 'ports'" class="net-probe__section">
-          <div class="net-probe__field">
-            <label class="net-probe__label">Host</label>
-            <input
-              v-model="scanHost"
-              class="net-probe__input"
-              type="text"
-              placeholder="192.168.1.1"
-              @keydown.enter="doScan"
-            />
-          </div>
-          <div class="net-probe__field">
-            <label class="net-probe__label">Ports (comma-separated)</label>
-            <input
-              v-model="scanPortsInput"
-              class="net-probe__input"
-              type="text"
-              placeholder="80, 443, 22, 8080"
-              @keydown.enter="doScan"
-            />
-          </div>
-          <button class="net-probe__btn" :disabled="scanLoading" @click="doScan">
-            <span v-if="scanLoading" class="net-probe__spinner" />
-            {{ scanLoading ? 'Scanning…' : '🔌 Scan' }}
-          </button>
+          <UiInput
+            v-model="scanHost"
+            label="Host"
+            size="sm"
+            placeholder="192.168.1.1"
+            @keydown.enter="doScan"
+          />
+          <UiInput
+            v-model="scanPortsInput"
+            label="Ports (comma-separated)"
+            size="sm"
+            placeholder="80, 443, 22, 8080"
+            @keydown.enter="doScan"
+          />
+          <UiButton variant="secondary" size="sm" :disabled="scanLoading" @click="doScan">
+            <template #icon>
+              <AliceSpinner v-if="scanLoading" size="xs" variant="dots" />
+              <span v-else>🔌</span>
+            </template>
+            {{ scanLoading ? 'Scanning…' : 'Scan' }}
+          </UiButton>
 
           <div v-if="scanError" class="net-probe__error">⚠️ {{ scanError }}</div>
 
@@ -517,11 +521,11 @@ function fmtMs(v: number | null): string {
           <div class="net-probe__divider" />
           <div class="net-probe__sub-title">Quick Service Check</div>
           <div class="net-probe__field-row">
-            <input
+            <UiInput
               v-model="svcHost"
-              class="net-probe__input"
-              type="text"
+              size="sm"
               placeholder="Host"
+              aria-label="Host"
               @keydown.enter="checkService"
             />
             <input
@@ -541,14 +545,13 @@ function fmtMs(v: number | null): string {
               @update:model-value="(v) => (svcProtocol = v === 'udp' ? 'udp' : 'tcp')"
             />
           </div>
-          <button
-            class="net-probe__btn net-probe__btn--sm"
-            :disabled="svcLoading"
-            @click="checkService"
-          >
-            <span v-if="svcLoading" class="net-probe__spinner" />
-            {{ svcLoading ? 'Checking…' : '⚡ Check' }}
-          </button>
+          <UiButton variant="secondary" size="sm" :disabled="svcLoading" @click="checkService">
+            <template #icon>
+              <AliceSpinner v-if="svcLoading" size="xs" variant="dots" />
+              <span v-else>⚡</span>
+            </template>
+            {{ svcLoading ? 'Checking…' : 'Check' }}
+          </UiButton>
           <div v-if="svcError" class="net-probe__error">⚠️ {{ svcError }}</div>
           <div v-if="svcResult" class="net-probe__card">
             <div class="net-probe__row">
@@ -582,10 +585,18 @@ function fmtMs(v: number | null): string {
 
         <!-- ─── Devices ──────────────────────────────────────── -->
         <div v-if="activeTab === 'devices'" class="net-probe__section">
-          <button class="net-probe__btn" :disabled="deviceLoading" @click="discoverDevices">
-            <span v-if="deviceLoading" class="net-probe__spinner" />
-            {{ deviceLoading ? 'Discovering…' : '📡 Discover Devices' }}
-          </button>
+          <UiButton
+            variant="secondary"
+            size="sm"
+            :disabled="deviceLoading"
+            @click="discoverDevices"
+          >
+            <template #icon>
+              <AliceSpinner v-if="deviceLoading" size="xs" variant="dots" />
+              <span v-else>📡</span>
+            </template>
+            {{ deviceLoading ? 'Discovering…' : 'Discover Devices' }}
+          </UiButton>
 
           <div v-if="deviceError" class="net-probe__error">⚠️ {{ deviceError }}</div>
 
@@ -610,10 +621,13 @@ function fmtMs(v: number | null): string {
 
         <!-- ─── Info ─────────────────────────────────────────── -->
         <div v-if="activeTab === 'info'" class="net-probe__section">
-          <button class="net-probe__btn" :disabled="infoLoading" @click="getNetworkInfo">
-            <span v-if="infoLoading" class="net-probe__spinner" />
-            {{ infoLoading ? 'Loading…' : '🔄 Refresh' }}
-          </button>
+          <UiButton variant="secondary" size="sm" :disabled="infoLoading" @click="getNetworkInfo">
+            <template #icon>
+              <AliceSpinner v-if="infoLoading" size="xs" variant="dots" />
+              <span v-else>🔄</span>
+            </template>
+            {{ infoLoading ? 'Loading…' : 'Refresh' }}
+          </UiButton>
 
           <div v-if="infoError" class="net-probe__error">⚠️ {{ infoError }}</div>
 
@@ -671,16 +685,13 @@ function fmtMs(v: number | null): string {
 
         <!-- ─── Traceroute ───────────────────────────────────── -->
         <div v-if="activeTab === 'traceroute'" class="net-probe__section">
-          <div class="net-probe__field">
-            <label class="net-probe__label">Host</label>
-            <input
-              v-model="traceHost"
-              class="net-probe__input"
-              type="text"
-              placeholder="192.168.1.1"
-              @keydown.enter="doTraceroute"
-            />
-          </div>
+          <UiInput
+            v-model="traceHost"
+            label="Host"
+            size="sm"
+            placeholder="192.168.1.1"
+            @keydown.enter="doTraceroute"
+          />
           <div class="net-probe__field">
             <label class="net-probe__label">Max Hops</label>
             <input
@@ -691,10 +702,13 @@ function fmtMs(v: number | null): string {
               max="30"
             />
           </div>
-          <button class="net-probe__btn" :disabled="traceLoading" @click="doTraceroute">
-            <span v-if="traceLoading" class="net-probe__spinner" />
-            {{ traceLoading ? 'Tracing…' : '🔀 Traceroute' }}
-          </button>
+          <UiButton variant="secondary" size="sm" :disabled="traceLoading" @click="doTraceroute">
+            <template #icon>
+              <AliceSpinner v-if="traceLoading" size="xs" variant="dots" />
+              <span v-else>🔀</span>
+            </template>
+            {{ traceLoading ? 'Tracing…' : 'Traceroute' }}
+          </UiButton>
 
           <div v-if="traceError" class="net-probe__error">⚠️ {{ traceError }}</div>
 
@@ -740,20 +754,20 @@ function fmtMs(v: number | null): string {
 
         <!-- ─── DNS ──────────────────────────────────────────── -->
         <div v-if="activeTab === 'dns'" class="net-probe__section">
-          <div class="net-probe__field">
-            <label class="net-probe__label">Hostname or IP</label>
-            <input
-              v-model="dnsQuery"
-              class="net-probe__input"
-              type="text"
-              placeholder="my-nas.local or 192.168.1.1"
-              @keydown.enter="doResolve"
-            />
-          </div>
-          <button class="net-probe__btn" :disabled="dnsLoading" @click="doResolve">
-            <span v-if="dnsLoading" class="net-probe__spinner" />
-            {{ dnsLoading ? 'Resolving…' : '🔍 Resolve' }}
-          </button>
+          <UiInput
+            v-model="dnsQuery"
+            label="Hostname or IP"
+            size="sm"
+            placeholder="my-nas.local or 192.168.1.1"
+            @keydown.enter="doResolve"
+          />
+          <UiButton variant="secondary" size="sm" :disabled="dnsLoading" @click="doResolve">
+            <template #icon>
+              <AliceSpinner v-if="dnsLoading" size="xs" variant="dots" />
+              <span v-else>🔍</span>
+            </template>
+            {{ dnsLoading ? 'Resolving…' : 'Resolve' }}
+          </UiButton>
 
           <div v-if="dnsError" class="net-probe__error">⚠️ {{ dnsError }}</div>
 
@@ -800,10 +814,13 @@ function fmtMs(v: number | null): string {
                 (v) => (connProtocol = v === 'udp' ? 'udp' : v === 'all' ? 'all' : 'tcp')
               "
             />
-            <button class="net-probe__btn" :disabled="connLoading" @click="getConnections">
-              <span v-if="connLoading" class="net-probe__spinner" />
-              {{ connLoading ? 'Loading…' : '🔗 List Connections' }}
-            </button>
+            <UiButton variant="secondary" size="sm" :disabled="connLoading" @click="getConnections">
+              <template #icon>
+                <AliceSpinner v-if="connLoading" size="xs" variant="dots" />
+                <span v-else>🔗</span>
+              </template>
+              {{ connLoading ? 'Loading…' : 'List Connections' }}
+            </UiButton>
           </div>
 
           <div v-if="connError" class="net-probe__error">⚠️ {{ connError }}</div>
@@ -882,21 +899,6 @@ function fmtMs(v: number | null): string {
   font-weight: 700;
   background: var(--accent);
   color: var(--bg-primary);
-}
-
-.net-probe__close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
-}
-
-.net-probe__close:hover {
-  background: var(--white-medium);
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────────── */
@@ -998,39 +1000,6 @@ function fmtMs(v: number | null): string {
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */
-
-.net-probe__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-3);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.net-probe__btn:hover:not(:disabled) {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-}
-
-.net-probe__btn:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.net-probe__btn--sm {
-  padding: 5px 10px;
-  font-size: 11px;
-}
 
 .net-probe__btn-link {
   background: none;
@@ -1201,23 +1170,6 @@ function fmtMs(v: number | null): string {
 .net-probe__error {
   font-size: 12px;
   color: var(--danger);
-}
-
-/* ── Spinner ────────────────────────────────────────────────────────── */
-
-.net-probe__spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--text-secondary);
-  border-top-color: transparent;
-  animation: net-probe-spin 0.7s linear infinite;
-}
-
-@keyframes net-probe-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ── Slide transition ───────────────────────────────────────────────── */

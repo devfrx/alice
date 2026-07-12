@@ -19,6 +19,8 @@ import { useServicesStore, type ServiceSnapshot } from '../stores/services'
 import type { AppIconName } from '../assets/icons'
 import AppIcon from '../components/ui/AppIcon.vue'
 import UiEmptyState from '../components/ui/UiEmptyState.vue'
+import UiButton from '../components/ui/UiButton.vue'
+import AliceSpinner from '../components/ui/AliceSpinner.vue'
 import ServiceCard from '../components/services/ServiceCard.vue'
 import TrellisConfigCard from '../components/services/TrellisConfigCard.vue'
 import TrellisSetupGuideModal from '../components/services/TrellisSetupGuideModal.vue'
@@ -163,15 +165,19 @@ async function refreshAll(): Promise<void> {
           <span class="services-view__overall-value">{{ activeDownloads }}</span>
           <span class="services-view__overall-label">download</span>
         </span>
-        <button
+        <UiButton
           class="services-view__refresh"
-          type="button"
+          variant="secondary"
+          size="md"
           :disabled="refreshing"
           @click="refreshAll"
         >
-          <AppIcon name="refresh-cw" :size="14" :class="{ 'is-spinning': refreshing }" />
-          <span>{{ refreshing ? 'Aggiorno…' : 'Aggiorna' }}</span>
-        </button>
+          <template #icon>
+            <AliceSpinner v-if="refreshing" size="xs" variant="dots" />
+            <AppIcon v-else name="refresh-cw" :size="14" />
+          </template>
+          {{ refreshing ? 'Aggiorno…' : 'Aggiorna' }}
+        </UiButton>
       </div>
     </header>
 
@@ -352,44 +358,6 @@ async function refreshAll(): Promise<void> {
 }
 .services-view__overall.is-accent .services-view__overall-value {
   color: var(--accent);
-}
-
-/* ── Refresh button ───────────────────────────────────────────── */
-.services-view__refresh {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 30px;
-  padding: 0 var(--space-3);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
-}
-.services-view__refresh:hover:not(:disabled) {
-  background: var(--surface-3);
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-}
-.services-view__refresh:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.is-spinning {
-  animation: services-spin 0.9s linear infinite;
-}
-@keyframes services-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ── Error banner ────────────────────────────────────────────── */

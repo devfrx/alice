@@ -17,6 +17,9 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { resolveBackendUrl } from '../../services/api'
 import type { CadModelPayload } from '../../types/chat'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiButton from '../ui/UiButton.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -308,21 +311,21 @@ onUnmounted(() => {
         <AppIcon name="box-3d" :size="12" :stroke-width="1.5" />
         <span class="side-cad__name-text">{{ activeModel?.model_name ?? '3D Model' }}</span>
       </div>
-      <button class="side-cad__close" title="Chiudi pannello 3D" @click="emit('close')">
+      <UiIconButton label="Chiudi pannello 3D" variant="ghost" size="xs" @click="emit('close')">
         <AppIcon name="x" :size="14" />
-      </button>
+      </UiIconButton>
     </div>
 
     <!-- Canvas -->
     <div ref="containerRef" class="side-cad__canvas">
       <div v-if="loading" class="side-cad__overlay">
-        <div class="side-cad__spinner" />
+        <AliceSpinner size="sm" />
         <span class="side-cad__overlay-text">Caricamento modello 3Dâ€¦</span>
       </div>
       <div v-if="errorMsg" class="side-cad__overlay side-cad__overlay--error">
         <AppIcon name="circle-x" :size="24" :stroke-width="1.5" />
         <span class="side-cad__overlay-text">{{ errorMsg }}</span>
-        <button class="side-cad__retry-btn" @click="retryLoad">Riprova</button>
+        <UiButton variant="secondary" size="sm" @click="retryLoad">Riprova</UiButton>
       </div>
       <p v-if="!loading && !errorMsg" class="side-cad__hint">
         Trascina per orbitare Â· Scroll per zoom
@@ -333,50 +336,56 @@ onUnmounted(() => {
     <div class="side-cad__footer">
       <!-- Multi-model navigation -->
       <div v-if="hasMultiple && !hideNav" class="side-cad__nav">
-        <button
-          class="side-cad__nav-btn"
+        <UiIconButton
+          label="Modello precedente"
+          variant="ghost"
+          size="xs"
           :disabled="!canPrev"
-          title="Modello precedente"
           @click="goPrev"
         >
           <AppIcon name="chevron-left" :size="14" />
-        </button>
+        </UiIconButton>
         <span class="side-cad__nav-label">{{ activeIndex + 1 }} / {{ models.length }}</span>
-        <button
-          class="side-cad__nav-btn"
+        <UiIconButton
+          label="Modello successivo"
+          variant="ghost"
+          size="xs"
           :disabled="!canNext"
-          title="Modello successivo"
           @click="goNext"
         >
           <AppIcon name="chevron-right" :size="14" />
-        </button>
+        </UiIconButton>
       </div>
 
       <!-- Controls -->
       <div class="side-cad__controls">
-        <button
-          class="side-cad__btn"
-          :class="{ 'side-cad__btn--active': autoRotate }"
-          title="Auto-rotazione"
+        <UiIconButton
+          label="Auto-rotazione"
+          variant="ghost"
+          size="sm"
+          toggle
+          :active="autoRotate"
           @click="toggleAutoRotate"
         >
           <AppIcon name="auto-rotate" :size="13" />
-        </button>
-        <button
-          class="side-cad__btn"
-          :class="{ 'side-cad__btn--active': wireframe }"
-          title="Wireframe"
+        </UiIconButton>
+        <UiIconButton
+          label="Wireframe"
+          variant="ghost"
+          size="sm"
+          toggle
+          :active="wireframe"
           @click="toggleWireframe"
         >
           <AppIcon name="wireframe" :size="13" />
-        </button>
-        <button class="side-cad__btn" title="Reset camera" @click="resetCamera">
+        </UiIconButton>
+        <UiIconButton label="Reset camera" variant="ghost" size="sm" @click="resetCamera">
           <AppIcon name="crosshair" :size="13" />
-        </button>
+        </UiIconButton>
         <div class="side-cad__divider" />
-        <button class="side-cad__btn" title="Scarica GLB" @click="downloadModel">
+        <UiIconButton label="Scarica GLB" variant="ghost" size="sm" @click="downloadModel">
           <AppIcon name="download" :size="13" />
-        </button>
+        </UiIconButton>
       </div>
     </div>
   </div>
@@ -424,28 +433,6 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.side-cad__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-
-.side-cad__close:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
 /* â”€â”€ Canvas â”€â”€ */
 .side-cad__canvas {
   position: relative;
@@ -488,37 +475,6 @@ onUnmounted(() => {
   color: var(--danger);
 }
 
-.side-cad__retry-btn {
-  margin-top: var(--space-2);
-  padding: var(--space-1) var(--space-4);
-  font-size: var(--text-xs);
-  color: var(--text-primary);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.side-cad__retry-btn:hover {
-  background: var(--surface-3);
-}
-
-.side-cad__spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: var(--radius-full);
-  animation: side-cad-spin 0.8s linear infinite;
-}
-
-@keyframes side-cad-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .side-cad__hint {
   position: absolute;
   bottom: var(--space-2);
@@ -553,32 +509,6 @@ onUnmounted(() => {
   gap: var(--space-1);
 }
 
-.side-cad__nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-
-.side-cad__nav-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.side-cad__nav-btn:disabled {
-  opacity: 0.25;
-  cursor: default;
-}
-
 .side-cad__nav-label {
   font-size: var(--text-2xs);
   color: var(--text-muted);
@@ -592,34 +522,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-}
-
-.side-cad__btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    background 0.15s,
-    border-color 0.15s;
-}
-
-.side-cad__btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.side-cad__btn--active {
-  color: var(--accent);
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
 }
 
 .side-cad__divider {

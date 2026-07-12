@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { pluginsApi } from '../../services/api'
+import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiSearchInput from '../ui/UiSearchInput.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 interface SearchResult {
   title: string
@@ -89,15 +94,17 @@ function openUrl(url: string): void {
           🔍 Web Search
           <span v-if="resultCount" class="search-panel__badge">{{ resultCount }}</span>
         </span>
-        <button class="search-panel__close" @click="emit('close')">✕</button>
+        <UiIconButton label="Chiudi pannello" variant="ghost" size="sm" @click="emit('close')">
+          <AppIcon name="x" :size="14" />
+        </UiIconButton>
       </header>
 
       <div class="search-panel__input-wrap">
-        <input
+        <UiSearchInput
           v-model="query"
-          class="search-panel__input"
-          type="text"
           placeholder="Cerca sul web..."
+          aria-label="Cerca sul web"
+          size="sm"
           @keydown.enter="search"
         />
       </div>
@@ -105,7 +112,7 @@ function openUrl(url: string): void {
       <div class="search-panel__body">
         <!-- Loading -->
         <div v-if="loading" class="search-panel__status">
-          <span class="search-panel__spinner" />Ricerca in corso…
+          <AliceSpinner size="xs" />Ricerca in corso…
         </div>
 
         <!-- Error -->
@@ -125,20 +132,22 @@ function openUrl(url: string): void {
             <span class="search-panel__card-url">{{ r.url }}</span>
             <p class="search-panel__card-snippet">{{ r.snippet }}</p>
             <div class="search-panel__card-actions">
-              <button
-                class="search-panel__btn"
-                :disabled="!!scrapingMap[i]"
+              <UiButton
+                variant="secondary"
+                size="sm"
+                :loading="!!scrapingMap[i]"
                 @click="scrape(i, r.url)"
               >
-                {{ scrapingMap[i] ? '⏳' : expandedMap[i] ? '▼ Chiudi' : '📄 Scrape' }}
-              </button>
-              <button
+                {{ expandedMap[i] ? '▼ Chiudi' : '📄 Scrape' }}
+              </UiButton>
+              <UiButton
                 v-if="scrapedTexts[i]"
-                class="search-panel__btn search-panel__btn--accent"
+                variant="secondary"
+                size="sm"
                 @click="emit('use-text', scrapedTexts[i])"
               >
                 ➜ Usa in chat
-              </button>
+              </UiButton>
             </div>
             <div v-if="scrapeErrors[i]" class="search-panel__scrape-error">
               ⚠️ {{ scrapeErrors[i] }}
@@ -194,38 +203,8 @@ function openUrl(url: string): void {
   color: var(--bg-primary);
 }
 
-.search-panel__close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.search-panel__close:hover {
-  background: var(--white-medium);
-}
-
 .search-panel__input-wrap {
   padding: 10px 14px 6px;
-}
-
-.search-panel__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-}
-
-.search-panel__input:focus {
-  border-color: var(--accent);
 }
 
 .search-panel__body {
@@ -246,21 +225,6 @@ function openUrl(url: string): void {
 
 .search-panel__status--error {
   color: var(--accent);
-}
-
-.search-panel__spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--text-secondary);
-  border-top-color: transparent;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .search-panel__results {
@@ -318,31 +282,6 @@ function openUrl(url: string): void {
   display: flex;
   gap: 6px;
   margin-top: 8px;
-}
-
-.search-panel__btn {
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: none;
-  font-size: 11px;
-  background: var(--surface-3);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.search-panel__btn:hover {
-  opacity: 0.8;
-}
-
-.search-panel__btn:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.search-panel__btn--accent {
-  background: var(--accent);
-  color: var(--bg-primary);
 }
 
 .search-panel__scrape-error {

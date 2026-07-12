@@ -8,6 +8,7 @@
 import { reactive } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiInput from '../ui/UiInput.vue'
 
 const props = defineProps<{
   entities: UiSelectOption[]
@@ -40,15 +41,13 @@ async function onCreateRelation(): Promise<void> {
         @update:model-value="(v) => (form.from = String(v))"
       />
     </label>
-    <label class="kg-field">
-      <span class="kg-field__label">Tipo relazione</span>
-      <input
+    <div class="kg-field">
+      <UiInput
         v-model="form.relationType"
-        type="text"
-        class="kg-input"
+        label="Tipo relazione"
         placeholder="es. conosce, lavora_con, si_trova_a"
       />
-    </label>
+    </div>
     <label class="kg-field">
       <span class="kg-field__label">A (entità)</span>
       <UiSelect
@@ -91,22 +90,6 @@ async function onCreateRelation(): Promise<void> {
   font-size: var(--text-xs);
   color: var(--text-secondary);
   font-weight: var(--weight-medium);
-}
-
-.kg-input {
-  padding: var(--space-1) var(--space-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.kg-input:focus {
-  border-color: var(--accent-border);
 }
 
 /* ── Actions ───────────────────────────────────────────────── */

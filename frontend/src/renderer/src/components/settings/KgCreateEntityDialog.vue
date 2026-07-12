@@ -7,6 +7,7 @@
  */
 import { reactive } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
+import UiInput from '../ui/UiInput.vue'
 
 const emit = defineEmits<{ close: [result: boolean] }>()
 
@@ -28,19 +29,12 @@ async function onCreate(): Promise<void> {
 
 <template>
   <div class="kg-create-entity">
-    <label class="kg-field">
-      <span class="kg-field__label">Nome</span>
-      <input v-model="form.name" type="text" class="kg-input" placeholder="es. Mario Rossi" />
-    </label>
-    <label class="kg-field">
-      <span class="kg-field__label">Tipo</span>
-      <input
-        v-model="form.entityType"
-        type="text"
-        class="kg-input"
-        placeholder="es. persona, luogo, concetto"
-      />
-    </label>
+    <div class="kg-field">
+      <UiInput v-model="form.name" label="Nome" placeholder="es. Mario Rossi" />
+    </div>
+    <div class="kg-field">
+      <UiInput v-model="form.entityType" label="Tipo" placeholder="es. persona, luogo, concetto" />
+    </div>
     <label class="kg-field">
       <span class="kg-field__label">Osservazioni (una per riga)</span>
       <textarea
@@ -81,22 +75,6 @@ async function onCreate(): Promise<void> {
   font-size: var(--text-xs);
   color: var(--text-secondary);
   font-weight: var(--weight-medium);
-}
-
-.kg-input {
-  padding: var(--space-1) var(--space-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.kg-input:focus {
-  border-color: var(--accent-border);
 }
 
 .kg-textarea {

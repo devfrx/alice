@@ -7,22 +7,23 @@
         <span class="ec__type">{{ entity.entityType }}</span>
       </div>
       <div class="ec__actions">
-        <button
-          class="ec__action-btn ec__action-btn--add"
-          title="Aggiungi osservazione"
-          aria-label="Aggiungi osservazione"
+        <UiIconButton
+          class="ec__action-btn--add"
+          label="Aggiungi osservazione"
+          size="xs"
+          tone="accent"
           @click="$emit('addObservation', entity.name)"
         >
-          +
-        </button>
-        <button
-          class="ec__action-btn ec__action-btn--delete"
-          title="Elimina entità"
-          aria-label="Elimina entità"
+          <AppIcon name="plus" :size="14" />
+        </UiIconButton>
+        <UiIconButton
+          label="Elimina entità"
+          size="xs"
+          tone="danger"
           @click="$emit('delete', entity.name)"
         >
-          ✕
-        </button>
+          <AppIcon name="trash" :size="14" />
+        </UiIconButton>
       </div>
     </div>
 
@@ -72,6 +73,8 @@
 
 <script setup lang="ts">
 import type { KGEntity, KGRelation } from '../../types/mcpMemory'
+import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 
 defineProps<{
   entity: KGEntity
@@ -136,37 +139,10 @@ defineEmits<{
   gap: var(--space-1);
 }
 
-.ec__action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  font-size: var(--text-xs);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.ec__action-btn--add {
+/* Compound override on the kit's own root class (per UI kit rules): the
+   "add" action stays accent-tinted at rest, not just on hover/tone. */
+.ec__action-btn--add.ui-icon-btn {
   color: var(--accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-}
-
-.ec__action-btn--add:hover {
-  background: var(--accent-dim);
-}
-
-.ec__action-btn--delete {
-  color: var(--text-muted);
-}
-
-.ec__action-btn--delete:hover {
-  background: var(--danger-light);
-  color: var(--danger);
 }
 
 /* ── Observations ──────────────────────────────────── */
@@ -225,6 +201,10 @@ defineEmits<{
 .ec__obs-delete:hover {
   background: var(--danger-light);
   color: var(--danger);
+}
+
+.ec__obs-delete:active {
+  transform: scale(0.92);
 }
 
 .ec__no-obs {
@@ -291,5 +271,9 @@ defineEmits<{
 .ec__rel-delete:hover {
   background: var(--danger-light);
   color: var(--danger);
+}
+
+.ec__rel-delete:active {
+  transform: scale(0.92);
 }
 </style>

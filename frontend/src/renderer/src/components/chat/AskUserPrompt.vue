@@ -12,6 +12,7 @@ import { ref, computed } from 'vue'
 
 import type { AskUserRequest, AskUserAnswer } from '../../types/chat'
 import UiButton from '../ui/UiButton.vue'
+import UiInput from '../ui/UiInput.vue'
 
 const props = defineProps<{ request: AskUserRequest }>()
 const emit = defineEmits<{ answer: [executionId: string, answers: AskUserAnswer[]] }>()
@@ -80,12 +81,13 @@ function submit(): void {
       </button>
     </div>
 
-    <input
+    <UiInput
       v-if="current.allow_free_text"
       v-model="freeText[current.id]"
       class="ask-card__free"
       type="text"
       placeholder="Oppure scrivi una risposta…"
+      aria-label="Risposta libera"
     />
 
     <div class="ask-card__nav">
@@ -167,13 +169,11 @@ function submit(): void {
   border-color: var(--accent);
 }
 
-.ask-card__free {
-  padding: 8px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+/* Compound override: match the surface-2 / border-subtle look of the option
+   buttons above, instead of UiInput's default surface-1 / border. */
+.ask-card__free.ui-input :deep(.ui-input__wrapper) {
   background: var(--surface-2);
-  color: inherit;
-  font-family: inherit;
+  border-color: var(--border-subtle);
 }
 
 .ask-card__nav {

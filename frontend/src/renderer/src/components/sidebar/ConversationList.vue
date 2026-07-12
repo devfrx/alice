@@ -202,30 +202,30 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
       <span class="conv-list__title">Conversazioni</span>
       <div class="conv-list__header-actions">
         <UiIconButton
-          class="conv-list__header-btn"
           label="Nuova chat"
           variant="ghost"
           size="xs"
+          tone="accent"
           @click="emit('create')"
         >
           <AppIcon name="plus" :size="12" />
         </UiIconButton>
         <UiIconButton
           v-if="conversations.length > 0"
-          class="conv-list__header-btn"
           label="Backup di tutte le conversazioni"
           variant="ghost"
           size="xs"
+          tone="accent"
           @click="emit('backup-all')"
         >
           <AppIcon name="folder" :size="11" />
         </UiIconButton>
         <UiIconButton
           v-if="conversations.length > 0"
-          class="conv-list__header-btn conv-list__header-btn--danger"
           label="Elimina tutte le conversazioni"
           variant="ghost"
           size="xs"
+          tone="danger"
           @click="emit('delete-all')"
         >
           <AppIcon name="trash" :size="11" />
@@ -294,7 +294,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
           <div class="conv-item__actions" @click.stop>
             <UiIconButton
               v-if="renamingId !== conv.id"
-              class="conv-item__action"
               label="Esporta conversazione"
               title="Esporta backup JSON"
               variant="ghost"
@@ -305,7 +304,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
             </UiIconButton>
             <UiIconButton
               v-if="renamingId !== conv.id"
-              class="conv-item__action"
               label="Rinomina conversazione"
               variant="ghost"
               size="xs"
@@ -315,19 +313,19 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
             </UiIconButton>
             <UiIconButton
               v-if="renamingId === conv.id"
-              class="conv-item__action conv-item__action--confirm"
               label="Conferma"
               variant="ghost"
               size="xs"
+              tone="success"
               @click="confirmRename(conv.id)"
             >
               <AppIcon name="check" :size="11" :stroke-width="2.5" />
             </UiIconButton>
             <UiIconButton
-              class="conv-item__action conv-item__action--danger"
               label="Elimina conversazione"
               variant="ghost"
               size="xs"
+              tone="danger"
               :disabled="conv.id === streamingId"
               @click="emit('delete', conv.id)"
             >
@@ -386,17 +384,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   display: flex;
   align-items: center;
   gap: var(--space-0-5);
-}
-
-/* Accent hover overrides the kit's default ghost hover (text-primary) — matches
-   the previous bespoke treatment for header actions. */
-.conv-list__header-btn:hover {
-  color: var(--accent);
-}
-
-.conv-list__header-btn--danger:hover {
-  color: var(--danger);
-  background: var(--danger-hover);
 }
 
 /* ─── Scroller ──────────────────────────────────────────────── */
@@ -607,18 +594,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   pointer-events: auto;
 }
 
-/* Kit ghost default already covers text-muted → text-primary / surface-hover;
-   only the state-specific overrides below are bespoke. */
-.conv-item__action--confirm:hover {
-  color: var(--success);
-}
-
-/* Delete → danger color on hover */
-.conv-item__action--danger:hover {
-  color: var(--danger);
-  background: var(--danger-hover);
-}
-
 /* ─── Empty state ───────────────────────────────────────────── */
 .conv-list__empty {
   position: absolute;
@@ -631,8 +606,6 @@ const timeAgo = (iso: string): string => formatRelativeTime(iso)
   .conv-item,
   .conv-item__actions,
   .conv-item__rename-input,
-  .conv-list__header-btn,
-  .conv-item__action,
   .conv-item__streaming-dot {
     transition: none;
     animation: none;

@@ -191,6 +191,7 @@ onUnmounted(() => {
         label="Apri sidebar"
         variant="ghost"
         size="sm"
+        toggle
         :active="uiStore.sidebarOpen"
         @click="uiStore.toggleSidebar"
       >

@@ -32,7 +32,10 @@ async def _probe(ctx: Any) -> tuple[bool, str]:
     if qd is None or emb is None:
         return False, "qdrant or embedding client missing"
     if getattr(qd, "in_memory", False):
-        return False, "Qdrant running in volatile in-memory fallback"
+        return False, (
+            getattr(qd, "fallback_reason", None)
+            or "Qdrant running in volatile in-memory fallback"
+        )
     try:
         vec = await emb.encode("readiness probe")
     except Exception as exc:

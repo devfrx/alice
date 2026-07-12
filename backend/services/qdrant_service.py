@@ -43,6 +43,7 @@ class QdrantService:
         self._config = config
         self._client: AsyncQdrantClient | None = None
         self._in_memory: bool = False
+        self._fallback_reason: str | None = None
 
     @property
     def in_memory(self) -> bool:
@@ -56,12 +57,23 @@ class QdrantService:
         """
         return self._in_memory
 
+    @property
+    def fallback_reason(self) -> str | None:
+        """Human-readable cause of the in-memory fallback, or ``None``.
+
+        Set alongside :attr:`in_memory` so status endpoints and the RAG
+        readiness verdict can tell the user *why* the store is volatile
+        instead of a generic "in-memory fallback".
+        """
+        return self._fallback_reason
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
     async def initialize(self) -> None:
         """Create the AsyncQdrantClient based on configured mode."""
+        self._fallback_reason = None
         if self._config.mode == "server":
             self._client = AsyncQdrantClient(
                 host=self._config.host,
@@ -106,6 +118,11 @@ class QdrantService:
             )
             self._client = AsyncQdrantClient(":memory:")
             self._in_memory = True
+            self._fallback_reason = (
+                "Vector store data directory is locked by another process — "
+                "another AL\\CE backend instance is likely running. Writes are "
+                "not persisted until it is closed."
+            )
 
     async def close(self) -> None:
         """Close the Qdrant client connection."""

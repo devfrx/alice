@@ -67,13 +67,22 @@ async def repair_vector_store(ctx: Any) -> RagReadiness:
             await old.close()
 
     new_qdrant = QdrantService(config.qdrant)
-    new_qdrant.clear_embedded_data()
+    cleared = new_qdrant.clear_embedded_data()
+    if not cleared and config.qdrant.mode == "embedded":
+        # rmtree(ignore_errors=True) silently no-ops on files held open by a
+        # live process (Windows). If the data dir cannot be cleared, another
+        # instance owns it — re-init below will fall back to in-memory.
+        logger.warning(
+            "Repair: embedded data dir could not be cleared (locked by another "
+            "process?) — {}", config.qdrant.path,
+        )
     qdrant_service: QdrantService | None = new_qdrant
     try:
         await new_qdrant.initialize()
-        logger.info(
-            "Repair: Qdrant re-initialised (mode={})", config.qdrant.mode,
+        actual_mode = (
+            "in-memory (fallback)" if new_qdrant.in_memory else config.qdrant.mode
         )
+        logger.info("Repair: Qdrant re-initialised (mode={})", actual_mode)
     except Exception as exc:
         logger.warning("Repair: Qdrant re-init failed: {}", exc)
         with contextlib.suppress(Exception):

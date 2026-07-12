@@ -29,6 +29,7 @@ from backend.core.bootstrap import (
 )
 from backend.core.config import PROJECT_ROOT, AliceConfig, load_config
 from backend.core.context import AppContext, create_context
+from backend.core.instance_lock import InstanceAlreadyRunningError, InstanceLock
 
 __version__ = "0.1.0"
 
@@ -45,7 +46,22 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     testing: bool = app.state._testing
 
     ctx: AppContext | None = None
+    # Single-instance guard: embedded Qdrant + the SQLite DBs under data/ are
+    # single-writer, so exactly one backend may own a data directory. Acquire
+    # BEFORE any data-dir access; a second process refuses to start rather than
+    # silently degrading to a volatile in-memory vector store. Skipped under
+    # `testing` (in-memory DB, no shared data dir; keeps parallel test runners
+    # from colliding on the machine-global lock file).
+    instance_lock: InstanceLock | None = None
     try:
+        if not testing:
+            instance_lock = InstanceLock(PROJECT_ROOT / "data" / ".instance.lock")
+            try:
+                await instance_lock.acquire()
+            except InstanceAlreadyRunningError as exc:
+                logger.critical(str(exc))
+                raise
+
         ctx = create_context(config)
 
         # Declarative bootstrap (Fase 5, spec §5.1): explicit stage order.
@@ -68,6 +84,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         # -- Shutdown -------------------------------------------------------
         await shutdown_services(ctx)
+        # Release the single-instance lock LAST — only once every service
+        # (Qdrant, SQLite engine, …) is closed — so a reloading worker that is
+        # waiting on it proceeds to a fully-released data directory.
+        if instance_lock is not None:
+            await instance_lock.release()
         logger.info("AL\\CE backend stopped")
 
 

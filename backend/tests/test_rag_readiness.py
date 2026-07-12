@@ -13,6 +13,7 @@ def _ctx(*, in_memory=False, embed_ok=True, mem_dim=1024):
     ctx.config.llm.tool_rag_enabled = True
     qd = MagicMock()
     qd.in_memory = in_memory
+    qd.fallback_reason = None
     qd.try_clear_stale_lock = MagicMock(return_value=False)
     qd.reinitialize = AsyncMock()
     qd.get_collection_dim = AsyncMock(return_value=mem_dim)
@@ -44,6 +45,15 @@ async def test_not_ready_when_in_memory_and_repair_fails():
     assert res.ready is False
     assert "in-memory" in res.reason.lower()
     ctx.qdrant_service.try_clear_stale_lock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_in_memory_reason_surfaces_specific_fallback_cause():
+    ctx = _ctx(in_memory=True)
+    ctx.qdrant_service.fallback_reason = "locked by another process"
+    res = await check_rag_readiness(ctx)
+    assert res.ready is False
+    assert res.reason == "locked by another process"
 
 
 @pytest.mark.asyncio

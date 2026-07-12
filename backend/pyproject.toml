@@ -50,6 +50,8 @@ dependencies = [
     "feedparser>=6.0",
     # Vector Store (Qdrant)
     "qdrant-client>=1.9",
+    # Cross-platform file locking (single-instance guard; also used by qdrant-client)
+    "portalocker>=2.0",
     # MCP Client (Phase 11)
     "mcp>=1.0",
     # System Info

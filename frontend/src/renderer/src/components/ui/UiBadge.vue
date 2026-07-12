@@ -151,7 +151,6 @@ const emit = defineEmits<{
   color: inherit;
   opacity: var(--opacity-medium);
   cursor: pointer;
-  outline: none;
   transition:
     background-color var(--duration-fast) var(--ease-out-quart),
     opacity var(--duration-fast) var(--ease-out-quart);

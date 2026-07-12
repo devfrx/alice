@@ -101,7 +101,6 @@ function onKeydown(e: KeyboardEvent): void {
 /* ── Interactive ── */
 .ui-card--interactive {
   cursor: pointer;
-  outline: none;
 }
 
 .ui-card--interactive:hover {

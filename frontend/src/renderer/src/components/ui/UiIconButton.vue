@@ -88,7 +88,6 @@ const nativeTitle = (): string | undefined => {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  outline: none;
   flex-shrink: 0;
   padding: 0;
   transition:

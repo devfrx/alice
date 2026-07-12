@@ -150,6 +150,8 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-dropdown);
   user-select: none;
+  /* Focus programmatico di fallback sul contenitore (tabindex=-1): non è
+     un'affordance interattiva. */
   outline: none;
   /* NO glass / NO backdrop-filter — solid surface only (unified recipe). */
 }

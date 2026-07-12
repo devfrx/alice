@@ -153,7 +153,6 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  outline: none;
   opacity: var(--opacity-medium);
   transition:
     background-color var(--duration-fast) var(--ease-out-quart),

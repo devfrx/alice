@@ -95,7 +95,6 @@ defineEmits<{
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  outline: none;
   transition:
     background-color var(--duration-fast) var(--ease-out-quart),
     border-color var(--duration-fast) var(--ease-out-quart),

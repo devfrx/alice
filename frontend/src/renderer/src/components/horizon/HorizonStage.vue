@@ -13,7 +13,7 @@ import type { HorizonArtifact } from '../../composables/horizon/horizonArtifacts
 import type { CadGenerationInfo } from '../../composables/useGenerationState'
 import { useArtifactsStore } from '../../stores/artifacts'
 
-const ImmersiveCADCanvas = defineAsyncComponent(() => import('../assistant/ImmersiveCADCanvas.vue'))
+const ImmersiveCADCanvas = defineAsyncComponent(() => import('../workspace/ImmersiveCADCanvas.vue'))
 const ChartViewer = defineAsyncComponent(() => import('../chat/ChartViewer.vue'))
 const TldrawCanvas = defineAsyncComponent(() => import('../whiteboard/TldrawCanvas.vue'))
 

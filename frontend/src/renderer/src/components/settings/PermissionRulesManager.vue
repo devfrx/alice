@@ -166,7 +166,7 @@ watch(conversationId, (id) => load(id))
           aria-label="Ambito"
           @update:model-value="(v) => (newScope = v as RuleScope)"
         />
-        <UiButton type="submit" variant="secondary" size="sm" :disabled="!canSubmit">
+        <UiButton type="submit" variant="primary" size="sm" :disabled="!canSubmit">
           <template #icon>
             <AppIcon name="plus" :size="14" :stroke-width="2" />
           </template>

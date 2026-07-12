@@ -98,6 +98,8 @@
             variant="secondary"
             size="sm"
             :disabled="mcpStore.reconnecting === server.name"
+            :aria-label="`Riconnetti ${server.name}`"
+            :title="`Riconnetti ${server.name}`"
             @click="mcpStore.reconnectServer(server.name)"
           >
             <template #icon>

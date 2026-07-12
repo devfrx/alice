@@ -84,6 +84,7 @@ async function handleUnload(instanceId: string): Promise<void> {
 
 /** Start downloading a model. */
 async function handleDownload(): Promise<void> {
+  if (isDownloading.value) return
   if (!downloadModelId.value.trim()) return
   isDownloading.value = true
   downloadError.value = null
@@ -264,7 +265,7 @@ onMounted(() => {
           placeholder="Quantizzazione (opzionale)"
         />
         <UiButton
-          variant="secondary"
+          variant="primary"
           :disabled="!downloadModelId.trim() || isDownloading"
           @click="handleDownload"
         >

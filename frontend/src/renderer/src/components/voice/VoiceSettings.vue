@@ -322,7 +322,7 @@ async function save(): Promise<void> {
               label="Lingua"
               type="text"
               placeholder="it"
-              @blur="save"
+              @change="save"
             />
           </template>
         </div>
@@ -373,7 +373,7 @@ async function save(): Promise<void> {
               label="Voce"
               type="text"
               placeholder="models/tts/piper/it_IT-paola-medium"
-              @blur="save"
+              @change="save"
             />
             <template v-if="ttsEngine === 'kokoro'">
               <label class="settings-field">
@@ -492,7 +492,7 @@ async function save(): Promise<void> {
             label="Parola di attivazione"
             type="text"
             placeholder="alice"
-            @blur="save"
+            @change="save"
           />
         </div>
       </section>

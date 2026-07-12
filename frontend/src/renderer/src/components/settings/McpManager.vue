@@ -24,16 +24,12 @@
     <div v-if="mcpStore.loading" class="mcp-loading">Caricamento server MCP...</div>
 
     <!-- Empty state -->
-    <div v-else-if="mcpStore.servers.length === 0" class="mcp-empty">
-      <div class="mcp-empty__icon">
-        <AppIcon name="server" :size="32" :stroke-width="1.5" />
-      </div>
-      <p class="mcp-empty__text">Nessun server MCP configurato</p>
-      <p class="mcp-empty__sub">
-        Aggiungi server in <code>config/default.yaml</code> per connettere strumenti esterni
-        (filesystem, git, browser, n8n, …)
-      </p>
-    </div>
+    <UiEmptyState
+      v-else-if="mcpStore.servers.length === 0"
+      icon="server"
+      title="Nessun server MCP configurato"
+      subtitle="Aggiungi server in config/default.yaml per connettere strumenti esterni (filesystem, git, browser, n8n, …)"
+    />
 
     <!-- Server list -->
     <div v-else class="mcp-list">
@@ -97,22 +93,21 @@
 
         <!-- Actions -->
         <div class="mcp-server__actions">
-          <button
+          <UiButton
             v-if="server.enabled && server.status !== 'connected'"
-            class="mcp-btn mcp-btn--reconnect"
+            variant="secondary"
+            size="sm"
             :disabled="mcpStore.reconnecting === server.name"
+            :aria-label="`Riconnetti ${server.name}`"
             :title="`Riconnetti ${server.name}`"
             @click="mcpStore.reconnectServer(server.name)"
           >
-            <AppIcon
-              name="refresh-cw"
-              :size="14"
-              class="mcp-btn__icon"
-              :class="{ 'mcp-btn__icon--spin': mcpStore.reconnecting === server.name }"
-            />
-            <span v-if="mcpStore.reconnecting !== server.name">Riconnetti</span>
-            <span v-else>Connessione...</span>
-          </button>
+            <template #icon>
+              <AliceSpinner v-if="mcpStore.reconnecting === server.name" size="xs" variant="dots" />
+              <AppIcon v-else name="refresh-cw" :size="14" />
+            </template>
+            {{ mcpStore.reconnecting === server.name ? 'Connessione...' : 'Riconnetti' }}
+          </UiButton>
           <span
             v-else-if="server.status === 'connected'"
             class="mcp-server__connected-dot"
@@ -124,13 +119,14 @@
 
     <!-- Refresh button -->
     <div v-if="mcpStore.servers.length > 0" class="mcp-actions">
-      <button
-        class="mcp-btn mcp-btn--refresh"
+      <UiButton
+        variant="secondary"
+        size="sm"
         :disabled="mcpStore.loading"
         @click="mcpStore.loadServers()"
       >
         Aggiorna stato
-      </button>
+      </UiButton>
     </div>
   </section>
 </template>
@@ -139,6 +135,9 @@
 import { onMounted } from 'vue'
 import { useMcpStore } from '../../stores/mcp'
 import AppIcon from '../ui/AppIcon.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 const mcpStore = useMcpStore()
 
@@ -214,44 +213,6 @@ onMounted(() => {
   color: var(--text-muted);
   padding: var(--space-2);
   font-size: var(--text-sm);
-}
-
-.mcp-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
-  text-align: center;
-}
-
-.mcp-empty__icon {
-  color: var(--text-muted);
-  opacity: var(--opacity-muted);
-}
-
-.mcp-empty__text {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  font-weight: var(--weight-medium);
-}
-
-.mcp-empty__sub {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  line-height: var(--leading-snug);
-  max-width: 380px;
-}
-
-.mcp-empty__sub code {
-  font-size: var(--text-2xs);
-  padding: 1px var(--space-1);
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
 }
 
 /* ── Server list ────────────────────────────────────────────── */
@@ -394,64 +355,9 @@ onMounted(() => {
   box-shadow: 0 0 6px var(--success-glow);
 }
 
-.mcp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-family: var(--font-sans);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.mcp-btn:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-}
-
-.mcp-btn:focus-visible {
-  outline: none;
-}
-
-.mcp-btn:disabled {
-  opacity: var(--opacity-dim);
-  cursor: not-allowed;
-}
-
-.mcp-btn__icon {
-  flex-shrink: 0;
-}
-
-.mcp-btn__icon--spin {
-  animation: mcp-spin 1s linear infinite;
-}
-
-@keyframes mcp-spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .mcp-actions {
   margin-top: var(--space-3);
   display: flex;
   gap: var(--space-2);
-}
-
-.mcp-btn--refresh {
-  border-color: var(--border-hover);
 }
 </style>

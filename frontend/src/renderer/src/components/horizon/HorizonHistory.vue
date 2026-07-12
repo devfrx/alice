@@ -59,6 +59,9 @@ function truncateContent(text: string, max = 200): string {
     <aside v-if="open" class="hz-history" aria-label="Conversazione">
       <header class="hz-history__head">
         <span class="hz-history__title">Conversazione</span>
+        <!-- Bespoke (Regola bespoke): content-sized, color-only hover actions —
+             the kit's 24px hover square would weigh down this minimal dossier.
+             Focus-visible comes from the global ring. -->
         <button class="hz-history__close" aria-label="Chiudi" @click="emit('close')">
           <AppIcon name="x" :size="13" />
         </button>
@@ -72,7 +75,7 @@ function truncateContent(text: string, max = 200): string {
               <button
                 v-if="msg.role === 'user' && !isStreaming"
                 class="hz-history__action"
-                title="Modifica"
+                aria-label="Modifica"
                 @click="emit('edit', msg.id)"
               >
                 <AppIcon name="edit" :size="11" />
@@ -80,7 +83,7 @@ function truncateContent(text: string, max = 200): string {
               <button
                 v-if="msg.role === 'assistant' && !branchDisabled"
                 class="hz-history__action"
-                title="Crea ramo"
+                aria-label="Crea ramo"
                 @click="emit('branch', msg.id)"
               >
                 <AppIcon name="branch" :size="11" />
@@ -155,6 +158,11 @@ function truncateContent(text: string, max = 200): string {
   background: transparent;
   color: var(--hz-ink-dim);
   cursor: pointer;
+  transition: color var(--hz-fade) ease;
+}
+
+.hz-history__close:hover {
+  color: var(--hz-ink);
 }
 
 .hz-history__scroll {
@@ -195,6 +203,7 @@ function truncateContent(text: string, max = 200): string {
   background: transparent;
   color: var(--hz-ink-faint);
   cursor: pointer;
+  transition: color var(--hz-fade) ease;
 }
 
 .hz-history__action:hover {

@@ -58,8 +58,11 @@ const props = withDefaults(defineProps<UiInputProps>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  /** Native change: fires on blur only when the value actually changed. */
+  change: [event: Event]
   focus: [event: FocusEvent]
   blur: [event: FocusEvent]
+  keydown: [event: KeyboardEvent]
 }>()
 
 const autoId = useId()
@@ -111,8 +114,10 @@ function onInput(e: Event): void {
         :aria-describedby="describedBy"
         :aria-busy="loading || undefined"
         @input="onInput"
+        @change="emit('change', $event)"
         @focus="emit('focus', $event)"
         @blur="emit('blur', $event)"
+        @keydown="emit('keydown', $event)"
       />
       <span v-if="loading" class="ui-input__spinner" aria-hidden="true" />
       <span v-else-if="$slots.suffix" class="ui-input__suffix">

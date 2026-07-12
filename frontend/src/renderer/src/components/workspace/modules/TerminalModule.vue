@@ -19,15 +19,17 @@
  * the events WS. The whole capability is gated by the backend `enabled` flag.
  */
 import '@xterm/xterm/css/xterm.css'
-import { Terminal } from '@xterm/xterm'
+import { Terminal, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import AppIcon from '../../ui/AppIcon.vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
-import { useChatStore } from '../../../stores/chat'
-import { useTerminalSessionsStore } from '../../../stores/terminalSessions'
-import type { TerminalSession } from '../../../types/terminal'
+import { useChatStore } from '@renderer/stores/chat'
+import { useTerminalSessionsStore } from '@renderer/stores/terminalSessions'
+import type { TerminalSession } from '@renderer/types/terminal'
+import { readTokens } from '@renderer/composables/useThemeTokens'
+import { ANSI_PALETTE } from '@renderer/utils/ansiPalette'
 
 defineProps<{
   params?: Record<string, unknown>
@@ -56,11 +58,32 @@ interface TermHandle {
 const terms = new Map<string, TermHandle>()
 const hostEls = new Map<string, HTMLElement>()
 
-const XTERM_THEME = {
-  background: '#0d1117',
-  foreground: '#c9d1d9',
-  cursor: '#58a6ff',
-  selectionBackground: '#264f78'
+/**
+ * xterm theme from the dedicated `--terminal-*` tokens (xterm renders to
+ * <canvas>, which cannot read var(--…) itself — hence readTokens). These
+ * tokens are deliberately NON-flipping: the terminal stays dark in BOTH
+ * themes, because the ANSI palette is dark-tuned and unreadable on ivory
+ * (see the Terminal Tokens section in theme.css). The tokens are fixed, so
+ * a one-shot read per terminal creation is enough — no theme-change watch.
+ * The 16 ANSI colors are a separate, deliberately NOT tokenized, shared
+ * constant — see utils/ansiPalette.ts.
+ */
+const TERMINAL_TOKEN_NAMES = [
+  '--terminal-surface',
+  '--terminal-fg',
+  '--terminal-cursor',
+  '--terminal-selection'
+] as const
+
+function buildXtermTheme(): ITheme {
+  const t = readTokens(TERMINAL_TOKEN_NAMES)
+  return {
+    background: t['--terminal-surface'],
+    foreground: t['--terminal-fg'],
+    cursor: t['--terminal-cursor'],
+    selectionBackground: t['--terminal-selection'],
+    ...ANSI_PALETTE
+  }
 }
 
 function setHostRef(sessionId: string, el: Element | null): void {
@@ -78,7 +101,7 @@ function ensureTerm(session: TerminalSession): void {
     fontFamily: 'var(--font-mono, monospace)',
     fontSize: 13,
     cursorBlink: true,
-    theme: XTERM_THEME,
+    theme: buildXtermTheme(),
     scrollback: 5000,
     convertEol: false
   })
@@ -352,7 +375,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #0d1117;
+  /* --terminal-surface (non-flipping): il wrapper resta scuro come l'xterm
+     anche in light theme — vedi Terminal Tokens in theme.css. */
+  background: var(--terminal-surface);
 }
 
 /* ── Tab strip ── */
@@ -389,8 +414,10 @@ onBeforeUnmount(() => {
 }
 
 .tm__tab--active {
-  color: var(--text-primary);
-  background: #0d1117;
+  /* Testo pinnato a --terminal-fg: su sfondo sempre-scuro il --text-primary
+     light (inchiostro scuro) sarebbe illeggibile. */
+  color: var(--terminal-fg);
+  background: var(--terminal-surface);
   border-color: var(--border);
 }
 

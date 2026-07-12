@@ -5,6 +5,7 @@
  */
 import { useEmailStore } from '../../stores/email'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 
 const emailStore = useEmailStore()
 
@@ -54,14 +55,14 @@ function formatFullDate(dateStr: string): string {
   <div v-if="emailStore.currentEmail" class="viewer">
     <!-- Top action bar -->
     <div class="viewer__topbar">
-      <button class="viewer__topbar-btn" title="Chiudi" @click="emailStore.clearCurrentEmail()">
+      <UiIconButton label="Chiudi" size="md" @click="emailStore.clearCurrentEmail()">
         <AppIcon name="arrow-left" :size="16" />
-      </button>
+      </UiIconButton>
 
       <div class="viewer__topbar-actions">
-        <button
-          class="viewer__topbar-btn"
-          :title="emailStore.currentEmail.is_read ? 'Segna come non letta' : 'Segna come letta'"
+        <UiIconButton
+          :label="emailStore.currentEmail.is_read ? 'Segna come non letta' : 'Segna come letta'"
+          size="md"
           @click="handleMarkRead(!emailStore.currentEmail?.is_read)"
         >
           <AppIcon
@@ -69,15 +70,11 @@ function formatFullDate(dateStr: string): string {
             :size="16"
             :stroke-width="1.8"
           />
-        </button>
+        </UiIconButton>
 
-        <button
-          class="viewer__topbar-btn viewer__topbar-btn--accent"
-          title="Archivia"
-          @click="handleArchive"
-        >
+        <UiIconButton label="Archivia" size="md" tone="accent" @click="handleArchive">
           <AppIcon name="archive" :size="16" :stroke-width="1.8" />
-        </button>
+        </UiIconButton>
       </div>
     </div>
 
@@ -152,39 +149,6 @@ function formatFullDate(dateStr: string): string {
 .viewer__topbar-actions {
   display: flex;
   gap: var(--space-1);
-}
-
-.viewer__topbar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.viewer__topbar-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.viewer__topbar-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.viewer__topbar-btn--accent:hover {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent-border);
 }
 
 /* ── Header ──────────────────────────── */

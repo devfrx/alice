@@ -11,6 +11,7 @@ import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
 import AppIcon from '../ui/AppIcon.vue'
 import UiCheckbox from '../ui/UiCheckbox.vue'
+import UiButton from '../ui/UiButton.vue'
 
 const props = defineProps<{
   model: LMStudioModel
@@ -98,16 +99,17 @@ async function confirmLoad(): Promise<void> {
     <UiCheckbox v-model="loadFlashAttention" label="Flash Attention" />
 
     <div class="model-load-dialog__actions">
-      <button class="mm-btn mm-btn--ghost" @click="emit('close', false)">Annulla</button>
-      <button
-        class="mm-btn mm-btn--primary"
+      <UiButton variant="secondary" size="sm" @click="emit('close', false)">Annulla</UiButton>
+      <UiButton
+        variant="primary"
+        size="sm"
         :disabled="
           settingsStore.isModelLoading(model.name) || settingsStore.isAnyOperationInProgress
         "
         @click="confirmLoad"
       >
         {{ settingsStore.isModelLoading(model.name) ? 'Caricamento…' : 'Carica' }}
-      </button>
+      </UiButton>
     </div>
   </div>
 </template>
@@ -154,6 +156,11 @@ async function confirmLoad(): Promise<void> {
 
 .model-load-dialog__error-close:hover {
   opacity: 1;
+}
+
+.model-load-dialog__error-close:active {
+  opacity: var(--opacity-medium);
+  transform: scale(0.92);
 }
 
 .model-load-dialog__label {
@@ -216,49 +223,5 @@ async function confirmLoad(): Promise<void> {
   gap: var(--space-2);
   padding-top: var(--space-4);
   border-top: 1px solid var(--border);
-}
-
-/* Reuse mm-btn styles from ModelManager */
-.mm-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1) var(--space-2-5);
-  font-size: var(--text-xs);
-  font-family: var(--font-sans);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  background: transparent;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-}
-
-.mm-btn:disabled {
-  opacity: var(--opacity-dim);
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.mm-btn--primary {
-  border-color: var(--accent-border);
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
-.mm-btn--primary:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--bg-primary);
-}
-
-.mm-btn--ghost {
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.mm-btn--ghost:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
 }
 </style>

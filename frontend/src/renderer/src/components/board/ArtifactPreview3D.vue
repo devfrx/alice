@@ -11,6 +11,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { resolveBackendUrl } from '../../services/api'
 import AppIcon from '../ui/AppIcon.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 import type { Artifact } from '../../types/artifacts'
 
 const props = defineProps<{
@@ -155,7 +156,7 @@ onUnmounted(() => {
 <template>
   <div ref="containerRef" class="artifact-preview-3d">
     <div v-if="loading" class="artifact-preview-3d__overlay">
-      <div class="artifact-preview-3d__spinner" />
+      <AliceSpinner size="md" />
     </div>
     <div v-if="errorMsg" class="artifact-preview-3d__overlay artifact-preview-3d__overlay--error">
       <AppIcon name="circle-x" :size="20" />
@@ -196,20 +197,5 @@ onUnmounted(() => {
 
 .artifact-preview-3d__overlay--error {
   color: var(--danger);
-}
-
-.artifact-preview-3d__spinner {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-full);
-  border: 2px solid var(--accent-border);
-  border-top-color: var(--accent);
-  animation: artifact-preview-spin 0.9s linear infinite;
-}
-
-@keyframes artifact-preview-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

@@ -17,6 +17,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useServicesStore, type ServiceSnapshot } from '../../stores/services'
 import AppIcon from '../ui/AppIcon.vue'
 import UiToggle from '../ui/UiToggle.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiButton from '../ui/UiButton.vue'
 
 const props = defineProps<{ service: ServiceSnapshot }>()
 const emit = defineEmits<{
@@ -167,24 +169,20 @@ async function stopService(): Promise<void> {
       <label class="trellis-card__field">
         <span class="trellis-card__label">Cartella {{ variantLabel }}</span>
         <div class="trellis-card__input-row">
-          <input
+          <UiInput
             v-model="dirPath"
             class="trellis-card__input"
             type="text"
+            size="md"
             :placeholder="placeholder"
-            spellcheck="false"
             :disabled="loading"
           />
-          <button
-            class="btn btn--ghost btn--icon"
-            type="button"
-            :disabled="loading"
-            :title="`Sfoglia per la cartella ${variantLabel}`"
-            @click="pickDir"
-          >
-            <AppIcon name="folder" :size="13" />
-            <span>Sfoglia</span>
-          </button>
+          <UiButton variant="ghost" size="md" :disabled="loading" @click="pickDir">
+            <template #icon>
+              <AppIcon name="folder" :size="13" />
+            </template>
+            Sfoglia
+          </UiButton>
         </div>
         <span class="trellis-card__hint"> Percorso del clone locale del repository. </span>
       </label>
@@ -207,42 +205,51 @@ async function stopService(): Promise<void> {
     </div>
 
     <div class="trellis-card__actions">
-      <button
-        class="btn btn--accent"
-        type="button"
+      <UiButton
+        variant="primary"
+        size="sm"
         :disabled="saving || restarting || stopping || loading"
         @click="save"
       >
-        <AppIcon name="check" :size="13" />
-        <span>{{ saving ? 'Salvo…' : 'Salva' }}</span>
-      </button>
-      <button
-        class="btn btn--ghost"
-        type="button"
+        <template #icon>
+          <AppIcon name="check" :size="13" />
+        </template>
+        {{ saving ? 'Salvo…' : 'Salva' }}
+      </UiButton>
+      <UiButton
+        variant="secondary"
+        size="sm"
         :disabled="saving || restarting || stopping || loading || isStarting"
         @click="startOrRestart"
       >
-        <AppIcon name="refresh-ccw" :size="13" />
-        <span>{{ restarting || isStarting ? 'Avvio…' : 'Avvia / Riavvia' }}</span>
-      </button>
-      <button
-        class="btn btn--ghost"
-        type="button"
+        <template #icon>
+          <AppIcon name="refresh-ccw" :size="13" />
+        </template>
+        {{ restarting || isStarting ? 'Avvio…' : 'Avvia / Riavvia' }}
+      </UiButton>
+      <UiButton
+        variant="secondary"
+        size="sm"
         :disabled="saving || restarting || stopping || loading || isStopped"
         @click="stopService"
       >
-        <AppIcon name="stop" :size="13" />
-        <span>{{ stopping ? 'Spengo…' : 'Spegni' }}</span>
-      </button>
-      <button
+        <template #icon>
+          <AppIcon name="stop" :size="13" />
+        </template>
+        {{ stopping ? 'Spengo…' : 'Spegni' }}
+      </UiButton>
+      <UiButton
         v-if="hasGuide"
-        class="btn btn--ghost btn--right"
-        type="button"
+        variant="ghost"
+        size="sm"
+        class="trellis-card__guide-btn"
         @click="emit('open-guide')"
       >
-        <AppIcon name="alert-circle" :size="13" />
-        <span>Guida setup</span>
-      </button>
+        <template #icon>
+          <AppIcon name="alert-circle" :size="13" />
+        </template>
+        Guida setup
+      </UiButton>
     </div>
   </article>
 </template>
@@ -260,9 +267,9 @@ async function stopService(): Promise<void> {
   border-radius: 8px;
   box-shadow: var(--shadow-xs);
   transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease;
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 .trellis-card:hover {
   background: var(--surface-2);
@@ -279,7 +286,7 @@ async function stopService(): Promise<void> {
   width: 2px;
   border-radius: var(--radius-pill);
   background: transparent;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 .trellis-card.is-up::before {
   background: var(--success);
@@ -423,27 +430,15 @@ async function stopService(): Promise<void> {
 .trellis-card__input {
   flex: 1 1 auto;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+}
+/* Compound override on the kit's own root class (per UI kit rules): this
+   field shows a filesystem path, so it keeps the subtle input surface and
+   monospace type instead of UiInput's defaults. */
+.trellis-card__input.ui-input :deep(.ui-input__wrapper) {
   background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: var(--text-xs);
+}
+.trellis-card__input.ui-input :deep(.ui-input__field) {
   font-family: var(--font-mono);
-  transition:
-    border-color 120ms ease,
-    background 120ms ease;
-}
-.trellis-card__input::placeholder {
-  color: var(--text-muted);
-}
-.trellis-card__input:focus {
-  outline: none;
-  border-color: var(--accent-border);
-  background: var(--surface-2);
-}
-.trellis-card__input:disabled {
-  opacity: 0.6;
 }
 
 /* ── Alerts ──────────────────────────────────────────────────── */
@@ -473,48 +468,9 @@ async function stopService(): Promise<void> {
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn--ghost {
-  background: transparent;
-  color: var(--text-secondary);
-  border-color: var(--border);
-}
-.btn--ghost:hover:not(:disabled) {
-  background: var(--surface-3);
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-}
-.btn--accent {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent-border);
-}
-.btn--accent:hover:not(:disabled) {
-  background: var(--accent-medium);
-  border-color: var(--accent-strong);
-}
-.btn--icon {
-  flex: 0 0 auto;
-}
-.btn--right {
+/* Compound override on the kit's own root class (per UI kit rules): pushes
+   the tertiary "Guida setup" action to the far right of the actions row. */
+.trellis-card__guide-btn.ui-btn {
   margin-left: auto;
 }
 </style>

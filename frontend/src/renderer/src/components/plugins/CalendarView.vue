@@ -10,10 +10,13 @@ import {
   HOURS,
   DAY_NAMES,
   type CalendarEvent,
-  type EventFormData
+  type EventFormData,
+  type ViewMode
 } from '../../composables/useCalendar'
 import { useModal } from '../../composables/useModal'
 import CalendarEventModal from '../calendar/CalendarEventModal.vue'
+import { UiButton, UiIconButton, UiSegmented, AppIcon } from '../ui'
+import type { UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 const {
   viewMode,
@@ -35,6 +38,15 @@ const {
 } = useCalendar()
 
 const { openCustom } = useModal()
+
+const viewModeOptions: UiSegmentedOption[] = [
+  { value: 'week', label: 'Settimana' },
+  { value: 'month', label: 'Mese' }
+]
+
+function setViewMode(value: string | number): void {
+  viewMode.value = value as ViewMode
+}
 
 /** Convert Date to datetime-local input value (YYYY-MM-DDTHH:mm). */
 function toLocalISOString(d: Date): string {
@@ -130,30 +142,29 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   <div class="calendar">
     <header class="calendar__header">
       <div class="calendar__nav">
-        <button class="calendar__btn" @click="navigate(-1)">‹</button>
-        <button class="calendar__btn" @click="goToday">Oggi</button>
-        <button class="calendar__btn" @click="navigate(1)">›</button>
+        <UiIconButton variant="outlined" size="md" label="Periodo precedente" @click="navigate(-1)">
+          <AppIcon name="chevron-left" :size="14" />
+        </UiIconButton>
+        <UiButton variant="secondary" size="md" @click="goToday">Oggi</UiButton>
+        <UiIconButton variant="outlined" size="md" label="Periodo successivo" @click="navigate(1)">
+          <AppIcon name="chevron-right" :size="14" />
+        </UiIconButton>
       </div>
       <h2 class="calendar__title">{{ headerLabel }}</h2>
-      <div class="calendar__mode">
-        <button
-          :class="['calendar__btn', { 'calendar__btn--active': viewMode === 'week' }]"
-          @click="viewMode = 'week'"
-        >
-          Settimana
-        </button>
-        <button
-          :class="['calendar__btn', { 'calendar__btn--active': viewMode === 'month' }]"
-          @click="viewMode = 'month'"
-        >
-          Mese
-        </button>
-      </div>
+      <UiSegmented
+        class="calendar__mode"
+        :model-value="viewMode"
+        :options="viewModeOptions"
+        size="md"
+        aria-label="Vista calendario"
+        @update:model-value="setViewMode"
+      />
     </header>
 
     <div v-if="loading" class="calendar__loading">Caricamento eventi…</div>
     <div v-else-if="error" class="calendar__error">
-      {{ error }} <button class="calendar__btn" @click="fetchEvents">Riprova</button>
+      {{ error }}
+      <UiButton variant="secondary" size="sm" @click="fetchEvents">Riprova</UiButton>
     </div>
 
     <div v-else-if="viewMode === 'week'" class="calendar__week">
@@ -274,8 +285,7 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   flex-shrink: 0;
 }
 
-.calendar__nav,
-.calendar__mode {
+.calendar__nav {
   display: flex;
   gap: var(--space-1);
 }
@@ -286,33 +296,6 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
   color: var(--text-primary);
   margin: 0;
   white-space: nowrap;
-}
-
-.calendar__btn {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1-5) var(--space-3);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-family: var(--font-sans);
-  transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.calendar__btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-}
-
-.calendar__btn--active {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
 }
 
 .calendar__loading,
@@ -474,6 +457,10 @@ function getEventHour(ev: CalendarEvent, day: Date): number {
 .calendar__event-add:hover {
   background: var(--accent);
   color: var(--text-on-accent);
+}
+
+.calendar__event-add:active {
+  transform: scale(0.92);
 }
 
 /* Month view */

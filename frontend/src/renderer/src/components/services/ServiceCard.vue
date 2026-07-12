@@ -14,6 +14,8 @@ import {
 } from '../../stores/services'
 import AppIcon from '../ui/AppIcon.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiBadge from '../ui/UiBadge.vue'
 import type { AppIconName } from '../../assets/icons'
 
 const props = defineProps<{ service: ServiceSnapshot }>()
@@ -47,6 +49,13 @@ const meta = computed(
 const statusClass = computed(() => `is-${props.service.status}`)
 const statusLabel = computed(() => STATUS_LABELS[props.service.status] ?? props.service.status)
 const isStarting = computed(() => props.service.status === 'starting')
+const STATUS_BADGE_VARIANTS: Record<string, 'success' | 'warning' | 'danger' | 'accent'> = {
+  up: 'success',
+  degraded: 'warning',
+  down: 'danger',
+  starting: 'accent'
+}
+const statusBadgeVariant = computed(() => STATUS_BADGE_VARIANTS[props.service.status] ?? 'accent')
 
 const isModelService = computed(() => props.service.name === 'stt' || props.service.name === 'tts')
 const catalog = computed(() =>
@@ -96,10 +105,14 @@ function fmtMb(mb: number): string {
         <h3 class="service-card__name">{{ meta.label }}</h3>
         <span v-if="meta.tagline" class="service-card__tagline">{{ meta.tagline }}</span>
       </div>
-      <div class="service-card__status" :class="statusClass">
-        <span class="service-card__status-dot" :class="{ 'is-pulsing': isStarting }" />
-        <span class="service-card__status-label">{{ statusLabel }}</span>
-      </div>
+      <UiBadge
+        class="service-card__status"
+        :class="{ 'is-pulsing': isStarting }"
+        :variant="statusBadgeVariant"
+        dot
+      >
+        {{ statusLabel }}
+      </UiBadge>
     </header>
 
     <p v-if="service.detail" class="service-card__detail">{{ service.detail }}</p>
@@ -122,23 +135,27 @@ function fmtMb(mb: number): string {
     </dl>
 
     <div class="service-card__actions">
-      <button class="btn btn--ghost" type="button" @click="emit('restart')">
-        <AppIcon name="refresh-ccw" :size="13" />
-        <span>Riavvia</span>
-      </button>
-      <button
+      <UiButton variant="secondary" size="sm" @click="emit('restart')">
+        <template #icon>
+          <AppIcon name="refresh-ccw" :size="13" />
+        </template>
+        Riavvia
+      </UiButton>
+      <UiButton
         v-if="isModelService"
-        class="btn btn--ghost"
-        type="button"
+        variant="secondary"
+        size="sm"
         :aria-expanded="expanded"
         @click="expanded = !expanded"
       >
-        <AppIcon :name="expanded ? 'chevron-up' : 'chevron-down'" :size="13" />
-        <span>{{ expanded ? 'Nascondi' : 'Modelli' }}</span>
+        <template #icon>
+          <AppIcon :name="expanded ? 'chevron-up' : 'chevron-down'" :size="13" />
+        </template>
+        {{ expanded ? 'Nascondi' : 'Modelli' }}
         <span v-if="catalog.length" class="btn__counter">
           {{ installedCount }}/{{ catalog.length }}
         </span>
-      </button>
+      </UiButton>
     </div>
 
     <section v-if="expanded && isModelService" class="service-card__models">
@@ -153,10 +170,10 @@ function fmtMb(mb: number): string {
           <div class="model-row__head">
             <div class="model-row__title">
               <span class="model-row__name">{{ m.display_name }}</span>
-              <span v-if="m.installed" class="model-row__chip model-row__chip--installed">
+              <UiBadge v-if="m.installed" variant="success" size="sm" class="model-row__chip">
                 <AppIcon name="check" :size="10" />
-                <span>Installato</span>
-              </span>
+                Installato
+              </UiBadge>
             </div>
             <span class="model-row__size">{{ fmtMb(m.size_mb) }}</span>
           </div>
@@ -185,19 +202,19 @@ function fmtMb(mb: number): string {
           </div>
 
           <div v-if="!m.installed" class="model-row__actions">
-            <button
-              class="btn btn--small btn--accent"
-              type="button"
+            <UiButton
+              variant="secondary"
+              size="sm"
               :disabled="
                 !!progressFor(m.model_id) && progressFor(m.model_id)?.phase === 'downloading'
               "
               @click="onDownload(m.model_id)"
             >
-              <AppIcon name="download" :size="12" />
-              <span>{{
-                progressFor(m.model_id)?.phase === 'downloading' ? 'In corso…' : 'Scarica'
-              }}</span>
-            </button>
+              <template #icon>
+                <AppIcon name="download" :size="12" />
+              </template>
+              {{ progressFor(m.model_id)?.phase === 'downloading' ? 'In corso…' : 'Scarica' }}
+            </UiButton>
           </div>
         </li>
       </ul>
@@ -215,13 +232,13 @@ function fmtMb(mb: number): string {
   padding: var(--space-4);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs);
   transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    transform 140ms ease,
-    box-shadow 140ms ease;
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 .service-card:hover {
   background: var(--surface-2);
@@ -238,7 +255,7 @@ function fmtMb(mb: number): string {
   width: 2px;
   border-radius: var(--radius-pill);
   background: transparent;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 .service-card.is-up::before {
   background: var(--success);
@@ -267,7 +284,7 @@ function fmtMb(mb: number): string {
   align-items: center;
   justify-content: center;
   background: var(--surface-2);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
 }
 .service-card__title-block {
@@ -292,25 +309,15 @@ function fmtMb(mb: number): string {
 }
 
 /* ── Status pill ─────────────────────────────────────────────── */
-.service-card__status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-1) var(--space-2);
-  border-radius: 8px;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+/* UiBadge handles color/shape/dot; only the uppercase tracking and the
+   "starting" pulse animation are card-specific overrides (compound
+   selector on the kit's own root/dot classes, per the UI kit rules). */
+.service-card :deep(.service-card__status.ui-badge) {
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
 }
-.service-card__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: currentColor;
+.service-card :deep(.service-card__status.is-pulsing .ui-badge__dot) {
   box-shadow: 0 0 6px currentColor;
-}
-.service-card__status-dot.is-pulsing {
   animation: status-pulse 1.4s ease-in-out infinite;
 }
 @keyframes status-pulse {
@@ -324,29 +331,13 @@ function fmtMb(mb: number): string {
     transform: scale(0.85);
   }
 }
-.service-card__status.is-up {
-  background: var(--success-light);
-  color: var(--success);
-}
-.service-card__status.is-degraded {
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-.service-card__status.is-down {
-  background: var(--danger-faint);
-  color: var(--danger);
-}
-.service-card__status.is-starting {
-  background: var(--accent-dim);
-  color: var(--accent);
-}
 
 /* ── Body ────────────────────────────────────────────────────── */
 .service-card__detail {
   margin: 0;
   padding: var(--space-2) var(--space-2-5);
   background: var(--surface-0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-xs);
   color: var(--text-secondary);
   line-height: var(--leading-snug);
@@ -394,48 +385,6 @@ function fmtMb(mb: number): string {
   margin-top: auto;
   padding-top: var(--space-1);
 }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-1-5) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn--ghost {
-  background: transparent;
-  color: var(--text-secondary);
-  border-color: var(--border);
-}
-.btn--ghost:hover:not(:disabled) {
-  background: var(--surface-3);
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-}
-.btn--accent {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent-border);
-}
-.btn--accent:hover:not(:disabled) {
-  background: var(--accent-medium);
-  border-color: var(--accent-strong);
-}
-.btn--small {
-  padding: var(--space-1) var(--space-2-5);
-  font-size: var(--text-2xs);
-}
 .btn__counter {
   margin-left: var(--space-1);
   padding: 0 var(--space-1-5);
@@ -443,7 +392,7 @@ function fmtMb(mb: number): string {
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   background: var(--surface-1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── Models panel ────────────────────────────────────────────── */
@@ -463,10 +412,10 @@ function fmtMb(mb: number): string {
   padding: var(--space-2-5) var(--space-3);
   background: var(--surface-0);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition:
-    background 120ms ease,
-    border-color 120ms ease;
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
 }
 .model-row:hover {
   border-color: var(--border-hover);
@@ -494,21 +443,10 @@ function fmtMb(mb: number): string {
   color: var(--text-primary);
   word-break: break-word;
 }
-.model-row__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-1-5);
-  border-radius: 6px;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+/* Compound override on the kit's own root class, per the UI kit rules. */
+.model-row__chip.ui-badge {
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
-}
-.model-row__chip--installed {
-  background: var(--success-medium);
-  color: var(--success);
-  border: 1px solid var(--success-border);
 }
 .model-row__size {
   flex: 0 0 auto;
@@ -540,7 +478,7 @@ function fmtMb(mb: number): string {
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 220ms ease;
+  transition: width var(--duration-normal) ease;
 }
 .bar--done .bar__fill {
   background: var(--success);

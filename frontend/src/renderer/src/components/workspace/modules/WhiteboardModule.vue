@@ -20,13 +20,13 @@
 import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import ModuleSelectorBar from '../ModuleSelectorBar.vue'
-import { useArtifactsStore } from '../../../stores/artifacts'
-import { useChatStore } from '../../../stores/chat'
+import { useArtifactsStore } from '@renderer/stores/artifacts'
+import { useChatStore } from '@renderer/stores/chat'
 import {
   useWhiteboardBoards,
   type WhiteboardBoardItem
-} from '../../../composables/whiteboard/useWhiteboardBoards'
-import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
+} from '@renderer/composables/whiteboard/useWhiteboardBoards'
+import { useModuleItemSelection } from '@renderer/composables/workspace/useModuleItemSelection'
 import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
 
 const TldrawCanvas = defineAsyncComponent(() => import('../../whiteboard/TldrawCanvas.vue'))

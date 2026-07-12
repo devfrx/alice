@@ -225,8 +225,8 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
   stroke-linecap: round;
   fill: none;
   transition:
-    stroke-dasharray 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-    stroke 0.3s ease;
+    stroke-dasharray var(--duration-slower) var(--ease-decel),
+    stroke var(--duration-moderate) ease;
 }
 
 .ctx__ring--pulse .ctx__ring-arc {
@@ -270,7 +270,7 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   letter-spacing: 0.01em;
-  transition: color 0.3s ease;
+  transition: color var(--duration-moderate) ease;
 }
 
 .ctx__label {
@@ -286,10 +286,12 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
   justify-content: center;
   opacity: 0.8;
 }
-</style>
 
-<!-- Tooltip styles are NOT scoped (teleported outside component DOM) -->
-<style>
+/* ── Breakdown tooltip ── teleported to <body> to escape overflow:hidden,
+   but the markup is defined directly in THIS component's own template (not
+   handed to a child via a slot), so the compiler still stamps it with this
+   component's scope attribute — scoped rules keep matching it wherever
+   Teleport relocates the DOM node. */
 .alice-ctx-tip {
   position: fixed;
   z-index: var(--z-tooltip);
@@ -346,7 +348,7 @@ const hasBreakdown = computed(() => breakdownRows.value.length > 0)
   height: 100%;
   border-radius: 2px;
   opacity: 0.65;
-  transition: width 0.4s ease;
+  transition: width var(--duration-slow) ease;
 }
 
 .alice-ctx-tip__val {

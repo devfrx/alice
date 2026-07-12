@@ -176,7 +176,7 @@ const { handleCodeBlockClick } = useCodeBlocks()
 }
 
 .content-fade-enter-active {
-  transition: opacity 120ms ease;
+  transition: opacity var(--duration-fast) ease;
 }
 
 .content-fade-enter-from {

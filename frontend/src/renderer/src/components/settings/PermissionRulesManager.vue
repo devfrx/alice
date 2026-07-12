@@ -20,6 +20,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 import { permissionsApi } from '../../services/api'
 import { useChatStore } from '../../stores/chat'
 import type { PermissionRule, RuleEffect, RuleScope } from '../../types/permission'
@@ -128,16 +132,20 @@ watch(conversationId, (id) => load(id))
       </span>
     </div>
 
-    <p v-if="conversationId === null" class="prm__empty">
-      Apri una conversazione per gestire le regole.
-    </p>
+    <UiEmptyState
+      v-if="conversationId === null"
+      title="Apri una conversazione per gestire le regole."
+      icon="shield"
+      compact
+    />
 
     <template v-else>
       <!-- Add form -->
       <form class="prm__add" @submit.prevent="addRule">
-        <input
+        <UiInput
           v-model="newTool"
           type="text"
+          size="sm"
           class="prm__input"
           placeholder="Nome strumento (es. run_terminal_command)"
           aria-label="Nome strumento"
@@ -158,15 +166,12 @@ watch(conversationId, (id) => load(id))
           aria-label="Ambito"
           @update:model-value="(v) => (newScope = v as RuleScope)"
         />
-        <button
-          type="submit"
-          class="prm__add-btn"
-          :disabled="!canSubmit"
-          aria-label="Aggiungi regola"
-        >
-          <AppIcon name="plus" :size="14" :stroke-width="2" />
+        <UiButton type="submit" variant="primary" size="sm" :disabled="!canSubmit">
+          <template #icon>
+            <AppIcon name="plus" :size="14" :stroke-width="2" />
+          </template>
           Aggiungi
-        </button>
+        </UiButton>
       </form>
 
       <p v-if="error" class="prm__error">
@@ -176,21 +181,27 @@ watch(conversationId, (id) => load(id))
 
       <!-- List -->
       <p v-if="loading" class="prm__empty">Caricamento…</p>
-      <p v-else-if="sortedRules.length === 0" class="prm__empty">Nessuna regola permanente.</p>
+      <UiEmptyState
+        v-else-if="sortedRules.length === 0"
+        title="Nessuna regola permanente."
+        icon="inbox"
+        compact
+      />
       <ul v-else class="prm__list">
         <li v-for="rule in sortedRules" :key="rule.id" class="prm__item">
           <span class="prm__effect" :class="`prm__effect--${rule.effect}`">{{ rule.effect }}</span>
           <span class="prm__tool" :title="rule.tool_name">{{ rule.tool_name }}</span>
           <span class="prm__scope">{{ rule.conversation_id ? 'conversazione' : 'globale' }}</span>
-          <button
-            type="button"
-            class="prm__del"
+          <UiIconButton
+            label="Rimuovi regola"
+            variant="ghost"
+            size="xs"
+            tone="danger"
             :disabled="busy"
-            aria-label="Rimuovi regola"
             @click="removeRule(rule)"
           >
             <AppIcon name="trash" :size="14" :stroke-width="2" />
-          </button>
+          </UiIconButton>
         </li>
       </ul>
     </template>
@@ -231,46 +242,14 @@ watch(conversationId, (id) => load(id))
 .prm__input {
   flex: 1 1 220px;
   min-width: 180px;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
 }
 
-.prm__input:focus {
-  outline: none;
-  border-color: var(--accent);
+.prm__input :deep(.ui-input__field) {
+  font-family: var(--font-mono);
 }
 
 .prm__select {
   min-width: 130px;
-}
-
-.prm__add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--surface-0);
-  background: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.prm__add-btn:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.prm__add-btn:disabled {
-  opacity: var(--opacity-dim);
-  cursor: not-allowed;
 }
 
 .prm__error {
@@ -350,31 +329,5 @@ watch(conversationId, (id) => load(id))
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.prm__del {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1);
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.prm__del:hover:not(:disabled) {
-  color: var(--error);
-  background: var(--error-bg);
-}
-
-.prm__del:disabled {
-  opacity: var(--opacity-dim);
-  cursor: not-allowed;
 }
 </style>

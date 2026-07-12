@@ -125,7 +125,6 @@ function onKeydown(e: KeyboardEvent): void {
   width: 100%;
   background: transparent;
   border: none;
-  outline: none;
   resize: none;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -136,6 +135,22 @@ function onKeydown(e: KeyboardEvent): void {
   line-height: 1.5;
   color: var(--hz-ink);
   caret-color: var(--hz-gold);
+  /* Hairline gold underline drawn as a shadow, not a border: the field's
+     height is JS-driven (autoResize = scrollHeight), so a real border
+     would add 1px of overflow. */
+  box-shadow: 0 1px 0 rgba(var(--hz-line-rgb), 0.18);
+  transition: box-shadow var(--hz-fade) ease;
+}
+
+/* Boxless editorial field: the generic 2px focus ring would break the
+   design; focus is communicated by the gold caret + the underline
+   lighting up. */
+.hz-composer__input:focus-visible {
+  outline: none;
+}
+
+.hz-composer__input:focus {
+  box-shadow: 0 1px 0 rgba(var(--hz-line-rgb), 0.45);
 }
 
 /* Wrapped content reads better ragged-right than centered. */

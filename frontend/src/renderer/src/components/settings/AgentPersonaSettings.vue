@@ -1,26 +1,21 @@
 <template>
-  <div class="sv__section-head">
-    <h3 class="sv__section-title">Agente / Persona</h3>
-    <p class="sv__section-desc">
-      Personalizza il tono globale dell'assistente, le istruzioni per ciascun livello di
-      autorizzazione e quali strumenti sono disponibili.
-    </p>
-  </div>
+  <UiSectionHeader
+    class="sv__section-head"
+    title="Agente / Persona"
+    description="Personalizza il tono globale dell'assistente, le istruzioni per ciascun livello di autorizzazione e quali strumenti sono disponibili."
+  />
 
   <!-- ── Global persona ───────────────────────────────────────── -->
   <div class="sv__fields sv__fields--stack">
     <label class="sv__field">
       <span class="sv__field-label">Persona globale</span>
-      <div class="sv__input-wrap">
-        <textarea
-          v-model="persona"
-          class="sv__input sv__textarea"
-          rows="5"
-          maxlength="4000"
-          placeholder="es. Rispondi sempre in modo conciso e diretto, in italiano."
-          @blur="savePersona"
-        />
-      </div>
+      <UiTextarea
+        v-model="persona"
+        :rows="5"
+        :maxlength="4000"
+        placeholder="es. Rispondi sempre in modo conciso e diretto, in italiano."
+        @blur="savePersona"
+      />
       <span class="ap__hint"
         >Aggiunta in fondo al system prompt di base, in ogni conversazione.</span
       >
@@ -40,25 +35,22 @@
     <label v-for="tier in AGENT_TIERS" :key="tier.key" class="sv__field">
       <span class="sv__field-label ap__tier-label">
         <span>{{ tier.label }}</span>
-        <button
+        <UiButton
           v-if="tierGuidance[tier.key].trim()"
-          type="button"
-          class="ap__reset"
+          variant="ghost"
+          size="sm"
           @click="resetTier(tier.key)"
         >
           Ripristina predefinito
-        </button>
+        </UiButton>
       </span>
-      <div class="sv__input-wrap">
-        <textarea
-          v-model="tierGuidance[tier.key]"
-          class="sv__input sv__textarea"
-          rows="3"
-          maxlength="4000"
-          placeholder="(usa il testo predefinito)"
-          @blur="saveTier"
-        />
-      </div>
+      <UiTextarea
+        v-model="tierGuidance[tier.key]"
+        :rows="3"
+        :maxlength="4000"
+        placeholder="(usa il testo predefinito)"
+        @blur="saveTier"
+      />
       <span class="ap__hint">{{ tier.hint }}</span>
     </label>
   </div>
@@ -75,34 +67,38 @@
   <div class="sv__group ap__tools">
     <div class="ap__tools-head">
       <span class="sv__row-label">{{ summary }}</span>
-      <button
+      <UiButton
         v-if="settingsStore.disabledToolCount > 0"
-        type="button"
-        class="ap__reset"
+        variant="ghost"
+        size="sm"
         @click="settingsStore.resetToolSelection()"
       >
         Riattiva tutti
-      </button>
+      </UiButton>
     </div>
 
-    <p v-if="settingsStore.toolCatalog.length === 0" class="sv__row-hint ap__tools-empty">
-      Nessuno strumento disponibile.
-    </p>
+    <UiEmptyState
+      v-if="settingsStore.toolCatalog.length === 0"
+      title="Nessuno strumento disponibile."
+      compact
+    />
 
     <ul v-else class="ap__list">
       <li v-for="group in settingsStore.toolCatalog" :key="group.plugin" class="ap__group">
         <div class="ap__group-head">
-          <button
-            type="button"
-            class="ap__expand"
-            :aria-label="expanded.has(group.plugin) ? 'Comprimi' : 'Espandi'"
+          <UiIconButton
+            :label="expanded.has(group.plugin) ? 'Comprimi' : 'Espandi'"
+            variant="ghost"
+            size="xs"
+            toggle
+            :active="expanded.has(group.plugin)"
             @click="toggleExpand(group.plugin)"
           >
             <AppIcon
               :name="expanded.has(group.plugin) ? 'chevron-down' : 'chevron-right'"
               :size="14"
             />
-          </button>
+          </UiIconButton>
           <span class="ap__plugin">{{ group.plugin }}</span>
           <span class="ap__count">{{ group.tools.length }}</span>
           <UiToggle
@@ -154,6 +150,11 @@ import { AGENT_TIERS } from '../../utils/agentPrompts'
 import type { AgentTier } from '../../types/settings'
 import AppIcon from '../ui/AppIcon.vue'
 import UiToggle from '../ui/UiToggle.vue'
+import UiTextarea from '../ui/UiTextarea.vue'
+import UiSectionHeader from '../ui/UiSectionHeader.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiEmptyState from '../ui/UiEmptyState.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -211,13 +212,6 @@ onMounted(() => {
   grid-template-columns: 1fr;
 }
 
-.sv__textarea {
-  min-height: 64px;
-  resize: vertical;
-  line-height: 1.5;
-  font-family: var(--font-sans);
-}
-
 .ap__hint {
   font-size: var(--text-2xs);
   color: var(--text-muted);
@@ -243,22 +237,6 @@ onMounted(() => {
   line-height: 1.45;
 }
 
-/* ── Reset / link buttons ──────────────────────────────────────── */
-.ap__reset {
-  border: none;
-  background: none;
-  padding: 0;
-  color: var(--accent);
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium, 500);
-  cursor: pointer;
-}
-
-.ap__reset:hover {
-  text-decoration: underline;
-}
-
 .ap__tier-label {
   display: flex;
   align-items: baseline;
@@ -277,10 +255,6 @@ onMounted(() => {
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-1) 0 var(--space-2);
-}
-
-.ap__tools-empty {
-  padding: var(--space-2) 0;
 }
 
 .ap__list,
@@ -303,15 +277,6 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) 0;
-}
-
-.ap__expand {
-  display: inline-flex;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 2px;
 }
 
 .ap__plugin {
@@ -355,11 +320,5 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ap__reset {
-    transition: none;
-  }
 }
 </style>

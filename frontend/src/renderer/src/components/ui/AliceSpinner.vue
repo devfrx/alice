@@ -231,4 +231,22 @@ withDefaults(
 .alice-spinner--lg .alice-spinner__label {
   font-size: var(--text-sm, 13px);
 }
+
+/* ── Reduced Motion ─────────────────────────────────────────── */
+/* Convenzione repo (theme.css): niente kill globale, opt-out mirato.
+   Con reduce: gli archi si fermano, i dots restano statici e visibili.
+   Gli archi statici restano leggibili come indicatore di attività:
+   il dasharray lascia un varco visibile su entrambi gli anelli
+   (opacity 0.35/0.70 sufficiente su entrambi i temi). */
+@media (prefers-reduced-motion: reduce) {
+  .alice-spinner__ring--outer,
+  .alice-spinner__ring--inner {
+    animation: none;
+  }
+
+  .alice-spinner__dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}
 </style>

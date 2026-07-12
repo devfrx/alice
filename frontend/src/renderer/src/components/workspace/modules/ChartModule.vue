@@ -23,11 +23,11 @@
 import { computed, defineAsyncComponent } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import ModuleSelectorBar from '../ModuleSelectorBar.vue'
-import { useChatStore } from '../../../stores/chat'
-import { extractCharts, isChartPayload } from '../../../types/chat'
-import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
+import { useChatStore } from '@renderer/stores/chat'
+import { extractCharts, isChartPayload } from '@renderer/types/chat'
+import { useModuleItemSelection } from '@renderer/composables/workspace/useModuleItemSelection'
 import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
-import type { ChartPayload } from '../../../types/chat'
+import type { ChartPayload } from '@renderer/types/chat'
 
 const ChartViewer = defineAsyncComponent(() => import('../../chat/ChartViewer.vue'))
 

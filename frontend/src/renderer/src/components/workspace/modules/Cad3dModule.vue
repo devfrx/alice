@@ -25,15 +25,13 @@
 import { computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import UiEmptyState from '../../ui/UiEmptyState.vue'
 import ModuleSelectorBar from '../ModuleSelectorBar.vue'
-import { useArtifactsStore } from '../../../stores/artifacts'
-import { useModuleItemSelection } from '../../../composables/workspace/useModuleItemSelection'
+import { useArtifactsStore } from '@renderer/stores/artifacts'
+import { useModuleItemSelection } from '@renderer/composables/workspace/useModuleItemSelection'
 import type { UiSegmentedOption } from '../../ui/UiSegmented.vue'
-import type { CadModelPayload } from '../../../types/chat'
-import type { Artifact } from '../../../types/artifacts'
+import type { CadModelPayload } from '@renderer/types/chat'
+import type { Artifact } from '@renderer/types/artifacts'
 
-const ImmersiveCADCanvas = defineAsyncComponent(
-  () => import('../../assistant/ImmersiveCADCanvas.vue')
-)
+const ImmersiveCADCanvas = defineAsyncComponent(() => import('../ImmersiveCADCanvas.vue'))
 
 const props = defineProps<{
   params?: Record<string, unknown>

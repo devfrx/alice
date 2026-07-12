@@ -1,10 +1,9 @@
 <template>
-  <div class="sv__section-head">
-    <h3 class="sv__section-title">Email</h3>
-    <p class="sv__section-desc">
-      Configura IMAP/SMTP a runtime usando il keyring locale per la password
-    </p>
-  </div>
+  <UiSectionHeader
+    class="sv__section-head"
+    title="Email"
+    description="Configura IMAP/SMTP a runtime usando il keyring locale per la password"
+  />
 
   <div class="sv__group">
     <div class="sv__row">
@@ -46,39 +45,26 @@
   </div>
 
   <div class="sv__fields">
-    <label class="sv__field">
-      <span class="sv__field-label">Username</span>
-      <div class="sv__input-wrap">
-        <input
-          v-model.trim="email.username"
-          type="email"
-          class="sv__input"
-          autocomplete="username"
-        />
-      </div>
-    </label>
-    <label class="sv__field">
-      <span class="sv__field-label">Password / App password</span>
-      <div class="sv__input-wrap">
-        <input
-          v-model="email.password"
-          type="password"
-          class="sv__input"
-          autocomplete="current-password"
-        />
-      </div>
-    </label>
-    <label class="sv__field">
-      <span class="sv__field-label">IMAP host</span>
-      <div class="sv__input-wrap">
-        <input
-          v-model.trim="email.imapHost"
-          type="text"
-          class="sv__input"
-          placeholder="imap.example.com"
-        />
-      </div>
-    </label>
+    <UiInput
+      :model-value="email.username"
+      label="Username"
+      type="email"
+      autocomplete="username"
+      @update:model-value="(v) => (email.username = v.trim())"
+    />
+    <UiInput
+      v-model="email.password"
+      label="Password / App password"
+      type="password"
+      autocomplete="current-password"
+    />
+    <UiInput
+      :model-value="email.imapHost"
+      label="IMAP host"
+      type="text"
+      placeholder="imap.example.com"
+      @update:model-value="(v) => (email.imapHost = v.trim())"
+    />
     <label class="sv__field">
       <span class="sv__field-label">IMAP porta</span>
       <div class="sv__input-wrap">
@@ -91,17 +77,13 @@
         />
       </div>
     </label>
-    <label class="sv__field">
-      <span class="sv__field-label">SMTP host</span>
-      <div class="sv__input-wrap">
-        <input
-          v-model.trim="email.smtpHost"
-          type="text"
-          class="sv__input"
-          placeholder="smtp.example.com"
-        />
-      </div>
-    </label>
+    <UiInput
+      :model-value="email.smtpHost"
+      label="SMTP host"
+      type="text"
+      placeholder="smtp.example.com"
+      @update:model-value="(v) => (email.smtpHost = v.trim())"
+    />
     <label class="sv__field">
       <span class="sv__field-label">SMTP porta</span>
       <div class="sv__input-wrap">
@@ -126,12 +108,12 @@
         />
       </div>
     </label>
-    <label class="sv__field">
-      <span class="sv__field-label">Cartella archivio</span>
-      <div class="sv__input-wrap">
-        <input v-model.trim="email.archiveFolder" type="text" class="sv__input" />
-      </div>
-    </label>
+    <UiInput
+      :model-value="email.archiveFolder"
+      label="Cartella archivio"
+      type="text"
+      @update:model-value="(v) => (email.archiveFolder = v.trim())"
+    />
   </div>
 
   <div class="sv__group">
@@ -165,6 +147,8 @@
 import { computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import UiToggle from '../ui/UiToggle.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiSectionHeader from '../ui/UiSectionHeader.vue'
 
 const settingsStore = useSettingsStore()
 const email = computed(() => settingsStore.settings.email)

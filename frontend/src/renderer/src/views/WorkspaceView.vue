@@ -15,7 +15,7 @@
  * it is a state of the workspace, not a separate destination.
  */
 import { computed } from 'vue'
-import PanelWorkspace from '../components/canvas/PanelWorkspace.vue'
+import PanelWorkspace from '../components/workspace/PanelWorkspace.vue'
 import HomeSurface from '../components/home/HomeSurface.vue'
 import { useChatStore } from '../stores/chat'
 
@@ -82,7 +82,7 @@ const showHome = computed<boolean>(
 @media (prefers-reduced-motion: reduce) {
   .ws-surface-enter-active,
   .ws-surface-leave-active {
-    transition: opacity 120ms linear;
+    transition: opacity var(--duration-fast) linear;
   }
 
   .ws-surface-enter-from,

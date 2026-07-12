@@ -95,7 +95,6 @@ defineEmits<{
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  outline: none;
   transition:
     background-color var(--duration-fast) var(--ease-out-quart),
     border-color var(--duration-fast) var(--ease-out-quart),
@@ -111,10 +110,6 @@ defineEmits<{
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
   pointer-events: none;
-}
-
-.ui-btn:focus-visible {
-  outline: none;
 }
 
 /* ── Sizes ─────────────────────────── */

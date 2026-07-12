@@ -123,9 +123,10 @@ function onChange(e: Event): void {
   border-color: var(--accent);
 }
 
+/* Focus lands on the visually-hidden input — mirror the global ring on the visible box. */
 .ui-checkbox__input:focus-visible + .ui-checkbox__box {
-  outline: 2px solid var(--accent-border);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-checkbox__label {

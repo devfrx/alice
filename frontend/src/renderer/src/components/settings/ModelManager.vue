@@ -11,6 +11,9 @@ import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../ui/AliceSpinner.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiInput from '../ui/UiInput.vue'
 import { useModal } from '../../composables/useModal'
 import ModelLoadDialog from './ModelLoadDialog.vue'
 
@@ -81,6 +84,7 @@ async function handleUnload(instanceId: string): Promise<void> {
 
 /** Start downloading a model. */
 async function handleDownload(): Promise<void> {
+  if (isDownloading.value) return
   if (!downloadModelId.value.trim()) return
   isDownloading.value = true
   downloadError.value = null
@@ -128,9 +132,9 @@ onMounted(() => {
     <!-- ── Error banner ── -->
     <div v-if="errorMessage" class="mm-error">
       <span>{{ errorMessage }}</span>
-      <button class="mm-error__close" aria-label="Chiudi errore" @click="errorMessage = null">
+      <UiIconButton label="Chiudi errore" variant="ghost" size="xs" @click="errorMessage = null">
         <AppIcon name="x" :size="14" />
-      </button>
+      </UiIconButton>
     </div>
 
     <!-- ── Operation banner ── -->
@@ -190,27 +194,29 @@ onMounted(() => {
             </span>
           </div>
           <div class="mm-model__actions">
-            <button
+            <UiButton
               v-if="!model.loaded"
-              class="mm-btn mm-btn--load"
+              variant="secondary"
+              size="sm"
               :disabled="
                 settingsStore.isModelLoading(model.name) || settingsStore.isAnyOperationInProgress
               "
               @click="openLoadDialog(model)"
             >
               {{ settingsStore.isModelLoading(model.name) ? 'Caricamento…' : 'Carica' }}
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               v-for="inst in model.loaded_instances"
               :key="inst.id"
-              class="mm-btn mm-btn--unload"
+              variant="danger"
+              size="sm"
               :disabled="
                 settingsStore.isInstanceUnloading(inst.id) || settingsStore.isAnyOperationInProgress
               "
               @click="handleUnload(inst.id)"
             >
               {{ settingsStore.isInstanceUnloading(inst.id) ? 'Scaricamento…' : 'Scarica' }}
-            </button>
+            </UiButton>
           </div>
         </div>
 
@@ -245,26 +251,26 @@ onMounted(() => {
     <div class="mm-download">
       <h4 class="mm-download__title">Scarica nuovo modello</h4>
       <div class="mm-download__form">
-        <input
+        <UiInput
           v-model="downloadModelId"
           class="mm-input"
           type="text"
           placeholder="Identificativo modello (es. ibm/granite-4-micro)"
-          @keyup.enter="handleDownload"
+          @keydown.enter="handleDownload"
         />
-        <input
+        <UiInput
           v-model="downloadQuantization"
           class="mm-input mm-input--narrow"
           type="text"
           placeholder="Quantizzazione (opzionale)"
         />
-        <button
-          class="mm-btn mm-btn--primary"
+        <UiButton
+          variant="primary"
           :disabled="!downloadModelId.trim() || isDownloading"
           @click="handleDownload"
         >
           {{ isDownloading ? 'Avvio…' : 'Scarica' }}
-        </button>
+        </UiButton>
       </div>
       <div v-if="downloadError" class="mm-download__error">{{ downloadError }}</div>
 
@@ -372,22 +378,6 @@ onMounted(() => {
   color: var(--danger);
   font-size: var(--text-sm);
   margin-bottom: var(--space-3);
-}
-
-.mm-error__close {
-  background: none;
-  border: none;
-  color: var(--danger);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  flex-shrink: 0;
-  opacity: var(--opacity-medium);
-  transition: opacity var(--transition-fast);
-}
-
-.mm-error__close:hover {
-  opacity: 1;
 }
 
 /* ── Operation banner ── */
@@ -585,69 +575,6 @@ onMounted(() => {
   opacity: var(--opacity-medium);
 }
 
-/* ── Buttons ── */
-.mm-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1) var(--space-2-5);
-  font-size: var(--text-xs);
-  font-family: var(--font-sans);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  background: transparent;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-}
-
-.mm-btn:disabled {
-  opacity: var(--opacity-dim);
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.mm-btn--load {
-  border-color: var(--accent-border);
-  color: var(--accent);
-  background: var(--accent-faint);
-}
-
-.mm-btn--load:hover:not(:disabled) {
-  background: var(--accent-dim);
-}
-
-.mm-btn--unload {
-  border-color: var(--danger-border);
-  color: var(--danger);
-}
-
-.mm-btn--unload:hover:not(:disabled) {
-  background: var(--danger-faint);
-}
-
-.mm-btn--primary {
-  border-color: var(--accent-border);
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
-.mm-btn--primary:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--bg-primary);
-}
-
-.mm-btn--ghost {
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.mm-btn--ghost:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
 /* ── Download section ── */
 .mm-download {
   background: var(--surface-1);
@@ -672,23 +599,6 @@ onMounted(() => {
 .mm-input {
   flex: 1;
   min-width: 200px;
-  padding: var(--space-1-5) var(--space-3);
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.mm-input:focus {
-  border-color: var(--accent-border);
-}
-
-.mm-input::placeholder {
-  color: var(--text-muted);
 }
 
 .mm-input--narrow {
@@ -775,7 +685,7 @@ onMounted(() => {
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 0.3s ease;
+  transition: width var(--duration-moderate) ease;
 }
 
 .mm-dl__footer {

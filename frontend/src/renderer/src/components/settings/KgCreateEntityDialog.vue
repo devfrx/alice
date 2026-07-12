@@ -7,6 +7,9 @@
  */
 import { reactive } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
+import UiButton from '../ui/UiButton.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiTextarea from '../ui/UiTextarea.vue'
 
 const emit = defineEmits<{ close: [result: boolean] }>()
 
@@ -28,37 +31,30 @@ async function onCreate(): Promise<void> {
 
 <template>
   <div class="kg-create-entity">
-    <label class="kg-field">
-      <span class="kg-field__label">Nome</span>
-      <input v-model="form.name" type="text" class="kg-input" placeholder="es. Mario Rossi" />
-    </label>
-    <label class="kg-field">
-      <span class="kg-field__label">Tipo</span>
-      <input
-        v-model="form.entityType"
-        type="text"
-        class="kg-input"
-        placeholder="es. persona, luogo, concetto"
-      />
-    </label>
-    <label class="kg-field">
-      <span class="kg-field__label">Osservazioni (una per riga)</span>
-      <textarea
+    <div class="kg-field">
+      <UiInput v-model="form.name" label="Nome" placeholder="es. Mario Rossi" />
+    </div>
+    <div class="kg-field">
+      <UiInput v-model="form.entityType" label="Tipo" placeholder="es. persona, luogo, concetto" />
+    </div>
+    <div class="kg-field">
+      <UiTextarea
         v-model="form.observationsText"
-        class="kg-textarea"
-        rows="3"
+        label="Osservazioni (una per riga)"
+        :rows="3"
         placeholder="es. Lavora come ingegnere&#10;Vive a Milano"
       />
-    </label>
+    </div>
     <div class="kg-dialog__actions">
-      <button class="kg-btn kg-btn--secondary" @click="emit('close', false)">Annulla</button>
-      <button
-        class="kg-btn kg-btn--accent"
+      <UiButton variant="secondary" size="sm" @click="emit('close', false)">Annulla</UiButton>
+      <UiButton
+        variant="primary"
+        size="sm"
         :disabled="!form.name.trim() || !form.entityType.trim()"
         @click="onCreate"
       >
         Crea
-      </button>
+      </UiButton>
     </div>
   </div>
 </template>
@@ -77,87 +73,11 @@ async function onCreate(): Promise<void> {
   margin-bottom: var(--space-3);
 }
 
-.kg-field__label {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  font-weight: var(--weight-medium);
-}
-
-.kg-input {
-  padding: var(--space-1) var(--space-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.kg-input:focus {
-  border-color: var(--accent-border);
-}
-
-.kg-textarea {
-  padding: var(--space-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  outline: none;
-  resize: vertical;
-  transition: border-color var(--transition-fast);
-}
-
-.kg-textarea:focus {
-  border-color: var(--accent-border);
-}
-
 /* ── Actions ───────────────────────────────────────────────── */
 .kg-dialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-.kg-btn {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
-}
-
-.kg-btn--accent {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.kg-btn--accent:hover:not(:disabled) {
-  background: var(--accent-light);
-  border-color: var(--accent);
-}
-
-.kg-btn--secondary {
-  background: var(--surface-3);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.kg-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.kg-btn:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
 }
 </style>

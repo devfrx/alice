@@ -5,11 +5,12 @@
  * Carica la ChartSpec completa dall'endpoint REST GET /api/artifacts/{id}/content (artifactsApi.getArtifactContent),
  * monta un'istanza echarts.init() sul div container e gestisce il resize.
  */
-import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { artifactsApi } from '../../services/api'
 import type { ChartPayload } from '../../types/chat'
+import { useThemeTokens } from '../../composables/useThemeTokens'
 
 const props = defineProps<{ payload: ChartPayload }>()
 
@@ -22,25 +23,92 @@ let unmounted = false
 const ready = ref(false)
 const loading = ref(true)
 const error = ref<string | null>(null)
-let fetchedOption: Record<string, unknown> | null = null
+/** Raw, unsanitized `echarts_option` as returned by the backend — kept
+ * pristine so it can be re-sanitized (re-tokenized) on every theme change
+ * without accumulating mutations from previous sanitize passes. */
+let rawOption: Record<string, unknown> | null = null
 
 /**
- * AL\CE chart color palette — warm, muted tones that harmonise with the
- * dark cream-accented interface. Derived from the CSS design tokens:
- * accent #E8DCC8 · success #5C9A6E · warning #D4A72C · danger #B85C5C.
+ * UI-chrome tokens read at runtime (ECharts renders to <canvas>, which
+ * cannot resolve var(--…) itself — see useThemeTokens). Re-read whenever
+ * `data-theme` changes on <html>, driving the watch below that rebuilds
+ * and re-applies the chart options.
  */
-const ALICE_PALETTE = [
-  '#E8DCC8', // cream — primary accent
-  '#7BAE8A', // sage green — success-adjacent
-  '#D4A72C', // warm amber — warning
-  '#8AABC8', // dusty steel blue
-  '#C08080', // muted coral — danger-adjacent
-  '#B09AC8', // dusty lavender
-  '#60A8A0', // warm teal
-  '#C8B070', // ochre gold
-  '#A87868', // terracotta
-  '#A0B890' // dusty sage
-]
+const CHART_TOKEN_NAMES = [
+  '--accent',
+  '--warning',
+  '--surface-3',
+  '--surface-4',
+  '--border',
+  '--border-hover',
+  '--text-primary',
+  '--text-secondary',
+  '--text-muted'
+] as const
+const themeTokens = useThemeTokens(CHART_TOKEN_NAMES)
+
+interface ChromeColors {
+  accent: string
+  warning: string
+  surface3: string
+  surface4: string
+  border: string
+  borderHover: string
+  textPrimary: string
+  textSecondary: string
+  textMuted: string
+}
+
+function readChromeColors(): ChromeColors {
+  const t = themeTokens.value
+  return {
+    accent: t['--accent'],
+    warning: t['--warning'],
+    surface3: t['--surface-3'],
+    surface4: t['--surface-4'],
+    border: t['--border'],
+    borderHover: t['--border-hover'],
+    textPrimary: t['--text-primary'],
+    textSecondary: t['--text-secondary'],
+    textMuted: t['--text-muted']
+  }
+}
+
+/** Add an alpha channel to a solid `#rrggbb` token value. */
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '')
+  const value = parseInt(clean, 16)
+  const r = (value >> 16) & 255
+  const g = (value >> 8) & 255
+  const b = value & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+/**
+ * Categorical data-series palette. A categorical data palette legitimately
+ * does not map 1:1 onto UI tokens (see the dataviz skill): reapplying
+ * --success/--danger verbatim onto arbitrary series 2/5 would incorrectly
+ * imply "this bar means success/failure". Those tints stay hand-tuned local
+ * constants. Only the two slots with an EXACT token correspondence are
+ * sourced live: `accent` (cream in dark, taupe mocha in light — this is
+ * what makes the chart follow the theme switch) and `warning` (identical
+ * hex in both themes, so this substitution is a no-op visually but keeps
+ * the palette single-sourced from the token).
+ */
+function buildPalette(chrome: ChromeColors): string[] {
+  return [
+    chrome.accent, // cream (dark) / taupe mocha (light) — primary accent
+    '#7BAE8A', // sage green — success-adjacent (intentionally not --success)
+    chrome.warning, // warm amber — exact token match
+    '#8AABC8', // dusty steel blue
+    '#C08080', // muted coral — danger-adjacent (intentionally not --danger)
+    '#B09AC8', // dusty lavender
+    '#60A8A0', // warm teal
+    '#C8B070', // ochre gold
+    '#A87868', // terracotta
+    '#A0B890' // dusty sage
+  ]
+}
 
 /**
  * Fix common LLM mistake: N cartesian series each with 1 data point
@@ -98,9 +166,13 @@ function fixSingleDataPointSeries(opt: Record<string, unknown>): void {
  * - Force containLabel so axis labels never overflow
  * - Apply AL\CE color palette for consistent look
  * - Fix markPoint/markLine entries with malformed coord arrays
- * - Clean up tooltip, legend, and axis styling for dark theme
+ * - Clean up tooltip, legend, and axis styling using live theme tokens
+ *   (`chrome`) so the chart follows the dark/light theme switch
  */
-function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
+function sanitizeOption(
+  opt: Record<string, unknown>,
+  chrome: ChromeColors
+): Record<string, unknown> {
   const hadTitle = !!opt.title
   delete opt.title
 
@@ -121,7 +193,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
   delete opt.toolbox
 
   // Apply AL\CE palette.
-  opt.color = ALICE_PALETTE
+  opt.color = buildPalette(chrome)
 
   // Fix common LLM mistake: N cartesian series each with 1 data point
   // for N xAxis categories. Merge them into a single series.
@@ -153,10 +225,10 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
     legend.bottom = 8
     legend.orient = 'horizontal'
     legend.type = 'scroll'
-    legend.textStyle = { color: '#C8C5BE', fontSize: 12 }
-    legend.pageTextStyle = { color: '#8A8A85' }
-    legend.pageIconColor = '#E8DCC8'
-    legend.pageIconInactiveColor = '#4A4A4A'
+    legend.textStyle = { color: chrome.textSecondary, fontSize: 12 }
+    legend.pageTextStyle = { color: chrome.textMuted }
+    legend.pageIconColor = chrome.accent
+    legend.pageIconInactiveColor = chrome.surface4
   }
 
   // Grid: generous padding, always containLabel.
@@ -191,29 +263,29 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
   // Use transparent background so the container CSS surface color shows through.
   opt.backgroundColor = 'transparent'
 
-  // Style tooltip — matches --surface-3 (#2A2A2A) and --text-primary (#EDEDE9).
+  // Style tooltip — matches --surface-3 and --text-primary (theme-aware).
   opt.tooltip = {
     ...(typeof opt.tooltip === 'object' && opt.tooltip ? opt.tooltip : {}),
-    backgroundColor: 'rgba(42, 42, 42, 0.97)',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: hexToRgba(chrome.surface3, 0.97),
+    borderColor: chrome.borderHover,
     borderWidth: 1,
-    textStyle: { color: '#EDEDE9', fontSize: 13 },
+    textStyle: { color: chrome.textPrimary, fontSize: 13 },
     extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04);'
   } as Record<string, unknown>
 
-  // Style axes — use --border and warm-gray text matching the app.
+  // Style axes — use --border/--text-muted tokens matching the app theme.
   for (const axisKey of ['xAxis', 'yAxis']) {
     const axis = opt[axisKey]
     const axes = Array.isArray(axis) ? axis : axis && typeof axis === 'object' ? [axis] : []
     for (const ax of axes as Record<string, unknown>[]) {
-      ax.axisLine = { lineStyle: { color: 'rgba(255,255,255,0.08)' } }
-      ax.axisTick = { lineStyle: { color: 'rgba(255,255,255,0.08)' } }
+      ax.axisLine = { lineStyle: { color: chrome.borderHover } }
+      ax.axisTick = { lineStyle: { color: chrome.borderHover } }
       ax.axisLabel = {
         ...(typeof ax.axisLabel === 'object' && ax.axisLabel ? ax.axisLabel : {}),
-        color: '#8A8A85',
+        color: chrome.textMuted,
         fontSize: 12
       }
-      ax.splitLine = { lineStyle: { color: 'rgba(255,255,255,0.05)', type: 'dashed' } }
+      ax.splitLine = { lineStyle: { color: chrome.border, type: 'dashed' } }
 
       if (ax.name) {
         // nameLocation 'end' (default) puts the label at the top of yAxis
@@ -227,7 +299,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
           ax.nameLocation = 'middle'
           ax.nameGap = 28
         }
-        ax.nameTextStyle = { color: '#C8C5BE', fontSize: 12 }
+        ax.nameTextStyle = { color: chrome.textSecondary, fontSize: 12 }
       }
     }
   }
@@ -257,7 +329,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
             const lbl = ser.label as Record<string, unknown>
             if (lbl.show) {
               lbl.position = 'top'
-              lbl.color = '#C8C5BE'
+              lbl.color = chrome.textSecondary
               lbl.fontSize = 11
               lbl.fontWeight = 500
               delete lbl.backgroundColor
@@ -276,7 +348,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
                   const il = item.label as Record<string, unknown>
                   if (il.show) {
                     il.position = 'top'
-                    il.color = '#C8C5BE'
+                    il.color = chrome.textSecondary
                     il.fontSize = 11
                     il.fontWeight = 500
                     delete il.backgroundColor
@@ -297,7 +369,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
         if (serType === 'pie') {
           ser.label = {
             ...(typeof ser.label === 'object' && ser.label ? ser.label : {}),
-            color: '#C8C5BE',
+            color: chrome.textSecondary,
             fontSize: 12,
             fontWeight: 500,
             fontFamily: 'var(--font-sans)'
@@ -305,7 +377,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
           ser.labelLine = {
             ...(typeof ser.labelLine === 'object' && ser.labelLine ? ser.labelLine : {}),
             lineStyle: {
-              color: 'rgba(200, 197, 190, 0.3)',
+              color: hexToRgba(chrome.textSecondary, 0.3),
               width: 1
             },
             smooth: 0.2,
@@ -316,7 +388,7 @@ function sanitizeOption(opt: Record<string, unknown>): Record<string, unknown> {
           ser.emphasis = {
             ...(typeof ser.emphasis === 'object' && ser.emphasis ? ser.emphasis : {}),
             label: {
-              color: '#EDEDE9',
+              color: chrome.textPrimary,
               fontSize: 13,
               fontWeight: 600
             }
@@ -392,11 +464,23 @@ function sanitizeMarkData(series: Record<string, unknown>, key: string): void {
   })
 }
 
+/**
+ * Re-run sanitizeOption against a fresh clone of the pristine `rawOption`
+ * with the currently-live theme colors. Cloning (instead of re-sanitizing
+ * the previous output in place) keeps repeated theme-change passes
+ * idempotent — sanitizeOption mutates its input.
+ */
+function buildSanitizedOption(): Record<string, unknown> | null {
+  if (!rawOption) return null
+  return sanitizeOption(structuredClone(rawOption), readChromeColors())
+}
+
 async function loadAndRender(): Promise<void> {
   try {
     const res = await artifactsApi.getArtifactContent(props.payload.chart_id)
     const spec = res.content as { echarts_option?: Record<string, unknown> }
-    fetchedOption = sanitizeOption(spec.echarts_option ?? {})
+    rawOption = spec.echarts_option ?? {}
+    const initialOption = buildSanitizedOption()!
 
     // Make the canvas div visible BEFORE echarts.init so it has real dimensions.
     ready.value = true
@@ -417,11 +501,11 @@ async function loadAndRender(): Promise<void> {
     // container CSS background shows through correctly.
     instance = echarts.init(containerRef.value)
     try {
-      instance.setOption(fetchedOption!)
+      instance.setOption(initialOption)
     } catch (renderErr) {
       console.warn('[ChartViewer] ECharts setOption error, retrying without marks:', renderErr)
       // Strip all markPoint/markLine/visualMap and retry
-      const fallback = { ...fetchedOption! }
+      const fallback = { ...initialOption }
       const series = fallback.series
       if (Array.isArray(series)) {
         for (const s of series) {
@@ -444,6 +528,15 @@ async function loadAndRender(): Promise<void> {
 }
 
 onMounted(loadAndRender)
+
+// The ECharts canvas cannot read var(--…) itself, so on every data-theme
+// change (see useThemeTokens) rebuild the option from the pristine raw spec
+// with fresh colors and re-apply it (notMerge so stale colors don't linger).
+watch(themeTokens, () => {
+  if (!instance) return
+  const option = buildSanitizedOption()
+  if (option) instance.setOption(option, true)
+})
 
 onUnmounted(() => {
   unmounted = true

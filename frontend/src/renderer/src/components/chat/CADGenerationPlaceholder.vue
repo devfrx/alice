@@ -249,7 +249,7 @@ const elapsed = computed(() => {
   height: 100%;
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong, var(--accent)) 100%);
   border-radius: inherit;
-  transition: width 220ms ease-out;
+  transition: width var(--duration-normal) ease-out;
   box-shadow: 0 0 12px var(--accent-glow);
 }
 

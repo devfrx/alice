@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { pluginsApi } from '../../services/api'
+import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiSearchInput from '../ui/UiSearchInput.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 interface SearchResult {
   title: string
@@ -89,15 +94,17 @@ function openUrl(url: string): void {
           🔍 Web Search
           <span v-if="resultCount" class="search-panel__badge">{{ resultCount }}</span>
         </span>
-        <button class="search-panel__close" @click="emit('close')">✕</button>
+        <UiIconButton label="Chiudi pannello" variant="ghost" size="sm" @click="emit('close')">
+          <AppIcon name="x" :size="14" />
+        </UiIconButton>
       </header>
 
       <div class="search-panel__input-wrap">
-        <input
+        <UiSearchInput
           v-model="query"
-          class="search-panel__input"
-          type="text"
           placeholder="Cerca sul web..."
+          aria-label="Cerca sul web"
+          size="sm"
           @keydown.enter="search"
         />
       </div>
@@ -105,7 +112,7 @@ function openUrl(url: string): void {
       <div class="search-panel__body">
         <!-- Loading -->
         <div v-if="loading" class="search-panel__status">
-          <span class="search-panel__spinner" />Ricerca in corso…
+          <AliceSpinner size="xs" />Ricerca in corso…
         </div>
 
         <!-- Error -->
@@ -125,20 +132,22 @@ function openUrl(url: string): void {
             <span class="search-panel__card-url">{{ r.url }}</span>
             <p class="search-panel__card-snippet">{{ r.snippet }}</p>
             <div class="search-panel__card-actions">
-              <button
-                class="search-panel__btn"
-                :disabled="!!scrapingMap[i]"
+              <UiButton
+                variant="secondary"
+                size="sm"
+                :loading="!!scrapingMap[i]"
                 @click="scrape(i, r.url)"
               >
-                {{ scrapingMap[i] ? '⏳' : expandedMap[i] ? '▼ Chiudi' : '📄 Scrape' }}
-              </button>
-              <button
+                {{ expandedMap[i] ? '▼ Chiudi' : '📄 Scrape' }}
+              </UiButton>
+              <UiButton
                 v-if="scrapedTexts[i]"
-                class="search-panel__btn search-panel__btn--accent"
+                variant="primary"
+                size="sm"
                 @click="emit('use-text', scrapedTexts[i])"
               >
                 ➜ Usa in chat
-              </button>
+              </UiButton>
             </div>
             <div v-if="scrapeErrors[i]" class="search-panel__scrape-error">
               ⚠️ {{ scrapeErrors[i] }}
@@ -168,7 +177,7 @@ function openUrl(url: string): void {
   border-left: 1px solid var(--border);
   z-index: var(--z-dropdown);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .search-panel__header {
@@ -181,51 +190,21 @@ function openUrl(url: string): void {
 .search-panel__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .search-panel__badge {
   margin-left: 6px;
   padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
   font-weight: 700;
   background: var(--accent);
   color: var(--bg-primary);
 }
 
-.search-panel__close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.search-panel__close:hover {
-  background: var(--white-medium);
-}
-
 .search-panel__input-wrap {
   padding: 10px 14px 6px;
-}
-
-.search-panel__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-}
-
-.search-panel__input:focus {
-  border-color: var(--accent);
 }
 
 .search-panel__body {
@@ -248,21 +227,6 @@ function openUrl(url: string): void {
   color: var(--accent);
 }
 
-.search-panel__spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--text-secondary);
-  border-top-color: transparent;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .search-panel__results {
   display: flex;
   flex-direction: column;
@@ -271,9 +235,9 @@ function openUrl(url: string): void {
 
 .search-panel__card {
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
-  transition: background 0.15s;
+  transition: background var(--duration-fast);
 }
 
 .search-panel__card:hover {
@@ -296,7 +260,7 @@ function openUrl(url: string): void {
 
 .search-panel__card-url {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -306,7 +270,7 @@ function openUrl(url: string): void {
 
 .search-panel__card-snippet {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -320,34 +284,9 @@ function openUrl(url: string): void {
   margin-top: 8px;
 }
 
-.search-panel__btn {
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: none;
-  font-size: 11px;
-  background: var(--surface-3);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.search-panel__btn:hover {
-  opacity: 0.8;
-}
-
-.search-panel__btn:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.search-panel__btn--accent {
-  background: var(--accent);
-  color: var(--bg-primary);
-}
-
 .search-panel__scrape-error {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--accent);
 }
 
@@ -356,7 +295,7 @@ function openUrl(url: string): void {
   padding: 8px;
   border-radius: 4px;
   background: var(--bg-primary);
-  font-size: 11px;
+  font-size: var(--text-xs);
   max-height: 200px;
   overflow-y: auto;
   white-space: pre-wrap;
@@ -367,7 +306,7 @@ function openUrl(url: string): void {
 /* Slide transition */
 .panel-slide-enter-active,
 .panel-slide-leave-active {
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-normal) ease;
 }
 
 .panel-slide-enter-from,
@@ -379,8 +318,8 @@ function openUrl(url: string): void {
 .scrape-expand-enter-active,
 .scrape-expand-leave-active {
   transition:
-    max-height 0.2s ease,
-    opacity 0.2s;
+    max-height var(--duration-normal) ease,
+    opacity var(--duration-normal);
 }
 
 .scrape-expand-enter-from,

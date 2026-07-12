@@ -12,6 +12,7 @@ import type { AudioDevice } from '../../composables/useVoice'
 import { useVoiceStore } from '../../stores/voice'
 import AppIcon from '../ui/AppIcon.vue'
 import UiPopover from '../ui/UiPopover.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 const store = useVoiceStore()
 
@@ -161,7 +162,13 @@ const ringOuterStyle = computed(() => ({
           class="mic-btn__icon"
           :class="{ 'mic-btn__icon--rec': isActive }"
         />
-        <span v-else key="dots" class="mic-btn__dots"> <span /><span /><span /> </span>
+        <AliceSpinner
+          v-else
+          key="dots"
+          size="xs"
+          variant="dots"
+          class="mic-btn__processing-spinner"
+        />
       </Transition>
     </button>
 
@@ -245,10 +252,6 @@ const ringOuterStyle = computed(() => ({
   border-color: var(--border-hover);
 }
 
-.mic-btn:focus-visible {
-  outline: none;
-}
-
 /* Recording state */
 .mic-btn--active {
   color: var(--listening);
@@ -310,7 +313,7 @@ const ringOuterStyle = computed(() => ({
 
 /* Click ripple */
 .mic-btn--click {
-  animation: mic-click 0.2s ease;
+  animation: mic-click var(--duration-normal) ease;
 }
 
 @keyframes mic-click {
@@ -333,8 +336,8 @@ const ringOuterStyle = computed(() => ({
   border-radius: var(--radius-md);
   pointer-events: none;
   transition:
-    transform 0.1s ease-out,
-    opacity 0.1s ease-out;
+    transform var(--duration-fast) ease-out,
+    opacity var(--duration-fast) ease-out;
 }
 
 .mic-ring--inner {
@@ -386,44 +389,12 @@ const ringOuterStyle = computed(() => ({
   opacity: 1;
 }
 
-/* ── Processing dots ── */
-.mic-btn__dots {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  justify-content: center;
+/* ── Processing spinner ──
+   Sits above .mic-btn__conic (position: absolute, z-index: auto) — needs its
+   own stacking context to paint on top. */
+.mic-btn__processing-spinner {
   position: relative;
   z-index: 1;
-}
-
-.mic-btn__dots span {
-  width: 4px;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  animation: dot-bounce 1.2s ease-in-out infinite;
-}
-
-.mic-btn__dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.mic-btn__dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes dot-bounce {
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.5;
-  }
-
-  40% {
-    transform: translateY(-5px);
-    opacity: 1;
-  }
 }
 
 /* ── Icon morph transition ── */
@@ -510,7 +481,6 @@ const ringOuterStyle = computed(() => ({
 @media (prefers-reduced-motion: reduce) {
   .mic-btn--active,
   .mic-btn__conic,
-  .mic-btn__dots span,
   .mic-btn--click {
     animation: none;
   }

@@ -140,86 +140,86 @@
 
 /* Base text — warm off-white on dark */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs {
-  color: #d6d2c8;
+  color: var(--code-fg);
 }
 
 /* Keywords, selectors, built-ins — cream accent */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name) {
-  color: #ddd0b8;
+  color: var(--code-keyword);
 }
 
 /* Strings, additions — muted sage green */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-string, .hljs-addition) {
-  color: #8db87a;
+  color: var(--code-string);
 }
 
 /* Comments, quotes — muted, italic */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-comment, .hljs-quote) {
-  color: #71706a;
+  color: var(--code-comment);
   font-style: italic;
 }
 
 /* Numbers, literals — warm amber */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-number, .hljs-literal) {
-  color: #c99a62;
+  color: var(--code-number);
 }
 
 /* Types, titles — slightly brighter neutral */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-type, .hljs-title) {
-  color: #c8bfa8;
+  color: var(--code-type);
 }
 
 /* Attributes, variables, template variables — warm mid-tone */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-attr, .hljs-variable, .hljs-template-variable) {
-  color: #b8ae9a;
+  color: var(--code-attr);
 }
 
 /* Functions — clean neutral */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-function {
-  color: #c4b89a;
+  color: var(--code-function);
 }
 
 /* Params — slightly dimmer neutral */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-params {
-  color: #aca598;
+  color: var(--code-params);
 }
 
 /* Regexp, links — muted terracotta */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-regexp, .hljs-link) {
-  color: #b89070;
+  color: var(--code-regexp);
 }
 
 /* Meta — secondary text */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-meta {
-  color: #9a9488;
+  color: var(--code-meta);
 }
 
 /* Deletions — muted red */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-deletion {
-  color: #b05c5c;
+  color: var(--code-deletion);
 }
 
-/* Symbols, bullets — cream accent */
+/* Symbols, bullets — cream accent (shares --code-keyword) */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-symbol, .hljs-bullet) {
-  color: #ddd0b8;
+  color: var(--code-keyword);
 }
 
-/* Subst — default base */
+/* Subst — default base (shares --code-fg) */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-subst {
-  color: #d6d2c8;
+  color: var(--code-fg);
 }
 
-/* Sections (e.g. markdown headings in code) — cream, bold */
+/* Sections (e.g. markdown headings in code) — cream, bold (shares --code-keyword) */
 :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body) .hljs-section {
-  color: #ddd0b8;
+  color: var(--code-keyword);
   font-weight: 600;
 }
 
@@ -237,99 +237,100 @@
  *  Light-theme syntax overrides
  *
  *  On ivory (#FAF9F5) surface, dark warm-ink colors replace the
- *  near-white dark-theme tokens. Concrete hex values are kept
- *  (syntax highlighting needs explicit contrast, not CSS vars).
+ *  near-white dark-theme tokens. Values come from the --code-*
+ *  tokens' [data-theme='light'] overrides in theme.css (darkened
+ *  for AA contrast — see that file for the contrast ratios).
  * ═══════════════════════════════════════════════════════════════
  */
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs {
-  color: #2c2820;
+  color: var(--code-fg);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name) {
-  color: #6b4a2a;
+  color: var(--code-keyword);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-string, .hljs-addition) {
-  color: #3d7a3a;
+  color: var(--code-string);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-comment, .hljs-quote) {
-  color: #8c8278;
+  color: var(--code-comment);
   font-style: italic;
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-number, .hljs-literal) {
-  color: #8b5e2a;
+  color: var(--code-number);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-type, .hljs-title) {
-  color: #3a5a7a;
+  color: var(--code-type);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-attr, .hljs-variable, .hljs-template-variable) {
-  color: #5a4030;
+  color: var(--code-attr);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs-function {
-  color: #3a5a7a;
+  color: var(--code-function);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs-params {
-  color: #4a3828;
+  color: var(--code-params);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-regexp, .hljs-link) {
-  color: #7a3a20;
+  color: var(--code-regexp);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs-meta {
-  color: #6a6258;
+  color: var(--code-meta);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs-deletion {
-  color: #8b2020;
+  color: var(--code-deletion);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   :is(.hljs-symbol, .hljs-bullet) {
-  color: #6b4a2a;
+  color: var(--code-keyword);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs-subst {
-  color: #2c2820;
+  color: var(--code-fg);
 }
 
 [data-theme='light']
   :is(.bubble__content, .streaming-bubble__content, .markdown-body, .response-body)
   .hljs-section {
-  color: #6b4a2a;
+  color: var(--code-keyword);
   font-weight: 600;
 }

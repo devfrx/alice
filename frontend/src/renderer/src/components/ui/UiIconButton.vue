@@ -12,10 +12,14 @@
 export interface UiIconButtonProps {
   variant?: 'ghost' | 'subtle' | 'outlined'
   size?: 'xs' | 'sm' | 'md' | 'lg'
+  /** Hover tone for semantic actions (destructive, confirm, highlight). */
+  tone?: 'default' | 'accent' | 'danger' | 'success'
   active?: boolean
   disabled?: boolean
   /** Shows an inline spinner and sets aria-busy. */
   loading?: boolean
+  /** Render as a true toggle: aria-pressed is always present (true/false). */
+  toggle?: boolean
   /** Native button type — defaults to "button". */
   type?: 'button' | 'submit' | 'reset'
   /**
@@ -30,9 +34,11 @@ export interface UiIconButtonProps {
 const props = withDefaults(defineProps<UiIconButtonProps>(), {
   variant: 'ghost',
   size: 'md',
+  tone: 'default',
   active: false,
   disabled: false,
   loading: false,
+  toggle: false,
   type: 'button',
   title: undefined
 })
@@ -53,13 +59,14 @@ const nativeTitle = (): string | undefined => {
     :class="[
       `ui-icon-btn--${variant}`,
       `ui-icon-btn--${size}`,
+      `ui-icon-btn--tone-${tone}`,
       { 'ui-icon-btn--active': active, 'ui-icon-btn--loading': loading }
     ]"
     :type="type"
     :disabled="disabled || loading"
     :aria-label="label"
     :aria-busy="loading || undefined"
-    :aria-pressed="active || undefined"
+    :aria-pressed="toggle ? active : active || undefined"
     :title="nativeTitle()"
     @click="$emit('click', $event)"
   >
@@ -81,7 +88,6 @@ const nativeTitle = (): string | undefined => {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  outline: none;
   flex-shrink: 0;
   padding: 0;
   transition:
@@ -103,10 +109,6 @@ const nativeTitle = (): string | undefined => {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
   pointer-events: none;
-}
-
-.ui-icon-btn:focus-visible {
-  outline: none;
 }
 
 .ui-icon-btn__content {
@@ -156,6 +158,24 @@ const nativeTitle = (): string | undefined => {
 .ui-icon-btn--outlined:hover:not(:disabled) {
   border-color: var(--border-hover);
   background: var(--surface-hover);
+}
+
+/* ── Tones (semantic hover) ── */
+/* Same specificity as the variant hover rules above — source order wins,
+   deterministic because they live in the same style block. */
+.ui-icon-btn--tone-danger:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--danger-hover);
+}
+
+.ui-icon-btn--tone-success:hover:not(:disabled) {
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.ui-icon-btn--tone-accent:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
 /* ── Active ────────── */

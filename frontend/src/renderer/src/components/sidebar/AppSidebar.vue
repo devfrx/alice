@@ -25,6 +25,7 @@ import BrandWordmark from '../branding/BrandWordmark.vue'
 import ConversationList from './ConversationList.vue'
 import CalendarWidget from '../calendar/CalendarWidget.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
 
 /**
@@ -248,14 +249,15 @@ async function onBackupAll(): Promise<void> {
           <span class="sidebar__brand">
             <BrandWordmark brand="alce" />
           </span>
-          <button
+          <UiIconButton
             v-if="!props.docked"
-            class="sidebar__close"
-            aria-label="Chiudi sidebar"
+            label="Chiudi sidebar"
+            variant="ghost"
+            size="sm"
             @click="toggle"
           >
             <AppIcon name="x" :size="14" :stroke-width="2.5" />
-          </button>
+          </UiIconButton>
         </div>
 
         <!-- Primary surface tabs: Assistente (Horizon) | Workspace (chat+modules) -->
@@ -408,7 +410,7 @@ async function onBackupAll(): Promise<void> {
 
 .sidebar-backdrop-enter-active,
 .sidebar-backdrop-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--duration-moderate) ease;
 }
 
 .sidebar-backdrop-enter-from,
@@ -465,11 +467,11 @@ async function onBackupAll(): Promise<void> {
 
 /* Slide animation */
 .sidebar-slide-enter-active {
-  transition: transform 0.3s var(--ease-out-expo);
+  transition: transform var(--duration-moderate) var(--ease-out-expo);
 }
 
 .sidebar-slide-leave-active {
-  transition: transform 0.25s var(--ease-decel);
+  transition: transform var(--duration-normal) var(--ease-decel);
 }
 
 .sidebar-slide-enter-from,
@@ -500,27 +502,6 @@ async function onBackupAll(): Promise<void> {
   letter-spacing: 0;
   color: var(--text-primary);
   text-transform: uppercase;
-}
-
-.sidebar__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.sidebar__close:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
 }
 
 /* Navigation */
@@ -610,10 +591,6 @@ async function onBackupAll(): Promise<void> {
   color: var(--text-primary);
 }
 
-.sidebar__link:focus-visible {
-  outline: none;
-}
-
 /* Icon */
 .sidebar__link-icon {
   display: flex;
@@ -679,7 +656,6 @@ async function onBackupAll(): Promise<void> {
   .sidebar__backdrop,
   .sidebar__link,
   .sidebar__link-icon,
-  .sidebar__close,
   .sidebar-slide-enter-active,
   .sidebar-slide-leave-active,
   .sidebar-backdrop-enter-active,

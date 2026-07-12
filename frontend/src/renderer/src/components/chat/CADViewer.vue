@@ -14,6 +14,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { resolveBackendUrl } from '../../services/api'
 import { useArtifactsStore } from '../../stores/artifacts'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
+import AliceSpinner from '../ui/AliceSpinner.vue'
 
 const props = defineProps<{
   /** Relative or absolute URL to the GLB model file. */
@@ -315,43 +317,42 @@ onUnmounted(() => {
         <span class="cad-viewer__format">.glb</span>
       </div>
       <div class="cad-viewer__actions">
-        <button
-          class="cad-viewer__btn"
-          :class="{ 'cad-viewer__btn--active': autoRotate }"
-          title="Auto-rotate"
+        <UiIconButton
+          size="sm"
+          variant="ghost"
+          :active="autoRotate"
+          label="Auto-rotate"
           @click="toggleAutoRotate"
         >
           <AppIcon name="auto-rotate" :size="14" />
-        </button>
-        <button
-          class="cad-viewer__btn"
-          :class="{ 'cad-viewer__btn--active': wireframe }"
-          title="Wireframe"
+        </UiIconButton>
+        <UiIconButton
+          size="sm"
+          variant="ghost"
+          :active="wireframe"
+          label="Wireframe"
           @click="toggleWireframe"
         >
           <AppIcon name="wireframe" :size="14" />
-        </button>
-        <button class="cad-viewer__btn" title="Reset camera" @click="resetCamera">
+        </UiIconButton>
+        <UiIconButton size="sm" variant="ghost" label="Reset camera" @click="resetCamera">
           <AppIcon name="crosshair" :size="14" />
-        </button>
+        </UiIconButton>
         <div class="cad-viewer__divider" />
-        <button
+        <UiIconButton
           v-if="artifactId"
-          class="cad-viewer__btn"
-          :class="{ 'cad-viewer__btn--active': pinned }"
-          :title="pinned ? 'Rimuovi dalla bacheca' : 'Salva in bacheca'"
-          :disabled="togglePinPending"
+          size="sm"
+          variant="ghost"
+          :active="pinned"
+          :loading="togglePinPending"
+          :label="pinned ? 'Rimuovi dalla bacheca' : 'Salva in bacheca'"
           @click="togglePin"
         >
           <AppIcon name="pin" :size="14" />
-        </button>
-        <button
-          class="cad-viewer__btn cad-viewer__btn--download"
-          title="Download GLB"
-          @click="downloadModel"
-        >
+        </UiIconButton>
+        <UiIconButton size="sm" variant="ghost" label="Download GLB" @click="downloadModel">
           <AppIcon name="download" :size="14" />
-        </button>
+        </UiIconButton>
       </div>
     </div>
 
@@ -359,7 +360,7 @@ onUnmounted(() => {
     <div ref="containerRef" class="cad-viewer__canvas">
       <!-- Loading overlay -->
       <div v-if="loading" class="cad-viewer__overlay">
-        <div class="cad-viewer__spinner" />
+        <AliceSpinner size="md" />
         <span class="cad-viewer__overlay-text">Caricamento modello 3D…</span>
       </div>
 
@@ -449,38 +450,6 @@ onUnmounted(() => {
   margin: 0 var(--space-0-5);
 }
 
-.cad-viewer__btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    background 0.15s,
-    border-color 0.15s;
-}
-
-.cad-viewer__btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.cad-viewer__btn--active {
-  color: var(--accent);
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-}
-
-.cad-viewer__btn--download:hover {
-  color: var(--accent);
-}
-
 /* ── Canvas ──────────────────────────────────── */
 
 .cad-viewer__canvas {
@@ -526,21 +495,6 @@ onUnmounted(() => {
   color: var(--danger);
 }
 
-.cad-viewer__spinner {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: cad-spin 0.8s linear infinite;
-}
-
-@keyframes cad-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* ── Interaction hint ────────────────────────── */
 
 .cad-viewer__hint {
@@ -551,7 +505,7 @@ onUnmounted(() => {
   color: var(--text-muted);
   opacity: 0.5;
   pointer-events: none;
-  transition: opacity 0.3s;
+  transition: opacity var(--duration-moderate);
 }
 
 .cad-viewer__canvas:hover .cad-viewer__hint {

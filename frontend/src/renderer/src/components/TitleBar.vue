@@ -12,6 +12,7 @@ import { useUIStore } from '../stores/ui'
 import BrandWordmark from './branding/BrandWordmark.vue'
 import AliceSpinner from './ui/AliceSpinner.vue'
 import AppIcon from './ui/AppIcon.vue'
+import UiIconButton from './ui/UiIconButton.vue'
 import UiPopover from './ui/UiPopover.vue'
 import type { AppIconName } from '../assets/icons'
 
@@ -185,16 +186,17 @@ onUnmounted(() => {
 <template>
   <header class="titlebar">
     <div class="titlebar__left">
-      <button
+      <UiIconButton
         class="titlebar__menu-btn"
-        type="button"
-        aria-label="Apri sidebar"
-        :aria-pressed="uiStore.sidebarOpen"
-        title="Sidebar"
+        label="Apri sidebar"
+        variant="ghost"
+        size="sm"
+        toggle
+        :active="uiStore.sidebarOpen"
         @click="uiStore.toggleSidebar"
       >
         <AppIcon name="hybrid-sidebar" :size="15" />
-      </button>
+      </UiIconButton>
       <span class="titlebar__title">
         <BrandWordmark brand="alce" />
       </span>
@@ -237,20 +239,15 @@ onUnmounted(() => {
                 <span class="titlebar__service-title">Servizi locali</span>
                 <span class="titlebar__service-subtitle">{{ servicePanelSubtitle }}</span>
               </div>
-              <button
-                class="titlebar__refresh-btn"
-                type="button"
-                aria-label="Aggiorna servizi"
-                title="Aggiorna"
-                :disabled="refreshingServices"
+              <UiIconButton
+                label="Aggiorna servizi"
+                variant="outlined"
+                size="sm"
+                :loading="refreshingServices"
                 @click.stop="refreshServiceStatus"
               >
-                <AppIcon
-                  name="refresh-cw"
-                  :size="13"
-                  :class="{ 'is-spinning': refreshingServices }"
-                />
-              </button>
+                <AppIcon name="refresh-cw" :size="13" />
+              </UiIconButton>
             </header>
 
             <div v-if="serviceCounts.total > 0" class="titlebar__service-stats">
@@ -394,34 +391,7 @@ onUnmounted(() => {
 }
 
 .titlebar__menu-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 28px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
   -webkit-app-region: no-drag;
-  transition:
-    color 120ms ease,
-    background 120ms ease,
-    border-color 120ms ease;
-}
-
-.titlebar__menu-btn:hover {
-  background: var(--surface-hover);
-  border-color: var(--border);
-  color: var(--text-primary);
-}
-
-.titlebar__menu-btn[aria-pressed='true'] {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
 }
 
 .titlebar__title {
@@ -465,10 +435,10 @@ onUnmounted(() => {
   cursor: pointer;
   box-shadow: var(--shadow-xs);
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    background var(--duration-normal) ease,
+    border-color var(--duration-normal) ease,
+    color var(--duration-normal) ease,
+    box-shadow var(--duration-normal) ease;
 }
 
 .titlebar__service-trigger:hover,
@@ -516,7 +486,7 @@ onUnmounted(() => {
 
 .titlebar__service-chevron {
   opacity: 0.72;
-  transition: transform 160ms ease;
+  transition: transform var(--duration-normal) ease;
 }
 
 .titlebar__service-chevron.is-open {
@@ -561,34 +531,6 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: var(--text-xs);
   letter-spacing: 0;
-}
-
-.titlebar__refresh-btn {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-
-.titlebar__refresh-btn:hover:not(:disabled) {
-  background: var(--surface-3);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
-.titlebar__refresh-btn:disabled {
-  opacity: 0.55;
-  cursor: default;
 }
 
 .titlebar__service-stats {
@@ -836,8 +778,8 @@ onUnmounted(() => {
   color: var(--text-muted);
   cursor: pointer;
   transition:
-    background 100ms ease,
-    color 100ms ease;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 .titlebar__btn:hover {
@@ -858,23 +800,6 @@ onUnmounted(() => {
   background: var(--danger);
   color: var(--text-primary);
   filter: brightness(0.9);
-}
-
-.titlebar__btn:focus-visible,
-.titlebar__menu-btn:focus-visible,
-.titlebar__service-trigger:focus-visible,
-.titlebar__refresh-btn:focus-visible {
-  outline: none;
-}
-
-.is-spinning {
-  animation: titlebar-spin 0.9s linear infinite;
-}
-
-@keyframes titlebar-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes titlebar-dot-pulse {

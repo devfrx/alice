@@ -4,6 +4,7 @@
  * dedicated event the parent handles by reopening the most recent thread.
  */
 import AppIcon from '../ui/AppIcon.vue'
+import UiChip from '../ui/UiChip.vue'
 
 const emit = defineEmits<{ prefill: [string]; 'resume-last': [] }>()
 
@@ -29,16 +30,18 @@ function activate(intent: Intent): void {
 
 <template>
   <div class="hi">
-    <button
+    <UiChip
       v-for="intent in intents"
       :key="intent.label"
+      size="md"
       class="hi__chip"
-      type="button"
       @click="activate(intent)"
     >
-      <AppIcon v-if="intent.lead" name="plus" :size="13" />
-      <span>{{ intent.label }}</span>
-    </button>
+      <template v-if="intent.lead" #icon>
+        <AppIcon name="plus" :size="13" />
+      </template>
+      {{ intent.label }}
+    </UiChip>
   </div>
 </template>
 
@@ -50,28 +53,14 @@ function activate(intent: Intent): void {
   margin-top: var(--space-4);
 }
 
-.hi__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
+/* Hero surface reads larger than the kit's compact chip scale (max "md" is
+   still a utility-density chip) — restore the original padding/type size. */
+.hi__chip.ui-chip {
   padding: var(--space-2) var(--space-3-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface-1);
-  color: var(--text-secondary);
   font-size: var(--text-sm);
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    color var(--transition-fast);
 }
 
-.hi__chip:hover {
-  border-color: var(--accent-border);
-  color: var(--text-primary);
-}
-
-.hi__chip :deep(svg) {
+.hi__chip :deep(.ui-chip__icon) {
   color: var(--accent);
 }
 </style>

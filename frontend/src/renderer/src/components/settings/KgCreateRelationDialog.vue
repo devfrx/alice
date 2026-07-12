@@ -8,6 +8,8 @@
 import { reactive } from 'vue'
 import { useMcpMemoryStore } from '../../stores/mcpMemory'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiInput from '../ui/UiInput.vue'
 
 const props = defineProps<{
   entities: UiSelectOption[]
@@ -40,15 +42,13 @@ async function onCreateRelation(): Promise<void> {
         @update:model-value="(v) => (form.from = String(v))"
       />
     </label>
-    <label class="kg-field">
-      <span class="kg-field__label">Tipo relazione</span>
-      <input
+    <div class="kg-field">
+      <UiInput
         v-model="form.relationType"
-        type="text"
-        class="kg-input"
+        label="Tipo relazione"
         placeholder="es. conosce, lavora_con, si_trova_a"
       />
-    </label>
+    </div>
     <label class="kg-field">
       <span class="kg-field__label">A (entità)</span>
       <UiSelect
@@ -61,14 +61,15 @@ async function onCreateRelation(): Promise<void> {
       />
     </label>
     <div class="kg-dialog__actions">
-      <button class="kg-btn kg-btn--secondary" @click="emit('close', false)">Annulla</button>
-      <button
-        class="kg-btn kg-btn--accent"
+      <UiButton variant="secondary" size="sm" @click="emit('close', false)">Annulla</UiButton>
+      <UiButton
+        variant="primary"
+        size="sm"
         :disabled="!form.from || !form.to || !form.relationType.trim()"
         @click="onCreateRelation"
       >
         Crea
-      </button>
+      </UiButton>
     </div>
   </div>
 </template>
@@ -93,64 +94,11 @@ async function onCreateRelation(): Promise<void> {
   font-weight: var(--weight-medium);
 }
 
-.kg-input {
-  padding: var(--space-1) var(--space-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.kg-input:focus {
-  border-color: var(--accent-border);
-}
-
 /* ── Actions ───────────────────────────────────────────────── */
 .kg-dialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-.kg-btn {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
-}
-
-.kg-btn--accent {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.kg-btn--accent:hover:not(:disabled) {
-  background: var(--accent-light);
-  border-color: var(--accent);
-}
-
-.kg-btn--secondary {
-  background: var(--surface-3);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.kg-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.kg-btn:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
 }
 </style>

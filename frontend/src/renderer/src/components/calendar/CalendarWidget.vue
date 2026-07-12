@@ -388,8 +388,8 @@ onUnmounted(() => {
 .cal-expand-enter-active,
 .cal-expand-leave-active {
   transition:
-    max-height 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.18s ease;
+    max-height var(--duration-normal) var(--ease-decel),
+    opacity var(--duration-normal) ease;
   overflow: hidden;
 }
 
@@ -408,8 +408,8 @@ onUnmounted(() => {
 .cal-next-enter-active,
 .cal-next-leave-active {
   transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 
 .cal-next-enter-from,

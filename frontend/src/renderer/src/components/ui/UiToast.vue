@@ -153,7 +153,6 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  outline: none;
   opacity: var(--opacity-medium);
   transition:
     background-color var(--duration-fast) var(--ease-out-quart),
@@ -164,10 +163,6 @@ const isAssertive = (type: ToastType): boolean => type === 'error' || type === '
   background: var(--surface-hover);
   opacity: 1;
   color: var(--text-primary);
-}
-
-.ui-toast__close:focus-visible {
-  outline: none;
 }
 
 /* ── Transition: slide in/out from right ────────────────────── */

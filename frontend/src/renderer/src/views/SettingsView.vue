@@ -28,10 +28,11 @@
 
       <!-- LLM Parameters -->
       <section id="section-llm" :ref="(el) => setSectionRef('llm', el)" class="sv__section">
-        <div class="sv__section-head">
-          <h3 class="sv__section-title">Parametri LLM</h3>
-          <p class="sv__section-desc">Configura il comportamento del modello di linguaggio</p>
-        </div>
+        <UiSectionHeader
+          class="sv__section-head"
+          title="Parametri LLM"
+          description="Configura il comportamento del modello di linguaggio"
+        />
 
         <div class="sv__group">
           <div class="sv__row">
@@ -72,18 +73,13 @@
         </div>
 
         <div class="sv__fields">
-          <label class="sv__field">
-            <span class="sv__field-label">Come Alice deve chiamarti</span>
-            <div class="sv__input-wrap">
-              <input
-                v-model="settingsStore.settings.llm.userPreferredName"
-                type="text"
-                class="sv__input"
-                maxlength="80"
-                placeholder="es. Marco"
-              />
-            </div>
-          </label>
+          <UiInput
+            v-model="settingsStore.settings.llm.userPreferredName"
+            label="Come Alice deve chiamarti"
+            type="text"
+            :maxlength="80"
+            placeholder="es. Marco"
+          />
           <label class="sv__field">
             <span class="sv__field-label">Temperatura</span>
             <div class="sv__input-wrap">
@@ -180,10 +176,11 @@
         :ref="(el) => setSectionRef('security', el)"
         class="sv__section"
       >
-        <div class="sv__section-head">
-          <h3 class="sv__section-title">Sicurezza</h3>
-          <p class="sv__section-desc">Controlla le autorizzazioni e i livelli di sicurezza</p>
-        </div>
+        <UiSectionHeader
+          class="sv__section-head"
+          title="Sicurezza"
+          description="Controlla le autorizzazioni e i livelli di sicurezza"
+        />
         <div class="sv__group">
           <div class="sv__row">
             <div class="sv__row-text">
@@ -212,10 +209,11 @@
 
       <!-- UI -->
       <section id="section-ui" :ref="(el) => setSectionRef('ui', el)" class="sv__section">
-        <div class="sv__section-head">
-          <h3 class="sv__section-title">Interfaccia</h3>
-          <p class="sv__section-desc">Personalizza l'aspetto e la lingua dell'applicazione</p>
-        </div>
+        <UiSectionHeader
+          class="sv__section-head"
+          title="Interfaccia"
+          description="Personalizza l'aspetto e la lingua dell'applicazione"
+        />
         <div class="sv__fields">
           <label class="sv__field">
             <span class="sv__field-label">Tema</span>
@@ -232,12 +230,7 @@
               />
             </div>
           </label>
-          <label class="sv__field">
-            <span class="sv__field-label">Lingua</span>
-            <div class="sv__input-wrap">
-              <input v-model="settingsStore.settings.ui.language" type="text" class="sv__input" />
-            </div>
-          </label>
+          <UiInput v-model="settingsStore.settings.ui.language" label="Lingua" type="text" />
         </div>
       </section>
 
@@ -263,6 +256,8 @@ import PermissionRulesManager from '../components/settings/PermissionRulesManage
 import AppIcon from '../components/ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../components/ui/UiSelect.vue'
 import UiToggle from '../components/ui/UiToggle.vue'
+import UiInput from '../components/ui/UiInput.vue'
+import UiSectionHeader from '../components/ui/UiSectionHeader.vue'
 import type { AppIconName } from '../assets/icons'
 import { useSettingsStore } from '../stores/settings'
 
@@ -509,21 +504,6 @@ onUnmounted(() => {
 
 .sv__section-head {
   margin-bottom: var(--space-5);
-}
-
-.sv__section-title {
-  margin: 0 0 var(--space-1) 0;
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold, 600);
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
-
-.sv__section-desc {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  line-height: 1.5;
 }
 
 /* ── Group card (toggle rows) ────────────────────────────── */

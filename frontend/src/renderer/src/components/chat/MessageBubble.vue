@@ -17,6 +17,7 @@ import ThinkingSection from './ThinkingSection.vue'
 import ToolCallSection from './ToolCallSection.vue'
 import MessageVersionNav from './MessageVersionNav.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import type {
   ChatMessage,
   CadModelPayload,
@@ -241,14 +242,15 @@ onUnmounted(() => {
     <!-- User hover actions — to the left of the bubble -->
     <div v-if="message.role === 'user'" class="bubble-side-actions">
       <span class="bubble__time">{{ formattedTime }}</span>
-      <button
+      <UiIconButton
         v-if="isEditable"
-        class="bubble__edit-btn"
-        aria-label="Modifica messaggio"
+        size="sm"
+        variant="ghost"
+        label="Modifica messaggio"
         @click="emit('edit', message.id)"
       >
         <AppIcon name="edit" :size="14" />
-      </button>
+      </UiIconButton>
     </div>
 
     <div class="bubble" :class="bubbleClass">
@@ -390,24 +392,31 @@ onUnmounted(() => {
 
     <!-- Assistant hover actions — to the right of the assistant bubble -->
     <div v-if="message.role === 'assistant'" class="bubble-side-actions bubble-side-actions--right">
-      <button
+      <UiIconButton
         v-if="isBranchable"
-        class="bubble__branch-btn"
-        aria-label="Dirama conversazione da qui"
-        :title="`Inizia una nuova conversazione da questo punto`"
+        size="sm"
+        variant="ghost"
+        label="Dirama conversazione da qui"
+        title="Inizia una nuova conversazione da questo punto"
         @click="emit('branch', message.id)"
       >
         <!-- Git fork icon -->
         <AppIcon name="branch" :size="14" />
-      </button>
+      </UiIconButton>
     </div>
 
     <!-- Full-size image overlay -->
     <Teleport to="body">
       <div v-if="overlayImageUrl" class="image-overlay" @click.self="closeOverlay">
-        <button class="image-overlay__close" aria-label="Chiudi" @click="closeOverlay">
+        <UiIconButton
+          class="image-overlay__close"
+          size="lg"
+          variant="ghost"
+          label="Chiudi"
+          @click="closeOverlay"
+        >
           <AppIcon name="x" :size="24" />
-        </button>
+        </UiIconButton>
         <img :src="overlayImageUrl" :alt="overlayImageAlt" class="image-overlay__img" />
       </div>
     </Teleport>
@@ -465,57 +474,11 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* Branch button */
-.bubble__branch-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.bubble__branch-btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-2);
-}
-
 .bubble-side-actions .bubble__time {
   position: static;
   transform: none;
   opacity: 1;
   pointer-events: auto;
-}
-
-/* Edit button (inside side-actions bar) */
-.bubble__edit-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.bubble__edit-btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-2);
 }
 
 /* Bubble base */
@@ -536,7 +499,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
-  animation: slideInRight 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInRight var(--duration-moderate) var(--ease-smooth) both;
 }
 
 /* Assistant — flowing text directly on the chat background. No bubble chrome:
@@ -550,7 +513,7 @@ onUnmounted(() => {
   padding: 0;
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
-  animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInLeft var(--duration-moderate) var(--ease-smooth) both;
 }
 
 /* Tool result bubble */
@@ -564,7 +527,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-relaxed);
-  animation: slideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInLeft var(--duration-moderate) var(--ease-smooth) both;
 }
 
 /* When tool bubble contains a CAD viewer, remove the mono/small styling
@@ -827,23 +790,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: var(--black-overlay);
-  animation: overlayFadeIn 200ms ease both;
+  animation: overlayFadeIn var(--duration-normal) ease both;
 }
 
 .image-overlay__close {
   position: absolute;
   top: var(--space-4);
   right: var(--space-4);
-  background: none;
-  border: none;
-  padding: var(--space-2);
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: color var(--transition-fast);
-}
-
-.image-overlay__close:hover {
-  color: var(--text-primary);
 }
 
 .image-overlay__img {
@@ -851,7 +804,7 @@ onUnmounted(() => {
   max-height: 88vh;
   object-fit: contain;
   border-radius: var(--radius-md);
-  animation: overlayZoomIn 250ms ease both;
+  animation: overlayZoomIn var(--duration-normal) ease both;
 }
 
 /* Keyframes */
@@ -991,8 +944,7 @@ onUnmounted(() => {
   }
 
   .bubble__time,
-  .bubble__attachment,
-  .image-overlay__close {
+  .bubble__attachment {
     transition: none;
   }
 }

@@ -9,6 +9,8 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useEmailStore } from '../../stores/email'
 import UiSkeleton from '../ui/UiSkeleton.vue'
 import UiSegmented, { type UiSegmentedOption } from '../ui/UiSegmented.vue'
+import UiSearchInput from '../ui/UiSearchInput.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
 
 const emailStore = useEmailStore()
@@ -89,15 +91,12 @@ function subjectPreview(subject: string): string {
   <div class="inbox">
     <!-- Search bar -->
     <div class="inbox__search">
-      <div class="inbox__search-wrapper">
-        <AppIcon class="inbox__search-icon" name="search" />
-        <input
-          v-model="searchQuery"
-          type="text"
-          class="inbox__search-input"
-          placeholder="Cerca email…"
-        />
-      </div>
+      <UiSearchInput
+        v-model="searchQuery"
+        size="md"
+        placeholder="Cerca email…"
+        aria-label="Cerca email"
+      />
     </div>
 
     <!-- Toolbar: count + filters + refresh -->
@@ -110,15 +109,15 @@ function subjectPreview(subject: string): string {
         aria-label="Filtro email"
         @update:model-value="(v) => (filterMode = v as 'all' | 'unread')"
       />
-      <button
-        class="inbox__refresh"
-        :disabled="emailStore.loading"
-        :class="{ 'inbox__refresh--spinning': emailStore.loading }"
-        title="Aggiorna"
+      <UiIconButton
+        label="Aggiorna"
+        variant="ghost"
+        size="sm"
+        :loading="emailStore.loading"
         @click="emailStore.fetchInbox(emailStore.currentFolder)"
       >
-        <AppIcon name="refresh-ccw" />
-      </button>
+        <AppIcon name="refresh-ccw" :size="15" />
+      </UiIconButton>
     </div>
 
     <!-- Loading skeletons -->
@@ -201,46 +200,6 @@ function subjectPreview(subject: string): string {
   border-bottom: 1px solid var(--border);
 }
 
-.inbox__search-wrapper {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-3);
-  height: 32px;
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.inbox__search-wrapper:focus-within {
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 2px var(--accent-faint);
-}
-
-.inbox__search-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.inbox__search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: var(--font-sans);
-}
-
-.inbox__search-input::placeholder {
-  color: var(--text-muted);
-}
-
 /* ── Toolbar ─────────────────────────── */
 .inbox__toolbar {
   display: flex;
@@ -248,47 +207,6 @@ function subjectPreview(subject: string): string {
   justify-content: space-between;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
-}
-
-.inbox__refresh {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.inbox__refresh:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.inbox__refresh:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.inbox__refresh svg {
-  width: 15px;
-  height: 15px;
-}
-
-.inbox__refresh--spinning svg {
-  animation: spin-refresh 1s linear infinite;
-}
-
-@keyframes spin-refresh {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ── Skeleton loading ────────────────── */

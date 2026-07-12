@@ -63,10 +63,6 @@ const emit = defineEmits<{ click: [] }>()
   background: var(--surface-hover);
 }
 
-.ctx-item:focus-visible {
-  outline: none;
-}
-
 .ctx-item:active:not(:disabled) {
   background: var(--surface-active);
 }

@@ -69,11 +69,17 @@ const emit = defineEmits<{
   letter-spacing: 0.25em;
   color: var(--hz-ink-faint);
   cursor: pointer;
-  transition: color var(--hz-fade) ease;
+  transition:
+    color var(--hz-fade) ease,
+    opacity var(--hz-fade) ease;
 }
 
 .hz-shelf__item:hover {
   color: var(--hz-ink);
+}
+
+.hz-shelf__item:active {
+  opacity: var(--opacity-disabled);
 }
 
 .hz-shelf__item--active {

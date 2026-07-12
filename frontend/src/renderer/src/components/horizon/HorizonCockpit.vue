@@ -13,6 +13,7 @@ import ScopeIndicator from '../chat/ScopeIndicator.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import ContextBar from '../chat/ContextBar.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
 import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
@@ -80,6 +81,10 @@ defineExpose({
         </button>
       </div>
     </div>
+    <!-- hz-cockpit__thumb-rm stays bespoke: 16px overlay badge on a 44px
+         thumbnail, below the kit's smallest icon-button size (xs, 24px) —
+         migrating would enlarge it and regress the thumbnail strip. See
+         the identical, already-migrated precedent in ChatInput.vue. -->
 
     <input
       ref="fileInputRef"
@@ -91,15 +96,15 @@ defineExpose({
     />
 
     <div class="hz-cockpit__rail">
-      <button
-        class="hz-cockpit__ghost"
+      <UiIconButton
+        size="sm"
+        variant="ghost"
         :disabled="!supportsVision"
-        :title="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
-        :aria-label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
+        :label="supportsVision ? 'Allega immagine' : 'Il modello attivo non supporta immagini'"
         @click="openFilePicker"
       >
         <AppIcon name="paperclip" :size="13" />
-      </button>
+      </UiIconButton>
 
       <ModelSelector model-type="llm" />
       <ScopeIndicator :conversation-id="chatStore.currentConversation?.id ?? null" />
@@ -124,17 +129,20 @@ defineExpose({
         @select-device="(id) => emit('select-device', id)"
       />
 
-      <button
+      <UiIconButton
         v-if="isStreaming"
-        class="hz-cockpit__ghost hz-cockpit__stop"
-        aria-label="Interrompi generazione"
+        class="hz-cockpit__stop"
+        size="sm"
+        variant="ghost"
+        tone="danger"
+        label="Interrompi generazione"
         @click="emit('stop')"
       >
         <AppIcon name="stop" :size="13" />
-      </button>
-      <button v-else class="hz-cockpit__ghost" aria-label="Invia messaggio" @click="emit('send')">
+      </UiIconButton>
+      <UiIconButton v-else size="sm" variant="ghost" label="Invia messaggio" @click="emit('send')">
         <AppIcon name="send" :size="13" />
-      </button>
+      </UiIconButton>
     </div>
   </div>
 </template>
@@ -183,6 +191,19 @@ defineExpose({
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  transition:
+    border-color var(--duration-fast) var(--ease-out-quart),
+    color var(--duration-fast) var(--ease-out-quart),
+    transform var(--duration-fast) var(--ease-out-quart);
+}
+
+.hz-cockpit__thumb-rm:hover {
+  border-color: var(--border-hover);
+  color: var(--danger);
+}
+
+.hz-cockpit__thumb-rm:active {
+  transform: scale(0.88);
 }
 
 .hz-cockpit__file-input {
@@ -199,32 +220,9 @@ defineExpose({
   border-top: 1px solid var(--border);
 }
 
-.hz-cockpit__ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--hz-ink-dim);
-  cursor: pointer;
-  transition:
-    color var(--hz-fade) ease,
-    background var(--hz-fade) ease;
-}
-
-.hz-cockpit__ghost:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--hz-ink);
-}
-
-.hz-cockpit__ghost:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
-}
-
+/* hz-cockpit__stop overrides the UiIconButton default color so the icon
+   reads danger-red at rest (streaming is happening now); tone="danger" on
+   the component still drives the hover tint. */
 .hz-cockpit__stop {
   color: var(--danger);
 }

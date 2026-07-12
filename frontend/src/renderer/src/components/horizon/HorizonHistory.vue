@@ -10,6 +10,7 @@ import { nextTick, ref, watch } from 'vue'
 import { renderMarkdown } from '../../composables/useMarkdown'
 import MessageVersionNav from '../chat/MessageVersionNav.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import type { ChatMessage } from '../../types/chat'
 
 const props = defineProps<{
@@ -59,9 +60,9 @@ function truncateContent(text: string, max = 200): string {
     <aside v-if="open" class="hz-history" aria-label="Conversazione">
       <header class="hz-history__head">
         <span class="hz-history__title">Conversazione</span>
-        <button class="hz-history__close" aria-label="Chiudi" @click="emit('close')">
+        <UiIconButton size="xs" variant="ghost" label="Chiudi" @click="emit('close')">
           <AppIcon name="x" :size="13" />
-        </button>
+        </UiIconButton>
       </header>
 
       <div ref="scrollRef" class="hz-history__scroll">
@@ -69,22 +70,24 @@ function truncateContent(text: string, max = 200): string {
           <div class="hz-history__rubric">
             <span class="hz-history__role">{{ ROLE_LABELS[msg.role] ?? msg.role }}</span>
             <span class="hz-history__entry-actions">
-              <button
+              <UiIconButton
                 v-if="msg.role === 'user' && !isStreaming"
-                class="hz-history__action"
-                title="Modifica"
+                size="xs"
+                variant="ghost"
+                label="Modifica"
                 @click="emit('edit', msg.id)"
               >
                 <AppIcon name="edit" :size="11" />
-              </button>
-              <button
+              </UiIconButton>
+              <UiIconButton
                 v-if="msg.role === 'assistant' && !branchDisabled"
-                class="hz-history__action"
-                title="Crea ramo"
+                size="xs"
+                variant="ghost"
+                label="Crea ramo"
                 @click="emit('branch', msg.id)"
               >
                 <AppIcon name="branch" :size="11" />
-              </button>
+              </UiIconButton>
             </span>
           </div>
 
@@ -149,14 +152,6 @@ function truncateContent(text: string, max = 200): string {
   color: var(--hz-ink);
 }
 
-.hz-history__close {
-  display: inline-flex;
-  border: none;
-  background: transparent;
-  color: var(--hz-ink-dim);
-  cursor: pointer;
-}
-
 .hz-history__scroll {
   flex: 1;
   min-height: 0;
@@ -187,18 +182,6 @@ function truncateContent(text: string, max = 200): string {
 .hz-history__entry-actions {
   display: inline-flex;
   gap: var(--space-1);
-}
-
-.hz-history__action {
-  display: inline-flex;
-  border: none;
-  background: transparent;
-  color: var(--hz-ink-faint);
-  cursor: pointer;
-}
-
-.hz-history__action:hover {
-  color: var(--hz-ink);
 }
 
 .hz-history__body {

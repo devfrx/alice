@@ -6,6 +6,7 @@
  */
 import { computed, defineAsyncComponent } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
+import UiIconButton from '../ui/UiIconButton.vue'
 import CADGenerationPlaceholder from '../chat/CADGenerationPlaceholder.vue'
 import { toRoman } from '../../composables/horizon/horizonScene'
 import type { HorizonArtifact } from '../../composables/horizon/horizonArtifacts'
@@ -86,35 +87,37 @@ function saveBoard(boardId: string, snapshot: Record<string, unknown>): void {
     </div>
 
     <footer class="hz-stage__footer">
-      <button
+      <UiIconButton
         v-if="artifacts.length > 1"
-        class="hz-stage__nav"
+        size="xs"
+        variant="ghost"
         :disabled="activeIndex <= 0"
-        aria-label="Precedente"
+        label="Precedente"
         @click="prev"
       >
         <AppIcon name="chevron-left" :size="12" />
-      </button>
+      </UiIconButton>
 
       <p class="hz-stage__caption">{{ caption }}</p>
 
-      <button
+      <UiIconButton
         v-if="artifacts.length > 1"
-        class="hz-stage__nav"
+        size="xs"
+        variant="ghost"
         :disabled="activeIndex >= artifacts.length - 1"
-        aria-label="Successivo"
+        label="Successivo"
         @click="next"
       >
         <AppIcon name="chevron-right" :size="12" />
-      </button>
+      </UiIconButton>
 
       <span v-if="artifacts.length > 1" class="hz-stage__counter">
         {{ toRoman(activeIndex + 1) }} / {{ toRoman(artifacts.length) }}
       </span>
 
-      <button class="hz-stage__close" aria-label="Chiudi il palco" @click="emit('close')">
+      <UiIconButton size="xs" variant="ghost" label="Chiudi il palco" @click="emit('close')">
         <AppIcon name="x" :size="12" />
-      </button>
+      </UiIconButton>
     </footer>
   </section>
 </template>
@@ -161,30 +164,5 @@ function saveBoard(boardId: string, snapshot: Record<string, unknown>): void {
   font-size: 9px;
   letter-spacing: 0.2em;
   color: var(--hz-ink-faint);
-}
-
-.hz-stage__nav,
-.hz-stage__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--hz-ink-dim);
-  cursor: pointer;
-}
-
-.hz-stage__nav:hover:not(:disabled),
-.hz-stage__close:hover {
-  color: var(--hz-ink);
-  background: var(--surface-2);
-}
-
-.hz-stage__nav:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
 }
 </style>

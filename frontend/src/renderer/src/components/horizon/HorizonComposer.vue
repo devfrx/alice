@@ -125,7 +125,6 @@ function onKeydown(e: KeyboardEvent): void {
   width: 100%;
   background: transparent;
   border: none;
-  outline: none;
   resize: none;
   overflow-y: auto;
   scrollbar-width: thin;

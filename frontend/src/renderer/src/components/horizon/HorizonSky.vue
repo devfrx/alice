@@ -153,9 +153,7 @@ function draw(now: number): void {
   for (const e of edges) {
     const a = nodes[e.a]
     const b = nodes[e.b]
-    const surge = reducedMotion
-      ? 0
-      : wake * (0.5 + Math.sin(t * 2 - (e.a + e.b) * 0.35) / 2) * 0.35
+    const surge = reducedMotion ? 0 : wake * (0.5 + Math.sin(t * 2 - (e.a + e.b) * 0.35) / 2) * 0.35
     ctx.strokeStyle = `rgba(${lineRgb}, ${baseAlpha * 0.6 + surge})`
     ctx.beginPath()
     ctx.moveTo(a.x * width, a.y * height)
@@ -195,13 +193,7 @@ function draw(now: number): void {
   }
 
   // Fully settled and idle → suspend the loop (zero idle work).
-  if (
-    props.mode === 'idle' &&
-    wake < 0.01 &&
-    sporeLevel < 0.01 &&
-    !reducedMotion &&
-    running
-  ) {
+  if (props.mode === 'idle' && wake < 0.01 && sporeLevel < 0.01 && !reducedMotion && running) {
     // One last faint frame is already painted; stop until inputs change.
     stop()
   }

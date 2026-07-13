@@ -269,10 +269,10 @@ watch(
   (len, was) => {
     if (len > (was ?? 0) && chatStore.isStreamingCurrentConversation) {
       const a = artifacts.value[len - 1]
-      if (a.kind === 'chart') desk.openWindow('chart', { chartPayload: a.chart })
-      else if (a.kind === 'whiteboard')
-        desk.openWindow('whiteboard', { boardId: a.board?.board_id })
-      else desk.openWindow('cad3d')
+      if (a.kind === 'chart' && a.chart) desk.openWindow('chart', { chartPayload: a.chart })
+      else if (a.kind === 'whiteboard' && a.board)
+        desk.openWindow('whiteboard', { boardId: a.board.board_id })
+      else if (a.kind === '3d') desk.openWindow('cad3d')
     }
   }
 )

@@ -3,7 +3,8 @@
  * useHorizonKeyboard — global key capture for the Horizon desk.
  *
  * Esc walks the interrupt chain: TTS → streaming → composer → focused
- * window (focus release only — Esc NEVER closes windows, spec §6.9).
+ * window (focus release only, and only when Esc comes from the scene — not
+ * from inside a desk window; Esc NEVER closes windows, spec §6.9).
  * Any printable first character materializes the composer (Jarvis entry),
  * unless the keystroke originates inside an input, a dialog, a desk window
  * or the dock (spec §6.7 — typing in the terminal must stay in the terminal).
@@ -35,7 +36,12 @@ export function useHorizonKeyboard(deps: HorizonKeyboardDeps): void {
       if (deps.isSpeaking()) deps.cancelSpeak()
       else if (deps.isStreaming()) deps.stopGeneration()
       else if (deps.composerActive.value) deps.composerActive.value = false
-      else if (deps.hasFocusedWindow()) deps.blurWindows()
+      else if (deps.hasFocusedWindow()) {
+        // Only release window focus when Esc originates from the scene —
+        // typing Esc INSIDE a window (vim, xterm) must not drop the ring.
+        const tgt = e.target as HTMLElement | null
+        if (!tgt?.closest('.desk-window')) deps.blurWindows()
+      }
       return
     }
     if (deps.composerActive.value) return

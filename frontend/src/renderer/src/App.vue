@@ -13,7 +13,7 @@ import { useEventsWebSocket } from './composables/useEventsWebSocket'
 import { useSettingsStore } from './stores/settings'
 import { usePluginsStore } from './stores/plugins'
 import { waitForBackend } from './services/api'
-import { installCoreCommands } from './commands'
+import { installCoreCommands, installDeskCommands } from './commands'
 
 const chatApi = useChat()
 provide(ChatApiKey, chatApi)
@@ -31,6 +31,7 @@ const route = useRoute()
 // re-registers the core set — so an HMR re-run of this setup block swaps in
 // fresh handler closures instead of throwing or keeping stale ones.
 installCoreCommands(router)
+installDeskCommands(router)
 
 /**
  * Horizon chrome (centered layout + surface-0 backdrop) is keyed off the

@@ -39,10 +39,12 @@ export function useWindowInteractions(windowId: string): {
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', end)
       el.removeEventListener('pointercancel', end)
+      el.removeEventListener('lostpointercapture', end)
     }
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', end)
     el.addEventListener('pointercancel', end)
+    el.addEventListener('lostpointercapture', end)
     e.preventDefault()
   }
 

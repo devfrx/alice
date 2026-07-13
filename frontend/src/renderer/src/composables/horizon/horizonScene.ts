@@ -3,8 +3,9 @@
  *
  * Maps plain snapshots of the voice/chat/tasks stores to a single scene state
  * and the line's visual mechanic. One state active at a time, with explicit
- * priority: working ▸ responding ▸ listening ▸ quiet. Desk windows are an
- * orthogonal presentation layer — they never affect the ambient scene state.
+ * priority: working ▸ thinking ▸ responding ▸ listening ▸ quiet. Desk windows
+ * are an orthogonal presentation layer — they never affect the ambient scene
+ * state.
  *
  * Pure functions only (no Vue imports) so the whole scene brain is unit
  * testable in the node environment.

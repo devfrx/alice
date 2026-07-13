@@ -126,7 +126,8 @@ function resize(): void {
   el.width = Math.round(width * dpr)
   el.height = Math.round(height * dpr)
   ctx?.setTransform(dpr, 0, 0, dpr, 0, 0)
-  if (reducedMotion) draw(performance.now())
+  // The loop may be suspended (idle settled): repaint explicitly.
+  if (reducedMotion || !running) draw(performance.now())
 }
 
 function draw(now: number): void {
@@ -209,6 +210,7 @@ function loop(now: number): void {
 }
 
 function start(): void {
+  if (document.hidden) return
   if (running || reducedMotion || !ctx) return
   running = true
   lastNow = 0
@@ -239,7 +241,8 @@ onMounted(() => {
   if (typeof MutationObserver !== 'undefined') {
     themeObserver = new MutationObserver(() => {
       readTheme()
-      if (reducedMotion) draw(performance.now())
+      // The loop may be suspended (idle settled): repaint explicitly.
+      if (reducedMotion || !running) draw(performance.now())
     })
     themeObserver.observe(document.documentElement, {
       attributes: true,

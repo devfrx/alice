@@ -1,11 +1,15 @@
 <script setup lang="ts">
 /**
  * HorizonHistory — the conversation record as an editorial dossier: a left
- * drawer with role rubrics in mono, serif bodies, hairline rules. Mirrors
- * the props/emits contract of the retired orb-era history drawer so the
- * view wiring is a drop-in.
+ * glass drawer aligned to the docked sidebar (same gutters + radius), reading
+ * bottom-up. Exchanges (a user prompt and the turns it triggers) are grouped:
+ * a hairline opens each exchange, and within one the turns flow without rules.
+ * User prompts read as quiet marginalia; AL\CE is the primary voice; tool
+ * results are contained receipts, not naked JSON. Mirrors the props/emits
+ * contract of the retired orb-era history drawer so the view wiring is a
+ * drop-in.
  */
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import { renderMarkdown } from '../../composables/useMarkdown'
 import MessageVersionNav from '../chat/MessageVersionNav.vue'
@@ -35,6 +39,15 @@ const ROLE_LABELS: Record<string, string> = {
   system: 'SISTEMA'
 }
 
+/**
+ * Assistant turns that are pure tool-call carriers (no textual content) render
+ * as dead rows — an "AL\CE" rubric over nothing. Drop them: the tool result
+ * that follows is the visible record of that step.
+ */
+const renderedMessages = computed(() =>
+  props.messages.filter((m) => !(m.role === 'assistant' && !(m.content ?? '').trim()))
+)
+
 const scrollRef = ref<HTMLElement | null>(null)
 
 // Open lands on the newest entry (the conversation reads bottom-up, like
@@ -49,7 +62,7 @@ watch(
 )
 
 /** Tool dumps are capped like the legacy drawer — the dossier is a record, not a log. */
-function truncateContent(text: string, max = 200): string {
+function truncateContent(text: string, max = 240): string {
   return text.length > max ? `${text.slice(0, max)}…` : text
 }
 </script>
@@ -68,9 +81,17 @@ function truncateContent(text: string, max = 200): string {
       </header>
 
       <div ref="scrollRef" class="hz-history__scroll">
-        <article v-for="msg in messages" :key="msg.id" class="hz-history__entry">
+        <article
+          v-for="msg in renderedMessages"
+          :key="msg.id"
+          class="hz-history__entry"
+          :class="`hz-history__entry--${msg.role}`"
+        >
           <div class="hz-history__rubric">
-            <span class="hz-history__role">{{ ROLE_LABELS[msg.role] ?? msg.role }}</span>
+            <span class="hz-history__role">
+              <span class="hz-history__dot" aria-hidden="true" />
+              {{ ROLE_LABELS[msg.role] ?? msg.role }}
+            </span>
             <span class="hz-history__entry-actions">
               <button
                 v-if="msg.role === 'user' && !isStreaming"
@@ -91,8 +112,8 @@ function truncateContent(text: string, max = 200): string {
             </span>
           </div>
 
-          <div v-if="msg.role === 'tool'" class="hz-history__body hz-history__body--tool">
-            {{ truncateContent(msg.content) }}
+          <div v-if="msg.role === 'tool'" class="hz-history__tool">
+            <div class="hz-history__tool-body">{{ truncateContent(msg.content) }}</div>
           </div>
           <!-- eslint-disable vue/no-v-html -- sanitized markdown render (renderMarkdown uses markdown-it with html:false) -->
           <div
@@ -120,19 +141,27 @@ function truncateContent(text: string, max = 200): string {
 </template>
 
 <style scoped>
-/* Floating card, matching the app's panel idiom (cfr. AppSidebar). */
+/*
+ * Glass drawer. It borrows the docked sidebar's gutters (--gutter-lg) and
+ * radius (--panel-radius) so the two panels sit on the same grid — but where
+ * the sidebar is a solid in-flow surface, this is a scene overlay: the veil
+ * (--glass-*, cfr. UiCard) lets the Horizon scene read through, so the drawer
+ * belongs to the scene rather than sitting opaquely on top of it.
+ */
 .hz-history {
   position: absolute;
-  top: calc(var(--titlebar-height, 38px) + 8px);
-  left: 12px;
-  bottom: 8px;
+  top: var(--gutter-lg);
+  left: var(--gutter-lg);
+  bottom: var(--gutter-lg);
   width: min(420px, 86vw);
   display: flex;
   flex-direction: column;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--panel-radius);
   box-shadow: var(--panel-shadow, var(--shadow-md));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+  backdrop-filter: blur(var(--glass-blur, 12px));
   z-index: var(--z-overlay);
   overflow: hidden;
 }
@@ -169,13 +198,21 @@ function truncateContent(text: string, max = 200): string {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-4);
   scrollbar-width: thin;
 }
 
+/* A turn. Rules only open an exchange (see the user-turn rule below). */
 .hz-history__entry {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
+  padding-block: var(--space-2-5);
+}
+
+/* Each user prompt opens a new exchange: a hairline + extra space above,
+   except the first rendered turn. Turns inside an exchange just breathe. */
+.hz-history__entry--user:not(:first-child) {
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
 }
 
 .hz-history__rubric {
@@ -186,10 +223,26 @@ function truncateContent(text: string, max = 200): string {
 }
 
 .hz-history__role {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
   font-family: var(--font-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.3em;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--hz-ink-faint);
+}
+
+/* AL\CE is the voice — the only rubric that carries the gold. */
+.hz-history__entry--assistant .hz-history__role {
   color: var(--hz-gold);
+}
+
+.hz-history__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
 }
 
 .hz-history__entry-actions {
@@ -197,13 +250,22 @@ function truncateContent(text: string, max = 200): string {
   gap: var(--space-1);
 }
 
+/* Actions stay out of the way until the turn is hovered. */
 .hz-history__action {
   display: inline-flex;
   border: none;
   background: transparent;
   color: var(--hz-ink-faint);
   cursor: pointer;
-  transition: color var(--hz-fade) ease;
+  opacity: 0;
+  transition:
+    opacity var(--hz-fade) ease,
+    color var(--hz-fade) ease;
+}
+
+.hz-history__entry:hover .hz-history__action,
+.hz-history__action:focus-visible {
+  opacity: 1;
 }
 
 .hz-history__action:hover {
@@ -213,27 +275,61 @@ function truncateContent(text: string, max = 200): string {
 .hz-history__body {
   font-family: var(--hz-serif);
   font-weight: 300;
-  font-size: var(--text-sm);
   line-height: 1.65;
-  color: var(--hz-ink-dim);
   overflow-wrap: anywhere;
 }
 
-.hz-history__body--tool {
-  font-family: var(--font-mono);
-  font-size: 0.8em;
-  white-space: pre-wrap;
-  opacity: 0.7;
+/* AL\CE — the primary voice: full ink, a touch larger. */
+.hz-history__entry--assistant .hz-history__body,
+.hz-history__entry--system .hz-history__body {
+  font-size: var(--text-md);
+  color: var(--hz-ink);
+}
+
+/* TU — the prompt, set as quiet marginalia against a hairline rule. */
+.hz-history__entry--user .hz-history__body {
+  font-size: var(--text-base);
+  color: var(--hz-ink-dim);
+  border-left: 2px solid var(--accent-dim);
+  padding-left: var(--space-3);
 }
 
 .hz-history__body :deep(p) {
   margin: 0 0 0.5em;
 }
 
+.hz-history__body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
 .hz-history__body :deep(pre),
 .hz-history__body :deep(code) {
   font-family: var(--font-mono);
   font-size: 0.8em;
+}
+
+/* Tool result — a contained receipt: quiet mono on an inset, long dumps
+   fade out rather than sprawling. */
+.hz-history__tool {
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+  background: var(--surface-inset);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.hz-history__tool-body {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--hz-ink-faint);
+  padding: var(--space-2) var(--space-2-5);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 88px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 62px, transparent);
+  mask-image: linear-gradient(180deg, #000 62px, transparent);
 }
 
 /* Short slide + fade: a full -100% slide fights the floating-card look. */

@@ -3,15 +3,16 @@
  *
  * Maps plain snapshots of the voice/chat/tasks stores to a single scene state
  * and the line's visual mechanic. One state active at a time, with explicit
- * priority: presenting ▸ working ▸ responding ▸ listening ▸ quiet.
+ * priority: working ▸ responding ▸ listening ▸ quiet. Desk windows are an
+ * orthogonal presentation layer — they never affect the ambient scene state.
  *
  * Pure functions only (no Vue imports) so the whole scene brain is unit
  * testable in the node environment.
  */
 import type { TaskStep } from '../../types/tasks'
 
-/** The five scene states (spec §3). */
-export type HorizonState = 'quiet' | 'listening' | 'responding' | 'working' | 'presenting'
+/** The four scene states (spec §3). */
+export type HorizonState = 'quiet' | 'listening' | 'responding' | 'working'
 
 /** The line's visual mechanic (HorizonLine modes). */
 export type HorizonLineMode = 'breathe' | 'tense' | 'pulse' | 'timeline' | 'flow'
@@ -24,8 +25,6 @@ export interface HorizonSceneInputs {
   isStreaming: boolean
   activeToolCount: number
   planSteps: TaskStep[]
-  stageOpen: boolean
-  artifactCount: number
   composerActive: boolean
 }
 
@@ -36,7 +35,6 @@ function planActive(steps: TaskStep[]): boolean {
 
 /** Derive the single active scene state (priority ordered). */
 export function deriveSceneState(i: HorizonSceneInputs): HorizonState {
-  if (i.stageOpen && i.artifactCount > 0) return 'presenting'
   if (i.isStreaming && (planActive(i.planSteps) || i.activeToolCount > 0)) return 'working'
   if (i.isStreaming || i.isSpeaking) return 'responding'
   if (i.isListening || i.isSttProcessing || i.composerActive) return 'listening'

@@ -1,11 +1,14 @@
+<!-- views/HorizonView.vue -->
 <script setup lang="ts">
 /**
- * HorizonView — the assistant surface: one morphing editorial scene whose
- * axis is the horizon line (AL\CE's presence). Orchestration only: this file
- * wires stores/composables into props for components/horizon/*; it owns no
- * scene markup beyond composition.
+ * HorizonView — the assistant desk ("atelier"): the ambient scene (greeting,
+ * composer, paced response, horizon line) with free-floating module windows
+ * (DeskSurface) and the tray (DeskDock) above it. Orchestration only — the
+ * heavy wiring lives in useHorizonKeyboard / useHorizonVoiceBridge and the
+ * desk store; scene derivation stays in the pure horizonScene brain.
  */
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import HorizonPlan from '../components/horizon/HorizonPlan.vue'
 import HorizonScene from '../components/horizon/HorizonScene.vue'
 import HorizonLine from '../components/horizon/HorizonLine.vue'
@@ -15,15 +18,14 @@ import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonCockpit from '../components/horizon/HorizonCockpit.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
-import HorizonShelf from '../components/horizon/HorizonShelf.vue'
-import HorizonStage from '../components/horizon/HorizonStage.vue'
-import { RouterLink } from 'vue-router'
-import HorizonHistory from '../components/horizon/HorizonHistory.vue'
+import DeskSurface from '../components/desk/DeskSurface.vue'
+import DeskDock from '../components/desk/DeskDock.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
 import AskUserPrompt from '../components/chat/AskUserPrompt.vue'
-import MessageEditDialog from '../components/chat/MessageEditDialog.vue'
 import { ChatApiKey } from '../composables/useChat'
 import { useSentencePacer } from '../composables/horizon/useSentencePacer'
+import { useHorizonKeyboard } from '../composables/horizon/useHorizonKeyboard'
+import { useHorizonVoiceBridge } from '../composables/horizon/useHorizonVoiceBridge'
 import { useVoice } from '../composables/useVoice'
 import { useModal } from '../composables/useModal'
 import {
@@ -38,12 +40,14 @@ import { useChatStore } from '../stores/chat'
 import { useVoiceStore } from '../stores/voice'
 import { useTasksStore } from '../stores/tasks'
 import { useCalendarStore } from '../stores/calendar'
+import { useDeskStore } from '../stores/desk'
 import '../assets/styles/horizon.css'
 
 const chatStore = useChatStore()
 const voiceStore = useVoiceStore()
 const tasksStore = useTasksStore()
 const calendarStore = useCalendarStore()
+const desk = useDeskStore()
 
 const chatApi = inject(ChatApiKey, null)
 const _noop = (): void => {}
@@ -52,7 +56,6 @@ const send = chatApi?.sendMessage ?? _asyncNoop
 const stopGeneration = chatApi?.stopGeneration ?? _noop
 const respondToConfirmation = chatApi?.respondToConfirmation ?? _noop
 const answerAskUser = chatApi?.answerAskUser ?? _noop
-const editMessage = chatApi?.editMessage ?? _asyncNoop
 const isConnected = chatApi?.isConnected ?? ref(false)
 
 const {
@@ -69,35 +72,25 @@ const {
 } = useVoice()
 
 const { cadGenerationInProgress } = useGenerationState()
+const { state: modalState } = useModal()
 
-const { state: modalState, openCustom } = useModal()
-
-/* ── ANCHOR: local-state ── */
+/* ── local state ── */
 const composerActive = ref(false)
-const historyOpen = ref(false)
-const stageOpen = ref(false)
-const stageIndex = ref(0)
-/** Plan kept visible outside the working state (shelf PIANO toggle). */
-const planPinned = ref(false)
+const magazine = ref(false)
 const composerRef = ref<InstanceType<typeof HorizonComposer> | null>(null)
 const cockpitRef = ref<InstanceType<typeof HorizonCockpit> | null>(null)
-
-const magazine = ref(false)
 
 const reducedMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
-/* ── ANCHOR: derived ── */
+/* ── derived ── */
 const planSteps = computed(() => {
   const id = chatStore.currentConversation?.id
   return id ? tasksStore.tasksFor(id) : []
 })
 
 const artifacts = computed(() => extractArtifacts(chatStore.messages))
-const artifactCount = computed(
-  () => artifacts.value.length + (cadGenerationInProgress.value ? 1 : 0)
-)
 
 const sceneInputs = computed<HorizonSceneInputs>(() => ({
   isListening: voiceStore.isListening,
@@ -106,8 +99,6 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
   isStreaming: chatStore.isStreamingCurrentConversation,
   activeToolCount: chatStore.activeToolExecutions.length,
   planSteps: planSteps.value,
-  stageOpen: stageOpen.value,
-  artifactCount: artifactCount.value,
   composerActive: composerActive.value
 }))
 
@@ -120,7 +111,6 @@ const { displayed: pacedStream, reset: resetPacer } = useSentencePacer(
   { immediate: reducedMotion }
 )
 
-/** Last completed assistant message (shown in quiet until a new turn). */
 const lastResponse = computed(() => {
   const msgs = chatStore.messages
   for (let i = msgs.length - 1; i >= 0; i--) {
@@ -129,7 +119,6 @@ const lastResponse = computed(() => {
   return ''
 })
 
-/** Last user message, echoed in small caps below the line. */
 const lastUserQuery = computed(() => {
   const msgs = chatStore.messages
   for (let i = msgs.length - 1; i >= 0; i--) {
@@ -138,29 +127,22 @@ const lastUserQuery = computed(() => {
   return ''
 })
 
-/** What the response component shows per state. */
 const responseText = computed(() => {
   if (sceneState.value === 'responding') {
-    // While streaming: only the paced stream (the previous answer must not
-    // flash at turn start). Responding via TTS after the stream: the
-    // committed message is the source of truth.
     return chatStore.isStreamingCurrentConversation ? pacedStream.value : lastResponse.value
   }
-  if (sceneState.value === 'quiet' || sceneState.value === 'presenting') return lastResponse.value
+  if (sceneState.value === 'quiet') return lastResponse.value
   return ''
 })
 
 const showResponse = computed(
   () =>
     responseText.value !== '' &&
-    (sceneState.value === 'responding' ||
-      sceneState.value === 'presenting' ||
-      (sceneState.value === 'quiet' && !composerActive.value))
+    (sceneState.value === 'responding' || (sceneState.value === 'quiet' && !composerActive.value))
 )
 
 const plan = computed(() => planView(planSteps.value))
 
-/** Mono state microlabel at the line's right end (quiet stays mute). */
 const lineLabel = computed(() => {
   if (voiceStore.isListening) return 'ASCOLTO'
   if (voiceStore.isProcessing) return 'ELABORO'
@@ -169,11 +151,10 @@ const lineLabel = computed(() => {
       ? `LAVORO ${plan.value.activeIndex + 1} DI ${plan.value.total}`
       : 'LAVORO'
   if (sceneState.value === 'responding') return 'RISPONDO'
-  if (sceneState.value === 'presenting') return 'OPERE'
   return ''
 })
 
-/* Ephemeral tool annotation: latest active tool name, faded after 2.5 s. */
+/* Ephemeral tool annotation (ambient sign; full detail = Attività window). */
 const toolAnnotation = ref('')
 let annotationTimer: ReturnType<typeof setTimeout> | null = null
 watch(
@@ -196,47 +177,14 @@ const sceneDimmed = computed(
   () => pendingConfirmationsList.value.length > 0 || pendingAskUserList.value.length > 0
 )
 
-/* ── ANCHOR: interactions ── */
-async function startEdit(messageId: string): Promise<void> {
-  if (chatStore.isStreamingCurrentConversation) return
-  const msg = chatStore.messages.find((m) => m.id === messageId)
-  if (!msg || msg.role !== 'user') return
-  await openCustom({
-    component: MessageEditDialog,
-    props: {
-      originalContent: msg.content,
-      onSubmit: async (newContent: string) => {
-        await editMessage(messageId, newContent)
-      }
-    },
-    width: '560px'
-  })
-}
-
-function handleVersionSwitch(versionGroupId: string, versionIndex: number): void {
-  chatStore.switchVersion(versionGroupId, versionIndex)
-}
-
-async function handleBranch(messageId: string): Promise<void> {
-  if (chatStore.isStreamingCurrentConversation) return
-  await chatStore.branchConversation(messageId)
-}
-
-/** Shelf medallion → summon the stage on that artifact. */
-function openArtifact(i: number): void {
-  stageIndex.value = i
-  stageOpen.value = true
-}
-
-/** Clicking empty scene space toggles voice (mirrors the old orb click). */
+/* ── interactions ── */
+/** Clicking empty desk space toggles voice — never windows, dock or overlays. */
 function handleSceneClick(event: MouseEvent): void {
-  // A pending dialog dims the scene (pointer-events: none) and retargets
-  // every click to this wrapper — never treat those as voice toggles.
   if (sceneDimmed.value) return
   const tgt = event.target as HTMLElement | null
   if (
     tgt?.closest(
-      'button, a, input, textarea, [contenteditable], .hz-stage, .hz-history, .hz-response'
+      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response'
     )
   )
     return
@@ -254,7 +202,6 @@ function handleSceneClick(event: MouseEvent): void {
   }
 }
 
-/** Sends typed text (+ pending cockpit attachments); collapses the composer. */
 async function handleComposerSend(content: string): Promise<void> {
   const files = cockpitRef.value ? [...cockpitRef.value.pendingFiles] : []
   cockpitRef.value?.clearAllFiles()
@@ -262,64 +209,37 @@ async function handleComposerSend(content: string): Promise<void> {
   await send(content, undefined, files.length > 0 ? files : undefined).catch(console.error)
 }
 
-/** Composer paste lands in the cockpit's attachment pipeline (images). */
 function handleComposerPaste(e: ClipboardEvent): void {
   cockpitRef.value?.handlePaste(e)
 }
 
-/**
- * Global key capture: Esc walks the interrupt chain; any printable first
- * character materializes the composer (Jarvis entry — no visible input box).
- */
-function onGlobalKeydown(e: KeyboardEvent): void {
-  if (e.isComposing) return
-  // A global modal owns the keyboard — never steal keystrokes or walk the chain.
-  if (modalState.visible) return
-  // A pending confirmation / ask_user owns the keyboard too: Esc must mean
-  // "reject the tool", never "abort the whole turn" (mirrors the click guard).
-  if (sceneDimmed.value) return
-  if (e.key === 'Escape') {
-    if (voiceStore.isSpeaking) cancelSpeak()
-    else if (chatStore.isStreamingCurrentConversation) stopGeneration()
-    else if (stageOpen.value) stageOpen.value = false
-    else if (historyOpen.value) historyOpen.value = false
-    else if (planPinned.value) planPinned.value = false
-    else composerActive.value = false
-    return
-  }
-  if (composerActive.value) return
-  // The open history drawer owns typing focus — don't materialize the
-  // composer invisibly behind it.
-  if (historyOpen.value) return
-  const tgt = e.target as HTMLElement | null
-  if (tgt?.closest('input, textarea, select, button, [contenteditable="true"], [role="dialog"]'))
-    return
-  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault()
-    composerActive.value = true
-    composerRef.value?.seed(e.key)
-  }
+function activateComposer(seed: string): void {
+  composerActive.value = true
+  composerRef.value?.seed(seed)
 }
 
-/* ── ANCHOR: voice-wiring ── */
-// STT transcript: auto-send by default; with "Conferma trascrizione" on, the
-// transcript lands in the composer instead — editable serif line, Enter sends.
-watch(
-  () => voiceStore.transcript,
-  (text) => {
-    if (!text.trim()) return
-    const spoken = text.trim()
-    voiceStore.clearTranscript()
-    if (voiceStore.confirmTranscript) {
-      composerActive.value = true
-      composerRef.value?.seed(spoken)
-    } else {
-      send(spoken, undefined, undefined, { source: 'voice' }).catch(console.error)
-    }
-  }
-)
+/** Materialize the ambient conversation into the chat window (singleton). */
+function materializeConversation(): void {
+  desk.openWindow('chat')
+}
 
-// New turn: reset pacing + magazine when a fresh stream starts.
+useHorizonKeyboard({
+  modalVisible: () => modalState.visible,
+  sceneDimmed: () => sceneDimmed.value,
+  composerActive,
+  isSpeaking: () => voiceStore.isSpeaking,
+  isStreaming: () => chatStore.isStreamingCurrentConversation,
+  cancelSpeak,
+  stopGeneration,
+  seedComposer: (ch) => composerRef.value?.seed(ch),
+  hasFocusedWindow: () => desk.focusedId !== null,
+  blurWindows: () => desk.blurWindows()
+})
+
+useHorizonVoiceBridge({ send, activateComposer, speak })
+
+/* ── watchers ── */
+// New turn: reset pacing + magazine.
 watch(
   () => chatStore.isStreamingCurrentConversation,
   (streaming, was) => {
@@ -330,15 +250,12 @@ watch(
   }
 )
 
-// Conversation switch: pacing, layout and stage never leak across conversations.
+// Conversation switch: pacing and layout never leak across conversations.
 watch(
   () => chatStore.currentConversation?.id,
   (id) => {
     resetPacer()
     magazine.value = false
-    stageOpen.value = false
-    stageIndex.value = 0
-    planPinned.value = false
     if (id)
       tasksStore.ensureForConversation(id).catch(() => {
         /* timeline stays empty */
@@ -346,69 +263,32 @@ watch(
   }
 )
 
-// TTS auto-speak when streaming completes (lifted from the legacy view).
-let wasStreamingHere = false
-watch(
-  () => chatStore.isStreamingCurrentConversation,
-  (streaming) => {
-    if (streaming) {
-      wasStreamingHere = true
-      return
-    }
-    if (!wasStreamingHere) return
-    wasStreamingHere = false
-    if (!voiceStore.autoTtsResponse || !voiceStore.ttsAvailable || !voiceStore.connected) return
-    const msgs = chatStore.messages
-    let lastUserIdx = -1
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role === 'user') {
-        lastUserIdx = i
-        break
-      }
-    }
-    const allContent = msgs
-      .slice(lastUserIdx + 1)
-      .filter((m) => m.role === 'assistant' && m.content.trim())
-      .map((m) => m.content.trim())
-      .join('\n')
-    if (allContent) speak(allContent)
-  }
-)
-
-// Auto-open the stage when a new artifact ARRIVES in a live turn (spec §3.5).
-// The streaming gate keeps restored conversations (messages loading async on
-// mount) and conversation switches from phantom-opening the stage.
+// A new artifact in a live turn opens its window (auto-open, spec §3.2).
 watch(
   () => artifacts.value.length,
   (len, was) => {
     if (len > (was ?? 0) && chatStore.isStreamingCurrentConversation) {
-      stageOpen.value = true
-      stageIndex.value = len - 1
-      // A long answer in the same turn must not squeeze the stage to half
-      // height: the stage owns the lower zone, prose stays compact above.
-      magazine.value = false
-    } else if (stageIndex.value >= len) {
-      stageIndex.value = Math.max(0, len - 1)
+      const a = artifacts.value[len - 1]
+      if (a.kind === 'chart') desk.openWindow('chart', { chartPayload: a.chart })
+      else if (a.kind === 'whiteboard')
+        desk.openWindow('whiteboard', { boardId: a.board?.board_id })
+      else desk.openWindow('cad3d')
     }
   }
 )
 
-// CAD generation surfaces the stage once per generation. Watch the stable
-// executionId: the progress computed returns a fresh object every tick, and
-// re-opening on each tick would defeat the user's Esc/✕ mid-generation.
+// CAD generation surfaces its window once per generation (stable executionId).
 watch(
   () => cadGenerationInProgress.value?.executionId,
   (id, old) => {
-    if (id && id !== old) stageOpen.value = true
+    if (id && id !== old) desk.openWindow('cad3d')
   }
 )
 
-/* ── ANCHOR: lifecycle ── */
+/* ── lifecycle ── */
 onMounted(() => {
   connectVoice()
   chatStore.restoreConversation().catch(console.error)
-  // Polling (not a one-shot refresh): the quiet scene is an ambient,
-  // always-on surface — the colophon's next event must not go stale.
   calendarStore.startPolling()
   const id = chatStore.currentConversation?.id
   if (id) {
@@ -416,12 +296,10 @@ onMounted(() => {
       /* timeline simply stays empty */
     })
   }
-  window.addEventListener('keydown', onGlobalKeydown)
 })
 
 onBeforeUnmount(() => {
   calendarStore.stopPolling()
-  window.removeEventListener('keydown', onGlobalKeydown)
   if (annotationTimer) clearTimeout(annotationTimer)
 })
 </script>
@@ -434,7 +312,6 @@ onBeforeUnmount(() => {
       </template>
 
       <template #upper>
-        <!-- ANCHOR: upper-zone -->
         <Transition name="hz-soft">
           <HorizonQuiet v-if="sceneState === 'quiet' && !composerActive && !lastResponse" />
         </Transition>
@@ -469,7 +346,7 @@ onBeforeUnmount(() => {
           v-model:magazine="magazine"
           :text="responseText"
           :user-query="lastUserQuery"
-          :compact="sceneState === 'presenting'"
+          :compact="false"
         />
         <p v-if="sceneState === 'working' && plan.statusSentence" class="horizon-view__status">
           <em>{{ plan.statusSentence }}</em>
@@ -477,41 +354,20 @@ onBeforeUnmount(() => {
       </template>
 
       <template #line>
-        <!-- dimmed → "embers" when the chat socket is down (spec §3.6) -->
         <HorizonLine
           :mode="lineMode"
           :audio-level="voiceStore.audioLevel"
-          :notch-count="sceneState === 'working' || planPinned ? planSteps.length : 0"
+          :notch-count="sceneState === 'working' ? planSteps.length : 0"
           :active-index="plan.activeIndex"
           :completed-count="plan.completed"
           :dimmed="!isConnected"
           :label="lineLabel"
-          :attenuated="sceneState === 'presenting'"
         />
       </template>
 
       <template #lower>
-        <!-- ANCHOR: lower-zone -->
-        <HorizonShelf
-          :artifacts="artifacts"
-          :plan-total="planSteps.length"
-          :plan-completed="plan.completed"
-          :active-artifact-index="sceneState === 'presenting' ? stageIndex : null"
-          :plan-pinned="planPinned"
-          @open-artifact="openArtifact"
-          @toggle-plan="planPinned = !planPinned"
-        />
-        <Transition name="hz-rise">
-          <HorizonStage
-            v-if="sceneState === 'presenting'"
-            v-model:active-index="stageIndex"
-            :artifacts="artifacts"
-            :cad-generation="cadGenerationInProgress"
-            @close="stageOpen = false"
-          />
-        </Transition>
         <HorizonPlan
-          v-if="(sceneState === 'working' || planPinned) && planSteps.length > 0"
+          v-if="sceneState === 'working' && planSteps.length > 0"
           :steps="planSteps"
           :active-index="plan.activeIndex"
           :completed="plan.completed"
@@ -522,39 +378,27 @@ onBeforeUnmount(() => {
           v-model:magazine="magazine"
           :text="responseText"
           :user-query="lastUserQuery"
-          :compact="sceneState === 'presenting'"
+          :compact="false"
         />
         <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
           {{ lastUserQuery }}
         </p>
-        <HorizonColophon
-          v-if="sceneState !== 'presenting'"
-          :next-event="calendarStore.nextEvent"
-          :connected="isConnected"
-        />
+        <HorizonColophon :next-event="calendarStore.nextEvent" :connected="isConnected" />
       </template>
     </HorizonScene>
 
-    <!-- ANCHOR: overlays -->
+    <!-- The windows layer + tray (the desk) -->
+    <DeskSurface />
+    <DeskDock />
+
     <nav class="horizon-view__corner" aria-label="Navigazione">
-      <button class="horizon-view__affordance" @click="historyOpen = !historyOpen">STORIA</button>
+      <button class="horizon-view__affordance" type="button" @click="materializeConversation">
+        CONVERSAZIONE
+      </button>
       <RouterLink class="horizon-view__affordance" :to="{ name: 'workspace' }">
         WORKSPACE
       </RouterLink>
     </nav>
-
-    <HorizonHistory
-      :open="historyOpen"
-      :messages="chatStore.messages"
-      :is-streaming="chatStore.isStreamingCurrentConversation"
-      :branch-disabled="chatStore.isStreamingCurrentConversation"
-      :get-version-count="chatStore.getVersionCount"
-      :get-active-version-index="chatStore.getActiveVersionIndex"
-      @close="historyOpen = false"
-      @edit="startEdit"
-      @switch-version="handleVersionSwitch"
-      @branch="handleBranch"
-    />
 
     <ToolConfirmationDialog
       v-if="pendingConfirmationsList.length > 0"
@@ -563,9 +407,7 @@ onBeforeUnmount(() => {
       @respond="respondToConfirmation"
     />
 
-    <!-- ask_user must sit ABOVE the dimmed scene (spec §3.6): the scene gets
-         pointer-events: none while a prompt is pending, so an in-scene render
-         would be unclickable. -->
+    <!-- ask_user sits ABOVE the dimmed scene (pointer-events gate). -->
     <div v-if="pendingAskUserList.length > 0" class="horizon-view__ask">
       <AskUserPrompt
         v-for="r in pendingAskUserList"
@@ -585,7 +427,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* ask_user overlay — centered above the dimmed scene, scrolls if tall. */
 .horizon-view__ask {
   position: absolute;
   inset: 0;
@@ -603,7 +444,6 @@ onBeforeUnmount(() => {
   width: min(640px, 92%);
 }
 
-/* Shared soft fade for scene content swaps. */
 .hz-soft-enter-active,
 .hz-soft-leave-active {
   transition: opacity var(--hz-fade) ease;
@@ -611,20 +451,6 @@ onBeforeUnmount(() => {
 
 .hz-soft-enter-from,
 .hz-soft-leave-to {
-  opacity: 0;
-}
-
-/* The stage rises from below the horizon and sinks back on close. */
-.hz-rise-enter-active,
-.hz-rise-leave-active {
-  transition:
-    transform var(--hz-morph) var(--ease-out-expo),
-    opacity var(--hz-morph) ease;
-}
-
-.hz-rise-enter-from,
-.hz-rise-leave-to {
-  transform: translateY(48px);
   opacity: 0;
 }
 

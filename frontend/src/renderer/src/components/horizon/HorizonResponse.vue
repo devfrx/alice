@@ -15,7 +15,7 @@ const props = defineProps<{
   text: string
   userQuery: string
   magazine: boolean
-  /** Compact mode while the stage (presenting) is open. */
+  /** Compact mode (reserved for callers with a tighter response zone). */
   compact?: boolean
 }>()
 
@@ -28,8 +28,8 @@ const sentenceCount = computed(() => (props.text.match(/[.!?…]+(\s|$)/g) ?? []
 watch(
   sentenceCount,
   (n) => {
-    // Never flip while compact (presenting): the stage owns the lower zone
-    // and a magazine column there would squeeze it to half height.
+    // Never flip while compact: the caller owns the lower zone and a
+    // magazine column there would squeeze it to half height.
     if (n > MAGAZINE_THRESHOLD && !props.magazine && !props.compact) {
       emit('update:magazine', true)
     }

@@ -23,8 +23,7 @@ const QUOTAS: Record<HorizonState, number> = {
   quiet: 0.58,
   listening: 0.6,
   responding: 0.64,
-  working: 0.5,
-  presenting: 0.26
+  working: 0.5
 }
 
 const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))

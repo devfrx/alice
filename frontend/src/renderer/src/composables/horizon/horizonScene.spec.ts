@@ -22,8 +22,6 @@ function inputs(over: Partial<HorizonSceneInputs> = {}): HorizonSceneInputs {
     isStreaming: false,
     activeToolCount: 0,
     planSteps: [],
-    stageOpen: false,
-    artifactCount: 0,
     composerActive: false,
     ...over
   }
@@ -60,20 +58,21 @@ describe('deriveSceneState', () => {
     ).toBe('responding')
   })
 
-  it('presenting wins over everything when the stage is open with artifacts', () => {
-    expect(
-      deriveSceneState(
-        inputs({ stageOpen: true, artifactCount: 1, isStreaming: true, activeToolCount: 2 })
-      )
-    ).toBe('presenting')
-  })
-
-  it('stage open without artifacts does NOT present', () => {
-    expect(deriveSceneState(inputs({ stageOpen: true }))).toBe('quiet')
-  })
-
   it('responding wins over listening (hot mic while the model streams)', () => {
     expect(deriveSceneState(inputs({ isStreaming: true, isListening: true }))).toBe('responding')
+  })
+
+  it('never returns presenting: windows are orthogonal to the scene', () => {
+    const state = deriveSceneState({
+      isListening: false,
+      isSttProcessing: false,
+      isSpeaking: false,
+      isStreaming: false,
+      activeToolCount: 0,
+      planSteps: [],
+      composerActive: false
+    })
+    expect(state).toBe('quiet')
   })
 })
 
@@ -85,7 +84,6 @@ describe('deriveLineMode', () => {
     expect(deriveLineMode('responding', inputs({ isStreaming: true }))).toBe('breathe')
     expect(deriveLineMode('working', inputs({ planSteps: [step('a')] }))).toBe('timeline')
     expect(deriveLineMode('working', inputs({ activeToolCount: 1 }))).toBe('flow')
-    expect(deriveLineMode('presenting', inputs())).toBe('breathe')
   })
 })
 

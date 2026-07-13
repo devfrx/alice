@@ -30,8 +30,6 @@ const props = withDefaults(
     dimmed?: boolean
     /** State microlabel at the line's right end ('' = hidden). */
     label?: string
-    /** Flatten + fade the line (stage presenting). */
-    attenuated?: boolean
     /** Notches drawn as completed (first N). */
     completedCount?: number
   }>(),
@@ -41,7 +39,6 @@ const props = withDefaults(
     activeIndex: -1,
     dimmed: false,
     label: '',
-    attenuated: false,
     completedCount: 0
   }
 )
@@ -94,7 +91,7 @@ function draw(now: number): void {
   const cy = height / 2
   const margin = width * 0.06
   const span = width - margin * 2
-  const alpha = (props.dimmed ? 0.35 : 1) * (props.attenuated ? 0.55 : 1)
+  const alpha = props.dimmed ? 0.35 : 1
 
   // Clamp to [0.06, 1]: a NaN or out-of-range level would poison the
   // exponential smoother permanently (NaN never decays back).
@@ -125,7 +122,7 @@ function draw(now: number): void {
     let y = cy
     if (!reducedMotion) {
       if (props.mode === 'breathe') {
-        y = cy + Math.sin(t * 0.7 + f * Math.PI) * (props.attenuated ? 0.5 : 1.5) * env
+        y = cy + Math.sin(t * 0.7 + f * Math.PI) * 1.5 * env
       } else if (props.mode === 'tense') {
         // Stronger audio response, biased upward: the crest visibly lifts.
         y =
@@ -282,7 +279,6 @@ watch(
     props.activeIndex,
     props.dimmed,
     props.label,
-    props.attenuated,
     props.completedCount
   ],
   () => {

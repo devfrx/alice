@@ -99,7 +99,8 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
   isStreaming: chatStore.isStreamingCurrentConversation,
   activeToolCount: chatStore.activeToolExecutions.length,
   planSteps: planSteps.value,
-  composerActive: composerActive.value
+  composerActive: composerActive.value,
+  isThinking: false
 }))
 
 const sceneState = computed(() => deriveSceneState(sceneInputs.value))

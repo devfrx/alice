@@ -22,6 +22,7 @@ const props = withDefaults(
 const QUOTAS: Record<HorizonState, number> = {
   quiet: 0.58,
   listening: 0.6,
+  thinking: 0.6,
   responding: 0.64,
   working: 0.5
 }

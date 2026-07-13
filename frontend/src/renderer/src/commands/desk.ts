@@ -36,6 +36,11 @@ export function installDeskCommands(router: Router): void {
     commandRegistry.unregister(name)
   }
 
+  // `navigation` by deliberate spec choice (§5): a window is UI chrome, not
+  // domain state — plan tier must still let the agent SHOW things (plan,
+  // charts). The localStorage write it implies is presentation-only and
+  // freely reversible; creating domain data stays `mutate` (cf.
+  // `conversation.new`).
   commandRegistry.register<WindowOpenArgs>({
     name: 'window.open',
     title: 'Apri finestra',

@@ -78,4 +78,29 @@ describe('installDeskCommands', () => {
     const out = (await commandRegistry.execute('window.list', {})) as { windows: unknown[] }
     expect(out.windows).toHaveLength(1)
   })
+
+  it('window.arrange executes on the store', async () => {
+    installDeskCommands(fakeRouter('assistant'))
+    await commandRegistry.execute('window.open', { module: 'chart' })
+    await commandRegistry.execute('window.open', { module: 'whiteboard' })
+    await expect(
+      commandRegistry.execute('window.arrange', { preset: 'tile' })
+    ).resolves.toBeUndefined()
+  })
+
+  it('window.list snapshot has the contract shape', async () => {
+    installDeskCommands(fakeRouter('assistant'))
+    await commandRegistry.execute('window.open', { module: 'chart' })
+    const out = (await commandRegistry.execute('window.list', {})) as {
+      windows: Array<Record<string, unknown>>
+    }
+    expect(Object.keys(out.windows[0]).sort()).toEqual([
+      'focused',
+      'id',
+      'minimized',
+      'module',
+      'rect',
+      'title'
+    ])
+  })
 })

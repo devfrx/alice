@@ -40,9 +40,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="hz-thinking">
+  <div class="hz-thinking" aria-live="polite">
     <Transition name="hz-think" mode="out-in">
-      <p :key="shown" class="hz-thinking__line" aria-live="polite">
+      <p v-if="shown" :key="shown" class="hz-thinking__line">
         sta ragionando — <em>«{{ shown }}»</em>
       </p>
     </Transition>

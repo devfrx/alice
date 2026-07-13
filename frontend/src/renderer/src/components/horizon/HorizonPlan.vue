@@ -25,7 +25,13 @@ const items = computed(() => manuscriptView(props.steps))
 <template>
   <div class="hz-plan">
     <span class="hz-plan__tether" aria-hidden="true" />
-    <TransitionGroup tag="ol" name="hz-plan-step" class="hz-plan__list" appear>
+    <TransitionGroup
+      tag="ol"
+      name="hz-plan-step"
+      class="hz-plan__list"
+      appear
+      appear-active-class="hz-plan-step-appear-active"
+    >
       <li
         v-for="(it, row) in items"
         :key="it.kind === 'step' ? `s-${it.index}` : it.kind"
@@ -36,6 +42,7 @@ const items = computed(() => manuscriptView(props.steps))
           'hz-plan__row--meta': it.kind !== 'step'
         }"
         :style="{ '--row': row }"
+        :aria-current="it.kind === 'step' && it.index === activeIndex ? 'step' : undefined"
       >
         <template v-if="it.kind === 'step'">
           <span class="hz-plan__marker" aria-hidden="true" />
@@ -72,6 +79,7 @@ const items = computed(() => manuscriptView(props.steps))
 }
 
 .hz-plan__list {
+  position: relative;
   list-style: none;
   margin: clamp(4px, 1vh, 10px) 0 0;
   padding: 0;
@@ -93,7 +101,8 @@ const items = computed(() => manuscriptView(props.steps))
   color: var(--hz-ink-faint);
   transition:
     color var(--hz-fade) ease,
-    opacity var(--hz-fade) ease;
+    opacity var(--hz-fade) ease,
+    font-size var(--hz-fade) ease;
 }
 
 .hz-plan__marker {
@@ -166,21 +175,33 @@ const items = computed(() => manuscriptView(props.steps))
   }
 }
 
-/* Staggered reveal: each row waits for the previous one (80ms). */
-.hz-plan-step-enter-active {
+/* Staggered reveal on the plan's FIRST appearance only: each row waits for
+   the previous one (80ms). Mid-run enters (late-added steps) use the plain
+   delay-free fade below. */
+.hz-plan-step-appear-active {
   transition:
     opacity 480ms var(--ease-out),
     transform 480ms var(--ease-out);
   transition-delay: calc(var(--row) * 80ms);
 }
 
+.hz-plan-step-enter-active {
+  transition:
+    opacity 480ms var(--ease-out),
+    transform 480ms var(--ease-out);
+}
+
 .hz-plan-step-leave-active {
   transition: opacity 200ms var(--ease-out);
   position: absolute; /* leaving rows don't push the list around */
+  max-width: 100%;
 }
 
 .hz-plan-step-move {
-  transition: transform 320ms var(--ease-out);
+  transition:
+    transform 320ms var(--ease-out),
+    color var(--hz-fade) ease,
+    opacity var(--hz-fade) ease;
 }
 
 .hz-plan-step-enter-from {
@@ -223,6 +244,7 @@ const items = computed(() => manuscriptView(props.steps))
     animation: none;
   }
 
+  .hz-plan-step-appear-active,
   .hz-plan-step-enter-active,
   .hz-plan-step-leave-active,
   .hz-plan-step-move {

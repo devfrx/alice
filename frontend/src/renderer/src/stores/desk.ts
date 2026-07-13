@@ -231,11 +231,17 @@ export const useDeskStore = defineStore('desk', () => {
     return focusWindow(id)
   }
 
-  /** Apply an arrange preset to the non-minimized windows (stacking order). */
+  /**
+   * Apply an arrange preset to the non-minimized windows (stacking order).
+   * Slot rects are computed for ALL visible windows (stable layout), but the
+   * window currently under a user drag keeps its rect (same guard as
+   * moveWindow/resizeWindow for external mutations).
+   */
   function arrangeWindows(preset: DeskArrangePreset): void {
     const visible = ordered.value.filter((w) => !w.minimized)
     const rects = arrangeRects(visible.length, viewport.value, preset)
     visible.forEach((w, i) => {
+      if (w.id === draggingId.value) return
       const target = _byId(w.id)
       if (target !== undefined) target.rect = rects[i]
     })

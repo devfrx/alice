@@ -139,4 +139,24 @@ describe('desk store', () => {
       }
     ])
   })
+
+  it('arrangeWindows skips the window being dragged', () => {
+    const desk = useDeskStore()
+    const a = desk.openWindow('chart') as string
+    desk.openWindow('whiteboard')
+    desk.setDragging(a)
+    const before = { ...desk.windows.find((w) => w.id === a)!.rect }
+    desk.arrangeWindows('tile')
+    expect(desk.windows.find((w) => w.id === a)!.rect).toEqual(before)
+    desk.setDragging(null)
+  })
+
+  it('persist stays bounded (no self-triggering watch regression)', () => {
+    const desk = useDeskStore()
+    const id = desk.openWindow('chart') as string
+    const spy = vi.spyOn(localStorage, 'setItem')
+    desk.focusWindow(id)
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(3)
+    spy.mockRestore()
+  })
 })

@@ -61,7 +61,12 @@ function stateOf(moduleId: string): 'open' | 'minimized' | 'none' {
         :class="{ 'desk-dock__dot--minimized': stateOf(m.id) === 'minimized' }"
         aria-hidden="true"
       />
-      <span v-if="m.id === 'activity' && activityCount > 0" class="desk-dock__badge">
+      <span
+        v-if="m.id === 'activity' && activityCount > 0"
+        class="desk-dock__badge"
+        role="status"
+        :aria-label="`${activityCount} attività in corso`"
+      >
         {{ activityCount }}
       </span>
     </span>

@@ -1,7 +1,7 @@
 /** Tests for the pure artifact extraction (tool-message JSON → flat list). */
 import { describe, it, expect } from 'vitest'
 
-import { artifactLabel, extractArtifacts } from './horizonArtifacts'
+import { extractArtifacts } from './horizonArtifacts'
 
 type Msg = { role: string; content: string }
 
@@ -64,13 +64,5 @@ describe('extractArtifacts', () => {
       { role: 'tool', content: JSON.stringify({ some_field: 'value', other_field: 42 }) }
     ])
     expect(out).toEqual([])
-  })
-})
-
-describe('artifactLabel', () => {
-  it('maps each kind to its editorial caption', () => {
-    expect(artifactLabel('3d')).toBe('MODELLO')
-    expect(artifactLabel('chart')).toBe('GRAFICO')
-    expect(artifactLabel('whiteboard')).toBe('LAVAGNA')
   })
 })

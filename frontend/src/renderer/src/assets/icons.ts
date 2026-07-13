@@ -163,9 +163,6 @@ const _ICONS = {
   /** Lightning bolt with flash (intense) */
   'lightning-flash': { icon: 'solar:bolt-circle-bold' },
 
-  /** Abstract orb (assistant surface) */
-  orb: { icon: 'solar:planet-bold' },
-
   // ── Layout / navigation ───────────────────────────────────────────────────
 
   /** Home / dashboard landing */

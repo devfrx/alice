@@ -9,7 +9,6 @@ import {
   deriveLineMode,
   notchPositions,
   planView,
-  toRoman,
   type HorizonSceneInputs
 } from './horizonScene'
 import type { TaskStep } from '../../types/tasks'
@@ -104,18 +103,5 @@ describe('planView', () => {
     expect(planView([step('uno', 'completed'), step('due')]).activeIndex).toBe(1)
     expect(planView([step('uno', 'completed')]).activeIndex).toBe(0)
     expect(planView([]).statusSentence).toBe('')
-  })
-})
-
-describe('toRoman', () => {
-  it('formats stage captions', () => {
-    expect(toRoman(1)).toBe('I')
-    expect(toRoman(4)).toBe('IV')
-    expect(toRoman(9)).toBe('IX')
-    expect(toRoman(14)).toBe('XIV')
-  })
-
-  it('degrades to an empty string below 1', () => {
-    expect(toRoman(0)).toBe('')
   })
 })

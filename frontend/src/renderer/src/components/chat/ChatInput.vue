@@ -39,7 +39,7 @@ const isOnWorkspace = computed(() => route.path.startsWith('/workspace'))
 const modeTarget = computed(() => (isOnWorkspace.value ? 'assistant' : 'workspace'))
 
 /** Icon for the mode ghost button — reflects the destination view. */
-const modeIcon = computed(() => (isOnWorkspace.value ? 'orb' : 'hybrid-panel'))
+const modeIcon = computed(() => (isOnWorkspace.value ? 'pulse' : 'hybrid-panel'))
 const modeTitle = computed(() => (isOnWorkspace.value ? "Vai all'assistente" : 'Vai al workspace'))
 
 /** Switch between the two primary surfaces (Workspace ↔ Assistant). */

@@ -50,7 +50,10 @@ function _isFiniteNum(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v)
 }
 
-function _validateWindow(raw: unknown, isRegistered: (id: string) => boolean): raw is DeskWindowState {
+function _validateWindow(
+  raw: unknown,
+  isRegistered: (id: string) => boolean
+): raw is DeskWindowState {
   if (!_isObject(raw)) return false
   if (typeof raw.id !== 'string' || raw.id === '') return false
   if (typeof raw.moduleId !== 'string' || !isRegistered(raw.moduleId)) return false
@@ -76,7 +79,9 @@ export function migrateDeskLayout(
   if (!_isObject(raw) || raw.version !== 1 || !Array.isArray(raw.windows)) {
     return { version: 1, windows: [] }
   }
-  const windows = compactZ(raw.windows.filter((w): w is DeskWindowState => _validateWindow(w, isRegistered)))
+  const windows = compactZ(
+    raw.windows.filter((w): w is DeskWindowState => _validateWindow(w, isRegistered))
+  )
   return { version: 1, windows }
 }
 
@@ -112,12 +117,17 @@ export const useDeskStore = defineStore('desk', () => {
     return out
   })
 
+  /**
+   * Persist a z-compacted snapshot WITHOUT mutating state (mirrors the
+   * workspace store's non-mutating _persistLayout, so the deep watch below
+   * never self-triggers). In-memory z values stay monotonic for the session
+   * and are compacted at persist/load time.
+   */
   function _persist(): void {
     try {
-      windows.value = compactZ(windows.value)
       localStorage.setItem(
         DESK_LAYOUT_KEY,
-        JSON.stringify({ version: 1, windows: windows.value } satisfies DeskLayout)
+        JSON.stringify({ version: 1, windows: compactZ(windows.value) } satisfies DeskLayout)
       )
     } catch {
       /* localStorage may be unavailable */
@@ -185,7 +195,12 @@ export const useDeskStore = defineStore('desk', () => {
     focusedId.value = null
   }
 
-  function moveWindow(id: string, x: number, y: number, source: 'user' | 'external' = 'user'): boolean {
+  function moveWindow(
+    id: string,
+    x: number,
+    y: number,
+    source: 'user' | 'external' = 'user'
+  ): boolean {
     const win = _byId(id)
     if (win === undefined) return false
     if (source === 'external' && draggingId.value === id) return false

@@ -29,7 +29,13 @@ describe('migrateDeskLayout', () => {
     const raw = {
       version: 1,
       windows: [
-        { id: 'a', moduleId: 'chart', rect: { x: 1, y: 2, w: 400, h: 300 }, z: 3, minimized: false },
+        {
+          id: 'a',
+          moduleId: 'chart',
+          rect: { x: 1, y: 2, w: 400, h: 300 },
+          z: 3,
+          minimized: false
+        },
         { id: 'b', moduleId: 'ghost', rect: { x: 1, y: 2, w: 400, h: 300 }, z: 1, minimized: false }
       ]
     }

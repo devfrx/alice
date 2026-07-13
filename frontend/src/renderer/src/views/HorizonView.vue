@@ -32,6 +32,7 @@ import { useModal } from '../composables/useModal'
 import {
   deriveSceneState,
   deriveLineMode,
+  deriveSkyMode,
   planView,
   type HorizonSceneInputs
 } from '../composables/horizon/horizonScene'
@@ -107,6 +108,7 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
 
 const sceneState = computed(() => deriveSceneState(sceneInputs.value))
 const lineMode = computed(() => deriveLineMode(sceneState.value, sceneInputs.value))
+const skyMode = computed(() => deriveSkyMode(sceneState.value, sceneInputs.value))
 
 const { displayed: pacedStream, reset: resetPacer } = useSentencePacer(
   computed(() => chatStore.currentStreamContent),
@@ -310,7 +312,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="horizon-view" aria-label="Assistente" @click="handleSceneClick">
-    <HorizonScene :state="sceneState" :magazine="magazine" :dimmed="sceneDimmed">
+    <HorizonScene :state="sceneState" :sky="skyMode" :magazine="magazine" :dimmed="sceneDimmed">
       <template #masthead>
         <HorizonMasthead :connected="isConnected" />
       </template>

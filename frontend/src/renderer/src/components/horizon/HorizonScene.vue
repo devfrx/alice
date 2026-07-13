@@ -5,7 +5,8 @@
  * that movement IS the visible morph. Pure layout: no stores.
  */
 import { computed } from 'vue'
-import type { HorizonState } from '../../composables/horizon/horizonScene'
+import HorizonSky from './HorizonSky.vue'
+import type { HorizonState, HorizonSkyMode } from '../../composables/horizon/horizonScene'
 
 const props = withDefaults(
   defineProps<{
@@ -14,8 +15,10 @@ const props = withDefaults(
     magazine?: boolean
     /** Dim the whole scene (a dialog is in front). */
     dimmed?: boolean
+    /** Living backdrop mode (HorizonSky). */
+    sky?: HorizonSkyMode
   }>(),
-  { magazine: false, dimmed: false }
+  { magazine: false, dimmed: false, sky: 'idle' }
 )
 
 /** Line vertical quota per state (fraction of scene height). */
@@ -36,6 +39,7 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
     :class="[`hz-scene--${state}`, { 'hz-scene--dimmed': dimmed }]"
     :style="{ '--quota': `${quota * 100}%` }"
   >
+    <HorizonSky :mode="sky" :line-quota="quota" />
     <header class="hz-scene__masthead"><slot name="masthead" /></header>
     <div class="hz-scene__upper"><slot name="upper" /></div>
     <div class="hz-scene__line"><slot name="line" /></div>

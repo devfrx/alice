@@ -132,13 +132,21 @@ describe('_clearOpenModuleHandlers', () => {
 
 describe('MODULE_REGISTRY shape', () => {
   // Optional registry shape tests co-located here for convenience.
-  it('module registry has the six expected ids', async () => {
+  it('module registry has the seven expected ids', async () => {
     const { MODULE_REGISTRY } = await import('./moduleRegistry')
 
     expect(Object.keys(MODULE_REGISTRY)).toEqual(
-      expect.arrayContaining(['chat', 'chart', 'whiteboard', 'cad3d', 'plan', 'terminal'])
+      expect.arrayContaining([
+        'chat',
+        'chart',
+        'whiteboard',
+        'cad3d',
+        'plan',
+        'terminal',
+        'activity'
+      ])
     )
-    expect(Object.keys(MODULE_REGISTRY)).toHaveLength(6)
+    expect(Object.keys(MODULE_REGISTRY)).toHaveLength(7)
   })
 
   it('each entry has a non-empty label and a function component', async () => {
@@ -161,18 +169,20 @@ describe('MODULE_REGISTRY shape', () => {
     expect(isModuleRegistered('cad3d')).toBe(true)
     expect(isModuleRegistered('plan')).toBe(true)
     expect(isModuleRegistered('terminal')).toBe(true)
+    expect(isModuleRegistered('activity')).toBe(true)
     // 'scope' was retired — scope is now managed inline via ScopeIndicator.
     expect(isModuleRegistered('scope')).toBe(false)
     expect(isModuleRegistered('nonexistent')).toBe(false)
     expect(isModuleRegistered('')).toBe(false)
   })
 
-  it('listModules returns all six defs', async () => {
+  it('listModules returns all seven defs', async () => {
     const { listModules } = await import('./moduleRegistry')
 
     const modules = listModules()
-    expect(modules).toHaveLength(6)
+    expect(modules).toHaveLength(7)
     expect(modules.map((m) => m.id).sort()).toEqual([
+      'activity',
       'cad3d',
       'chart',
       'chat',

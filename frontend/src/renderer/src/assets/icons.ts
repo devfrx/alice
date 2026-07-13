@@ -299,6 +299,9 @@ const _ICONS = {
   /** Bar chart */
   'bar-chart': { icon: 'solar:chart-2-bold' },
 
+  /** Agent activity (tools / subagents) */
+  pulse: { icon: 'solar:pulse-bold' },
+
   /** Magnifier zoom-in */
   'search-plus': { icon: 'solar:magnifer-zoom-in-bold' },
 

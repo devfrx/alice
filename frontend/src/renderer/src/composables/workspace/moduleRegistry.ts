@@ -95,6 +95,15 @@ const terminal: ModuleDef = {
   singleton: true
 }
 
+const activity: ModuleDef = {
+  id: 'activity',
+  label: 'Attività',
+  icon: 'pulse',
+  component: () => import('../../components/workspace/modules/ActivityModule.vue'),
+  defaultZone: 'right',
+  singleton: true
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -109,7 +118,8 @@ export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   whiteboard,
   cad3d,
   plan,
-  terminal
+  terminal,
+  activity
 }
 
 // ---------------------------------------------------------------------------

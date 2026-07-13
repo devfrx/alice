@@ -35,6 +35,17 @@ const activities = computed(() => {
 
 const isEmpty = computed(() => run.value === null && backgroundTasks.active.length === 0)
 
+/** Italian labels for the interaction `kind` enum (ws schema: WsInteractionRequested.kind). */
+const INTERACTION_LABELS: Record<string, string> = {
+  tool_confirmation: 'conferma tool',
+  ask_user: 'domanda',
+  client_tool_call: 'comando app'
+}
+
+function interactionLabel(kind: string): string {
+  return INTERACTION_LABELS[kind] ?? kind.replace(/_/g, ' ')
+}
+
 function argsSummary(args: Record<string, unknown>): string {
   try {
     const s = JSON.stringify(args)
@@ -79,13 +90,17 @@ function argsSummary(args: Record<string, unknown>): string {
           </template>
           <template v-else>
             <AppIcon name="alert-circle" :size="12" />
-            <span class="activity-module__name">{{ a.interaction.kind }}</span>
+            <span class="activity-module__name">{{ interactionLabel(a.interaction.kind) }}</span>
             <span class="activity-module__args">{{
               a.interaction.status === 'pending' ? 'in attesa…' : (a.interaction.outcome ?? '')
             }}</span>
           </template>
         </li>
       </ul>
+
+      <p v-if="run && activities.length === 0" class="activity-module__waiting">
+        in attesa del primo tool…
+      </p>
 
       <section v-if="backgroundTasks.active.length > 0" class="activity-module__bg">
         <h3 class="activity-module__bg-title">In background</h3>
@@ -141,16 +156,29 @@ function argsSummary(args: Record<string, unknown>): string {
 
 .activity-module__name {
   color: var(--text-primary);
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .activity-module__args {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-muted);
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.activity-module__waiting {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 .activity-module__ok {

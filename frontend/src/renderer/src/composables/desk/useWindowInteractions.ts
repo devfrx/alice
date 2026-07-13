@@ -7,8 +7,12 @@
  * While a drag/resize session is active the store's draggingId is set, so
  * external (agent) geometry mutations on the same window are ignored
  * (spec §6.10 — user interaction wins).
+ *
+ * West/north resize pins the opposite edge by pre-clamping to MIN_SIZE (the
+ * store's clampRect clamps size and position independently).
  */
 import { useDeskStore } from '../../stores/desk'
+import { MIN_SIZE } from './deskGeometry'
 import type { DeskRect } from './deskGeometry'
 
 export type ResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
@@ -64,12 +68,14 @@ export function useWindowInteractions(windowId: string): {
       if (edge.includes('e')) r.w = start.w + dx
       if (edge.includes('s')) r.h = start.h + dy
       if (edge.includes('w')) {
-        r.x = start.x + dx
-        r.w = start.w - dx
+        // Clamp width first, then pin the RIGHT edge (start.x + start.w).
+        r.w = Math.max(MIN_SIZE.w, start.w - dx)
+        r.x = start.x + start.w - r.w
       }
       if (edge.includes('n')) {
-        r.y = start.y + dy
-        r.h = start.h - dy
+        // Clamp height first, then pin the BOTTOM edge (start.y + start.h).
+        r.h = Math.max(MIN_SIZE.h, start.h - dy)
+        r.y = start.y + start.h - r.h
       }
       desk.resizeWindow(windowId, r)
     })

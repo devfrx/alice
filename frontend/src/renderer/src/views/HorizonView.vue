@@ -366,6 +366,7 @@ onBeforeUnmount(() => {
           :completed-count="plan.completed"
           :dimmed="!isConnected"
           :label="lineLabel"
+          :impulses="sceneState === 'thinking' || sceneState === 'working'"
         />
       </template>
 

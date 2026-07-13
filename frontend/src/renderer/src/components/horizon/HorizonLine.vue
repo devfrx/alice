@@ -8,6 +8,7 @@
  *  - pulse    : luminance travelling out from center (TTS speaking)
  *  - timeline : straight line + plan notches + spark easing to the active step
  *  - flow     : a light packet travelling left→right (indeterminate work)
+ *  - impulses : overlay, light packets travelling the filament (thinking/working)
  *
  * One rAF loop, paused on document.hidden; static single draw under
  * prefers-reduced-motion. Colors come from --hz-line-rgb (re-read on theme
@@ -32,6 +33,8 @@ const props = withDefaults(
     label?: string
     /** Notches drawn as completed (first N). */
     completedCount?: number
+    /** Travelling light packets along the filament (thinking/working). */
+    impulses?: boolean
   }>(),
   {
     audioLevel: 0,
@@ -39,11 +42,15 @@ const props = withDefaults(
     activeIndex: -1,
     dimmed: false,
     label: '',
-    completedCount: 0
+    completedCount: 0,
+    impulses: false
   }
 )
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+
+/** Fixed synaptic nodes on the filament (fractions of the span). */
+const NODE_FRACTIONS = [0.28, 0.47, 0.63, 0.8]
 
 let ctx: CanvasRenderingContext2D | null = null
 let raf = 0
@@ -111,7 +118,7 @@ function draw(now: number): void {
   ctx.strokeStyle = grad
   ctx.lineWidth = 1
   ctx.shadowColor = `rgba(${lineRgb}, 0.5)`
-  ctx.shadowBlur = 12
+  ctx.shadowBlur = reducedMotion ? 12 : 12 + Math.sin((t * Math.PI * 2) / 5) * 4
 
   ctx.beginPath()
   const steps = 96
@@ -141,6 +148,42 @@ function draw(now: number): void {
   }
   ctx.stroke()
   ctx.restore()
+
+  /* ── synaptic nodes: fixed points breathing on the filament ── */
+  if (props.notchCount === 0) {
+    ctx.save()
+    ctx.fillStyle = `rgba(${lineRgb}, 0.95)`
+    ctx.shadowColor = `rgba(${lineRgb}, 0.8)`
+    ctx.shadowBlur = 6
+    for (let i = 0; i < NODE_FRACTIONS.length; i++) {
+      const x = margin + NODE_FRACTIONS[i] * span
+      const breath = reducedMotion ? 0.6 : 0.35 + 0.65 * (0.5 + Math.sin(t * 1.1 + i * 1.7) / 2)
+      ctx.globalAlpha = alpha * 0.85 * breath
+      ctx.beginPath()
+      ctx.arc(x, cy, 1.4, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  /* ── impulses: light packets travelling the filament ── */
+  if (props.impulses && !reducedMotion) {
+    ctx.save()
+    // Under the plan timeline the impulses recede so the ticks stay readable.
+    const dim = props.notchCount > 0 ? 0.5 : 1
+    for (let i = 0; i < 2; i++) {
+      const f = (t * 0.16 + i * 0.5) % 1
+      const x = margin + f * span
+      const fade = Math.sin(f * Math.PI) // born and dies at the line's ends
+      const g = ctx.createRadialGradient(x, cy, 0, x, cy, 16)
+      g.addColorStop(0, `rgba(${lineRgb}, ${0.9 * fade * dim})`)
+      g.addColorStop(1, `rgba(${lineRgb}, 0)`)
+      ctx.globalAlpha = alpha
+      ctx.fillStyle = g
+      ctx.fillRect(x - 16, cy - 3, 32, 6)
+    }
+    ctx.restore()
+  }
 
   /* ── pulse: one crest travelling left→right with trailing echoes (TTS) ── */
   if (props.mode === 'pulse' && !reducedMotion) {
@@ -279,7 +322,8 @@ watch(
     props.activeIndex,
     props.dimmed,
     props.label,
-    props.completedCount
+    props.completedCount,
+    props.impulses
   ],
   () => {
     if (reducedMotion) draw(performance.now())

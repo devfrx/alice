@@ -18,6 +18,7 @@ import HorizonColophon from '../components/horizon/HorizonColophon.vue'
 import HorizonCockpit from '../components/horizon/HorizonCockpit.vue'
 import HorizonComposer from '../components/horizon/HorizonComposer.vue'
 import HorizonResponse from '../components/horizon/HorizonResponse.vue'
+import HorizonThinking from '../components/horizon/HorizonThinking.vue'
 import DeskSurface from '../components/desk/DeskSurface.vue'
 import DeskDock from '../components/desk/DeskDock.vue'
 import ToolConfirmationDialog from '../components/chat/ToolConfirmationDialog.vue'
@@ -345,6 +346,15 @@ onBeforeUnmount(() => {
             @voice-cancel-processing="cancelProcessing"
             @refresh-devices="refreshDevices"
             @select-device="(id) => (selectedDeviceId = id)"
+          />
+        </Transition>
+        <Transition name="hz-soft">
+          <HorizonThinking
+            v-if="
+              (sceneState === 'thinking' || (sceneState === 'working' && isThinking)) &&
+              chatStore.currentThinkingContent !== ''
+            "
+            :content="chatStore.currentThinkingContent"
           />
         </Transition>
         <HorizonResponse

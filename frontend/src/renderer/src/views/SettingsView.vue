@@ -371,24 +371,30 @@ onUnmounted(() => {
 
 <style scoped>
 /* ============================================================
-   SettingsView — Supabase-inspired flat dashboard design
+   SettingsView — house-style page frame.
+   Follows the shared page recipe (cfr. EmailPageView / TerminalPageView):
+   a --surface-0 wrapper padded by --space-2-5, holding bordered --surface-1
+   panels (border, no shadow) so Settings reads like the rest of the app
+   rather than as a standalone dashboard.
    ============================================================ */
 
 /* ── Layout ───────────────────────────────────────────────── */
 .sv {
   display: flex;
-  height: calc(100% - 16px);
-  margin: 8px;
-  gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-2-5);
+  gap: var(--space-2-5);
+  background: var(--surface-0);
   color: var(--text-primary);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* ── Sidebar navigation ──────────────────────────────────── */
 .sv__nav {
   flex-shrink: 0;
   width: 180px;
-  margin: 12px 0 12px 12px;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -396,7 +402,6 @@ onUnmounted(() => {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
   overflow-y: auto;
 }
 
@@ -410,6 +415,7 @@ onUnmounted(() => {
 
 .sv__title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold, 600);
   letter-spacing: -0.01em;
@@ -468,12 +474,16 @@ onUnmounted(() => {
 }
 
 /* ── Content panel ────────────────────────────────────────── */
+/* --surface-0 (identical to the old --bg-primary) keeps the exact backdrop the
+   child managers were tuned against; the added border is what turns it into a
+   framed panel (cfr. email-page__inbox). */
 .sv__content {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-6) var(--space-8);
   scroll-behavior: smooth;
-  background: var(--bg-primary);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-sizing: border-box;
 }
@@ -507,8 +517,11 @@ onUnmounted(() => {
 }
 
 /* ── Group card (toggle rows) ────────────────────────────── */
+/* --surface-1 matches the card layer the child managers use, so inline groups
+   and manager sections read as one set of cards on the surface-0 content.
+   (Previously surface-0, i.e. the same colour as the bg — border-only.) */
 .sv__group {
-  background: var(--surface-0);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0 var(--space-4);
@@ -605,8 +618,9 @@ onUnmounted(() => {
   gap: var(--space-1);
 }
 
+/* Matches UiInput's label so native fields and kit inputs read as one set. */
 .sv__field-label {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   font-weight: var(--weight-medium, 500);
 }
@@ -615,22 +629,30 @@ onUnmounted(() => {
   position: relative;
 }
 
+/* Native number fields (temperature/max tokens/iterations): UiInput can't
+   carry number typing + min/max/step, so they stay native — but they borrow
+   UiInput's surface, hover and focus treatment to sit in the same visual set. */
 .sv__input {
   width: 100%;
-  padding: 8px var(--space-3);
-  background: var(--surface-inset);
+  height: var(--input-height-md);
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   outline: none;
-  transition: border-color var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) var(--ease-out-quart, ease);
   box-sizing: border-box;
 }
 
-.sv__input:focus {
+.sv__input:hover {
   border-color: var(--border-hover);
+}
+
+.sv__input:focus {
+  border-color: var(--accent-border);
 }
 
 .sv__input::placeholder {

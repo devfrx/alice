@@ -115,11 +115,11 @@ export interface ThinkingSignalState {
   active: boolean
 }
 
-export const THINKING_SIGNAL_IDLE: ThinkingSignalState = {
+export const THINKING_SIGNAL_IDLE: Readonly<ThinkingSignalState> = Object.freeze({
   thinkingLen: 0,
   contentLen: 0,
   active: false
-}
+})
 
 /**
  * Pure reducer for the "is Alice reasoning right now" signal: thinking growth

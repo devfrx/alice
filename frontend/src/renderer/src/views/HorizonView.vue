@@ -26,6 +26,7 @@ import { ChatApiKey } from '../composables/useChat'
 import { useSentencePacer } from '../composables/horizon/useSentencePacer'
 import { useHorizonKeyboard } from '../composables/horizon/useHorizonKeyboard'
 import { useHorizonVoiceBridge } from '../composables/horizon/useHorizonVoiceBridge'
+import { useThinkingSignal } from '../composables/horizon/useThinkingSignal'
 import { useVoice } from '../composables/useVoice'
 import { useModal } from '../composables/useModal'
 import {
@@ -73,6 +74,7 @@ const {
 
 const { cadGenerationInProgress } = useGenerationState()
 const { state: modalState } = useModal()
+const isThinking = useThinkingSignal()
 
 /* ── local state ── */
 const composerActive = ref(false)
@@ -100,7 +102,7 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
   activeToolCount: chatStore.activeToolExecutions.length,
   planSteps: planSteps.value,
   composerActive: composerActive.value,
-  isThinking: false
+  isThinking: isThinking.value
 }))
 
 const sceneState = computed(() => deriveSceneState(sceneInputs.value))
@@ -151,6 +153,7 @@ const lineLabel = computed(() => {
     return planSteps.value.length > 0
       ? `LAVORO ${plan.value.activeIndex + 1} DI ${plan.value.total}`
       : 'LAVORO'
+  if (sceneState.value === 'thinking') return 'RAGIONO'
   if (sceneState.value === 'responding') return 'RISPONDO'
   return ''
 })

@@ -36,6 +36,17 @@
   /* canvas line color — --accent (#E8DCC8) decomposed to an RGB triplet */
   --hz-line-rgb: 232, 220, 200;
 
+  /* materia — alias/derivati del tema (Horizon Vivo §8) */
+  --hz-warmth: 0.05; /* alpha del gradiente caldo che sale dall'orizzonte */
+  --hz-grain-ink: rgba(255, 255, 255, 0.012); /* colore della grana carta */
+  --hz-grain-opacity: 0.5;
+  --hz-vignette: 0.3; /* alpha della vignettatura ai bordi */
+  --hz-sky-alpha: 0.1; /* alpha base della costellazione in quiete */
+  --hz-highlight: rgba(255, 255, 255, 0.05); /* highlight interno superfici */
+  --hz-shadow-sheet:
+    0 1px 0 rgba(0, 0, 0, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.45); /* ombra doppia (contatto + diffusa) */
+
   /* motion */
   --hz-morph: 600ms;
   --hz-fade: 280ms;
@@ -45,4 +56,14 @@
 [data-theme='light'] {
   /* --accent (#8C6A4A) decomposed */
   --hz-line-rgb: 140, 106, 74;
+
+  --hz-warmth: 0.07;
+  --hz-grain-ink: rgba(60, 50, 40, 0.02);
+  --hz-grain-opacity: 0.8;
+  --hz-vignette: 0.07;
+  --hz-sky-alpha: 0.16;
+  --hz-highlight: rgba(255, 255, 255, 0.55);
+  --hz-shadow-sheet:
+    0 1px 0 rgba(0, 0, 0, 0.05),
+    0 14px 30px rgba(0, 0, 0, 0.1);
 }

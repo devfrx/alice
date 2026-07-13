@@ -48,9 +48,41 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
   position: relative;
   width: 100%;
   height: 100%;
-  background: var(--surface-0);
+  background:
+    radial-gradient(
+      120% 85% at 50% 115%,
+      rgba(var(--hz-line-rgb), var(--hz-warmth)),
+      transparent 60%
+    ),
+    var(--surface-0);
   overflow: hidden;
   transition: opacity var(--hz-fade) ease;
+}
+
+/* Grana carta: pattern CSS puro, nessun asset esterno. */
+.hz-scene::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--hz-grain-opacity);
+  background-image: repeating-conic-gradient(var(--hz-grain-ink) 0 25%, transparent 0 50%);
+  background-size: 3px 3px;
+}
+
+/* Vignettatura: chiude la scena ai bordi. */
+.hz-scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 100% at 50% 45%,
+    transparent 60%,
+    rgba(0, 0, 0, var(--hz-vignette)) 100%
+  );
 }
 
 .hz-scene--dimmed {

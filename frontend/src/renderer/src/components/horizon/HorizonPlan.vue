@@ -19,7 +19,7 @@ const props = defineProps<{
   annotation: string
 }>()
 
-const items = computed(() => manuscriptView(props.steps))
+const items = computed(() => manuscriptView(props.steps, 7, props.activeIndex))
 </script>
 
 <template>

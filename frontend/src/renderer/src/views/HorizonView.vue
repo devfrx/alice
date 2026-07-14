@@ -191,7 +191,7 @@ function handleSceneClick(event: MouseEvent): void {
   const tgt = event.target as HTMLElement | null
   if (
     tgt?.closest(
-      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response'
+      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response, .hz-colophon'
     )
   )
     return

@@ -239,6 +239,19 @@ describe('manuscriptView', () => {
   it('empty plan → empty manuscript', () => {
     expect(manuscriptView([])).toEqual([])
   })
+
+  it('the active step survives the "+N" tail collapse (non-sequential plans)', () => {
+    const steps = Array.from({ length: 12 }, (_, i) =>
+      step(`p${i + 1}`, i === 9 ? 'in_progress' : 'pending')
+    )
+    const items = manuscriptView(steps, 7, 9)
+    expect(items.some((it) => it.kind === 'step' && it.index === 9)).toBe(true)
+    const last = items[items.length - 1]
+    expect(last.kind).toBe('more')
+    const visibleSteps = items.filter((it) => it.kind === 'step').length
+    expect(last.kind === 'more' ? last.count : -1).toBe(12 - visibleSteps)
+    expect(items.length).toBeLessThanOrEqual(7)
+  })
 })
 
 describe('notchPositions', () => {

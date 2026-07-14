@@ -166,9 +166,16 @@ export type HorizonManuscriptItem =
 /**
  * Rows for the manuscript plan. Long plans collapse their oldest completed
  * steps into a counter row (always keeping the last 2 completed) and, if
- * still over budget, tail-collapse the far future into a "+N" row.
+ * still over budget, tail-collapse the far future into a "+N" row. The
+ * active step (spec §3.1: always visible) is pinned into the kept rows if
+ * the tail collapse would otherwise hide it — it swaps in for the last kept
+ * step slot rather than disappearing behind the "+N" counter.
  */
-export function manuscriptView(steps: TaskStep[], maxVisible = 7): HorizonManuscriptItem[] {
+export function manuscriptView(
+  steps: TaskStep[],
+  maxVisible = 7,
+  activeIndex = -1
+): HorizonManuscriptItem[] {
   const all: HorizonManuscriptItem[] = steps.map((step, index) => ({ kind: 'step', index, step }))
   if (all.length <= maxVisible) return all
 
@@ -186,8 +193,22 @@ export function manuscriptView(steps: TaskStep[], maxVisible = 7): HorizonManusc
 
   const budget = maxVisible + (collapsedCount > 0 ? 1 : 0)
   if (items.length > budget) {
-    const hiddenSteps = items.slice(budget - 1).filter((it) => it.kind === 'step').length
-    items = [...items.slice(0, budget - 1), { kind: 'more', count: hiddenSteps }]
+    const kept = items.slice(0, budget - 1)
+    const tail = items.slice(budget - 1)
+    const activeRow = tail.find((it) => it.kind === 'step' && it.index === activeIndex)
+    if (activeRow !== undefined) {
+      // Never hide the active step: it takes the last kept step slot.
+      for (let i = kept.length - 1; i >= 0; i--) {
+        if (kept[i].kind === 'step') {
+          kept.splice(i, 1)
+          break
+        }
+      }
+      kept.push(activeRow)
+    }
+    const keptSteps = new Set(kept.flatMap((it) => (it.kind === 'step' ? [it.index] : [])))
+    const totalStepRows = items.filter((it) => it.kind === 'step').length
+    items = [...kept, { kind: 'more', count: totalStepRows - keptSteps.size }]
   }
   return items
 }

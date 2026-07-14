@@ -55,6 +55,7 @@ const parts = computed(() => {
   color: var(--hz-ink-faint);
   text-align: center;
   user-select: none;
+  pointer-events: auto;
 }
 
 .hz-colophon--off {

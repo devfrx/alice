@@ -490,6 +490,7 @@ import {
   anyHop,
   routeView,
   mulberry32,
+  type Hop,
   type NeuralGraph,
   type ProjectedNode
 } from '../../composables/horizon/neuralGraph'
@@ -661,7 +662,7 @@ function spawnHop(
   forwardBias = false
 ): boolean {
   if (travelers.length >= MAX_TRAVELERS) return false
-  let hop = null
+  let hop: Hop | null = null
   if (forwardBias && rand() < 0.7) {
     const fwd = graph.nodes[from].edges.filter((ek) => {
       const e = graph.edges[ek]
@@ -1626,6 +1627,9 @@ git commit -m "chore(horizon): sweep finale pivot rete neurale"
   selezione `plan` (min y²+z² per disco) e `polar` (min y ultimo disco); docstring: divergenza
   prospettica per ‖p‖ → FOV in `projectNode`, contratto `rand ∈ [0,1)` in `anyHop`; commento del
   guard esplicita che solo l'ultimo disco può orfanare (ramo col-0 difensivo).
+- **T2 — tipizzazione `spawnHop`**: `let hop = null` veniva inferito come tipo letterale `null`
+  in strict mode (TS2322/TS2339). Fix: `let hop: Hop | null = null` + import di `type Hop`
+  (già integrato nel blocco di codice del Task 2 qui sopra). Solo typing, zero effetti runtime.
 
 ## Self-review del piano
 

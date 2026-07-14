@@ -1662,6 +1662,13 @@ git commit -m "chore(horizon): sweep finale pivot rete neurale"
   falso positivo VOLUTO: `--hz-sky-alpha` è il token condiviso che la spec §7 riusa per la
   presenza a riposo della rete (definizioni dual-theme in horizon.css + lettura in readTheme).
   NON rinominarlo. Gates finali: vitest 362/362, typecheck node+web, lint zero warning.
+- **Review olistica finale** (baseline `05a8dcb` → head): «Ready to merge: With fixes» — un solo
+  seam-slip vero tra le review per-task: la crescita del piano mid-run faceva scattare la rotta
+  all'indietro di colpo (spec §10 promette il riancoraggio morbido). Fix in `24d4df8`: easing
+  della posizione attiva col pattern sparkX (`routeEase` smorzato, snap solo su piano NUOVO,
+  `shownDone` mai oltre il ganglio mostrato) + 4 commenti stantii che citavano ancora la linea
+  (HorizonView, HorizonPlan, theme.css, horizon.css). Coverage spec §2-§11 confermata; regressioni
+  zero; gates ri-verificati indipendentemente dal coordinatore (362/362, typecheck, lint puliti).
 
 ## Self-review del piano
 

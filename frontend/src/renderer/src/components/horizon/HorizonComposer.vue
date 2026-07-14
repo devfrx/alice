@@ -150,7 +150,9 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .hz-composer__input:focus {
-  box-shadow: 0 1px 0 rgba(var(--hz-line-rgb), 0.45);
+  box-shadow:
+    0 1px 0 rgba(var(--hz-line-rgb), 0.45),
+    0 16px 32px -20px rgba(var(--hz-line-rgb), 0.55);
 }
 
 /* Wrapped content reads better ragged-right than centered. */

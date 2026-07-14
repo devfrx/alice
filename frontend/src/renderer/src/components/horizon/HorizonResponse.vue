@@ -79,6 +79,22 @@ const { handleCodeBlockClick } = useCodeBlocks()
   text-align: left;
 }
 
+.hz-response__body :deep(hr) {
+  border: none;
+  height: 1px;
+  width: 60%;
+  margin: 1.2em auto;
+  background: linear-gradient(90deg, transparent, rgba(var(--hz-line-rgb), 0.4), transparent);
+}
+
+.hz-response__body :deep(blockquote) {
+  margin: 0.6em 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid rgba(var(--hz-line-rgb), 0.35);
+  color: var(--hz-ink-dim);
+  font-style: italic;
+}
+
 /* ── magazine: long answers become a reading column ── */
 .hz-response--magazine {
   width: min(86%, 760px);

@@ -8,10 +8,10 @@
  * flash on arrival; propagation is free (random hops) — only the endpoints
  * are semantic (voice enters disc 0, speech exits the last disc).
  *
- * Declarative (props only). One rAF loop with the full suspension pattern
- * inherited from HorizonSky: explicit redraws on resize/theme while
- * suspended, double running guard in loop(), start() never arms while
- * hidden. In quiet the loop stops once settled; a timer wakes it every
+ * Declarative (props only). One rAF loop with a full suspension pattern:
+ * explicit redraws on resize/theme while suspended, double running guard
+ * in loop(), start() never arms while hidden. In quiet the loop stops once
+ * settled; a timer wakes it every
  * ~4 s for a single wandering "dream" signal, then it re-suspends.
  * Colors come from --hz-line-rgb / --hz-sky-alpha (re-read on data-theme).
  * The state microlabel and the plan annotation are DOM overlays tracked on

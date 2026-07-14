@@ -315,7 +315,7 @@ onBeforeUnmount(() => {
           :state="sceneState"
           :audio-level="voiceStore.audioLevel"
           :speaking="voiceStore.isSpeaking"
-          :plan-total="sceneState === 'working' ? planSteps.length : 0"
+          :plan-total="planSteps.length"
           :plan-active-index="plan.activeIndex"
           :plan-completed="plan.completed"
           :plan-step-label="plan.statusSentence"

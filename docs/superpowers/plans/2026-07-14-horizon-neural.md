@@ -294,6 +294,34 @@ export function buildNeuralGraph(seed: number): NeuralGraph {
         }
       })
   })
+  // Coverage guard (fix in esecuzione, vedi nota sotto): forward-only
+  // nearest-neighbor selection can leave a node unpicked (typically in the
+  // terminal disc) — attach any orphan to its nearest node in the adjacent
+  // disc so every node has degree >= 1.
+  const degree = new Array(nodes.length).fill(0)
+  for (const e of edges) {
+    degree[e.a]++
+    degree[e.b]++
+  }
+  nodes.forEach((n, i) => {
+    if (degree[i] > 0) return
+    const targetCol = n.col === 0 ? 1 : n.col - 1
+    let best = -1
+    let bestD = Infinity
+    nodes.forEach((m, j) => {
+      if (m.col !== targetCol) return
+      const d = (m.y - n.y) ** 2 + (m.z - n.z) ** 2
+      if (d < bestD) {
+        bestD = d
+        best = j
+      }
+    })
+    if (best >= 0) {
+      edges.push({ a: Math.min(i, best), b: Math.max(i, best) })
+      degree[i]++
+      degree[best]++
+    }
+  })
   edges.forEach((e, k) => {
     nodes[e.a].edges.push(k)
     nodes[e.b].edges.push(k)
@@ -1584,6 +1612,14 @@ git commit -m "chore(horizon): sweep finale pivot rete neurale"
 
 - **Verifica manuale nell'app viva** (spec §11): 5 coreografie (quiete+sogno, membrana, sweep randomici, rotta+posa, cadenza+anelli), parallasse (solo pointer fine), sospensione in quiete (CPU ferma tra i sogni), entrambi i temi, `prefers-reduced-motion`, `dimmed`/disconnesso, viewport basso, piano >5 passi (rotta proporzionale). Assorbe la parte superstite della checklist Vivo §13 (manoscritto, banco, finestre).
 - Aggiornare l'handoff/memoria di sessione con l'esito.
+
+## Fix in esecuzione (annotati, prevale il codice committato)
+
+- **T1 — coverage guard in `buildNeuralGraph`**: l'algoritmo originale creava archi solo «in avanti»
+  (disco c → c+1), quindi un nodo dell'ultimo disco poteva restare orfano (grado 0) — al seed 197
+  succedeva al nodo 35, rompendo il test `degree >= 1` e `anyHop`. Trovato dall'implementer T1 in
+  TDD; fix: post-pass deterministico che aggancia ogni orfano al nodo più vicino del disco
+  adiacente (già integrato nel blocco di codice del Task 1 qui sopra).
 
 ## Self-review del piano
 

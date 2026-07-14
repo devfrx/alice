@@ -1652,6 +1652,16 @@ git commit -m "chore(horizon): sweep finale pivot rete neurale"
   blocco T2). Minor rimandati: stutter dello spin al settle in quiete (giudicare nella QA visiva),
   traveler che ignorano la membrana sul disco 0, `sweepClock` persistente tra sessioni di
   thinking, buffer per-frame hoistabili, snapshot one-shot di reducedMotion/pointerFine.
+- **T3 — review**: approvato senza fix. Minor assorbiti nel T5: gate `planTotal` che tagliava
+  netto la rotta all'uscita da working (ora `:plan-total="planSteps.length"` — il fade lo
+  possiede `intens.working`); slot backdrop senza wrapper strutturale (lasciato com'è, contratto
+  nel figlio). Da guardare in QA visiva: transizione working→responding, primo frame della label.
+- **T4 — review**: approvato senza fix. Minor assorbito nel T5: docstring di HorizonNeural
+  riformulata senza il riferimento a HorizonSky (componente rimosso).
+- **T5 — esito** (commit `5511236`): fade rotta + docstring; grep residui pulito con un solo
+  falso positivo VOLUTO: `--hz-sky-alpha` è il token condiviso che la spec §7 riusa per la
+  presenza a riposo della rete (definizioni dual-theme in horizon.css + lettura in readTheme).
+  NON rinominarlo. Gates finali: vitest 362/362, typecheck node+web, lint zero warning.
 
 ## Self-review del piano
 

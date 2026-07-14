@@ -46,7 +46,7 @@ export const FOV = 3
 
 const PER_COL = [6, 8, 9, 8, 6]
 const DISC_RADIUS = [0.52, 0.74, 0.88, 0.74, 0.52]
-const X_JITTER = 0.14
+export const X_JITTER = 0.14
 
 /** Mulberry32: tiny deterministic PRNG (same seed → same sequence). */
 export function mulberry32(seed: number): () => number {
@@ -108,6 +108,8 @@ export function buildNeuralGraph(seed: number): NeuralGraph {
   // Coverage guard: forward-only nearest-neighbor selection can leave a
   // node unpicked (typically in the terminal disc) — attach any orphan to
   // its nearest node in the adjacent disc so every node has degree >= 1.
+  // Today only the last disc can orphan (every earlier node initiates
+  // edges); the col-0 branch is defensive.
   const degree = new Array(nodes.length).fill(0)
   for (const e of edges) {
     degree[e.a]++
@@ -166,6 +168,7 @@ export interface ProjectedNode {
  * Rotate around the layer axis (x) by rotX — the disc spin — then swing
  * around the vertical axis (y) by rotY — the cursor parallax — and project
  * with a perspective camera on +z at distance FOV, mapped onto the viewport.
+ * Callers must keep ‖p‖ < FOV: the perspective factor diverges as z → FOV.
  */
 export function projectNode(
   p: { x: number; y: number; z: number },
@@ -208,6 +211,7 @@ export interface Hop {
  * Random hop along ANY incident edge of `from` — the free-flow propagation
  * (user decision: signals are not confined to the forward direction).
  * Returns null only for isolated nodes (degree 0, impossible by build).
+ * rand must return values in [0, 1) (mulberry32 does).
  */
 export function anyHop(g: NeuralGraph, from: number, rand: () => number): Hop | null {
   const list = g.nodes[from].edges

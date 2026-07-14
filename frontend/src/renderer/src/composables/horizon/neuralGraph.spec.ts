@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   DISC_COUNT,
   FOV,
+  X_JITTER,
   buildNeuralGraph,
   projectNode,
   depthNorm,
@@ -32,7 +33,7 @@ describe('buildNeuralGraph', () => {
       const lx = -1 + (c / (DISC_COUNT - 1)) * 2
       for (const i of col) {
         expect(g.nodes[i].col).toBe(c)
-        expect(Math.abs(g.nodes[i].x - lx)).toBeLessThanOrEqual(0.07 + 1e-9)
+        expect(Math.abs(g.nodes[i].x - lx)).toBeLessThanOrEqual(X_JITTER / 2 + 1e-9)
       }
     })
   })
@@ -47,6 +48,20 @@ describe('buildNeuralGraph', () => {
       seen.add(key)
     }
     g.nodes.forEach((n) => expect(n.edges.length).toBeGreaterThanOrEqual(1))
+  })
+
+  it('holds structural invariants across many seeds', () => {
+    for (const seed of Array.from({ length: 50 }, (_, i) => i * 41 + 3)) {
+      const g = buildNeuralGraph(seed)
+      const seen = new Set<string>()
+      for (const e of g.edges) {
+        expect(Math.abs(g.nodes[e.a].col - g.nodes[e.b].col)).toBe(1)
+        const key = `${Math.min(e.a, e.b)}-${Math.max(e.a, e.b)}`
+        expect(seen.has(key)).toBe(false)
+        seen.add(key)
+      }
+      g.nodes.forEach((n) => expect(n.edges.length).toBeGreaterThanOrEqual(1))
+    }
   })
 
   it('indexes incident edges consistently', () => {
@@ -64,6 +79,15 @@ describe('buildNeuralGraph', () => {
     expect(g.plan).toHaveLength(DISC_COUNT)
     g.plan.forEach((ni, c) => expect(g.nodes[ni].col).toBe(c))
     expect(g.nodes[g.polar].col).toBe(DISC_COUNT - 1)
+    g.plan.forEach((ni, c) => {
+      const r2 = g.nodes[ni].y ** 2 + g.nodes[ni].z ** 2
+      for (const i of g.byCol[c]) {
+        expect(r2).toBeLessThanOrEqual(g.nodes[i].y ** 2 + g.nodes[i].z ** 2)
+      }
+    })
+    for (const i of g.byCol[DISC_COUNT - 1]) {
+      expect(g.nodes[g.polar].y).toBeLessThanOrEqual(g.nodes[i].y)
+    }
   })
 })
 

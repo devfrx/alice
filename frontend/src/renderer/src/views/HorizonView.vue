@@ -191,7 +191,7 @@ function handleSceneClick(event: MouseEvent): void {
   const tgt = event.target as HTMLElement | null
   if (
     tgt?.closest(
-      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response, .horizon-view__ground'
+      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response'
     )
   )
     return
@@ -509,6 +509,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: clamp(5px, 1.1vh, 9px);
   z-index: 5;
+  pointer-events: none;
 }
 
 .horizon-view__corner {

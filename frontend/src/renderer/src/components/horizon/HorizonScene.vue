@@ -137,6 +137,7 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
   align-items: center;
   z-index: 2;
   padding-top: 44px;
+  padding-bottom: clamp(78px, 13vh, 112px); /* clearance for the ground bench (dock + colophon) */
   transition: top var(--hz-morph) var(--ease-out-expo);
 }
 

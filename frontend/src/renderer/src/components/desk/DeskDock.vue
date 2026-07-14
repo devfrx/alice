@@ -86,6 +86,7 @@ function stateOf(moduleId: string): 'open' | 'minimized' | 'none' {
 <style scoped>
 .desk-dock {
   position: relative;
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: var(--space-1);

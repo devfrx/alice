@@ -25,10 +25,8 @@ const parts = computed(() => {
       hour: '2-digit',
       minute: '2-digit'
     })
-    const title =
-      props.nextEvent.title.length > 48
-        ? `${props.nextEvent.title.slice(0, 47)}…`
-        : props.nextEvent.title
+    const chars = [...props.nextEvent.title]
+    const title = chars.length > 48 ? `${chars.slice(0, 47).join('')}…` : props.nextEvent.title
     list.push(`${title} alle ${hm}`)
   }
   if (!props.connected) list.push('DISCONNESSA')

@@ -25,7 +25,11 @@ const parts = computed(() => {
       hour: '2-digit',
       minute: '2-digit'
     })
-    list.push(`${props.nextEvent.title} alle ${hm}`)
+    const title =
+      props.nextEvent.title.length > 48
+        ? `${props.nextEvent.title.slice(0, 47)}…`
+        : props.nextEvent.title
+    list.push(`${title} alle ${hm}`)
   }
   if (!props.connected) list.push('DISCONNESSA')
   return list
@@ -40,7 +44,11 @@ const parts = computed(() => {
 
 <style scoped>
 .hz-colophon {
-  margin: auto 0 clamp(20px, 4vh, 40px);
+  margin: 0;
+  max-width: min(72vw, 680px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-sans);
   font-weight: 400;
   font-size: 10px;

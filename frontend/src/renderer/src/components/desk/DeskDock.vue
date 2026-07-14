@@ -85,19 +85,17 @@ function stateOf(moduleId: string): 'open' | 'minimized' | 'none' {
 
 <style scoped>
 .desk-dock {
-  position: absolute;
-  bottom: clamp(40px, 6vh, 56px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1-5) var(--space-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  border: 1px solid var(--accent-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-floating);
-  z-index: 5;
+  box-shadow:
+    var(--hz-shadow-sheet, var(--shadow-floating)),
+    inset 0 1px 0 var(--hz-highlight, transparent);
 }
 
 .desk-dock__slot {
@@ -114,10 +112,12 @@ function stateOf(moduleId: string): 'open' | 'minimized' | 'none' {
   height: 4px;
   border-radius: var(--radius-full);
   background: var(--accent);
+  animation: desk-dock-breath 3s ease-in-out infinite;
 }
 
 .desk-dock__dot--minimized {
   background: var(--border-hover);
+  animation: none;
 }
 
 .desk-dock__badge {
@@ -152,5 +152,21 @@ function stateOf(moduleId: string): 'open' | 'minimized' | 'none' {
 
 .desk-dock__plan:hover {
   color: var(--text-primary);
+}
+
+@keyframes desk-dock-breath {
+  0%,
+  100% {
+    box-shadow: 0 0 3px var(--accent-medium);
+  }
+  50% {
+    box-shadow: 0 0 8px var(--accent-vivid);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk-dock__dot {
+    animation: none;
+  }
 }
 </style>

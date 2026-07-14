@@ -191,7 +191,7 @@ function handleSceneClick(event: MouseEvent): void {
   const tgt = event.target as HTMLElement | null
   if (
     tgt?.closest(
-      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response'
+      'button, a, input, textarea, [contenteditable], .desk-window, .desk-dock, .hz-response, .horizon-view__ground'
     )
   )
     return
@@ -400,13 +400,17 @@ onBeforeUnmount(() => {
         <p v-if="sceneState === 'responding' && lastUserQuery" class="horizon-view__echo">
           {{ lastUserQuery }}
         </p>
-        <HorizonColophon :next-event="calendarStore.nextEvent" :connected="isConnected" />
       </template>
     </HorizonScene>
 
     <!-- The windows layer + tray (the desk) -->
     <DeskSurface />
-    <DeskDock />
+
+    <!-- The ground bench: tray on top, colophon engraved below (never covered). -->
+    <div class="horizon-view__ground">
+      <DeskDock />
+      <HorizonColophon :next-event="calendarStore.nextEvent" :connected="isConnected" />
+    </div>
 
     <nav class="horizon-view__corner" aria-label="Navigazione">
       <button class="horizon-view__affordance" type="button" @click="materializeConversation">
@@ -493,6 +497,18 @@ onBeforeUnmount(() => {
   font-size: clamp(17px, 2.4vmin, 24px);
   color: var(--hz-ink);
   text-align: center;
+}
+
+.horizon-view__ground {
+  position: absolute;
+  bottom: clamp(12px, 2.6vh, 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(5px, 1.1vh, 9px);
+  z-index: 5;
 }
 
 .horizon-view__corner {

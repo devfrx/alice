@@ -701,12 +701,13 @@ watch(
     clearDream()
     if (reducedMotion) draw(performance.now())
     else start()
-  }
+  },
+  { flush: 'post' }
 )
 </script>
 
 <template>
-  <div class="hz-neural">
+  <div class="hz-neural" :class="{ 'hz-neural--dimmed': dimmed }">
     <canvas ref="canvasRef" class="hz-neural__canvas" aria-hidden="true" />
     <Transition name="hz-neural-fade">
       <span v-if="label" :key="label" ref="labelRef" class="hz-neural__label">{{ label }}</span>
@@ -778,6 +779,16 @@ watch(
   white-space: nowrap;
   user-select: none;
   will-change: transform;
+}
+
+.hz-neural__label,
+.hz-neural__annotation {
+  transition: opacity var(--hz-fade) ease;
+}
+
+.hz-neural--dimmed .hz-neural__label,
+.hz-neural--dimmed .hz-neural__annotation {
+  opacity: 0.35;
 }
 
 .hz-neural-fade-enter-active,

@@ -11,7 +11,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import HorizonPlan from '../components/horizon/HorizonPlan.vue'
 import HorizonScene from '../components/horizon/HorizonScene.vue'
-import HorizonLine from '../components/horizon/HorizonLine.vue'
+import HorizonNeural from '../components/horizon/HorizonNeural.vue'
 import HorizonMasthead from '../components/horizon/HorizonMasthead.vue'
 import HorizonQuiet from '../components/horizon/HorizonQuiet.vue'
 import HorizonColophon from '../components/horizon/HorizonColophon.vue'
@@ -32,8 +32,6 @@ import { useVoice } from '../composables/useVoice'
 import { useModal } from '../composables/useModal'
 import {
   deriveSceneState,
-  deriveLineMode,
-  deriveSkyMode,
   planView,
   type HorizonSceneInputs
 } from '../composables/horizon/horizonScene'
@@ -108,8 +106,6 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
 }))
 
 const sceneState = computed(() => deriveSceneState(sceneInputs.value))
-const lineMode = computed(() => deriveLineMode(sceneState.value, sceneInputs.value))
-const skyMode = computed(() => deriveSkyMode(sceneState.value, sceneInputs.value))
 
 const { displayed: pacedStream, reset: resetPacer } = useSentencePacer(
   computed(() => chatStore.currentStreamContent),
@@ -149,7 +145,7 @@ const showResponse = computed(
 
 const plan = computed(() => planView(planSteps.value))
 
-const lineLabel = computed(() => {
+const stateLabel = computed(() => {
   if (voiceStore.isListening) return 'ASCOLTO'
   if (voiceStore.isProcessing) return 'ELABORO'
   if (sceneState.value === 'working')
@@ -313,7 +309,21 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="horizon-view" aria-label="Assistente" @click="handleSceneClick">
-    <HorizonScene :state="sceneState" :sky="skyMode" :magazine="magazine" :dimmed="sceneDimmed">
+    <HorizonScene :state="sceneState" :magazine="magazine" :dimmed="sceneDimmed">
+      <template #backdrop>
+        <HorizonNeural
+          :state="sceneState"
+          :audio-level="voiceStore.audioLevel"
+          :speaking="voiceStore.isSpeaking"
+          :plan-total="sceneState === 'working' ? planSteps.length : 0"
+          :plan-active-index="plan.activeIndex"
+          :plan-completed="plan.completed"
+          :plan-step-label="plan.statusSentence"
+          :label="stateLabel"
+          :dimmed="!isConnected"
+        />
+      </template>
+
       <template #masthead>
         <HorizonMasthead :connected="isConnected" />
       </template>
@@ -363,22 +373,6 @@ onBeforeUnmount(() => {
           :text="responseText"
           :user-query="lastUserQuery"
           :compact="false"
-        />
-        <p v-if="sceneState === 'working' && plan.statusSentence" class="horizon-view__status">
-          <em>{{ plan.statusSentence }}</em>
-        </p>
-      </template>
-
-      <template #line>
-        <HorizonLine
-          :mode="lineMode"
-          :audio-level="voiceStore.audioLevel"
-          :notch-count="sceneState === 'working' ? planSteps.length : 0"
-          :active-index="plan.activeIndex"
-          :completed-count="plan.completed"
-          :dimmed="!isConnected"
-          :label="lineLabel"
-          :impulses="sceneState === 'thinking' || sceneState === 'working'"
         />
       </template>
 
@@ -486,17 +480,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.horizon-view__status {
-  margin: 0 0 clamp(20px, 4vh, 48px);
-  max-width: min(60ch, 80%);
-  font-family: var(--hz-serif);
-  font-style: italic;
-  font-weight: 300;
-  font-size: clamp(17px, 2.4vmin, 24px);
-  color: var(--hz-ink);
-  text-align: center;
 }
 
 .horizon-view__ground {

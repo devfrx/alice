@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * HorizonScene — the stage. Owns the vertical zoning (masthead / upper /
- * line / lower) and animates the line's vertical quota between scene states:
- * that movement IS the visible morph. Pure layout: no stores.
+ * lower) and animates the content quota between scene states: that movement
+ * IS the visible morph. The backdrop slot hosts the neural network
+ * (HorizonNeural), full-bleed under the content zones. Pure layout: no stores.
  */
 import { computed } from 'vue'
-import HorizonSky from './HorizonSky.vue'
-import type { HorizonState, HorizonSkyMode } from '../../composables/horizon/horizonScene'
+import type { HorizonState } from '../../composables/horizon/horizonScene'
 
 const props = withDefaults(
   defineProps<{
@@ -15,13 +15,11 @@ const props = withDefaults(
     magazine?: boolean
     /** Dim the whole scene (a dialog is in front). */
     dimmed?: boolean
-    /** Living backdrop mode (HorizonSky). */
-    sky?: HorizonSkyMode
   }>(),
-  { magazine: false, dimmed: false, sky: 'idle' }
+  { magazine: false, dimmed: false }
 )
 
-/** Line vertical quota per state (fraction of scene height). */
+/** Content quota per state (fraction of scene height). */
 const QUOTAS: Record<HorizonState, number> = {
   quiet: 0.58,
   listening: 0.6,
@@ -39,10 +37,9 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
     :class="[`hz-scene--${state}`, { 'hz-scene--dimmed': dimmed }]"
     :style="{ '--quota': `${quota * 100}%` }"
   >
-    <HorizonSky :mode="sky" :line-quota="quota" />
+    <slot name="backdrop" />
     <header class="hz-scene__masthead"><slot name="masthead" /></header>
     <div class="hz-scene__upper"><slot name="upper" /></div>
-    <div class="hz-scene__line"><slot name="line" /></div>
     <div class="hz-scene__lower"><slot name="lower" /></div>
   </div>
 </template>
@@ -116,16 +113,6 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
   transition: height var(--hz-morph) var(--ease-out-expo);
 }
 
-.hz-scene__line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--quota);
-  transform: translateY(-50%);
-  z-index: 1;
-  transition: top var(--hz-morph) var(--ease-out-expo);
-}
-
 .hz-scene__lower {
   position: absolute;
   left: 0;
@@ -143,7 +130,6 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
 
 @media (prefers-reduced-motion: reduce) {
   .hz-scene__upper,
-  .hz-scene__line,
   .hz-scene__lower {
     transition: none;
   }

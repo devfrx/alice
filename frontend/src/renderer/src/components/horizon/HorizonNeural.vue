@@ -139,6 +139,11 @@ let sweepDim = 0.9
 let sweepCount = 0
 let dreamTimer: ReturnType<typeof setTimeout> | null = null
 
+/* route easing: the displayed active ganglion glides (the old sparkX pattern) */
+let routeEase = 0
+let routeShown = 0
+let lastPlanTotal = 0
+
 let resizeObserver: ResizeObserver | null = null
 let themeObserver: MutationObserver | null = null
 
@@ -366,8 +371,7 @@ function positionOverlays(P: ProjectedNode[]): void {
   }
   const ann = annotationRef.value
   if (ann && props.planTotal > 0) {
-    const route = routeView(props.planActiveIndex, props.planCompleted, props.planTotal)
-    const p = P[graph.plan[Math.max(0, route.active)]]
+    const p = P[graph.plan[routeShown]]
     const flip = p.sx > width / 2
     ann.style.transform =
       `translate(${Math.round(p.sx + (flip ? -12 : 12))}px, ${Math.round(p.sy - 26)}px)` +
@@ -516,11 +520,16 @@ function draw(now: number): void {
   /* working — the route takes the stage (spin is damped to rest by updateCamera) */
   if (intens.working > 0.02 && props.planTotal > 0) {
     const route = routeView(props.planActiveIndex, props.planCompleted, props.planTotal)
+    // A NEW plan snaps; within-plan motion (including mid-run growth) glides.
+    if (lastPlanTotal === 0 || reducedMotion) routeEase = route.active
+    else routeEase = damp(routeEase, route.active, 4, dt)
+    routeShown = Math.max(0, Math.min(DISC_COUNT - 1, Math.round(routeEase)))
+    const shownDone = Math.min(route.done, routeShown)
     const pts = graph.plan.map((ni) => P[ni])
     c.save()
     c.globalAlpha = (props.dimmed ? 0.35 : 1) * intens.working
     for (let k = 0; k < DISC_COUNT - 1; k++) {
-      const lit = k < route.active
+      const lit = k < routeShown
       c.strokeStyle = `rgba(${lineRgb}, ${lit ? 0.6 : 0.2})`
       c.lineWidth = 1
       c.setLineDash(lit ? [] : [1, 3])
@@ -530,8 +539,8 @@ function draw(now: number): void {
       c.stroke()
     }
     c.setLineDash([])
-    if (route.active > 0 && !reducedMotion) {
-      const k = route.active - 1
+    if (routeShown > 0 && !reducedMotion) {
+      const k = routeShown - 1
       const f = (t * 0.7) % 1
       const x = pts[k].sx + (pts[k + 1].sx - pts[k].sx) * f
       const y = pts[k].sy + (pts[k + 1].sy - pts[k].sy) * f
@@ -541,8 +550,8 @@ function draw(now: number): void {
       c.fill()
     }
     pts.forEach((p, k) => {
-      const done = k < route.done
-      const active = k === route.active
+      const done = k < shownDone
+      const active = k === routeShown
       const pulse = active && !reducedMotion ? 0.75 + Math.sin(t * 3) * 0.25 : 1
       c.strokeStyle = `rgba(${lineRgb}, ${active ? 1 : done ? 0.85 : 0.35})`
       c.lineWidth = active ? 1.4 : 1
@@ -567,6 +576,7 @@ function draw(now: number): void {
 
   c.restore()
   positionOverlays(P)
+  lastPlanTotal = props.planTotal
 
   // Quiet fully settled → suspend; the dream timer re-arms the loop.
   if (!reducedMotion && running && props.state === 'quiet' && isSettled()) {

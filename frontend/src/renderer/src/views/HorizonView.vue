@@ -2,7 +2,7 @@
 <script setup lang="ts">
 /**
  * HorizonView — the assistant desk ("atelier"): the ambient scene (greeting,
- * composer, paced response, horizon line) with free-floating module windows
+ * composer, paced response, neural backdrop) with free-floating module windows
  * (DeskSurface) and the tray (DeskDock) above it. Orchestration only — the
  * heavy wiring lives in useHorizonKeyboard / useHorizonVoiceBridge and the
  * desk store; scene derivation stays in the pure horizonScene brain.

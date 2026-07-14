@@ -71,7 +71,7 @@ const items = computed(() => manuscriptView(props.steps, 7, props.activeIndex))
   text-align: center;
 }
 
-/* Dendrite tethering the manuscript to the horizon line above. */
+/* Dendrite tethering the manuscript to the scene above. */
 .hz-plan__tether {
   width: 1px;
   height: clamp(12px, 2.4vh, 22px);

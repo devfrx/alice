@@ -520,7 +520,7 @@ body {
  * triggering on Windows when any accessibility visual-effect setting was
  * set to "Custom", causing ALL CSS animations (spinners, loaders, pulses)
  * to freeze — even though the user had no explicit "reduce motion" intent.
- * Canvas/rAF renderers (e.g. the Horizon line) are unaffected, as they
+ * Canvas/rAF renderers (e.g. the Horizon neural backdrop) are unaffected, as they
  * do not use CSS animations.
  * Individual components that contain decorative-only animations add their
  * own targeted @media (prefers-reduced-motion: reduce) blocks where needed.

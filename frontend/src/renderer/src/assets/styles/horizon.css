@@ -41,7 +41,7 @@
   --hz-grain-ink: rgba(255, 255, 255, 0.012); /* colore della grana carta */
   --hz-grain-opacity: 0.5;
   --hz-vignette: 0.3; /* alpha della vignettatura ai bordi */
-  --hz-sky-alpha: 0.1; /* alpha base della costellazione in quiete */
+  --hz-sky-alpha: 0.1; /* alpha base della rete in quiete */
   --hz-highlight: rgba(255, 255, 255, 0.05); /* highlight interno superfici */
   --hz-shadow-sheet:
     0 1px 0 rgba(0, 0, 0, 0.35),

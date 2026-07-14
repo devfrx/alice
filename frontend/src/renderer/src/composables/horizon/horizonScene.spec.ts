@@ -6,13 +6,10 @@ import { describe, it, expect } from 'vitest'
 
 import {
   deriveSceneState,
-  deriveLineMode,
-  deriveSkyMode,
   manuscriptView,
   thinkingSignalNext,
   THINKING_SIGNAL_IDLE,
   lastThinkingLine,
-  notchPositions,
   planView,
   type HorizonSceneInputs
 } from './horizonScene'
@@ -100,42 +97,6 @@ describe('deriveSceneState — thinking', () => {
 
   it('thinking requires streaming (stale signal after cancel is inert)', () => {
     expect(deriveSceneState(inputs({ isThinking: true }))).toBe('quiet')
-  })
-})
-
-describe('deriveLineMode', () => {
-  it('maps states to line mechanics', () => {
-    expect(deriveLineMode('quiet', inputs())).toBe('breathe')
-    expect(deriveLineMode('listening', inputs({ isListening: true }))).toBe('tense')
-    expect(deriveLineMode('responding', inputs({ isSpeaking: true }))).toBe('pulse')
-    expect(deriveLineMode('responding', inputs({ isStreaming: true }))).toBe('breathe')
-    expect(deriveLineMode('working', inputs({ planSteps: [step('a')] }))).toBe('timeline')
-    expect(deriveLineMode('working', inputs({ activeToolCount: 1 }))).toBe('flow')
-  })
-})
-
-describe('deriveLineMode — thinking', () => {
-  it('thinking keeps the breathing line (life comes from impulses/sky)', () => {
-    expect(deriveLineMode('thinking', inputs({ isStreaming: true, isThinking: true }))).toBe(
-      'breathe'
-    )
-  })
-})
-
-describe('deriveSkyMode', () => {
-  it('wakes the constellation whenever reasoning is live, even inside working', () => {
-    expect(deriveSkyMode('thinking', inputs({ isThinking: true }))).toBe('thinking')
-    expect(deriveSkyMode('working', inputs({ isThinking: true }))).toBe('thinking')
-  })
-
-  it('working without reasoning drives the spores', () => {
-    expect(deriveSkyMode('working', inputs())).toBe('working')
-  })
-
-  it('everything else is idle', () => {
-    expect(deriveSkyMode('quiet', inputs())).toBe('idle')
-    expect(deriveSkyMode('responding', inputs())).toBe('idle')
-    expect(deriveSkyMode('listening', inputs())).toBe('idle')
   })
 })
 
@@ -251,14 +212,6 @@ describe('manuscriptView', () => {
     const visibleSteps = items.filter((it) => it.kind === 'step').length
     expect(last.kind === 'more' ? last.count : -1).toBe(12 - visibleSteps)
     expect(items.length).toBeLessThanOrEqual(7)
-  })
-})
-
-describe('notchPositions', () => {
-  it('returns centered fractions across the span', () => {
-    expect(notchPositions(0)).toEqual([])
-    expect(notchPositions(1)).toEqual([0.5])
-    expect(notchPositions(3)).toEqual([0.15, 0.5, 0.85])
   })
 })
 

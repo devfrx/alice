@@ -1,11 +1,12 @@
 /**
  * horizonScene.ts — Pure derivation for the Horizon assistant scene.
  *
- * Maps plain snapshots of the voice/chat/tasks stores to a single scene state
- * and the line's visual mechanic. One state active at a time, with explicit
- * priority: working ▸ thinking ▸ responding ▸ listening ▸ quiet. Desk windows
- * are an orthogonal presentation layer — they never affect the ambient scene
- * state.
+ * Maps plain snapshots of the voice/chat/tasks stores to a single scene
+ * state. The neural backdrop (HorizonNeural) derives its choreography from
+ * that state directly; the plan/manuscript/thinking helpers live here. One
+ * state active at a time, with explicit priority: working ▸ thinking ▸
+ * responding ▸ listening ▸ quiet. Desk windows are an orthogonal
+ * presentation layer — they never affect the ambient scene state.
  *
  * Pure functions only (no Vue imports) so the whole scene brain is unit
  * testable in the node environment.
@@ -14,12 +15,6 @@ import type { TaskStep } from '../../types/tasks'
 
 /** The five scene states (spec Horizon Vivo §3.1). */
 export type HorizonState = 'quiet' | 'listening' | 'thinking' | 'responding' | 'working'
-
-/** The living backdrop's mode (HorizonSky). */
-export type HorizonSkyMode = 'idle' | 'thinking' | 'working'
-
-/** The line's visual mechanic (HorizonLine modes). */
-export type HorizonLineMode = 'breathe' | 'tense' | 'pulse' | 'timeline' | 'flow'
 
 /** Plain-value snapshot of everything the scene depends on. */
 export interface HorizonSceneInputs {
@@ -48,33 +43,6 @@ export function deriveSceneState(i: HorizonSceneInputs): HorizonState {
   return 'quiet'
 }
 
-/** Derive the line mechanic for a scene state. */
-export function deriveLineMode(state: HorizonState, i: HorizonSceneInputs): HorizonLineMode {
-  switch (state) {
-    case 'listening':
-      return 'tense'
-    case 'responding':
-      return i.isSpeaking ? 'pulse' : 'breathe'
-    case 'working':
-      return i.planSteps.length > 0 ? 'timeline' : 'flow'
-    case 'thinking':
-      return 'breathe'
-    default:
-      return 'breathe'
-  }
-}
-
-/**
- * Notch x-positions for the timeline mode as fractions (0..1) of the line
- * span, centered over the middle 70% so end fades stay clean. Shared by the
- * canvas (ticks/spark) and the DOM labels so they always agree.
- */
-export function notchPositions(count: number): number[] {
-  if (count <= 0) return []
-  if (count === 1) return [0.5]
-  return Array.from({ length: count }, (_, i) => 0.15 + (i * 0.7) / (count - 1))
-}
-
 /** Plan summary for the working state. */
 export interface HorizonPlanView {
   total: number
@@ -92,13 +60,6 @@ export function planView(steps: TaskStep[]): HorizonPlanView {
   if (activeIndex < 0) activeIndex = steps.findIndex((s) => s.status === 'pending')
   if (activeIndex < 0) activeIndex = total - 1
   return { total, completed, activeIndex, statusSentence: steps[activeIndex]?.step ?? '' }
-}
-
-/** Sky mode: the constellation wakes on live reasoning, spores on work. */
-export function deriveSkyMode(state: HorizonState, i: HorizonSceneInputs): HorizonSkyMode {
-  if (i.isThinking && (state === 'thinking' || state === 'working')) return 'thinking'
-  if (state === 'working') return 'working'
-  return 'idle'
 }
 
 /* ── thinking signal (edge-triggered, non level-based: works in tool loops) ── */

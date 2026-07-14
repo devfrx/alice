@@ -1619,7 +1619,13 @@ git commit -m "chore(horizon): sweep finale pivot rete neurale"
   (disco c → c+1), quindi un nodo dell'ultimo disco poteva restare orfano (grado 0) — al seed 197
   succedeva al nodo 35, rompendo il test `degree >= 1` e `anyHop`. Trovato dall'implementer T1 in
   TDD; fix: post-pass deterministico che aggancia ogni orfano al nodo più vicino del disco
-  adiacente (già integrato nel blocco di codice del Task 1 qui sopra).
+  adiacente (già integrato nel blocco di codice del Task 1 qui sopra). Commit `7c1f175`.
+- **T1 — fix di quality review** (commit `8e55b00`): test sweep multi-seed (50 seed) degli
+  invarianti strutturali (adiacenza/dedup/grado ≥ 1 — la classe di bug del coverage guard);
+  `X_JITTER` esportato e usato dal test del layout al posto del magic 0.07; assert dei criteri di
+  selezione `plan` (min y²+z² per disco) e `polar` (min y ultimo disco); docstring: divergenza
+  prospettica per ‖p‖ → FOV in `projectNode`, contratto `rand ∈ [0,1)` in `anyHop`; commento del
+  guard esplicita che solo l'ultimo disco può orfanare (ramo col-0 difensivo).
 
 ## Self-review del piano
 

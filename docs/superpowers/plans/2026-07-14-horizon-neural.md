@@ -1163,12 +1163,16 @@ watch(
     clearDream()
     if (reducedMotion) draw(performance.now())
     else start()
-  }
+  },
+  // Post-flush: with the default 'pre' flush the label span (v-if + :key) is
+  // recreated AFTER draw() has positioned the stale one — permanently
+  // untransformed at (0,0) under reduced motion.
+  { flush: 'post' }
 )
 </script>
 
 <template>
-  <div class="hz-neural">
+  <div class="hz-neural" :class="{ 'hz-neural--dimmed': dimmed }">
     <canvas ref="canvasRef" class="hz-neural__canvas" aria-hidden="true" />
     <Transition name="hz-neural-fade">
       <span v-if="label" :key="label" ref="labelRef" class="hz-neural__label">{{ label }}</span>
@@ -1240,6 +1244,17 @@ watch(
   white-space: nowrap;
   user-select: none;
   will-change: transform;
+}
+
+/* dimmed dims the DOM overlays too, not only the canvas */
+.hz-neural__label,
+.hz-neural__annotation {
+  transition: opacity var(--hz-fade) ease;
+}
+
+.hz-neural--dimmed .hz-neural__label,
+.hz-neural--dimmed .hz-neural__annotation {
+  opacity: 0.35;
 }
 
 .hz-neural-fade-enter-active,
@@ -1630,6 +1645,13 @@ git commit -m "chore(horizon): sweep finale pivot rete neurale"
 - **T2 — tipizzazione `spawnHop`**: `let hop = null` veniva inferito come tipo letterale `null`
   in strict mode (TS2322/TS2339). Fix: `let hop: Hop | null = null` + import di `type Hop`
   (già integrato nel blocco di codice del Task 2 qui sopra). Solo typing, zero effetti runtime.
+- **T2 — fix di quality review**: (Critical) il watch delle props era pre-flush → con `v-if`+`:key`
+  la span della label veniva ricreata dopo `draw()` e restava a (0,0), permanentemente in
+  reduced-motion → `{ flush: 'post' }`; (Important) `dimmed` attenuava solo il canvas → classe
+  `hz-neural--dimmed` che porta anche label/annotazione a opacity 0.35 (entrambi integrati nel
+  blocco T2). Minor rimandati: stutter dello spin al settle in quiete (giudicare nella QA visiva),
+  traveler che ignorano la membrana sul disco 0, `sweepClock` persistente tra sessioni di
+  thinking, buffer per-frame hoistabili, snapshot one-shot di reducedMotion/pointerFine.
 
 ## Self-review del piano
 

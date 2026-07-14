@@ -71,56 +71,58 @@ function onWindowPointerDown(): void {
 </script>
 
 <template>
-  <section
-    v-show="!win.minimized"
-    class="desk-window"
-    :class="{ 'desk-window--focused': focused }"
-    :style="styleObj"
-    role="region"
-    :aria-label="title"
-    @pointerdown="onWindowPointerDown"
-  >
-    <header class="desk-window__header" @pointerdown="startDrag">
-      <AppIcon v-if="moduleDef" :name="moduleDef.icon" :size="13" class="desk-window__icon" />
-      <span class="desk-window__title">{{ title }}</span>
-      <UiIconButton
-        label="Riduci nel vassoio"
-        size="xs"
-        variant="ghost"
-        @click="desk.minimizeWindow(win.id)"
-      >
-        <AppIcon name="minus" :size="12" />
-      </UiIconButton>
-      <UiIconButton
-        label="Chiudi finestra"
-        size="xs"
-        variant="ghost"
-        @click="desk.closeWindow(win.id)"
-      >
-        <AppIcon name="x" :size="12" />
-      </UiIconButton>
-    </header>
+  <Transition name="desk-sheet" appear>
+    <section
+      v-show="!win.minimized"
+      class="desk-window"
+      :class="{ 'desk-window--focused': focused }"
+      :style="styleObj"
+      role="region"
+      :aria-label="title"
+      @pointerdown="onWindowPointerDown"
+    >
+      <header class="desk-window__header" @pointerdown="startDrag">
+        <AppIcon v-if="moduleDef" :name="moduleDef.icon" :size="13" class="desk-window__icon" />
+        <span class="desk-window__title">{{ title }}</span>
+        <UiIconButton
+          label="Riduci nel vassoio"
+          size="xs"
+          variant="ghost"
+          @click="desk.minimizeWindow(win.id)"
+        >
+          <AppIcon name="minus" :size="12" />
+        </UiIconButton>
+        <UiIconButton
+          label="Chiudi finestra"
+          size="xs"
+          variant="ghost"
+          @click="desk.closeWindow(win.id)"
+        >
+          <AppIcon name="x" :size="12" />
+        </UiIconButton>
+      </header>
 
-    <div class="desk-window__body">
-      <component :is="asyncComp" v-if="asyncComp" :params="win.params" />
-      <UiEmptyState
-        v-else
-        icon="alert-triangle"
-        title="Modulo non disponibile"
-        :subtitle="`«${win.moduleId}» non è registrato`"
-        compact
+      <div class="desk-window__body">
+        <component :is="asyncComp" v-if="asyncComp" :params="win.params" />
+        <UiEmptyState
+          v-else
+          icon="alert-triangle"
+          title="Modulo non disponibile"
+          :subtitle="`«${win.moduleId}» non è registrato`"
+          compact
+        />
+      </div>
+
+      <span
+        v-for="edge in EDGES"
+        :key="edge"
+        class="desk-window__grip"
+        :class="`desk-window__grip--${edge}`"
+        aria-hidden="true"
+        @pointerdown="(e) => startResize(edge, e)"
       />
-    </div>
-
-    <span
-      v-for="edge in EDGES"
-      :key="edge"
-      class="desk-window__grip"
-      :class="`desk-window__grip--${edge}`"
-      aria-hidden="true"
-      @pointerdown="(e) => startResize(edge, e)"
-    />
-  </section>
+    </section>
+  </Transition>
 </template>
 
 <style scoped>
@@ -132,17 +134,34 @@ function onWindowPointerDown(): void {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--hz-shadow-sheet, var(--shadow-floating));
   overflow: hidden;
   pointer-events: auto;
 }
 
 .desk-window--focused {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-elevated);
+  border-color: var(--accent-border);
+  box-shadow:
+    var(--hz-shadow-sheet, var(--shadow-elevated)),
+    0 0 24px -8px var(--accent-vivid);
+}
+
+/* The gold thread: the filament "enters" the focused sheet. */
+.desk-window--focused::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 8px var(--accent-vivid);
 }
 
 .desk-window__header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -154,6 +173,19 @@ function onWindowPointerDown(): void {
   cursor: grab;
   user-select: none;
   touch-action: none;
+}
+
+.desk-window__header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: calc(var(--hz-grain-opacity, 0.5) * 0.6);
+  background-image: repeating-conic-gradient(
+    var(--hz-grain-ink, transparent) 0 25%,
+    transparent 0 50%
+  );
+  background-size: 3px 3px;
 }
 
 .desk-window__header:active {
@@ -256,5 +288,35 @@ function onWindowPointerDown(): void {
   bottom: -3px;
   left: -3px;
   cursor: nesw-resize;
+}
+
+/* Opening: the sheet settles down. Minimizing: it slides toward the bench. */
+.desk-sheet-enter-active {
+  transition:
+    opacity 250ms var(--ease-out),
+    transform 250ms var(--ease-out);
+}
+
+.desk-sheet-leave-active {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+.desk-sheet-enter-from {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.desk-sheet-leave-to {
+  opacity: 0;
+  transform: scale(0.92) translateY(24px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk-sheet-enter-from,
+  .desk-sheet-leave-to {
+    transform: none;
+  }
 }
 </style>

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from sqlmodel import select
 
+from backend.db.database import create_engine_and_session, init_db
+from backend.db.models import Conversation, Message
 from backend.services.turn.direct_executor import DirectTurnExecutor
 from backend.services.turn.models import TurnProgress, TurnResult
 
@@ -75,3 +78,45 @@ def test_message_model_has_usage_column() -> None:
     assert msg.usage is None
     msg.usage = {"prompt_tokens": 1, "completion_tokens": 2, "cost": 0.5}
     assert msg.usage["cost"] == 0.5
+
+
+async def test_usage_round_trips_through_db_and_sums() -> None:
+    """Message.usage survives a real commit/read-back on SQLite.
+
+    Covers the migration path (``init_db`` runs the ``ALTER TABLE`` that
+    adds the ``usage`` column) and the on-read cost aggregation used by
+    the conversations route.
+    """
+    from backend.api.routes.chat.conversations import _sum_usage_cost
+
+    engine, session_factory = create_engine_and_session("sqlite+aiosqlite://")
+    await init_db(engine)
+
+    conv = Conversation(title="Cost round-trip")
+    async with session_factory() as session:
+        session.add(conv)
+        await session.commit()
+
+    msg = Message(
+        conversation_id=conv.id,
+        role="assistant",
+        content="ok",
+        usage={"prompt_tokens": 10, "completion_tokens": 5, "cost": 0.001},
+    )
+    async with session_factory() as session:
+        session.add(msg)
+        await session.commit()
+
+    async with session_factory() as session:
+        result = await session.exec(
+            select(Message).where(Message.conversation_id == conv.id)
+        )
+        loaded = result.one()
+        assert loaded.usage == {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "cost": 0.001,
+        }
+        assert _sum_usage_cost([loaded]) == pytest.approx(0.001)
+
+    await engine.dispose()

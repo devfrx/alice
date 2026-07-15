@@ -32,6 +32,11 @@ async def stage_inference(ctx: AppContext) -> None:
     llm_service = LLMService(config.llm, model_registry=model_registry)
     ctx.llm_service = llm_service
 
+    from backend.services.openrouter_service import OpenRouterService
+    ctx.openrouter_service = OpenRouterService(
+        config.llm, model_registry=model_registry,
+    )
+
     from backend.services.context_manager import ContextManager
     ctx.context_manager = ContextManager(config.llm)
 

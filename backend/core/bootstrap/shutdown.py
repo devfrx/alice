@@ -57,6 +57,11 @@ async def shutdown_services(ctx: AppContext | None) -> None:
             await ctx.llm_service.close()
         except Exception as exc:
             logger.error("LLM service shutdown error: {}", exc)
+    if ctx.openrouter_service is not None:
+        try:
+            await ctx.openrouter_service.close()
+        except Exception as exc:
+            logger.error("OpenRouter service shutdown error: {}", exc)
     if ctx.stt_service:
         try:
             await ctx.stt_service.stop()

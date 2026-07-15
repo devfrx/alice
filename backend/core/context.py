@@ -63,6 +63,7 @@ class AppContext:
         "db", "engine",
         "plugin_manager", "tool_registry", "llm_service", "stt_service",
         "tts_service", "lmstudio_manager", "vram_monitor", "model_registry",
+        "openrouter_service",
         "preferences_service", "memory_service", "knowledge_service",
         "continuum_client", "email_service", "qdrant_service",
         "embedding_client", "rag_readiness", "ws_connection_manager",
@@ -153,6 +154,14 @@ class AppContext:
     @model_downloader.setter
     def model_downloader(self, value: Any) -> None:
         self.inference.model_downloader = value
+
+    @property
+    def openrouter_service(self) -> Any:
+        return self.inference.openrouter_service
+
+    @openrouter_service.setter
+    def openrouter_service(self, value: Any) -> None:
+        self.inference.openrouter_service = value
 
     @property
     def embedding_client(self) -> EmbeddingClientProtocol | None:

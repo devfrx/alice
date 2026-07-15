@@ -107,6 +107,9 @@ class TurnResult:
         agent_run_id: Optional UUID of a persisted ``AgentRun`` row.
             Always ``None`` on the current model-driven path (kept for
             backward-compatible serialization).
+        cost: Total generation cost in provider credits, accumulated from
+            per-step ``usage`` events (``0.0`` = not reported by the
+            provider, e.g. LM Studio's native path).
     """
 
     content: str
@@ -114,6 +117,8 @@ class TurnResult:
     input_tokens: int
     output_tokens: int
     finish_reason: str
+    cost: float = 0.0
+    """Total generation cost in provider credits (0.0 = not reported)."""
     final_assistant_message_id: uuid.UUID | None = None
     had_tool_calls: bool = False
     agent_run_id: uuid.UUID | None = None
@@ -131,8 +136,11 @@ class TurnProgress:
         turn_id: Stable identifier minted once at the start of the turn.
         steps: Number of LLM steps emitted so far this turn.
         tool_calls: Cumulative tool calls dispatched this turn.
+        cost: Accumulated generation cost across all LLM steps of the turn.
     """
 
     turn_id: str
     steps: int = 0
     tool_calls: int = 0
+    cost: float = 0.0
+    """Accumulated generation cost across all LLM steps of the turn."""

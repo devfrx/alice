@@ -229,6 +229,8 @@ class LLMService:
         Serves the cached value (or the default) immediately. When the cache is
         empty or stale it schedules a background refresh so the *next* call is
         warm — the hot path (turn-start, conversation-open) never awaits LM Studio.
+        For OpenRouter, the value comes from the capability registry (catalog)
+        instead — no cache and no LM Studio probe involved.
 
         Args:
             lmstudio_manager: Optional LMStudioManager used by the background
@@ -237,8 +239,8 @@ class LLMService:
         Returns:
             Context window size in tokens (cached, last-known, or the default).
         """
-        # OpenRouter: il context window viene dal catalogo (capability
-        # registry), non da un probe LM Studio. ``getattr`` guards against
+        # OpenRouter: the context window comes from the catalog (capability
+        # registry), not an LM Studio probe. ``getattr`` guards against
         # ``tests/test_context_window_cache.py``, which builds the service
         # via ``LLMService.__new__`` and never sets ``_config``.
         config: LLMConfig | None = getattr(self, "_config", None)

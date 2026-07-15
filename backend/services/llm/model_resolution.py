@@ -157,7 +157,9 @@ class ModelResolver:
 
         Checks the registry first (if available), falling back to the
         static config flag.  Uses the cached auto-resolved model when
-        available to avoid an async call.
+        available to avoid an async call.  For OpenRouter, looks up the
+        configured ``openrouter_model`` directly in the registry — there is
+        no auto-resolved model cache to fall back on.
         """
         if self._is_openrouter and self._model_registry is not None:
             return self._model_registry.get_profile(
@@ -177,6 +179,8 @@ class ModelResolver:
         OAI-compatible ``/v1/models`` endpoint) for the first loaded model
         and caches the result for ``_auto_model_ttl`` seconds.  Falls back to
         ``"auto"`` itself if the query fails so LM Studio chooses for us.
+        For OpenRouter, returns ``openrouter_model`` directly with no probe —
+        there is no "loaded model" concept for a cloud provider.
 
         Returns:
             The resolved model ID string.

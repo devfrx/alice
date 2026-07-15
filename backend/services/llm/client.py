@@ -96,8 +96,8 @@ class LLMClient:
         """Stream a chat completion, choosing the best backend.
 
         Uses LM Studio's native ``/api/v1/chat`` when possible (no
-        tools, not Ollama, user_content provided).  Falls back to the
-        OpenAI-compatible ``/v1/chat/completions`` otherwise.
+        tools, not Ollama, not OpenRouter, user_content provided).  Falls
+        back to the OpenAI-compatible ``/v1/chat/completions`` otherwise.
 
         Args:
             messages: Full message list (used by OAI-compat path).
@@ -499,7 +499,7 @@ class LLMClient:
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion via the OAI-compatible endpoint.
 
-        Sends a POST to ``{base_url}/v1/chat/completions`` with
+        Sends a POST to ``{effective_base_url}/v1/chat/completions`` with
         ``stream=True`` and yields parsed event dicts.
 
         Args:
@@ -688,6 +688,7 @@ class LLMClient:
                                 "type": "usage",
                                 "input_tokens": _last_usage.get("prompt_tokens", 0),
                                 "output_tokens": _last_usage.get("completion_tokens", 0),
+                                "cost": _last_usage.get("cost"),
                             }
                         yield {
                             "type": "done",

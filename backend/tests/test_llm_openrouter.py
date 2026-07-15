@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from backend.core.config import PROJECT_ROOT, LLMConfig
@@ -10,8 +12,8 @@ from backend.services.llm_service import LLMService
 pytestmark = pytest.mark.asyncio
 
 
-def _openrouter_config(**overrides) -> LLMConfig:
-    base = dict(
+def _openrouter_config(**overrides: Any) -> LLMConfig:
+    base: dict[str, Any] = dict(
         provider="openrouter",
         openrouter_api_key="sk-or-test-123",
         openrouter_model="anthropic/claude-sonnet-5",

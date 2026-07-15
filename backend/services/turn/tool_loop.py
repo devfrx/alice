@@ -918,6 +918,7 @@ async def run_tool_loop(
                         _loop_last_output_tokens = event.get(
                             "output_tokens", 0,
                         )
+                        progress.cost += float(event.get("cost") or 0.0)
                     elif event["type"] == "done":
                         _loop_finish_reason = event.get(
                             "finish_reason", "stop",

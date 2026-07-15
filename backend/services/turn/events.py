@@ -255,6 +255,7 @@ def turn_finished(
     input_tokens: int,
     output_tokens: int,
     steps: int,
+    cost: float | None = None,
 ) -> dict[str, Any]:
     """Build a ``turn.finished`` frame marking the end of a turn.
 
@@ -270,6 +271,8 @@ def turn_finished(
         input_tokens: Total input tokens for the final LLM step.
         output_tokens: Total output tokens for the final LLM step.
         steps: Number of LLM steps executed in the turn.
+        cost: Costo totale del turno in crediti provider, o None quando non
+            riportato.
 
     Returns:
         The JSON-serialisable event frame.
@@ -281,6 +284,7 @@ def turn_finished(
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "steps": steps,
+        "cost": cost,
     }
 
 

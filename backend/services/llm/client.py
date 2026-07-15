@@ -58,6 +58,7 @@ class LLMClient:
         # Derived from the (runtime-immutable) config — ModelResolver
         # derives the same flag independently; not shared mutable state.
         self._is_ollama = config.provider == "ollama"
+        self._is_openrouter = config.provider == "openrouter"
         self._response_ids: OrderedDict[str, str] = OrderedDict()
         self._response_ids_max = 500
         # None = unknown, True = supported, False = not supported
@@ -119,6 +120,7 @@ class LLMClient:
         """
         use_native = (
             not self._is_ollama
+            and not self._is_openrouter
             and tools is None
             and user_content is not None
         )
@@ -513,7 +515,7 @@ class LLMClient:
             - ``{"type": "tool_call", "id": "...", "function": {...}}``
             - ``{"type": "done", "finish_reason": "stop"|"cancelled"}``
         """
-        url = f"{self._config.base_url}/v1/chat/completions"
+        url = f"{self._config.effective_base_url}/v1/chat/completions"
 
         # LM Studio suppresses reasoning_content when a 'system' role
         # message is present in the messages array.  Work around this
@@ -525,7 +527,7 @@ class LLMClient:
         # prompt into user content breaks this — the model sees the
         # tools but cannot emit structured tool_calls.  Thinking is
         # still captured via inline <think> tags (ThinkTagParser).
-        should_fold = not self._is_ollama and not tools
+        should_fold = not self._is_ollama and not self._is_openrouter and not tools
         actual_messages = (
             self._prompts._fold_system_into_user(messages)
             if should_fold
@@ -827,7 +829,7 @@ class LLMClient:
         Returns:
             The assistant's response text, or ``""`` on failure.
         """
-        url = f"{self._config.base_url}/v1/chat/completions"
+        url = f"{self._config.effective_base_url}/v1/chat/completions"
         active_model = await self._resolver.resolve()
         payload: dict[str, Any] = {
             "model": active_model,

@@ -47,6 +47,7 @@ class ModelResolver:
         self._model_registry = model_registry
         self._http = http
         self._is_ollama = config.provider == "ollama"
+        self._is_openrouter = config.provider == "openrouter"
         # Cache for "auto" model resolution: (resolved_id, resolved_at_monotonic)
         self._auto_model_cache: tuple[str, float] | None = None
         self._auto_model_ttl: float = 300.0  # seconds
@@ -158,6 +159,10 @@ class ModelResolver:
         static config flag.  Uses the cached auto-resolved model when
         available to avoid an async call.
         """
+        if self._is_openrouter and self._model_registry is not None:
+            return self._model_registry.get_profile(
+                self._config.openrouter_model or "openrouter/auto",
+            ).supports_vision
         if self._model_registry is not None and self._auto_model_cache:
             profile = self._model_registry.get_profile(
                 self._auto_model_cache[0],
@@ -176,6 +181,11 @@ class ModelResolver:
         Returns:
             The resolved model ID string.
         """
+        if self._is_openrouter:
+            # Nessun concetto di "modello caricato" per un provider cloud:
+            # il modello attivo è la scelta esplicita dell'utente.
+            return self._config.openrouter_model or "openrouter/auto"
+
         if self._config.model != "auto":
             return self._config.model
 

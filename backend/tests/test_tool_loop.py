@@ -401,6 +401,96 @@ class TestErrorRecovery:
 
 
 # ---------------------------------------------------------------------------
+# Tests — transient LLM errors in the re-query (retry, then abort)
+# ---------------------------------------------------------------------------
+
+_STREAM_ERROR = [
+    {"type": "token", "content": "parz"},
+    {"type": "error", "content": "Upstream idle timeout exceeded"},
+    {"type": "done", "finish_reason": "error"},
+]
+
+
+async def _run_with_llm(
+    llm: MockLLM, tool_calls: list[dict],
+) -> tuple[MockWebSocket, tuple]:
+    """Like ``_run`` but with a caller-owned LLM (to count chat calls)."""
+    websocket = MockWebSocket()
+    result = await run_tool_loop(
+        channel=websocket,
+        sink=websocket,
+        ctx=_Ctx(MockToolRegistry()),
+        session=MockSession(),
+        conv_id=uuid.uuid4(),
+        llm=llm,
+        tool_calls_from_llm=tool_calls,
+        full_content="",
+        thinking_content="",
+        max_iterations=5,
+        confirmation_timeout_s=2,
+        client_ip="127.0.0.1",
+    )
+    return websocket, result
+
+
+class TestTransientErrorRetry:
+    """Mid-stream provider errors are retried before aborting the loop."""
+
+    @pytest.mark.asyncio
+    async def test_stream_error_retried_and_recovers(self) -> None:
+        """First re-query dies mid-stream, the retry produces the answer."""
+        llm = MockLLM([
+            _STREAM_ERROR,
+            [
+                {"type": "token", "content": "Risposta completa."},
+                {"type": "done"},
+            ],
+        ])
+        ws, result = await _run_with_llm(llm, [_tc("tool_a")])
+
+        assert result[0] == "Risposta completa."
+        # The retry re-announces the requery so the frontend drops the
+        # partial fragment of the failed generation.
+        requeries = [m for m in ws.sent if m.get("type") == "llm_requery"]
+        assert len(requeries) == 2
+        assert llm._idx == 2
+
+    @pytest.mark.asyncio
+    async def test_stream_error_exhausts_retries_then_aborts(self) -> None:
+        """Persistent stream errors abort after the retry budget."""
+        llm = MockLLM([_STREAM_ERROR, _STREAM_ERROR, _STREAM_ERROR])
+        ws, result = await _run_with_llm(llm, [_tc("tool_a")])
+
+        # 1 attempt + _EMPTY_REQUERY_RETRIES retries, no fourth call
+        # (MockLLM would answer successfully past the configured list).
+        assert llm._idx == 3
+        assert result[4] == "error"
+
+    @pytest.mark.asyncio
+    async def test_http_status_error_is_not_retried(self) -> None:
+        """4xx/5xx from the provider (auth, credits, context) fail fast."""
+        import httpx
+
+        class _HTTPErrorLLM(MockLLM):
+            def __init__(self) -> None:
+                super().__init__()
+                self.calls = 0
+
+            async def chat(self, *a, **k):
+                self.calls += 1
+                req = httpx.Request("POST", "https://x/v1/chat/completions")
+                resp = httpx.Response(402, request=req)
+                raise httpx.HTTPStatusError(
+                    "Payment Required", request=req, response=resp,
+                )
+                yield  # pragma: no cover — makes this an async generator
+
+        llm = _HTTPErrorLLM()
+        ws, _ = await _run_with_llm(llm, [_tc("tool_a")])
+        assert llm.calls == 1
+
+
+# ---------------------------------------------------------------------------
 # Tests — cancellation
 # ---------------------------------------------------------------------------
 

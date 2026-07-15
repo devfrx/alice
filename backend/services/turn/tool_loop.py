@@ -14,6 +14,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
+import httpx
 from loguru import logger
 
 from backend.core.context import AppContext
@@ -839,12 +840,15 @@ async def run_tool_loop(
                         {"type": "context_compression_failed"},
                     )
 
-        # 6. Re-stream LLM (with retry on empty responses).
+        # 6. Re-stream LLM (with retry on empty responses and on
+        # transient stream errors).
         # Local LLMs sometimes return completely empty completions
-        # after tool execution.  Retry up to _EMPTY_REQUERY_RETRIES
-        # times before accepting an empty result as "final answer".
-        # On retries we inject a continuation nudge so the model
-        # understands it must produce a response.
+        # after tool execution; cloud providers (OpenRouter) can drop
+        # a stream mid-generation ("Upstream idle timeout exceeded").
+        # Both are retried up to _EMPTY_REQUERY_RETRIES times before
+        # accepting/aborting.  Empty retries inject a continuation
+        # nudge; error retries re-issue the same query.
+        retry_reason: str | None = None
         for requery_attempt in range(_EMPTY_REQUERY_RETRIES + 1):
             full_content = ""
             thinking_content = ""
@@ -862,6 +866,22 @@ async def run_tool_loop(
                     await sink.send(events.turn_llm_step(
                         turn_id=progress.turn_id, step=progress.steps,
                     ))
+            elif retry_reason == "error":
+                logger.info(
+                    "Re-query retry {}/{} (iter {}) — transient LLM "
+                    "error, re-issuing the query",
+                    requery_attempt, _EMPTY_REQUERY_RETRIES,
+                    iteration + 1,
+                )
+                query_messages = messages
+                # Re-announce the requery: the frontend resets its
+                # streaming buffer on this frame, dropping the partial
+                # fragment of the failed generation.
+                await sink.send({
+                    "type": "llm_requery",
+                    "iteration": iteration + 1,
+                })
+                await asyncio.sleep(1.0 * requery_attempt)
             else:
                 logger.info(
                     "Re-query retry {}/{} (iter {}) — LLM returned empty, "
@@ -887,6 +907,7 @@ async def run_tool_loop(
             # read-pump (it sets ``cancel_event``), which ``llm.chat`` honours
             # per chunk — no dedicated reader here (avoids a second WS reader).
             llm_error_in_requery = False
+            llm_error_retryable = False
 
             try:
                 async for event in llm.chat(
@@ -911,6 +932,10 @@ async def run_tool_loop(
                             event.get("content", "unknown"),
                         )
                         llm_error_in_requery = True
+                        # In-stream error: the request itself was accepted,
+                        # the provider died mid-generation (e.g. OpenRouter
+                        # "Upstream idle timeout exceeded") — transient.
+                        llm_error_retryable = True
                     elif event["type"] == "usage":
                         _loop_last_input_tokens = event.get(
                             "input_tokens", 0,
@@ -923,6 +948,15 @@ async def run_tool_loop(
                         _loop_finish_reason = event.get(
                             "finish_reason", "stop",
                         )
+            except httpx.HTTPStatusError as exc:
+                # 4xx/5xx before the stream started (auth, credits,
+                # context length): retrying cannot help — fail fast.
+                logger.error(
+                    "LLM HTTP error during tool loop re-query "
+                    "(iter {}): {}",
+                    iteration + 1, exc,
+                )
+                llm_error_in_requery = True
             except Exception as exc:
                 logger.error(
                     "LLM exception during tool loop re-query "
@@ -930,15 +964,25 @@ async def run_tool_loop(
                     iteration + 1, exc,
                 )
                 llm_error_in_requery = True
+                # Transport-level failure (connection dropped, read
+                # error): transient by nature.
+                llm_error_retryable = True
 
-            # Got content or tool calls or an error — accept the result.
-            if (
-                full_content.strip()
-                or tool_calls_from_llm
-                or llm_error_in_requery
-            ):
+            if llm_error_in_requery:
+                if (
+                    llm_error_retryable
+                    and requery_attempt < _EMPTY_REQUERY_RETRIES
+                    and not (cancel_event and cancel_event.is_set())
+                ):
+                    retry_reason = "error"
+                    continue
                 break
 
+            # Got content or tool calls — accept the result.
+            if full_content.strip() or tool_calls_from_llm:
+                break
+
+            retry_reason = "empty"
             # Empty response on last attempt — accept as-is.
             if requery_attempt == _EMPTY_REQUERY_RETRIES:
                 logger.warning(

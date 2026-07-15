@@ -151,7 +151,8 @@ async def test_openrouter_chat_uses_oai_path_with_usage_accounting() -> None:
 
 async def test_context_window_from_registry_for_openrouter() -> None:
     from backend.services.model_capability_registry import (
-        ModelCapabilityRegistry, ModelProfile,
+        ModelCapabilityRegistry,
+        ModelProfile,
     )
 
     registry = ModelCapabilityRegistry()

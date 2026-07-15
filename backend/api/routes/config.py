@@ -387,6 +387,8 @@ async def update_config(request: Request) -> dict[str, Any]:
 
     # Apply supported runtime overrides.
     if "llm" in body:
+        # Aliases body["llm"]: value normalizations below are intentionally
+        # visible to persist_from_update(body).
         llm_updates = body["llm"]
         if "model" in llm_updates:
             model_val = str(llm_updates["model"]).strip()
@@ -493,6 +495,7 @@ async def update_config(request: Request) -> dict[str, Any]:
                 raise HTTPException(
                     400, "provider must be one of: lmstudio, ollama, openrouter",
                 )
+            llm_updates["provider"] = prov
             if prov != cfg.llm.provider:
                 object.__setattr__(cfg.llm, "provider", prov)
                 llm_service_rebuild_needed = True
@@ -515,6 +518,7 @@ async def update_config(request: Request) -> dict[str, Any]:
             if len(om) > 256:
                 raise HTTPException(400, "openrouter_model max 256 chars")
             object.__setattr__(cfg.llm, "openrouter_model", om)
+            llm_updates["openrouter_model"] = om
             if ctx.llm_service is not None:
                 ctx.llm_service.invalidate_model_cache()
                 ctx.llm_service.invalidate_context_window_cache()
@@ -526,7 +530,10 @@ async def update_config(request: Request) -> dict[str, Any]:
                 raise HTTPException(
                     400, "openrouter_favorites must be a list of strings",
                 )
-            object.__setattr__(cfg.llm, "openrouter_favorites", favs[:200])
+            if len(favs) > 200:
+                raise HTTPException(400, "openrouter_favorites max 200 items")
+            object.__setattr__(cfg.llm, "openrouter_favorites", favs)
+            llm_updates["openrouter_favorites"] = favs
 
     if "ui" in body:
         ui_updates = body["ui"]
@@ -886,6 +893,9 @@ async def _apply_llm_provider_change(ctx: AppContext) -> None:
     old = ctx.llm_service
     new_service = LLMService(ctx.config.llm, model_registry=ctx.model_registry)
     ctx.llm_service = new_service
+    # add_models_changed_listener has no removal API: the old service's
+    # listener stays registered (harmless no-op on a closed service,
+    # bounded by user-initiated switches).
     if ctx.lmstudio_manager is not None:
         ctx.lmstudio_manager.add_models_changed_listener(
             new_service.invalidate_context_window_cache

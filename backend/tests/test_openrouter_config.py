@@ -49,6 +49,20 @@ class TestProviderSwitch:
         assert ctx.config.llm.provider == "openrouter"
         assert ctx.llm_service is not old_service
 
+    async def test_provider_is_normalized_in_memory_and_in_prefs(
+        self, client, app,
+    ) -> None:
+        ctx = app.state.context
+
+        resp = await client.put(
+            "/api/config", json={"llm": {"provider": "OpenRouter"}},
+        )
+
+        assert resp.status_code == 200
+        assert ctx.config.llm.provider == "openrouter"
+        prefs = await ctx.preferences_service.load_all()
+        assert prefs["llm"]["provider"] == "openrouter"
+
     async def test_invalid_provider_returns_400(self, client) -> None:
         resp = await client.put(
             "/api/config", json={"llm": {"provider": "bogus"}},

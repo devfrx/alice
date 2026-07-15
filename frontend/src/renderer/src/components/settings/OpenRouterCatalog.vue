@@ -30,9 +30,13 @@ const CAPABILITY_OPTIONS: UiSegmentedOption[] = [
 /** The currently active OpenRouter model id, from settings. */
 const activeModelId = computed(() => settingsStore.settings.llm.openrouterModel)
 
-/** `200000` → `"200k ctx"`; `0`/`undefined` → `"—"`. */
+/** `200000` → `"200k ctx"`; `1048576` → `"1M ctx"`; `0`/`undefined` → `"—"`. */
 function formatContext(length?: number): string {
   if (!length) return '—'
+  if (length >= 1_000_000) {
+    const millions = Math.round((length / 1_000_000) * 10) / 10
+    return `${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)}M ctx`
+  }
   if (length >= 1000) return `${Math.round(length / 1000)}k ctx`
   return `${length} ctx`
 }
@@ -41,6 +45,11 @@ function formatContext(length?: number): string {
 function pricePerMtok(perToken: number | null | undefined): string {
   if (perToken == null) return '—'
   return `$${(perToken * 1_000_000).toFixed(2)}`
+}
+
+/** True when both prompt and completion pricing are exactly zero (free model). */
+function isFree(model: OpenRouterModel): boolean {
+  return model.pricing?.prompt === 0 && model.pricing?.completion === 0
 }
 
 function hasAnyCapability(model: OpenRouterModel): boolean {
@@ -106,7 +115,12 @@ function favoriteLabel(id: string): string {
         class="or-row"
         :class="{ 'or-row--active': model.id === activeModelId }"
       >
-        <button type="button" class="or-row__select" @click="store.selectModel(model.id)">
+        <button
+          type="button"
+          class="or-row__select"
+          :aria-current="model.id === activeModelId ? 'true' : undefined"
+          @click="store.selectModel(model.id)"
+        >
           <span class="or-row__main">
             <span class="or-row__name">{{ model.name }}</span>
             <span class="or-row__id">{{ model.id }}</span>
@@ -118,7 +132,8 @@ function favoriteLabel(id: string): string {
           </span>
           <span class="or-row__meta">
             <span class="or-row__ctx">{{ formatContext(model.context_length) }}</span>
-            <span class="or-row__price">
+            <span v-if="isFree(model)" class="or-row__price or-row__price--free">gratis</span>
+            <span v-else class="or-row__price">
               {{ pricePerMtok(model.pricing?.prompt) }} in /
               {{ pricePerMtok(model.pricing?.completion) }} out · Mtok
             </span>
@@ -278,5 +293,10 @@ function favoriteLabel(id: string): string {
   font-size: var(--text-xs);
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.or-row__price--free {
+  color: var(--text-muted);
+  font-style: italic;
 }
 </style>

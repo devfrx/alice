@@ -62,9 +62,15 @@ const creditsText = computed(() => {
   return `$${(credits.usage ?? 0).toFixed(2)} usati`
 })
 
-/** Load the catalog, and credits when a key is already configured. */
+/**
+ * Load the catalog (skipped when already populated, to avoid a list-replacing
+ * spinner flash on section re-activation), and credits when a key is
+ * already configured.
+ */
 function loadOpenRouterData(): void {
-  openrouterStore.loadCatalog()
+  if (openrouterStore.models.length === 0) {
+    openrouterStore.loadCatalog()
+  }
   if (settingsStore.openrouterKeyConfigured) {
     openrouterStore.loadCredits()
   }

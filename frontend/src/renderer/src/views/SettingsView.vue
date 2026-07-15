@@ -26,6 +26,15 @@
         <ModelManager />
       </section>
 
+      <!-- Provider -->
+      <section
+        id="section-provider"
+        :ref="(el) => setSectionRef('provider', el)"
+        class="sv__section"
+      >
+        <OpenRouterManager />
+      </section>
+
       <!-- LLM Parameters -->
       <section id="section-llm" :ref="(el) => setSectionRef('llm', el)" class="sv__section">
         <UiSectionHeader
@@ -244,6 +253,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import ModelManager from '../components/settings/ModelManager.vue'
+import OpenRouterManager from '../components/settings/OpenRouterManager.vue'
 import AgentPersonaSettings from '../components/settings/AgentPersonaSettings.vue'
 import EmailSettings from '../components/settings/EmailSettings.vue'
 import VoiceSettings from '../components/voice/VoiceSettings.vue'
@@ -272,6 +282,7 @@ const themeOptions: UiSelectOption[] = [
 /* ── Navigation ─────────────────────────────────────────────── */
 type SectionId =
   | 'model'
+  | 'provider'
   | 'llm'
   | 'persona'
   | 'voice'
@@ -286,6 +297,7 @@ type SectionId =
 
 const navItems: { id: SectionId; label: string; iconName: AppIconName }[] = [
   { id: 'model', label: 'Modello', iconName: 'package' },
+  { id: 'provider', label: 'Provider', iconName: 'link' },
   { id: 'llm', label: 'Parametri LLM', iconName: 'sliders' },
   { id: 'persona', label: 'Agente / Persona', iconName: 'user' },
   { id: 'voice', label: 'Voce', iconName: 'mic' },
@@ -303,6 +315,7 @@ const activeSection = ref<SectionId>('model')
 const contentRef = ref<HTMLElement | null>(null)
 const sectionRefs = reactive<Record<SectionId, HTMLElement | null>>({
   model: null,
+  provider: null,
   llm: null,
   persona: null,
   voice: null,

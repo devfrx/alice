@@ -17,6 +17,14 @@ def _ctx(request: Request) -> AppContext:
     return request.app.state.context
 
 
+def _safe_float(value: Any) -> float | None:
+    """Coerce an untrusted upstream value to float (None when absent/invalid)."""
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Response models (contract-first: the ratchet requires a response_model)
 # ---------------------------------------------------------------------------
@@ -55,20 +63,15 @@ class OpenRouterCreditsResponse(BaseModel):
     limit_remaining: float | None = None
     usage: float = 0.0
     is_free_tier: bool | None = None
+    """``None`` means unknown/not reported by OpenRouter, not "false"."""
 
     @classmethod
     def from_key_data(cls, data: dict[str, Any]) -> OpenRouterCreditsResponse:
         """Build from the raw ``data`` object of the /v1/key response."""
-        def _num(value: Any) -> float | None:
-            try:
-                return float(value) if value is not None else None
-            except (TypeError, ValueError):
-                return None
-
         return cls(
-            limit=_num(data.get("limit")),
-            limit_remaining=_num(data.get("limit_remaining")),
-            usage=_num(data.get("usage")) or 0.0,
+            limit=_safe_float(data.get("limit")),
+            limit_remaining=_safe_float(data.get("limit_remaining")),
+            usage=_safe_float(data.get("usage")) or 0.0,
             is_free_tier=data.get("is_free_tier"),
         )
 
@@ -84,13 +87,6 @@ def _serialise_model(m: dict[str, Any]) -> OpenRouterModelOut:
     arch = m.get("architecture") or {}
     pricing = m.get("pricing") or {}
 
-    def _price(key: str) -> float | None:
-        raw = pricing.get(key)
-        try:
-            return float(raw) if raw is not None else None
-        except (TypeError, ValueError):
-            return None
-
     model_id = m.get("id", "")
     return OpenRouterModelOut(
         id=model_id,
@@ -102,7 +98,8 @@ def _serialise_model(m: dict[str, Any]) -> OpenRouterModelOut:
             or 0
         ),
         pricing=OpenRouterPricing(
-            prompt=_price("prompt"), completion=_price("completion"),
+            prompt=_safe_float(pricing.get("prompt")),
+            completion=_safe_float(pricing.get("completion")),
         ),
         supports_tools="tools" in params,
         supports_vision="image" in (arch.get("input_modalities") or []),
@@ -132,6 +129,8 @@ async def list_openrouter_models(
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(503, "OpenRouter unreachable") from exc
+    except ValueError as exc:
+        raise HTTPException(502, "OpenRouter returned malformed data") from exc
     return OpenRouterModelsResponse(
         models=[_serialise_model(m) for m in models],
     )
@@ -156,4 +155,6 @@ async def get_openrouter_credits(request: Request) -> OpenRouterCreditsResponse:
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(503, "OpenRouter unreachable") from exc
+    except ValueError as exc:
+        raise HTTPException(502, "OpenRouter returned malformed data") from exc
     return OpenRouterCreditsResponse.from_key_data(data)

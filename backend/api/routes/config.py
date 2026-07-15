@@ -499,12 +499,17 @@ async def update_config(request: Request) -> dict[str, Any]:
         if "openrouter_api_key" in llm_updates:
             raw_key = str(llm_updates["openrouter_api_key"] or "").strip()
             # "***" is the mask returned by GET — never overwrite the real
-            # key with it.
+            # key with it, neither in memory nor in the persisted prefs.
             if raw_key and raw_key != "***":
                 if len(raw_key) > 256:
                     raise HTTPException(400, "openrouter_api_key max 256 chars")
                 object.__setattr__(cfg.llm, "openrouter_api_key", raw_key)
+                llm_updates["openrouter_api_key"] = raw_key
                 llm_service_rebuild_needed = True
+            else:
+                # No-op update: drop the key so persist_from_update
+                # cannot clobber the stored secret with the mask.
+                llm_updates.pop("openrouter_api_key", None)
         if "openrouter_model" in llm_updates:
             om = str(llm_updates["openrouter_model"] or "").strip()
             if len(om) > 256:

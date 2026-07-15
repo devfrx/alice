@@ -77,3 +77,42 @@ class TestProviderSwitch:
         )
         assert masked.status_code == 200
         assert ctx.config.llm.openrouter_api_key == "sk-or-real-secret"
+
+    async def test_masked_api_key_does_not_clobber_persisted_preference(
+        self, client, app,
+    ) -> None:
+        ctx = app.state.context
+
+        seed = await client.put(
+            "/api/config",
+            json={"llm": {"openrouter_api_key": "sk-or-real-secret"}},
+        )
+        assert seed.status_code == 200
+
+        masked = await client.put(
+            "/api/config", json={"llm": {"openrouter_api_key": "***"}},
+        )
+        assert masked.status_code == 200
+
+        prefs = await ctx.preferences_service.load_all()
+        assert prefs["llm"]["openrouter_api_key"] == "sk-or-real-secret"
+
+    async def test_empty_api_key_is_a_noop_in_memory_and_in_prefs(
+        self, client, app,
+    ) -> None:
+        ctx = app.state.context
+
+        seed = await client.put(
+            "/api/config",
+            json={"llm": {"openrouter_api_key": "sk-or-real-secret"}},
+        )
+        assert seed.status_code == 200
+
+        cleared = await client.put(
+            "/api/config", json={"llm": {"openrouter_api_key": ""}},
+        )
+        assert cleared.status_code == 200
+        assert ctx.config.llm.openrouter_api_key == "sk-or-real-secret"
+
+        prefs = await ctx.preferences_service.load_all()
+        assert prefs["llm"]["openrouter_api_key"] == "sk-or-real-secret"

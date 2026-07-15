@@ -66,7 +66,9 @@ class OpenRouterService:
             force_refresh: Bypass the cache and re-fetch.
 
         Returns:
-            The raw ``data`` list from the OpenRouter response.
+            A shallow copy of the raw ``data`` list from the OpenRouter
+            response (safe for callers to mutate without corrupting the
+            shared cache).
         """
         now = time.monotonic()
         if (
@@ -74,7 +76,7 @@ class OpenRouterService:
             and self._catalog_cache is not None
             and now - self._catalog_fetched_at < self._catalog_ttl
         ):
-            return self._catalog_cache
+            return list(self._catalog_cache)
         async with self._lock:
             now = time.monotonic()
             if (
@@ -82,7 +84,7 @@ class OpenRouterService:
                 and self._catalog_cache is not None
                 and now - self._catalog_fetched_at < self._catalog_ttl
             ):
-                return self._catalog_cache
+                return list(self._catalog_cache)
             resp = await self._http.get(f"{self._base()}/v1/models")
             resp.raise_for_status()
             models: list[dict[str, Any]] = resp.json().get("data", [])
@@ -91,7 +93,7 @@ class OpenRouterService:
             self._catalog_cache = models
             self._catalog_fetched_at = now
             logger.info("OpenRouter catalog fetched: {} models", len(models))
-            return models
+            return list(models)
 
     async def get_credits(self) -> dict[str, Any]:
         """Return key limits/usage from ``GET /v1/key``.

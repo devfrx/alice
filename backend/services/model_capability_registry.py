@@ -169,11 +169,18 @@ class ModelCapabilityRegistry:
                 model_id = m.get("id", "")
                 if not model_id:
                     continue
+
+                old = self._profiles.get(model_id)
+                # Never clobber a profile detected from the local LM Studio
+                # API: local capabilities win for locally-served models.
+                if old is not None and old.source == "lmstudio_api":
+                    continue
+
                 params = m.get("supported_parameters") or []
                 arch = m.get("architecture") or {}
                 modalities = arch.get("input_modalities") or []
                 top = m.get("top_provider") or {}
-                self._profiles[model_id] = ModelProfile(
+                profile = ModelProfile(
                     model_id=model_id,
                     supports_thinking="reasoning" in params,
                     supports_vision="image" in modalities,
@@ -185,6 +192,20 @@ class ModelCapabilityRegistry:
                     ),
                     source="openrouter_api",
                 )
+
+                # Preserve runtime-learned knowledge (same policy as
+                # refresh_from_api).
+                if old is not None:
+                    if old.accepts_reasoning_param is not None:
+                        profile.accepts_reasoning_param = (
+                            old.accepts_reasoning_param
+                        )
+                    if old.emits_reasoning_natively is not None:
+                        profile.emits_reasoning_natively = (
+                            old.emits_reasoning_natively
+                        )
+
+                self._profiles[model_id] = profile
                 updated += 1
             self._last_refresh = time.monotonic()
         if updated:

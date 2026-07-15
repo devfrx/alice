@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -89,3 +90,38 @@ async def test_get_credits_sends_auth_header() -> None:
     _, kwargs = svc._http.get.await_args
     assert kwargs["headers"]["Authorization"] == "Bearer sk-or-x"
     await svc.close()
+
+
+async def test_concurrent_list_models_fetches_once() -> None:
+    svc = OpenRouterService(_config())
+
+    async def _slow_get(*_a, **_k):
+        await asyncio.sleep(0.05)
+        return _json_response({"data": _CATALOG})
+
+    svc._http.get = AsyncMock(side_effect=_slow_get)
+    results = await asyncio.gather(*(svc.list_models() for _ in range(10)))
+    assert all(len(r) == 2 for r in results)
+    assert svc._http.get.await_count == 1
+    await svc.close()
+
+
+async def test_refresh_from_openrouter_preserves_lmstudio_profiles() -> None:
+    from backend.services.model_capability_registry import ModelProfile
+
+    registry = ModelCapabilityRegistry()
+    registry._profiles["qwen/qwen3.5-72b"] = ModelProfile(
+        model_id="qwen/qwen3.5-72b",
+        supports_vision=True,
+        context_length=8192,
+        accepts_reasoning_param=True,
+        source="lmstudio_api",
+    )
+    await registry.refresh_from_openrouter(_CATALOG)
+    # Il profilo LM Studio non viene clobberato...
+    local = registry.get_profile("qwen/qwen3.5-72b")
+    assert local.source == "lmstudio_api"
+    assert local.context_length == 8192
+    # ...mentre i modelli nuovi vengono aggiunti normalmente.
+    cloud = registry.get_profile("anthropic/claude-sonnet-5")
+    assert cloud.source == "openrouter_api"

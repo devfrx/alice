@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**AL\CE** (a.k.a. *Omnia*) — a 100% local personal AI assistant. No external paid APIs; everything (LLM, STT, TTS, vector store, 3D generation) runs on the user's machine. **Windows is the primary target.**
+**AL\CE** (a.k.a. *Omnia*) — a local-first personal AI assistant. Everything (LLM, STT, TTS, vector store, 3D generation) runs on the user's machine by default; **OpenRouter** is supported as an optional cloud LLM provider of equal rank (`llm.provider: "openrouter"`, API key required, per-token billing). Memory/embeddings stay strictly local regardless of provider. **Windows is the primary target.**
 
 The repo is effectively a small multi-project workspace:
 

@@ -1,6 +1,6 @@
 # AL\CE
 
-> **O**rchestrated **M**odular **N**etwork for **I**ntelligent **A**utomation — Assistente AI personale, 100% locale.
+> **O**rchestrated **M**odular **N**etwork for **I**ntelligent **A**utomation — Assistente AI personale, local-first. LLM locale via LM Studio/Ollama, oppure cloud opzionale via OpenRouter (API key, a consumo); memoria ed embedding restano sempre locali.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@
 | Python | 3.11+ | [python.org](https://www.python.org/downloads/) |
 | Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
 | NVIDIA GPU | CUDA 12 compatible (optional) | Driver aggiornati |
-| LM Studio **oppure** Ollama | — | [lmstudio.ai](https://lmstudio.ai/) / [ollama.com](https://ollama.com/) |
+| LM Studio **oppure** Ollama (locale) **oppure** una API key [OpenRouter](https://openrouter.ai/) (cloud) | — | [lmstudio.ai](https://lmstudio.ai/) / [ollama.com](https://ollama.com/) |
 
 ## Quick Setup
 

@@ -18,7 +18,7 @@
 
 **Fatti API OpenRouter verificati (doc ufficiale, 2026-07-15):**
 - Chat: `POST {base}/v1/chat/completions`, OpenAI-compatible, SSE, tool calling. Auth: `Authorization: Bearer <key>`. Attribution opzionale: `HTTP-Referer`, `X-Title`.
-- Usage accounting: `"usage": {"include": true}` nel payload → il chunk SSE finale contiene `usage.cost` (crediti USD) oltre a `prompt_tokens`/`completion_tokens`.
+- Usage accounting: AUTOMATICO — "full usage details are now always included automatically in every response"; `"usage": {"include": true}` e `stream_options: {include_usage: true}` sono deprecati e senza effetto su OpenRouter. Il chunk SSE finale contiene `usage.cost` (crediti) oltre a `prompt_tokens`/`completion_tokens`. Il client NON deve aggiungere alcun campo al payload; il `stream_options` già inviato dal client è innocuo (no-op).
 - Catalogo: `GET {base}/v1/models` (senza auth) → `data[]` con `id`, `name`, `description`, `context_length`, `pricing.{prompt,completion}` (stringhe, USD/token), `architecture.input_modalities` (`["text","image",...]`), `supported_parameters` (`["tools","reasoning",...]`), `top_provider.context_length`.
 - Crediti: `GET {base}/v1/key` (con auth) → `data.{limit, limit_remaining, usage, is_free_tier, ...}`. 401 se key non valida.
 - Base URL usata nel codice: `https://openrouter.ai/api` (il client appende `/v1/...`, stessa convenzione di LM Studio).
@@ -274,7 +274,8 @@ async def test_openrouter_chat_uses_oai_path_with_usage_accounting() -> None:
     ]
 
     assert captured["url"] == "https://openrouter.ai/api/v1/chat/completions"
-    assert captured["payload"]["usage"] == {"include": True}
+    # Usage accounting è automatico su OpenRouter: nessun campo extra.
+    assert "usage" not in captured["payload"]
     assert captured["payload"]["model"] == "anthropic/claude-sonnet-5"
     tokens = [e for e in events if e["type"] == "token"]
     assert tokens and tokens[0]["content"] == "ciao"
@@ -374,14 +375,9 @@ Costruttore (dopo riga 60 `self._is_ollama = ...`):
 
 `_chat_openai_compat` (riga 516): `url = f"{self._config.effective_base_url}/v1/chat/completions"`.
 
-Nel payload (dopo il blocco `stream_options`, riga 544) aggiungi:
-
-```python
-        if self._is_openrouter:
-            # OpenRouter usage accounting: il chunk SSE finale porta i
-            # token reali e il costo in crediti della generazione.
-            payload["usage"] = {"include": True}
-```
+NON serve alcun campo payload per l'usage accounting (automatico su
+OpenRouter — verificato sulla doc ufficiale: `usage: {include: true}` è
+deprecato e senza effetto; il costo arriva comunque nell'ultimo chunk SSE).
 
 Anche il folding del system prompt deve restare attivo solo per LM Studio: la riga 528 `should_fold = not self._is_ollama and not tools` diventa:
 

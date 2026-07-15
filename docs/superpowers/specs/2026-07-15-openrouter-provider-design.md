@@ -83,9 +83,9 @@ Ciò che OpenRouter richiede in più rispetto a LM Studio/Ollama:
 
 ## 3. Costo per conversazione
 
-- Le richieste streaming verso OpenRouter includono `usage: {include: true}`;
-  l'ultimo chunk SSE riporta prompt/completion tokens e **costo in crediti**
-  della generazione.
+- L'usage accounting OpenRouter è automatico (nessun parametro richiesto —
+  `usage: {include: true}` è deprecato e senza effetto): l'ultimo chunk SSE
+  riporta prompt/completion tokens e **costo in crediti** della generazione.
 - Persistenza: nuova colonna nullable `usage` (JSON:
   `{prompt_tokens, completion_tokens, cost}`) su `Message` — affianca il
   `token_count` esistente senza toccarlo. Migrazione additiva (colonna

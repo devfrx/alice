@@ -162,6 +162,28 @@ export const useChatStore = defineStore('chat', () => {
   /** Whether context compression is currently in progress. */
   const isCompressingContext = ref(false)
 
+  /**
+   * Total cost of the active conversation, in OpenRouter credits.
+   *
+   * Seeded from the persisted `total_cost` on conversation load
+   * ({@link setConversationCost}), then incremented live as `turn.finished`
+   * frames arrive ({@link addTurnCost}). `null` when no OpenRouter-priced
+   * generation has been reported yet (e.g. a local provider, which never
+   * reports a cost).
+   */
+  const conversationCost = ref<number | null>(null)
+
+  /** Set the conversation's persisted total cost (e.g. from a GET detail response). */
+  function setConversationCost(total: number | null): void {
+    conversationCost.value = total
+  }
+
+  /** Accumulate a turn's cost onto the running total. `null`/non-positive costs are a no-op. */
+  function addTurnCost(cost: number | null | undefined): void {
+    if (cost == null || cost <= 0) return
+    conversationCost.value = (conversationCost.value ?? 0) + cost
+  }
+
   // -----------------------------------------------------------------------
   // Computed
   // -----------------------------------------------------------------------
@@ -262,6 +284,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!isSameConversation && (!isStreaming.value || streamingConversationId.value !== id)) {
       contextInfo.value = null
       isCompressingContext.value = false
+      conversationCost.value = null
     }
 
     // NOTE: Do NOT cancel any in-progress stream for a different conversation.
@@ -317,6 +340,11 @@ export const useChatStore = defineStore('chat', () => {
           breakdown: detail.context_info.breakdown
         }
       }
+
+      // The persisted total is always authoritative — unlike context_info
+      // (estimate vs. real), there's no live signal more precise than this
+      // sum, so every successful load resyncs to it.
+      setConversationCost(detail.total_cost ?? null)
     } catch (err) {
       // The fetch was aborted by a newer selection — silently discard.
       if ((err as { name?: string })?.name === 'AbortError') return
@@ -902,6 +930,7 @@ export const useChatStore = defineStore('chat', () => {
     pendingAskUser,
     contextInfo,
     isCompressingContext,
+    conversationCost,
 
     // computed
     messages,
@@ -944,6 +973,8 @@ export const useChatStore = defineStore('chat', () => {
     removePendingAskUser,
     updateContextInfo,
     setCompressingContext,
-    setCompressionDone
+    setCompressionDone,
+    setConversationCost,
+    addTurnCost
   }
 })

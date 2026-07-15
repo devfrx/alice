@@ -116,6 +116,14 @@ defineExpose({
         :is-compressing="chatStore.isCompressingContext"
       />
 
+      <span
+        v-if="chatStore.conversationCost != null"
+        class="hz-cockpit__cost"
+        :title="'Costo conversazione (crediti OpenRouter)'"
+      >
+        ${{ chatStore.conversationCost.toFixed(4) }}
+      </span>
+
       <MicrophoneButton
         v-if="voiceStore.isReady"
         :available="voiceStore.sttAvailable"
@@ -208,6 +216,14 @@ defineExpose({
 
 .hz-cockpit__file-input {
   display: none;
+}
+
+.hz-cockpit__cost {
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .hz-cockpit__rail {

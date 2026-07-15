@@ -47,7 +47,8 @@ const PENDING_RUN: AgentRun = Object.freeze({
   inputTokens: 0,
   outputTokens: 0,
   toolCalls: 0,
-  finishReason: null
+  finishReason: null,
+  cost: null
 }) as AgentRun
 
 export const useAgentRunStore = defineStore('agentRun', () => {
@@ -108,7 +109,8 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       inputTokens: 0,
       outputTokens: 0,
       toolCalls: 0,
-      finishReason: null
+      finishReason: null,
+      cost: null
     }
     runs.value = { ...runs.value, [turnId]: run }
     return runs.value[turnId]
@@ -132,7 +134,8 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       inputTokens: 0,
       outputTokens: 0,
       toolCalls: 0,
-      finishReason: null
+      finishReason: null,
+      cost: null
     }
     runs.value = { ...runs.value, [msg.turn_id]: run }
     currentTurnId.value = msg.turn_id
@@ -255,6 +258,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     run.inputTokens = msg.input_tokens
     run.outputTokens = msg.output_tokens
     run.step = msg.steps
+    run.cost = msg.cost ?? null
   }
 
   /**

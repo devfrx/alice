@@ -253,6 +253,14 @@ defineExpose({
           :is-compressing="chatStore.isCompressingContext"
         />
 
+        <span
+          v-if="chatStore.conversationCost != null"
+          class="conversation-cost"
+          :title="'Costo conversazione (crediti OpenRouter)'"
+        >
+          ${{ chatStore.conversationCost.toFixed(4) }}
+        </span>
+
         <UiIconButton
           class="ci__mode"
           size="sm"
@@ -551,6 +559,14 @@ defineExpose({
 }
 .ci__glabel--agent {
   margin-left: var(--space-1);
+}
+
+.conversation-cost {
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  user-select: none;
 }
 
 /* ============================================================

@@ -295,7 +295,10 @@ export function useChat(): UseChatReturn {
     'interaction.requested': (msg) => agentRunStore.applyInteractionRequested(msg),
     'interaction.resolved': (msg) => agentRunStore.applyInteractionResolved(msg),
     'turn.usage': (msg) => agentRunStore.applyTurnUsage(msg),
-    'turn.finished': (msg) => agentRunStore.applyTurnFinished(msg),
+    'turn.finished': (msg) => {
+      agentRunStore.applyTurnFinished(msg)
+      store.addTurnCost(msg.cost ?? null)
+    },
 
     // Reflective-executor telemetry frames — no UI surface yet (backlog).
     'agent.critic_invoked': noop,

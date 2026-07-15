@@ -84,4 +84,6 @@ export interface AgentRun {
   outputTokens: number
   toolCalls: number
   finishReason: string | null
+  /** Cost of this turn's generations, in OpenRouter credits; `null` for local providers. */
+  cost: number | null
 }

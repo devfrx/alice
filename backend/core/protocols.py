@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -422,6 +422,12 @@ class LMStudioManagerProtocol(Protocol):
     ) -> dict: ...
 
     async def get_download_status(self, job_id: str) -> dict: ...
+
+    def add_models_changed_listener(
+        self, callback: Callable[[], None],
+    ) -> None:
+        """Register a callback fired whenever the loaded-model set changes."""
+        ...
 
     async def check_health(self) -> bool:
         """Return True if LM Studio is reachable."""

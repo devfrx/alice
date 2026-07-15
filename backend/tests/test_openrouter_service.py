@@ -49,7 +49,9 @@ def _json_response(payload: dict) -> MagicMock:
 async def test_list_models_caches_and_seeds_registry() -> None:
     registry = ModelCapabilityRegistry()
     svc = OpenRouterService(_config(), model_registry=registry)
-    svc._http.get = AsyncMock(return_value=_json_response({"data": _CATALOG}))
+    svc._http.get = AsyncMock(  # type: ignore[method-assign]
+        return_value=_json_response({"data": _CATALOG}),
+    )
 
     models = await svc.list_models()
     assert len(models) == 2
@@ -72,7 +74,9 @@ async def test_list_models_caches_and_seeds_registry() -> None:
 
 async def test_list_models_force_refresh_bypasses_cache() -> None:
     svc = OpenRouterService(_config())
-    svc._http.get = AsyncMock(return_value=_json_response({"data": _CATALOG}))
+    svc._http.get = AsyncMock(  # type: ignore[method-assign]
+        return_value=_json_response({"data": _CATALOG}),
+    )
     await svc.list_models()
     await svc.list_models(force_refresh=True)
     assert svc._http.get.await_count == 2
@@ -81,14 +85,17 @@ async def test_list_models_force_refresh_bypasses_cache() -> None:
 
 async def test_get_credits_sends_auth_header() -> None:
     svc = OpenRouterService(_config())
-    svc._http.get = AsyncMock(return_value=_json_response({
-        "data": {"limit": 10.0, "limit_remaining": 7.5, "usage": 2.5},
-    }))
+    svc._http.get = AsyncMock(  # type: ignore[method-assign]
+        return_value=_json_response({
+            "data": {"limit": 10.0, "limit_remaining": 7.5, "usage": 2.5},
+        }),
+    )
 
     data = await svc.get_credits()
     assert data["limit_remaining"] == 7.5
-    _, kwargs = svc._http.get.await_args
-    assert kwargs["headers"]["Authorization"] == "Bearer sk-or-x"
+    call = svc._http.get.await_args
+    assert call is not None
+    assert call.kwargs["headers"]["Authorization"] == "Bearer sk-or-x"
     await svc.close()
 
 
@@ -99,7 +106,7 @@ async def test_concurrent_list_models_fetches_once() -> None:
         await asyncio.sleep(0.05)
         return _json_response({"data": _CATALOG})
 
-    svc._http.get = AsyncMock(side_effect=_slow_get)
+    svc._http.get = AsyncMock(side_effect=_slow_get)  # type: ignore[method-assign]
     results = await asyncio.gather(*(svc.list_models() for _ in range(10)))
     assert all(len(r) == 2 for r in results)
     assert svc._http.get.await_count == 1

@@ -99,7 +99,7 @@ function toggle(): void {
   errorMessage.value = null
   if (!isOpen.value) {
     searchQuery.value = ''
-    openrouterStore.searchQuery = ''
+    if (isOpenrouterProvider.value) openrouterStore.searchQuery = ''
   }
 }
 

@@ -219,6 +219,16 @@ async def _persist_final_turn(
                 session.add(asst_msg)
                 await session.flush()
 
+        # Usage accounting (OpenRouter): persisti il costo del turno sul
+        # messaggio assistant finale. La SUM per conversazione è on-read.
+        if asst_msg is not None and result.cost > 0:
+            asst_msg.usage = {
+                "prompt_tokens": result.input_tokens,
+                "completion_tokens": result.output_tokens,
+                "cost": round(result.cost, 8),
+            }
+            session.add(asst_msg)
+
         conv.updated_at = _utcnow()
         if conv.title is None and user_content:
             conv.title = user_content[:100]

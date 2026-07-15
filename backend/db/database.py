@@ -113,6 +113,7 @@ async def init_db(engine: AsyncEngine) -> None:
         ("messages", "is_context_summary", "INTEGER DEFAULT 0"),
         ("messages", "context_excluded", "INTEGER DEFAULT 0"),
         ("conversations", "context_snapshot", "TEXT"),
+        ("messages", "usage", "TEXT"),
     ]
 
     # Batch all column-existence checks in a single run_sync call to

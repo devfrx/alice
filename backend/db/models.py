@@ -123,6 +123,15 @@ class Message(SQLModel, table=True):
         default=None,
         description="Real token count from LLM API (stored after response).",
     )
+    usage: Optional[Any] = Field(
+        default=None,
+        sa_column=sa.Column(sa.JSON, nullable=True),
+        description=(
+            "Per-turn usage from the LLM API: "
+            "{prompt_tokens, completion_tokens, cost} — cost in provider "
+            "credits (OpenRouter usage accounting)."
+        ),
+    )
     is_context_summary: bool = Field(
         default=False,
         description="True if this is an LLM-generated context summary.",

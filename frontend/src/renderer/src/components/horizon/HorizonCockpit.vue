@@ -15,6 +15,7 @@ import ContextBar from '../chat/ContextBar.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
+import { formatCost } from '../../utils/formatCost'
 import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
@@ -121,7 +122,7 @@ defineExpose({
         class="hz-cockpit__cost"
         :title="'Costo conversazione (crediti OpenRouter)'"
       >
-        ${{ chatStore.conversationCost.toFixed(4) }}
+        {{ formatCost(chatStore.conversationCost) }}
       </span>
 
       <MicrophoneButton

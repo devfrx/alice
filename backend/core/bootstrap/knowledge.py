@@ -23,11 +23,15 @@ async def stage_knowledge(ctx: AppContext) -> None:
     from backend.services.embedding_client import EmbeddingClient
     from backend.services.qdrant_service import QdrantService
 
+    # api_enabled is decided once at bootstrap time: a runtime provider switch
+    # does NOT rebuild the embedding client, so memory keeps using whatever
+    # backend was active at startup until the process restarts.
     embedding_client = EmbeddingClient(
         base_url=config.llm.base_url,
         model=config.qdrant.embedding_model,
         dimensions=config.qdrant.embedding_dim,
         fallback_enabled=config.qdrant.embedding_fallback,
+        api_enabled=config.llm.provider != "openrouter",
     )
     # Probe actual dims so ensure_collection uses the real vector size,
     # not the potentially stale config value.

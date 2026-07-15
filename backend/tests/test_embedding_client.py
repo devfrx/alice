@@ -292,3 +292,57 @@ async def test_fastembed_not_available():
                 base_url=BASE_URL, model=MODEL, dimensions=DIMS,
                 fallback_enabled=True,
             )
+
+
+# ---------------------------------------------------------------------------
+# Tests — api_enabled=False (cloud provider guard, Task 8)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_disabled_goes_straight_to_fastembed(monkeypatch) -> None:
+    """Con api_enabled=False il backend OpenAI non viene MAI chiamato."""
+    from backend.services.embedding_client import EmbeddingClient
+
+    client = EmbeddingClient(
+        base_url="http://localhost:1234",
+        model="text-embedding-x",
+        dimensions=384,
+        fallback_enabled=True,
+        api_enabled=False,
+    )
+
+    async def _fail(*_a, **_k):
+        raise AssertionError("OpenAI backend must not be called")
+
+    monkeypatch.setattr(client._openai, "encode", _fail)
+    monkeypatch.setattr(client._openai, "encode_batch", _fail)
+
+    fake_vec = [0.0] * 384
+
+    async def _fake_encode(_text: str) -> list[float]:
+        return fake_vec
+
+    async def _fake_encode_batch(texts: list[str]) -> list[list[float]]:
+        return [fake_vec for _ in texts]
+
+    monkeypatch.setattr(client._fastembed, "encode", _fake_encode)
+    monkeypatch.setattr(client._fastembed, "encode_batch", _fake_encode_batch)
+
+    assert await client.encode("ciao") == fake_vec
+    assert await client.encode_batch(["a", "b"]) == [fake_vec, fake_vec]
+
+
+@pytest.mark.asyncio
+async def test_api_disabled_probe_returns_fallback_dims() -> None:
+    """Con api_enabled=False probe_dimensions non chiama l'API remota."""
+    from backend.services.embedding_client import EmbeddingClient
+
+    client = EmbeddingClient(
+        base_url="http://localhost:1234",
+        model="text-embedding-x",
+        dimensions=384,
+        fallback_enabled=True,
+        api_enabled=False,
+    )
+    assert await client.probe_dimensions() == 384

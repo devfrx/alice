@@ -260,6 +260,9 @@ class EmbeddingClient:
         model: Embedding model tag for the API backend.
         dimensions: Vector dimensionality of the primary model.
         fallback_enabled: If ``True``, fall back to fastembed on API errors.
+        api_enabled: When False the remote API backend is skipped entirely —
+            used with cloud LLM providers (OpenRouter) to keep embeddings
+            strictly local.
     """
 
     def __init__(
@@ -268,9 +271,11 @@ class EmbeddingClient:
         model: str,
         dimensions: int,
         fallback_enabled: bool = True,
+        api_enabled: bool = True,
     ) -> None:
         self._openai = OpenAIEmbeddingClient(base_url, model, dimensions)
         self._fallback_enabled = fallback_enabled
+        self._api_enabled = api_enabled
         # Only enable fastembed fallback when its default model dimensions
         # (384 for BAAI/bge-small-en-v1.5) match the configured dimensions.
         # A mismatch would produce wrong-sized vectors and corrupt the vector
@@ -311,6 +316,13 @@ class EmbeddingClient:
         Returns:
             Actual number of dimensions produced by the active backend.
         """
+        if not self._api_enabled:
+            return (
+                self._fastembed.dimensions
+                if self._fastembed is not None
+                else self._openai.dimensions
+            )
+
         # Guard: don't trigger an LM Studio auto-load if the model isn't up.
         model_loaded = await self._openai.is_model_loaded()
         if not model_loaded:
@@ -355,18 +367,24 @@ class EmbeddingClient:
 
     async def encode(self, text: str) -> list[float]:
         """Encode a single text, falling back to CPU if the API is unreachable."""
+        if not self._api_enabled:
+            return await self._fallback_encode(text)
         try:
             return await self._openai.encode(text)
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             logger.debug("OpenAI embedding failed: {}", exc)
+            logger.warning("Embedding API unreachable, falling back to fastembed")
             return await self._fallback_encode(text)
 
     async def encode_batch(self, texts: list[str]) -> list[list[float]]:
         """Encode a batch of texts, falling back to CPU if the API is unreachable."""
+        if not self._api_enabled:
+            return await self._fallback_encode_batch(texts)
         try:
             return await self._openai.encode_batch(texts)
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             logger.debug("OpenAI embedding batch failed: {}", exc)
+            logger.warning("Embedding API unreachable, falling back to fastembed")
             return await self._fallback_encode_batch(texts)
 
     async def _fallback_encode(self, text: str) -> list[float]:
@@ -375,7 +393,6 @@ class EmbeddingClient:
             raise RuntimeError(
                 "Embedding API unreachable and fastembed fallback is disabled"
             )
-        logger.warning("Embedding API unreachable, falling back to fastembed")
         return await self._fastembed.encode(text)
 
     async def _fallback_encode_batch(self, texts: list[str]) -> list[list[float]]:
@@ -384,7 +401,6 @@ class EmbeddingClient:
             raise RuntimeError(
                 "Embedding API unreachable and fastembed fallback is disabled"
             )
-        logger.warning("Embedding API unreachable, falling back to fastembed")
         return await self._fastembed.encode_batch(texts)
 
     async def close(self) -> None:

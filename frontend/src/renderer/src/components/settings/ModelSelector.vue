@@ -8,6 +8,7 @@
  * badges, load status, and metadata.
  */
 import { computed, onMounted, ref } from 'vue'
+import { useOpenrouterStore } from '../../stores/openrouter'
 import { useSettingsStore } from '../../stores/settings'
 import type { LMStudioModel } from '../../types/settings'
 import AliceSpinner from '../../components/ui/AliceSpinner.vue'
@@ -25,11 +26,17 @@ const props = withDefaults(
 )
 
 const settingsStore = useSettingsStore()
+const openrouterStore = useOpenrouterStore()
 
 const isOpen = ref(false)
 const errorMessage = ref<string | null>(null)
 const triggerRef = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
+
+/** True when this selector should render the OpenRouter catalog instead of LM Studio. */
+const isOpenrouterProvider = computed(
+  () => settingsStore.settings.llm.provider === 'openrouter' && props.modelType === 'llm'
+)
 
 /** All models for this selector's type. */
 const typeModels = computed(() =>
@@ -59,6 +66,11 @@ const active = computed(() =>
 
 /** Label shown on the trigger button. */
 const triggerLabel = computed(() => {
+  if (isOpenrouterProvider.value) {
+    return settingsStore.settings.llm.openrouterModel
+      ? truncateName(settingsStore.settings.llm.openrouterModel)
+      : 'Scegli modello'
+  }
   if (active.value) return truncateName(active.value.display_name || active.value.name)
   if (props.modelType === 'embedding') return 'Nessun embedding'
   return settingsStore.settings.llm.model
@@ -76,12 +88,26 @@ function truncateName(name: string, maxLen = 24): string {
 }
 
 function toggle(): void {
-  if (!isOpen.value && typeModels.value.length === 0) {
-    settingsStore.loadModels()
+  if (!isOpen.value) {
+    if (isOpenrouterProvider.value) {
+      if (openrouterStore.models.length === 0) void openrouterStore.loadCatalog()
+    } else if (typeModels.value.length === 0) {
+      settingsStore.loadModels()
+    }
   }
   isOpen.value = !isOpen.value
   errorMessage.value = null
-  if (!isOpen.value) searchQuery.value = ''
+  if (!isOpen.value) {
+    searchQuery.value = ''
+    openrouterStore.searchQuery = ''
+  }
+}
+
+/** Select an OpenRouter model as active and close the popover. */
+function selectOpenrouterModel(id: string): void {
+  openrouterStore.selectModel(id)
+  isOpen.value = false
+  openrouterStore.searchQuery = ''
 }
 
 async function toggleModelLoad(model: LMStudioModel, event: MouseEvent): Promise<void> {
@@ -137,9 +163,9 @@ onMounted(() => {
         :size="11"
         title="Embedding model"
       />
-      <!-- Warning icon only when LM Studio is disconnected -->
+      <!-- Warning icon only when LM Studio is disconnected (not relevant on OpenRouter) -->
       <AppIcon
-        v-else-if="!settingsStore.lmStudioConnected"
+        v-else-if="!isOpenrouterProvider && !settingsStore.lmStudioConnected"
         class="ms__warn-icon"
         name="alert-triangle"
         :size="11"
@@ -166,185 +192,259 @@ onMounted(() => {
       @update:open="isOpen = $event"
     >
       <div class="ms__dropdown" role="group">
-        <!-- Search (only when many models) -->
-        <div v-if="showSearch" class="ms__search">
-          <UiSearchInput
-            v-model="searchQuery"
-            placeholder="Cerca modello…"
-            size="sm"
-            aria-label="Cerca modello"
-            @keydown.stop
-          />
-        </div>
-
-        <!-- Error -->
-        <div v-if="errorMessage" class="ms__error">
-          {{ errorMessage }}
-        </div>
-
-        <!-- Global operation in progress -->
-        <div v-if="settingsStore.isAnyOperationInProgress" class="ms__operation">
-          <div class="ms__operation-bar">
-            <div class="ms__operation-fill" />
-          </div>
-          <span class="ms__operation-text">{{ settingsStore.operationDescription }}</span>
-        </div>
-
-        <!-- Scrollable model list -->
-        <div class="ms__list">
-          <!-- Loading state -->
-          <div v-if="settingsStore.isLoadingModels" class="ms__state">
-            <AliceSpinner size="xs" label="Caricamento modelli…" />
+        <!-- OpenRouter branch: active only for the LLM selector when provider === 'openrouter' -->
+        <template v-if="isOpenrouterProvider">
+          <div class="ms__search">
+            <UiSearchInput
+              v-model="openrouterStore.searchQuery"
+              placeholder="Cerca modello…"
+              size="sm"
+              aria-label="Cerca modello"
+              @keydown.stop
+            />
           </div>
 
-          <!-- Empty state -->
-          <div v-else-if="typeModels.length === 0" class="ms__state">
-            {{
-              props.modelType === 'embedding'
-                ? 'Nessun modello embedding disponibile'
-                : 'Nessun modello disponibile'
-            }}
+          <div v-if="openrouterStore.error" class="ms__error">
+            {{ openrouterStore.error }}
           </div>
 
-          <!-- No search results -->
-          <div
-            v-else-if="loadedModels.length === 0 && availableModels.length === 0 && searchQuery"
-            class="ms__state"
-          >
-            Nessun risultato per "{{ searchQuery }}"
-          </div>
+          <div class="ms__list">
+            <!-- Loading state -->
+            <div v-if="openrouterStore.loadingCatalog" class="ms__state">
+              <AliceSpinner size="xs" label="Caricamento catalogo…" />
+            </div>
 
-          <template v-else>
-            <!-- Loaded models -->
-            <template v-if="loadedModels.length > 0">
-              <div class="ms__section-head">
-                <span class="ms__section-dot ms__section-dot--on" />
-                Caricati ({{ loadedModels.length }})
-              </div>
+            <!-- Empty / no results -->
+            <div v-else-if="openrouterStore.filteredModels.length === 0" class="ms__state">
+              {{
+                openrouterStore.searchQuery
+                  ? `Nessun risultato per "${openrouterStore.searchQuery}"`
+                  : 'Nessun modello disponibile'
+              }}
+            </div>
+
+            <template v-else>
               <div
-                v-for="model in loadedModels"
-                :key="'l-' + model.name"
-                class="ms__item ms__item--loaded"
-                :class="{ 'ms__item--busy': isModelBusy(model) }"
-                :aria-disabled="settingsStore.isAnyOperationInProgress || undefined"
+                v-for="model in openrouterStore.filteredModels"
+                :key="model.id"
+                class="ms__item ms__item--or"
+                :class="{
+                  'ms__item--active': model.id === settingsStore.settings.llm.openrouterModel
+                }"
               >
-                <span class="ms__accent" />
-                <div class="ms__item-top">
-                  <span class="ms__dot ms__dot--on" />
-                  <span class="ms__name" :title="model.display_name || model.name">
-                    {{ model.display_name || model.name }}
-                  </span>
-                  <UiIconButton
-                    label="Scarica dalla memoria"
-                    variant="outlined"
-                    size="xs"
-                    tone="accent"
-                    :loading="isModelBusy(model)"
-                    :disabled="settingsStore.isAnyOperationInProgress"
-                    class="ms__action-btn"
-                    @click="toggleModelLoad(model, $event)"
-                  >
-                    <AppIcon name="model-unload" :size="11" />
-                  </UiIconButton>
-                </div>
-                <div class="ms__item-meta">
-                  <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
-                    model.params_string
-                  }}</span>
-                  <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{
-                    model.quantization.name
-                  }}</span>
-                  <span class="ms__tag ms__tag--size">{{ formatSize(model.size) }}</span>
-                  <span
-                    v-if="model.loaded && model.loaded_instances.length > 0"
-                    class="ms__tag ms__tag--ctx"
-                  >
-                    ctx {{ model.loaded_instances[0].config.context_length.toLocaleString() }}
-                  </span>
-                  <span v-if="model.capabilities.vision" class="ms__cap" title="Vision">
-                    <AppIcon name="eye" :size="11" />
-                  </span>
-                  <span v-if="model.capabilities.thinking" class="ms__cap" title="Thinking">
-                    <AppIcon name="thinking-cap" :size="11" />
-                  </span>
-                  <span
-                    v-if="model.capabilities.trained_for_tool_use"
-                    class="ms__cap"
-                    title="Tool Use"
-                  >
-                    <AppIcon name="tool" :size="11" />
-                  </span>
-                </div>
-                <!-- Loading progress -->
-                <div v-if="settingsStore.isModelLoading(model.name)" class="ms__progress">
-                  <div class="ms__progress-bar" />
-                </div>
+                <button
+                  type="button"
+                  class="ms__or-select"
+                  :aria-current="
+                    model.id === settingsStore.settings.llm.openrouterModel || undefined
+                  "
+                  @click="selectOpenrouterModel(model.id)"
+                >
+                  <span class="ms__name" :title="model.name">{{ model.name }}</span>
+                  <span class="ms__or-id">{{ model.id }}</span>
+                </button>
+                <UiIconButton
+                  label="Preferito"
+                  variant="ghost"
+                  size="xs"
+                  tone="accent"
+                  toggle
+                  :active="openrouterStore.isFavorite(model.id)"
+                  class="ms__or-fav"
+                  @click.stop="openrouterStore.toggleFavorite(model.id)"
+                >
+                  <AppIcon name="star" :size="12" />
+                </UiIconButton>
               </div>
             </template>
+          </div>
+        </template>
 
-            <!-- Divider -->
-            <div v-if="loadedModels.length > 0 && availableModels.length > 0" class="ms__divider" />
+        <!-- LM Studio branch (existing flow, unchanged) -->
+        <template v-else>
+          <!-- Search (only when many models) -->
+          <div v-if="showSearch" class="ms__search">
+            <UiSearchInput
+              v-model="searchQuery"
+              placeholder="Cerca modello…"
+              size="sm"
+              aria-label="Cerca modello"
+              @keydown.stop
+            />
+          </div>
 
-            <!-- Available models -->
-            <template v-if="availableModels.length > 0">
-              <div class="ms__section-head">
-                <span class="ms__section-dot ms__section-dot--off" />
-                Disponibili ({{ availableModels.length }})
-              </div>
+          <!-- Error -->
+          <div v-if="errorMessage" class="ms__error">
+            {{ errorMessage }}
+          </div>
+
+          <!-- Global operation in progress -->
+          <div v-if="settingsStore.isAnyOperationInProgress" class="ms__operation">
+            <div class="ms__operation-bar">
+              <div class="ms__operation-fill" />
+            </div>
+            <span class="ms__operation-text">{{ settingsStore.operationDescription }}</span>
+          </div>
+
+          <!-- Scrollable model list -->
+          <div class="ms__list">
+            <!-- Loading state -->
+            <div v-if="settingsStore.isLoadingModels" class="ms__state">
+              <AliceSpinner size="xs" label="Caricamento modelli…" />
+            </div>
+
+            <!-- Empty state -->
+            <div v-else-if="typeModels.length === 0" class="ms__state">
+              {{
+                props.modelType === 'embedding'
+                  ? 'Nessun modello embedding disponibile'
+                  : 'Nessun modello disponibile'
+              }}
+            </div>
+
+            <!-- No search results -->
+            <div
+              v-else-if="loadedModels.length === 0 && availableModels.length === 0 && searchQuery"
+              class="ms__state"
+            >
+              Nessun risultato per "{{ searchQuery }}"
+            </div>
+
+            <template v-else>
+              <!-- Loaded models -->
+              <template v-if="loadedModels.length > 0">
+                <div class="ms__section-head">
+                  <span class="ms__section-dot ms__section-dot--on" />
+                  Caricati ({{ loadedModels.length }})
+                </div>
+                <div
+                  v-for="model in loadedModels"
+                  :key="'l-' + model.name"
+                  class="ms__item ms__item--loaded"
+                  :class="{ 'ms__item--busy': isModelBusy(model) }"
+                  :aria-disabled="settingsStore.isAnyOperationInProgress || undefined"
+                >
+                  <span class="ms__accent" />
+                  <div class="ms__item-top">
+                    <span class="ms__dot ms__dot--on" />
+                    <span class="ms__name" :title="model.display_name || model.name">
+                      {{ model.display_name || model.name }}
+                    </span>
+                    <UiIconButton
+                      label="Scarica dalla memoria"
+                      variant="outlined"
+                      size="xs"
+                      tone="accent"
+                      :loading="isModelBusy(model)"
+                      :disabled="settingsStore.isAnyOperationInProgress"
+                      class="ms__action-btn"
+                      @click="toggleModelLoad(model, $event)"
+                    >
+                      <AppIcon name="model-unload" :size="11" />
+                    </UiIconButton>
+                  </div>
+                  <div class="ms__item-meta">
+                    <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
+                      model.params_string
+                    }}</span>
+                    <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{
+                      model.quantization.name
+                    }}</span>
+                    <span class="ms__tag ms__tag--size">{{ formatSize(model.size) }}</span>
+                    <span
+                      v-if="model.loaded && model.loaded_instances.length > 0"
+                      class="ms__tag ms__tag--ctx"
+                    >
+                      ctx {{ model.loaded_instances[0].config.context_length.toLocaleString() }}
+                    </span>
+                    <span v-if="model.capabilities.vision" class="ms__cap" title="Vision">
+                      <AppIcon name="eye" :size="11" />
+                    </span>
+                    <span v-if="model.capabilities.thinking" class="ms__cap" title="Thinking">
+                      <AppIcon name="thinking-cap" :size="11" />
+                    </span>
+                    <span
+                      v-if="model.capabilities.trained_for_tool_use"
+                      class="ms__cap"
+                      title="Tool Use"
+                    >
+                      <AppIcon name="tool" :size="11" />
+                    </span>
+                  </div>
+                  <!-- Loading progress -->
+                  <div v-if="settingsStore.isModelLoading(model.name)" class="ms__progress">
+                    <div class="ms__progress-bar" />
+                  </div>
+                </div>
+              </template>
+
+              <!-- Divider -->
               <div
-                v-for="model in availableModels"
-                :key="'a-' + model.name"
-                class="ms__item"
-                :class="{ 'ms__item--busy': isModelBusy(model) }"
-                :aria-disabled="settingsStore.isAnyOperationInProgress || undefined"
-              >
-                <div class="ms__item-top">
-                  <span class="ms__dot ms__dot--off" />
-                  <span class="ms__name" :title="model.display_name || model.name">
-                    {{ model.display_name || model.name }}
-                  </span>
-                  <UiIconButton
-                    label="Carica in memoria"
-                    variant="outlined"
-                    size="xs"
-                    tone="accent"
-                    :loading="isModelBusy(model)"
-                    :disabled="settingsStore.isAnyOperationInProgress"
-                    class="ms__action-btn"
-                    @click="toggleModelLoad(model, $event)"
-                  >
-                    <AppIcon name="model-load" :size="11" />
-                  </UiIconButton>
+                v-if="loadedModels.length > 0 && availableModels.length > 0"
+                class="ms__divider"
+              />
+
+              <!-- Available models -->
+              <template v-if="availableModels.length > 0">
+                <div class="ms__section-head">
+                  <span class="ms__section-dot ms__section-dot--off" />
+                  Disponibili ({{ availableModels.length }})
                 </div>
-                <div class="ms__item-meta">
-                  <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
-                    model.params_string
-                  }}</span>
-                  <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{
-                    model.quantization.name
-                  }}</span>
-                  <span class="ms__tag ms__tag--size">{{ formatSize(model.size) }}</span>
-                  <span v-if="model.capabilities.vision" class="ms__cap" title="Vision">
-                    <AppIcon name="eye" :size="11" />
-                  </span>
-                  <span v-if="model.capabilities.thinking" class="ms__cap" title="Thinking">
-                    <AppIcon name="thinking-cap" :size="11" />
-                  </span>
-                  <span
-                    v-if="model.capabilities.trained_for_tool_use"
-                    class="ms__cap"
-                    title="Tool Use"
-                  >
-                    <AppIcon name="tool" :size="11" />
-                  </span>
+                <div
+                  v-for="model in availableModels"
+                  :key="'a-' + model.name"
+                  class="ms__item"
+                  :class="{ 'ms__item--busy': isModelBusy(model) }"
+                  :aria-disabled="settingsStore.isAnyOperationInProgress || undefined"
+                >
+                  <div class="ms__item-top">
+                    <span class="ms__dot ms__dot--off" />
+                    <span class="ms__name" :title="model.display_name || model.name">
+                      {{ model.display_name || model.name }}
+                    </span>
+                    <UiIconButton
+                      label="Carica in memoria"
+                      variant="outlined"
+                      size="xs"
+                      tone="accent"
+                      :loading="isModelBusy(model)"
+                      :disabled="settingsStore.isAnyOperationInProgress"
+                      class="ms__action-btn"
+                      @click="toggleModelLoad(model, $event)"
+                    >
+                      <AppIcon name="model-load" :size="11" />
+                    </UiIconButton>
+                  </div>
+                  <div class="ms__item-meta">
+                    <span v-if="model.params_string" class="ms__tag ms__tag--params">{{
+                      model.params_string
+                    }}</span>
+                    <span v-if="model.quantization?.name" class="ms__tag ms__tag--quant">{{
+                      model.quantization.name
+                    }}</span>
+                    <span class="ms__tag ms__tag--size">{{ formatSize(model.size) }}</span>
+                    <span v-if="model.capabilities.vision" class="ms__cap" title="Vision">
+                      <AppIcon name="eye" :size="11" />
+                    </span>
+                    <span v-if="model.capabilities.thinking" class="ms__cap" title="Thinking">
+                      <AppIcon name="thinking-cap" :size="11" />
+                    </span>
+                    <span
+                      v-if="model.capabilities.trained_for_tool_use"
+                      class="ms__cap"
+                      title="Tool Use"
+                    >
+                      <AppIcon name="tool" :size="11" />
+                    </span>
+                  </div>
+                  <div v-if="settingsStore.isModelLoading(model.name)" class="ms__progress">
+                    <div class="ms__progress-bar" />
+                  </div>
                 </div>
-                <div v-if="settingsStore.isModelLoading(model.name)" class="ms__progress">
-                  <div class="ms__progress-bar" />
-                </div>
-              </div>
+              </template>
             </template>
-          </template>
-        </div>
+          </div>
+        </template>
       </div>
     </UiPopover>
   </div>
@@ -624,6 +724,52 @@ onMounted(() => {
   50% {
     opacity: 0.6;
   }
+}
+
+/* ── OpenRouter item (selection button + favorite star as siblings) ──── */
+.ms__item--or {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-1) 0 0;
+}
+
+.ms__item--active {
+  background: var(--surface-selected, var(--surface-2));
+}
+
+.ms__item--active:hover {
+  background: var(--surface-selected, var(--surface-3));
+}
+
+.ms__or-select {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2-5) var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ms__or-id {
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ms__or-fav {
+  flex-shrink: 0;
 }
 
 /* ── Accent bar (loaded) ──────────────────────────────────────── */

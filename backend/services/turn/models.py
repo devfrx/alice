@@ -118,7 +118,6 @@ class TurnResult:
     output_tokens: int
     finish_reason: str
     cost: float = 0.0
-    """Total generation cost in provider credits (0.0 = not reported)."""
     final_assistant_message_id: uuid.UUID | None = None
     had_tool_calls: bool = False
     agent_run_id: uuid.UUID | None = None
@@ -143,4 +142,3 @@ class TurnProgress:
     steps: int = 0
     tool_calls: int = 0
     cost: float = 0.0
-    """Accumulated generation cost across all LLM steps of the turn."""

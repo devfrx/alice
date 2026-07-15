@@ -262,9 +262,11 @@ def test_turn_finished_with_reason() -> None:
         "input_tokens",
         "output_tokens",
         "steps",
+        "cost",
     }
     assert frame["finish_reason"] == "stop"
     assert frame["steps"] == 3
+    assert frame["cost"] is None
 
 
 def test_turn_finished_keeps_finish_reason_when_none() -> None:
@@ -282,9 +284,11 @@ def test_turn_finished_keeps_finish_reason_when_none() -> None:
         "input_tokens",
         "output_tokens",
         "steps",
+        "cost",
     }
     assert "finish_reason" in frame
     assert frame["finish_reason"] is None
+    assert frame["cost"] is None
 
 
 # ---------------------------------------------------------------------------

@@ -259,9 +259,10 @@ def turn_finished(
 ) -> dict[str, Any]:
     """Build a ``turn.finished`` frame marking the end of a turn.
 
-    Unlike other optional fields, ``finish_reason`` is always present (even
-    when ``None``) because a finished turn always carries a terminal
-    disposition; ``None`` means the model did not report one.
+    Unlike other optional fields, ``finish_reason`` and ``cost`` are always
+    present (even when ``None``): a finished turn always carries a terminal
+    disposition (``None`` meaning the model did not report one) and a cost
+    slot (``None`` meaning the provider did not report one).
 
     Args:
         turn_id: Stable identifier of the turn.
@@ -271,8 +272,8 @@ def turn_finished(
         input_tokens: Total input tokens for the final LLM step.
         output_tokens: Total output tokens for the final LLM step.
         steps: Number of LLM steps executed in the turn.
-        cost: Costo totale del turno in crediti provider, o None quando non
-            riportato.
+        cost: Total turn cost in provider credits, or ``None`` when not
+            reported.
 
     Returns:
         The JSON-serialisable event frame.

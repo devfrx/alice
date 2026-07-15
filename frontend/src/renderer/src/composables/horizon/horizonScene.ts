@@ -1,20 +1,20 @@
 /**
  * horizonScene.ts — Pure derivation for the Horizon assistant scene.
  *
- * Maps plain snapshots of the voice/chat/tasks stores to a single scene state
- * and the line's visual mechanic. One state active at a time, with explicit
- * priority: presenting ▸ working ▸ responding ▸ listening ▸ quiet.
+ * Maps plain snapshots of the voice/chat/tasks stores to a single scene
+ * state. The neural backdrop (HorizonNeural) derives its choreography from
+ * that state directly; the plan/manuscript/thinking helpers live here. One
+ * state active at a time, with explicit priority: working ▸ thinking ▸
+ * responding ▸ listening ▸ quiet. Desk windows are an orthogonal
+ * presentation layer — they never affect the ambient scene state.
  *
  * Pure functions only (no Vue imports) so the whole scene brain is unit
  * testable in the node environment.
  */
 import type { TaskStep } from '../../types/tasks'
 
-/** The five scene states (spec §3). */
-export type HorizonState = 'quiet' | 'listening' | 'responding' | 'working' | 'presenting'
-
-/** The line's visual mechanic (HorizonLine modes). */
-export type HorizonLineMode = 'breathe' | 'tense' | 'pulse' | 'timeline' | 'flow'
+/** The five scene states (spec Horizon Vivo §3.1). */
+export type HorizonState = 'quiet' | 'listening' | 'thinking' | 'responding' | 'working'
 
 /** Plain-value snapshot of everything the scene depends on. */
 export interface HorizonSceneInputs {
@@ -24,9 +24,9 @@ export interface HorizonSceneInputs {
   isStreaming: boolean
   activeToolCount: number
   planSteps: TaskStep[]
-  stageOpen: boolean
-  artifactCount: number
   composerActive: boolean
+  /** Live reasoning signal (useThinkingSignal): thinking tokens are flowing. */
+  isThinking: boolean
 }
 
 /** Whether the plan exists and is not yet fully completed. */
@@ -36,36 +36,11 @@ function planActive(steps: TaskStep[]): boolean {
 
 /** Derive the single active scene state (priority ordered). */
 export function deriveSceneState(i: HorizonSceneInputs): HorizonState {
-  if (i.stageOpen && i.artifactCount > 0) return 'presenting'
   if (i.isStreaming && (planActive(i.planSteps) || i.activeToolCount > 0)) return 'working'
+  if (i.isStreaming && i.isThinking) return 'thinking'
   if (i.isStreaming || i.isSpeaking) return 'responding'
   if (i.isListening || i.isSttProcessing || i.composerActive) return 'listening'
   return 'quiet'
-}
-
-/** Derive the line mechanic for a scene state. */
-export function deriveLineMode(state: HorizonState, i: HorizonSceneInputs): HorizonLineMode {
-  switch (state) {
-    case 'listening':
-      return 'tense'
-    case 'responding':
-      return i.isSpeaking ? 'pulse' : 'breathe'
-    case 'working':
-      return i.planSteps.length > 0 ? 'timeline' : 'flow'
-    default:
-      return 'breathe'
-  }
-}
-
-/**
- * Notch x-positions for the timeline mode as fractions (0..1) of the line
- * span, centered over the middle 70% so end fades stay clean. Shared by the
- * canvas (ticks/spark) and the DOM labels so they always agree.
- */
-export function notchPositions(count: number): number[] {
-  if (count <= 0) return []
-  if (count === 1) return [0.5]
-  return Array.from({ length: count }, (_, i) => 0.15 + (i * 0.7) / (count - 1))
 }
 
 /** Plan summary for the working state. */
@@ -87,29 +62,114 @@ export function planView(steps: TaskStep[]): HorizonPlanView {
   return { total, completed, activeIndex, statusSentence: steps[activeIndex]?.step ?? '' }
 }
 
-/** Roman numeral for stage captions (Fig. I, II, …). Supports 1..3999. */
-export function toRoman(n: number): string {
-  const table: Array<[number, string]> = [
-    [1000, 'M'],
-    [900, 'CM'],
-    [500, 'D'],
-    [400, 'CD'],
-    [100, 'C'],
-    [90, 'XC'],
-    [50, 'L'],
-    [40, 'XL'],
-    [10, 'X'],
-    [9, 'IX'],
-    [5, 'V'],
-    [4, 'IV'],
-    [1, 'I']
-  ]
-  let out = ''
-  for (const [v, s] of table) {
-    while (n >= v) {
-      out += s
-      n -= v
-    }
+/* ── thinking signal (edge-triggered, non level-based: works in tool loops) ── */
+
+export interface ThinkingSignalSnapshot {
+  thinkingLen: number
+  contentLen: number
+  isStreaming: boolean
+}
+
+export interface ThinkingSignalState {
+  thinkingLen: number
+  contentLen: number
+  active: boolean
+}
+
+export const THINKING_SIGNAL_IDLE: Readonly<ThinkingSignalState> = Object.freeze({
+  thinkingLen: 0,
+  contentLen: 0,
+  active: false
+})
+
+/**
+ * Pure reducer for the "is Alice reasoning right now" signal: thinking growth
+ * activates it, visible-content growth deactivates it (content wins when both
+ * grow in one tick), stream end and buffer resets deactivate/re-baseline.
+ */
+export function thinkingSignalNext(
+  prev: ThinkingSignalState,
+  snap: ThinkingSignalSnapshot
+): ThinkingSignalState {
+  if (!snap.isStreaming) {
+    return { thinkingLen: snap.thinkingLen, contentLen: snap.contentLen, active: false }
   }
-  return out
+  let active = prev.active
+  if (snap.thinkingLen < prev.thinkingLen || snap.contentLen < prev.contentLen) {
+    // Buffers were reset (new turn): re-baseline on what is present now.
+    active = snap.thinkingLen > 0 && snap.contentLen === 0
+  } else if (snap.contentLen > prev.contentLen) {
+    active = false
+  } else if (snap.thinkingLen > prev.thinkingLen) {
+    active = true
+  }
+  return { thinkingLen: snap.thinkingLen, contentLen: snap.contentLen, active }
+}
+
+/** Last meaningful line of the thinking stream (marginalia text). */
+export function lastThinkingLine(content: string, maxChars = 120): string {
+  const lines = content.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (line === '' || line === '---') continue
+    return line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line
+  }
+  return ''
+}
+
+/* ── manuscript plan (Horizon Vivo §5) ── */
+
+export type HorizonManuscriptItem =
+  | { kind: 'step'; index: number; step: TaskStep }
+  | { kind: 'collapsed'; count: number }
+  | { kind: 'more'; count: number }
+
+/**
+ * Rows for the manuscript plan. Long plans collapse their oldest completed
+ * steps into a counter row (always keeping the last 2 completed) and, if
+ * still over budget, tail-collapse the far future into a "+N" row. The
+ * active step (spec §3.1: always visible) is pinned into the kept rows if
+ * the tail collapse would otherwise hide it — it swaps in for the last kept
+ * step slot rather than disappearing behind the "+N" counter.
+ */
+export function manuscriptView(
+  steps: TaskStep[],
+  maxVisible = 7,
+  activeIndex = -1
+): HorizonManuscriptItem[] {
+  const all: HorizonManuscriptItem[] = steps.map((step, index) => ({ kind: 'step', index, step }))
+  if (all.length <= maxVisible) return all
+
+  const completedIdx = steps
+    .map((s, index) => ({ s, index }))
+    .filter(({ s }) => s.status === 'completed')
+    .map(({ index }) => index)
+  const keepCompleted = new Set(completedIdx.slice(-2))
+  const collapsedCount = completedIdx.length - keepCompleted.size
+
+  let items = all.filter(
+    (it) => it.kind !== 'step' || it.step.status !== 'completed' || keepCompleted.has(it.index)
+  )
+  if (collapsedCount > 0) items = [{ kind: 'collapsed', count: collapsedCount }, ...items]
+
+  const budget = maxVisible + (collapsedCount > 0 ? 1 : 0)
+  if (items.length > budget) {
+    const kept = items.slice(0, budget - 1)
+    const tail = items.slice(budget - 1)
+    const activeRow = tail.find((it) => it.kind === 'step' && it.index === activeIndex)
+    if (activeRow !== undefined) {
+      // Never hide the active step: it takes the last kept step slot.
+      for (let i = kept.length - 1; i >= 0; i--) {
+        if (kept[i].kind === 'step') {
+          kept.splice(i, 1)
+          break
+        }
+      }
+      kept.push(activeRow)
+    }
+    const keptSteps = new Set(kept.flatMap((it) => (it.kind === 'step' ? [it.index] : [])))
+    const totalStepRows = items.filter((it) => it.kind === 'step').length
+    items = [...kept, { kind: 'more', count: totalStepRows - keptSteps.size }]
+  }
+  return items
 }

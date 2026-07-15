@@ -27,5 +27,22 @@ const greeting = computed(() => {
   letter-spacing: 0.01em;
   color: var(--hz-ink);
   user-select: none;
+  animation: hz-quiet-breath 6s ease-in-out infinite;
+}
+
+@keyframes hz-quiet-breath {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hz-quiet {
+    animation: none;
+  }
 }
 </style>

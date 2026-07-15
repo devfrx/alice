@@ -217,7 +217,7 @@ defineExpose({
   flex-wrap: wrap;
   gap: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(var(--hz-line-rgb), 0.18);
 }
 
 /* hz-cockpit__stop overrides the UiIconButton default color so the icon

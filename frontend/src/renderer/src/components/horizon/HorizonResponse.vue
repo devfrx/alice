@@ -15,7 +15,7 @@ const props = defineProps<{
   text: string
   userQuery: string
   magazine: boolean
-  /** Compact mode while the stage (presenting) is open. */
+  /** Compact mode (reserved for callers with a tighter response zone). */
   compact?: boolean
 }>()
 
@@ -28,8 +28,8 @@ const sentenceCount = computed(() => (props.text.match(/[.!?…]+(\s|$)/g) ?? []
 watch(
   sentenceCount,
   (n) => {
-    // Never flip while compact (presenting): the stage owns the lower zone
-    // and a magazine column there would squeeze it to half height.
+    // Never flip while compact: the caller owns the lower zone and a
+    // magazine column there would squeeze it to half height.
     if (n > MAGAZINE_THRESHOLD && !props.magazine && !props.compact) {
       emit('update:magazine', true)
     }
@@ -77,6 +77,22 @@ const { handleCodeBlockClick } = useCodeBlocks()
   font-family: var(--font-mono);
   font-size: 0.78em;
   text-align: left;
+}
+
+.hz-response__body :deep(hr) {
+  border: none;
+  height: 1px;
+  width: 60%;
+  margin: 1.2em auto;
+  background: linear-gradient(90deg, transparent, rgba(var(--hz-line-rgb), 0.4), transparent);
+}
+
+.hz-response__body :deep(blockquote) {
+  margin: 0.6em 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid rgba(var(--hz-line-rgb), 0.35);
+  color: var(--hz-ink-dim);
+  font-style: italic;
 }
 
 /* ── magazine: long answers become a reading column ── */

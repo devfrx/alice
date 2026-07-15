@@ -74,7 +74,12 @@ const cad3d: ModuleDef = {
   label: '3D',
   icon: 'box-3d',
   component: () => import('../../components/workspace/modules/Cad3dModule.vue'),
-  defaultZone: 'right'
+  defaultZone: 'right',
+  // The module has its own internal model selector: one 3D window is the
+  // right behavior, and it keeps the executionId + artifact auto-open
+  // watchers from spawning two windows per CAD generation (the second
+  // open collapses into a focus).
+  singleton: true
 }
 
 const plan: ModuleDef = {
@@ -95,6 +100,15 @@ const terminal: ModuleDef = {
   singleton: true
 }
 
+const activity: ModuleDef = {
+  id: 'activity',
+  label: 'Attività',
+  icon: 'pulse',
+  component: () => import('../../components/workspace/modules/ActivityModule.vue'),
+  defaultZone: 'right',
+  singleton: true
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -109,7 +123,8 @@ export const MODULE_REGISTRY: Record<string, ModuleDef> = {
   whiteboard,
   cad3d,
   plan,
-  terminal
+  terminal,
+  activity
 }
 
 // ---------------------------------------------------------------------------

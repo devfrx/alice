@@ -138,7 +138,9 @@ function onKeydown(e: KeyboardEvent): void {
   /* Hairline gold underline drawn as a shadow, not a border: the field's
      height is JS-driven (autoResize = scrollHeight), so a real border
      would add 1px of overflow. */
-  box-shadow: 0 1px 0 rgba(var(--hz-line-rgb), 0.18);
+  box-shadow:
+    0 1px 0 rgba(var(--hz-line-rgb), 0.18),
+    0 16px 32px -20px rgba(var(--hz-line-rgb), 0);
   transition: box-shadow var(--hz-fade) ease;
 }
 
@@ -150,7 +152,9 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .hz-composer__input:focus {
-  box-shadow: 0 1px 0 rgba(var(--hz-line-rgb), 0.45);
+  box-shadow:
+    0 1px 0 rgba(var(--hz-line-rgb), 0.45),
+    0 16px 32px -20px rgba(var(--hz-line-rgb), 0.55);
 }
 
 /* Wrapped content reads better ragged-right than centered. */

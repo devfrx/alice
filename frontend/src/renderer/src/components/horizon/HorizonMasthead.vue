@@ -25,10 +25,11 @@ defineProps<{ connected: boolean }>()
 }
 
 .hz-masthead__folio {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
-  letter-spacing: 0.42em;
-  text-indent: 0.42em; /* optically recenters the tracked text */
+  letter-spacing: 0.32em;
+  text-indent: 0.32em; /* optically recenters the tracked text */
+  text-transform: uppercase;
   color: var(--hz-ink-faint);
 }
 

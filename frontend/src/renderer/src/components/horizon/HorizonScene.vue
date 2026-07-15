@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
  * HorizonScene — the stage. Owns the vertical zoning (masthead / upper /
- * line / lower) and animates the line's vertical quota between scene states:
- * that movement IS the visible morph. Pure layout: no stores.
+ * lower) and animates the content quota between scene states: that movement
+ * IS the visible morph. The backdrop slot hosts the neural network
+ * (HorizonNeural), full-bleed under the content zones. Pure layout: no stores.
  */
 import { computed } from 'vue'
 import type { HorizonState } from '../../composables/horizon/horizonScene'
@@ -18,13 +19,13 @@ const props = withDefaults(
   { magazine: false, dimmed: false }
 )
 
-/** Line vertical quota per state (fraction of scene height). */
+/** Content quota per state (fraction of scene height). */
 const QUOTAS: Record<HorizonState, number> = {
   quiet: 0.58,
   listening: 0.6,
+  thinking: 0.6,
   responding: 0.64,
-  working: 0.5,
-  presenting: 0.26
+  working: 0.5
 }
 
 const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
@@ -36,9 +37,9 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
     :class="[`hz-scene--${state}`, { 'hz-scene--dimmed': dimmed }]"
     :style="{ '--quota': `${quota * 100}%` }"
   >
+    <slot name="backdrop" />
     <header class="hz-scene__masthead"><slot name="masthead" /></header>
     <div class="hz-scene__upper"><slot name="upper" /></div>
-    <div class="hz-scene__line"><slot name="line" /></div>
     <div class="hz-scene__lower"><slot name="lower" /></div>
   </div>
 </template>
@@ -48,9 +49,41 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
   position: relative;
   width: 100%;
   height: 100%;
-  background: var(--surface-0);
+  background:
+    radial-gradient(
+      120% 85% at 50% 115%,
+      rgba(var(--hz-line-rgb), var(--hz-warmth)),
+      transparent 60%
+    ),
+    var(--surface-0);
   overflow: hidden;
   transition: opacity var(--hz-fade) ease;
+}
+
+/* Grana carta: pattern CSS puro, nessun asset esterno. */
+.hz-scene::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--hz-grain-opacity);
+  background-image: repeating-conic-gradient(var(--hz-grain-ink) 0 25%, transparent 0 50%);
+  background-size: 3px 3px;
+}
+
+/* Vignettatura: chiude la scena ai bordi. */
+.hz-scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 100% at 50% 45%,
+    transparent 60%,
+    rgba(0, 0, 0, var(--hz-vignette)) 100%
+  );
 }
 
 .hz-scene--dimmed {
@@ -80,16 +113,6 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
   transition: height var(--hz-morph) var(--ease-out-expo);
 }
 
-.hz-scene__line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--quota);
-  transform: translateY(-50%);
-  z-index: 1;
-  transition: top var(--hz-morph) var(--ease-out-expo);
-}
-
 .hz-scene__lower {
   position: absolute;
   left: 0;
@@ -101,12 +124,12 @@ const quota = computed(() => (props.magazine ? 0.18 : QUOTAS[props.state]))
   align-items: center;
   z-index: 2;
   padding-top: 44px;
+  padding-bottom: clamp(78px, 13vh, 112px); /* clearance for the ground bench (dock + colophon) */
   transition: top var(--hz-morph) var(--ease-out-expo);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hz-scene__upper,
-  .hz-scene__line,
   .hz-scene__lower {
     transition: none;
   }

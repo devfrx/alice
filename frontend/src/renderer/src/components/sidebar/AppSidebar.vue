@@ -67,7 +67,7 @@ const isHomeActive = computed(
 
 /** The two primary-surface options for the shared segmented control. */
 const modeTabOptions: UiSegmentedOption[] = [
-  { value: 'assistant', label: 'Assistente', icon: 'orb' },
+  { value: 'assistant', label: 'Assistente', icon: 'pulse' },
   { value: 'workspace', label: 'Workspace', icon: 'hybrid-panel' }
 ]
 

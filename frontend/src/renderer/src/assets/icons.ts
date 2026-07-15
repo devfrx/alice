@@ -163,9 +163,6 @@ const _ICONS = {
   /** Lightning bolt with flash (intense) */
   'lightning-flash': { icon: 'solar:bolt-circle-bold' },
 
-  /** Abstract orb (assistant surface) */
-  orb: { icon: 'solar:planet-bold' },
-
   // ── Layout / navigation ───────────────────────────────────────────────────
 
   /** Home / dashboard landing */
@@ -298,6 +295,9 @@ const _ICONS = {
 
   /** Bar chart */
   'bar-chart': { icon: 'solar:chart-2-bold' },
+
+  /** Agent activity (tools / subagents) */
+  pulse: { icon: 'solar:pulse-bold' },
 
   /** Magnifier zoom-in */
   'search-plus': { icon: 'solar:magnifer-zoom-in-bold' },

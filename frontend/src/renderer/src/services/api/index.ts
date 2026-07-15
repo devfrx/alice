@@ -9,6 +9,7 @@ export { ApiError, BACKEND_HOST, resolveBackendUrl, waitForBackend } from './htt
 export { chatApi } from './chat'
 export { configApi } from './config'
 export { modelsApi } from './models'
+export { openrouterApi } from './openrouter'
 export { pluginsApi } from './plugins'
 export { voiceApi } from './voice'
 export { settingsApi } from './settings'

@@ -1,6 +1,7 @@
 # Handoff — Rework settings-core (rework/settings-core)
 
-**Data:** 2026-07-16 · **Branch:** `rework/settings-core` (21 commit su `394d8d4`, non mergiato)
+**Data:** 2026-07-16 · **Aggiornato:** 2026-07-16 sera (audit post-merge)
+**Branch:** `rework/settings-core` — **MERGIATO in main** (`f24afe1`) **e pushato**
 **Spec:** `docs/superpowers/specs/2026-07-16-settings-core-rework-design.md`
 **Piano:** `docs/superpowers/plans/2026-07-16-settings-core-rework.md` (15 task)
 **Metodo:** subagent-driven — ogni task: implementer + review task-scoped (spec+quality) + fix loop;
@@ -14,12 +15,13 @@ i segreti nel Credential Manager di Windows via SecretStore, PUT/PATCH sul motor
 `set_many` + registry reazioni, migrazione one-shot idempotente, FE diff-save con flag derivati.
 Il doppio sistema e lo split-brain sono morti strutturalmente (test di regressione dedicato).
 
-### Cosa resta del task 16 (equivalente)
+### Cosa resta del task 16 (equivalente) — stato post-audit
 
-1. **Suite pytest integrale**: lanciata sul commit `cdf8b24` (pre-fix B1), in corso al momento
-   dell'handoff; le suite mirate del fix B1 sono verdi. Esito da leggere.
-2. **E2E con l'utente** (checklist al §E2E sotto) — mai eseguito su macchina reale.
-3. **Merge in main** — verdetto review finale: **mergiabile** (dopo fix B1, commit `0f83e28`).
+1. **Suite pytest integrale**: rilanciata nell'audit del 2026-07-16 su main aggiornato
+   (post-merge di entrambi i branch + fix F1–F4 + bonifica B904) — esito nell'handoff OpenRouter,
+   §Post-merge.
+2. **E2E con l'utente** (checklist al §E2E sotto) — ANCORA da eseguire su macchina reale.
+3. ~~Merge in main~~ → **FATTO** (`f24afe1`) e pushato.
 
 ## Gate verdi a fine sessione
 
@@ -101,8 +103,11 @@ handler in `config_reactions.py`); ogni task con suite mirate verdi.
   `load_preferences_layer`).
 - **M2**: body PUT a 3 livelli produce righe dict sovrapposte (documentare o rifiutare
   valori-dict in `_flatten_update_body`).
-- Preesistenti già chippati: `test_plugins_enabled_list` stale (20 vs 21), guardia embedding
-  dim≠384, capability bleed fuzzy match, divergenza costo live/persistito.
+- Preesistenti già chippati — aggiornamento audit 2026-07-16: ~~guardia embedding dim≠384~~
+  **risolto** (F3, `8657646`); ~~capability bleed fuzzy match~~ **risolto** (F4, `2b00667` —
+  registry namespaced per provider, vedi handoff OpenRouter gotcha 5); ~~divergenza costo
+  live/persistito~~ **risolto** (`3368fe6`). Resta SOLO `test_plugins_enabled_list` stale
+  (riverificato rosso).
 
 ## E2E (da eseguire con l'utente, post-merge o su branch)
 

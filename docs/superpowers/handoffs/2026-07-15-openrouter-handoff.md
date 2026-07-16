@@ -1,32 +1,51 @@
 # Handoff — Provider OpenRouter (feat/openrouter-provider)
 
-**Data:** 2026-07-15 · **Branch:** `feat/openrouter-provider` (27 commit su `abc3130`, NON pushato, non mergiato)
+**Data:** 2026-07-15 · **Aggiornato:** 2026-07-16 (audit post-merge)
+**Branch:** `feat/openrouter-provider` — **MERGIATO in main** (`394d8d4`) **e pushato**
 **Spec:** `docs/superpowers/specs/2026-07-15-openrouter-provider-design.md`
 **Piano:** `docs/superpowers/plans/2026-07-15-openrouter-provider.md` (16 task)
 **Metodo:** subagent-driven — ogni task: implementer + spec review + quality review; tutti i rilievi bloccanti risolti in-branch.
 
-## Stato: task 1–15 COMPLETI e approvati, task 16 PARZIALE
+## Stato: MERGIATO; review olistica fatta, finding risolti (vedi §Post-merge)
 
 Feature completa end-to-end nel codice: OpenRouter è il terzo provider LLM di pari rango
 (catalogo con prezzi/capacità, saldo crediti, preferiti, costo per conversazione live+persistito,
 switch provider a runtime, guardia embedding). Docs identità aggiornati (CLAUDE.md, README).
 
-### Cosa resta del task 16 (verifica finale)
+### Task 16 — stato post-audit (2026-07-16)
 
-1. **`pytest tests/` COMPLETO mai portato a termine** — il processo è stato interrotto due volte
-   (la suite integrale dura 15-20+ minuti). Tutti i sottoinsiemi mirati eseguiti per-task sono verdi
-   (inclusi i lenti: branch_conversation/message_editing/models = 45 passed in 13 min).
-2. **`ruff check backend/` e `mypy backend/` globali interrotti** — per-file verdi su ogni file toccato
-   (zero errori NUOVI, debito preesistente censito sotto).
-3. **Review finale olistica sull'intero diff** — dispatchata ma il risultato è andato perso per un
-   errore interno; da rifare (`git diff abc3130..HEAD`).
-4. **Verifica e2e con API key reale** (serve l'utente): switch a openrouter → chiave → catalogo →
-   crediti → messaggio in chat con chip costo → riavvio (persistenza) → ritorno a lmstudio intatto →
-   log memoria solo fastembed.
-5. Push del branch + merge: da decidere dopo la sessione di fix.
+1. **`pytest tests/` COMPLETO**: rilanciato nell'audit del 2026-07-16 — esito annotato in §Post-merge.
+   Tutti i sottoinsiemi mirati eseguiti per-task e per-fix sono verdi.
+2. ~~ruff/mypy globali interrotti~~ → censiti nell'audit: **0 errori B904 su tutto il backend**
+   (bonifica `185b371`); residuo preesistente aggiornato in §Debito sotto.
+3. ~~Review finale olistica da rifare~~ → **FATTA** (2026-07-16): 4 finding, tutti risolti e
+   mergiati (vedi §Post-merge).
+4. **Verifica e2e con API key reale** (serve l'utente): ANCORA DA FARE — switch a openrouter →
+   chiave → catalogo → crediti → messaggio in chat con chip costo → riavvio (persistenza) →
+   ritorno a lmstudio intatto → log memoria solo fastembed.
+5. ~~Push del branch + merge~~ → **FATTO**: merge `394d8d4`, tutto pushato su origin/main.
 
 Gate già verdi a fine sessione: `lint-imports` (6 contratti kept), `check-contracts.ps1`,
 `pytest tests/contracts/` (98), FE `typecheck`/`lint`/`vitest` (369/369).
+
+## Post-merge (2026-07-16) — review olistica e fix
+
+Review olistica sull'intero diff del branch eseguita il 2026-07-16: 4 finding, tutti risolti
+con branch dedicati mergiati in main e pushati:
+
+- **F1/F2 — divergenza costo live/persistito sui turni in errore** → `3368fe6` (merge `f8cf897`):
+  `cost=None` sul frame `turn.finished` dei turni in errore (il chip live non somma costi che il
+  reload non può confermare). Vedi gotcha 7 aggiornato.
+- **F3 — guardia embedding openrouter+dim≠384** → `8657646` (merge `9d7811f`): stato degradato
+  reso esplicito.
+- **F4 — capability bleed nel fuzzy match del registry** → `2b00667` (merge `8070693`):
+  **fix strutturale, gotcha 5 riscritto sotto** — il registry ora è namespaced per provider.
+- **Bonifica B904 estesa** (nata dal chip su models.py) → `185b371` (merge `e9eb199`): chaining
+  esplicito delle eccezioni su TUTTI i 22 siti del backend, `ruff --select B904` = 0.
+
+Nota repo: GitHub ha rinominato il repository `devfrx/omnia` → `devfrx/alice`; il remote locale
+punta ancora a `omnia` (il redirect funziona) — aggiornare con
+`git remote set-url origin https://github.com/devfrx/alice.git`.
 
 ## Architettura implementata (dove guardare)
 
@@ -70,8 +89,13 @@ Gate già verdi a fine sessione: `lint-imports` (6 contratti kept), `check-contr
    nel codice). Bug reale trovato e fixato: la maschera `"***"` clobberava la chiave persistita.
 4. **Maschera `"***"`**: mai sovrascrivere la chiave reale (né in memoria né nelle prefs); non
    esiste un percorso per CANCELLARE la chiave via API (deliberato, documentato).
-5. **Registry condiviso** LM Studio/OpenRouter: `refresh_from_openrouter` NON clobbera profili
-   `source=="lmstudio_api"` e preserva i campi runtime-learned (id `org/model` collidono davvero).
+5. **Registry namespaced per provider** (riscritto post-F4, `2b00667`): i profili vivono in due
+   namespace (`local` = LM Studio/Ollama/KNOWN_MODELS, `openrouter` = catalogo). `get_profile`
+   e i `mark_*` richiedono `namespace=` keyword-only; il fuzzy match esiste SOLO nel namespace
+   local (tag Ollama ↔ path LM Studio), i lookup openrouter sono solo esatti. Gli id `org/model`
+   che collidono tra i provider ora coesistono con profili indipendenti — il vecchio non-clobber
+   su `source=="lmstudio_api"` NON esiste più. I campi runtime-learned restano preservati
+   per-namespace nei refresh.
 6. **`turn.finished`**: la chiave `cost` è sempre presente (None quando non riportato) — i test
    key-set in `test_turn_events.py` sono stati aggiornati; se aggiungi campi al frame, aggiornali.
 7. **Sottostima nota del costo**: subagent, summarization/compaction e reflection non sono tracciati
@@ -90,21 +114,27 @@ Gate già verdi a fine sessione: `lint-imports` (6 contratti kept), `check-contr
    UiIconButton richiede `label`; icona `star` unica con `active`, non esiste `star-filled`).
 10. **Line endings**: un Edit su file LF può produrre CRLF — controllare il diff prima di committare.
 
-## Debito preesistente censito (NON introdotto dal branch — non "fixarlo di straforo")
+## Debito preesistente censito (aggiornato all'audit 2026-07-16)
 
-- `test_plugins_enabled_list` fallisce a baseline (conta 20 vs 21 plugin, hardcoded stale).
-- ruff: `db/models.py` (Optional/UP045 diffusi), `api/routes/config.py` (11× B904),
-  `api/routes/__init__.py` (I001/E501 sulla riga import lunga),
-  `services/model_capability_registry.py` (F401 `field` inutilizzato), `tool_loop.py` (B905/E501/I001).
-- mypy: stub `types-PyYAML` non installati.
-- `get_active_context_window` non ha lo short-circuit openrouter (nessun caller produttivo; nota
-  della review T2).
+- `test_plugins_enabled_list` (`tests/test_config.py`) fallisce ANCORA a baseline
+  (conteggio plugin hardcoded stale) — riverificato nell'audit.
+- ruff (riverificato): ~~B904 ovunque~~ **bonificati tutti** (`185b371`);
+  ~~F401 in model_capability_registry~~ **risolto** (riscrittura F4). Restano 29 errori sui file
+  censiti: `db/models.py` (22× UP045), `api/routes/__init__.py` (I001/E501),
+  `tool_loop.py` (B905/E501/I001) + ~500 violazioni repo-wide di altre classi (F401/I001/UP017/
+  E501/N806…, in gran parte auto-fixabili). **ruff NON è un gate in CI** (`contracts.yml` non lo
+  esegue): finché non c'è il gate il debito riaccumula — candidata bonifica dedicata + step CI.
+- mypy: stub `types-PyYAML` ANCORA non installati (riverificato con `pip show`).
+- `get_active_context_window`: la nota T2 è quasi assorbita — ora termina su
+  `get_cached_context_window`, che HA lo short-circuit openrouter; resta solo un probe LM Studio
+  inutile quando provider=openrouter (nessun caller produttivo).
 
 ## Come riprendere
 
 1. Leggi questo handoff, poi spec e piano (le deviazioni dal piano sono documentate nei messaggi
    di commit e sono tutte sanzionate dalle review).
-2. Completa i 5 punti del task 16 sopra, POI affronta i fix che l'utente richiederà nella sessione.
+2. Resta solo: **e2e con API key reale insieme all'utente** (punto 4 del task 16) e l'eventuale
+   esito della pytest integrale se non annotato in §Post-merge.
 3. Convenzioni vincolanti: endpoint nuovi con `response_model` (ratchet), frame WS nel vocabolario
    congelato, `gen-contracts.ps1` dopo ogni modifica contratto, import-linter, niente `any` FE,
    token-only styling dual-theme.

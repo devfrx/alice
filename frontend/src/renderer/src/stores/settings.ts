@@ -475,12 +475,18 @@ export const useSettingsStore = defineStore('settings', () => {
       const updated = await configApi.updateConfig(diff)
       lastConfirmedPayload = payload
       _loadingSettings = true
-      applyConfigResponse(updated)
-      if (emailPassword) {
-        settings.value.email.password = ''
+      try {
+        applyConfigResponse(updated)
+        if (emailPassword) {
+          // Belt-and-suspenders: applyConfigResponse already clears the password.
+          settings.value.email.password = ''
+        }
+      } finally {
+        // Always reset the guard — otherwise a throw above would silently
+        // disable every future autosave.
+        await nextTick()
+        _loadingSettings = false
       }
-      await nextTick()
-      _loadingSettings = false
     } catch (err) {
       console.warn('[settings store] saveSettings failed:', err)
     }

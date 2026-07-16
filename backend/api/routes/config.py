@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import httpx
@@ -12,8 +11,9 @@ from pydantic import SecretStr, ValidationError
 
 from backend.api.routes.models import serialise_model
 from backend.api.routes.voice import push_voice_ready
-from backend.core.config import KNOWN_MODELS
+from backend.core.config import KNOWN_MODELS, AliceConfig
 from backend.core.context import AppContext
+from backend.services.config_policy import is_secret_path
 from backend.services.config_service import ConfigLayer
 from backend.services.stt_service import STTService
 from backend.services.tts_service import TTSService
@@ -257,7 +257,6 @@ async def get_config(request: Request) -> dict[str, Any]:
     """Return the current server configuration as JSON."""
     ctx = _ctx(request)
     cfg = ctx.config
-    email_password_configured = await _email_password_configured(cfg.email)
     return {
         "llm": {
             "provider": cfg.llm.provider,
@@ -322,12 +321,11 @@ async def get_config(request: Request) -> dict[str, Any]:
             "smtp_port": cfg.email.smtp_port,
             "smtp_ssl": cfg.email.smtp_ssl,
             "username": cfg.email.username,
-            "use_keyring": cfg.email.use_keyring,
             "fetch_last_n": cfg.email.fetch_last_n,
             "max_fetch": cfg.email.max_fetch,
             "imap_idle_enabled": cfg.email.imap_idle_enabled,
             "archive_folder": cfg.email.archive_folder,
-            "password_configured": email_password_configured,
+            "password_configured": bool(cfg.email.password.get_secret_value()),
             "service_running": ctx.email_service is not None,
         },
     }
@@ -378,7 +376,6 @@ async def update_config(request: Request) -> dict[str, Any]:
         "smtp_port": cfg.email.smtp_port,
         "smtp_ssl": cfg.email.smtp_ssl,
         "username": cfg.email.username,
-        "use_keyring": cfg.email.use_keyring,
         "fetch_last_n": cfg.email.fetch_last_n,
         "max_fetch": cfg.email.max_fetch,
         "imap_idle_enabled": cfg.email.imap_idle_enabled,
@@ -502,19 +499,14 @@ async def update_config(request: Request) -> dict[str, Any]:
                 object.__setattr__(cfg.llm, "provider", prov)
                 llm_service_rebuild_needed = True
         if "openrouter_api_key" in llm_updates:
-            raw_key = str(llm_updates["openrouter_api_key"] or "").strip()
-            # "***" is the mask returned by GET — never overwrite the real
-            # key with it, neither in memory nor in the persisted prefs.
-            if raw_key and raw_key != "***":
-                if len(raw_key) > 256:
-                    raise HTTPException(400, "openrouter_api_key max 256 chars")
-                object.__setattr__(cfg.llm, "openrouter_api_key", SecretStr(raw_key))
-                llm_updates["openrouter_api_key"] = raw_key
+            # pop() always — the raw value must never reach
+            # persist_from_update(body); secrets live only in the
+            # SecretStore (Task 5), never in the preferences DB.
+            key_changed = await _apply_secret_updates(
+                ctx, {"llm.openrouter_api_key": llm_updates.pop("openrouter_api_key")},
+            )
+            if key_changed:
                 llm_service_rebuild_needed = True
-            else:
-                # No-op update: drop the key so persist_from_update
-                # cannot clobber the stored secret with the mask.
-                llm_updates.pop("openrouter_api_key", None)
         if "openrouter_model" in llm_updates:
             om = str(llm_updates["openrouter_model"] or "").strip()
             if len(om) > 256:
@@ -694,7 +686,7 @@ async def update_config(request: Request) -> dict[str, Any]:
             if not isinstance(email_updates["enabled"], bool):
                 raise HTTPException(400, "email.enabled must be a boolean")
             object.__setattr__(cfg.email, "enabled", email_updates["enabled"])
-        for key in ("imap_ssl", "smtp_ssl", "use_keyring", "imap_idle_enabled"):
+        for key in ("imap_ssl", "smtp_ssl", "imap_idle_enabled"):
             if key in email_updates:
                 if not isinstance(email_updates[key], bool):
                     raise HTTPException(400, f"email.{key} must be a boolean")
@@ -724,14 +716,15 @@ async def update_config(request: Request) -> dict[str, Any]:
                     raise HTTPException(400, f"email.{key} must be between 1 and 500")
                 object.__setattr__(cfg.email, key, value)
 
-        raw_password = email_updates.get("password")
-        if isinstance(raw_password, str) and raw_password:
-            if cfg.email.use_keyring:
-                await _store_email_password(cfg.email.username, raw_password)
-                object.__setattr__(cfg.email, "password", SecretStr(""))
-            else:
-                object.__setattr__(cfg.email, "password", SecretStr(raw_password))
-            email_password_changed = True
+        # pop() is mandatory — the raw password must never reach
+        # persist_from_update(body); passing "" to the helper is a no-op
+        # by construction (empty string is filtered before it can clobber
+        # a stored secret).
+        email_password_changed = bool(
+            await _apply_secret_updates(
+                ctx, {"email.password": email_updates.pop("password", "")},
+            )
+        )
 
     # -- Persist independent preferences to database -------------------------
     if ctx.preferences_service is not None:
@@ -910,40 +903,82 @@ async def _apply_llm_provider_change(ctx: AppContext) -> None:
     logger.info("LLM service rebuilt (provider={})", ctx.config.llm.provider)
 
 
-async def _store_email_password(username: str, password: str) -> None:
-    """Persist an email password in the OS keyring.
+_SECRET_MAX_LEN = 512
+
+# Maps a dotted secret path (config_policy.SECRET_PATHS) to the
+# (section, attribute) pair on AliceConfig it hydrates.
+_SECRET_CONFIG_MAP: dict[str, tuple[str, str]] = {
+    "llm.api_token": ("llm", "api_token"),
+    "llm.openrouter_api_key": ("llm", "openrouter_api_key"),
+    "home_assistant.token": ("home_assistant", "token"),
+    "mqtt.password": ("mqtt", "password"),
+    "continuum.api_token": ("continuum", "api_token"),
+    "email.password": ("email", "password"),
+}
+
+
+def _mirror_secret_to_config(cfg: AliceConfig, path: str, value: str) -> None:
+    """Mirror a secret write onto the live ``cfg`` object in place.
+
+    Mirroring in-place until Task 11 unifies the write path: the PUT
+    handler still mutates ``cfg = ctx.config`` in place for non-secret
+    fields before this helper runs, and those mutations are not yet
+    persisted anywhere else. A full ``ctx.config_service.rebuild()`` here
+    would replace ``ctx.config`` with a freshly-merged object that never
+    saw the in-flight mutations, silently discarding them. Task 11
+    rewrites the handler around the unified rebuild-based write path and
+    this helper goes away.
+    """
+    mapping = _SECRET_CONFIG_MAP.get(path)
+    if mapping is None:
+        return
+    section, attr = mapping
+    sub = getattr(cfg, section, None)
+    if sub is None:
+        return
+    object.__setattr__(sub, attr, SecretStr(value))
+
+
+async def _apply_secret_updates(
+    ctx: AppContext, updates: dict[str, Any],
+) -> set[str]:
+    """Apply secret writes (keyring semantics) and mirror them onto ``ctx.config``.
+
+    Uniform semantics for every path in ``updates`` (each MUST be a
+    ``config_policy.SECRET_PATHS`` member): a non-empty string other than
+    ``"***"`` sets the secret; ``""`` or ``"***"`` (the GET mask) is a
+    no-op; ``None`` deletes it. Reused by Task 11's rewritten PUT handler.
 
     Args:
-        username: Account username used as the keyring account name.
-        password: Secret value to store.
+        ctx: App context — reads/writes ``ctx.secret_store`` and mirrors
+            onto ``ctx.config``.
+        updates: Mapping of dotted secret path -> raw request value.
+
+    Returns:
+        The set of dotted paths whose stored value actually changed.
     """
-    username = username.strip()
-    if not username:
-        raise HTTPException(400, "email.username is required before saving password")
-    try:
-        import keyring
-    except ImportError as exc:  # pragma: no cover — dependency is declared
-        raise HTTPException(500, "Python keyring package is not installed") from exc
-    try:
-        await asyncio.to_thread(keyring.set_password, "alice", username, password)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(500, f"Failed to save email password in keyring: {exc}") from exc
-
-
-async def _email_password_configured(email_cfg: Any) -> bool:
-    """Return whether an email password is available without exposing it."""
-    if email_cfg.password.get_secret_value():
-        return True
-    if not email_cfg.use_keyring or not email_cfg.username:
-        return False
-    try:
-        import keyring
-        pwd = await asyncio.to_thread(
-            keyring.get_password, "alice", email_cfg.username,
-        )
-        return bool(pwd)
-    except Exception:
-        return False
+    changed: set[str] = set()
+    if ctx.secret_store is None:
+        return changed
+    cfg = ctx.config
+    for path, raw in updates.items():
+        assert is_secret_path(path), f"_apply_secret_updates: not a secret path: {path}"
+        if raw is None:
+            if ctx.secret_store.cached().get(path):
+                await ctx.secret_store.delete(path)
+                changed.add(path)
+            _mirror_secret_to_config(cfg, path, "")
+            continue
+        value = str(raw).strip()
+        if not value or value == "***":
+            continue
+        if len(value) > _SECRET_MAX_LEN:
+            raise HTTPException(400, f"{path} max {_SECRET_MAX_LEN} chars")
+        if value != ctx.secret_store.cached().get(path):
+            await ctx.secret_store.set(path, value)
+            changed.add(path)
+        _mirror_secret_to_config(cfg, path, value)
+    return changed
 
 
 async def _apply_email_changes(ctx: AppContext) -> None:

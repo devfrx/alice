@@ -108,8 +108,11 @@ class TestProviderSwitch:
         )
         assert masked.status_code == 200
 
+        # Secrets never land in the preferences DB — the real value only
+        # ever lives in the SecretStore (Task 5).
+        assert ctx.secret_store.cached()["llm.openrouter_api_key"] == "sk-or-real-secret"
         prefs = await ctx.preferences_service.load_all()
-        assert prefs["llm"]["openrouter_api_key"] == "sk-or-real-secret"
+        assert "openrouter_api_key" not in prefs.get("llm", {})
 
     async def test_empty_api_key_is_a_noop_in_memory_and_in_prefs(
         self, client, app,
@@ -128,5 +131,31 @@ class TestProviderSwitch:
         assert cleared.status_code == 200
         assert ctx.config.llm.openrouter_api_key.get_secret_value() == "sk-or-real-secret"
 
+        assert ctx.secret_store.cached()["llm.openrouter_api_key"] == "sk-or-real-secret"
         prefs = await ctx.preferences_service.load_all()
-        assert prefs["llm"]["openrouter_api_key"] == "sk-or-real-secret"
+        assert "openrouter_api_key" not in prefs.get("llm", {})
+
+    async def test_api_key_lands_in_secret_store_not_in_db(self, client, app) -> None:
+        ctx = app.state.context
+        resp = await client.put(
+            "/api/config",
+            json={"llm": {"openrouter_api_key": "sk-or-secret-store"}},
+        )
+        assert resp.status_code == 200
+        assert ctx.secret_store.cached()["llm.openrouter_api_key"] == "sk-or-secret-store"
+        assert ctx.config.llm.openrouter_api_key.get_secret_value() == "sk-or-secret-store"
+        prefs = await ctx.preferences_service.load_all()
+        assert "openrouter_api_key" not in prefs.get("llm", {})
+
+    async def test_null_api_key_deletes_secret(self, client, app) -> None:
+        ctx = app.state.context
+        await client.put(
+            "/api/config", json={"llm": {"openrouter_api_key": "sk-or-todelete"}},
+        )
+        resp = await client.put(
+            "/api/config", json={"llm": {"openrouter_api_key": None}},
+        )
+        assert resp.status_code == 200
+        assert "llm.openrouter_api_key" not in ctx.secret_store.cached()
+        assert ctx.config.llm.openrouter_api_key.get_secret_value() == ""
+        assert resp.json()["llm"]["openrouter_api_key_configured"] is False

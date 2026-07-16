@@ -61,9 +61,12 @@ class _LRUCache:
 class EmailService:
     """Async IMAP/SMTP service for reading and sending emails locally.
 
-    Credentials are never stored in plaintext; they are retrieved from
-    the OS keyring (``use_keyring=True``, default) or from the
-    ``ALICE_EMAIL__PASSWORD`` environment variable (``use_keyring=False``).
+    The password never touches this service in plaintext form beyond a
+    single hop: it arrives already hydrated on ``config.password`` (a
+    ``SecretStr``) — ``LayeredConfigService`` reads it from the OS
+    keyring-backed ``SecretStore`` and mirrors it onto the resolved
+    config before this service is constructed. No ``keyring`` import
+    here.
 
     The service owns:
     - A persistent ``aioimaplib`` client for inbox operations
@@ -93,7 +96,7 @@ class EmailService:
                 "email.imap_host is required — configure it in default.yaml"
             )
 
-        self._password_resolved = await self._resolve_password()
+        self._password_resolved = self._config.password.get_secret_value()
 
         self._imap = await self._connect_imap()
         logger.info(
@@ -459,32 +462,6 @@ class EmailService:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
-    async def _resolve_password(self) -> str:
-        """Retrieve password from keyring or config field."""
-        if self._config.use_keyring:
-            try:
-                import keyring
-
-                pwd = await asyncio.to_thread(
-                    keyring.get_password,
-                    "alice",
-                    self._config.username,
-                )
-                if pwd:
-                    return pwd
-                logger.warning(
-                    "Password non trovata nel keyring per '{}'. "
-                    "Esegui: keyring set alice {}",
-                    self._config.username,
-                    self._config.username,
-                )
-            except ImportError:
-                logger.warning(
-                    "Libreria 'keyring' non installata — "
-                    "fallback a email.password dal config",
-                )
-        return self._config.password.get_secret_value()
 
     async def _connect_imap(
         self,

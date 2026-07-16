@@ -809,7 +809,6 @@ class EmailConfig(BaseSettings):
     smtp_port: int = 587
     smtp_ssl: bool = False
     username: str = ""
-    use_keyring: bool = True
     password: SecretStr = Field(default=SecretStr(""))
     fetch_last_n: int = 20
     max_fetch: int = 50
@@ -1262,6 +1261,7 @@ _REMOVED_LEGACY_KEYS: tuple[tuple[str, str], ...] = (
     ("voice", "voice_confirmation_enabled"),
     ("pc_automation", "enabled"),
     ("notifications", "sound_enabled"),
+    ("email", "use_keyring"),
 )
 
 

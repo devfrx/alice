@@ -261,3 +261,20 @@ def test_secret_fields_are_secretstr_and_redacted_in_dump() -> None:
     dumped = cfg.model_dump(mode="json")
     assert "sk-or-x" not in str(dumped)
     assert "pw" not in str(dumped)
+
+
+# ---------------------------------------------------------------------------
+# PUT /config — email password lands in the SecretStore (Task 5)
+# ---------------------------------------------------------------------------
+
+
+async def test_email_password_lands_in_secret_store(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config",
+        json={"email": {"username": "u@example.com", "password": "s3cret"}},
+    )
+    assert resp.status_code == 200
+    assert ctx.secret_store.cached()["email.password"] == "s3cret"
+    assert resp.json()["email"]["password_configured"] is True
+    assert "use_keyring" not in resp.json()["email"]

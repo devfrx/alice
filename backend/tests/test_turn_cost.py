@@ -54,6 +54,45 @@ async def test_finish_omits_cost_when_zero() -> None:
     assert finished and finished[0]["cost"] is None
 
 
+@pytest.mark.asyncio
+async def test_finish_suppresses_frame_cost_on_error() -> None:
+    """Error turns roll back in ``_persist_final_turn``: the frame must not
+    carry a cost the persisted ledger won't back (live chip would diverge
+    on reload). The returned result keeps the real accumulated cost."""
+    executor = DirectTurnExecutor.__new__(DirectTurnExecutor)
+    sink = _RecordingSink()
+    progress = TurnProgress(turn_id="t1", steps=2, cost=0.0015)
+    result = TurnResult(
+        content="", thinking="", input_tokens=10, output_tokens=5,
+        finish_reason="error",
+    )
+
+    out = await executor._finish(sink, progress, result)
+
+    assert out.cost == pytest.approx(0.0015)
+    finished = [e for e in sink.events if e["type"] == "turn.finished"]
+    assert finished and finished[0]["cost"] is None
+
+
+@pytest.mark.asyncio
+async def test_finish_keeps_frame_cost_on_cancelled() -> None:
+    """Cancelled turns with content DO persist their cost — the frame must
+    keep carrying it (only the error/rollback class is suppressed)."""
+    executor = DirectTurnExecutor.__new__(DirectTurnExecutor)
+    sink = _RecordingSink()
+    progress = TurnProgress(turn_id="t1", steps=1, cost=0.002)
+    result = TurnResult(
+        content="partial", thinking="", input_tokens=10, output_tokens=5,
+        finish_reason="cancelled",
+    )
+
+    out = await executor._finish(sink, progress, result)
+
+    assert out.cost == pytest.approx(0.002)
+    finished = [e for e in sink.events if e["type"] == "turn.finished"]
+    assert finished and finished[0]["cost"] == pytest.approx(0.002)
+
+
 def test_sum_usage_cost_ignores_malformed_entries() -> None:
     from backend.api.routes.chat.conversations import _sum_usage_cost
 

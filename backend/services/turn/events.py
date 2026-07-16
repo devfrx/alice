@@ -262,7 +262,8 @@ def turn_finished(
     Unlike other optional fields, ``finish_reason`` and ``cost`` are always
     present (even when ``None``): a finished turn always carries a terminal
     disposition (``None`` meaning the model did not report one) and a cost
-    slot (``None`` meaning the provider did not report one).
+    slot (``None`` meaning the provider did not report one, or the caller
+    withheld it — e.g. error turns, whose cost is never persisted).
 
     Args:
         turn_id: Stable identifier of the turn.

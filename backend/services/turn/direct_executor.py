@@ -325,6 +325,14 @@ class DirectTurnExecutor:
         :func:`contextlib.suppress`) so it can never alter the existing
         control flow or return value.
 
+        On ``finish_reason == "error"`` the frame carries ``cost=None`` even
+        when credits were spent on intermediate steps: ``_persist_final_turn``
+        rolls back error turns, so a cost on the frame would be summed by the
+        frontend live chip but never backed by the persisted ledger — the
+        total would drop on reload. The discarded cost joins the documented
+        under-count classes (handoff OpenRouter, gotcha 7). The returned
+        ``result`` keeps the real accumulated cost either way.
+
         Args:
             sink: Outbound event sink for the turn.
             progress: Mutable per-turn counters (supplies ``turn_id``,
@@ -335,6 +343,11 @@ class DirectTurnExecutor:
             ``result`` with ``cost`` stamped from ``progress.cost``.
         """
         result = replace(result, cost=progress.cost)
+        frame_cost = (
+            result.cost
+            if result.cost > 0 and result.finish_reason != "error"
+            else None
+        )
         with contextlib.suppress(Exception):
             await sink.send(events.turn_finished(
                 turn_id=progress.turn_id,
@@ -342,7 +355,7 @@ class DirectTurnExecutor:
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
                 steps=progress.steps,
-                cost=result.cost if result.cost > 0 else None,
+                cost=frame_cost,
             ))
         return result
 

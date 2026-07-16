@@ -42,10 +42,8 @@ def _ctx(ws_or_request: WebSocket | Request) -> AppContext:
 async def _send_json(ws: WebSocket, data: dict) -> None:
     """Send JSON to client; silently ignore if connection already closed."""
     if ws.client_state == WebSocketState.CONNECTED:
-        try:
+        with contextlib.suppress(Exception):
             await ws.send_json(data)
-        except Exception:
-            pass
 
 
 async def _stream_tts(
@@ -74,10 +72,8 @@ async def _cancel_tts(
     cancel_event.set()
     if tts_task and not tts_task.done():
         tts_task.cancel()
-        try:
+        with contextlib.suppress(TimeoutError, asyncio.CancelledError, Exception):
             await asyncio.wait_for(tts_task, timeout=1.0)
-        except (TimeoutError, asyncio.CancelledError, Exception):
-            pass
     return asyncio.Event()
 
 
@@ -354,10 +350,8 @@ async def ws_voice(websocket: WebSocket) -> None:
         # Cancel any running TTS task
         if tts_task and not tts_task.done():
             tts_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await tts_task
-            except (asyncio.CancelledError, Exception):
-                pass
         async with _voice_lock:
             _voice_connections[client_ip] = max(
                 0, _voice_connections.get(client_ip, 1) - 1,
@@ -366,12 +360,10 @@ async def ws_voice(websocket: WebSocket) -> None:
                 _voice_connections.pop(client_ip, None)
         _active_voice_sockets.discard(websocket)
         cancel_event.set()
-        try:
+        with contextlib.suppress(Exception):
             await ctx.event_bus.emit(
                 AliceEvent.VOICE_SESSION_END, session_id=session_id,
             )
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------

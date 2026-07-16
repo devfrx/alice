@@ -33,6 +33,7 @@ from backend.services.calendar_events import (
     CalendarEvent,
     validate_rrule,
 )
+import contextlib
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -173,20 +174,16 @@ class CalendarPlugin(BasePlugin):
         """Cancel the background reminder loop."""
         if self._reminder_task and not self._reminder_task.done():
             self._reminder_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._reminder_task
-            except asyncio.CancelledError:
-                pass
             self.logger.debug("Reminder loop stopped")
 
     async def cleanup(self) -> None:
         """Cancel the reminder task and release resources."""
         if self._reminder_task and not self._reminder_task.done():
             self._reminder_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._reminder_task
-            except asyncio.CancelledError:
-                pass
         self._fired_reminders.clear()
         await super().cleanup()
 

@@ -29,6 +29,7 @@ from backend.plugins.pc_automation.validators import (
     safe_subprocess,
     sanitize_text_input,
 )
+import contextlib
 
 # -- Lazy imports for optional dependencies --------------------------------
 
@@ -335,10 +336,8 @@ async def exec_type_text(text: str) -> str:
         finally:
             # Restore previous clipboard content
             if old_clip is not None:
-                try:
+                with contextlib.suppress(Exception):
                     pyperclip.copy(old_clip)
-                except Exception:
-                    pass
 
         return f"Typed {len(sanitized)} characters"
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
@@ -187,10 +187,8 @@ class TestCalendarPluginLifecycle:
         assert isinstance(plugin._reminder_task, asyncio.Task)
         # Cleanup
         plugin._reminder_task.cancel()
-        try:
+        with suppress(asyncio.CancelledError):
             await plugin._reminder_task
-        except asyncio.CancelledError:
-            pass
 
     async def test_on_app_shutdown_cancels_task(
         self, plugin: CalendarPlugin,

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from loguru import logger
+import contextlib
 
 if TYPE_CHECKING:
     from backend.core.config import NetworkProbeConfig
@@ -817,14 +818,12 @@ class NetworkProber:
 
         async def _ping_one(ip_str: str) -> None:
             async with semaphore:
-                try:
+                with contextlib.suppress(subprocess.TimeoutExpired, OSError):
                     await asyncio.to_thread(
                         _run_cmd,
                         "ping", "-n", "1", "-w", "200", ip_str,
                         timeout=3.0,
                     )
-                except (subprocess.TimeoutExpired, OSError):
-                    pass
 
         ping_tasks: list[asyncio.Task[None]] = []
         for net_addr, prefix in subnets:

@@ -26,6 +26,7 @@ from typing import Literal, Protocol, runtime_checkable
 from loguru import logger
 
 from backend.core.event_bus import AliceEvent, EventBus
+import contextlib
 
 # ---------------------------------------------------------------------------
 # Public types
@@ -262,10 +263,8 @@ class ServiceOrchestrator:
             for task in (entry.poll_task, entry.restart_task):
                 if task is None:
                     continue
-                try:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
-                except (asyncio.CancelledError, Exception):
-                    pass
             entry.poll_task = None
             entry.restart_task = None
 
@@ -290,10 +289,8 @@ class ServiceOrchestrator:
             for task in (entry.poll_task, entry.restart_task):
                 if task is None:
                     continue
-                try:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
-                except (asyncio.CancelledError, Exception):
-                    pass
             entry.poll_task = None
             entry.restart_task = None
 
@@ -339,10 +336,8 @@ class ServiceOrchestrator:
         entry = self._entries[name]
         if entry.restart_task is not None and not entry.restart_task.done():
             entry.restart_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await entry.restart_task
-            except (asyncio.CancelledError, Exception):
-                pass
             entry.restart_task = None
         entry.backoff_attempts = 0
         await self._stop_one(name)
@@ -425,10 +420,8 @@ class ServiceOrchestrator:
     async def _restart_with_backoff(self, name: str) -> None:
         entry = self._entries[name]
         # Stop first (best-effort).
-        try:
+        with contextlib.suppress(Exception):
             await self._stop_one(name)
-        except Exception:
-            pass
 
         for attempt, delay in enumerate(_BACKOFF_SCHEDULE, start=1):
             if self._stopped:

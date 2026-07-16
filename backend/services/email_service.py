@@ -22,6 +22,7 @@ from loguru import logger
 
 from backend.core.config import EmailConfig
 from backend.core.event_bus import AliceEvent, EventBus
+import contextlib
 
 _TRUNCATION_SUFFIX = "\n[…troncato]"
 
@@ -113,16 +114,12 @@ class EmailService:
         """Cancel IDLE task and close IMAP connection."""
         if self._idle_task and not self._idle_task.done():
             self._idle_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._idle_task
-            except asyncio.CancelledError:
-                pass
         async with self._imap_lock:
             if self._imap:
-                try:
+                with contextlib.suppress(Exception):
                     await self._imap.logout()
-                except Exception:
-                    pass
                 self._imap = None
             self._cache.clear()
         logger.info("EmailService closed")
@@ -692,19 +689,15 @@ class EmailService:
                         self._cache.clear()
             except asyncio.CancelledError:
                 if idle_imap:
-                    try:
+                    with contextlib.suppress(Exception):
                         await idle_imap.logout()
-                    except Exception:
-                        pass
                 return
             except Exception as exc:
                 logger.warning(
                     "IMAP IDLE error (retrying in 60s): {}", exc,
                 )
                 if idle_imap:
-                    try:
+                    with contextlib.suppress(Exception):
                         await idle_imap.logout()
-                    except Exception:
-                        pass
                     idle_imap = None
                 await asyncio.sleep(60)

@@ -12,6 +12,7 @@ from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import AliceEvent, EventBus
 from backend.core.plugin_models import ConnectionStatus, ExecutionContext
+import contextlib
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -627,10 +628,8 @@ class TestTimerManager:
 
         # Cleanup
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
     @pytest.mark.asyncio
     async def test_create_timer_persists_to_db(self):
@@ -659,10 +658,8 @@ class TestTimerManager:
 
         # Cleanup
         manager._timers["t-2"].cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await manager._timers["t-2"]
-        except asyncio.CancelledError:
-            pass
 
     @pytest.mark.asyncio
     async def test_cancel_timer_cancels_task(self):
@@ -952,10 +949,8 @@ class TestRestoreAndShutdown:
             # Let the task enter asyncio.sleep() before cancelling
             await asyncio.sleep(0)
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
 
             mock_update.assert_awaited_once_with(
                 "cancel-status", "cancelled",

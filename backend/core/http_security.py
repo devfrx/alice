@@ -93,7 +93,7 @@ def _resolve_and_check(hostname: str) -> None:
     except socket.gaierror as exc:
         raise ValueError(f"DNS resolution failed for '{hostname}': {exc}") from exc
 
-    for family, _type, _proto, _canon, sockaddr in results:
+    for _family, _type, _proto, _canon, sockaddr in results:
         ip_str = sockaddr[0]
         # Unwrap IPv4-mapped IPv6 for logging clarity
         try:

@@ -17,6 +17,7 @@ from qdrant_client import models
 from backend.core.config import MemoryConfig
 from backend.core.protocols import EmbeddingClientProtocol, QdrantServiceProtocol
 from backend.services.qdrant_service import COLLECTION_MEMORY
+import contextlib
 
 # ---------------------------------------------------------------------------
 # Memory entry dataclass (lightweight, no SQLModel table mapping needed
@@ -116,10 +117,8 @@ class MemoryService:
         """Cancel cleanup task. Does NOT close qdrant or embedding client."""
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
         self._cleanup_task = None
         self._log.info("Memory service closed")
 

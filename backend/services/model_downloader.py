@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 from loguru import logger
+import contextlib
 
 if TYPE_CHECKING:
     from backend.core.event_bus import EventBus
@@ -468,10 +469,8 @@ class ModelDownloader:
             )
         except Exception:
             if tmp.exists():
-                try:
+                with contextlib.suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             raise
 
     async def _fetch_ranged(
@@ -529,10 +528,8 @@ class ModelDownloader:
             )
         except Exception:
             if tmp.exists():
-                try:
+                with contextlib.suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             raise
 
     async def _tick(

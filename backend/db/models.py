@@ -297,7 +297,7 @@ class PluginState(SQLModel, table=True):
 # ---------------------------------------------------------------------------
 
 
-class ArtifactKind(str, enum.Enum):
+class ArtifactKind(enum.StrEnum):
     """Type of artifact produced by a tool.
 
     Extend with new members when adding new artifact-producing tools

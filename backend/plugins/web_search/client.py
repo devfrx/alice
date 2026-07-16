@@ -26,6 +26,7 @@ from backend.core.http_security import (
     async_validate_url_ssrf,
     create_ssrf_safe_event_hooks,
 )
+import contextlib
 
 # -- Lazy DDGS import ------------------------------------------------------
 
@@ -254,10 +255,8 @@ class WebSearchClient:
     async def close(self) -> None:
         """Close the underlying HTTP and primp clients."""
         await self._http.aclose()
-        try:
+        with contextlib.suppress(Exception):
             self._primp.close()
-        except Exception:
-            pass
 
     # ------------------------------------------------------------------
     # Private helpers

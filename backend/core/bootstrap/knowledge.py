@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from backend.core.context import AppContext
+import contextlib
 
 if TYPE_CHECKING:
     from backend.core.config import AliceConfig
@@ -90,10 +91,8 @@ async def stage_knowledge(ctx: AppContext) -> None:
         logger.info("Qdrant service started (mode={})", config.qdrant.mode)
     except Exception as exc:
         logger.warning("Qdrant service failed to start: {}", exc)
-        try:
+        with contextlib.suppress(Exception):
             await qdrant_service.close()
-        except Exception:
-            pass
         qdrant_service = None
 
     # -- Memory service (Phase 9) ------------------------------------------

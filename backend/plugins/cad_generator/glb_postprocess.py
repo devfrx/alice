@@ -109,14 +109,12 @@ def patch_glb_materials(
         pbr = mat.setdefault("pbrMetallicRoughness", {})
         if not isinstance(pbr, dict):
             continue
-        if metallic_factor is not None:
-            if pbr.get("metallicFactor") != metallic_factor:
-                pbr["metallicFactor"] = float(metallic_factor)
-                changed = True
-        if roughness_factor is not None:
-            if pbr.get("roughnessFactor") != roughness_factor:
-                pbr["roughnessFactor"] = float(roughness_factor)
-                changed = True
+        if metallic_factor is not None and pbr.get("metallicFactor") != metallic_factor:
+            pbr["metallicFactor"] = float(metallic_factor)
+            changed = True
+        if roughness_factor is not None and pbr.get("roughnessFactor") != roughness_factor:
+            pbr["roughnessFactor"] = float(roughness_factor)
+            changed = True
 
     if not changed:
         return glb_bytes

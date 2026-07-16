@@ -83,7 +83,7 @@ class TestTTSServiceLifecycle:
     async def test_stop_cleans_up(self, tts_config: TTSConfig):
         """Stopping should release engine resources."""
         piper = _mock_piper_module()
-        with patch.dict(sys.modules, {"piper": piper, "piper.config": piper.config, "piper.config": piper.config}):
+        with patch.dict(sys.modules, {"piper": piper, "piper.config": piper.config}):
             svc = _build_service(tts_config)
             await svc.start()
             await svc.stop()
@@ -92,7 +92,7 @@ class TestTTSServiceLifecycle:
     async def test_health_check_true(self, tts_config: TTSConfig):
         """health_check True when engine loaded."""
         piper = _mock_piper_module()
-        with patch.dict(sys.modules, {"piper": piper, "piper.config": piper.config, "piper.config": piper.config}):
+        with patch.dict(sys.modules, {"piper": piper, "piper.config": piper.config}):
             svc = _build_service(tts_config)
             await svc.start()
             assert await svc.health_check() is True

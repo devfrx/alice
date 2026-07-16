@@ -704,10 +704,8 @@ class CadGeneratorPlugin(BasePlugin):
             logger.error(gen_error)
         finally:
             # Step 3: unload TRELLIS model (best-effort)
-            try:
+            with contextlib.suppress(Exception):
                 await self._client.unload_model()
-            except Exception:
-                pass
 
             # Step 4: reload everything we unloaded, including cancellation paths
             if cfg.auto_vram_swap and unloaded_models:
@@ -920,10 +918,8 @@ class CadGeneratorPlugin(BasePlugin):
                 await progress_task
             # Best-effort unload of the TRELLIS.2 weights so the LLM can
             # reclaim VRAM cleanly even on failure or cancellation.
-            try:
+            with contextlib.suppress(Exception):
                 await self._client_v2.unload_model()
-            except Exception:
-                pass
 
             if cfg2.auto_vram_swap and unloaded_models:
                 await self._reload_llm_after_swap(unloaded_models)
@@ -1193,10 +1189,8 @@ class CadGeneratorPlugin(BasePlugin):
             progress_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await progress_task
-            try:
+            with contextlib.suppress(Exception):
                 await self._client_multiview.unload_model()
-            except Exception:
-                pass
             if cfg_mv.auto_vram_swap and unloaded_models:
                 await self._reload_llm_after_swap(unloaded_models)
 

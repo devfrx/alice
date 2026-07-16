@@ -481,6 +481,26 @@ class PreferencesServiceProtocol(Protocol):
 
 
 # ---------------------------------------------------------------------------
+# Secret store
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class SecretStoreProtocol(Protocol):
+    """OS-keyring-backed secret storage with a synchronous read cache."""
+
+    async def get(self, name: str) -> str | None: ...
+
+    async def set(self, name: str, value: str) -> None: ...
+
+    async def delete(self, name: str) -> None: ...
+
+    async def load_cache(self) -> dict[str, str]: ...
+
+    def cached(self) -> dict[str, str]: ...
+
+
+# ---------------------------------------------------------------------------
 # Memory service
 # ---------------------------------------------------------------------------
 

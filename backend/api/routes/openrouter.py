@@ -14,7 +14,8 @@ router = APIRouter(tags=["openrouter"])
 
 
 def _ctx(request: Request) -> AppContext:
-    return request.app.state.context
+    context: AppContext = request.app.state.context
+    return context
 
 
 def _safe_float(value: Any) -> float | None:

@@ -65,7 +65,7 @@ class AppContext:
         "plugin_manager", "tool_registry", "llm_service", "stt_service",
         "tts_service", "lmstudio_manager", "vram_monitor", "model_registry",
         "openrouter_service",
-        "preferences_service", "memory_service", "knowledge_service",
+        "memory_service", "knowledge_service",
         "continuum_client", "email_service", "qdrant_service",
         "embedding_client", "rag_readiness", "ws_connection_manager",
         "context_manager", "plugin_state_repo", "config_service",
@@ -383,16 +383,6 @@ class AppContext:
     @plugin_state_repo.setter
     def plugin_state_repo(self, value: Any) -> None:
         self.platform.plugin_state_repo = value
-
-    @property
-    def preferences_service(self) -> PreferencesServiceProtocol | None:
-        return self.platform.preferences_service
-
-    @preferences_service.setter
-    def preferences_service(
-        self, value: PreferencesServiceProtocol | None,
-    ) -> None:
-        self.platform.preferences_service = value
 
     @property
     def email_service(self) -> EmailServiceProtocol | None:

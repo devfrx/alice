@@ -126,8 +126,6 @@ class PlatformServices:
     tool_registry: ToolRegistryProtocol | None = None
     orchestrator: Any = None
     plugin_state_repo: Any = None
-    preferences_service: PreferencesServiceProtocol | None = None
-    """Legacy alias for ``preferences_store``; dies in Task 11."""
     preferences_store: PreferencesServiceProtocol | None = None
     """DB-backed store for the ``preferences`` config layer (Task 7)."""
     email_service: EmailServiceProtocol | None = None

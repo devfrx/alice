@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.api.routes.config import _REDACT_KEYS, _redact
-from backend.services.preferences_service import PERSISTABLE_LLM_KEYS
+from backend.services.config_policy import is_preference_writable, is_secret_path
 
 
 def test_redact_masks_openrouter_api_key() -> None:
@@ -17,13 +17,11 @@ def test_redact_masks_openrouter_api_key() -> None:
 
 
 def test_openrouter_keys_are_persistable_preferences() -> None:
-    for key in (
-        "provider",
-        "openrouter_api_key",
-        "openrouter_model",
-        "openrouter_favorites",
-    ):
-        assert key in PERSISTABLE_LLM_KEYS
+    # ``openrouter_api_key`` is a secret (SecretStore-only, never a config
+    # layer); the rest are policy-writable preferences.
+    assert is_secret_path("llm.openrouter_api_key")
+    for key in ("provider", "openrouter_model", "openrouter_favorites"):
+        assert is_preference_writable(f"llm.{key}")
 
 
 # ---------------------------------------------------------------------------
@@ -49,9 +47,13 @@ class TestProviderSwitch:
         assert ctx.config.llm.provider == "openrouter"
         assert ctx.llm_service is not old_service
 
-    async def test_provider_is_normalized_in_memory_and_in_prefs(
+    async def test_provider_is_normalized_in_memory_but_raw_in_prefs(
         self, client, app,
     ) -> None:
+        """Resolution normalizes case; the persisted preferences row does
+        not — the preferences layer holds the user's literal input, exactly
+        like the user/system YAML layers (canonical form is re-derived on
+        every resolve, never written back to the layer)."""
         ctx = app.state.context
 
         resp = await client.put(
@@ -60,14 +62,16 @@ class TestProviderSwitch:
 
         assert resp.status_code == 200
         assert ctx.config.llm.provider == "openrouter"
-        prefs = await ctx.preferences_service.load_all()
-        assert prefs["llm"]["provider"] == "openrouter"
+        prefs = await ctx.preferences_store.load()
+        assert prefs["llm"]["provider"] == "OpenRouter"
 
-    async def test_invalid_provider_returns_400(self, client) -> None:
+    async def test_invalid_provider_returns_422(self, client) -> None:
+        # Task 11: validation now happens in the pydantic model via
+        # set_many, so a bad value is a 422 (was a hand-rolled 400).
         resp = await client.put(
             "/api/config", json={"llm": {"provider": "bogus"}},
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     async def test_masked_api_key_is_not_persisted_over_real_key(
         self, client, app,
@@ -111,7 +115,7 @@ class TestProviderSwitch:
         # Secrets never land in the preferences DB — the real value only
         # ever lives in the SecretStore (Task 5).
         assert ctx.secret_store.cached()["llm.openrouter_api_key"] == "sk-or-real-secret"
-        prefs = await ctx.preferences_service.load_all()
+        prefs = await ctx.preferences_store.load()
         assert "openrouter_api_key" not in prefs.get("llm", {})
 
     async def test_empty_api_key_is_a_noop_in_memory_and_in_prefs(
@@ -132,7 +136,7 @@ class TestProviderSwitch:
         assert ctx.config.llm.openrouter_api_key.get_secret_value() == "sk-or-real-secret"
 
         assert ctx.secret_store.cached()["llm.openrouter_api_key"] == "sk-or-real-secret"
-        prefs = await ctx.preferences_service.load_all()
+        prefs = await ctx.preferences_store.load()
         assert "openrouter_api_key" not in prefs.get("llm", {})
 
     async def test_api_key_lands_in_secret_store_not_in_db(self, client, app) -> None:
@@ -144,7 +148,7 @@ class TestProviderSwitch:
         assert resp.status_code == 200
         assert ctx.secret_store.cached()["llm.openrouter_api_key"] == "sk-or-secret-store"
         assert ctx.config.llm.openrouter_api_key.get_secret_value() == "sk-or-secret-store"
-        prefs = await ctx.preferences_service.load_all()
+        prefs = await ctx.preferences_store.load()
         assert "openrouter_api_key" not in prefs.get("llm", {})
 
     async def test_null_api_key_deletes_secret(self, client, app) -> None:

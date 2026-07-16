@@ -7,19 +7,17 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
-from pydantic import SecretStr, ValidationError
+from pydantic import ValidationError
 
 from backend.api.routes.config_reactions import (
-    _apply_email_changes,
-    _apply_llm_provider_change,
-    _apply_stt_changes,
-    _apply_tts_changes,
+    ALL_REACTIVE_PATHS,
+    apply_reactions,
+    diff_paths,
 )
 from backend.api.routes.models import serialise_model
-from backend.api.routes.voice import push_voice_ready
-from backend.core.config import KNOWN_MODELS, AliceConfig
+from backend.core.config import KNOWN_MODELS
 from backend.core.context import AppContext
-from backend.services.config_policy import is_secret_path
+from backend.services.config_policy import is_preference_writable, is_secret_path
 from backend.services.config_service import ConfigLayer
 
 router = APIRouter(tags=["config"])
@@ -93,14 +91,16 @@ async def patch_config(request: Request) -> dict[str, Any]:
     Body schema::
 
         {
-            "path":  "llm.temperature",   # dotted path, required
-            "value": 0.9,                  # any JSON value
-            "layer": "user"                # optional, default "user"
+            "path":  "llm.temperature",     # dotted path, required
+            "value": 0.9,                    # any JSON value
+            "layer": "preferences"           # optional, default "preferences"
         }
 
-    Allowed layers: ``user`` (default, persisted to user.yaml),
-    ``system`` (persisted to system.yaml — admin use), ``runtime``
-    (in-memory, lost on restart).  ``defaults`` is read-only.
+    Allowed layers: ``preferences`` (default, persisted to the DB-backed
+    preferences layer — policy-gated), ``user`` (persisted to user.yaml —
+    power-user escape hatch), ``system`` (persisted to system.yaml — admin
+    use), ``runtime`` (in-memory, lost on restart).  ``defaults`` is
+    read-only.
     """
     ctx = _ctx(request)
     if ctx.config_service is None:
@@ -120,7 +120,7 @@ async def patch_config(request: Request) -> dict[str, Any]:
         raise HTTPException(400, "'value' is required")
     value = body["value"]
 
-    raw_layer = body.get("layer", ConfigLayer.USER.value)
+    raw_layer = body.get("layer", ConfigLayer.PREFERENCES.value)
     if not isinstance(raw_layer, str):
         raise HTTPException(400, "'layer' must be a string")
     try:
@@ -128,7 +128,8 @@ async def patch_config(request: Request) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(
             400,
-            f"'layer' must be one of: user, system, runtime (got '{raw_layer}')",
+            f"'layer' must be one of: preferences, user, system, runtime "
+            f"(got '{raw_layer}')",
         ) from exc
     if layer is ConfigLayer.DEFAULTS:
         raise HTTPException(400, "'defaults' layer is read-only")
@@ -136,9 +137,16 @@ async def patch_config(request: Request) -> dict[str, Any]:
     try:
         await ctx.config_service.set(path, value, layer=layer)
     except ValidationError as exc:
-        raise HTTPException(422, exc.errors()) from exc
+        # include_context=False: ``value_error`` entries carry the raw
+        # ValueError in ``ctx`` — not JSON-serializable in a response.
+        raise HTTPException(
+            422, exc.errors(include_url=False, include_context=False),
+        ) from exc
     except (ValueError, KeyError) as exc:
         raise HTTPException(400, str(exc)) from exc
+
+    ctx.config = ctx.config_service.get_resolved()
+    await apply_reactions(ctx, {path})
 
     if ctx.ws_connection_manager is not None:
         try:
@@ -335,499 +343,101 @@ async def get_config(request: Request) -> dict[str, Any]:
     }
 
 
+def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
+    """Flatten a nested update body into dotted paths (legacy aliases folded)."""
+    flat: dict[str, Any] = {}
+    for section, updates in body.items():
+        if not isinstance(updates, dict):
+            raise HTTPException(400, f"'{section}' must be a JSON object")
+        for key, value in updates.items():
+            flat[f"{section}.{key}"] = value
+    # Historical alias — the UI still sends the pc_automation shape.
+    if "pc_automation.confirmations_enabled" in flat:
+        flat["permissions.confirmations_enabled"] = flat.pop(
+            "pc_automation.confirmations_enabled"
+        )
+    return flat
+
+
 @router.put("/config")
 async def update_config(request: Request) -> dict[str, Any]:
-    """Update configuration values at runtime.
+    """Update configuration values (preferences layer + secrets).
 
-    Body: a partial config dict with only the keys to change.
-
-    Independent preferences (TTS, STT, voice, UI, etc.) are automatically
-    persisted to the database so they survive restarts.
+    Body: partial nested config dict. Unknown/out-of-policy paths -> 400,
+    invalid values -> 422, secrets routed to the SecretStore.
     """
     ctx = _ctx(request)
+    if ctx.config_service is None:
+        raise HTTPException(503, "Config service unavailable")
     try:
         body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
-
+    except Exception as exc:
+        raise HTTPException(400, "Invalid JSON body") from exc
     if not isinstance(body, dict):
-        raise HTTPException(status_code=400, detail="Request body must be a JSON object")
+        raise HTTPException(400, "Request body must be a JSON object")
 
-    cfg = ctx.config
+    flat = _flatten_update_body(body)
 
-    # Snapshot old STT/TTS values for change detection
-    old_stt = {
-        "enabled": cfg.stt.enabled,
-        "model": cfg.stt.model,
-        "device": cfg.stt.device,
-    } if "stt" in body else None
-    old_tts = {
-        "enabled": cfg.tts.enabled,
-        "engine": cfg.tts.engine,
-        "voice": cfg.tts.voice,
-        "speed": cfg.tts.speed,
-        "kokoro_model": cfg.tts.kokoro_model,
-        "kokoro_voices": cfg.tts.kokoro_voices,
-        "kokoro_voice": cfg.tts.kokoro_voice,
-        "kokoro_language": cfg.tts.kokoro_language,
-    } if "tts" in body else None
-    old_email = {
-        "enabled": cfg.email.enabled,
-        "imap_host": cfg.email.imap_host,
-        "imap_port": cfg.email.imap_port,
-        "imap_ssl": cfg.email.imap_ssl,
-        "smtp_host": cfg.email.smtp_host,
-        "smtp_port": cfg.email.smtp_port,
-        "smtp_ssl": cfg.email.smtp_ssl,
-        "username": cfg.email.username,
-        "fetch_last_n": cfg.email.fetch_last_n,
-        "max_fetch": cfg.email.max_fetch,
-        "imap_idle_enabled": cfg.email.imap_idle_enabled,
-        "archive_folder": cfg.email.archive_folder,
-    } if "email" in body else None
-    email_password_changed = False
-    llm_service_rebuild_needed = False
-
-    # Apply supported runtime overrides.
-    if "llm" in body:
-        # Aliases body["llm"]: value normalizations below are intentionally
-        # visible to persist_from_update(body).
-        llm_updates = body["llm"]
-        if "model" in llm_updates:
-            model_val = str(llm_updates["model"]).strip()
-            if not model_val or len(model_val) > 256:
-                raise HTTPException(400, "model must be a non-empty string (max 256 chars)")
-            object.__setattr__(cfg.llm, "model", model_val)
-            # Invalidate auto-resolved model cache when model changes.
-            if ctx.llm_service is not None:
-                ctx.llm_service.invalidate_model_cache()
-        if "temperature" in llm_updates:
-            try:
-                temp = float(llm_updates["temperature"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "temperature must be a number")
-            if not (0.0 <= temp <= 2.0):
-                raise HTTPException(400, "temperature must be between 0.0 and 2.0")
-            object.__setattr__(cfg.llm, "temperature", temp)
-        if "max_tokens" in llm_updates:
-            try:
-                mt = int(llm_updates["max_tokens"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "max_tokens must be an integer")
-            if mt < -1 or mt == 0:
-                raise HTTPException(
-                    400,
-                    "max_tokens must be a positive integer or -1 (unlimited)",
-                )
-            object.__setattr__(cfg.llm, "max_tokens", mt)
-        if "max_tool_iterations" in llm_updates:
-            try:
-                mti = int(llm_updates["max_tool_iterations"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "max_tool_iterations must be a positive integer")
-            if not (1 <= mti <= 100):
-                raise HTTPException(400, "max_tool_iterations must be between 1 and 100")
-            object.__setattr__(cfg.llm, "max_tool_iterations", mti)
-        if "supports_thinking" in llm_updates:
-            if not isinstance(llm_updates["supports_thinking"], bool):
-                raise HTTPException(400, "supports_thinking must be a boolean")
-            object.__setattr__(cfg.llm, "supports_thinking", llm_updates["supports_thinking"])
-        if "supports_vision" in llm_updates:
-            if not isinstance(llm_updates["supports_vision"], bool):
-                raise HTTPException(400, "supports_vision must be a boolean")
-            object.__setattr__(cfg.llm, "supports_vision", llm_updates["supports_vision"])
-        if "context_compression_enabled" in llm_updates:
-            if not isinstance(llm_updates["context_compression_enabled"], bool):
-                raise HTTPException(400, "context_compression_enabled must be a boolean")
-            object.__setattr__(
-                cfg.llm, "context_compression_enabled",
-                llm_updates["context_compression_enabled"],
-            )
-        if "context_compression_threshold" in llm_updates:
-            try:
-                thr = float(llm_updates["context_compression_threshold"])
-            except (TypeError, ValueError):
-                raise HTTPException(
-                    400, "context_compression_threshold must be a number",
-                )
-            if not (0.50 <= thr <= 0.95):
-                raise HTTPException(
-                    400,
-                    "context_compression_threshold must be between 0.50 and 0.95",
-                )
-            object.__setattr__(cfg.llm, "context_compression_threshold", thr)
-        if "context_compression_reserve" in llm_updates:
-            try:
-                res = int(llm_updates["context_compression_reserve"])
-            except (TypeError, ValueError):
-                raise HTTPException(
-                    400, "context_compression_reserve must be an integer",
-                )
-            if not (512 <= res <= 8192):
-                raise HTTPException(
-                    400,
-                    "context_compression_reserve must be between 512 and 8192",
-                )
-            object.__setattr__(cfg.llm, "context_compression_reserve", res)
-        if "tool_rag_enabled" in llm_updates:
-            if not isinstance(llm_updates["tool_rag_enabled"], bool):
-                raise HTTPException(400, "tool_rag_enabled must be a boolean")
-            object.__setattr__(cfg.llm, "tool_rag_enabled", llm_updates["tool_rag_enabled"])
-        if "tool_rag_top_k" in llm_updates:
-            try:
-                trk = int(llm_updates["tool_rag_top_k"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "tool_rag_top_k must be an integer")
-            if not (1 <= trk <= 100):
-                raise HTTPException(400, "tool_rag_top_k must be between 1 and 100")
-            object.__setattr__(cfg.llm, "tool_rag_top_k", trk)
-        if "user_preferred_name" in llm_updates:
-            raw_name = llm_updates["user_preferred_name"]
-            name = "" if raw_name is None else str(raw_name).strip()
-            if len(name) > 80:
-                raise HTTPException(
-                    400, "user_preferred_name must be at most 80 characters",
-                )
-            object.__setattr__(cfg.llm, "user_preferred_name", name)
-            # Drop the cached prompt so the next turn rebuilds it with the name.
-            if ctx.llm_service is not None:
-                ctx.llm_service.invalidate_system_prompt_cache()
-        if "provider" in llm_updates:
-            prov = str(llm_updates["provider"]).strip().lower()
-            if prov not in ("lmstudio", "ollama", "openrouter"):
-                raise HTTPException(
-                    400, "provider must be one of: lmstudio, ollama, openrouter",
-                )
-            llm_updates["provider"] = prov
-            if prov != cfg.llm.provider:
-                object.__setattr__(cfg.llm, "provider", prov)
-                llm_service_rebuild_needed = True
-        if "openrouter_api_key" in llm_updates:
-            # pop() always — the raw value must never reach
-            # persist_from_update(body); secrets live only in the
-            # SecretStore (Task 5), never in the preferences DB.
-            key_changed = await _apply_secret_updates(
-                ctx, {"llm.openrouter_api_key": llm_updates.pop("openrouter_api_key")},
-            )
-            if key_changed:
-                llm_service_rebuild_needed = True
-        if "openrouter_model" in llm_updates:
-            om = str(llm_updates["openrouter_model"] or "").strip()
-            if len(om) > 256:
-                raise HTTPException(400, "openrouter_model max 256 chars")
-            object.__setattr__(cfg.llm, "openrouter_model", om)
-            llm_updates["openrouter_model"] = om
-            if ctx.llm_service is not None:
-                ctx.llm_service.invalidate_model_cache()
-                ctx.llm_service.invalidate_context_window_cache()
-        if "openrouter_favorites" in llm_updates:
-            favs = llm_updates["openrouter_favorites"]
-            if not isinstance(favs, list) or not all(
-                isinstance(f, str) for f in favs
-            ):
-                raise HTTPException(
-                    400, "openrouter_favorites must be a list of strings",
-                )
-            if len(favs) > 200:
-                raise HTTPException(400, "openrouter_favorites max 200 items")
-            object.__setattr__(cfg.llm, "openrouter_favorites", favs)
-            llm_updates["openrouter_favorites"] = favs
-
-    if "ui" in body:
-        ui_updates = body["ui"]
-        if "theme" in ui_updates:
-            theme = str(ui_updates["theme"]).strip()
-            if theme not in ("dark", "light"):
-                raise HTTPException(400, "theme must be 'dark' or 'light'")
-            object.__setattr__(cfg.ui, "theme", theme)
-        if "language" in ui_updates:
-            lang = str(ui_updates["language"]).strip()
-            if not lang or len(lang) > 10:
-                raise HTTPException(
-                    400, "ui language must be a non-empty string (max 10 chars)",
-                )
-            object.__setattr__(cfg.ui, "language", lang)
-
-    if "stt" in body:
-        stt_updates = body["stt"]
-        if "enabled" in stt_updates:
-            if not isinstance(stt_updates["enabled"], bool):
-                raise HTTPException(400, "stt.enabled must be a boolean")
-            object.__setattr__(cfg.stt, "enabled", stt_updates["enabled"])
-        if "language" in stt_updates:
-            raw_lang = stt_updates["language"]
-            if raw_lang is None or (
-                isinstance(raw_lang, str) and not raw_lang.strip()
-            ):
-                object.__setattr__(cfg.stt, "language", None)
-            else:
-                lang = str(raw_lang).strip()
-                if not lang or len(lang) > 10:
-                    raise HTTPException(
-                        400,
-                        "language must be a non-empty string (max 10 chars)",
-                    )
-                object.__setattr__(cfg.stt, "language", lang)
-        if "model" in stt_updates:
-            model = str(stt_updates["model"]).strip()
-            if not model or len(model) > 64:
-                raise HTTPException(
-                    400, "STT model must be a non-empty string (max 64 chars)",
-                )
-            object.__setattr__(cfg.stt, "model", model)
-        if "device" in stt_updates:
-            device = str(stt_updates["device"]).strip()
-            if device not in ("cpu", "cuda"):
-                raise HTTPException(400, "device must be 'cpu' or 'cuda'")
-            object.__setattr__(cfg.stt, "device", device)
-
-    if "tts" in body:
-        tts_updates = body["tts"]
-        if "enabled" in tts_updates:
-            if not isinstance(tts_updates["enabled"], bool):
-                raise HTTPException(400, "tts.enabled must be a boolean")
-            object.__setattr__(cfg.tts, "enabled", tts_updates["enabled"])
-        if "engine" in tts_updates:
-            engine = str(tts_updates["engine"]).strip()
-            if engine not in ("piper", "xtts", "kokoro"):
-                raise HTTPException(
-                    400, "TTS engine must be 'piper', 'xtts', or 'kokoro'",
-                )
-            object.__setattr__(cfg.tts, "engine", engine)
-        if "voice" in tts_updates:
-            voice = str(tts_updates["voice"]).strip()
-            if not voice or len(voice) > 256:
-                raise HTTPException(
-                    400, "voice must be a non-empty string (max 256 chars)",
-                )
-            object.__setattr__(cfg.tts, "voice", voice)
-        if "speed" in tts_updates:
-            try:
-                speed = float(tts_updates["speed"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "speed must be a number")
-            if not (0.5 <= speed <= 2.0):
-                raise HTTPException(
-                    400, "speed must be between 0.5 and 2.0",
-                )
-            object.__setattr__(cfg.tts, "speed", speed)
-        if "sample_rate" in tts_updates:
-            try:
-                sr = int(tts_updates["sample_rate"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "sample_rate must be an integer")
-            if sr not in (16000, 22050, 24000, 44100, 48000):
-                raise HTTPException(
-                    400,
-                    "sample_rate must be one of: 16000, 22050, 24000, 44100, 48000",
-                )
-            object.__setattr__(cfg.tts, "sample_rate", sr)
-        if "kokoro_voice" in tts_updates:
-            kv = str(tts_updates["kokoro_voice"]).strip()
-            if not kv or len(kv) > 100:
-                raise HTTPException(400, "kokoro_voice must be non-empty (max 100 chars)")
-            object.__setattr__(cfg.tts, "kokoro_voice", kv)
-        if "kokoro_language" in tts_updates:
-            kl = str(tts_updates["kokoro_language"]).strip()
-            if not kl or len(kl) > 10:
-                raise HTTPException(400, "kokoro_language must be non-empty (max 10 chars)")
-            object.__setattr__(cfg.tts, "kokoro_language", kl)
-        if "kokoro_model" in tts_updates:
-            km = str(tts_updates["kokoro_model"]).strip()
-            if not km or len(km) > 256:
-                raise HTTPException(400, "kokoro_model must be non-empty (max 256 chars)")
-            object.__setattr__(cfg.tts, "kokoro_model", km)
-        if "kokoro_voices" in tts_updates:
-            kvf = str(tts_updates["kokoro_voices"]).strip()
-            if not kvf or len(kvf) > 256:
-                raise HTTPException(400, "kokoro_voices must be non-empty (max 256 chars)")
-            object.__setattr__(cfg.tts, "kokoro_voices", kvf)
-
-    if "voice" in body:
-        voice_updates = body["voice"]
-        if "auto_tts_response" in voice_updates:
-            if not isinstance(voice_updates["auto_tts_response"], bool):
-                raise HTTPException(400, "auto_tts_response must be a boolean")
-            object.__setattr__(
-                cfg.voice, "auto_tts_response",
-                voice_updates["auto_tts_response"],
-            )
-        if "activation_mode" in voice_updates:
-            mode = str(voice_updates["activation_mode"]).strip()
-            if mode not in ("push_to_talk", "wake_word", "always_on"):
-                raise HTTPException(
-                    400,
-                    "activation_mode must be one of: push_to_talk, wake_word, always_on",
-                )
-            object.__setattr__(cfg.voice, "activation_mode", mode)
-        if "wake_word" in voice_updates:
-            ww = str(voice_updates["wake_word"]).strip()
-            if not ww or len(ww) > 50:
-                raise HTTPException(
-                    400,
-                    "wake_word must be a non-empty string (max 50 chars)",
-                )
-            object.__setattr__(cfg.voice, "wake_word", ww)
-
-    if "pc_automation" in body:
-        pc_updates = body["pc_automation"]
-        if "confirmations_enabled" in pc_updates:
-            if not isinstance(pc_updates["confirmations_enabled"], bool):
-                raise HTTPException(400, "confirmations_enabled must be a boolean")
-            # Promoted to the neutral ``permissions`` block in Fase 2; the
-            # request keeps the historical shape (persisted body is migrated).
-            object.__setattr__(
-                cfg.permissions, "confirmations_enabled",
-                pc_updates["confirmations_enabled"],
-            )
-
-    if "email" in body:
-        email_updates = body["email"]
-        if not isinstance(email_updates, dict):
-            raise HTTPException(400, "email must be a JSON object")
-
-        if "enabled" in email_updates:
-            if not isinstance(email_updates["enabled"], bool):
-                raise HTTPException(400, "email.enabled must be a boolean")
-            object.__setattr__(cfg.email, "enabled", email_updates["enabled"])
-        for key in ("imap_ssl", "smtp_ssl", "imap_idle_enabled"):
-            if key in email_updates:
-                if not isinstance(email_updates[key], bool):
-                    raise HTTPException(400, f"email.{key} must be a boolean")
-                object.__setattr__(cfg.email, key, email_updates[key])
-        for key in ("imap_host", "smtp_host", "username", "archive_folder"):
-            if key in email_updates:
-                value = str(email_updates[key]).strip()
-                if len(value) > 255:
-                    raise HTTPException(400, f"email.{key} must be max 255 chars")
-                object.__setattr__(cfg.email, key, value)
-        for key in ("imap_port", "smtp_port"):
-            if key in email_updates:
-                try:
-                    port = int(email_updates[key])
-                except (TypeError, ValueError):
-                    raise HTTPException(400, f"email.{key} must be an integer")
-                if not (1 <= port <= 65535):
-                    raise HTTPException(400, f"email.{key} must be between 1 and 65535")
-                object.__setattr__(cfg.email, key, port)
-        for key in ("fetch_last_n", "max_fetch"):
-            if key in email_updates:
-                try:
-                    value = int(email_updates[key])
-                except (TypeError, ValueError):
-                    raise HTTPException(400, f"email.{key} must be an integer")
-                if not (1 <= value <= 500):
-                    raise HTTPException(400, f"email.{key} must be between 1 and 500")
-                object.__setattr__(cfg.email, key, value)
-
-        # pop() is mandatory — the raw password must never reach
-        # persist_from_update(body); passing "" to the helper is a no-op
-        # by construction (empty string is filtered before it can clobber
-        # a stored secret).
-        email_password_changed = bool(
-            await _apply_secret_updates(
-                ctx, {"email.password": email_updates.pop("password", "")},
-            )
+    secret_updates: dict[str, Any] = {}
+    pref_updates: dict[str, Any] = {}
+    rejected: list[str] = []
+    for path, value in flat.items():
+        if is_secret_path(path):
+            secret_updates[path] = value
+        elif is_preference_writable(path):
+            pref_updates[path] = value
+        else:
+            rejected.append(path)
+    if rejected:
+        raise HTTPException(
+            400, f"Unknown or non-writable config paths: {sorted(rejected)}",
         )
 
-    # -- Persist independent preferences to database -------------------------
-    if ctx.preferences_service is not None:
+    old_config = ctx.config
+
+    secret_changed = await _apply_secret_updates(ctx, secret_updates)
+
+    if pref_updates:
         try:
-            await ctx.preferences_service.persist_from_update(body)
-        except Exception as exc:
-            logger.warning("Failed to persist preferences: {}", exc)
+            await ctx.config_service.set_many(
+                pref_updates, layer=ConfigLayer.PREFERENCES,
+            )
+        except ValidationError as exc:
+            # include_context=False: ``value_error`` entries carry the raw
+            # ValueError in ``ctx`` — not JSON-serializable in a response.
+            raise HTTPException(
+                422, exc.errors(include_url=False, include_context=False),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        ctx.config = ctx.config_service.get_resolved()
 
-    # -- Restart STT/TTS services if their config ACTUALLY changed ---------
-    if old_stt is not None:
-        stt_changed = (
-            cfg.stt.enabled != old_stt["enabled"]
-            or cfg.stt.model != old_stt["model"]
-            or cfg.stt.device != old_stt["device"]
-        )
-        if stt_changed:
-            await _apply_stt_changes(ctx, body["stt"])
-            await push_voice_ready(ctx)
+    changed = diff_paths(
+        old_config, ctx.config, set(pref_updates) | ALL_REACTIVE_PATHS,
+    ) | secret_changed
+    await apply_reactions(ctx, changed)
 
-    if old_tts is not None:
-        tts_changed = (
-            cfg.tts.enabled != old_tts["enabled"]
-            or cfg.tts.engine != old_tts["engine"]
-            or cfg.tts.voice != old_tts["voice"]
-            or cfg.tts.speed != old_tts["speed"]
-            or cfg.tts.kokoro_model != old_tts["kokoro_model"]
-            or cfg.tts.kokoro_voices != old_tts["kokoro_voices"]
-            or cfg.tts.kokoro_voice != old_tts["kokoro_voice"]
-            or cfg.tts.kokoro_language
-            != old_tts["kokoro_language"]
-        )
-        if tts_changed:
-            await _apply_tts_changes(ctx, body["tts"])
-            await push_voice_ready(ctx)
-
-    if old_email is not None:
-        email_changed = email_password_changed or any(
-            getattr(cfg.email, key) != value
-            for key, value in old_email.items()
-        )
-        if email_changed:
-            await _apply_email_changes(ctx)
-
-    if llm_service_rebuild_needed:
-        await _apply_llm_provider_change(ctx)
-
-    # Return the full config after applying changes.
     return await get_config(request)
 
 
 _SECRET_MAX_LEN = 512
 
-# Maps a dotted secret path (config_policy.SECRET_PATHS) to the
-# (section, attribute) pair on AliceConfig it hydrates.
-_SECRET_CONFIG_MAP: dict[str, tuple[str, str]] = {
-    "llm.api_token": ("llm", "api_token"),
-    "llm.openrouter_api_key": ("llm", "openrouter_api_key"),
-    "home_assistant.token": ("home_assistant", "token"),
-    "mqtt.password": ("mqtt", "password"),
-    "continuum.api_token": ("continuum", "api_token"),
-    "email.password": ("email", "password"),
-}
-
-
-def _mirror_secret_to_config(cfg: AliceConfig, path: str, value: str) -> None:
-    """Mirror a secret write onto the live ``cfg`` object in place.
-
-    Mirroring in-place until Task 11 unifies the write path: the PUT
-    handler still mutates ``cfg = ctx.config`` in place for non-secret
-    fields before this helper runs, and those mutations are not yet
-    persisted anywhere else. A full ``ctx.config_service.rebuild()`` here
-    would replace ``ctx.config`` with a freshly-merged object that never
-    saw the in-flight mutations, silently discarding them. Task 11
-    rewrites the handler around the unified rebuild-based write path and
-    this helper goes away.
-    """
-    mapping = _SECRET_CONFIG_MAP.get(path)
-    if mapping is None:
-        return
-    section, attr = mapping
-    sub = getattr(cfg, section, None)
-    if sub is None:
-        return
-    object.__setattr__(sub, attr, SecretStr(value))
-
 
 async def _apply_secret_updates(
     ctx: AppContext, updates: dict[str, Any],
 ) -> set[str]:
-    """Apply secret writes (keyring semantics) and mirror them onto ``ctx.config``.
+    """Apply secret writes (keyring semantics) and refresh ``ctx.config``.
 
     Uniform semantics for every path in ``updates`` (each MUST be a
     ``config_policy.SECRET_PATHS`` member): a non-empty string other than
     ``"***"`` sets the secret; ``""`` or ``"***"`` (the GET mask) is a
-    no-op; ``None`` deletes it. Reused by Task 11's rewritten PUT handler.
+    no-op; ``None`` deletes it. When any secret actually changed, the
+    config is rebuilt through the layered service so ``ctx.config``
+    re-hydrates from the secret store instead of being mutated in place.
 
     Args:
-        ctx: App context — reads/writes ``ctx.secret_store`` and mirrors
-            onto ``ctx.config``.
+        ctx: App context — reads/writes ``ctx.secret_store`` and rebuilds
+            ``ctx.config`` via ``ctx.config_service``.
         updates: Mapping of dotted secret path -> raw request value.
 
     Returns:
@@ -836,14 +446,12 @@ async def _apply_secret_updates(
     changed: set[str] = set()
     if ctx.secret_store is None:
         return changed
-    cfg = ctx.config
     for path, raw in updates.items():
         assert is_secret_path(path), f"_apply_secret_updates: not a secret path: {path}"
         if raw is None:
             if ctx.secret_store.cached().get(path):
                 await ctx.secret_store.delete(path)
                 changed.add(path)
-            _mirror_secret_to_config(cfg, path, "")
             continue
         value = str(raw).strip()
         if not value or value == "***":
@@ -853,7 +461,8 @@ async def _apply_secret_updates(
         if value != ctx.secret_store.cached().get(path):
             await ctx.secret_store.set(path, value)
             changed.add(path)
-        _mirror_secret_to_config(cfg, path, value)
+    if changed and ctx.config_service is not None:
+        ctx.config = await ctx.config_service.rebuild()
     return changed
 
 

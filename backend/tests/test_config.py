@@ -286,6 +286,60 @@ async def test_email_password_lands_in_secret_store(client, app) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PUT /config rewritten on the unified engine (Task 11)
+# ---------------------------------------------------------------------------
+
+
+async def test_unknown_path_returns_400_with_the_paths(client) -> None:
+    resp = await client.put(
+        "/api/config", json={"llm": {"bogus_key": 1}, "nonsense": {"x": 2}},
+    )
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert "llm.bogus_key" in str(detail)
+    assert "nonsense.x" in str(detail)
+
+
+async def test_invalid_value_returns_422(client) -> None:
+    resp = await client.put("/api/config", json={"llm": {"temperature": 99}})
+    assert resp.status_code == 422
+
+
+async def test_put_persists_only_sent_paths(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.put("/api/config", json={"ui": {"theme": "light"}})
+    assert resp.status_code == 200
+    prefs = await ctx.preferences_store.load()
+    assert prefs == {"ui": {"theme": "light"}}
+
+
+async def test_patch_persona_does_not_clobber_preferences(client, app) -> None:
+    """Il test di regressione split-brain: oggi sarebbe rosso su main."""
+    ctx = app.state.context
+    seed = await client.put(
+        "/api/config", json={"llm": {"provider": "openrouter"}},
+    )
+    assert seed.status_code == 200
+    patch = await client.patch(
+        "/api/config",
+        json={"path": "agent.prompts.persona", "value": "Sii conciso."},
+    )
+    assert patch.status_code == 200
+    # la resolved config conserva la preferenza DB dopo il rebuild da PATCH
+    assert ctx.config.llm.provider == "openrouter"
+
+
+async def test_patch_defaults_to_preferences_layer(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.patch(
+        "/api/config", json={"path": "ui.theme", "value": "light"},
+    )
+    assert resp.status_code == 200
+    prefs = await ctx.preferences_store.load()
+    assert prefs["ui"]["theme"] == "light"
+
+
+# ---------------------------------------------------------------------------
 # Declarative field constraints (Task 8) — replace hand-rolled route checks
 # ---------------------------------------------------------------------------
 

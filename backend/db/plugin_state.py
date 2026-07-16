@@ -3,7 +3,7 @@
 Provides a thin async repository over the ``plugin_states`` table so
 that plugin enable/disable toggles survive application restarts.
 
-Usage pattern (mirrors PreferencesService):
+Usage pattern (mirrors PreferencesLayerStore):
 
     repo = PluginStateRepository(ctx.db)
     states = await repo.get_all()          # {name: enabled, ...}

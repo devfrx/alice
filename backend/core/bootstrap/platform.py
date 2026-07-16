@@ -104,7 +104,6 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
 
     preferences_store = PreferencesLayerStore(session_factory)
     ctx.preferences_store = preferences_store
-    ctx.preferences_service = preferences_store  # legacy alias, dies in Task 11
 
     if not testing:
         from backend.services.config_migration import run_secret_migrations
@@ -112,34 +111,33 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
         try:
             # 1. Load prefs ONCE for the migration's username source (the row
             #    may exist only in the DB, not in YAML).
-            prefs = await preferences_store.load_all()
+            prefs = await preferences_store.load()
             email_username = str(
                 prefs.get("email", {}).get("username", "") or config.email.username
             )
 
-            # 2. Migrate legacy secrets (DB rows / YAML / legacy keyring name).
+            # 2. Migrate legacy secrets (DB rows / YAML / legacy keyring name)
+            #    BEFORE the preferences layer below loads, so no stale
+            #    secret/dead rows leak into it.
             await run_secret_migrations(
                 secret_store, session_factory, config_service,
                 email_username=email_username,
             )
-
-            # 3. Load the preferences layer AND rebuild (replaces the bare
-            #    ``rebuild()``) so migrated+pruned rows are what the layer
-            #    sees, and future writes to the PREFERENCES layer persist
-            #    through this same store.
-            ctx.config = await config_service.load_preferences_layer(preferences_store)
-            config = ctx.config
-
-            # 4. RELOAD prefs (migration pruned secret/dead rows: the reloaded
-            #    dict can no longer smear a raw string over a SecretStr field)
-            #    and apply the legacy overlay onto the NEW resolved object.
-            #    Double application of identical values is harmless now that
-            #    the preferences layer and this overlay hold the same data;
-            #    the overlay dies in Task 11.
-            prefs = await preferences_store.load_all()
-            preferences_store.apply_to_config(config, prefs)
         except Exception as exc:
-            logger.warning("Failed to load persisted preferences: {}", exc)
+            logger.warning("Failed to migrate legacy secrets: {}", exc)
+
+    # 3. Load the preferences layer AND rebuild (replaces the bare
+    #    ``rebuild()``) so persisted rows are what the layer sees, and
+    #    future writes to the PREFERENCES layer persist through this same
+    #    store. The layer IS the source of truth now — no separate overlay
+    #    onto the resolved config. Runs unconditionally (including under
+    #    ``testing``) so ``ctx.config_service`` always knows its store
+    #    before any PUT/PATCH write lands on the preferences layer.
+    try:
+        ctx.config = await config_service.load_preferences_layer(preferences_store)
+        config = ctx.config
+    except Exception as exc:
+        logger.warning("Failed to load the preferences layer: {}", exc)
 
     # -- Restore persisted plugin toggle states -----------------------------
     from backend.db.plugin_state import PluginStateRepository

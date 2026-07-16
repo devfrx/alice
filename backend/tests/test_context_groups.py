@@ -99,7 +99,7 @@ class TestFlatDelegation:
         group_of.update(dict.fromkeys((
             "event_bus", "config_service", "ws_connection_manager",
             "plugin_manager", "tool_registry", "orchestrator",
-            "plugin_state_repo", "preferences_service", "email_service",
+            "plugin_state_repo", "email_service",
             "plugin_local_state", "background_task_service",
             "attention_service", "trigger_service",
             "secret_store", "preferences_store",

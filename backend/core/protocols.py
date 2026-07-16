@@ -12,7 +12,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from backend.core.plugin_models import (
     ConnectionStatus,
@@ -20,10 +20,6 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
-
-if TYPE_CHECKING:
-    from backend.core.config import AliceConfig
-
 
 # ---------------------------------------------------------------------------
 # LLM
@@ -448,9 +444,10 @@ class PreferencesServiceProtocol(Protocol):
     """Protocol for the ``preferences`` config-layer store.
 
     Mirrors :class:`backend.services.preferences_service.
-    PreferencesLayerStore`: the current store API (``load``/``save_paths``/
-    ``delete_paths``) plus the legacy shims still called by ``config.py``'s
-    PUT handler and ``bootstrap/platform.py`` until Task 11 removes them.
+    PreferencesLayerStore`: ``load``/``save_paths``/``delete_paths``/
+    ``delete_all`` — the DB-backed store's current API, consumed by
+    :class:`~backend.services.config_service.LayeredConfigService` (writes)
+    and the settings routes (bulk read/reset).
     """
 
     async def load(self) -> dict[str, Any]:
@@ -463,36 +460,6 @@ class PreferencesServiceProtocol(Protocol):
 
     async def delete_paths(self, paths: Iterable[str]) -> int:
         """Delete the given dotted paths; returns the number removed."""
-        ...
-
-    # -- Legacy shims (removed in Task 11) --------------------------------
-
-    async def load_all(self) -> dict[str, Any]:
-        """Load all stored preferences (legacy alias for ``load``)."""
-        ...
-
-    def apply_to_config(
-        self, config: AliceConfig, prefs: dict[str, Any],
-    ) -> None:
-        """Overlay persisted preferences onto config."""
-        ...
-
-    async def save_preference(
-        self, key: str, value: Any,
-    ) -> None:
-        """Save a single preference."""
-        ...
-
-    async def save_section(
-        self, section: str, data: dict[str, Any],
-    ) -> None:
-        """Persist all keys in a section."""
-        ...
-
-    async def persist_from_update(
-        self, body: dict[str, Any],
-    ) -> None:
-        """Extract and persist preferences from update."""
         ...
 
     async def delete_all(self) -> int:
@@ -598,7 +565,6 @@ class MemoryServiceProtocol(Protocol):
 from backend.services.knowledge.protocol import (  # noqa: E402
     KnowledgeServiceProtocol as KnowledgeServiceProtocol,
 )
-
 
 # ---------------------------------------------------------------------------
 # Email service

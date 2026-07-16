@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 CheckKind = Literal[
     "file_exists",
@@ -31,12 +31,16 @@ Domain = Literal[
 class SandboxFile(BaseModel):
     """Un file da creare nella sandbox prima del turno."""
 
+    model_config = ConfigDict(extra="forbid")
+
     path: str
     content: str = ""
 
 
 class ScenarioSetup(BaseModel):
     """Preparazione dell'ambiente per uno scenario."""
+
+    model_config = ConfigDict(extra="forbid")
 
     sandbox: list[SandboxFile] = Field(default_factory=list)
     permission_mode: str = "auto_edits"
@@ -45,11 +49,15 @@ class ScenarioSetup(BaseModel):
 class BudgetSpec(BaseModel):
     """Budget wall-clock dello scenario."""
 
+    model_config = ConfigDict(extra="forbid")
+
     max_seconds: float = Field(default=180.0, gt=0)
 
 
 class CheckSpec(BaseModel):
     """Un check deterministico. I campi usati dipendono da ``kind``."""
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: CheckKind
     path: str | None = None
@@ -62,11 +70,15 @@ class CheckSpec(BaseModel):
 class JudgeSpec(BaseModel):
     """Criteri qualitativi valutati dal judge LLM (misura secondaria)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     criteria: list[str] = Field(min_length=1)
 
 
 class Scenario(BaseModel):
     """Uno scenario agentico completo (un file YAML)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
     title: str
@@ -109,7 +121,7 @@ class ScenarioResult(BaseModel):
     """Esito completo di uno scenario."""
 
     scenario_id: str
-    domain: str
+    domain: Domain
     passed: bool
     checks: list[CheckResult] = Field(default_factory=list)
     judge: list[JudgeVerdict] = Field(default_factory=list)

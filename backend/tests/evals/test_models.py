@@ -7,7 +7,7 @@ from backend.evals.models import CheckSpec, Scenario
 from pydantic import ValidationError
 
 
-def _minimal_scenario_data() -> dict:
+def _minimal_scenario_data() -> dict[str, object]:
     return {
         "id": "fs-demo-01",
         "title": "Demo",
@@ -42,3 +42,10 @@ def test_scenario_rejects_unknown_domain() -> None:
 def test_check_spec_rejects_unknown_kind() -> None:
     with pytest.raises(ValidationError):
         CheckSpec.model_validate({"kind": "boh"})
+
+
+def test_scenario_rejects_unknown_fields() -> None:
+    data = _minimal_scenario_data()
+    data["cheks"] = []  # typo intenzionale
+    with pytest.raises(ValidationError):
+        Scenario.model_validate(data)

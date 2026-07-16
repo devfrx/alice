@@ -106,23 +106,34 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     ctx.preferences_service = preferences_service
 
     if not testing:
+        from backend.services.config_migration import run_secret_migrations
+
         try:
+            # 1. Load prefs ONCE for the migration's username source (the row
+            #    may exist only in the DB, not in YAML).
+            prefs = await preferences_service.load_all()
+            email_username = str(
+                prefs.get("email", {}).get("username", "") or config.email.username
+            )
+
+            # 2. Migrate legacy secrets (DB rows / YAML / legacy keyring name).
+            await run_secret_migrations(
+                secret_store, session_factory, config_service,
+                email_username=email_username,
+            )
+
+            # 3. Rebuild AFTER migration so hydration sees the migrated secrets.
+            ctx.config = await config_service.rebuild()
+            config = ctx.config
+
+            # 4. RELOAD prefs (migration pruned secret/dead rows: the reloaded
+            #    dict can no longer smear a raw string over a SecretStr field)
+            #    and apply the legacy overlay onto the NEW resolved object.
+            #    This ordering dies with the preferences layer (Task 7/11).
             prefs = await preferences_service.load_all()
             preferences_service.apply_to_config(config, prefs)
         except Exception as exc:
             logger.warning("Failed to load persisted preferences: {}", exc)
-
-        from backend.services.config_migration import run_secret_migrations
-
-        try:
-            await run_secret_migrations(
-                secret_store, session_factory, config_service,
-                email_username=config.email.username,
-            )
-            ctx.config = await config_service.rebuild()
-            config = ctx.config
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Secret migration failed: {}", exc)
 
     # -- Restore persisted plugin toggle states -----------------------------
     from backend.db.plugin_state import PluginStateRepository

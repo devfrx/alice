@@ -153,3 +153,14 @@ def test_main_list_dispatches_to_cmd_list(monkeypatch: pytest.MonkeyPatch) -> No
     """
     monkeypatch.setattr("backend.evals.cli.load_scenarios", lambda *a, **k: [])
     assert main(["list"]) == 0
+
+
+def test_main_list_survives_narrow_console_encoding(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """main() non deve crashare quando stdout non supporta UTF-8 (cp1252)."""
+    monkeypatch.setattr(
+        "backend.evals.cli.load_scenarios",
+        lambda *a, **k: [],
+    )
+    assert main(["list"]) == 0

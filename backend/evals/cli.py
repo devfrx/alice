@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import os
 import sys
 from datetime import UTC, datetime
@@ -119,6 +120,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point della CLI."""
+    # I titoli degli scenari contengono Unicode (→, accenti): su console
+    # Windows cp1252 print() crasherebbe — forza UTF-8 quando possibile.
+    for stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(Exception):
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     args = build_parser().parse_args(argv)
     if args.command == "list":
         return _cmd_list()

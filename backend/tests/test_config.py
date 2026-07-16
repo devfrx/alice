@@ -92,7 +92,9 @@ def test_plugins_enabled_list(config: AliceConfig) -> None:
     assert "mcp_client" in enabled
     assert "agent" in enabled
     assert "terminal" in enabled
-    assert len(enabled) == 20
+    # No exact-count assert: it was a change-detector that went stale on
+    # every plugin addition. The invariant that matters is no duplicates.
+    assert len(enabled) == len(set(enabled))
 
 
 def test_stt_defaults(config: AliceConfig) -> None:

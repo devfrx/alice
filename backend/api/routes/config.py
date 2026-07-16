@@ -15,7 +15,7 @@ from backend.api.routes.config_reactions import (
     diff_paths,
 )
 from backend.api.routes.models import serialise_model
-from backend.core.config import KNOWN_MODELS
+from backend.core.config import _REMOVED_LEGACY_PATHS, KNOWN_MODELS
 from backend.core.context import AppContext
 from backend.services.config_policy import is_preference_writable, is_secret_path
 from backend.services.config_service import ConfigLayer
@@ -344,7 +344,14 @@ async def get_config(request: Request) -> dict[str, Any]:
 
 
 def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
-    """Flatten a nested update body into dotted paths (legacy aliases folded)."""
+    """Flatten a nested update body into dotted paths (legacy aliases folded).
+
+    Removed-legacy paths (``config.py``'s ``_REMOVED_LEGACY_PATHS`` — keys the
+    system itself deprecated, e.g. ``email.use_keyring``) are dropped here
+    rather than rejected: an older frontend build may still send them in every
+    PUT body, and treating them as an unknown/non-writable path would 400 the
+    whole request, blocking unrelated fields from saving.
+    """
     flat: dict[str, Any] = {}
     for section, updates in body.items():
         if not isinstance(updates, dict):
@@ -356,6 +363,11 @@ def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
         flat["permissions.confirmations_enabled"] = flat.pop(
             "pc_automation.confirmations_enabled"
         )
+    dropped = [path for path in flat if path in _REMOVED_LEGACY_PATHS]
+    if dropped:
+        for path in dropped:
+            flat.pop(path)
+        logger.debug("PUT /api/config: dropped removed-legacy paths {}", sorted(dropped))
     return flat
 
 

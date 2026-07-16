@@ -285,6 +285,23 @@ async def test_email_password_lands_in_secret_store(client, app) -> None:
     assert "use_keyring" not in resp.json()["email"]
 
 
+async def test_removed_legacy_key_is_dropped_not_rejected(client) -> None:
+    """A removed-legacy path (Task 11 review Finding 1) must not 400 the PUT.
+
+    The FE cleanup for ``email.use_keyring`` happens in a later task; until
+    then every auto-save PUT still sends it. A removed-legacy key is a
+    distinct class from an unknown path — the system itself deprecated it —
+    so it is silently dropped instead of rejecting the whole request.
+    """
+    resp = await client.put(
+        "/api/config",
+        json={"email": {"use_keyring": False, "imap_port": 995}, "ui": {"theme": "light"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["email"]["imap_port"] == 995
+    assert resp.json()["ui"]["theme"] == "light"
+
+
 # ---------------------------------------------------------------------------
 # PUT /config rewritten on the unified engine (Task 11)
 # ---------------------------------------------------------------------------
@@ -396,3 +413,34 @@ def test_provider_is_normalized_lowercase() -> None:
 def test_openrouter_favorites_capped_at_200() -> None:
     with pytest.raises(ValidationError):
         LLMConfig(openrouter_favorites=[f"m{i}" for i in range(201)])
+
+
+# ---------------------------------------------------------------------------
+# Strip/coercion normalizations restored at the model layer (Task 11 review
+# Finding 2) — the old imperative PUT handler used to strip/coerce string
+# inputs before storing them; now every ``set_many`` call runs full model
+# validation, so the models themselves must canonicalize.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("model_cls", "field", "raw", "expected"),
+    [
+        (LLMConfig, "model", " my-model ", "my-model"),
+        (LLMConfig, "user_preferred_name", None, ""),
+        (LLMConfig, "user_preferred_name", " Jays ", "Jays"),
+        (LLMConfig, "openrouter_model", None, ""),
+        (EmailConfig, "imap_host", "imap.gmail.com ", "imap.gmail.com"),
+        (EmailConfig, "username", " u@example.com ", "u@example.com"),
+        (VoiceConfig, "wake_word", " alice ", "alice"),
+        (UIConfig, "language", " it ", "it"),
+        (TTSConfig, "voice", " path/to/voice ", "path/to/voice"),
+    ],
+)
+def test_string_fields_are_normalized(model_cls, field, raw, expected) -> None:
+    assert getattr(model_cls(**{field: raw}), field) == expected
+
+
+def test_whitespace_only_model_rejected() -> None:
+    with pytest.raises(ValidationError):
+        LLMConfig(model="   ")

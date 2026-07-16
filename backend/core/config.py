@@ -34,6 +34,18 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _strip_str(v: object) -> object:
+    """Strip surrounding whitespace from ``v`` if it is a string, else pass through.
+
+    Shared ``mode="before"`` validator body for the string-normalization
+    findings of the T11 review: the old imperative PUT handler used to
+    strip/coerce inputs before storing them; now that every ``set_many``
+    call runs full model validation, each affected field must canonicalize
+    itself.
+    """
+    return v.strip() if isinstance(v, str) else v
+
+
 # ---------------------------------------------------------------------------
 # Model catalog
 # ---------------------------------------------------------------------------
@@ -228,6 +240,20 @@ class LLMConfig(BaseSettings):
             raise ValueError("provider must be one of: lmstudio, ollama, openrouter")
         return prov
 
+    @field_validator("model", mode="before")
+    @classmethod
+    def _strip_model(cls, v: object) -> object:
+        """Strip surrounding whitespace before the ``min_length=1`` check runs."""
+        return _strip_str(v)
+
+    @field_validator("user_preferred_name", "openrouter_model", mode="before")
+    @classmethod
+    def _normalize_optional_name(cls, v: object) -> object:
+        """Treat ``None`` as unset (``""``) and strip whitespace otherwise."""
+        if v is None:
+            return ""
+        return _strip_str(v)
+
     @field_validator("max_tokens")
     @classmethod
     def _validate_max_tokens(cls, v: int) -> int:
@@ -309,6 +335,15 @@ class TTSConfig(BaseSettings):
     kokoro_language: str = Field(default="it", min_length=1, max_length=10)
     """Language code for Kokoro (e.g. 'it', 'en', 'fr')."""
 
+    @field_validator(
+        "voice", "kokoro_model", "kokoro_voices", "kokoro_voice", "kokoro_language",
+        mode="before",
+    )
+    @classmethod
+    def _strip_tts_fields(cls, v: object) -> object:
+        """Strip surrounding whitespace before ``min_length`` checks run."""
+        return _strip_str(v)
+
 
 class DatabaseConfig(BaseSettings):
     """Database configuration."""
@@ -360,6 +395,12 @@ class VoiceConfig(BaseSettings):
     silence_timeout_ms: int = 1500
     auto_tts_response: bool = True
     """Automatically speak LLM responses when voice mode is active."""
+
+    @field_validator("wake_word", mode="before")
+    @classmethod
+    def _strip_wake_word(cls, v: object) -> object:
+        """Strip surrounding whitespace so whitespace-only input is rejected."""
+        return _strip_str(v)
 
 
 class PcAutomationConfig(BaseSettings):
@@ -550,6 +591,12 @@ class UIConfig(BaseSettings):
     theme: Literal["dark", "light"] = "dark"
     global_hotkey: str = "Ctrl+Shift+O"
     language: str = Field(default="it", min_length=1, max_length=10)
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def _strip_language(cls, v: object) -> object:
+        """Strip surrounding whitespace before the ``min_length`` check runs."""
+        return _strip_str(v)
 
 
 class CalendarConfig(BaseSettings):
@@ -832,6 +879,12 @@ class EmailConfig(BaseSettings):
     imap_idle_enabled: bool = True
     connection_timeout_s: int = 30
     archive_folder: str = Field(default="Archive", max_length=255)
+
+    @field_validator("imap_host", "smtp_host", "username", "archive_folder", mode="before")
+    @classmethod
+    def _strip_email_fields(cls, v: object) -> object:
+        """Strip surrounding whitespace from user-typed host/name fields."""
+        return _strip_str(v)
 
 
 class TrellisServiceConfig(BaseSettings):
@@ -1275,6 +1328,15 @@ _REMOVED_LEGACY_KEYS: tuple[tuple[str, str], ...] = (
     ("pc_automation", "enabled"),
     ("notifications", "sound_enabled"),
     ("email", "use_keyring"),
+)
+
+# Dotted-path view of _REMOVED_LEGACY_KEYS above. A removed-legacy key is a
+# distinct class from an unknown/non-writable path: the system itself
+# deprecated it, so it must be silently dropped rather than rejected.
+# Consumed by ``api/routes/config.py``'s PUT handler, which flattens nested
+# update bodies into dotted paths before partitioning them.
+_REMOVED_LEGACY_PATHS: frozenset[str] = frozenset(
+    f"{section}.{key}" for section, key in _REMOVED_LEGACY_KEYS
 )
 
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from backend.evals.cli import build_parser, main, resolve_api_key
+from backend.evals.loader import ScenarioLoadError
 from backend.evals.models import CheckSpec, RunReport, Scenario
 
 
@@ -164,3 +165,14 @@ def test_main_list_survives_narrow_console_encoding(
         lambda *a, **k: [],
     )
     assert main(["list"]) == 0
+
+
+def test_cmd_list_invalid_scenario_exits_cleanly(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    def _boom(*a: object, **k: object) -> list[object]:
+        raise ScenarioLoadError("rotto.yaml: schema invalido")
+
+    monkeypatch.setattr("backend.evals.cli.load_scenarios", _boom)
+    assert main(["list"]) == 2
+    assert "rotto.yaml" in capsys.readouterr().err

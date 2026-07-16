@@ -13,7 +13,7 @@ from pathlib import Path
 import keyring
 from loguru import logger
 
-from backend.evals.loader import SCENARIOS_DIR, load_scenarios
+from backend.evals.loader import SCENARIOS_DIR, ScenarioLoadError, load_scenarios
 from backend.evals.report import load_report, render_text, save_report
 from backend.evals.runner import PINNED_MODEL, run_suite
 
@@ -57,7 +57,12 @@ def resolve_api_key() -> str | None:
 
 
 def _cmd_list() -> int:
-    for scenario in load_scenarios(SCENARIOS_DIR):
+    try:
+        scenarios = load_scenarios(SCENARIOS_DIR)
+    except ScenarioLoadError as exc:
+        print(f"ERRORE: {exc}", file=sys.stderr)
+        return 2
+    for scenario in scenarios:
         print(f"{scenario.id:28} {scenario.domain:12} {scenario.title}")
     return 0
 
@@ -90,7 +95,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
     os.environ["ALICE_LLM__PROVIDER"] = "openrouter"
     os.environ["ALICE_LLM__OPENROUTER_MODEL"] = PINNED_MODEL
 
-    scenarios = load_scenarios(SCENARIOS_DIR, filter_substring=args.filter)
+    try:
+        scenarios = load_scenarios(SCENARIOS_DIR, filter_substring=args.filter)
+    except ScenarioLoadError as exc:
+        print(f"ERRORE: {exc}", file=sys.stderr)
+        return 2
     if not scenarios:
         print("Nessuno scenario selezionato.", file=sys.stderr)
         return 2

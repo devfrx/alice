@@ -23,7 +23,9 @@ def summarize_trace(
         cost: ``TurnResult.cost`` del turno (crediti provider).
 
     Returns:
-        La sintesi numerica della trace.
+        La sintesi numerica della trace. I token sono sommati su tutti gli
+        step del turno: ogni frame ``turn.usage`` è uno snapshot per-step
+        (uno per iterazione del tool loop), non un cumulativo.
     """
     steps = 0
     tool_calls: list[str] = []
@@ -36,8 +38,8 @@ def summarize_trace(
         elif etype == "tool.call":
             tool_calls.append(str(event.get("tool_name", "")))
         elif etype == "turn.usage":
-            input_tokens = int(event.get("input_tokens", 0) or 0)
-            output_tokens = int(event.get("output_tokens", 0) or 0)
+            input_tokens += int(event.get("input_tokens", 0) or 0)
+            output_tokens += int(event.get("output_tokens", 0) or 0)
     return TraceSummary(
         steps=steps,
         tool_calls=tool_calls,

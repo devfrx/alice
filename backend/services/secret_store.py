@@ -60,7 +60,8 @@ class KeyringSecretStore:
                 # fragile under PyInstaller.
                 from keyring.backends.Windows import WinVaultKeyring
 
-                _keyring.set_keyring(WinVaultKeyring())  # type: ignore[no-untyped-call]  # keyring stub gap
+                # type-ignore: keyring stub gap on set_keyring
+                _keyring.set_keyring(WinVaultKeyring())  # type: ignore[no-untyped-call]
             resolved = _keyring
         self._keyring: Any = resolved
         self._cache: dict[str, str] = {}

@@ -346,3 +346,59 @@ async def test_api_disabled_probe_returns_fallback_dims() -> None:
         api_enabled=False,
     )
     assert await client.probe_dimensions() == 384
+
+
+@pytest.mark.asyncio
+async def test_api_disabled_dim_mismatch_error_explains_state() -> None:
+    """Con api_enabled=False e dim != 384 l'errore spiega la combinazione.
+
+    Il messaggio storico ("Embedding API unreachable") è fuorviante: l'API
+    non è irraggiungibile, è disabilitata di proposito (provider cloud).
+    """
+    from backend.services.embedding_client import EmbeddingClient
+
+    client = EmbeddingClient(
+        base_url="http://localhost:1234",
+        model="text-embedding-x",
+        dimensions=1024,
+        fallback_enabled=True,
+        api_enabled=False,
+    )
+
+    with pytest.raises(RuntimeError, match="embedding API is disabled") as excinfo:
+        await client.encode("ciao")
+    assert "unreachable" not in str(excinfo.value)
+    assert "384" in str(excinfo.value)
+
+    with pytest.raises(RuntimeError, match="embedding API is disabled"):
+        await client.encode_batch(["a", "b"])
+
+
+def test_has_active_backend() -> None:
+    """has_active_backend riflette la disponibilità di almeno un backend."""
+    from backend.services.embedding_client import EmbeddingClient
+
+    with patch("backend.services.embedding_client.httpx.AsyncClient"):
+        # API attiva: sempre True, a prescindere dal fallback.
+        assert EmbeddingClient(
+            base_url=BASE_URL, model=MODEL, dimensions=1024,
+            fallback_enabled=False, api_enabled=True,
+        ).has_active_backend
+
+        # API disabilitata ma fastembed attivo (dim == 384): True.
+        assert EmbeddingClient(
+            base_url=BASE_URL, model=MODEL, dimensions=DIMS,
+            fallback_enabled=True, api_enabled=False,
+        ).has_active_backend
+
+        # API disabilitata + dim mismatch: nessun backend.
+        assert not EmbeddingClient(
+            base_url=BASE_URL, model=MODEL, dimensions=1024,
+            fallback_enabled=True, api_enabled=False,
+        ).has_active_backend
+
+        # API disabilitata + fallback esplicitamente spento: nessun backend.
+        assert not EmbeddingClient(
+            base_url=BASE_URL, model=MODEL, dimensions=DIMS,
+            fallback_enabled=False, api_enabled=False,
+        ).has_active_backend

@@ -300,6 +300,17 @@ class EmbeddingClient:
     def dimensions(self) -> int:
         return self._openai.dimensions
 
+    @property
+    def has_active_backend(self) -> bool:
+        """True when at least one backend can actually serve encode calls.
+
+        False only in the degraded combination "API disabled (cloud LLM
+        provider) + fastembed inactive" — every encode/encode_batch would
+        raise.  Callers (bootstrap) use this to warn loudly instead of
+        letting memory fail silently at each operation.
+        """
+        return self._api_enabled or self._fastembed is not None
+
     async def probe_dimensions(self) -> int:
         """Discover the actual embedding dimensionality by making one test call.
 
@@ -387,20 +398,36 @@ class EmbeddingClient:
             logger.warning("Embedding API unreachable, falling back to fastembed")
             return await self._fallback_encode_batch(texts)
 
+    def _fallback_unavailable_error(self) -> RuntimeError:
+        """Build the error raised when fastembed is needed but inactive.
+
+        The wording depends on why fastembed was reached: with the API
+        deliberately disabled (cloud LLM provider) "unreachable" would be
+        misleading — there was never an API to reach.
+        """
+        if not self._api_enabled:
+            return RuntimeError(
+                "No embedding backend available: the embedding API is disabled "
+                "(cloud LLM provider keeps embeddings local) and the fastembed "
+                "fallback is inactive. Set qdrant.embedding_dim to "
+                f"{_FASTEMBED_DEFAULT_DIMS} (fastembed's default model) and "
+                "enable qdrant.embedding_fallback, or switch to a local LLM "
+                "provider."
+            )
+        return RuntimeError(
+            "Embedding API unreachable and fastembed fallback is disabled"
+        )
+
     async def _fallback_encode(self, text: str) -> list[float]:
         """Attempt single-text encoding via fastembed."""
         if self._fastembed is None:
-            raise RuntimeError(
-                "Embedding API unreachable and fastembed fallback is disabled"
-            )
+            raise self._fallback_unavailable_error()
         return await self._fastembed.encode(text)
 
     async def _fallback_encode_batch(self, texts: list[str]) -> list[list[float]]:
         """Attempt batch encoding via fastembed."""
         if self._fastembed is None:
-            raise RuntimeError(
-                "Embedding API unreachable and fastembed fallback is disabled"
-            )
+            raise self._fallback_unavailable_error()
         return await self._fastembed.encode_batch(texts)
 
     async def close(self) -> None:

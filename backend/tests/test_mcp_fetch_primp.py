@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 # --- Module loader --------------------------------------------------------
 # The script lives outside the ``backend`` package and depends on the
 # optional ``primp`` extra. Loading it via spec lets us skip cleanly when
@@ -23,9 +22,9 @@ def _load_module():
     if not _TOOL_PATH.exists():  # pragma: no cover - layout guard
         pytest.skip("mcp_fetch_primp.py not present")
     try:
-        import primp  # noqa: F401
         import bs4  # noqa: F401
         import mcp  # noqa: F401
+        import primp  # noqa: F401
     except Exception:
         pytest.skip("optional MCP/primp deps not installed")
     spec = importlib.util.spec_from_file_location("mcp_fetch_primp", _TOOL_PATH)
@@ -111,9 +110,8 @@ async def test_redirect_to_private_ip_is_blocked(mod):
     )
 
     fake_client = SimpleNamespace(get=lambda _url: redirecting)
-    with patch.object(mod, "_primp", fake_client):
-        with pytest.raises(ValueError):
-            await mod._fetch_with_redirect_validation("https://example.com/")
+    with patch.object(mod, "_primp", fake_client), pytest.raises(ValueError):
+        await mod._fetch_with_redirect_validation("https://example.com/")
 
 
 @pytest.mark.asyncio
@@ -130,9 +128,8 @@ async def test_redirect_loop_capped(mod):
 
     fake_client = SimpleNamespace(get=lambda _url: response)
     with patch.object(mod, "_validate_url", side_effect=fake_validate), \
-         patch.object(mod, "_primp", fake_client):
-        with pytest.raises(ValueError):
-            await mod._fetch_with_redirect_validation("https://example.com/")
+         patch.object(mod, "_primp", fake_client), pytest.raises(ValueError):
+        await mod._fetch_with_redirect_validation("https://example.com/")
 
 
 # --- call_tool argument validation ----------------------------------------

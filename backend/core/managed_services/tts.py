@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from backend.core.service_orchestrator import (
     ManagedService,
@@ -45,7 +45,7 @@ class TTSManagedService(ManagedService):
 
     async def health(self) -> ServiceHealth:
         ok = await self._service.health_check()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if ok:
             return ServiceHealth(
                 status="up",

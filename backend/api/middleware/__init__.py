@@ -1,4 +1,4 @@
-"""AL\CE — API middleware package."""
+r"""AL\CE — API middleware package."""
 
 from backend.api.middleware.exception_handler import UnhandledExceptionMiddleware
 from backend.api.middleware.origin_guard import OriginGuardMiddleware

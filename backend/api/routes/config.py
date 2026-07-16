@@ -361,7 +361,16 @@ async def get_config(request: Request) -> dict[str, Any]:
 
 
 def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
-    """Flatten a nested update body into dotted paths (legacy aliases folded).
+    """Flatten a nested update body into dotted LEAF paths (legacy aliases folded).
+
+    Recurses into nested dicts at every depth, so a deeper body (e.g.
+    ``{"agent": {"reflection": {"enabled": true}}}``) lands as leaf rows
+    (``agent.reflection.enabled``) in the preferences store instead of a
+    dict-valued row that would overlap dotted rows persisted for the same
+    subtree. PUT is therefore a per-leaf merge; subtree REPLACE semantics
+    stay available via PATCH, whose value is stored as-is. An empty dict
+    value flattens to nothing — a no-op, same effect the layer deep-merge
+    would have had.
 
     Removed-legacy paths (``config.py``'s ``_REMOVED_LEGACY_PATHS`` — keys the
     system itself deprecated, e.g. ``email.use_keyring``) are dropped here
@@ -370,11 +379,19 @@ def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
     whole request, blocking unrelated fields from saving.
     """
     flat: dict[str, Any] = {}
+
+    def _walk(prefix: str, node: dict[str, Any]) -> None:
+        for key, value in node.items():
+            path = f"{prefix}.{key}"
+            if isinstance(value, dict):
+                _walk(path, value)
+            else:
+                flat[path] = value
+
     for section, updates in body.items():
         if not isinstance(updates, dict):
             raise HTTPException(400, f"'{section}' must be a JSON object")
-        for key, value in updates.items():
-            flat[f"{section}.{key}"] = value
+        _walk(str(section), updates)
     # Historical alias — the UI still sends the pc_automation shape.
     if "pc_automation.confirmations_enabled" in flat:
         flat["permissions.confirmations_enabled"] = flat.pop(
@@ -422,9 +439,17 @@ async def update_config(request: Request) -> dict[str, Any]:
             400, f"Unknown or non-writable config paths: {sorted(rejected)}",
         )
 
-    old_config = ctx.config
+    # Pre-flight the secret half BEFORE any commit: a mixed body must not
+    # persist a valid secret while the preference half fails validation
+    # (or land preferences while the secret half 400s/503s).
+    if secret_updates:
+        if ctx.secret_store is None:
+            raise HTTPException(
+                503, "Secret store unavailable — secret values cannot be persisted",
+            )
+        _validate_secret_updates(secret_updates)
 
-    secret_changed = await _apply_secret_updates(ctx, secret_updates)
+    old_config = ctx.config
 
     if pref_updates:
         try:
@@ -441,6 +466,8 @@ async def update_config(request: Request) -> dict[str, Any]:
             raise HTTPException(400, str(exc)) from exc
         ctx.config = ctx.config_service.get_resolved()
 
+    secret_changed = await _apply_secret_updates(ctx, secret_updates)
+
     changed = diff_paths(
         old_config, ctx.config, set(pref_updates) | ALL_REACTIVE_PATHS,
     ) | secret_changed
@@ -450,6 +477,19 @@ async def update_config(request: Request) -> dict[str, Any]:
 
 
 _SECRET_MAX_LEN = 512
+
+
+def _validate_secret_updates(updates: dict[str, Any]) -> None:
+    """Reject invalid secret values before anything is committed.
+
+    Pure check (no store I/O) so ``update_config`` can validate the whole
+    mixed body — secrets AND preferences — before the first write lands.
+    """
+    for path, raw in updates.items():
+        if raw is None:
+            continue
+        if len(str(raw).strip()) > _SECRET_MAX_LEN:
+            raise HTTPException(400, f"{path} max {_SECRET_MAX_LEN} chars")
 
 
 async def _apply_secret_updates(
@@ -464,6 +504,11 @@ async def _apply_secret_updates(
     config is rebuilt through the layered service so ``ctx.config``
     re-hydrates from the secret store instead of being mutated in place.
 
+    The caller must have pre-flighted the batch — store present (503
+    otherwise) and values valid (``_validate_secret_updates``) — BEFORE
+    committing anything, so this apply step cannot fail a mixed request
+    halfway through.
+
     Args:
         ctx: App context — reads/writes ``ctx.secret_store`` and rebuilds
             ``ctx.config`` via ``ctx.config_service``.
@@ -473,22 +518,22 @@ async def _apply_secret_updates(
         The set of dotted paths whose stored value actually changed.
     """
     changed: set[str] = set()
-    if ctx.secret_store is None:
+    if not updates:
         return changed
+    store = ctx.secret_store
+    assert store is not None, "update_config pre-flights the store before any commit"
     for path, raw in updates.items():
         assert is_secret_path(path), f"_apply_secret_updates: not a secret path: {path}"
         if raw is None:
-            if ctx.secret_store.cached().get(path):
-                await ctx.secret_store.delete(path)
+            if store.cached().get(path):
+                await store.delete(path)
                 changed.add(path)
             continue
         value = str(raw).strip()
         if not value or value == "***":
             continue
-        if len(value) > _SECRET_MAX_LEN:
-            raise HTTPException(400, f"{path} max {_SECRET_MAX_LEN} chars")
-        if value != ctx.secret_store.cached().get(path):
-            await ctx.secret_store.set(path, value)
+        if value != store.cached().get(path):
+            await store.set(path, value)
             changed.add(path)
     if changed and ctx.config_service is not None:
         ctx.config = await ctx.config_service.rebuild()
@@ -557,9 +602,22 @@ async def sync_model(request: Request) -> dict[str, Any]:
         "vision", known.get("vision", False),
     )
 
-    object.__setattr__(cfg.llm, "model", loaded_key)
-    object.__setattr__(cfg.llm, "supports_thinking", supports_thinking)
-    object.__setattr__(cfg.llm, "supports_vision", supports_vision)
+    if ctx.config_service is None:
+        return {"synced": False, "reason": "config service unavailable"}
+
+    # Preferences layer, NOT runtime: a runtime override on llm.model would
+    # mask every later preferences write of the same path — and this is the
+    # same value the FE snapshot would persist on its next diff-save anyway.
+    # (The old in-place mutation was clobbered by the first config rebuild.)
+    await ctx.config_service.set_many(
+        {
+            "llm.model": loaded_key,
+            "llm.supports_thinking": supports_thinking,
+            "llm.supports_vision": supports_vision,
+        },
+        layer=ConfigLayer.PREFERENCES,
+    )
+    ctx.config = ctx.config_service.get_resolved()
 
     # Invalidate auto-model cache so the next chat request uses the new model.
     if ctx.llm_service is not None:

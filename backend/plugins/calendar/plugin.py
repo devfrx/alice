@@ -8,17 +8,18 @@ delete_event, and get_today_summary.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from dateutil import parser as dt_parser
 from dateutil.rrule import rrulestr
 from loguru import logger
 from sqlmodel import select
-from zoneinfo import ZoneInfo
 
 from backend.core.event_bus import AliceEvent
 from backend.core.plugin_base import BasePlugin
@@ -65,8 +66,8 @@ def _expand_recurring(
 
     def _utc(dt: datetime) -> datetime:
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
 
     result: list[CalendarEvent] = []
     for ev in events:
@@ -93,7 +94,7 @@ def _expand_recurring(
                 )
                 occurrences = occurrences[:_MAX_OCCURRENCES]
             for occ in occurrences:
-                occ_utc = occ.astimezone(timezone.utc)
+                occ_utc = occ.astimezone(UTC)
                 virtual = CalendarEvent(
                     id=ev.id,
                     title=ev.title,
@@ -173,20 +174,16 @@ class CalendarPlugin(BasePlugin):
         """Cancel the background reminder loop."""
         if self._reminder_task and not self._reminder_task.done():
             self._reminder_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._reminder_task
-            except asyncio.CancelledError:
-                pass
             self.logger.debug("Reminder loop stopped")
 
     async def cleanup(self) -> None:
         """Cancel the reminder task and release resources."""
         if self._reminder_task and not self._reminder_task.done():
             self._reminder_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._reminder_task
-            except asyncio.CancelledError:
-                pass
         self._fired_reminders.clear()
         await super().cleanup()
 
@@ -533,7 +530,7 @@ class CalendarPlugin(BasePlugin):
         else:
             range_start = now_local.replace(
                 hour=0, minute=0, second=0, microsecond=0,
-            ).astimezone(timezone.utc)
+            ).astimezone(UTC)
 
         if args.get("end_date"):
             range_end = self._parse_to_utc(args["end_date"])
@@ -696,7 +693,7 @@ class CalendarPlugin(BasePlugin):
         now_local = datetime.now(self._tz)
         day_start = now_local.replace(
             hour=0, minute=0, second=0, microsecond=0,
-        ).astimezone(timezone.utc)
+        ).astimezone(UTC)
         day_end = day_start + timedelta(days=1)
 
         stmt = (
@@ -771,7 +768,7 @@ class CalendarPlugin(BasePlugin):
         reminders that have already been fired (deduplication).
         Expands RRULE recurrence to check upcoming occurrences.
         """
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         horizon = now_utc + timedelta(hours=24)
 
         stmt = (
@@ -859,8 +856,8 @@ class CalendarPlugin(BasePlugin):
             A timezone-aware ``datetime`` in UTC.
         """
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
 
     def _parse_to_utc(self, value: str) -> datetime:
         """Parse an ISO 8601 string to a UTC-aware datetime.
@@ -877,4 +874,4 @@ class CalendarPlugin(BasePlugin):
         dt = dt_parser.parse(value)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=self._tz)
-        return dt.astimezone(timezone.utc)
+        return dt.astimezone(UTC)

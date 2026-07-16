@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 
 from backend.plugins.cad_generator.client import GenerationResult, TrellisClient
-
 
 # ---------------------------------------------------------------------------
 # Helpers

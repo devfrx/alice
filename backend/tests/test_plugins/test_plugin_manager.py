@@ -7,23 +7,21 @@ status reporting, and health checks.
 
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
-from backend.core.event_bus import EventBus, AliceEvent
+from backend.core.event_bus import AliceEvent, EventBus
 from backend.core.plugin_base import BasePlugin
+from backend.core.plugin_manager import PLUGIN_REGISTRY, PluginManager
 from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
     ToolResult,
 )
-from backend.core.plugin_manager import PLUGIN_REGISTRY, PluginManager
-
 
 # ===================================================================
 # Helpers — concrete mock plugins
@@ -622,7 +620,7 @@ class TestReloadPlugin:
         # Patch importlib.reload and sys.modules so reload succeeds
         with (
             patch("backend.core.plugin_manager.sys") as mock_sys,
-            patch("backend.core.plugin_manager.importlib") as mock_importlib,
+            patch("backend.core.plugin_manager.importlib"),
         ):
             mock_sys.modules.get.return_value = None
             PLUGIN_REGISTRY["stub"] = StubPlugin

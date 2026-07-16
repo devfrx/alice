@@ -20,7 +20,6 @@ from starlette.testclient import TestClient
 
 from backend.api.routes.chat import _filter_messages_by_active_versions
 
-
 # ---------------------------------------------------------------------------
 # Mock LLM helpers (same pattern as test_websocket.py)
 # ---------------------------------------------------------------------------
@@ -159,7 +158,9 @@ class TestFilterMessagesByActiveVersions:
         assert result[1]["content"] == "b1"
 
     def test_orphaned_group_excluded(self) -> None:
-        """When active_versions references an index that no message has, those messages are excluded."""
+        """When active_versions references an index that no message has,
+        those messages are excluded.
+        """
         gid = str(uuid.uuid4())
         msgs = [
             {"role": "user", "content": "unversioned"},

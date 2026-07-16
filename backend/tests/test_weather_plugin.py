@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -11,10 +11,9 @@ import pytest
 from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
+from backend.core.plugin_models import ConnectionStatus, ExecutionContext
 from backend.plugins.weather.client import WeatherClient, _weather_code_text
 from backend.plugins.weather.plugin import WeatherPlugin
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -224,7 +223,9 @@ class TestGetWeatherTool:
         assert result.success is True
         default_city = ctx.config.weather.default_city
         assert result.content["city"] == default_city
-        plugin._client.get_coordinates.assert_awaited_once_with(default_city, ctx.config.weather.lang)
+        plugin._client.get_coordinates.assert_awaited_once_with(
+            default_city, ctx.config.weather.lang,
+        )
         await plugin.cleanup()
 
     @pytest.mark.asyncio
@@ -497,7 +498,7 @@ class TestWeatherClient:
         client._http.get = AsyncMock(return_value=mock_resp)  # type: ignore[method-assign]
 
         # days=0 → clamped to 1
-        result = await client.get_forecast(41.89, 12.48, days=0)
+        await client.get_forecast(41.89, 12.48, days=0)
         call_params = client._http.get.call_args
         assert call_params.kwargs.get("params", {}).get("forecast_days") == 1
 

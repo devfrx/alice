@@ -7,9 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.plugin_models import ExecutionContext, ToolResult
+from backend.core.plugin_models import ExecutionContext
 from backend.plugins.email_assistant.plugin import EmailPlugin
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

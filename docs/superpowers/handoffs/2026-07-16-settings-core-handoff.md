@@ -90,24 +90,30 @@ handler in `config_reactions.py`); ogni task con suite mirate verdi.
 8. **Lockfile**: `npm install` di riparazione pota entry opzionali dal package-lock —
    ripristinare con `git checkout -- frontend/package-lock.json` se non intenzionale.
 
-## Ticket di follow-up (dalla review finale — NON bloccanti, da aprire)
+## Ticket di follow-up — TUTTI RISOLTI (audit 2026-07-16 sera, branch fix/settings-followups-lint-gate)
 
-- **I1**: overlay in-place `plugins.enabled` (`bootstrap/platform.py` + `api/routes/plugins.py`)
-  e `sync_model` (`config.py`) clobberati da OGNI rebuild (quindi da ogni PUT) — portarli nel
-  merge dei layer o sul layer `runtime`.
-- **Triage#1**: `ctx.secret_store is None` in `_apply_secret_updates` → 200 silenzioso senza
-  persistenza; meglio 503 esplicito (2 righe).
-- **Triage#4**: nel PUT misto, validare le pref PRIMA di committare i segreti (oggi un segreto
-  valido + pref invalida salva il segreto ma salta le reazioni fino alla prossima scrittura).
-- **M1**: `DELETE /settings/preferences` non ricarica il layer (una riga:
-  `load_preferences_layer`).
-- **M2**: body PUT a 3 livelli produce righe dict sovrapposte (documentare o rifiutare
-  valori-dict in `_flatten_update_body`).
+Dettaglio completo in `docs/superpowers/audits/2026-07-16-followups-audit.md`.
+
+- ~~I1~~ **RISOLTO** (`c8b58c0`): `sync_model` → layer preferences via `set_many` (non
+  runtime: maschererebbe le scritture preferences successive di `llm.model`);
+  `plugins.enabled` → layer runtime in bootstrap e toggle (la tabella `plugin_state` resta
+  l'unica fonte persistita). Niente più overlay in-place censiti.
+- ~~Triage#1~~ **RISOLTO** (`aeb4c34`): scrittura secreta con store assente → 503 esplicito,
+  pre-flight PRIMA di ogni commit.
+- ~~Triage#4~~ **RISOLTO** (`aeb4c34`): PUT misto all-or-nothing fino alla validazione —
+  pre-flight segreti (503/400) → `set_many` atomico (422) → apply segreti → reazioni.
+- ~~M1~~ **RISOLTO** (`2cbbdde`): il reset ricarica il layer e applica le reazioni; default
+  vivi senza riavvio.
+- ~~M2~~ **RISOLTO** (`889b36b`): semantica definita — PUT = merge per-foglia (flatten
+  ricorsivo), PATCH = replace del sottoalbero, `save_paths` pruna i discendenti (autoescape),
+  `load()` deterministico shallowest-first. NB: il rifiuto dei dict NON era percorribile
+  (il FE PATCHa `agent.prompts.tier_guidance` come dict con semantica replace).
 - Preesistenti già chippati — aggiornamento audit 2026-07-16: ~~guardia embedding dim≠384~~
   **risolto** (F3, `8657646`); ~~capability bleed fuzzy match~~ **risolto** (F4, `2b00667` —
   registry namespaced per provider, vedi handoff OpenRouter gotcha 5); ~~divergenza costo
-  live/persistito~~ **risolto** (`3368fe6`). Resta SOLO `test_plugins_enabled_list` stale
-  (riverificato rosso).
+  live/persistito~~ **risolto** (`3368fe6`); ~~`test_plugins_enabled_list` stale~~
+  **risolto** (`13a7bd0`, audit 2026-07-16 sera: via il conteggio hardcoded, resta
+  l'invariante niente-duplicati).
 
 ## E2E (da eseguire con l'utente, post-merge o su branch)
 

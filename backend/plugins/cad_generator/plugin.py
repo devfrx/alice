@@ -12,12 +12,7 @@ import contextlib
 import re
 import time
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
-
-# Seconds between live HTTP health checks when TRELLIS is reachable.
-# Avoids hammering the server (and initialising its CUDA context) on
-# every single LLM tool-building call.
-_STATUS_CACHE_TTL_S: float = 30.0
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -31,18 +26,27 @@ from backend.core.plugin_models import (
 )
 from backend.core.tool_progress import emit_tool_progress
 from backend.plugins.cad_generator.client import TrellisClient
-from backend.plugins.cad_generator.client_v2 import (
-    Trellis2Client,
-    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_PIPELINES,
+from backend.plugins.cad_generator.client_multiview import (
+    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_MULTIVIEW_PIPELINES,
 )
 from backend.plugins.cad_generator.client_multiview import (
     Trellis2MultiviewClient,
-    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_MULTIVIEW_PIPELINES,
+)
+from backend.plugins.cad_generator.client_v2 import (
+    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_PIPELINES,
+)
+from backend.plugins.cad_generator.client_v2 import (
+    Trellis2Client,
 )
 from backend.plugins.cad_generator.glb_postprocess import patch_glb_materials
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
+
+# Seconds between live HTTP health checks when TRELLIS is reachable.
+# Avoids hammering the server (and initialising its CUDA context) on
+# every single LLM tool-building call.
+_STATUS_CACHE_TTL_S: float = 30.0
 
 _MODEL_NAME_RE = re.compile(r"^[a-zA-Z0-9_]{1,64}$")
 
@@ -285,9 +289,11 @@ class CadGeneratorPlugin(BasePlugin):
             ToolDefinition(
                 name="cad_generate",
                 description=(
-                    "Generate a 3D model (GLB) from a text description using the local TRELLIS neural network. "
+                    "Generate a 3D model (GLB) from a text description "
+                    "using the local TRELLIS neural network. "
                     "Returns the file path and a URL to view the model. "
-                    "Write DETAILED descriptions for best results: shape, dimensions, material, style, details. "
+                    "Write DETAILED descriptions for best results: "
+                    "shape, dimensions, material, style, details. "
                     "Use descriptive English model_name (e.g. 'phone_stand', 'decorative_vase'). "
                     "Generation takes 30–90 seconds — warn the user. "
                     "Do NOT write CAD code — the system uses a neural network."
@@ -334,10 +340,13 @@ class CadGeneratorPlugin(BasePlugin):
                     description=(
                         "Generate a high-fidelity 3D model (GLB) from a USER-PROVIDED IMAGE "
                         "using the local TRELLIS.2 neural network (image-to-3D). "
-                        "Use this when the user attaches a photo / sketch / render and asks for a 3D model of it. "
+                        "Use this when the user attaches a photo / sketch / render "
+                        "and asks for a 3D model of it. "
                         "REQUIRES an image: the 'image_path' parameter must point to a previously "
-                        "uploaded file under 'data/uploads/...' (use the file_path from an attachment). "
-                        "Generation takes ~10–60 seconds depending on pipeline_type — warn the user. "
+                        "uploaded file under 'data/uploads/...' "
+                        "(use the file_path from an attachment). "
+                        "Generation takes ~10–60 seconds depending on "
+                        "pipeline_type — warn the user. "
                         "Do NOT use this tool for text-only requests; use 'cad_generate' instead."
                     ),
                     parameters={
@@ -390,15 +399,19 @@ class CadGeneratorPlugin(BasePlugin):
                 ToolDefinition(
                     name="cad_generate_from_multiview",
                     description=(
-                        "Generate a HIGH-FIDELITY 3D model (GLB) from MULTIPLE USER-PROVIDED IMAGES "
+                        "Generate a HIGH-FIDELITY 3D model (GLB) from "
+                        "MULTIPLE USER-PROVIDED IMAGES "
                         "of the same object taken from DIFFERENT ANGLES, using the local "
                         "TRELLIS.2 multi-view neural network. "
-                        "Use this when the user attaches 2 or more photos / renders / sketches of the SAME object "
-                        "and wants a more accurate 3D reconstruction than single-image would yield. "
+                        "Use this when the user attaches 2 or more photos / renders / "
+                        "sketches of the SAME object "
+                        "and wants a more accurate 3D reconstruction "
+                        "than single-image would yield. "
                         "REQUIRES at least 1 image (typically 2-6 distinct angles): every entry of "
                         "'image_paths' must point to an existing file under 'data/uploads/...'. "
                         "If only one image is available, use 'cad_generate_from_image' instead. "
-                        "Generation takes ~30-120 seconds depending on pipeline_type and image count."
+                        "Generation takes ~30-120 seconds depending on "
+                        "pipeline_type and image count."
                     ),
                     parameters={
                         "type": "object",
@@ -412,7 +425,8 @@ class CadGeneratorPlugin(BasePlugin):
                                     "description": (
                                         "Path to one input image, relative to the project root "
                                         "(e.g. 'data/uploads/<conv_id>/<file_id>.png'). "
-                                        "Must be an existing PNG/JPEG/WebP/GIF inside data/uploads/."
+                                        "Must be an existing PNG/JPEG/WebP/GIF "
+                                        "inside data/uploads/."
                                     ),
                                 },
                                 "description": (
@@ -700,10 +714,8 @@ class CadGeneratorPlugin(BasePlugin):
             logger.error(gen_error)
         finally:
             # Step 3: unload TRELLIS model (best-effort)
-            try:
+            with contextlib.suppress(Exception):
                 await self._client.unload_model()
-            except Exception:
-                pass
 
             # Step 4: reload everything we unloaded, including cancellation paths
             if cfg.auto_vram_swap and unloaded_models:
@@ -916,10 +928,8 @@ class CadGeneratorPlugin(BasePlugin):
                 await progress_task
             # Best-effort unload of the TRELLIS.2 weights so the LLM can
             # reclaim VRAM cleanly even on failure or cancellation.
-            try:
+            with contextlib.suppress(Exception):
                 await self._client_v2.unload_model()
-            except Exception:
-                pass
 
             if cfg2.auto_vram_swap and unloaded_models:
                 await self._reload_llm_after_swap(unloaded_models)
@@ -1189,10 +1199,8 @@ class CadGeneratorPlugin(BasePlugin):
             progress_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await progress_task
-            try:
+            with contextlib.suppress(Exception):
                 await self._client_multiview.unload_model()
-            except Exception:
-                pass
             if cfg_mv.auto_vram_swap and unloaded_models:
                 await self._reload_llm_after_swap(unloaded_models)
 

@@ -114,17 +114,18 @@ punta ancora a `omnia` (il redirect funziona) — aggiornare con
    UiIconButton richiede `label`; icona `star` unica con `active`, non esiste `star-filled`).
 10. **Line endings**: un Edit su file LF può produrre CRLF — controllare il diff prima di committare.
 
-## Debito preesistente censito (aggiornato all'audit 2026-07-16)
+## Debito preesistente censito (aggiornato all'audit follow-up 2026-07-16 sera)
 
-- `test_plugins_enabled_list` (`tests/test_config.py`) fallisce ANCORA a baseline
-  (conteggio plugin hardcoded stale) — riverificato nell'audit.
-- ruff (riverificato): ~~B904 ovunque~~ **bonificati tutti** (`185b371`);
-  ~~F401 in model_capability_registry~~ **risolto** (riscrittura F4). Restano 29 errori sui file
-  censiti: `db/models.py` (22× UP045), `api/routes/__init__.py` (I001/E501),
-  `tool_loop.py` (B905/E501/I001) + ~500 violazioni repo-wide di altre classi (F401/I001/UP017/
-  E501/N806…, in gran parte auto-fixabili). **ruff NON è un gate in CI** (`contracts.yml` non lo
-  esegue): finché non c'è il gate il debito riaccumula — candidata bonifica dedicata + step CI.
-- mypy: stub `types-PyYAML` ANCORA non installati (riverificato con `pip show`).
+- ~~`test_plugins_enabled_list` rosso a baseline~~ **risolto** (`13a7bd0`): via il conteggio
+  hardcoded, restano membership + invariante niente-duplicati.
+- ~~ruff ~500 violazioni repo-wide senza gate~~ **bonifica COMPLETA a zero** + step
+  **"Backend lint (ruff)"** in `contracts.yml` (branch fix/settings-followups-lint-gate,
+  dettaglio in `docs/superpowers/audits/2026-07-16-followups-audit.md`). Eccezioni deliberate
+  censite in `per-file-ignores` con motivazione. Gotcha operativo: `ruff --fix` riscrive i
+  file con EOL nativi — il repo ha EOL misti per file (52 file CRLF), ripristinare l'EOL
+  di HEAD dopo ogni bonifica.
+- mypy: stub `types-PyYAML` ANCORA non installati; ~2.400 errori strict pre-esistenti
+  (mypy non è gate in CI); `backend/dist/` inquina i run da root (candidato exclude).
 - `get_active_context_window`: la nota T2 è quasi assorbita — ora termina su
   `get_cached_context_window`, che HA lo short-circuit openrouter; resta solo un probe LM Studio
   inutile quando provider=openrouter (nessun caller produttivo).

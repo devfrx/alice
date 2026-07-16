@@ -1,14 +1,10 @@
 """Tests for PC Automation screenshot functionality (Phase 5)."""
 
 import io
-import time
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
-from backend.plugins.pc_automation.constants import (
-    MAX_SCREENSHOT_PIXELS,
-    SCREENSHOT_LOCKOUT_S,
-)
+import pytest
+
 from backend.plugins.pc_automation.security import ScreenshotLockout
 
 
@@ -84,7 +80,7 @@ class TestScreenshotDownscale:
     async def test_screenshot_without_pyautogui(self):
         """Screenshot fails gracefully without pyautogui."""
         from backend.plugins.pc_automation.executor import exec_take_screenshot
-        
+
         with pytest.raises(RuntimeError, match="pyautogui is not installed"):
             await exec_take_screenshot()
 
@@ -121,14 +117,14 @@ class TestPostScreenshotLockout:
     def test_lockout_expires(self, mock_time):
         """Lockout expires after SCREENSHOT_LOCKOUT_S seconds."""
         lockout = ScreenshotLockout()
-        
+
         mock_time.return_value = 100.0
         lockout.record_screenshot()
-        
+
         # Still locked at 100 + 30s
         mock_time.return_value = 130.0
         assert lockout.is_locked("execute_command")
-        
+
         # Unlocked at 100 + 61s
         mock_time.return_value = 161.0
         assert not lockout.is_locked("execute_command")
@@ -137,10 +133,10 @@ class TestPostScreenshotLockout:
     def test_remaining_seconds_accuracy(self, mock_time):
         """get_remaining_s returns correct remaining time."""
         lockout = ScreenshotLockout()
-        
+
         mock_time.return_value = 100.0
         lockout.record_screenshot()
-        
+
         mock_time.return_value = 120.0
         remaining = lockout.get_remaining_s()
         assert 39.0 <= remaining <= 41.0  # ~40s remaining
@@ -149,7 +145,7 @@ class TestPostScreenshotLockout:
         """Lockout is thread-safe (uses threading.Lock)."""
         import threading
         lockout = ScreenshotLockout()
-        
+
         errors = []
         def worker():
             try:
@@ -159,11 +155,11 @@ class TestPostScreenshotLockout:
                     lockout.get_remaining_s()
             except Exception as e:
                 errors.append(e)
-        
+
         threads = [threading.Thread(target=worker) for _ in range(5)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        
+
         assert len(errors) == 0

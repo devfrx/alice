@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.context import AppContext
 from backend.core.plugin_models import ExecutionContext
+from backend.services.config_service import ConfigLayer
 
 router = APIRouter(tags=["plugins"])
 
@@ -106,18 +107,21 @@ async def toggle_plugin(
             detail="Plugin manager not available",
         )
 
+    if ctx.config_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Config service unavailable",
+        )
+
     async with _toggle_lock:
-        current = ctx.config.plugins.enabled
+        current = list(ctx.config.plugins.enabled)
 
         if enabled:
             if plugin_name not in current:
                 current.append(plugin_name)
             ok = await pm.load_plugin(plugin_name)
             if not ok:
-                # Roll back the enable so config and PluginManager stay in
-                # sync, then surface the failure to the caller.
-                if plugin_name in current:
-                    current.remove(plugin_name)
+                # Config layer untouched — nothing to roll back.
                 logger.warning(
                     "Plugin '{}' was enabled but failed to load",
                     plugin_name,
@@ -132,6 +136,13 @@ async def toggle_plugin(
             if plugin_name in current:
                 current.remove(plugin_name)
             await pm.unload_plugin(plugin_name)
+
+        # RUNTIME layer, not an in-place list mutation (clobbered by the
+        # first rebuild): the plugin_state table below is the persisted
+        # source of truth, the config list is a derived projection.
+        ctx.config = await ctx.config_service.set_many(
+            {"plugins.enabled": current}, layer=ConfigLayer.RUNTIME,
+        )
 
         # Persist the new state so it survives restarts.
         if ctx.plugin_state_repo:

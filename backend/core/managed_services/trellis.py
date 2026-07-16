@@ -16,7 +16,7 @@ import os
 import signal
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
 from urllib.parse import urlparse
@@ -237,7 +237,7 @@ class TrellisManagedService(ManagedService):
             handle = path.open("ab", buffering=0)
             header = (
                 "\n"
-                f"[{datetime.now(timezone.utc).isoformat()}] launching {self.name}\n"
+                f"[{datetime.now(UTC).isoformat()}] launching {self.name}\n"
                 f"cwd: {base}\n"
                 f"argv: {argv!r}\n"
                 "--- output ---\n"
@@ -402,7 +402,7 @@ class TrellisManagedService(ManagedService):
 
     async def health(self) -> ServiceHealth:
         """Probe ``GET /health`` (or root) on the TRELLIS service."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         launcher_exit_detail: str | None = None
         returncode = self._proc.poll() if self._proc is not None else None
         if self._proc is not None and returncode is not None:

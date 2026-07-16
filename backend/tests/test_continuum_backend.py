@@ -6,6 +6,7 @@ these tests exercise the mapping/dispatch logic without a live server.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,10 +15,11 @@ from backend.services.knowledge import (
     CompositeKnowledgeBackend,
     ContinuumBackend,
     KnowledgeDocCreate,
-    KnowledgeDocPatch,
 )
 from backend.services.knowledge.protocol import BackendHealth, KnowledgeHit
 
+if TYPE_CHECKING:
+    from backend.services.knowledge.continuum_client import ContinuumClient
 
 _NOTE = {
     "id": "11111111-1111-1111-1111-111111111111",
@@ -172,7 +174,7 @@ async def test_composite_health_aggregates_worst_case(composite):
 # ---------------------------------------------------------------------------
 
 
-def _make_real_client() -> "ContinuumClient":
+def _make_real_client() -> ContinuumClient:
     from backend.services.knowledge.continuum_client import ContinuumClient
 
     return ContinuumClient(
@@ -187,7 +189,9 @@ def _make_real_client() -> "ContinuumClient":
 async def test_folder_cache_is_reused_within_ttl():
     """The folder forest is fetched once and served from cache within TTL."""
     client = _make_real_client()
-    client.request = AsyncMock(return_value=[{"id": "f1", "slug": "work"}])
+    client.request = AsyncMock(  # type: ignore[method-assign]
+        return_value=[{"id": "f1", "slug": "work"}],
+    )
 
     assert await client.resolve_folder_id("work") == "f1"
     assert await client.resolve_folder_id("work") == "f1"
@@ -199,7 +203,9 @@ async def test_invalidate_folder_cache_forces_refetch():
     """After invalidation the next resolve refetches the folder tree and
     sees a folder created since the last fetch."""
     client = _make_real_client()
-    client.request = AsyncMock(return_value=[{"id": "f1", "slug": "work"}])
+    client.request = AsyncMock(  # type: ignore[method-assign]
+        return_value=[{"id": "f1", "slug": "work"}],
+    )
 
     assert await client.resolve_folder_id("work") == "f1"
     # A new folder is created out-of-band; without invalidation the stale

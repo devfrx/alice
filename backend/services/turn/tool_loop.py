@@ -454,7 +454,7 @@ async def run_tool_loop(
 
         # Build a lookup from future to task metadata — used for
         # both pending (timeout) and done (exception) handling.
-        future_to_call = dict(zip(coros, deferred))
+        future_to_call = dict(zip(coros, deferred, strict=True))
 
         if pending:
             logger.error(
@@ -1031,7 +1031,10 @@ async def run_tool_loop(
         )
         await sink.send({
             "type": "warning",
-            "content": f"Tool loop exceeded maximum iterations ({max_iterations}). Returning partial response.",
+            "content": (
+                f"Tool loop exceeded maximum iterations ({max_iterations}). "
+                "Returning partial response."
+            ),
         })
     else:
         exit_reason = (
@@ -1226,6 +1229,7 @@ async def _persist_tool_image(
         Relative path from the project root, or ``None`` on failure.
     """
     import base64
+
     from backend.core.config import PROJECT_ROOT
 
     ext_map = {

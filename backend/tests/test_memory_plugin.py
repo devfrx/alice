@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.plugin_models import ExecutionContext, ToolResult
+from backend.core.plugin_models import ExecutionContext
 from backend.services.memory_service import MemoryEntry
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,7 +37,7 @@ def _make_memory_entry(
         scope=scope,
         category=category,
         source=source,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         expires_at=None,
         conversation_id=None,
         embedding_model="test-model",

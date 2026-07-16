@@ -31,6 +31,7 @@ Frontend subscribes to these events via the existing event WebSocket.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -468,10 +469,8 @@ class ModelDownloader:
             )
         except Exception:
             if tmp.exists():
-                try:
+                with contextlib.suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             raise
 
     async def _fetch_ranged(
@@ -529,10 +528,8 @@ class ModelDownloader:
             )
         except Exception:
             if tmp.exists():
-                try:
+                with contextlib.suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             raise
 
     async def _tick(

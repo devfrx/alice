@@ -87,10 +87,10 @@ class QdrantService:
             # Retry loop — during hot-reload the previous process may still
             # hold the RocksDB lock for a moment after its file descriptors
             # are closed by the OS.  Five quick retries usually suffice.
-            _RETRIES = 5
-            _DELAY = 0.6  # seconds between attempts
+            max_retries = 5
+            retry_delay = 0.6  # seconds between attempts
             last_exc: Exception | None = None
-            for attempt in range(1, _RETRIES + 1):
+            for attempt in range(1, max_retries + 1):
                 try:
                     self._client = AsyncQdrantClient(path=self._config.path)
                     _log.info(
@@ -104,9 +104,9 @@ class QdrantService:
                     last_exc = exc
                     _log.debug(
                         "Qdrant lock held — retry {}/{} in {:.1f}s …",
-                        attempt, _RETRIES, _DELAY,
+                        attempt, max_retries, retry_delay,
                     )
-                    await asyncio.sleep(_DELAY)
+                    await asyncio.sleep(retry_delay)
 
             # All retries exhausted — fall back gracefully.
             _log.warning(
@@ -114,7 +114,7 @@ class QdrantService:
                 "falling back to in-memory mode. "
                 "Data will not persist until the lock is released. "
                 "Cause: {}",
-                _RETRIES, last_exc,
+                max_retries, last_exc,
             )
             self._client = AsyncQdrantClient(":memory:")
             self._in_memory = True

@@ -6,9 +6,8 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from loguru import logger
 from sqlalchemy import func as sa_func
-from sqlmodel import select, col
+from sqlmodel import col, select
 
 from backend.db.models import ToolConfirmationAudit
 

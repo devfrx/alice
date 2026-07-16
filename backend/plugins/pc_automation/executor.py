@@ -8,10 +8,10 @@ performed before execution via the security module.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import csv
 import io
 import re
-from typing import Any
 
 from loguru import logger
 
@@ -234,7 +234,9 @@ async def exec_open_app(app_name: str, cwd: str | None = None) -> str:
     # Build the full candidate list for _find_executable so all alternates
     # (e.g. chrome.exe / Chrome.exe) are tried.
     _raw = ALLOWED_APPS.get(app_name.strip().lower().replace(" ", "_"))
-    candidates: list[str] = _raw if isinstance(_raw, list) else ([primary_exe] if primary_exe else [])
+    candidates: list[str] = (
+        _raw if isinstance(_raw, list) else ([primary_exe] if primary_exe else [])
+    )
 
     def _open() -> str:
         import os
@@ -336,10 +338,8 @@ async def exec_type_text(text: str) -> str:
         finally:
             # Restore previous clipboard content
             if old_clip is not None:
-                try:
+                with contextlib.suppress(Exception):
                     pyperclip.copy(old_clip)
-                except Exception:
-                    pass
 
         return f"Typed {len(sanitized)} characters"
 

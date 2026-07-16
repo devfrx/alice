@@ -46,10 +46,7 @@ def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
 
     executable = ALLOWED_APPS[normalized]
     # Resolve to the primary (first) candidate
-    if isinstance(executable, list):
-        primary = executable[0]
-    else:
-        primary = executable
+    primary = executable[0] if isinstance(executable, list) else executable
 
     return True, f"Application '{normalized}' is whitelisted", primary
 

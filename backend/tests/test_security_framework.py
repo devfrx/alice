@@ -1,15 +1,11 @@
 """Tests for PC Automation security framework (Phase 5)."""
 
-import pytest
 import time
 from unittest.mock import patch
 
+from backend.core.plugin_models import ToolDefinition
 from backend.plugins.pc_automation.constants import (
     ALLOWED_APPS,
-    ALLOWED_KEY_COMBOS,
-    COMMAND_WHITELIST,
-    FORBIDDEN_KEY_COMBOS,
-    FORBIDDEN_PATHS,
 )
 from backend.plugins.pc_automation.security import (
     ScreenshotLockout,
@@ -18,8 +14,6 @@ from backend.plugins.pc_automation.security import (
     validate_keys,
     validate_path,
 )
-from backend.core.plugin_models import ToolDefinition
-
 
 # ===================================================================
 # TestValidateAppName

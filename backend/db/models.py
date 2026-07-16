@@ -2,8 +2,8 @@
 
 import enum
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import sqlalchemy as sa
 from sqlmodel import Field, Relationship, SQLModel
@@ -11,7 +11,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 def _utcnow() -> datetime:
     """Return the current UTC time (timezone-aware)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _new_uuid() -> uuid.UUID:
@@ -36,15 +36,15 @@ class Conversation(SQLModel, table=True):
         default_factory=_new_uuid,
         primary_key=True,
     )
-    title: Optional[str] = Field(default=None, max_length=256)
+    title: str | None = Field(default=None, max_length=256)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
-    active_versions: Optional[Any] = Field(
+    active_versions: Any | None = Field(
         default=None,
         sa_column=sa.Column(sa.JSON, nullable=True),
         description="Map of version_group_id → active version_index.",
     )
-    context_snapshot: Optional[Any] = Field(
+    context_snapshot: Any | None = Field(
         default=None,
         sa_column=sa.Column(sa.JSON, nullable=True),
         description=(
@@ -102,16 +102,16 @@ class Message(SQLModel, table=True):
         description='One of "user", "assistant", "system", or "tool".',
     )
     content: str = Field(default="")
-    tool_calls: Optional[Any] = Field(
+    tool_calls: Any | None = Field(
         default=None,
         sa_column=sa.Column(sa.JSON, nullable=True),
     )
-    tool_call_id: Optional[str] = Field(default=None, max_length=64)
-    thinking_content: Optional[str] = Field(
+    tool_call_id: str | None = Field(default=None, max_length=64)
+    thinking_content: str | None = Field(
         default=None,
         description="Reasoning/thinking tokens from models that support it.",
     )
-    version_group_id: Optional[uuid.UUID] = Field(
+    version_group_id: uuid.UUID | None = Field(
         default=None,
         description="Groups message versions at the same edit point.",
     )
@@ -119,7 +119,7 @@ class Message(SQLModel, table=True):
         default=0,
         description="Version index within a version group (0 = original).",
     )
-    token_count: Optional[int] = Field(
+    token_count: int | None = Field(
         default=None,
         description="Real token count from LLM API (stored after response).",
     )
@@ -143,7 +143,7 @@ class Message(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
     # -- relationships ------------------------------------------------------
-    conversation: Optional[Conversation] = Relationship(
+    conversation: Conversation | None = Relationship(
         back_populates="messages"
     )
     attachments: list["Attachment"] = Relationship(
@@ -169,7 +169,7 @@ class Attachment(SQLModel, table=True):
         default_factory=_new_uuid,
         primary_key=True,
     )
-    message_id: Optional[uuid.UUID] = Field(
+    message_id: uuid.UUID | None = Field(
         default=None,
         sa_column=sa.Column(
             sa.Uuid,
@@ -186,7 +186,7 @@ class Attachment(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
     # -- relationships ------------------------------------------------------
-    message: Optional[Message] = Relationship(back_populates="attachments")
+    message: Message | None = Relationship(back_populates="attachments")
 
 
 # ---------------------------------------------------------------------------
@@ -238,11 +238,11 @@ class ToolConfirmationAudit(SQLModel, table=True):
     user_approved: bool = Field(
         description="Whether the user approved the execution.",
     )
-    rejection_reason: Optional[str] = Field(
+    rejection_reason: str | None = Field(
         default=None,
         description="Reason for rejection: 'user_rejected', 'timeout', 'cancelled'.",
     )
-    thinking_content: Optional[str] = Field(
+    thinking_content: str | None = Field(
         default=None,
         description="LLM reasoning/thinking content at time of tool invocation.",
     )
@@ -297,7 +297,7 @@ class PluginState(SQLModel, table=True):
 # ---------------------------------------------------------------------------
 
 
-class ArtifactKind(str, enum.Enum):
+class ArtifactKind(enum.StrEnum):
     """Type of artifact produced by a tool.
 
     Extend with new members when adding new artifact-producing tools
@@ -336,7 +336,7 @@ class Artifact(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=_new_uuid, primary_key=True)
-    conversation_id: Optional[uuid.UUID] = Field(
+    conversation_id: uuid.UUID | None = Field(
         default=None,
         sa_column=sa.Column(
             sa.Uuid,
@@ -350,7 +350,7 @@ class Artifact(SQLModel, table=True):
             "the board)."
         ),
     )
-    message_id: Optional[uuid.UUID] = Field(
+    message_id: uuid.UUID | None = Field(
         default=None,
         sa_column=sa.Column(
             sa.Uuid,
@@ -360,7 +360,7 @@ class Artifact(SQLModel, table=True):
         ),
         description="The tool-result message that produced this artifact.",
     )
-    tool_call_id: Optional[str] = Field(
+    tool_call_id: str | None = Field(
         default=None, max_length=64, index=True,
         description="OpenAI tool_call_id that produced this artifact.",
     )
@@ -398,7 +398,7 @@ class Artifact(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_utcnow)
 
     # -- relationships ------------------------------------------------------
-    conversation: Optional[Conversation] = Relationship(
+    conversation: Conversation | None = Relationship(
         back_populates="artifacts"
     )
 
@@ -457,7 +457,7 @@ class AgentRun(SQLModel, table=True):
         ),
         description="The user message that triggered this run.",
     )
-    final_assistant_message_id: Optional[uuid.UUID] = Field(
+    final_assistant_message_id: uuid.UUID | None = Field(
         default=None,
         sa_column=sa.Column(
             sa.Uuid,
@@ -481,8 +481,8 @@ class AgentRun(SQLModel, table=True):
     total_tool_calls: int = Field(default=0)
 
     started_at: datetime = Field(default_factory=_utcnow)
-    finished_at: Optional[datetime] = Field(default=None)
-    error: Optional[str] = Field(default=None)
+    finished_at: datetime | None = Field(default=None)
+    error: str | None = Field(default=None)
 
 
 # ---------------------------------------------------------------------------
@@ -644,7 +644,7 @@ class PermissionRule(SQLModel, table=True):
         default_factory=_new_uuid,
         primary_key=True,
     )
-    conversation_id: Optional[uuid.UUID] = Field(
+    conversation_id: uuid.UUID | None = Field(
         default=None,
         sa_column=sa.Column(
             sa.Uuid,
@@ -661,7 +661,7 @@ class PermissionRule(SQLModel, table=True):
         max_length=8,
         description="Rule effect: allow/ask/deny.",
     )
-    pattern: Optional[str] = Field(
+    pattern: str | None = Field(
         default=None,
         max_length=256,
         description="Reserved for a future argument/bash-prefix matcher.",

@@ -7,8 +7,9 @@ with automatic expiry cleanup for session-scoped entries.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
@@ -17,7 +18,6 @@ from qdrant_client import models
 from backend.core.config import MemoryConfig
 from backend.core.protocols import EmbeddingClientProtocol, QdrantServiceProtocol
 from backend.services.qdrant_service import COLLECTION_MEMORY
-
 
 # ---------------------------------------------------------------------------
 # Memory entry dataclass (lightweight, no SQLModel table mapping needed
@@ -117,10 +117,8 @@ class MemoryService:
         """Cancel cleanup task. Does NOT close qdrant or embedding client."""
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
         self._cleanup_task = None
         self._log.info("Memory service closed")
 
@@ -152,7 +150,7 @@ class MemoryService:
             The created ``MemoryEntry``.
         """
         entry_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         vector = await self._embedder.encode(content)
 
@@ -232,7 +230,7 @@ class MemoryService:
             COLLECTION_MEMORY, vector, k=k * 2, query_filter=query_filter,
         )
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         results: list[dict[str, Any]] = []
         for hit in hits:
             payload = hit.payload or {}
@@ -445,7 +443,7 @@ class MemoryService:
             source=payload.get("source", "user"),
             created_at=(
                 datetime.fromisoformat(created) if created
-                else datetime.now(timezone.utc)
+                else datetime.now(UTC)
             ),
             expires_at=datetime.fromisoformat(expires) if expires else None,
             conversation_id=uuid.UUID(cid) if cid else None,
@@ -482,7 +480,7 @@ class MemoryService:
         Returns:
             Number of expired entries removed.
         """
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         removed = 0
         offset = None
 

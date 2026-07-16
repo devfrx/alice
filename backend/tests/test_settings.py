@@ -42,6 +42,42 @@ class TestToolConfirmations:
         assert resp.status_code == 422
 
 
+_PREFS_URL = "/api/settings/preferences"
+
+
+@pytest.mark.asyncio
+class TestResetPreferences:
+    """DELETE /api/settings/preferences — reset vivo, senza riavvio (audit M1)."""
+
+    async def test_reset_drops_the_layer_live(self, client, app):
+        ctx = app.state.context
+        new_theme = "light" if ctx.config.ui.theme != "light" else "dark"
+        seed = await client.put("/api/config", json={"ui": {"theme": new_theme}})
+        assert seed.status_code == 200
+        assert ctx.config.ui.theme == new_theme
+
+        resp = await client.delete(_PREFS_URL)
+        assert resp.status_code == 200
+        assert resp.json()["deleted"] >= 1
+
+        from backend.services.config_service import ConfigLayer
+
+        assert ctx.config_service.get_layer(ConfigLayer.PREFERENCES) == {}
+        assert ctx.config.ui.theme != new_theme
+
+    async def test_reset_applies_reactions(self, client, app):
+        ctx = app.state.context
+        seed = await client.put("/api/config", json={"llm": {"provider": "openrouter"}})
+        assert seed.status_code == 200
+        old_service = ctx.llm_service
+
+        resp = await client.delete(_PREFS_URL)
+        assert resp.status_code == 200
+        assert ctx.config.llm.provider == "lmstudio"
+        # Il reset del provider passa dalle reazioni: servizio LLM ricostruito.
+        assert ctx.llm_service is not old_service
+
+
 _CATALOG_URL = "/api/settings/tool-catalog"
 _ACTIVE_URL = "/api/settings/active-tools"
 

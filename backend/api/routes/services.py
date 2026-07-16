@@ -25,8 +25,8 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from backend.core.managed_services import TrellisManagedService, resolve_trellis_launcher
 from backend.core.context import AppContext
+from backend.core.managed_services import TrellisManagedService, resolve_trellis_launcher
 from backend.services.model_downloader import CATALOG, list_catalog
 
 router = APIRouter(tags=["services"])
@@ -378,7 +378,8 @@ risponde 200.
 | Problema | Soluzione |
 |----------|-----------|
 | `nvcc fatal: cannot find compiler 'cl.exe'` | Installa Visual Studio Build Tools |
-| `CUDA version (13.x) mismatches PyTorch (12.8)` | Disinstalla CUDA 13 o imposta `CUDA_HOME` su CUDA 12.x |
+| `CUDA version (13.x) mismatches PyTorch (12.8)` | Disinstalla CUDA 13 o imposta \
+`CUDA_HOME` su CUDA 12.x |
 | `flash-attn` build OOM | Chiudi browser/IDE durante il build, serve ~16 GB RAM |
 | Status sempre `down` | Verifica che `start-trellis2.ps1` parta a mano dal terminale |
 """
@@ -411,7 +412,8 @@ Identici a TRELLIS.2: GPU NVIDIA ≥ 16 GB VRAM, CUDA Toolkit 12.x
 ## 2. Clonare il repository multi-view
 
 ```powershell
-git clone https://huggingface.co/spaces/cpuai/Trellis.2.multiview "C:\\Users\\<tu>\\Source\\TRELLIS.2.multiview"
+git clone https://huggingface.co/spaces/cpuai/Trellis.2.multiview \
+"C:\\Users\\<tu>\\Source\\TRELLIS.2.multiview"
 ```
 
 (Si tratta di uno HuggingFace Space, non di un repo GitHub: usa `git clone`

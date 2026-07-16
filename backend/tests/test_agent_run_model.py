@@ -15,7 +15,6 @@ from sqlmodel import select
 from backend.db.database import create_engine_and_session, init_db
 from backend.db.models import AgentRun, Conversation, Message
 
-
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------

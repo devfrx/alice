@@ -7,12 +7,10 @@ WebSearchClient helper class.
 
 from __future__ import annotations
 
-import asyncio
-import time
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
@@ -20,8 +18,6 @@ from backend.core.event_bus import EventBus
 from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
-    ToolDefinition,
-    ToolResult,
 )
 
 
@@ -232,7 +228,9 @@ class TestWebSearchTool:
         await plugin.cleanup()
 
     @pytest.mark.asyncio
-    async def test_search_missing_query_error(self, ctx: AppContext, exec_context: ExecutionContext):
+    async def test_search_missing_query_error(
+        self, ctx: AppContext, exec_context: ExecutionContext,
+    ):
         """Missing query key returns an error."""
         plugin = _get_plugin()
         await plugin.initialize(ctx)
@@ -244,7 +242,9 @@ class TestWebSearchTool:
         await plugin.cleanup()
 
     @pytest.mark.asyncio
-    async def test_search_max_results_clamped(self, ctx: AppContext, exec_context: ExecutionContext):
+    async def test_search_max_results_clamped(
+        self, ctx: AppContext, exec_context: ExecutionContext,
+    ):
         """Invalid max_results values fall back to default (5)."""
         plugin = _get_plugin()
         await plugin.initialize(ctx)
@@ -472,7 +472,9 @@ class TestWebSearchClient:
         ) as mock_thread:
             results = await client.search("python asyncio", max_results=3)
 
-        mock_thread.assert_awaited_once_with(client._metasearch_sync, "python asyncio", 3, client._region, client._proxy_url)
+        mock_thread.assert_awaited_once_with(
+            client._metasearch_sync, "python asyncio", 3, client._region, client._proxy_url,
+        )
         assert results == fake
         await client.close()
 
@@ -558,9 +560,11 @@ class TestWebSearchClient:
         """search() raises RuntimeError when DDGS is not installed."""
         client = self._make_client()
 
-        with patch("backend.plugins.web_search.client._DDGS_AVAILABLE", False):
-            with pytest.raises(RuntimeError, match="not installed"):
-                await client.search("test")
+        with (
+            patch("backend.plugins.web_search.client._DDGS_AVAILABLE", False),
+            pytest.raises(RuntimeError, match="not installed"),
+        ):
+            await client.search("test")
 
         await client.close()
 
@@ -611,8 +615,14 @@ class TestWebSearchClient:
             return mock_response
 
         with (
-            patch("backend.plugins.web_search.client.asyncio.to_thread", side_effect=fake_to_thread),
-            patch("backend.plugins.web_search.client.async_validate_url_ssrf", new_callable=AsyncMock),
+            patch(
+                "backend.plugins.web_search.client.asyncio.to_thread",
+                side_effect=fake_to_thread,
+            ),
+            patch(
+                "backend.plugins.web_search.client.async_validate_url_ssrf",
+                new_callable=AsyncMock,
+            ),
         ):
             text = await client.scrape("https://example.com/page")
 
@@ -645,8 +655,14 @@ class TestWebSearchClient:
             return mock_response
 
         with (
-            patch("backend.plugins.web_search.client.asyncio.to_thread", side_effect=fake_to_thread),
-            patch("backend.plugins.web_search.client.async_validate_url_ssrf", new_callable=AsyncMock),
+            patch(
+                "backend.plugins.web_search.client.asyncio.to_thread",
+                side_effect=fake_to_thread,
+            ),
+            patch(
+                "backend.plugins.web_search.client.async_validate_url_ssrf",
+                new_callable=AsyncMock,
+            ),
         ):
             text = await client.scrape("https://example.com/big")
 
@@ -662,9 +678,8 @@ class TestWebSearchClient:
             "backend.plugins.web_search.client.async_validate_url_ssrf",
             new_callable=AsyncMock,
             side_effect=ValueError("resolves to private address"),
-        ):
-            with pytest.raises(ValueError, match="private address"):
-                await client.scrape("http://192.168.1.1/admin")
+        ), pytest.raises(ValueError, match="private address"):
+            await client.scrape("http://192.168.1.1/admin")
 
         await client.close()
 
@@ -687,11 +702,17 @@ class TestWebSearchClient:
             return mock_response
 
         with (
-            patch("backend.plugins.web_search.client.asyncio.to_thread", side_effect=fake_to_thread),
-            patch("backend.plugins.web_search.client.async_validate_url_ssrf", new_callable=AsyncMock),
+            patch(
+                "backend.plugins.web_search.client.asyncio.to_thread",
+                side_effect=fake_to_thread,
+            ),
+            patch(
+                "backend.plugins.web_search.client.async_validate_url_ssrf",
+                new_callable=AsyncMock,
+            ),
+            pytest.raises(httpx.HTTPStatusError),
         ):
-            with pytest.raises(httpx.HTTPStatusError):
-                await client.scrape("https://example.com/404")
+            await client.scrape("https://example.com/404")
 
         await client.close()
 
@@ -734,4 +755,6 @@ class TestWebSearchClient:
         assert len(results) == 2
         assert results[0] == {"title": "T1", "href": "https://a.com", "body": "B1"}
         assert results[1] == {"title": "T2", "href": "https://b.com", "body": "B2"}
-        mock_ddgs_instance.text.assert_called_once_with("test query", region="it-it", max_results=2, backend="auto")
+        mock_ddgs_instance.text.assert_called_once_with(
+            "test query", region="it-it", max_results=2, backend="auto",
+        )

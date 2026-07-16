@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from backend.core.service_orchestrator import (
     ManagedService,
@@ -44,7 +44,7 @@ class VRAMManagedService(ManagedService):
 
     async def health(self) -> ServiceHealth:
         ok = await self._monitor.health_check()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         usage = self._monitor.last_usage
         if ok:
             detail = "no recent reading"

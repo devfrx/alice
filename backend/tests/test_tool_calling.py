@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from backend.core.event_bus import EventBus, AliceEvent
 from backend.core.plugin_models import (
-    ConnectionStatus,
-    ExecutionContext,
-    ToolDefinition,
     ToolResult,
 )
 from backend.db.models import Message
 from backend.services.llm_service import LLMService, normalize_history
-
 
 # -- fixtures --
 
@@ -26,9 +20,7 @@ from backend.services.llm_service import LLMService, normalize_history
 @pytest.fixture
 def llm_config():
     """Create a test LLMConfig with defaults."""
-    from backend.core.config import LLMConfig
-
-    from backend.core.config import PROJECT_ROOT
+    from backend.core.config import PROJECT_ROOT, LLMConfig
 
     return LLMConfig(
         base_url="http://localhost:11434",
@@ -305,7 +297,7 @@ class _FakeStreamResponse:
 
 def _make_llm(*, supports_thinking: bool) -> LLMService:
     """Create an LLMService with a fake system prompt and given thinking flag."""
-    from backend.core.config import LLMConfig, PROJECT_ROOT
+    from backend.core.config import PROJECT_ROOT, LLMConfig
 
     cfg = LLMConfig(
         base_url="http://localhost:1234",

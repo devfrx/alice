@@ -13,9 +13,9 @@ import os
 import string
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -423,10 +423,10 @@ class FileSearchPlugin(BasePlugin):
             stat = resolved.stat()
             mime_type, _ = mimetypes.guess_type(str(resolved))
             created_dt = datetime.fromtimestamp(
-                stat.st_ctime, tz=timezone.utc,
+                stat.st_ctime, tz=UTC,
             )
             modified_dt = datetime.fromtimestamp(
-                stat.st_mtime, tz=timezone.utc,
+                stat.st_mtime, tz=UTC,
             )
 
             return {

@@ -6,6 +6,7 @@ and the single-entry-point ``KnowledgeService``.
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -90,10 +91,8 @@ async def stage_knowledge(ctx: AppContext) -> None:
         logger.info("Qdrant service started (mode={})", config.qdrant.mode)
     except Exception as exc:
         logger.warning("Qdrant service failed to start: {}", exc)
-        try:
+        with contextlib.suppress(Exception):
             await qdrant_service.close()
-        except Exception:
-            pass
         qdrant_service = None
 
     # -- Memory service (Phase 9) ------------------------------------------

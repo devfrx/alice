@@ -6,12 +6,10 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Mock LLM helpers

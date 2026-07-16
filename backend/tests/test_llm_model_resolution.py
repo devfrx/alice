@@ -15,7 +15,6 @@ import pytest
 from backend.core.config import PROJECT_ROOT, LLMConfig
 from backend.services.llm_service import LLMService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ plain ``httpx`` triggers on sites like trovaprezzi.it and idealo.it.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import time
 from typing import Any
@@ -254,10 +255,8 @@ class WebSearchClient:
     async def close(self) -> None:
         """Close the underlying HTTP and primp clients."""
         await self._http.aclose()
-        try:
+        with contextlib.suppress(Exception):
             self._primp.close()
-        except Exception:
-            pass
 
     # ------------------------------------------------------------------
     # Private helpers

@@ -19,7 +19,7 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
-from backend.plugins.web_search.client import WebSearchClient, _DDGS_AVAILABLE
+from backend.plugins.web_search.client import _DDGS_AVAILABLE, WebSearchClient
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext

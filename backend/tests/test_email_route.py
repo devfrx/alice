@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
 from httpx import AsyncClient
-
 
 # ---------------------------------------------------------------------------
 # All endpoints return 503 when email service is disabled (default in tests)

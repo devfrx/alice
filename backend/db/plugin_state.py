@@ -12,17 +12,16 @@ Usage pattern (mirrors PreferencesLayerStore):
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.db.models import PluginState
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class PluginStateRepository:

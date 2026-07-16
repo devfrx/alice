@@ -15,6 +15,8 @@ try:
 except ImportError:  # pragma: no cover
     _TIKTOKEN_AVAILABLE = False
 
+import contextlib
+
 from backend.core.config import LLMConfig
 
 
@@ -108,10 +110,8 @@ class ContextManager:
                     tokens += 765
                 else:
                     # Unknown part: fall back to JSON-stringified estimate.
-                    try:
+                    with contextlib.suppress(TypeError, ValueError):
                         tokens += self.estimate_tokens(json.dumps(part))
-                    except (TypeError, ValueError):
-                        pass
         else:
             tokens += self.estimate_tokens(content)
         tool_calls = msg.get("tool_calls")
@@ -203,13 +203,10 @@ class ContextManager:
         """
         if usage.percentage >= self._config.context_compression_threshold:
             return True
-        if (
+        return bool(
             usage.available_tokens > 0
-            and usage.available_tokens
-            <= self._config.context_compression_reserve
-        ):
-            return True
-        return False
+            and usage.available_tokens <= self._config.context_compression_reserve
+        )
 
     async def compress(
         self,

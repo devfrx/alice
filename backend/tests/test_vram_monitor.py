@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 from backend.core.event_bus import EventBus
 from backend.services.vram_monitor import VRAMMonitor, VRAMUsage
@@ -39,9 +39,8 @@ async def _run_single_poll(monitor: VRAMMonitor) -> VRAMUsage | None:
     async def _cancel_sleep(_seconds: float) -> None:
         raise asyncio.CancelledError
 
-    with patch("asyncio.sleep", _cancel_sleep):
-        with contextlib.suppress(asyncio.CancelledError):
-            await monitor._poll_loop()
+    with patch("asyncio.sleep", _cancel_sleep), contextlib.suppress(asyncio.CancelledError):
+        await monitor._poll_loop()
     return monitor.last_usage
 
 

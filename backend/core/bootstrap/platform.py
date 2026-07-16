@@ -51,7 +51,7 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     # Built early so any subsequent service can read merged config through
     # ``ctx.config`` exactly as before.  The service rebuilds ``ctx.config``
     # whenever a layer mutation succeeds.
-    from backend.services.config_service import LayeredConfigService
+    from backend.services.config_service import ConfigLayer, LayeredConfigService
 
     config_service = LayeredConfigService(
         event_bus=ctx.event_bus,
@@ -151,14 +151,20 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
             await plugin_state_repo.initialize_defaults(
                 config.plugins.enabled
             )
-            # Replace in-memory list with the persisted user choices.
             persisted = await plugin_state_repo.get_all()
-            config.plugins.enabled = [
+            enabled_names = [
                 name for name, enabled in persisted.items() if enabled
             ]
+            # RUNTIME layer, not an in-place list assignment (clobbered by
+            # the first rebuild) and not preferences (the plugin_state table
+            # is already the persisted source of truth — the config list is
+            # a derived projection, re-derived here at every boot).
+            ctx.config = await config_service.set_many(
+                {"plugins.enabled": enabled_names}, layer=ConfigLayer.RUNTIME,
+            )
+            config = ctx.config
             logger.debug(
-                "Plugin states restored from DB: enabled={}",
-                config.plugins.enabled,
+                "Plugin states restored from DB: enabled={}", enabled_names,
             )
         except Exception as exc:
             logger.warning("Failed to restore plugin states: {}", exc)

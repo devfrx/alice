@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlmodel import select
 
 from backend.db.database import create_engine_and_session, init_db
 from backend.db.models import Conversation, Message
-
 
 # ---------------------------------------------------------------------------
 # Unit tests — model creation with defaults

@@ -11,18 +11,15 @@ production, these tests focus on what IS available in voice.py:
 from __future__ import annotations
 
 import json
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 from backend.api.routes import voice as voice_module
 from backend.core.app import create_app
-from backend.core.config import AliceConfig, load_config
-from backend.services.audio_utils import MAX_AUDIO_SIZE_BYTES
-
+from backend.core.config import AliceConfig
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -383,6 +380,6 @@ class TestVoiceConcurrentSessions:
             voice_module._MAX_VOICE_PER_IP
         )
         client = TestClient(voice_app)
-        with client.websocket_connect("/api/voice/ws/voice") as ws:
+        with client.websocket_connect("/api/voice/ws/voice"):
             # Server accepts then immediately closes with 4029.
             pass

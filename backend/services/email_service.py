@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import email
 import email.header
 import email.utils
@@ -10,7 +11,6 @@ import html
 import re
 import time
 import uuid
-from email.message import Message
 from email.mime.text import MIMEText
 from typing import Any
 
@@ -22,7 +22,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 
 from backend.core.config import EmailConfig
-from backend.core.event_bus import EventBus, AliceEvent
+from backend.core.event_bus import AliceEvent, EventBus
 
 _TRUNCATION_SUFFIX = "\n[…troncato]"
 
@@ -114,16 +114,12 @@ class EmailService:
         """Cancel IDLE task and close IMAP connection."""
         if self._idle_task and not self._idle_task.done():
             self._idle_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._idle_task
-            except asyncio.CancelledError:
-                pass
         async with self._imap_lock:
             if self._imap:
-                try:
+                with contextlib.suppress(Exception):
                     await self._imap.logout()
-                except Exception:
-                    pass
                 self._imap = None
             self._cache.clear()
         logger.info("EmailService closed")
@@ -675,7 +671,7 @@ class EmailService:
                         idle_imap.wait_server_push(), timeout=29 * 60,
                     )
                     new_mail = True
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Normal keepalive cycle
                 finally:
                     idle_imap.idle_done()
@@ -693,19 +689,15 @@ class EmailService:
                         self._cache.clear()
             except asyncio.CancelledError:
                 if idle_imap:
-                    try:
+                    with contextlib.suppress(Exception):
                         await idle_imap.logout()
-                    except Exception:
-                        pass
                 return
             except Exception as exc:
                 logger.warning(
                     "IMAP IDLE error (retrying in 60s): {}", exc,
                 )
                 if idle_imap:
-                    try:
+                    with contextlib.suppress(Exception):
                         await idle_imap.logout()
-                    except Exception:
-                        pass
                     idle_imap = None
                 await asyncio.sleep(60)

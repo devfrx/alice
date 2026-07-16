@@ -15,7 +15,7 @@ from typing import Any
 import sqlalchemy as sa
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlmodel import select
+from sqlmodel import col, select
 
 from backend.db.models import UserPreference, _utcnow
 
@@ -27,11 +27,18 @@ class PreferencesLayerStore:
         self._session_factory = session_factory
 
     async def load(self) -> dict[str, Any]:
-        """Return all rows as a nested dict (invalid JSON rows skipped)."""
+        """Return all rows as a nested dict (invalid JSON rows skipped).
+
+        Rows are materialised shallowest-first so overlapping rows (a
+        dict-valued row plus a deeper leaf row for the same subtree, possible
+        in DBs written before ``save_paths`` pruned descendants) resolve
+        deterministically: the most-specific row wins instead of whichever
+        happened to come last in insertion order.
+        """
         async with self._session_factory() as session:
             rows = (await session.exec(select(UserPreference))).all()
         nested: dict[str, Any] = {}
-        for row in rows:
+        for row in sorted(rows, key=lambda r: (r.key.count("."), r.key)):
             try:
                 value = json.loads(row.value)
             except (json.JSONDecodeError, TypeError):
@@ -49,10 +56,25 @@ class PreferencesLayerStore:
         return nested
 
     async def save_paths(self, changes: dict[str, Any]) -> None:
-        """Upsert one row per dotted path (single transaction)."""
+        """Upsert one row per dotted path (single transaction).
+
+        Writing a path makes it authoritative for its whole subtree: any
+        descendant rows (``path.*``) are deleted in the same transaction.
+        A dict-valued row (PATCH replace-subtree semantics, e.g.
+        ``agent.prompts.tier_guidance``) therefore cannot leave stale deeper
+        rows behind that would resurrect pruned overrides on the next load.
+        """
         now = _utcnow()
         async with self._session_factory() as session:
             for path, value in changes.items():
+                await session.execute(
+                    sa.delete(UserPreference).where(
+                        # autoescape: "_" in a dotted path is a LIKE wildcard.
+                        col(UserPreference.key).startswith(
+                            path + ".", autoescape=True,
+                        )
+                    )
+                )
                 await session.merge(
                     UserPreference(key=path, value=json.dumps(value), updated_at=now)
                 )
@@ -77,7 +99,7 @@ class PreferencesLayerStore:
         async with self._session_factory() as session:
             rows = (await session.exec(select(UserPreference))).all()
             count = len(rows)
-            await session.execute(sa.delete(UserPreference))  # type: ignore[arg-type]
+            await session.execute(sa.delete(UserPreference))
             await session.commit()
         logger.info("Deleted {} persisted preferences", count)
         return count

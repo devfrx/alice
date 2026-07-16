@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import os
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,11 +18,9 @@ from backend.plugins.file_search.readers import (
 )
 from backend.plugins.file_search.searcher import (
     ForbiddenPathError,
-    _sync_walk,
     _validate_path,
     search_files,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -897,14 +892,14 @@ class TestPathSecurity:
         with (
             patch.object(Path, "resolve", return_value=target),
             patch.object(Path, "is_symlink", return_value=True),
+            pytest.raises(ValueError, match="Symlinks not allowed"),
         ):
-            with pytest.raises(ValueError, match="Symlinks not allowed"):
-                _validate_path(
-                    str(target),
-                    allowed_roots=[allowed],
-                    forbidden=[],
-                    follow_symlinks=False,
-                )
+            _validate_path(
+                str(target),
+                allowed_roots=[allowed],
+                forbidden=[],
+                follow_symlinks=False,
+            )
 
     def test_symlink_allowed_when_follow_symlinks_true(self):
         """Symlinks should be accepted when follow_symlinks=True."""

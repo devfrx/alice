@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
@@ -70,10 +70,12 @@ _UPDATE_SCHEMA: dict[str, Any] = {
         "echarts_option": {
             "type": "object",
             "description": "Nuova configurazione ECharts completa che sostituisce la precedente. "
-                "STRUTTURA: le chiavi top-level (xAxis, yAxis, series, tooltip, legend, grid, ecc.) "
+                "STRUTTURA: le chiavi top-level (xAxis, yAxis, series, tooltip, "
+                "legend, grid, ecc.) "
                 "devono essere chiavi dell'oggetto radice. "
                 "legend NON va messa dentro series — è una chiave top-level separata. "
-                "series contiene SOLO oggetti con type in: 'bar','line','pie','scatter','gauge','radar'. "
+                "series contiene SOLO oggetti con type in: "
+                "'bar','line','pie','scatter','gauge','radar'. "
                 "Esempio: {\"xAxis\":{\"data\":[...]}, \"yAxis\":{\"type\":\"value\"}, "
                 "\"series\":[{\"type\":\"bar\",\"data\":[...]}], "
                 "\"legend\":{\"data\":[\"serie1\"]}, \"tooltip\":{\"trigger\":\"axis\"}}",
@@ -153,7 +155,7 @@ class ChartGeneratorPlugin(BasePlugin):
             raise RuntimeError("Artifact registry non inizializzato.")
         return cast("ArtifactRegistry", registry)
 
-    async def initialize(self, ctx: "AppContext") -> None:
+    async def initialize(self, ctx: AppContext) -> None:
         await super().initialize(ctx)
         if not ctx.config.chart.enabled:
             self.logger.info("Plugin chart_generator disabilitato dalla configurazione.")
@@ -176,7 +178,8 @@ class ChartGeneratorPlugin(BasePlugin):
                     "(2) costruisci l'echarts_option JSON direttamente in questo tool — "
                     "NON scrivere codice Python/pseudocodice: non esiste un interprete, "
                     "tutto il processing avviene dentro echarts_option. "
-                    "REGOLE echarts_option: (1) series[].data deve avere la stessa lunghezza di xAxis/yAxis.data; "
+                    "REGOLE echarts_option: (1) series[].data deve avere "
+                    "la stessa lunghezza di xAxis/yAxis.data; "
                     "(2) non mischiare unità diverse nella stessa serie; "
                     "(3) NON includere 'title' — il titolo è già nell'header del viewer; "
                     "(4) pie chart: series[0].type='pie' con data=[{name,value}], no xAxis/yAxis."
@@ -276,7 +279,8 @@ class ChartGeneratorPlugin(BasePlugin):
         if len(option_str) > cfg.max_option_chars:
             return ToolResult.error(
                 f"La echarts_option supera il limite di {cfg.max_option_chars} caratteri "
-                f"(attuale: {len(option_str)}). Aggrega o riduci i dati prima di richiamare il tool."
+                f"(attuale: {len(option_str)}). "
+                "Aggrega o riduci i dati prima di richiamare il tool."
             )
 
         try:
@@ -294,7 +298,7 @@ class ChartGeneratorPlugin(BasePlugin):
             )
 
         aid = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         spec = ChartSpec(
             chart_id=str(aid),
             title=title,

@@ -9,7 +9,6 @@ from backend.plugins.chart_generator.option_validator import (
     validate_and_normalize_option,
 )
 
-
 # ---------------------------------------------------------------------------
 # Auto-fix
 # ---------------------------------------------------------------------------

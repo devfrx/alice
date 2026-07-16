@@ -1,16 +1,17 @@
 """Tests for PC Automation validators module (Phase 5)."""
 
 import subprocess
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from backend.plugins.pc_automation.validators import (
-    safe_subprocess,
-    sanitize_text_input,
-)
+import pytest
+
 from backend.plugins.pc_automation.constants import (
     COMMAND_TIMEOUT_S,
     MAX_COMMAND_OUTPUT_CHARS,
+)
+from backend.plugins.pc_automation.validators import (
+    safe_subprocess,
+    sanitize_text_input,
 )
 
 
@@ -77,7 +78,10 @@ class TestSafeSubprocess:
         mock_run.return_value = MagicMock(stdout="ok", stderr="", returncode=0)
         await safe_subprocess("echo")
         call_kwargs = mock_run.call_args
-        assert call_kwargs.kwargs.get("timeout") == COMMAND_TIMEOUT_S or call_kwargs[1].get("timeout") == COMMAND_TIMEOUT_S
+        assert (
+            call_kwargs.kwargs.get("timeout") == COMMAND_TIMEOUT_S
+            or call_kwargs[1].get("timeout") == COMMAND_TIMEOUT_S
+        )
 
     @pytest.mark.asyncio
     @patch("backend.plugins.pc_automation.validators.subprocess.run")

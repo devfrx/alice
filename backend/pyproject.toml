@@ -170,6 +170,20 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+# sys.path bootstrap must precede the backend imports in standalone scripts.
+"scripts/*" = ["E402"]
+# Campi pydantic camelCase: contratto wire del protocollo MCP memory —
+# rinominarli romperebbe i client.
+"api/routes/mcp_memory.py" = ["N815"]
+# Hook di lifecycle opzionali (on_app_startup, cancel_tool, ...): i plugin
+# li overridano solo se servono — corpi vuoti deliberati, non metodi astratti.
+"core/plugin_base.py" = ["B027"]
+# I parametri keyword-only `filter`/`id` rispecchiano la terminologia Qdrant
+# e i nomi dei campi persistiti; rinominarli rompe i chiamanti keyword.
+"core/protocols.py" = ["A002"]
+"services/memory_service.py" = ["A002"]
+
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection markers are designed to be called in argument
 # defaults — they are immutable sentinels, not real mutable-default bugs.

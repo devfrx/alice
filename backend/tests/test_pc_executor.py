@@ -1,20 +1,20 @@
 """Tests for PC Automation executor module (Phase 5)."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
 from backend.plugins.pc_automation.executor import (
     _tokenize_command,
-    exec_open_app,
-    exec_close_app,
-    exec_type_text,
-    exec_press_keys,
-    exec_get_active_window,
-    exec_get_running_apps,
-    exec_command,
-    exec_move_mouse,
-    exec_click,
     check_dependencies,
+    exec_click,
+    exec_close_app,
+    exec_command,
+    exec_get_active_window,
+    exec_move_mouse,
+    exec_open_app,
+    exec_press_keys,
+    exec_type_text,
 )
 
 

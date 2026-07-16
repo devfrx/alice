@@ -1,8 +1,8 @@
 """Tests for tool confirmation audit system (Phase 5)."""
 
 import uuid
+
 import pytest
-from datetime import datetime, timezone
 
 from backend.db.models import ToolConfirmationAudit
 
@@ -47,7 +47,9 @@ class TestToolConfirmationAuditModel:
             args_json='{"app_name": "notepad"}',
             risk_level="medium",
             user_approved=True,
-            thinking_content="The user asked to open Notepad so I will use the open_application tool.",
+            thinking_content=(
+                "The user asked to open Notepad so I will use the open_application tool."
+            ),
         )
         assert entry.thinking_content is not None
 

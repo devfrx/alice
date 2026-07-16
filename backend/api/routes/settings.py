@@ -8,6 +8,11 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 from pydantic import BaseModel
 
+from backend.api.routes.config_reactions import (
+    ALL_REACTIVE_PATHS,
+    apply_reactions,
+    diff_paths,
+)
 from backend.core.context import AppContext
 from backend.services.config_service import ConfigLayer
 
@@ -321,13 +326,23 @@ async def get_available_voice_engines() -> dict[str, Any]:
 async def reset_preferences(request: Request) -> dict[str, Any]:
     """Reset all persisted user preferences to defaults.
 
-    The next restart will use only YAML defaults.
+    Deletes every preference row, drops the in-memory preferences layer
+    (re-loading the now-empty store) and re-applies config reactions, so
+    YAML defaults are live immediately — no restart required.
     """
     ctx = _ctx(request)
     if ctx.preferences_store is None:
         raise HTTPException(503, "Preferences service not available")
     count = await ctx.preferences_store.delete_all()
+    if ctx.config_service is not None:
+        old_config = ctx.config
+        ctx.config = await ctx.config_service.load_preferences_layer(
+            ctx.preferences_store,
+        )
+        await apply_reactions(
+            ctx, diff_paths(old_config, ctx.config, ALL_REACTIVE_PATHS),
+        )
     return {
         "deleted": count,
-        "message": "Preferences reset. Restart to apply YAML defaults.",
+        "message": "Preferences reset. Defaults are live.",
     }

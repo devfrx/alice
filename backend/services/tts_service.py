@@ -21,6 +21,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
 
 def _resolve_resource_root() -> Path:
     """Return the directory that holds bundled ``models/`` and other data.
@@ -35,8 +37,6 @@ def _resolve_resource_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent.parent
-
-from loguru import logger
 
 if TYPE_CHECKING:
     from backend.core.config import TTSConfig

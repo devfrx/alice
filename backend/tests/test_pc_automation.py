@@ -6,11 +6,9 @@ and tool execution with mocked dependencies.
 
 from __future__ import annotations
 
-import base64
-import io
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
@@ -19,9 +17,7 @@ from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
-    ToolResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

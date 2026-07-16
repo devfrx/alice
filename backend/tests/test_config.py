@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import SecretStr, ValidationError
@@ -92,7 +93,9 @@ def test_plugins_enabled_list(config: AliceConfig) -> None:
     assert "mcp_client" in enabled
     assert "agent" in enabled
     assert "terminal" in enabled
-    assert len(enabled) == 20
+    # No exact-count assert: it was a change-detector that went stale on
+    # every plugin addition. The invariant that matters is no duplicates.
+    assert len(enabled) == len(set(enabled))
 
 
 def test_stt_defaults(config: AliceConfig) -> None:
@@ -300,6 +303,154 @@ async def test_removed_legacy_key_is_dropped_not_rejected(client) -> None:
     assert resp.status_code == 200
     assert resp.json()["email"]["imap_port"] == 995
     assert resp.json()["ui"]["theme"] == "light"
+
+
+# ---------------------------------------------------------------------------
+# Overlay in-place → layer (audit I1)
+# ---------------------------------------------------------------------------
+
+
+async def test_sync_model_survives_config_rebuild(client, app) -> None:
+    """sync-model scrive il layer preferences: un rebuild non lo perde più."""
+    ctx = app.state.context
+
+    class _StubManager:
+        async def list_models(self) -> dict[str, Any]:
+            return {
+                "models": [{
+                    "key": "org/synced-model",
+                    "loaded_instances": [{"id": "i1"}],
+                    "capabilities": {"thinking": True, "vision": False},
+                }],
+            }
+
+    saved = ctx.lmstudio_manager
+    ctx.lmstudio_manager = _StubManager()
+    try:
+        resp = await client.post("/api/config/sync-model")
+        assert resp.status_code == 200
+        assert resp.json() == {"synced": True, "model": "org/synced-model"}
+        assert ctx.config.llm.model == "org/synced-model"
+        assert ctx.config.llm.supports_thinking is True
+
+        # Prima: object.__setattr__ in-place, clobberato dal primo rebuild.
+        rebuilt = await ctx.config_service.rebuild()
+        assert rebuilt.llm.model == "org/synced-model"
+
+        prefs = await ctx.preferences_store.load()
+        assert prefs["llm"]["model"] == "org/synced-model"
+    finally:
+        ctx.lmstudio_manager = saved
+
+
+async def test_plugin_toggle_survives_config_rebuild(client, app) -> None:
+    """Il toggle plugin scrive il layer runtime: un rebuild non lo perde più."""
+    ctx = app.state.context
+    target = "system_info"
+    if target not in ctx.config.plugins.enabled:
+        pytest.skip("system_info not enabled in the test app")
+
+    resp = await client.patch(f"/api/plugins/{target}", json={"enabled": False})
+    assert resp.status_code == 200
+    assert target not in ctx.config.plugins.enabled
+
+    # Prima: lista mutata in-place, clobberata dal primo rebuild.
+    rebuilt = await ctx.config_service.rebuild()
+    assert target not in rebuilt.plugins.enabled
+
+
+# ---------------------------------------------------------------------------
+# PUT /config misto — tutta la validazione PRIMA di ogni commit
+# (audit Triage#1 / Triage#4)
+# ---------------------------------------------------------------------------
+
+
+async def test_mixed_put_invalid_pref_does_not_commit_secret(client, app) -> None:
+    """Un segreto valido non deve atterrare se la parte preferenze 422a."""
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config",
+        json={"llm": {"temperature": 99, "openrouter_api_key": "sk-or-must-not-land"}},
+    )
+    assert resp.status_code == 422
+    assert "llm.openrouter_api_key" not in ctx.secret_store.cached()
+
+
+async def test_mixed_put_oversize_secret_does_not_commit_pref(client, app) -> None:
+    """Una preferenza valida non deve atterrare se il segreto 400a."""
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config",
+        json={"ui": {"theme": "light"}, "llm": {"openrouter_api_key": "x" * 600}},
+    )
+    assert resp.status_code == 400
+    prefs = await ctx.preferences_store.load()
+    assert prefs.get("ui", {}).get("theme") != "light"
+
+
+async def test_secret_update_without_store_returns_503(client, app) -> None:
+    """Store segreti assente = 503 esplicito, non un 200 silenzioso."""
+    ctx = app.state.context
+    saved = ctx.secret_store
+    ctx.secret_store = None
+    try:
+        resp = await client.put(
+            "/api/config",
+            json={"ui": {"theme": "light"}, "llm": {"openrouter_api_key": "sk-or-x"}},
+        )
+        assert resp.status_code == 503
+        # Pre-flight: neanche la parte preferenze del body misto è atterrata.
+        prefs = await ctx.preferences_store.load()
+        assert prefs.get("ui", {}).get("theme") != "light"
+    finally:
+        ctx.secret_store = saved
+
+
+# ---------------------------------------------------------------------------
+# PUT /config — nested bodies flatten to leaf paths (audit M2)
+# ---------------------------------------------------------------------------
+
+
+def test_flatten_update_body_recurses_to_leaves() -> None:
+    from backend.api.routes.config import _flatten_update_body
+
+    flat = _flatten_update_body(
+        {"agent": {"reflection": {"enabled": True}, "planning": False}},
+    )
+    assert flat == {"agent.reflection.enabled": True, "agent.planning": False}
+
+
+def test_flatten_update_body_preserves_list_values() -> None:
+    from backend.api.routes.config import _flatten_update_body
+
+    flat = _flatten_update_body({"llm": {"openrouter_favorites": ["org/model"]}})
+    assert flat == {"llm.openrouter_favorites": ["org/model"]}
+
+
+def test_flatten_update_body_empty_dict_is_noop() -> None:
+    from backend.api.routes.config import _flatten_update_body
+
+    assert _flatten_update_body({"agent": {"prompts": {}}}) == {}
+
+
+def test_flatten_update_body_non_dict_section_rejected() -> None:
+    from fastapi import HTTPException
+
+    from backend.api.routes.config import _flatten_update_body
+
+    with pytest.raises(HTTPException):
+        _flatten_update_body({"ui": 5})
+
+
+async def test_put_three_level_body_persists_leaf_rows(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config", json={"agent": {"reflection": {"enabled": True}}},
+    )
+    assert resp.status_code == 200
+    assert ctx.config.agent.reflection.enabled is True
+    # The persisted row is the LEAF path — no dict-valued intermediate row.
+    assert await ctx.preferences_store.delete_paths(["agent.reflection.enabled"]) == 1
 
 
 # ---------------------------------------------------------------------------

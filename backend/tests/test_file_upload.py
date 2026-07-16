@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-import io
 import uuid
 from typing import Any
-from unittest.mock import patch
 
-import pytest
-from fastapi import FastAPI
 from httpx import AsyncClient
 
 from backend.core.config import PROJECT_ROOT
-
 
 # ---------------------------------------------------------------------------
 # Helpers

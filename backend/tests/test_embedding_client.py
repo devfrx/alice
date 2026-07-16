@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -31,7 +30,6 @@ def _make_httpx_response(
     status_code: int = 200,
 ) -> httpx.Response:
     """Create an httpx.Response from a dict payload."""
-    import json
 
     return httpx.Response(
         status_code=status_code,
@@ -53,11 +51,11 @@ async def test_openai_encode_success():
     expected = [0.1, 0.2, 0.3]
     mock_response = _make_httpx_response(_openai_response([expected]))
 
-    with patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient:
+    with patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls:
         instance = AsyncMock()
         instance.post = AsyncMock(return_value=mock_response)
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -75,11 +73,11 @@ async def test_openai_encode_batch():
     vectors = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
     mock_response = _make_httpx_response(_openai_response(vectors))
 
-    with patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient:
+    with patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls:
         instance = AsyncMock()
         instance.post = AsyncMock(return_value=mock_response)
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -103,10 +101,10 @@ async def test_openai_failure_fastembed_fallback():
     fallback_vec = [0.9, 0.8, 0.7]
 
     with (
-        patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient,
+        patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls,
         patch(
             "backend.services.embedding_client.FastEmbedClient",
-        ) as MockFallback,
+        ) as mock_fallback_cls,
     ):
         # OpenAI side — raise ConnectError
         instance = AsyncMock()
@@ -114,12 +112,12 @@ async def test_openai_failure_fastembed_fallback():
             side_effect=httpx.ConnectError("connection refused"),
         )
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         # fastembed side — return a vector
         fb_instance = MagicMock()
         fb_instance.encode = AsyncMock(return_value=fallback_vec)
-        MockFallback.return_value = fb_instance
+        mock_fallback_cls.return_value = fb_instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -139,21 +137,21 @@ async def test_openai_timeout_fastembed_fallback():
     fallback_vec = [0.5, 0.4, 0.3]
 
     with (
-        patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient,
+        patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls,
         patch(
             "backend.services.embedding_client.FastEmbedClient",
-        ) as MockFallback,
+        ) as mock_fallback_cls,
     ):
         instance = AsyncMock()
         instance.post = AsyncMock(
             side_effect=httpx.ReadTimeout("read timed out"),
         )
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         fb_instance = MagicMock()
         fb_instance.encode = AsyncMock(return_value=fallback_vec)
-        MockFallback.return_value = fb_instance
+        mock_fallback_cls.return_value = fb_instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -177,10 +175,10 @@ async def test_openai_http_status_error_fastembed_fallback():
     )
 
     with (
-        patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient,
+        patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls,
         patch(
             "backend.services.embedding_client.FastEmbedClient",
-        ) as MockFallback,
+        ) as mock_fallback_cls,
     ):
         instance = AsyncMock()
         instance.post = AsyncMock(
@@ -190,11 +188,11 @@ async def test_openai_http_status_error_fastembed_fallback():
             ),
         )
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         fb_instance = MagicMock()
         fb_instance.encode = AsyncMock(return_value=fallback_vec)
-        MockFallback.return_value = fb_instance
+        mock_fallback_cls.return_value = fb_instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -229,10 +227,10 @@ async def test_close():
     """close() calls the underlying HTTP client's aclose."""
     from backend.services.embedding_client import EmbeddingClient
 
-    with patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient:
+    with patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls:
         instance = AsyncMock()
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -252,13 +250,13 @@ async def test_fallback_disabled():
     """With fallback_enabled=False, OpenAI failure raises instead of falling back."""
     from backend.services.embedding_client import EmbeddingClient
 
-    with patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient:
+    with patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls:
         instance = AsyncMock()
         instance.post = AsyncMock(
             side_effect=httpx.ConnectError("connection refused"),
         )
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         client = EmbeddingClient(
             base_url=BASE_URL, model=MODEL, dimensions=DIMS,
@@ -275,7 +273,7 @@ async def test_fastembed_not_available():
     from backend.services.embedding_client import EmbeddingClient
 
     with (
-        patch("backend.services.embedding_client.httpx.AsyncClient") as MockClient,
+        patch("backend.services.embedding_client.httpx.AsyncClient") as mock_client_cls,
         patch(
             "backend.services.embedding_client.FastEmbedClient",
             side_effect=ImportError("No module named 'fastembed'"),
@@ -283,7 +281,7 @@ async def test_fastembed_not_available():
     ):
         instance = AsyncMock()
         instance.aclose = AsyncMock()
-        MockClient.return_value = instance
+        mock_client_cls.return_value = instance
 
         # FastEmbedClient() is called during __init__ when fallback_enabled,
         # so ImportError propagates at construction time.

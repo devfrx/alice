@@ -7,10 +7,9 @@ ping/pong, and TTS streaming against the real ``voice.py`` router.
 from __future__ import annotations
 
 import json
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from starlette.testclient import TestClient
@@ -18,7 +17,6 @@ from starlette.testclient import TestClient
 from backend.api.routes import voice as voice_module
 from backend.core.app import create_app
 from backend.core.config import load_config
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -331,7 +329,7 @@ class TestVoiceConnectionLimit:
             voice_module._MAX_VOICE_PER_IP
         )
         client = TestClient(voice_app)
-        with client.websocket_connect("/api/voice/ws/voice") as ws:
+        with client.websocket_connect("/api/voice/ws/voice"):
             # Server accepts then immediately closes.
             pass
 

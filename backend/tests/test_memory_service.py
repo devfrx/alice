@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from backend.core.config import MemoryConfig
 from backend.services.memory_service import MemoryEntry, MemoryService
@@ -62,7 +62,7 @@ class TestMemoryServiceCRUD:
     async def test_add_with_explicit_expires(
         self, memory_service, mock_qdrant_service,
     ):
-        expires = datetime(2026, 12, 31, tzinfo=timezone.utc)
+        expires = datetime(2026, 12, 31, tzinfo=UTC)
         entry = await memory_service.add(
             "session data", scope="session", expires_at=expires,
         )
@@ -176,7 +176,7 @@ class TestMemoryEntry:
             category="general",
             source="user",
             conversation_id=None,
-            created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
             expires_at=None,
             embedding_model="test-model",
         )

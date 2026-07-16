@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -33,7 +33,7 @@ def _make_entry(
         scope=scope,
         category=category,
         source="llm",
-        created_at=datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC),
         expires_at=None,
         conversation_id=None,
         embedding_model="test-model",

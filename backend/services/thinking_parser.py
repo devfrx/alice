@@ -66,16 +66,15 @@ class ThinkTagParser:
         results: list[tuple[str, str]] = []
 
         while self._buffer:
-            if self._open is None:
-                # Tag format unknown yet — try to detect it.
-                if not self._try_detect():
-                    # No complete open tag found; hold back partial prefixes.
-                    safe, held = self._split_at_any_partial_open(self._buffer)
-                    if safe:
-                        results.append(("content", safe))
-                    self._buffer = held
-                    break
-                # Detected — fall through to normal parsing.
+            # Tag format unknown yet — try to detect it; on success fall
+            # through to normal parsing.
+            if self._open is None and not self._try_detect():
+                # No complete open tag found; hold back partial prefixes.
+                safe, held = self._split_at_any_partial_open(self._buffer)
+                if safe:
+                    results.append(("content", safe))
+                self._buffer = held
+                break
 
             tag = self._close if self._in_thinking else self._open
             assert tag is not None  # guaranteed after detection

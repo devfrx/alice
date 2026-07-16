@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from backend.services.turn.tool_loop import run_tool_loop
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
 from backend.db.models import Message
+from backend.services.turn.tool_loop import run_tool_loop
 
 # ---------------------------------------------------------------------------
 # Mock helpers

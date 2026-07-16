@@ -28,8 +28,8 @@ _WIN32_AVAILABLE: bool = False
 
 if _IS_WINDOWS:
     try:
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
         from comtypes import CLSCTX_ALL
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
         _PYCAW_AVAILABLE = True
     except ImportError:

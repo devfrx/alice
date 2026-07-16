@@ -26,7 +26,6 @@ from loguru import logger
 
 from backend.plugins.cad_generator.client import GenerationResult
 
-
 # Pipeline types mirror ``trellis2multiview_server.server._ALLOWED_PIPELINE_TYPES``.
 _ALLOWED_PIPELINE_TYPES: frozenset[str] = frozenset(
     {"512", "1024", "1024_cascade", "1536_cascade"}

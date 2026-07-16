@@ -18,9 +18,10 @@ adapters live in ``backend.core.managed_services``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal, Protocol, runtime_checkable
 
 from loguru import logger
@@ -152,7 +153,7 @@ class ServiceOrchestrator:
             last_health=ServiceHealth(
                 status="down",
                 detail="not started",
-                last_check=datetime.now(timezone.utc),
+                last_check=datetime.now(UTC),
             ),
         )
         logger.debug(
@@ -262,10 +263,8 @@ class ServiceOrchestrator:
             for task in (entry.poll_task, entry.restart_task):
                 if task is None:
                     continue
-                try:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
-                except (asyncio.CancelledError, Exception):
-                    pass
             entry.poll_task = None
             entry.restart_task = None
 
@@ -290,10 +289,8 @@ class ServiceOrchestrator:
             for task in (entry.poll_task, entry.restart_task):
                 if task is None:
                     continue
-                try:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
-                except (asyncio.CancelledError, Exception):
-                    pass
             entry.poll_task = None
             entry.restart_task = None
 
@@ -339,10 +336,8 @@ class ServiceOrchestrator:
         entry = self._entries[name]
         if entry.restart_task is not None and not entry.restart_task.done():
             entry.restart_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await entry.restart_task
-            except (asyncio.CancelledError, Exception):
-                pass
             entry.restart_task = None
         entry.backoff_attempts = 0
         await self._stop_one(name)
@@ -412,7 +407,7 @@ class ServiceOrchestrator:
             await asyncio.wait_for(
                 entry.service.stop(), timeout=_STOP_TIMEOUT_S,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 "Orchestrator: '{}' stop() exceeded {}s — wrapper must "
                 "have force-killed by now", name, _STOP_TIMEOUT_S,
@@ -425,10 +420,8 @@ class ServiceOrchestrator:
     async def _restart_with_backoff(self, name: str) -> None:
         entry = self._entries[name]
         # Stop first (best-effort).
-        try:
+        with contextlib.suppress(Exception):
             await self._stop_one(name)
-        except Exception:
-            pass
 
         for attempt, delay in enumerate(_BACKOFF_SCHEDULE, start=1):
             if self._stopped:
@@ -502,7 +495,7 @@ class ServiceOrchestrator:
             health = ServiceHealth(
                 status="down",
                 detail=f"health probe error: {exc}",
-                last_check=datetime.now(timezone.utc),
+                last_check=datetime.now(UTC),
             )
         await self._apply_health(name, health)
 
@@ -527,7 +520,7 @@ class ServiceOrchestrator:
         health = ServiceHealth(
             status=status,
             detail=detail,
-            last_check=datetime.now(timezone.utc),
+            last_check=datetime.now(UTC),
         )
         prev = entry.last_health
         entry.last_health = health

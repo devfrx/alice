@@ -123,7 +123,7 @@ class Message(SQLModel, table=True):
         default=None,
         description="Real token count from LLM API (stored after response).",
     )
-    usage: Optional[Any] = Field(
+    usage: Any | None = Field(
         default=None,
         sa_column=sa.Column(sa.JSON, nullable=True),
         description=(

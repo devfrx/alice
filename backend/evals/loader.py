@@ -27,11 +27,13 @@ def load_scenario(path: Path) -> Scenario:
         Lo :class:`Scenario` validato.
 
     Raises:
-        ScenarioLoadError: YAML illeggibile, schema invalido o ``id``
-            diverso dallo stem del filename.
+        ScenarioLoadError: YAML illeggibile (I/O o sintassi), schema invalido o
+            ``id`` diverso dallo stem del filename.
     """
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ScenarioLoadError(f"{path.name}: lettura fallita — {exc}") from exc
     except yaml.YAMLError as exc:
         raise ScenarioLoadError(f"{path.name}: YAML invalido — {exc}") from exc
     try:

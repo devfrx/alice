@@ -41,9 +41,20 @@ def test_load_scenario_invalid_yaml(tmp_path: Path) -> None:
 def test_load_scenarios_sorted_and_filtered(tmp_path: Path) -> None:
     for sid in ("b-02", "a-01"):
         (tmp_path / f"{sid}.yaml").write_text(
-            _VALID_YAML.replace("fs-demo-01", sid), encoding="utf-8",
+            _VALID_YAML.replace("fs-demo-01", sid),
+            encoding="utf-8",
         )
     all_scenarios = load_scenarios(tmp_path)
     assert [s.id for s in all_scenarios] == ["a-01", "b-02"]
     filtered = load_scenarios(tmp_path, filter_substring="b-")
     assert [s.id for s in filtered] == ["b-02"]
+
+
+def test_load_scenarios_propagates_invalid_file(tmp_path: Path) -> None:
+    (tmp_path / "a-01.yaml").write_text(
+        _VALID_YAML.replace("fs-demo-01", "a-01"),
+        encoding="utf-8",
+    )
+    (tmp_path / "rotto.yaml").write_text("id: [non chiuso", encoding="utf-8")
+    with pytest.raises(ScenarioLoadError):
+        load_scenarios(tmp_path)

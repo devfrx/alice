@@ -94,6 +94,68 @@ async def test_secret_paths_rejected_on_every_layer(
 
 
 @pytest.mark.asyncio
+async def test_fossil_row_does_not_poison_layer_or_brick_writes(
+    session_factory, tmp_path,
+) -> None:
+    """A fossil ``agent.enabled`` row must never brick the write path.
+
+    Reproduces the real-DB blocker: an old schema had ``AgentConfig.enabled``,
+    today's ``AgentConfig`` is ``extra=forbid`` and has no such field. If the
+    preferences layer committed before validation, ``AliceConfig(**merged)``
+    would raise, the poisoned dict would stay committed, and every later
+    ``set_many`` would re-raise forever (permanent 422). Here the layer must
+    stay unmounted instead, and subsequent writes must still succeed.
+    """
+    store = PreferencesLayerStore(session_factory)
+    await store.save_paths({"agent": {"enabled": True}})
+    svc = LayeredConfigService(
+        defaults_path=tmp_path / "d.yaml",
+        system_path=tmp_path / "s.yaml",
+        user_path=tmp_path / "u.yaml",
+    )
+
+    resolved = await svc.load_preferences_layer(store)  # must not raise
+
+    # Resolved config is still valid (defaults) — nothing bricked.
+    assert resolved.agent.planning is True
+    assert not hasattr(resolved.agent, "enabled")
+
+    # Write path must not be bricked by the poisoned layer.
+    await svc.set("ui.theme", "dark", layer=ConfigLayer.PREFERENCES)
+    assert svc.get_resolved().ui.theme == "dark"
+
+
+@pytest.mark.asyncio
+async def test_migration_then_load_mounts_only_valid_rows(
+    session_factory, tmp_path,
+) -> None:
+    """End-to-end bootstrap order: migration prunes, then the layer mounts clean.
+
+    Seeds the fossil ``agent.enabled`` row alongside a valid one directly in
+    the DB store (bypassing policy-gated ``set``), runs
+    ``run_secret_migrations`` (which prunes schema-unknown rows), then loads
+    the preferences layer — mirroring what the real bootstrap does at
+    startup. Only the valid row should end up mounted.
+    """
+    from backend.services.config_migration import run_secret_migrations
+    from backend.services.secret_store import InMemorySecretStore
+
+    store = PreferencesLayerStore(session_factory)
+    await store.save_paths({"agent.enabled": True, "ui.theme": "dark"})
+    svc = LayeredConfigService(
+        defaults_path=tmp_path / "d.yaml",
+        system_path=tmp_path / "s.yaml",
+        user_path=tmp_path / "u.yaml",
+    )
+
+    await run_secret_migrations(InMemorySecretStore(), session_factory, svc, email_username="")
+    resolved = await svc.load_preferences_layer(store)
+
+    assert resolved.ui.theme == "dark"
+    assert svc.get_layer(ConfigLayer.PREFERENCES) == {"ui": {"theme": "dark"}}
+
+
+@pytest.mark.asyncio
 async def test_out_of_policy_path_rejected_on_preferences(
     session_factory, tmp_path,
 ) -> None:

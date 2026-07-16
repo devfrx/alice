@@ -19,11 +19,31 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
+from backend.core.config import AliceConfig
 from backend.db.models import UserPreference
 from backend.services.config_policy import SECRET_PATHS, is_preference_writable
 from backend.services.config_service import ConfigLayer, LayeredConfigService
 
 _LEGACY_KEYRING_SERVICE = "alice"
+
+
+def _path_exists_in_schema(path: str, root: AliceConfig) -> bool:
+    """Return whether dotted ``path`` resolves against ``root``'s schema.
+
+    Walks each segment via ``getattr`` starting from ``root`` (a default
+    :class:`AliceConfig` instance the caller builds once). Every segment,
+    including the final one, must resolve via ``hasattr`` for the path to
+    be considered part of the current schema. A policy-writable path
+    (``is_preference_writable``) that fails this check is a fossil left
+    behind by a schema change — e.g. a removed field like the old
+    ``agent.enabled`` — and should be pruned rather than trusted.
+    """
+    node: Any = root
+    for part in path.split("."):
+        if not hasattr(node, part):
+            return False
+        node = getattr(node, part)
+    return True
 
 
 async def run_secret_migrations(
@@ -53,7 +73,8 @@ async def run_secret_migrations(
 async def _migrate_db_rows(
     secret_store: Any, session_factory: async_sessionmaker[SQLModelAsyncSession],
 ) -> None:
-    """Secret rows -> store; out-of-policy rows -> deleted."""
+    """Secret rows -> store; out-of-policy or schema-unknown rows -> deleted."""
+    schema_root = AliceConfig()
     async with session_factory() as session:
         rows = (await session.exec(select(UserPreference))).all()
         dead_keys: list[str] = []
@@ -68,6 +89,12 @@ async def _migrate_db_rows(
                     logger.info("Migrated secret '{}' from DB to keyring", row.key)
                 dead_keys.append(row.key)
             elif not is_preference_writable(row.key):
+                dead_keys.append(row.key)
+            elif not _path_exists_in_schema(row.key, schema_root):
+                logger.warning(
+                    "Pruning preference '{}': path no longer exists in the config schema",
+                    row.key,
+                )
                 dead_keys.append(row.key)
         if dead_keys:
             await session.execute(

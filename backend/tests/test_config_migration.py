@@ -58,6 +58,34 @@ async def test_db_secret_row_moves_to_store_and_row_deleted(
 
 
 @pytest.mark.asyncio
+async def test_schema_unknown_fossil_row_is_pruned(session_factory, tmp_path) -> None:
+    """A row admitted by policy but unknown to the current schema is a fossil.
+
+    ``agent.enabled`` existed in an old schema version; today's
+    ``AgentConfig`` has no such field (``extra=forbid``). The migration
+    must prune it even though ``is_preference_writable("agent.enabled")``
+    is True (the "agent." prefix still admits it).
+    """
+    await _seed_pref(session_factory, "agent.enabled", True)
+    await _seed_pref(session_factory, "ui.theme", "dark")
+    store = InMemorySecretStore()
+    svc = LayeredConfigService(
+        defaults_path=tmp_path / "d.yaml",
+        system_path=tmp_path / "s.yaml",
+        user_path=tmp_path / "u.yaml",
+    )
+
+    await run_secret_migrations(store, session_factory, svc, email_username="")
+
+    from sqlmodel import select
+    async with session_factory() as session:
+        rows = (await session.exec(select(UserPreference))).all()
+    keys = {r.key for r in rows}
+    assert "agent.enabled" not in keys   # fossile pruned
+    assert "ui.theme" in keys            # valid preference survives
+
+
+@pytest.mark.asyncio
 async def test_yaml_secret_is_stripped_and_stored(session_factory, tmp_path) -> None:
     user_yaml = tmp_path / "u.yaml"
     user_yaml.write_text(

@@ -37,6 +37,7 @@ from typing import Any
 
 import yaml
 from loguru import logger
+from pydantic import ValidationError
 
 from backend.core.config import (
     DEFAULT_CONFIG_PATH,
@@ -287,21 +288,49 @@ class LayeredConfigService:
     async def load_preferences_layer(self, store: Any) -> AliceConfig:
         """Load the DB-backed preferences layer and keep the store for writes.
 
+        Validates a tentative merge BEFORE committing the layer — mirrors
+        :meth:`set_many`. A DB fossil (a preference row whose path no longer
+        exists in the current schema, e.g. a removed ``agent.enabled``) must
+        never brick the write path: if validation fails, the preferences
+        layer is left as it was (empty at boot) and the failure is only
+        logged, but the store reference is still kept so later ``set``/
+        ``set_many`` calls persist normally.
+
         Args:
             store: A :class:`~backend.services.preferences_service.
                 PreferencesLayerStore` (or anything with an async ``load()``
                 returning a nested dict).
 
         Returns:
-            The newly resolved :class:`AliceConfig`.
+            The newly resolved :class:`AliceConfig` on success, or the
+            previously resolved config unchanged if the loaded layer fails
+            validation.
         """
         data = await store.load()
+        tentative = migrate_legacy_config_keys(data)
         async with self._lock:
             self._preferences_store = store
-            self._layers[ConfigLayer.PREFERENCES] = migrate_legacy_config_keys(data)
-            self._rebuild()
-            assert self._resolved is not None
-            return self._resolved
+
+            merged: dict[str, Any] = {}
+            for lyr in _LAYER_ORDER:
+                src = tentative if lyr is ConfigLayer.PREFERENCES else self._layers[lyr]
+                _deep_merge(merged, src)
+            self._hydrate(merged)
+
+            try:
+                new_resolved = AliceConfig(**merged)
+            except ValidationError as exc:
+                logger.warning(
+                    "Preferences layer failed validation, leaving it unmounted "
+                    "(store kept for future writes): {}",
+                    exc,
+                )
+                assert self._resolved is not None
+                return self._resolved
+
+            self._layers[ConfigLayer.PREFERENCES] = tentative
+            self._resolved = new_resolved
+            return new_resolved
 
     # -- merge / validation ----------------------------------------------
 

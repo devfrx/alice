@@ -582,12 +582,10 @@ export interface paths {
         get: operations["get_config_api_config_get"];
         /**
          * Update Config
-         * @description Update configuration values at runtime.
+         * @description Update configuration values (preferences layer + secrets).
          *
-         *     Body: a partial config dict with only the keys to change.
-         *
-         *     Independent preferences (TTS, STT, voice, UI, etc.) are automatically
-         *     persisted to the database so they survive restarts.
+         *     Body: partial nested config dict. Unknown/out-of-policy paths -> 400,
+         *     invalid values -> 422, secrets routed to the SecretStore.
          */
         put: operations["update_config_api_config_put"];
         post?: never;
@@ -601,14 +599,20 @@ export interface paths {
          *     Body schema::
          *
          *         {
-         *             "path":  "llm.temperature",   # dotted path, required
-         *             "value": 0.9,                  # any JSON value
-         *             "layer": "user"                # optional, default "user"
+         *             "path":  "llm.temperature",     # dotted path, required
+         *             "value": 0.9,                    # any JSON value
+         *             "layer": "preferences"           # optional, default "preferences"
          *         }
          *
-         *     Allowed layers: ``user`` (default, persisted to user.yaml),
-         *     ``system`` (persisted to system.yaml — admin use), ``runtime``
-         *     (in-memory, lost on restart).  ``defaults`` is read-only.
+         *     Allowed layers: ``preferences`` (default, persisted to the DB-backed
+         *     preferences layer — policy-gated), ``user`` (persisted to user.yaml —
+         *     power-user escape hatch), ``system`` (persisted to system.yaml — admin
+         *     use), ``runtime`` (in-memory, lost on restart).  ``defaults`` is
+         *     read-only.
+         *
+         *     Shape: the full redacted ``AliceConfig`` (same as ``/config/resolved``)
+         *     — deliberately left as ``dict[str, Any]``, not the ``ConfigResponse``
+         *     contract.
          */
         patch: operations["patch_config_api_config_patch"];
         trace?: never;
@@ -626,6 +630,9 @@ export interface paths {
          *
          *     Useful for diagnostics: shows exactly which layer contributes each
          *     value before the merge step.
+         *
+         *     Shape: per-layer redacted config dicts — deliberately left as
+         *     ``dict[str, Any]`` (not the stable ``ConfigResponse`` contract).
          */
         get: operations["get_config_layers_api_config_layers_get"];
         put?: never;
@@ -671,6 +678,9 @@ export interface paths {
         /**
          * Reload Config
          * @description Re-read disk layers (defaults/system/user) and revalidate.
+         *
+         *     Shape: the full redacted ``AliceConfig`` — deliberately left as
+         *     ``dict[str, Any]``, not the ``ConfigResponse`` contract.
          */
         post: operations["reload_config_api_config_reload_post"];
         delete?: never;
@@ -689,6 +699,10 @@ export interface paths {
         /**
          * Get Resolved Config
          * @description Return the full merged-and-validated configuration (secrets redacted).
+         *
+         *     Shape: the entire redacted ``AliceConfig`` — deliberately left as
+         *     ``dict[str, Any]`` rather than pinned to a model (see ``ConfigResponse``
+         *     for the narrower, stable ``GET /api/config`` contract).
          */
         get: operations["get_resolved_config_api_config_resolved_get"];
         put?: never;
@@ -2537,6 +2551,19 @@ export interface components {
             name: string;
         };
         /**
+         * ConfigResponse
+         * @description ``GET /api/config`` and ``PUT /api/config`` response shape.
+         */
+        ConfigResponse: {
+            email: components["schemas"]["EmailSection"];
+            llm: components["schemas"]["LLMSection"];
+            pc_automation: components["schemas"]["PCAutomationSection"];
+            stt: components["schemas"]["STTSection"];
+            tts: components["schemas"]["TTSSection"];
+            ui: components["schemas"]["UISection"];
+            voice: components["schemas"]["VoiceSection"];
+        };
+        /**
          * ConversationExport
          * @description Full conversation export (REST response body and backup file schema).
          */
@@ -2677,6 +2704,40 @@ export interface components {
             quantization?: string | null;
         };
         /**
+         * EmailSection
+         * @description ``GET /api/config`` ``email`` section (without ``use_keyring``).
+         */
+        EmailSection: {
+            /** Archive Folder */
+            archive_folder: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Fetch Last N */
+            fetch_last_n: number;
+            /** Imap Host */
+            imap_host: string;
+            /** Imap Idle Enabled */
+            imap_idle_enabled: boolean;
+            /** Imap Port */
+            imap_port: number;
+            /** Imap Ssl */
+            imap_ssl: boolean;
+            /** Max Fetch */
+            max_fetch: number;
+            /** Password Configured */
+            password_configured: boolean;
+            /** Service Running */
+            service_running: boolean;
+            /** Smtp Host */
+            smtp_host: string;
+            /** Smtp Port */
+            smtp_port: number;
+            /** Smtp Ssl */
+            smtp_ssl: boolean;
+            /** Username */
+            username: string;
+        };
+        /**
          * EntityInput
          * @description Single entity to create.
          */
@@ -2802,6 +2863,46 @@ export interface components {
             relationType: string;
             /** To */
             to: string;
+        };
+        /**
+         * LLMSection
+         * @description ``GET /api/config`` ``llm`` section.
+         */
+        LLMSection: {
+            /** Base Url */
+            base_url: string;
+            /** Context Compression Enabled */
+            context_compression_enabled: boolean;
+            /** Context Compression Reserve */
+            context_compression_reserve: number;
+            /** Context Compression Threshold */
+            context_compression_threshold: number;
+            /** Max Tokens */
+            max_tokens: number;
+            /** Max Tool Iterations */
+            max_tool_iterations: number;
+            /** Model */
+            model: string;
+            /** Openrouter Api Key Configured */
+            openrouter_api_key_configured: boolean;
+            /** Openrouter Favorites */
+            openrouter_favorites: string[];
+            /** Openrouter Model */
+            openrouter_model: string;
+            /** Provider */
+            provider: string;
+            /** Supports Thinking */
+            supports_thinking: boolean;
+            /** Supports Vision */
+            supports_vision: boolean;
+            /** Temperature */
+            temperature: number;
+            /** Tool Rag Enabled */
+            tool_rag_enabled: boolean;
+            /** Tool Rag Top K */
+            tool_rag_top_k: number;
+            /** User Preferred Name */
+            user_preferred_name: string;
         };
         /**
          * LoadModelRequest
@@ -3029,6 +3130,19 @@ export interface components {
             prompt?: number | null;
         };
         /**
+         * PCAutomationSection
+         * @description ``GET /api/config`` ``pc_automation`` section.
+         *
+         *     Storage moved to the neutral ``permissions`` block in Fase 2; the
+         *     response keeps the historical shape for the settings UI.
+         */
+        PCAutomationSection: {
+            /** Confirmations Enabled */
+            confirmations_enabled: boolean;
+            /** Screenshot Lockout S */
+            screenshot_lockout_s: number;
+        };
+        /**
          * PermissionMode
          * @description The authorization tier governing a conversation's tool-calls.
          * @enum {string}
@@ -3149,6 +3263,22 @@ export interface components {
             to: string;
         };
         /**
+         * STTSection
+         * @description ``GET /api/config`` ``stt`` section.
+         */
+        STTSection: {
+            /** Device */
+            device: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Engine */
+            engine: string;
+            /** Language */
+            language: string | null;
+            /** Model */
+            model: string;
+        };
+        /**
          * ScopeResponse
          * @description The workspace scope for a single conversation.
          *
@@ -3207,6 +3337,30 @@ export interface components {
         SystemPromptResponse: {
             /** System Prompt Enabled */
             system_prompt_enabled: boolean;
+        };
+        /**
+         * TTSSection
+         * @description ``GET /api/config`` ``tts`` section.
+         */
+        TTSSection: {
+            /** Enabled */
+            enabled: boolean;
+            /** Engine */
+            engine: string;
+            /** Kokoro Language */
+            kokoro_language: string;
+            /** Kokoro Model */
+            kokoro_model: string;
+            /** Kokoro Voice */
+            kokoro_voice: string;
+            /** Kokoro Voices */
+            kokoro_voices: string;
+            /** Sample Rate */
+            sample_rate: number;
+            /** Speed */
+            speed: number;
+            /** Voice */
+            voice: string;
         };
         /**
          * TasksResponse
@@ -3394,6 +3548,16 @@ export interface components {
             tools_enabled: boolean;
         };
         /**
+         * UISection
+         * @description ``GET /api/config`` ``ui`` section.
+         */
+        UISection: {
+            /** Language */
+            language: string;
+            /** Theme */
+            theme: string;
+        };
+        /**
          * UnloadModelRequest
          * @description Body for ``POST /models/unload``.
          */
@@ -3456,6 +3620,18 @@ export interface components {
             /** Mode */
             mode: string;
             rag: components["schemas"]["RagReadinessResponse"];
+        };
+        /**
+         * VoiceSection
+         * @description ``GET /api/config`` ``voice`` section.
+         */
+        VoiceSection: {
+            /** Activation Mode */
+            activation_mode: string;
+            /** Auto Tts Response */
+            auto_tts_response: boolean;
+            /** Wake Word */
+            wake_word: string;
         };
         /**
          * WsAgentCriticInvoked
@@ -6618,9 +6794,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConfigResponse"];
                 };
             };
         };
@@ -6640,9 +6814,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConfigResponse"];
                 };
             };
         };

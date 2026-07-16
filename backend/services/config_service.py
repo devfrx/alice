@@ -30,12 +30,14 @@ from __future__ import annotations
 import asyncio
 import copy
 import os
+from collections.abc import Callable, Iterable
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 import yaml
 from loguru import logger
+from pydantic import ValidationError
 
 from backend.core.config import (
     DEFAULT_CONFIG_PATH,
@@ -44,6 +46,7 @@ from backend.core.config import (
     migrate_legacy_config_keys,
 )
 from backend.core.event_bus import EventBus
+from backend.services.config_policy import is_preference_writable, is_secret_path
 
 # ---------------------------------------------------------------------------
 # Layer enum
@@ -56,6 +59,7 @@ class ConfigLayer(StrEnum):
     DEFAULTS = "defaults"
     SYSTEM = "system"
     USER = "user"
+    PREFERENCES = "preferences"
     RUNTIME = "runtime"
 
 
@@ -63,6 +67,7 @@ _LAYER_ORDER: tuple[ConfigLayer, ...] = (
     ConfigLayer.DEFAULTS,
     ConfigLayer.SYSTEM,
     ConfigLayer.USER,
+    ConfigLayer.PREFERENCES,
     ConfigLayer.RUNTIME,
 )
 
@@ -218,18 +223,22 @@ class LayeredConfigService:
         defaults_path: Path | None = None,
         system_path: Path | None = None,
         user_path: Path | None = None,
+        secrets_provider: Callable[[], dict[str, str]] | None = None,
     ) -> None:
         self._event_bus = event_bus
         self._defaults_path = defaults_path or DEFAULT_CONFIG_PATH
         self._system_path = system_path or get_system_config_path()
         self._user_path = user_path or get_user_config_path()
+        self._secrets_provider = secrets_provider
 
         self._layers: dict[ConfigLayer, dict[str, Any]] = {
             ConfigLayer.DEFAULTS: {},
             ConfigLayer.SYSTEM: {},
             ConfigLayer.USER: {},
+            ConfigLayer.PREFERENCES: {},
             ConfigLayer.RUNTIME: {},
         }
+        self._preferences_store: Any | None = None
         self._resolved: AliceConfig | None = None
         self._lock = asyncio.Lock()
 
@@ -276,6 +285,53 @@ class LayeredConfigService:
         assert self._resolved is not None
         return self._resolved
 
+    async def load_preferences_layer(self, store: Any) -> AliceConfig:
+        """Load the DB-backed preferences layer and keep the store for writes.
+
+        Validates a tentative merge BEFORE committing the layer — mirrors
+        :meth:`set_many`. A DB fossil (a preference row whose path no longer
+        exists in the current schema, e.g. a removed ``agent.enabled``) must
+        never brick the write path: if validation fails, the preferences
+        layer is left as it was (empty at boot) and the failure is only
+        logged, but the store reference is still kept so later ``set``/
+        ``set_many`` calls persist normally.
+
+        Args:
+            store: A :class:`~backend.services.preferences_service.
+                PreferencesLayerStore` (or anything with an async ``load()``
+                returning a nested dict).
+
+        Returns:
+            The newly resolved :class:`AliceConfig` on success, or the
+            previously resolved config unchanged if the loaded layer fails
+            validation.
+        """
+        data = await store.load()
+        tentative = migrate_legacy_config_keys(data)
+        async with self._lock:
+            self._preferences_store = store
+
+            merged: dict[str, Any] = {}
+            for lyr in _LAYER_ORDER:
+                src = tentative if lyr is ConfigLayer.PREFERENCES else self._layers[lyr]
+                _deep_merge(merged, src)
+            self._hydrate(merged)
+
+            try:
+                new_resolved = AliceConfig(**merged)
+            except ValidationError as exc:
+                logger.warning(
+                    "Preferences layer failed validation, leaving it unmounted "
+                    "(store kept for future writes): {}",
+                    exc,
+                )
+                assert self._resolved is not None
+                return self._resolved
+
+            self._layers[ConfigLayer.PREFERENCES] = tentative
+            self._resolved = new_resolved
+            return new_resolved
+
     # -- merge / validation ----------------------------------------------
 
     def _merged_dict(self) -> dict[str, Any]:
@@ -285,14 +341,25 @@ class LayeredConfigService:
             _deep_merge(merged, self._layers[layer])
         return merged
 
+    def _hydrate(self, merged: dict[str, Any]) -> None:
+        """Inject secrets from ``self._secrets_provider`` into ``merged`` in-place.
+
+        Secrets win over every YAML layer but still lose to ``ALICE_*`` env
+        vars — :meth:`AliceConfig.settings_customise_sources` returns
+        ``env_settings`` before ``init_settings``.
+        """
+        if self._secrets_provider is not None:
+            for path, value in self._secrets_provider().items():
+                _set_dotted(merged, path, value)
+
     def _rebuild(self) -> None:
         """Validate the merged dict into a new :class:`AliceConfig`.
 
-        Env vars (``ALICE_*``) override the merged dict because
-        :meth:`AliceConfig.settings_customise_sources` returns
-        ``env_settings`` before ``init_settings``.
+        Secrets are hydrated (see :meth:`_hydrate`) AFTER the layer merge
+        but BEFORE validation.
         """
         merged = self._merged_dict()
+        self._hydrate(merged)
         self._resolved = AliceConfig(**merged)
 
     # -- public read API -------------------------------------------------
@@ -324,44 +391,61 @@ class LayeredConfigService:
 
     # -- public write API ------------------------------------------------
 
-    async def set(
+    async def set_many(
         self,
-        path: str,
-        value: Any,
-        layer: ConfigLayer = ConfigLayer.USER,
+        changes: dict[str, Any],
+        layer: ConfigLayer = ConfigLayer.PREFERENCES,
     ) -> AliceConfig:
-        """Set a dotted ``path`` in ``layer``, validate, persist, and notify.
+        """Set several dotted paths in ``layer`` atomically.
 
         Workflow:
 
-        1. Mutate a tentative copy of the target layer.
-        2. Re-validate the merged dict through :class:`AliceConfig`.
+        1. Mutate a tentative copy of the target layer with every change.
+        2. Re-validate the merged dict through :class:`AliceConfig` ONCE.
         3. On success, commit the new layer dict in memory; persist
-           ``system``/``user`` layers to disk atomically.
-        4. Emit ``config.changed`` on the event bus.
+           ``system``/``user``/``preferences`` layers to disk/DB in a
+           single batched write.
+        4. Emit one ``config.changed`` event per path, after the lock is
+           released.
 
         Args:
-            path: Dotted path (e.g. ``"llm.temperature"``).
-            value: New value (any JSON-serialisable Python object).
-            layer: Target layer.  Defaults to :attr:`ConfigLayer.USER`.
+            changes: Mapping of dotted path -> new value.
+            layer: Target layer.  Defaults to :attr:`ConfigLayer.PREFERENCES`.
 
         Returns:
             The new resolved :class:`AliceConfig`.
 
         Raises:
-            ValueError: when ``path`` is invalid or descends into a non-dict.
+            ValueError: when any path is invalid or descends into a
+                non-dict, when any path designates a secret (never written
+                to any layer), or when ``layer`` is ``PREFERENCES`` and any
+                path is not preference-writable per policy.
             pydantic.ValidationError: when the resulting config fails
-                validation.  Disk and in-memory state remain unchanged.
+                validation.  Disk and in-memory state remain unchanged —
+                no partial commit.
         """
+        if not changes:
+            return self.get_resolved()
+
+        for path in changes:
+            if is_secret_path(path):
+                raise ValueError(
+                    f"secret path '{path}' cannot be written to config layers"
+                )
+            if layer is ConfigLayer.PREFERENCES and not is_preference_writable(path):
+                raise ValueError(f"path '{path}' is not preference-writable (policy)")
+
         async with self._lock:
             tentative = copy.deepcopy(self._layers[layer])
-            _set_dotted(tentative, path, value)
+            for path, value in changes.items():
+                _set_dotted(tentative, path, value)
 
             # Build a tentative merged dict and validate.
             merged: dict[str, Any] = {}
             for lyr in _LAYER_ORDER:
                 src = tentative if lyr is layer else self._layers[lyr]
                 _deep_merge(merged, src)
+            self._hydrate(merged)
             new_resolved = AliceConfig(**merged)
 
             # Validation succeeded — commit in-memory.
@@ -377,25 +461,37 @@ class LayeredConfigService:
                 )
                 await asyncio.to_thread(_write_yaml_atomic, target_path, tentative)
                 logger.info(
-                    "Persisted config change ({} = {!r}) to {}",
-                    path, value, target_path,
+                    "Persisted {} config change(s) to {}", len(changes), target_path,
                 )
+            elif layer is ConfigLayer.PREFERENCES and self._preferences_store is not None:
+                await self._preferences_store.save_paths(changes)
+                logger.info("Persisted {} preference change(s)", len(changes))
             else:
-                logger.debug("Runtime config change ({} = {!r})", path, value)
+                logger.debug("Runtime config change(s): {}", changes)
 
         # Emit outside the lock so handlers can call back into the service.
         if self._event_bus is not None:
-            try:
-                await self._event_bus.emit(
-                    "config.changed",
-                    path=path,
-                    value=value,
-                    layer=layer.value,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("config.changed handler raised: {}", exc)
+            for path, value in changes.items():
+                try:
+                    await self._event_bus.emit(
+                        "config.changed",
+                        path=path,
+                        value=value,
+                        layer=layer.value,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("config.changed handler raised: {}", exc)
 
         return new_resolved
+
+    async def set(
+        self,
+        path: str,
+        value: Any,
+        layer: ConfigLayer = ConfigLayer.USER,
+    ) -> AliceConfig:
+        """Set a single dotted ``path`` in ``layer`` (see :meth:`set_many`)."""
+        return await self.set_many({path: value}, layer=layer)
 
     async def reset_runtime(self) -> AliceConfig:
         """Drop every runtime override and revalidate."""
@@ -404,3 +500,41 @@ class LayeredConfigService:
             self._rebuild()
             assert self._resolved is not None
             return self._resolved
+
+    async def rebuild(self) -> AliceConfig:
+        """Re-validate the merged config (e.g. after a secret write)."""
+        async with self._lock:
+            self._rebuild()
+            assert self._resolved is not None
+            return self._resolved
+
+    async def strip_paths_from_disk_layer(
+        self, layer: ConfigLayer, paths: Iterable[str],
+    ) -> list[str]:
+        """Remove dotted ``paths`` from a disk layer and rewrite its file.
+
+        Returns the paths actually removed. No-op for paths not present.
+        """
+        if layer not in (ConfigLayer.SYSTEM, ConfigLayer.USER):
+            raise ValueError("only disk layers can be stripped")
+        removed: list[str] = []
+        async with self._lock:
+            data = copy.deepcopy(self._layers[layer])
+            for path in paths:
+                try:
+                    _get_dotted(data, path)
+                except KeyError:
+                    continue
+                parts = path.split(".")
+                node = data
+                for part in parts[:-1]:
+                    node = node[part]
+                del node[parts[-1]]
+                removed.append(path)
+            if not removed:
+                return []
+            self._layers[layer] = data
+            self._rebuild()
+            target = self._system_path if layer is ConfigLayer.SYSTEM else self._user_path
+            await asyncio.to_thread(_write_yaml_atomic, target, data)
+        return removed

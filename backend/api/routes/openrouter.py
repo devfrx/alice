@@ -145,7 +145,7 @@ async def get_openrouter_credits(request: Request) -> OpenRouterCreditsResponse:
     svc = ctx.openrouter_service
     if svc is None:
         raise HTTPException(503, "OpenRouter service unavailable")
-    if not ctx.config.llm.openrouter_api_key:
+    if not ctx.config.llm.openrouter_api_key.get_secret_value():
         raise HTTPException(400, "OpenRouter API key not configured")
     try:
         data = await svc.get_credits()

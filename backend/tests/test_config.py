@@ -5,13 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr, ValidationError
 
 from backend.core.config import (
     DEFAULT_MODEL,
     KNOWN_MODELS,
     PROJECT_ROOT,
     AliceConfig,
+    EmailConfig,
     LLMConfig,
+    STTConfig,
+    TTSConfig,
+    UIConfig,
+    VoiceConfig,
     load_config,
 )
 
@@ -235,6 +241,223 @@ def test_effective_base_url_local_providers() -> None:
 
 def test_openrouter_defaults() -> None:
     cfg = LLMConfig()
-    assert cfg.openrouter_api_key == ""
+    assert cfg.openrouter_api_key.get_secret_value() == ""
     assert cfg.openrouter_model == ""
     assert cfg.openrouter_favorites == []
+
+
+# ---------------------------------------------------------------------------
+# Secret fields (SecretStr)
+# ---------------------------------------------------------------------------
+
+
+def test_secret_fields_are_secretstr_and_redacted_in_dump() -> None:
+    cfg = AliceConfig(
+        llm={"api_token": "tok", "openrouter_api_key": "sk-or-x"},
+        home_assistant={"token": "ha"},
+        mqtt={"password": "mq"},
+        continuum={"api_token": "ct"},
+        email={"password": "pw"},
+    )
+    assert isinstance(cfg.llm.api_token, SecretStr)
+    assert cfg.llm.openrouter_api_key.get_secret_value() == "sk-or-x"
+    assert cfg.continuum.api_token is not None
+    assert cfg.continuum.api_token.get_secret_value() == "ct"
+    dumped = cfg.model_dump(mode="json")
+    assert "sk-or-x" not in str(dumped)
+    assert "pw" not in str(dumped)
+
+
+# ---------------------------------------------------------------------------
+# PUT /config — email password lands in the SecretStore (Task 5)
+# ---------------------------------------------------------------------------
+
+
+async def test_email_password_lands_in_secret_store(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config",
+        json={"email": {"username": "u@example.com", "password": "s3cret"}},
+    )
+    assert resp.status_code == 200
+    assert ctx.secret_store.cached()["email.password"] == "s3cret"
+    assert resp.json()["email"]["password_configured"] is True
+    assert "use_keyring" not in resp.json()["email"]
+
+
+async def test_removed_legacy_key_is_dropped_not_rejected(client) -> None:
+    """A removed-legacy path (Task 11 review Finding 1) must not 400 the PUT.
+
+    The FE cleanup for ``email.use_keyring`` happens in a later task; until
+    then every auto-save PUT still sends it. A removed-legacy key is a
+    distinct class from an unknown path — the system itself deprecated it —
+    so it is silently dropped instead of rejecting the whole request.
+    """
+    resp = await client.put(
+        "/api/config",
+        json={"email": {"use_keyring": False, "imap_port": 995}, "ui": {"theme": "light"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["email"]["imap_port"] == 995
+    assert resp.json()["ui"]["theme"] == "light"
+
+
+# ---------------------------------------------------------------------------
+# PUT /config rewritten on the unified engine (Task 11)
+# ---------------------------------------------------------------------------
+
+
+async def test_unknown_path_returns_400_with_the_paths(client) -> None:
+    resp = await client.put(
+        "/api/config", json={"llm": {"bogus_key": 1}, "nonsense": {"x": 2}},
+    )
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert "llm.bogus_key" in str(detail)
+    assert "nonsense.x" in str(detail)
+
+
+async def test_invalid_value_returns_422(client) -> None:
+    resp = await client.put("/api/config", json={"llm": {"temperature": 99}})
+    assert resp.status_code == 422
+
+
+async def test_put_persists_only_sent_paths(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.put("/api/config", json={"ui": {"theme": "light"}})
+    assert resp.status_code == 200
+    prefs = await ctx.preferences_store.load()
+    assert prefs == {"ui": {"theme": "light"}}
+
+
+async def test_patch_persona_does_not_clobber_preferences(client, app) -> None:
+    """Il test di regressione split-brain: oggi sarebbe rosso su main."""
+    ctx = app.state.context
+    seed = await client.put(
+        "/api/config", json={"llm": {"provider": "openrouter"}},
+    )
+    assert seed.status_code == 200
+    patch = await client.patch(
+        "/api/config",
+        json={"path": "agent.prompts.persona", "value": "Sii conciso."},
+    )
+    assert patch.status_code == 200
+    # la resolved config conserva la preferenza DB dopo il rebuild da PATCH
+    assert ctx.config.llm.provider == "openrouter"
+
+
+async def test_patch_defaults_to_preferences_layer(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.patch(
+        "/api/config", json={"path": "ui.theme", "value": "light"},
+    )
+    assert resp.status_code == 200
+    prefs = await ctx.preferences_store.load()
+    assert prefs["ui"]["theme"] == "light"
+
+
+# ---------------------------------------------------------------------------
+# Declarative field constraints (Task 8) — replace hand-rolled route checks
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("model_cls", "field", "bad"),
+    [
+        (LLMConfig, "temperature", 2.5),
+        (LLMConfig, "temperature", -0.1),
+        (LLMConfig, "max_tokens", 0),
+        (LLMConfig, "max_tokens", -2),
+        (LLMConfig, "max_tool_iterations", 0),
+        (LLMConfig, "max_tool_iterations", 101),
+        (LLMConfig, "context_compression_threshold", 0.4),
+        (LLMConfig, "context_compression_threshold", 0.96),
+        (LLMConfig, "context_compression_reserve", 511),
+        (LLMConfig, "context_compression_reserve", 8193),
+        (LLMConfig, "tool_rag_top_k", 0),
+        (LLMConfig, "tool_rag_top_k", 101),
+        (LLMConfig, "user_preferred_name", "x" * 81),
+        (LLMConfig, "model", ""),
+        (LLMConfig, "model", "x" * 257),
+        (LLMConfig, "openrouter_model", "x" * 257),
+        (LLMConfig, "provider", "bogus"),
+        (STTConfig, "device", "tpu"),
+        (STTConfig, "model", ""),
+        (STTConfig, "language", "x" * 11),
+        (TTSConfig, "engine", "espeak"),
+        (TTSConfig, "speed", 0.4),
+        (TTSConfig, "speed", 2.1),
+        (TTSConfig, "sample_rate", 12345),
+        (TTSConfig, "voice", ""),
+        (UIConfig, "theme", "sepia"),
+        (UIConfig, "language", ""),
+        (VoiceConfig, "activation_mode", "telepathy"),
+        (VoiceConfig, "wake_word", ""),
+        (EmailConfig, "imap_port", 0),
+        (EmailConfig, "imap_port", 65536),
+        (EmailConfig, "fetch_last_n", 0),
+        (EmailConfig, "fetch_last_n", 501),
+        (EmailConfig, "max_fetch", 501),
+        (EmailConfig, "imap_host", "x" * 256),
+    ],
+)
+def test_field_constraints_reject_bad_values(model_cls, field, bad) -> None:
+    with pytest.raises(ValidationError):
+        model_cls(**{field: bad})
+
+
+def test_provider_is_normalized_lowercase() -> None:
+    assert LLMConfig(provider="OpenRouter").provider == "openrouter"
+
+
+def test_openrouter_favorites_capped_at_200() -> None:
+    with pytest.raises(ValidationError):
+        LLMConfig(openrouter_favorites=[f"m{i}" for i in range(201)])
+
+
+# ---------------------------------------------------------------------------
+# Strip/coercion normalizations restored at the model layer (Task 11 review
+# Finding 2) — the old imperative PUT handler used to strip/coerce string
+# inputs before storing them; now every ``set_many`` call runs full model
+# validation, so the models themselves must canonicalize.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("model_cls", "field", "raw", "expected"),
+    [
+        (LLMConfig, "model", " my-model ", "my-model"),
+        (LLMConfig, "user_preferred_name", None, ""),
+        (LLMConfig, "user_preferred_name", " Jays ", "Jays"),
+        (LLMConfig, "openrouter_model", None, ""),
+        (EmailConfig, "imap_host", "imap.gmail.com ", "imap.gmail.com"),
+        (EmailConfig, "username", " u@example.com ", "u@example.com"),
+        (VoiceConfig, "wake_word", " alice ", "alice"),
+        (UIConfig, "language", " it ", "it"),
+        (TTSConfig, "voice", " path/to/voice ", "path/to/voice"),
+    ],
+)
+def test_string_fields_are_normalized(model_cls, field, raw, expected) -> None:
+    assert getattr(model_cls(**{field: raw}), field) == expected
+
+
+def test_whitespace_only_model_rejected() -> None:
+    with pytest.raises(ValidationError):
+        LLMConfig(model="   ")
+
+
+# ---------------------------------------------------------------------------
+# Typed response model (Task 12)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_config_matches_response_model(client) -> None:
+    resp = await client.get("/api/config")
+    assert resp.status_code == 200
+    body = resp.json()
+    from backend.api.routes.config_schemas import ConfigResponse
+
+    parsed = ConfigResponse.model_validate(body)
+    assert parsed.llm.provider in ("lmstudio", "ollama", "openrouter")
+    assert not hasattr(parsed.email, "use_keyring")

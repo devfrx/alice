@@ -52,7 +52,6 @@ export interface AliceSettings {
     smtpSsl: boolean
     username: string
     password: string
-    useKeyring: boolean
     fetchLastN: number
     maxFetch: number
     imapIdleEnabled: boolean
@@ -60,6 +59,31 @@ export interface AliceSettings {
     passwordConfigured: boolean
     serviceRunning: boolean
   }
+}
+
+/** Nested partial body accepted by PUT /api/config (sections -> snake_case keys). */
+export type ConfigUpdatePayload = Record<string, Record<string, unknown>>
+
+/** Value-equality for JSON-ish leaves (arrays compared by content). */
+function sameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+/** Return only the keys of `next` that differ from `prev` (empty sections dropped). */
+export function diffConfigPayload(
+  prev: ConfigUpdatePayload,
+  next: ConfigUpdatePayload
+): ConfigUpdatePayload {
+  const out: ConfigUpdatePayload = {}
+  for (const [section, nextKeys] of Object.entries(next)) {
+    const prevKeys = prev[section] ?? {}
+    const changed: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(nextKeys)) {
+      if (!sameValue(prevKeys[key], value)) changed[key] = value
+    }
+    if (Object.keys(changed).length > 0) out[section] = changed
+  }
+  return out
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -101,7 +125,6 @@ export const useSettingsStore = defineStore('settings', () => {
       smtpSsl: false,
       username: '',
       password: '',
-      useKeyring: true,
       fetchLastN: 20,
       maxFetch: 50,
       imapIdleEnabled: true,
@@ -127,6 +150,9 @@ export const useSettingsStore = defineStore('settings', () => {
   let _loadingToggles = false
   /** Guard flag: skip deep settings watcher while loading from backend. */
   let _loadingSettings = false
+
+  /** The last payload confirmed by the backend (PUT response or post-load rebuild). */
+  let lastConfirmedPayload: ConfigUpdatePayload | null = null
 
   watch(toolConfirmations, (val) => {
     if (_loadingToggles) return
@@ -304,79 +330,126 @@ export const useSettingsStore = defineStore('settings', () => {
     await saveAgentTierGuidance()
   }
 
+  /** Copy a `GET/PUT /config` response into the reactive store (flags always derive from it). */
+  function applyConfigResponse(config: Record<string, unknown>): void {
+    if (config.llm) {
+      const llm = config.llm as Record<string, unknown>
+      settings.value.llm.model = (llm.model as string) ?? settings.value.llm.model
+      settings.value.llm.temperature = (llm.temperature as number) ?? settings.value.llm.temperature
+      settings.value.llm.maxTokens = (llm.max_tokens as number) ?? settings.value.llm.maxTokens
+      settings.value.llm.maxToolIterations =
+        (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
+      settings.value.llm.contextCompressionEnabled =
+        (llm.context_compression_enabled as boolean) ?? settings.value.llm.contextCompressionEnabled
+      settings.value.llm.contextCompressionThreshold =
+        (llm.context_compression_threshold as number) ??
+        settings.value.llm.contextCompressionThreshold
+      settings.value.llm.contextCompressionReserve =
+        (llm.context_compression_reserve as number) ?? settings.value.llm.contextCompressionReserve
+      settings.value.llm.toolRagEnabled =
+        (llm.tool_rag_enabled as boolean) ?? settings.value.llm.toolRagEnabled
+      settings.value.llm.toolRagTopK =
+        (llm.tool_rag_top_k as number) ?? settings.value.llm.toolRagTopK
+      settings.value.llm.userPreferredName =
+        (llm.user_preferred_name as string) ?? settings.value.llm.userPreferredName
+      settings.value.llm.provider = (llm.provider as LlmProvider) ?? settings.value.llm.provider
+      settings.value.llm.openrouterModel =
+        (llm.openrouter_model as string) ?? settings.value.llm.openrouterModel
+      settings.value.llm.openrouterFavorites =
+        (llm.openrouter_favorites as string[]) ?? settings.value.llm.openrouterFavorites
+      openrouterKeyConfigured.value = Boolean(llm.openrouter_api_key_configured)
+    }
+    if (config.stt) {
+      const stt = config.stt as Record<string, unknown>
+      settings.value.stt.language = stt.language != null ? (stt.language as string) : ''
+      settings.value.stt.model = (stt.model as string) ?? settings.value.stt.model
+    }
+    if (config.tts) {
+      const tts = config.tts as Record<string, unknown>
+      settings.value.tts.engine = (tts.engine as string) ?? settings.value.tts.engine
+      settings.value.tts.voice = (tts.voice as string) ?? settings.value.tts.voice
+    }
+    if (config.ui) {
+      const ui = config.ui as Record<string, unknown>
+      settings.value.ui.theme = (ui.theme as 'dark' | 'light') ?? settings.value.ui.theme
+      settings.value.ui.language = (ui.language as string) ?? settings.value.ui.language
+    }
+    if (config.email) {
+      const email = config.email as Record<string, unknown>
+      settings.value.email.enabled = (email.enabled as boolean) ?? settings.value.email.enabled
+      settings.value.email.imapHost = (email.imap_host as string) ?? settings.value.email.imapHost
+      settings.value.email.imapPort = (email.imap_port as number) ?? settings.value.email.imapPort
+      settings.value.email.imapSsl = (email.imap_ssl as boolean) ?? settings.value.email.imapSsl
+      settings.value.email.smtpHost = (email.smtp_host as string) ?? settings.value.email.smtpHost
+      settings.value.email.smtpPort = (email.smtp_port as number) ?? settings.value.email.smtpPort
+      settings.value.email.smtpSsl = (email.smtp_ssl as boolean) ?? settings.value.email.smtpSsl
+      settings.value.email.username = (email.username as string) ?? settings.value.email.username
+      settings.value.email.fetchLastN =
+        (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
+      settings.value.email.maxFetch = (email.max_fetch as number) ?? settings.value.email.maxFetch
+      settings.value.email.imapIdleEnabled =
+        (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
+      settings.value.email.archiveFolder =
+        (email.archive_folder as string) ?? settings.value.email.archiveFolder
+      settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? false
+      settings.value.email.serviceRunning = (email.service_running as boolean) ?? false
+      settings.value.email.password = ''
+    }
+  }
+
+  /** Build the full nested PUT `/config` body from current store state (minus the password). */
+  function buildConfigPayload(): ConfigUpdatePayload {
+    return {
+      llm: {
+        temperature: settings.value.llm.temperature,
+        max_tokens: settings.value.llm.maxTokens,
+        max_tool_iterations: settings.value.llm.maxToolIterations,
+        context_compression_enabled: settings.value.llm.contextCompressionEnabled,
+        context_compression_threshold: settings.value.llm.contextCompressionThreshold,
+        context_compression_reserve: settings.value.llm.contextCompressionReserve,
+        tool_rag_enabled: settings.value.llm.toolRagEnabled,
+        tool_rag_top_k: settings.value.llm.toolRagTopK,
+        user_preferred_name: settings.value.llm.userPreferredName,
+        provider: settings.value.llm.provider,
+        openrouter_model: settings.value.llm.openrouterModel,
+        openrouter_favorites: settings.value.llm.openrouterFavorites
+      },
+      stt: {
+        ...(settings.value.stt.language ? { language: settings.value.stt.language } : {}),
+        model: settings.value.stt.model
+      },
+      tts: {
+        engine: settings.value.tts.engine,
+        voice: settings.value.tts.voice
+      },
+      ui: {
+        theme: settings.value.ui.theme,
+        language: settings.value.ui.language
+      },
+      email: {
+        enabled: settings.value.email.enabled,
+        imap_host: settings.value.email.imapHost,
+        imap_port: settings.value.email.imapPort,
+        imap_ssl: settings.value.email.imapSsl,
+        smtp_host: settings.value.email.smtpHost,
+        smtp_port: settings.value.email.smtpPort,
+        smtp_ssl: settings.value.email.smtpSsl,
+        username: settings.value.email.username,
+        fetch_last_n: settings.value.email.fetchLastN,
+        max_fetch: settings.value.email.maxFetch,
+        imap_idle_enabled: settings.value.email.imapIdleEnabled,
+        archive_folder: settings.value.email.archiveFolder
+      }
+    }
+  }
+
   /** Load settings from the backend into the reactive store. */
   async function loadSettings(): Promise<void> {
     _loadingSettings = true
     try {
       const config = await configApi.getConfig()
-      if (config.llm) {
-        const llm = config.llm as Record<string, unknown>
-        settings.value.llm.model = (llm.model as string) ?? settings.value.llm.model
-        settings.value.llm.temperature =
-          (llm.temperature as number) ?? settings.value.llm.temperature
-        settings.value.llm.maxTokens = (llm.max_tokens as number) ?? settings.value.llm.maxTokens
-        settings.value.llm.maxToolIterations =
-          (llm.max_tool_iterations as number) ?? settings.value.llm.maxToolIterations
-        settings.value.llm.contextCompressionEnabled =
-          (llm.context_compression_enabled as boolean) ??
-          settings.value.llm.contextCompressionEnabled
-        settings.value.llm.contextCompressionThreshold =
-          (llm.context_compression_threshold as number) ??
-          settings.value.llm.contextCompressionThreshold
-        settings.value.llm.contextCompressionReserve =
-          (llm.context_compression_reserve as number) ??
-          settings.value.llm.contextCompressionReserve
-        settings.value.llm.toolRagEnabled =
-          (llm.tool_rag_enabled as boolean) ?? settings.value.llm.toolRagEnabled
-        settings.value.llm.toolRagTopK =
-          (llm.tool_rag_top_k as number) ?? settings.value.llm.toolRagTopK
-        settings.value.llm.userPreferredName =
-          (llm.user_preferred_name as string) ?? settings.value.llm.userPreferredName
-        settings.value.llm.provider = (llm.provider as LlmProvider) ?? settings.value.llm.provider
-        settings.value.llm.openrouterModel =
-          (llm.openrouter_model as string) ?? settings.value.llm.openrouterModel
-        settings.value.llm.openrouterFavorites =
-          (llm.openrouter_favorites as string[]) ?? settings.value.llm.openrouterFavorites
-        openrouterKeyConfigured.value = Boolean(llm.openrouter_api_key_configured)
-      }
-      if (config.stt) {
-        const stt = config.stt as Record<string, unknown>
-        settings.value.stt.language = stt.language != null ? (stt.language as string) : ''
-        settings.value.stt.model = (stt.model as string) ?? settings.value.stt.model
-      }
-      if (config.tts) {
-        const tts = config.tts as Record<string, unknown>
-        settings.value.tts.engine = (tts.engine as string) ?? settings.value.tts.engine
-        settings.value.tts.voice = (tts.voice as string) ?? settings.value.tts.voice
-      }
-      if (config.ui) {
-        const ui = config.ui as Record<string, unknown>
-        settings.value.ui.theme = (ui.theme as 'dark' | 'light') ?? settings.value.ui.theme
-        settings.value.ui.language = (ui.language as string) ?? settings.value.ui.language
-      }
-      if (config.email) {
-        const email = config.email as Record<string, unknown>
-        settings.value.email.enabled = (email.enabled as boolean) ?? settings.value.email.enabled
-        settings.value.email.imapHost = (email.imap_host as string) ?? settings.value.email.imapHost
-        settings.value.email.imapPort = (email.imap_port as number) ?? settings.value.email.imapPort
-        settings.value.email.imapSsl = (email.imap_ssl as boolean) ?? settings.value.email.imapSsl
-        settings.value.email.smtpHost = (email.smtp_host as string) ?? settings.value.email.smtpHost
-        settings.value.email.smtpPort = (email.smtp_port as number) ?? settings.value.email.smtpPort
-        settings.value.email.smtpSsl = (email.smtp_ssl as boolean) ?? settings.value.email.smtpSsl
-        settings.value.email.username = (email.username as string) ?? settings.value.email.username
-        settings.value.email.useKeyring =
-          (email.use_keyring as boolean) ?? settings.value.email.useKeyring
-        settings.value.email.fetchLastN =
-          (email.fetch_last_n as number) ?? settings.value.email.fetchLastN
-        settings.value.email.maxFetch = (email.max_fetch as number) ?? settings.value.email.maxFetch
-        settings.value.email.imapIdleEnabled =
-          (email.imap_idle_enabled as boolean) ?? settings.value.email.imapIdleEnabled
-        settings.value.email.archiveFolder =
-          (email.archive_folder as string) ?? settings.value.email.archiveFolder
-        settings.value.email.passwordConfigured = (email.password_configured as boolean) ?? false
-        settings.value.email.serviceRunning = (email.service_running as boolean) ?? false
-        settings.value.email.password = ''
-      }
+      applyConfigResponse(config)
+      lastConfirmedPayload = buildConfigPayload()
     } catch (err) {
       console.warn('[settings store] loadSettings failed:', err)
     } finally {
@@ -388,64 +461,29 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  /** Save current settings to the backend. */
+  /** Save only the changed settings to the backend (diffed against the last confirmed payload). */
   async function saveSettings(): Promise<void> {
     const emailPassword = settings.value.email.password.trim()
+    const payload = buildConfigPayload()
+    const diff =
+      lastConfirmedPayload === null ? payload : diffConfigPayload(lastConfirmedPayload, payload)
+    if (emailPassword) {
+      diff.email = { ...(diff.email ?? {}), password: emailPassword }
+    }
+    if (Object.keys(diff).length === 0) return
     try {
-      const updated = await configApi.updateConfig({
-        llm: {
-          temperature: settings.value.llm.temperature,
-          max_tokens: settings.value.llm.maxTokens,
-          max_tool_iterations: settings.value.llm.maxToolIterations,
-          context_compression_enabled: settings.value.llm.contextCompressionEnabled,
-          context_compression_threshold: settings.value.llm.contextCompressionThreshold,
-          context_compression_reserve: settings.value.llm.contextCompressionReserve,
-          tool_rag_enabled: settings.value.llm.toolRagEnabled,
-          tool_rag_top_k: settings.value.llm.toolRagTopK,
-          user_preferred_name: settings.value.llm.userPreferredName,
-          provider: settings.value.llm.provider,
-          openrouter_model: settings.value.llm.openrouterModel,
-          openrouter_favorites: settings.value.llm.openrouterFavorites
-        },
-        stt: {
-          ...(settings.value.stt.language ? { language: settings.value.stt.language } : {}),
-          model: settings.value.stt.model
-        },
-        tts: {
-          engine: settings.value.tts.engine,
-          voice: settings.value.tts.voice
-        },
-        ui: {
-          theme: settings.value.ui.theme,
-          language: settings.value.ui.language
-        },
-        email: {
-          enabled: settings.value.email.enabled,
-          imap_host: settings.value.email.imapHost,
-          imap_port: settings.value.email.imapPort,
-          imap_ssl: settings.value.email.imapSsl,
-          smtp_host: settings.value.email.smtpHost,
-          smtp_port: settings.value.email.smtpPort,
-          smtp_ssl: settings.value.email.smtpSsl,
-          username: settings.value.email.username,
-          use_keyring: settings.value.email.useKeyring,
-          fetch_last_n: settings.value.email.fetchLastN,
-          max_fetch: settings.value.email.maxFetch,
-          imap_idle_enabled: settings.value.email.imapIdleEnabled,
-          archive_folder: settings.value.email.archiveFolder,
-          ...(emailPassword ? { password: emailPassword } : {})
+      const updated = await configApi.updateConfig(diff)
+      lastConfirmedPayload = payload
+      _loadingSettings = true
+      try {
+        applyConfigResponse(updated)
+        if (emailPassword) {
+          // Belt-and-suspenders: applyConfigResponse already clears the password.
+          settings.value.email.password = ''
         }
-      })
-      const email = updated.email as Record<string, unknown> | undefined
-      if (email) {
-        settings.value.email.passwordConfigured =
-          (email.password_configured as boolean) ?? settings.value.email.passwordConfigured
-        settings.value.email.serviceRunning =
-          (email.service_running as boolean) ?? settings.value.email.serviceRunning
-      }
-      if (emailPassword) {
-        _loadingSettings = true
-        settings.value.email.password = ''
+      } finally {
+        // Always reset the guard — otherwise a throw above would silently
+        // disable every future autosave.
         await nextTick()
         _loadingSettings = false
       }
@@ -457,13 +495,13 @@ export const useSettingsStore = defineStore('settings', () => {
   /**
    * Persist the OpenRouter API key once (not part of the deep-watched
    * `settings` ref — the key itself is never read back from the backend,
-   * only the `openrouterKeyConfigured` flag is).
+   * only the `openrouterKeyConfigured` flag is, derived from the response).
    */
   async function setOpenrouterApiKey(key: string): Promise<void> {
     const trimmed = key.trim()
     if (!trimmed) return
-    await configApi.updateConfig({ llm: { openrouter_api_key: trimmed } })
-    openrouterKeyConfigured.value = true
+    const updated = await configApi.updateConfig({ llm: { openrouter_api_key: trimmed } })
+    applyConfigResponse(updated)
   }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null

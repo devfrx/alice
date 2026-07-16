@@ -31,7 +31,6 @@ def email_config() -> EmailConfig:
         smtp_ssl=False,
         username="user@example.com",
         password=SecretStr("test-password"),
-        use_keyring=False,
         imap_idle_enabled=False,
         rate_limit_send_per_hour=3,
         max_email_body_chars=100,
@@ -103,16 +102,19 @@ class TestLRUCache:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_password tests
+# Password hydration (Task 5 — no more keyring lookup inside the service)
 # ---------------------------------------------------------------------------
 
 
-async def test_resolve_password_secretstr_fallback(
-    service: EmailService,
+async def test_initialize_resolves_password_from_config(
+    service: EmailService, email_config: EmailConfig,
 ):
-    """When use_keyring=False, password comes from SecretStr."""
-    pwd = await service._resolve_password()
-    assert pwd == "test-password"
+    """Password arrives pre-hydrated on config.password (SecretStore-fed)."""
+    with patch.object(service, "_connect_imap", new_callable=AsyncMock) as mock_connect:
+        mock_connect.return_value = MagicMock()
+        await service.initialize()
+    assert service._password_resolved == email_config.password.get_secret_value()
+    assert service._password_resolved == "test-password"
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +177,6 @@ async def test_send_empty_whitelist_allows_all(event_bus: EventBus):
         smtp_host="smtp.example.com",
         username="user@example.com",
         password=SecretStr("pw"),
-        use_keyring=False,
         imap_idle_enabled=False,
         allowed_recipients=[],
     )

@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from backend.core.plugin_models import (
     ConnectionStatus,
@@ -20,10 +20,6 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
-
-if TYPE_CHECKING:
-    from backend.core.config import AliceConfig
-
 
 # ---------------------------------------------------------------------------
 # LLM
@@ -445,39 +441,50 @@ class LMStudioManagerProtocol(Protocol):
 
 @runtime_checkable
 class PreferencesServiceProtocol(Protocol):
-    """Protocol for user preferences persistence."""
+    """Protocol for the ``preferences`` config-layer store.
 
-    async def load_all(self) -> dict[str, Any]:
-        """Load all stored preferences."""
+    Mirrors :class:`backend.services.preferences_service.
+    PreferencesLayerStore`: ``load``/``save_paths``/``delete_paths``/
+    ``delete_all`` — the DB-backed store's current API, consumed by
+    :class:`~backend.services.config_service.LayeredConfigService` (writes)
+    and the settings routes (bulk read/reset).
+    """
+
+    async def load(self) -> dict[str, Any]:
+        """Return all rows as a nested dict."""
         ...
 
-    def apply_to_config(
-        self, config: AliceConfig, prefs: dict[str, Any],
-    ) -> None:
-        """Overlay persisted preferences onto config."""
+    async def save_paths(self, changes: dict[str, Any]) -> None:
+        """Upsert one row per dotted path."""
         ...
 
-    async def save_preference(
-        self, key: str, value: Any,
-    ) -> None:
-        """Save a single preference."""
-        ...
-
-    async def save_section(
-        self, section: str, data: dict[str, Any],
-    ) -> None:
-        """Persist all keys in a section."""
-        ...
-
-    async def persist_from_update(
-        self, body: dict[str, Any],
-    ) -> None:
-        """Extract and persist preferences from update."""
+    async def delete_paths(self, paths: Iterable[str]) -> int:
+        """Delete the given dotted paths; returns the number removed."""
         ...
 
     async def delete_all(self) -> int:
         """Delete all persisted preferences."""
         ...
+
+
+# ---------------------------------------------------------------------------
+# Secret store
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class SecretStoreProtocol(Protocol):
+    """OS-keyring-backed secret storage with a synchronous read cache."""
+
+    async def get(self, name: str) -> str | None: ...
+
+    async def set(self, name: str, value: str) -> None: ...
+
+    async def delete(self, name: str) -> None: ...
+
+    async def load_cache(self) -> dict[str, str]: ...
+
+    def cached(self) -> dict[str, str]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -558,7 +565,6 @@ class MemoryServiceProtocol(Protocol):
 from backend.services.knowledge.protocol import (  # noqa: E402
     KnowledgeServiceProtocol as KnowledgeServiceProtocol,
 )
-
 
 # ---------------------------------------------------------------------------
 # Email service

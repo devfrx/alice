@@ -2,21 +2,24 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
-from pydantic import SecretStr, ValidationError
+from pydantic import ValidationError
 
+from backend.api.routes.config_reactions import (
+    ALL_REACTIVE_PATHS,
+    apply_reactions,
+    diff_paths,
+)
+from backend.api.routes.config_schemas import ConfigResponse
 from backend.api.routes.models import serialise_model
-from backend.api.routes.voice import push_voice_ready
-from backend.core.config import KNOWN_MODELS
+from backend.core.config import _REMOVED_LEGACY_PATHS, KNOWN_MODELS
 from backend.core.context import AppContext
+from backend.services.config_policy import is_preference_writable, is_secret_path
 from backend.services.config_service import ConfigLayer
-from backend.services.stt_service import STTService
-from backend.services.tts_service import TTSService
 
 router = APIRouter(tags=["config"])
 
@@ -62,18 +65,26 @@ def _resolved_dict(ctx: AppContext) -> dict[str, Any]:
     return _redact(cfg.model_dump(mode="json"))
 
 
-@router.get("/config/resolved")
+@router.get("/config/resolved", response_model=dict[str, Any])
 async def get_resolved_config(request: Request) -> dict[str, Any]:
-    """Return the full merged-and-validated configuration (secrets redacted)."""
+    """Return the full merged-and-validated configuration (secrets redacted).
+
+    Shape: the entire redacted ``AliceConfig`` — deliberately left as
+    ``dict[str, Any]`` rather than pinned to a model (see ``ConfigResponse``
+    for the narrower, stable ``GET /api/config`` contract).
+    """
     return _resolved_dict(_ctx(request))
 
 
-@router.get("/config/layers")
+@router.get("/config/layers", response_model=dict[str, Any])
 async def get_config_layers(request: Request) -> dict[str, Any]:
     """Return the raw per-layer dicts (defaults/system/user/runtime).
 
     Useful for diagnostics: shows exactly which layer contributes each
     value before the merge step.
+
+    Shape: per-layer redacted config dicts — deliberately left as
+    ``dict[str, Any]`` (not the stable ``ConfigResponse`` contract).
     """
     ctx = _ctx(request)
     if ctx.config_service is None:
@@ -82,21 +93,27 @@ async def get_config_layers(request: Request) -> dict[str, Any]:
     return {name: _redact(data) for name, data in layers.items()}
 
 
-@router.patch("/config")
+@router.patch("/config", response_model=dict[str, Any])
 async def patch_config(request: Request) -> dict[str, Any]:
     """Set a single dotted-path value in the chosen layer.
 
     Body schema::
 
         {
-            "path":  "llm.temperature",   # dotted path, required
-            "value": 0.9,                  # any JSON value
-            "layer": "user"                # optional, default "user"
+            "path":  "llm.temperature",     # dotted path, required
+            "value": 0.9,                    # any JSON value
+            "layer": "preferences"           # optional, default "preferences"
         }
 
-    Allowed layers: ``user`` (default, persisted to user.yaml),
-    ``system`` (persisted to system.yaml — admin use), ``runtime``
-    (in-memory, lost on restart).  ``defaults`` is read-only.
+    Allowed layers: ``preferences`` (default, persisted to the DB-backed
+    preferences layer — policy-gated), ``user`` (persisted to user.yaml —
+    power-user escape hatch), ``system`` (persisted to system.yaml — admin
+    use), ``runtime`` (in-memory, lost on restart).  ``defaults`` is
+    read-only.
+
+    Shape: the full redacted ``AliceConfig`` (same as ``/config/resolved``)
+    — deliberately left as ``dict[str, Any]``, not the ``ConfigResponse``
+    contract.
     """
     ctx = _ctx(request)
     if ctx.config_service is None:
@@ -116,7 +133,7 @@ async def patch_config(request: Request) -> dict[str, Any]:
         raise HTTPException(400, "'value' is required")
     value = body["value"]
 
-    raw_layer = body.get("layer", ConfigLayer.USER.value)
+    raw_layer = body.get("layer", ConfigLayer.PREFERENCES.value)
     if not isinstance(raw_layer, str):
         raise HTTPException(400, "'layer' must be a string")
     try:
@@ -124,7 +141,8 @@ async def patch_config(request: Request) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(
             400,
-            f"'layer' must be one of: user, system, runtime (got '{raw_layer}')",
+            f"'layer' must be one of: preferences, user, system, runtime "
+            f"(got '{raw_layer}')",
         ) from exc
     if layer is ConfigLayer.DEFAULTS:
         raise HTTPException(400, "'defaults' layer is read-only")
@@ -132,9 +150,16 @@ async def patch_config(request: Request) -> dict[str, Any]:
     try:
         await ctx.config_service.set(path, value, layer=layer)
     except ValidationError as exc:
-        raise HTTPException(422, exc.errors()) from exc
+        # include_context=False: ``value_error`` entries carry the raw
+        # ValueError in ``ctx`` — not JSON-serializable in a response.
+        raise HTTPException(
+            422, exc.errors(include_url=False, include_context=False),
+        ) from exc
     except (ValueError, KeyError) as exc:
         raise HTTPException(400, str(exc)) from exc
+
+    ctx.config = ctx.config_service.get_resolved()
+    await apply_reactions(ctx, {path})
 
     if ctx.ws_connection_manager is not None:
         try:
@@ -150,9 +175,13 @@ async def patch_config(request: Request) -> dict[str, Any]:
     return _resolved_dict(ctx)
 
 
-@router.post("/config/reload")
+@router.post("/config/reload", response_model=dict[str, Any])
 async def reload_config(request: Request) -> dict[str, Any]:
-    """Re-read disk layers (defaults/system/user) and revalidate."""
+    """Re-read disk layers (defaults/system/user) and revalidate.
+
+    Shape: the full redacted ``AliceConfig`` — deliberately left as
+    ``dict[str, Any]``, not the ``ConfigResponse`` contract.
+    """
     ctx = _ctx(request)
     if ctx.config_service is None:
         raise HTTPException(503, "Config service unavailable")
@@ -252,12 +281,11 @@ async def _models_legacy(ctx: AppContext) -> list[dict[str, Any]]:
     return models
 
 
-@router.get("/config")
+@router.get("/config", response_model=ConfigResponse)
 async def get_config(request: Request) -> dict[str, Any]:
     """Return the current server configuration as JSON."""
     ctx = _ctx(request)
     cfg = ctx.config
-    email_password_configured = await _email_password_configured(cfg.email)
     return {
         "llm": {
             "provider": cfg.llm.provider,
@@ -274,7 +302,9 @@ async def get_config(request: Request) -> dict[str, Any]:
             "tool_rag_enabled": cfg.llm.tool_rag_enabled,
             "tool_rag_top_k": cfg.llm.tool_rag_top_k,
             "user_preferred_name": cfg.llm.user_preferred_name,
-            "openrouter_api_key_configured": bool(cfg.llm.openrouter_api_key),
+            "openrouter_api_key_configured": bool(
+                cfg.llm.openrouter_api_key.get_secret_value(),
+            ),
             "openrouter_model": cfg.llm.openrouter_model,
             "openrouter_favorites": list(cfg.llm.openrouter_favorites),
         },
@@ -320,653 +350,149 @@ async def get_config(request: Request) -> dict[str, Any]:
             "smtp_port": cfg.email.smtp_port,
             "smtp_ssl": cfg.email.smtp_ssl,
             "username": cfg.email.username,
-            "use_keyring": cfg.email.use_keyring,
             "fetch_last_n": cfg.email.fetch_last_n,
             "max_fetch": cfg.email.max_fetch,
             "imap_idle_enabled": cfg.email.imap_idle_enabled,
             "archive_folder": cfg.email.archive_folder,
-            "password_configured": email_password_configured,
+            "password_configured": bool(cfg.email.password.get_secret_value()),
             "service_running": ctx.email_service is not None,
         },
     }
 
 
-@router.put("/config")
+def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
+    """Flatten a nested update body into dotted paths (legacy aliases folded).
+
+    Removed-legacy paths (``config.py``'s ``_REMOVED_LEGACY_PATHS`` — keys the
+    system itself deprecated, e.g. ``email.use_keyring``) are dropped here
+    rather than rejected: an older frontend build may still send them in every
+    PUT body, and treating them as an unknown/non-writable path would 400 the
+    whole request, blocking unrelated fields from saving.
+    """
+    flat: dict[str, Any] = {}
+    for section, updates in body.items():
+        if not isinstance(updates, dict):
+            raise HTTPException(400, f"'{section}' must be a JSON object")
+        for key, value in updates.items():
+            flat[f"{section}.{key}"] = value
+    # Historical alias — the UI still sends the pc_automation shape.
+    if "pc_automation.confirmations_enabled" in flat:
+        flat["permissions.confirmations_enabled"] = flat.pop(
+            "pc_automation.confirmations_enabled"
+        )
+    dropped = [path for path in flat if path in _REMOVED_LEGACY_PATHS]
+    if dropped:
+        for path in dropped:
+            flat.pop(path)
+        logger.debug("PUT /api/config: dropped removed-legacy paths {}", sorted(dropped))
+    return flat
+
+
+@router.put("/config", response_model=ConfigResponse)
 async def update_config(request: Request) -> dict[str, Any]:
-    """Update configuration values at runtime.
+    """Update configuration values (preferences layer + secrets).
 
-    Body: a partial config dict with only the keys to change.
-
-    Independent preferences (TTS, STT, voice, UI, etc.) are automatically
-    persisted to the database so they survive restarts.
+    Body: partial nested config dict. Unknown/out-of-policy paths -> 400,
+    invalid values -> 422, secrets routed to the SecretStore.
     """
     ctx = _ctx(request)
+    if ctx.config_service is None:
+        raise HTTPException(503, "Config service unavailable")
     try:
         body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
-
+    except Exception as exc:
+        raise HTTPException(400, "Invalid JSON body") from exc
     if not isinstance(body, dict):
-        raise HTTPException(status_code=400, detail="Request body must be a JSON object")
+        raise HTTPException(400, "Request body must be a JSON object")
 
-    cfg = ctx.config
+    flat = _flatten_update_body(body)
 
-    # Snapshot old STT/TTS values for change detection
-    old_stt = {
-        "enabled": cfg.stt.enabled,
-        "model": cfg.stt.model,
-        "device": cfg.stt.device,
-    } if "stt" in body else None
-    old_tts = {
-        "enabled": cfg.tts.enabled,
-        "engine": cfg.tts.engine,
-        "voice": cfg.tts.voice,
-        "speed": cfg.tts.speed,
-        "kokoro_model": cfg.tts.kokoro_model,
-        "kokoro_voices": cfg.tts.kokoro_voices,
-        "kokoro_voice": cfg.tts.kokoro_voice,
-        "kokoro_language": cfg.tts.kokoro_language,
-    } if "tts" in body else None
-    old_email = {
-        "enabled": cfg.email.enabled,
-        "imap_host": cfg.email.imap_host,
-        "imap_port": cfg.email.imap_port,
-        "imap_ssl": cfg.email.imap_ssl,
-        "smtp_host": cfg.email.smtp_host,
-        "smtp_port": cfg.email.smtp_port,
-        "smtp_ssl": cfg.email.smtp_ssl,
-        "username": cfg.email.username,
-        "use_keyring": cfg.email.use_keyring,
-        "fetch_last_n": cfg.email.fetch_last_n,
-        "max_fetch": cfg.email.max_fetch,
-        "imap_idle_enabled": cfg.email.imap_idle_enabled,
-        "archive_folder": cfg.email.archive_folder,
-    } if "email" in body else None
-    email_password_changed = False
-    llm_service_rebuild_needed = False
+    secret_updates: dict[str, Any] = {}
+    pref_updates: dict[str, Any] = {}
+    rejected: list[str] = []
+    for path, value in flat.items():
+        if is_secret_path(path):
+            secret_updates[path] = value
+        elif is_preference_writable(path):
+            pref_updates[path] = value
+        else:
+            rejected.append(path)
+    if rejected:
+        raise HTTPException(
+            400, f"Unknown or non-writable config paths: {sorted(rejected)}",
+        )
 
-    # Apply supported runtime overrides.
-    if "llm" in body:
-        # Aliases body["llm"]: value normalizations below are intentionally
-        # visible to persist_from_update(body).
-        llm_updates = body["llm"]
-        if "model" in llm_updates:
-            model_val = str(llm_updates["model"]).strip()
-            if not model_val or len(model_val) > 256:
-                raise HTTPException(400, "model must be a non-empty string (max 256 chars)")
-            object.__setattr__(cfg.llm, "model", model_val)
-            # Invalidate auto-resolved model cache when model changes.
-            if ctx.llm_service is not None:
-                ctx.llm_service.invalidate_model_cache()
-        if "temperature" in llm_updates:
-            try:
-                temp = float(llm_updates["temperature"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "temperature must be a number")
-            if not (0.0 <= temp <= 2.0):
-                raise HTTPException(400, "temperature must be between 0.0 and 2.0")
-            object.__setattr__(cfg.llm, "temperature", temp)
-        if "max_tokens" in llm_updates:
-            try:
-                mt = int(llm_updates["max_tokens"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "max_tokens must be an integer")
-            if mt < -1 or mt == 0:
-                raise HTTPException(
-                    400,
-                    "max_tokens must be a positive integer or -1 (unlimited)",
-                )
-            object.__setattr__(cfg.llm, "max_tokens", mt)
-        if "max_tool_iterations" in llm_updates:
-            try:
-                mti = int(llm_updates["max_tool_iterations"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "max_tool_iterations must be a positive integer")
-            if not (1 <= mti <= 100):
-                raise HTTPException(400, "max_tool_iterations must be between 1 and 100")
-            object.__setattr__(cfg.llm, "max_tool_iterations", mti)
-        if "supports_thinking" in llm_updates:
-            if not isinstance(llm_updates["supports_thinking"], bool):
-                raise HTTPException(400, "supports_thinking must be a boolean")
-            object.__setattr__(cfg.llm, "supports_thinking", llm_updates["supports_thinking"])
-        if "supports_vision" in llm_updates:
-            if not isinstance(llm_updates["supports_vision"], bool):
-                raise HTTPException(400, "supports_vision must be a boolean")
-            object.__setattr__(cfg.llm, "supports_vision", llm_updates["supports_vision"])
-        if "context_compression_enabled" in llm_updates:
-            if not isinstance(llm_updates["context_compression_enabled"], bool):
-                raise HTTPException(400, "context_compression_enabled must be a boolean")
-            object.__setattr__(
-                cfg.llm, "context_compression_enabled",
-                llm_updates["context_compression_enabled"],
-            )
-        if "context_compression_threshold" in llm_updates:
-            try:
-                thr = float(llm_updates["context_compression_threshold"])
-            except (TypeError, ValueError):
-                raise HTTPException(
-                    400, "context_compression_threshold must be a number",
-                )
-            if not (0.50 <= thr <= 0.95):
-                raise HTTPException(
-                    400,
-                    "context_compression_threshold must be between 0.50 and 0.95",
-                )
-            object.__setattr__(cfg.llm, "context_compression_threshold", thr)
-        if "context_compression_reserve" in llm_updates:
-            try:
-                res = int(llm_updates["context_compression_reserve"])
-            except (TypeError, ValueError):
-                raise HTTPException(
-                    400, "context_compression_reserve must be an integer",
-                )
-            if not (512 <= res <= 8192):
-                raise HTTPException(
-                    400,
-                    "context_compression_reserve must be between 512 and 8192",
-                )
-            object.__setattr__(cfg.llm, "context_compression_reserve", res)
-        if "tool_rag_enabled" in llm_updates:
-            if not isinstance(llm_updates["tool_rag_enabled"], bool):
-                raise HTTPException(400, "tool_rag_enabled must be a boolean")
-            object.__setattr__(cfg.llm, "tool_rag_enabled", llm_updates["tool_rag_enabled"])
-        if "tool_rag_top_k" in llm_updates:
-            try:
-                trk = int(llm_updates["tool_rag_top_k"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "tool_rag_top_k must be an integer")
-            if not (1 <= trk <= 100):
-                raise HTTPException(400, "tool_rag_top_k must be between 1 and 100")
-            object.__setattr__(cfg.llm, "tool_rag_top_k", trk)
-        if "user_preferred_name" in llm_updates:
-            raw_name = llm_updates["user_preferred_name"]
-            name = "" if raw_name is None else str(raw_name).strip()
-            if len(name) > 80:
-                raise HTTPException(
-                    400, "user_preferred_name must be at most 80 characters",
-                )
-            object.__setattr__(cfg.llm, "user_preferred_name", name)
-            # Drop the cached prompt so the next turn rebuilds it with the name.
-            if ctx.llm_service is not None:
-                ctx.llm_service.invalidate_system_prompt_cache()
-        if "provider" in llm_updates:
-            prov = str(llm_updates["provider"]).strip().lower()
-            if prov not in ("lmstudio", "ollama", "openrouter"):
-                raise HTTPException(
-                    400, "provider must be one of: lmstudio, ollama, openrouter",
-                )
-            llm_updates["provider"] = prov
-            if prov != cfg.llm.provider:
-                object.__setattr__(cfg.llm, "provider", prov)
-                llm_service_rebuild_needed = True
-        if "openrouter_api_key" in llm_updates:
-            raw_key = str(llm_updates["openrouter_api_key"] or "").strip()
-            # "***" is the mask returned by GET — never overwrite the real
-            # key with it, neither in memory nor in the persisted prefs.
-            if raw_key and raw_key != "***":
-                if len(raw_key) > 256:
-                    raise HTTPException(400, "openrouter_api_key max 256 chars")
-                object.__setattr__(cfg.llm, "openrouter_api_key", raw_key)
-                llm_updates["openrouter_api_key"] = raw_key
-                llm_service_rebuild_needed = True
-            else:
-                # No-op update: drop the key so persist_from_update
-                # cannot clobber the stored secret with the mask.
-                llm_updates.pop("openrouter_api_key", None)
-        if "openrouter_model" in llm_updates:
-            om = str(llm_updates["openrouter_model"] or "").strip()
-            if len(om) > 256:
-                raise HTTPException(400, "openrouter_model max 256 chars")
-            object.__setattr__(cfg.llm, "openrouter_model", om)
-            llm_updates["openrouter_model"] = om
-            if ctx.llm_service is not None:
-                ctx.llm_service.invalidate_model_cache()
-                ctx.llm_service.invalidate_context_window_cache()
-        if "openrouter_favorites" in llm_updates:
-            favs = llm_updates["openrouter_favorites"]
-            if not isinstance(favs, list) or not all(
-                isinstance(f, str) for f in favs
-            ):
-                raise HTTPException(
-                    400, "openrouter_favorites must be a list of strings",
-                )
-            if len(favs) > 200:
-                raise HTTPException(400, "openrouter_favorites max 200 items")
-            object.__setattr__(cfg.llm, "openrouter_favorites", favs)
-            llm_updates["openrouter_favorites"] = favs
+    old_config = ctx.config
 
-    if "ui" in body:
-        ui_updates = body["ui"]
-        if "theme" in ui_updates:
-            theme = str(ui_updates["theme"]).strip()
-            if theme not in ("dark", "light"):
-                raise HTTPException(400, "theme must be 'dark' or 'light'")
-            object.__setattr__(cfg.ui, "theme", theme)
-        if "language" in ui_updates:
-            lang = str(ui_updates["language"]).strip()
-            if not lang or len(lang) > 10:
-                raise HTTPException(
-                    400, "ui language must be a non-empty string (max 10 chars)",
-                )
-            object.__setattr__(cfg.ui, "language", lang)
+    secret_changed = await _apply_secret_updates(ctx, secret_updates)
 
-    if "stt" in body:
-        stt_updates = body["stt"]
-        if "enabled" in stt_updates:
-            if not isinstance(stt_updates["enabled"], bool):
-                raise HTTPException(400, "stt.enabled must be a boolean")
-            object.__setattr__(cfg.stt, "enabled", stt_updates["enabled"])
-        if "language" in stt_updates:
-            raw_lang = stt_updates["language"]
-            if raw_lang is None or (
-                isinstance(raw_lang, str) and not raw_lang.strip()
-            ):
-                object.__setattr__(cfg.stt, "language", None)
-            else:
-                lang = str(raw_lang).strip()
-                if not lang or len(lang) > 10:
-                    raise HTTPException(
-                        400,
-                        "language must be a non-empty string (max 10 chars)",
-                    )
-                object.__setattr__(cfg.stt, "language", lang)
-        if "model" in stt_updates:
-            model = str(stt_updates["model"]).strip()
-            if not model or len(model) > 64:
-                raise HTTPException(
-                    400, "STT model must be a non-empty string (max 64 chars)",
-                )
-            object.__setattr__(cfg.stt, "model", model)
-        if "device" in stt_updates:
-            device = str(stt_updates["device"]).strip()
-            if device not in ("cpu", "cuda"):
-                raise HTTPException(400, "device must be 'cpu' or 'cuda'")
-            object.__setattr__(cfg.stt, "device", device)
-
-    if "tts" in body:
-        tts_updates = body["tts"]
-        if "enabled" in tts_updates:
-            if not isinstance(tts_updates["enabled"], bool):
-                raise HTTPException(400, "tts.enabled must be a boolean")
-            object.__setattr__(cfg.tts, "enabled", tts_updates["enabled"])
-        if "engine" in tts_updates:
-            engine = str(tts_updates["engine"]).strip()
-            if engine not in ("piper", "xtts", "kokoro"):
-                raise HTTPException(
-                    400, "TTS engine must be 'piper', 'xtts', or 'kokoro'",
-                )
-            object.__setattr__(cfg.tts, "engine", engine)
-        if "voice" in tts_updates:
-            voice = str(tts_updates["voice"]).strip()
-            if not voice or len(voice) > 256:
-                raise HTTPException(
-                    400, "voice must be a non-empty string (max 256 chars)",
-                )
-            object.__setattr__(cfg.tts, "voice", voice)
-        if "speed" in tts_updates:
-            try:
-                speed = float(tts_updates["speed"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "speed must be a number")
-            if not (0.5 <= speed <= 2.0):
-                raise HTTPException(
-                    400, "speed must be between 0.5 and 2.0",
-                )
-            object.__setattr__(cfg.tts, "speed", speed)
-        if "sample_rate" in tts_updates:
-            try:
-                sr = int(tts_updates["sample_rate"])
-            except (TypeError, ValueError):
-                raise HTTPException(400, "sample_rate must be an integer")
-            if sr not in (16000, 22050, 24000, 44100, 48000):
-                raise HTTPException(
-                    400,
-                    "sample_rate must be one of: 16000, 22050, 24000, 44100, 48000",
-                )
-            object.__setattr__(cfg.tts, "sample_rate", sr)
-        if "kokoro_voice" in tts_updates:
-            kv = str(tts_updates["kokoro_voice"]).strip()
-            if not kv or len(kv) > 100:
-                raise HTTPException(400, "kokoro_voice must be non-empty (max 100 chars)")
-            object.__setattr__(cfg.tts, "kokoro_voice", kv)
-        if "kokoro_language" in tts_updates:
-            kl = str(tts_updates["kokoro_language"]).strip()
-            if not kl or len(kl) > 10:
-                raise HTTPException(400, "kokoro_language must be non-empty (max 10 chars)")
-            object.__setattr__(cfg.tts, "kokoro_language", kl)
-        if "kokoro_model" in tts_updates:
-            km = str(tts_updates["kokoro_model"]).strip()
-            if not km or len(km) > 256:
-                raise HTTPException(400, "kokoro_model must be non-empty (max 256 chars)")
-            object.__setattr__(cfg.tts, "kokoro_model", km)
-        if "kokoro_voices" in tts_updates:
-            kvf = str(tts_updates["kokoro_voices"]).strip()
-            if not kvf or len(kvf) > 256:
-                raise HTTPException(400, "kokoro_voices must be non-empty (max 256 chars)")
-            object.__setattr__(cfg.tts, "kokoro_voices", kvf)
-
-    if "voice" in body:
-        voice_updates = body["voice"]
-        if "auto_tts_response" in voice_updates:
-            if not isinstance(voice_updates["auto_tts_response"], bool):
-                raise HTTPException(400, "auto_tts_response must be a boolean")
-            object.__setattr__(
-                cfg.voice, "auto_tts_response",
-                voice_updates["auto_tts_response"],
-            )
-        if "activation_mode" in voice_updates:
-            mode = str(voice_updates["activation_mode"]).strip()
-            if mode not in ("push_to_talk", "wake_word", "always_on"):
-                raise HTTPException(
-                    400,
-                    "activation_mode must be one of: push_to_talk, wake_word, always_on",
-                )
-            object.__setattr__(cfg.voice, "activation_mode", mode)
-        if "wake_word" in voice_updates:
-            ww = str(voice_updates["wake_word"]).strip()
-            if not ww or len(ww) > 50:
-                raise HTTPException(
-                    400,
-                    "wake_word must be a non-empty string (max 50 chars)",
-                )
-            object.__setattr__(cfg.voice, "wake_word", ww)
-
-    if "pc_automation" in body:
-        pc_updates = body["pc_automation"]
-        if "confirmations_enabled" in pc_updates:
-            if not isinstance(pc_updates["confirmations_enabled"], bool):
-                raise HTTPException(400, "confirmations_enabled must be a boolean")
-            # Promoted to the neutral ``permissions`` block in Fase 2; the
-            # request keeps the historical shape (persisted body is migrated).
-            object.__setattr__(
-                cfg.permissions, "confirmations_enabled",
-                pc_updates["confirmations_enabled"],
-            )
-
-    if "email" in body:
-        email_updates = body["email"]
-        if not isinstance(email_updates, dict):
-            raise HTTPException(400, "email must be a JSON object")
-
-        if "enabled" in email_updates:
-            if not isinstance(email_updates["enabled"], bool):
-                raise HTTPException(400, "email.enabled must be a boolean")
-            object.__setattr__(cfg.email, "enabled", email_updates["enabled"])
-        for key in ("imap_ssl", "smtp_ssl", "use_keyring", "imap_idle_enabled"):
-            if key in email_updates:
-                if not isinstance(email_updates[key], bool):
-                    raise HTTPException(400, f"email.{key} must be a boolean")
-                object.__setattr__(cfg.email, key, email_updates[key])
-        for key in ("imap_host", "smtp_host", "username", "archive_folder"):
-            if key in email_updates:
-                value = str(email_updates[key]).strip()
-                if len(value) > 255:
-                    raise HTTPException(400, f"email.{key} must be max 255 chars")
-                object.__setattr__(cfg.email, key, value)
-        for key in ("imap_port", "smtp_port"):
-            if key in email_updates:
-                try:
-                    port = int(email_updates[key])
-                except (TypeError, ValueError):
-                    raise HTTPException(400, f"email.{key} must be an integer")
-                if not (1 <= port <= 65535):
-                    raise HTTPException(400, f"email.{key} must be between 1 and 65535")
-                object.__setattr__(cfg.email, key, port)
-        for key in ("fetch_last_n", "max_fetch"):
-            if key in email_updates:
-                try:
-                    value = int(email_updates[key])
-                except (TypeError, ValueError):
-                    raise HTTPException(400, f"email.{key} must be an integer")
-                if not (1 <= value <= 500):
-                    raise HTTPException(400, f"email.{key} must be between 1 and 500")
-                object.__setattr__(cfg.email, key, value)
-
-        raw_password = email_updates.get("password")
-        if isinstance(raw_password, str) and raw_password:
-            if cfg.email.use_keyring:
-                await _store_email_password(cfg.email.username, raw_password)
-                object.__setattr__(cfg.email, "password", SecretStr(""))
-            else:
-                object.__setattr__(cfg.email, "password", SecretStr(raw_password))
-            email_password_changed = True
-
-    # -- Persist independent preferences to database -------------------------
-    if ctx.preferences_service is not None:
+    if pref_updates:
         try:
-            await ctx.preferences_service.persist_from_update(body)
-        except Exception as exc:
-            logger.warning("Failed to persist preferences: {}", exc)
+            await ctx.config_service.set_many(
+                pref_updates, layer=ConfigLayer.PREFERENCES,
+            )
+        except ValidationError as exc:
+            # include_context=False: ``value_error`` entries carry the raw
+            # ValueError in ``ctx`` — not JSON-serializable in a response.
+            raise HTTPException(
+                422, exc.errors(include_url=False, include_context=False),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        ctx.config = ctx.config_service.get_resolved()
 
-    # -- Restart STT/TTS services if their config ACTUALLY changed ---------
-    if old_stt is not None:
-        stt_changed = (
-            cfg.stt.enabled != old_stt["enabled"]
-            or cfg.stt.model != old_stt["model"]
-            or cfg.stt.device != old_stt["device"]
-        )
-        if stt_changed:
-            await _apply_stt_changes(ctx, body["stt"])
-            await push_voice_ready(ctx)
+    changed = diff_paths(
+        old_config, ctx.config, set(pref_updates) | ALL_REACTIVE_PATHS,
+    ) | secret_changed
+    await apply_reactions(ctx, changed)
 
-    if old_tts is not None:
-        tts_changed = (
-            cfg.tts.enabled != old_tts["enabled"]
-            or cfg.tts.engine != old_tts["engine"]
-            or cfg.tts.voice != old_tts["voice"]
-            or cfg.tts.speed != old_tts["speed"]
-            or cfg.tts.kokoro_model != old_tts["kokoro_model"]
-            or cfg.tts.kokoro_voices != old_tts["kokoro_voices"]
-            or cfg.tts.kokoro_voice != old_tts["kokoro_voice"]
-            or cfg.tts.kokoro_language
-            != old_tts["kokoro_language"]
-        )
-        if tts_changed:
-            await _apply_tts_changes(ctx, body["tts"])
-            await push_voice_ready(ctx)
-
-    if old_email is not None:
-        email_changed = email_password_changed or any(
-            getattr(cfg.email, key) != value
-            for key, value in old_email.items()
-        )
-        if email_changed:
-            await _apply_email_changes(ctx)
-
-    if llm_service_rebuild_needed:
-        await _apply_llm_provider_change(ctx)
-
-    # Return the full config after applying changes.
     return await get_config(request)
 
 
-async def _apply_stt_changes(ctx: AppContext, stt_updates: dict) -> None:
-    """Restart or stop the STT service when its config changes."""
-    cfg = ctx.config
-
-    # Disable → stop service
-    if "enabled" in stt_updates and not cfg.stt.enabled:
-        if ctx.stt_service is not None:
-            try:
-                await ctx.stt_service.stop()
-                logger.info("STT service stopped (disabled via config)")
-            except Exception as exc:
-                logger.warning("Failed to stop STT service: {}", exc)
-            ctx.stt_service = None
-        return
-
-    # Enable or model/device changed → restart service
-    needs_restart = any(
-        k in stt_updates for k in ("enabled", "model", "device")
-    )
-    if not needs_restart:
-        return
-
-    if not cfg.stt.enabled:
-        return
-
-    # Stop existing
-    if ctx.stt_service is not None:
-        try:
-            await ctx.stt_service.stop()
-        except Exception as exc:
-            logger.warning("Failed to stop STT service for restart: {}", exc)
-        ctx.stt_service = None
-
-    # Auto-correct compute_type for CPU (float16 not supported)
-    if cfg.stt.device == "cpu" and cfg.stt.compute_type == "float16":
-        object.__setattr__(cfg.stt, "compute_type", "int8")
-        logger.info("Auto-corrected STT compute_type to int8 for CPU device")
-
-    # Start new
-    try:
-        stt = STTService(cfg.stt)
-        await stt.start()
-        ctx.stt_service = stt
-        logger.info(
-            "STT service restarted (model={}, device={}, compute_type={})",
-            cfg.stt.model, cfg.stt.device, cfg.stt.compute_type,
-        )
-    except Exception as exc:
-        logger.warning("STT service failed to restart: {}", exc)
+_SECRET_MAX_LEN = 512
 
 
-async def _apply_tts_changes(ctx: AppContext, tts_updates: dict) -> None:
-    """Restart or stop the TTS service when its config changes."""
-    cfg = ctx.config
+async def _apply_secret_updates(
+    ctx: AppContext, updates: dict[str, Any],
+) -> set[str]:
+    """Apply secret writes (keyring semantics) and refresh ``ctx.config``.
 
-    # Disable → stop service
-    if "enabled" in tts_updates and not cfg.tts.enabled:
-        if ctx.tts_service is not None:
-            try:
-                await ctx.tts_service.stop()
-                logger.info("TTS service stopped (disabled via config)")
-            except Exception as exc:
-                logger.warning("Failed to stop TTS service: {}", exc)
-            ctx.tts_service = None
-        return
-
-    # Engine, voice, or speed changed → restart service
-    needs_restart = any(
-        k in tts_updates for k in (
-            "enabled", "engine", "voice", "speed",
-            "kokoro_model", "kokoro_voices", "kokoro_voice", "kokoro_language",
-        )
-    )
-    if not needs_restart:
-        return
-
-    if not cfg.tts.enabled:
-        return
-
-    # Stop existing
-    if ctx.tts_service is not None:
-        try:
-            await ctx.tts_service.stop()
-        except Exception as exc:
-            logger.warning("Failed to stop TTS service for restart: {}", exc)
-        ctx.tts_service = None
-
-    # Start new
-    try:
-        tts = TTSService(cfg.tts)
-        await tts.start()
-        ctx.tts_service = tts
-        logger.info(
-            "TTS service restarted (engine={}, voice={})",
-            cfg.tts.engine, cfg.tts.voice,
-        )
-    except Exception as exc:
-        logger.warning("TTS service failed to restart: {}", exc)
-
-
-async def _apply_llm_provider_change(ctx: AppContext) -> None:
-    """Rebuild the LLM service after a provider or API-key change.
-
-    Auth headers on the shared httpx client and the provider-derived
-    flags in LLMClient/ModelResolver are fixed at construction time, so
-    an in-place config mutation is not enough — recreate the service,
-    mirroring the STT/TTS restart pattern.
-    """
-    from backend.services.llm_service import LLMService
-
-    old = ctx.llm_service
-    new_service = LLMService(ctx.config.llm, model_registry=ctx.model_registry)
-    ctx.llm_service = new_service
-    # add_models_changed_listener has no removal API: the old service's
-    # listener stays registered (harmless no-op on a closed service,
-    # bounded by user-initiated switches).
-    if ctx.lmstudio_manager is not None:
-        ctx.lmstudio_manager.add_models_changed_listener(
-            new_service.invalidate_context_window_cache
-        )
-    if old is not None:
-        try:
-            await old.close()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to close previous LLM service: {}", exc)
-    logger.info("LLM service rebuilt (provider={})", ctx.config.llm.provider)
-
-
-async def _store_email_password(username: str, password: str) -> None:
-    """Persist an email password in the OS keyring.
+    Uniform semantics for every path in ``updates`` (each MUST be a
+    ``config_policy.SECRET_PATHS`` member): a non-empty string other than
+    ``"***"`` sets the secret; ``""`` or ``"***"`` (the GET mask) is a
+    no-op; ``None`` deletes it. When any secret actually changed, the
+    config is rebuilt through the layered service so ``ctx.config``
+    re-hydrates from the secret store instead of being mutated in place.
 
     Args:
-        username: Account username used as the keyring account name.
-        password: Secret value to store.
+        ctx: App context — reads/writes ``ctx.secret_store`` and rebuilds
+            ``ctx.config`` via ``ctx.config_service``.
+        updates: Mapping of dotted secret path -> raw request value.
+
+    Returns:
+        The set of dotted paths whose stored value actually changed.
     """
-    username = username.strip()
-    if not username:
-        raise HTTPException(400, "email.username is required before saving password")
-    try:
-        import keyring
-    except ImportError as exc:  # pragma: no cover — dependency is declared
-        raise HTTPException(500, "Python keyring package is not installed") from exc
-    try:
-        await asyncio.to_thread(keyring.set_password, "alice", username, password)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(500, f"Failed to save email password in keyring: {exc}") from exc
-
-
-async def _email_password_configured(email_cfg: Any) -> bool:
-    """Return whether an email password is available without exposing it."""
-    if email_cfg.password.get_secret_value():
-        return True
-    if not email_cfg.use_keyring or not email_cfg.username:
-        return False
-    try:
-        import keyring
-        pwd = await asyncio.to_thread(
-            keyring.get_password, "alice", email_cfg.username,
-        )
-        return bool(pwd)
-    except Exception:
-        return False
-
-
-async def _apply_email_changes(ctx: AppContext) -> None:
-    """Restart or stop the email service after runtime config changes."""
-    if ctx.email_service is not None:
-        try:
-            await ctx.email_service.close()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to stop EmailService for restart: {}", exc)
-        ctx.email_service = None
-
-    if not ctx.config.email.enabled:
-        logger.info("Email service stopped (disabled via config)")
-        return
-
-    from backend.services.email_service import EmailService
-
-    email_service = EmailService(ctx.config.email, ctx.event_bus)
-    try:
-        await email_service.initialize()
-        ctx.email_service = email_service
-        logger.info("Email service restarted ({})", ctx.config.email.username)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Email service failed to restart: {}", exc)
-        await email_service.close()
+    changed: set[str] = set()
+    if ctx.secret_store is None:
+        return changed
+    for path, raw in updates.items():
+        assert is_secret_path(path), f"_apply_secret_updates: not a secret path: {path}"
+        if raw is None:
+            if ctx.secret_store.cached().get(path):
+                await ctx.secret_store.delete(path)
+                changed.add(path)
+            continue
+        value = str(raw).strip()
+        if not value or value == "***":
+            continue
+        if len(value) > _SECRET_MAX_LEN:
+            raise HTTPException(400, f"{path} max {_SECRET_MAX_LEN} chars")
+        if value != ctx.secret_store.cached().get(path):
+            await ctx.secret_store.set(path, value)
+            changed.add(path)
+    if changed and ctx.config_service is not None:
+        ctx.config = await ctx.config_service.rebuild()
+    return changed
 
 
 @router.post("/config/sync-model")

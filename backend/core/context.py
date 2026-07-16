@@ -31,6 +31,7 @@ from backend.core.protocols import (
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     QdrantServiceProtocol,
+    SecretStoreProtocol,
     STTServiceProtocol,
     ToolRegistryProtocol,
     TTSServiceProtocol,
@@ -64,7 +65,7 @@ class AppContext:
         "plugin_manager", "tool_registry", "llm_service", "stt_service",
         "tts_service", "lmstudio_manager", "vram_monitor", "model_registry",
         "openrouter_service",
-        "preferences_service", "memory_service", "knowledge_service",
+        "memory_service", "knowledge_service",
         "continuum_client", "email_service", "qdrant_service",
         "embedding_client", "rag_readiness", "ws_connection_manager",
         "context_manager", "plugin_state_repo", "config_service",
@@ -73,7 +74,7 @@ class AppContext:
         "permission_rule_service", "terminal_session_manager",
         "plugin_local_state", "orchestrator", "model_downloader",
         "event_bus", "background_task_service", "attention_service",
-        "trigger_service",
+        "trigger_service", "secret_store", "preferences_store",
     )
 
     def __init__(
@@ -384,16 +385,6 @@ class AppContext:
         self.platform.plugin_state_repo = value
 
     @property
-    def preferences_service(self) -> PreferencesServiceProtocol | None:
-        return self.platform.preferences_service
-
-    @preferences_service.setter
-    def preferences_service(
-        self, value: PreferencesServiceProtocol | None,
-    ) -> None:
-        self.platform.preferences_service = value
-
-    @property
     def email_service(self) -> EmailServiceProtocol | None:
         return self.platform.email_service
 
@@ -432,6 +423,24 @@ class AppContext:
     @trigger_service.setter
     def trigger_service(self, value: Any) -> None:
         self.platform.trigger_service = value
+
+    @property
+    def secret_store(self) -> SecretStoreProtocol | None:
+        return self.platform.secret_store
+
+    @secret_store.setter
+    def secret_store(self, value: SecretStoreProtocol | None) -> None:
+        self.platform.secret_store = value
+
+    @property
+    def preferences_store(self) -> PreferencesServiceProtocol | None:
+        return self.platform.preferences_store
+
+    @preferences_store.setter
+    def preferences_store(
+        self, value: PreferencesServiceProtocol | None,
+    ) -> None:
+        self.platform.preferences_store = value
 
     # ------------------------------------------------------------------
     # Plugin state helpers

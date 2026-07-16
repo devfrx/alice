@@ -50,7 +50,7 @@ async def stage_inference(ctx: AppContext) -> None:
 
     lmstudio_manager = LMStudioManager(
         base_url=config.llm.base_url,
-        api_token=config.llm.api_token,
+        api_token=config.llm.api_token.get_secret_value(),
     )
     ctx.lmstudio_manager = lmstudio_manager
 

@@ -34,13 +34,29 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     orchestrator = ServiceOrchestrator(ctx.event_bus)
     ctx.orchestrator = orchestrator
 
+    # -- Secret store (OS keyring) -------------------------------------------
+    # Built before the config service so its synchronous ``cached()`` reader
+    # can be passed straight in as the secrets provider.
+    from backend.services.secret_store import create_secret_store
+
+    secret_store = create_secret_store(prefer_memory=testing)
+    if not testing:
+        try:
+            await secret_store.load_cache()
+        except Exception as exc:  # noqa: BLE001 — keyring failure must not kill boot
+            logger.warning("Secret cache load failed: {}", exc)
+    ctx.secret_store = secret_store
+
     # -- Layered configuration service (defaults/system/user/runtime) -------
     # Built early so any subsequent service can read merged config through
     # ``ctx.config`` exactly as before.  The service rebuilds ``ctx.config``
     # whenever a layer mutation succeeds.
     from backend.services.config_service import LayeredConfigService
 
-    config_service = LayeredConfigService(event_bus=ctx.event_bus)
+    config_service = LayeredConfigService(
+        event_bus=ctx.event_bus,
+        secrets_provider=secret_store.cached,
+    )
     ctx.config_service = config_service
     ctx.config = config_service.get_resolved()
     config = ctx.config  # keep local alias in sync for the rest of this stage
@@ -81,20 +97,47 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     ctx.event_bus.subscribe(PROGRESS_EVENT, _forward_download_progress)
 
     # -- Load persisted user preferences ------------------------------------
-    from backend.services.preferences_service import PreferencesService
+    from backend.services.preferences_service import PreferencesLayerStore
 
     assert ctx.db is not None, "stage_database must run before stage_platform"
     session_factory = ctx.db
 
-    preferences_service = PreferencesService(session_factory)
-    ctx.preferences_service = preferences_service
+    preferences_store = PreferencesLayerStore(session_factory)
+    ctx.preferences_store = preferences_store
 
     if not testing:
+        from backend.services.config_migration import run_secret_migrations
+
         try:
-            prefs = await preferences_service.load_all()
-            preferences_service.apply_to_config(config, prefs)
+            # 1. Load prefs ONCE for the migration's username source (the row
+            #    may exist only in the DB, not in YAML).
+            prefs = await preferences_store.load()
+            email_username = str(
+                prefs.get("email", {}).get("username", "") or config.email.username
+            )
+
+            # 2. Migrate legacy secrets (DB rows / YAML / legacy keyring name)
+            #    BEFORE the preferences layer below loads, so no stale
+            #    secret/dead rows leak into it.
+            await run_secret_migrations(
+                secret_store, session_factory, config_service,
+                email_username=email_username,
+            )
         except Exception as exc:
-            logger.warning("Failed to load persisted preferences: {}", exc)
+            logger.warning("Failed to migrate legacy secrets: {}", exc)
+
+    # 3. Load the preferences layer AND rebuild (replaces the bare
+    #    ``rebuild()``) so persisted rows are what the layer sees, and
+    #    future writes to the PREFERENCES layer persist through this same
+    #    store. The layer IS the source of truth now — no separate overlay
+    #    onto the resolved config. Runs unconditionally (including under
+    #    ``testing``) so ``ctx.config_service`` always knows its store
+    #    before any PUT/PATCH write lands on the preferences layer.
+    try:
+        ctx.config = await config_service.load_preferences_layer(preferences_store)
+        config = ctx.config
+    except Exception as exc:
+        logger.warning("Failed to load the preferences layer: {}", exc)
 
     # -- Restore persisted plugin toggle states -----------------------------
     from backend.db.plugin_state import PluginStateRepository

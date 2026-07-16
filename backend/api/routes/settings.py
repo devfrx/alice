@@ -9,12 +9,41 @@ from loguru import logger
 from pydantic import BaseModel
 
 from backend.core.context import AppContext
+from backend.services.config_service import ConfigLayer
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 def _ctx(request: Request) -> AppContext:
     return request.app.state.context
+
+
+async def _set_preference(ctx: AppContext, path: str, value: Any, *, label: str) -> None:
+    """Persist a single dotted-path preference, with an in-memory fallback.
+
+    Encapsulates the pattern repeated by every runtime toggle in this
+    module: write through ``config_service`` (PREFERENCES layer) and
+    refresh ``ctx.config`` from the resolved result; if the service is
+    unavailable or the persisted write fails for any reason, fall back to
+    mutating ``ctx.config`` directly so the running process still reflects
+    the change, with a warning logged.
+
+    Args:
+        ctx: App context — reads/writes ``ctx.config`` and ``ctx.config_service``.
+        path: Dotted config path, e.g. ``"llm.tools_enabled"`` (single level:
+            ``section.field``).
+        value: The new value to set.
+        label: Short human label for the warning log message, e.g. "tools".
+    """
+    section, _, field = path.partition(".")
+    if ctx.config_service is not None:
+        try:
+            await ctx.config_service.set(path, value, layer=ConfigLayer.PREFERENCES)
+            ctx.config = ctx.config_service.get_resolved()
+            return
+        except Exception as exc:
+            logger.warning("Failed to persist {} preference: {}", label, exc)
+    object.__setattr__(getattr(ctx.config, section), field, value)
 
 
 class ToolConfirmationsRequest(BaseModel):
@@ -42,18 +71,9 @@ async def set_tool_confirmations(
     Fase 2; the API field name is unchanged.)
     """
     ctx = _ctx(request)
-    object.__setattr__(
-        ctx.config.permissions,
-        "confirmations_enabled",
-        body.enabled,
+    await _set_preference(
+        ctx, "permissions.confirmations_enabled", body.enabled, label="tool-confirmations",
     )
-    if ctx.preferences_service is not None:
-        try:
-            await ctx.preferences_service.save_preference(
-                "permissions.confirmations_enabled", body.enabled,
-            )
-        except Exception as exc:
-            logger.warning("Failed to persist tool-confirmations preference: {}", exc)
     return ToolConfirmationsResponse(
         confirmations_enabled=ctx.config.permissions.confirmations_enabled,
     )
@@ -92,19 +112,12 @@ async def set_system_prompt(
 ) -> SystemPromptResponse:
     """Toggle system prompt on/off at runtime."""
     ctx = _ctx(request)
-    object.__setattr__(
-        ctx.config.llm, "system_prompt_enabled", body.enabled,
+    await _set_preference(
+        ctx, "llm.system_prompt_enabled", body.enabled, label="system-prompt",
     )
     # Invalidate cached system prompt so change takes effect immediately
     if ctx.llm_service is not None:
         ctx.llm_service.invalidate_system_prompt_cache()
-    if ctx.preferences_service is not None:
-        try:
-            await ctx.preferences_service.save_preference(
-                "llm.system_prompt_enabled", body.enabled,
-            )
-        except Exception as exc:
-            logger.warning("Failed to persist system-prompt preference: {}", exc)
     return SystemPromptResponse(
         system_prompt_enabled=ctx.config.llm.system_prompt_enabled,
     )
@@ -143,16 +156,7 @@ async def set_tools(
 ) -> ToolsResponse:
     """Toggle tool definitions on/off at runtime."""
     ctx = _ctx(request)
-    object.__setattr__(
-        ctx.config.llm, "tools_enabled", body.enabled,
-    )
-    if ctx.preferences_service is not None:
-        try:
-            await ctx.preferences_service.save_preference(
-                "llm.tools_enabled", body.enabled,
-            )
-        except Exception as exc:
-            logger.warning("Failed to persist tools preference: {}", exc)
+    await _set_preference(ctx, "llm.tools_enabled", body.enabled, label="tools")
     return ToolsResponse(
         tools_enabled=ctx.config.llm.tools_enabled,
     )
@@ -263,14 +267,7 @@ async def set_active_tools(
     """
     ctx = _ctx(request)
     cleaned = sorted({n for n in body.disabled_tools if isinstance(n, str) and n})
-    object.__setattr__(ctx.config.llm, "disabled_tools", cleaned)
-    if ctx.preferences_service is not None:
-        try:
-            await ctx.preferences_service.save_preference(
-                "llm.disabled_tools", cleaned,
-            )
-        except Exception as exc:
-            logger.warning("Failed to persist active-tools preference: {}", exc)
+    await _set_preference(ctx, "llm.disabled_tools", cleaned, label="active-tools")
     return _build_tool_catalog(ctx)
 
 
@@ -281,9 +278,9 @@ async def set_active_tools(
 async def get_preferences(request: Request) -> dict[str, Any]:
     """Return all persisted user preferences."""
     ctx = _ctx(request)
-    if ctx.preferences_service is None:
+    if ctx.preferences_store is None:
         return {}
-    return await ctx.preferences_service.load_all()
+    return await ctx.preferences_store.load()
 
 
 # -- Voice engine availability check ---------------------------------------
@@ -327,9 +324,9 @@ async def reset_preferences(request: Request) -> dict[str, Any]:
     The next restart will use only YAML defaults.
     """
     ctx = _ctx(request)
-    if ctx.preferences_service is None:
+    if ctx.preferences_store is None:
         raise HTTPException(503, "Preferences service not available")
-    count = await ctx.preferences_service.delete_all()
+    count = await ctx.preferences_store.delete_all()
     return {
         "deleted": count,
         "message": "Preferences reset. Restart to apply YAML defaults.",

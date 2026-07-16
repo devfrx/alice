@@ -37,6 +37,7 @@ from backend.core.protocols import (
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     QdrantServiceProtocol,
+    SecretStoreProtocol,
     STTServiceProtocol,
     ToolRegistryProtocol,
     TTSServiceProtocol,
@@ -125,7 +126,8 @@ class PlatformServices:
     tool_registry: ToolRegistryProtocol | None = None
     orchestrator: Any = None
     plugin_state_repo: Any = None
-    preferences_service: PreferencesServiceProtocol | None = None
+    preferences_store: PreferencesServiceProtocol | None = None
+    """DB-backed store for the ``preferences`` config layer (Task 7)."""
     email_service: EmailServiceProtocol | None = None
     plugin_local_state: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Per-plugin local state, keyed by plugin name."""
@@ -135,3 +137,6 @@ class PlatformServices:
     """Single decision point for agent-initiated user attention (Fase 8)."""
     trigger_service: Any = None
     """Autonomous-turn trigger sources: schedule/event/manual (Fase 8)."""
+    secret_store: SecretStoreProtocol | None = None
+    """OS-keyring-backed secret storage (synchronous cache for config
+    hydration; see :class:`backend.services.config_service.LayeredConfigService`)."""

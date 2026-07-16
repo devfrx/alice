@@ -362,8 +362,10 @@ async def update_event(
 
     try:
         eid = _uuid.UUID(event_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid event ID")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid event ID",
+        ) from exc
 
     async with ctx.db() as session:
         event = await session.get(CalendarEvent, eid)
@@ -421,8 +423,10 @@ async def delete_event(request: Request, event_id: str) -> dict:
 
     try:
         eid = _uuid.UUID(event_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid event ID")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid event ID",
+        ) from exc
 
     async with ctx.db() as session:
         event = await session.get(CalendarEvent, eid)

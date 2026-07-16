@@ -47,7 +47,7 @@ async def _call(session: McpSession, tool: str, args: dict[str, Any]) -> Any:
         raw = await session.call_tool(tool, args)
     except Exception as exc:
         logger.warning("MCP memory tool '{}' failed: {}", tool, exc)
-        raise HTTPException(502, f"MCP tool '{tool}' failed: {exc}")
+        raise HTTPException(502, f"MCP tool '{tool}' failed: {exc}") from exc
 
     try:
         return json.loads(raw)

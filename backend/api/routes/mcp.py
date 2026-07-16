@@ -140,4 +140,4 @@ async def reconnect_mcp_server(
         raise HTTPException(
             status_code=503,
             detail=f"Reconnection failed: {exc}",
-        )
+        ) from exc

@@ -167,8 +167,8 @@ async def list_models(request: Request) -> list[dict[str, Any]]:
     mgr = _manager(request)
     try:
         data = await mgr.list_models()
-    except httpx.HTTPError:
-        raise HTTPException(503, "LM Studio is unreachable")
+    except httpx.HTTPError as exc:
+        raise HTTPException(503, "LM Studio is unreachable") from exc
 
     models = data.get("models", [])
 
@@ -215,10 +215,10 @@ async def load_model(body: LoadModelRequest, request: Request) -> dict:
                 pass  # non-critical; next list_models will refresh
         return result
     except RuntimeError as exc:
-        raise HTTPException(409, str(exc))
+        raise HTTPException(409, str(exc)) from exc
     except httpx.HTTPError as exc:
         logger.error("Load model failed: {}", exc)
-        raise HTTPException(503, "LM Studio is unreachable")
+        raise HTTPException(503, "LM Studio is unreachable") from exc
 
 
 @router.post("/models/unload")
@@ -238,10 +238,10 @@ async def unload_model(body: UnloadModelRequest, request: Request) -> dict:
         _invalidate_status_cache()
         return result
     except RuntimeError as exc:
-        raise HTTPException(409, str(exc))
+        raise HTTPException(409, str(exc)) from exc
     except httpx.HTTPError as exc:
         logger.error("Unload model failed: {}", exc)
-        raise HTTPException(503, "LM Studio is unreachable")
+        raise HTTPException(503, "LM Studio is unreachable") from exc
 
 
 @router.post("/models/download")
@@ -254,7 +254,7 @@ async def download_model(body: DownloadModelRequest, request: Request) -> dict:
         )
     except httpx.HTTPError as exc:
         logger.error("Download model failed: {}", exc)
-        raise HTTPException(503, "LM Studio is unreachable")
+        raise HTTPException(503, "LM Studio is unreachable") from exc
 
 
 @router.get("/models/download/{job_id}")
@@ -265,7 +265,7 @@ async def download_status(job_id: str, request: Request) -> dict:
         return await mgr.get_download_status(job_id)
     except httpx.HTTPError as exc:
         logger.error("Download status failed: {}", exc)
-        raise HTTPException(503, "LM Studio is unreachable")
+        raise HTTPException(503, "LM Studio is unreachable") from exc
 
 
 @router.get("/models/status")

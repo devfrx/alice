@@ -110,8 +110,10 @@ async def delete_memory(
 
     try:
         uuid.UUID(memory_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid memory ID format")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid memory ID format",
+        ) from exc
 
     deleted = await svc.delete(memory_id, kind="memory")
     if not deleted:

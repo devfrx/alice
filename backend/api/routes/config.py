@@ -14,6 +14,7 @@ from backend.api.routes.config_reactions import (
     apply_reactions,
     diff_paths,
 )
+from backend.api.routes.config_schemas import ConfigResponse
 from backend.api.routes.models import serialise_model
 from backend.core.config import _REMOVED_LEGACY_PATHS, KNOWN_MODELS
 from backend.core.context import AppContext
@@ -64,18 +65,26 @@ def _resolved_dict(ctx: AppContext) -> dict[str, Any]:
     return _redact(cfg.model_dump(mode="json"))
 
 
-@router.get("/config/resolved")
+@router.get("/config/resolved", response_model=dict[str, Any])
 async def get_resolved_config(request: Request) -> dict[str, Any]:
-    """Return the full merged-and-validated configuration (secrets redacted)."""
+    """Return the full merged-and-validated configuration (secrets redacted).
+
+    Shape: the entire redacted ``AliceConfig`` — deliberately left as
+    ``dict[str, Any]`` rather than pinned to a model (see ``ConfigResponse``
+    for the narrower, stable ``GET /api/config`` contract).
+    """
     return _resolved_dict(_ctx(request))
 
 
-@router.get("/config/layers")
+@router.get("/config/layers", response_model=dict[str, Any])
 async def get_config_layers(request: Request) -> dict[str, Any]:
     """Return the raw per-layer dicts (defaults/system/user/runtime).
 
     Useful for diagnostics: shows exactly which layer contributes each
     value before the merge step.
+
+    Shape: per-layer redacted config dicts — deliberately left as
+    ``dict[str, Any]`` (not the stable ``ConfigResponse`` contract).
     """
     ctx = _ctx(request)
     if ctx.config_service is None:
@@ -84,7 +93,7 @@ async def get_config_layers(request: Request) -> dict[str, Any]:
     return {name: _redact(data) for name, data in layers.items()}
 
 
-@router.patch("/config")
+@router.patch("/config", response_model=dict[str, Any])
 async def patch_config(request: Request) -> dict[str, Any]:
     """Set a single dotted-path value in the chosen layer.
 
@@ -101,6 +110,10 @@ async def patch_config(request: Request) -> dict[str, Any]:
     power-user escape hatch), ``system`` (persisted to system.yaml — admin
     use), ``runtime`` (in-memory, lost on restart).  ``defaults`` is
     read-only.
+
+    Shape: the full redacted ``AliceConfig`` (same as ``/config/resolved``)
+    — deliberately left as ``dict[str, Any]``, not the ``ConfigResponse``
+    contract.
     """
     ctx = _ctx(request)
     if ctx.config_service is None:
@@ -162,9 +175,13 @@ async def patch_config(request: Request) -> dict[str, Any]:
     return _resolved_dict(ctx)
 
 
-@router.post("/config/reload")
+@router.post("/config/reload", response_model=dict[str, Any])
 async def reload_config(request: Request) -> dict[str, Any]:
-    """Re-read disk layers (defaults/system/user) and revalidate."""
+    """Re-read disk layers (defaults/system/user) and revalidate.
+
+    Shape: the full redacted ``AliceConfig`` — deliberately left as
+    ``dict[str, Any]``, not the ``ConfigResponse`` contract.
+    """
     ctx = _ctx(request)
     if ctx.config_service is None:
         raise HTTPException(503, "Config service unavailable")
@@ -264,7 +281,7 @@ async def _models_legacy(ctx: AppContext) -> list[dict[str, Any]]:
     return models
 
 
-@router.get("/config")
+@router.get("/config", response_model=ConfigResponse)
 async def get_config(request: Request) -> dict[str, Any]:
     """Return the current server configuration as JSON."""
     ctx = _ctx(request)
@@ -371,7 +388,7 @@ def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
     return flat
 
 
-@router.put("/config")
+@router.put("/config", response_model=ConfigResponse)
 async def update_config(request: Request) -> dict[str, Any]:
     """Update configuration values (preferences layer + secrets).
 

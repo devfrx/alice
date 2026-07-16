@@ -444,3 +444,20 @@ def test_string_fields_are_normalized(model_cls, field, raw, expected) -> None:
 def test_whitespace_only_model_rejected() -> None:
     with pytest.raises(ValidationError):
         LLMConfig(model="   ")
+
+
+# ---------------------------------------------------------------------------
+# Typed response model (Task 12)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_config_matches_response_model(client) -> None:
+    resp = await client.get("/api/config")
+    assert resp.status_code == 200
+    body = resp.json()
+    from backend.api.routes.config_schemas import ConfigResponse
+
+    parsed = ConfigResponse.model_validate(body)
+    assert parsed.llm.provider in ("lmstudio", "ollama", "openrouter")
+    assert not hasattr(parsed.email, "use_keyring")

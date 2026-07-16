@@ -12,7 +12,6 @@ GET /api/calendar/events
 GET /api/calendar/today
 GET /api/calendar/upcoming
 GET /api/chat/conversations/{conversation_id}
-GET /api/config
 GET /api/config/layers
 GET /api/config/models
 GET /api/config/resolved
@@ -54,6 +53,5 @@ POST /api/services/{name}/models/{model_id}/download
 POST /api/services/{name}/restart
 POST /api/services/{name}/stop
 PUT /api/calendar/events/{event_id}
-PUT /api/config
 PUT /api/email/{uid}/archive
 PUT /api/email/{uid}/read

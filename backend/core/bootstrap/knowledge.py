@@ -87,7 +87,11 @@ async def stage_knowledge(ctx: AppContext) -> None:
 
         ctx.continuum_client = ContinuumClient(
             base_url=config.continuum.base_url,
-            api_token=config.continuum.api_token,
+            api_token=(
+                config.continuum.api_token.get_secret_value()
+                if config.continuum.api_token
+                else None
+            ),
             timeout_s=config.continuum.timeout_s,
             folder_cache_ttl_s=config.continuum.folder_cache_ttl_s,
         )

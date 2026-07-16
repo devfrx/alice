@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 
 from backend.core.config import (
     DEFAULT_MODEL,
@@ -235,6 +236,28 @@ def test_effective_base_url_local_providers() -> None:
 
 def test_openrouter_defaults() -> None:
     cfg = LLMConfig()
-    assert cfg.openrouter_api_key == ""
+    assert cfg.openrouter_api_key.get_secret_value() == ""
     assert cfg.openrouter_model == ""
     assert cfg.openrouter_favorites == []
+
+
+# ---------------------------------------------------------------------------
+# Secret fields (SecretStr)
+# ---------------------------------------------------------------------------
+
+
+def test_secret_fields_are_secretstr_and_redacted_in_dump() -> None:
+    cfg = AliceConfig(
+        llm={"api_token": "tok", "openrouter_api_key": "sk-or-x"},
+        home_assistant={"token": "ha"},
+        mqtt={"password": "mq"},
+        continuum={"api_token": "ct"},
+        email={"password": "pw"},
+    )
+    assert isinstance(cfg.llm.api_token, SecretStr)
+    assert cfg.llm.openrouter_api_key.get_secret_value() == "sk-or-x"
+    assert cfg.continuum.api_token is not None
+    assert cfg.continuum.api_token.get_secret_value() == "ct"
+    dumped = cfg.model_dump(mode="json")
+    assert "sk-or-x" not in str(dumped)
+    assert "pw" not in str(dumped)

@@ -274,7 +274,9 @@ async def get_config(request: Request) -> dict[str, Any]:
             "tool_rag_enabled": cfg.llm.tool_rag_enabled,
             "tool_rag_top_k": cfg.llm.tool_rag_top_k,
             "user_preferred_name": cfg.llm.user_preferred_name,
-            "openrouter_api_key_configured": bool(cfg.llm.openrouter_api_key),
+            "openrouter_api_key_configured": bool(
+                cfg.llm.openrouter_api_key.get_secret_value(),
+            ),
             "openrouter_model": cfg.llm.openrouter_model,
             "openrouter_favorites": list(cfg.llm.openrouter_favorites),
         },
@@ -506,7 +508,7 @@ async def update_config(request: Request) -> dict[str, Any]:
             if raw_key and raw_key != "***":
                 if len(raw_key) > 256:
                     raise HTTPException(400, "openrouter_api_key max 256 chars")
-                object.__setattr__(cfg.llm, "openrouter_api_key", raw_key)
+                object.__setattr__(cfg.llm, "openrouter_api_key", SecretStr(raw_key))
                 llm_updates["openrouter_api_key"] = raw_key
                 llm_service_rebuild_needed = True
             else:

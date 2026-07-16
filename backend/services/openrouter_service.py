@@ -51,10 +51,11 @@ class OpenRouterService:
         return self._config.openrouter_base_url.rstrip("/")
 
     def _auth_headers(self) -> dict[str, str]:
-        if not self._config.openrouter_api_key:
+        api_key = self._config.openrouter_api_key.get_secret_value()
+        if not api_key:
             return {}
         return {
-            "Authorization": f"Bearer {self._config.openrouter_api_key}",
+            "Authorization": f"Bearer {api_key}",
         }
 
     async def list_models(

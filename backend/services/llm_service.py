@@ -51,9 +51,10 @@ class LLMService:
         # directly expecting the raw httpx client (see Deviazioni in the
         # Task 5 report).
         headers: dict[str, str] = {}
-        if config.provider == "openrouter" and config.openrouter_api_key:
+        api_key = config.openrouter_api_key.get_secret_value()
+        if config.provider == "openrouter" and api_key:
             headers = {
-                "Authorization": f"Bearer {config.openrouter_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 # Attribution opzionale OpenRouter (rankings).
                 "HTTP-Referer": "https://github.com/devfrx/alice",
                 "X-Title": "ALICE",

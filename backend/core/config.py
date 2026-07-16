@@ -121,7 +121,7 @@ class LLMConfig(BaseSettings):
     model: str = DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = -1
-    api_token: str = ""
+    api_token: SecretStr = Field(default=SecretStr(""))
     """LM Studio API authentication token (optional)."""
     timeout: float = 120.0
     """HTTP read timeout in seconds for streaming LLM responses."""
@@ -183,7 +183,7 @@ class LLMConfig(BaseSettings):
     keep_alive: str = "5m"
     """How long Ollama keeps the model loaded in memory after a request."""
     # -- OpenRouter-specific options (used when provider == "openrouter") --
-    openrouter_api_key: str = ""
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""))
     """OpenRouter API key (Bearer). Empty = not configured."""
     openrouter_base_url: str = "https://openrouter.ai/api"
     """OpenRouter API origin. ``/v1/...`` paths are appended by the client."""
@@ -323,7 +323,7 @@ class HomeAssistantConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_HOME_ASSISTANT__")
 
     url: str = "http://homeassistant.local:8123"
-    token: str = ""
+    token: SecretStr = Field(default=SecretStr(""))
 
 
 class MQTTConfig(BaseSettings):
@@ -334,7 +334,7 @@ class MQTTConfig(BaseSettings):
     broker: str = "localhost"
     port: int = 1883
     username: str = ""
-    password: str = ""
+    password: SecretStr = Field(default=SecretStr(""))
 
 
 class VoiceConfig(BaseSettings):
@@ -696,7 +696,7 @@ CompositeKnowledgeBackend`.
     base_url: str = "http://localhost:3001"
     """Base URL of the Continuum server (no trailing ``/api``)."""
 
-    api_token: str | None = None
+    api_token: SecretStr | None = None
     """Bearer token sent on every request; ``None`` for token-less servers."""
 
     timeout_s: float = 15.0

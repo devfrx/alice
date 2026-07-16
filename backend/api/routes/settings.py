@@ -281,9 +281,9 @@ async def set_active_tools(
 async def get_preferences(request: Request) -> dict[str, Any]:
     """Return all persisted user preferences."""
     ctx = _ctx(request)
-    if ctx.preferences_service is None:
+    if ctx.preferences_store is None:
         return {}
-    return await ctx.preferences_service.load_all()
+    return await ctx.preferences_store.load()
 
 
 # -- Voice engine availability check ---------------------------------------
@@ -327,9 +327,9 @@ async def reset_preferences(request: Request) -> dict[str, Any]:
     The next restart will use only YAML defaults.
     """
     ctx = _ctx(request)
-    if ctx.preferences_service is None:
+    if ctx.preferences_store is None:
         raise HTTPException(503, "Preferences service not available")
-    count = await ctx.preferences_service.delete_all()
+    count = await ctx.preferences_store.delete_all()
     return {
         "deleted": count,
         "message": "Preferences reset. Restart to apply YAML defaults.",

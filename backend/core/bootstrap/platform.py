@@ -97,13 +97,14 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     ctx.event_bus.subscribe(PROGRESS_EVENT, _forward_download_progress)
 
     # -- Load persisted user preferences ------------------------------------
-    from backend.services.preferences_service import PreferencesService
+    from backend.services.preferences_service import PreferencesLayerStore
 
     assert ctx.db is not None, "stage_database must run before stage_platform"
     session_factory = ctx.db
 
-    preferences_service = PreferencesService(session_factory)
-    ctx.preferences_service = preferences_service
+    preferences_store = PreferencesLayerStore(session_factory)
+    ctx.preferences_store = preferences_store
+    ctx.preferences_service = preferences_store  # legacy alias, dies in Task 11
 
     if not testing:
         from backend.services.config_migration import run_secret_migrations
@@ -111,7 +112,7 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
         try:
             # 1. Load prefs ONCE for the migration's username source (the row
             #    may exist only in the DB, not in YAML).
-            prefs = await preferences_service.load_all()
+            prefs = await preferences_store.load_all()
             email_username = str(
                 prefs.get("email", {}).get("username", "") or config.email.username
             )
@@ -122,16 +123,21 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
                 email_username=email_username,
             )
 
-            # 3. Rebuild AFTER migration so hydration sees the migrated secrets.
-            ctx.config = await config_service.rebuild()
+            # 3. Load the preferences layer AND rebuild (replaces the bare
+            #    ``rebuild()``) so migrated+pruned rows are what the layer
+            #    sees, and future writes to the PREFERENCES layer persist
+            #    through this same store.
+            ctx.config = await config_service.load_preferences_layer(preferences_store)
             config = ctx.config
 
             # 4. RELOAD prefs (migration pruned secret/dead rows: the reloaded
             #    dict can no longer smear a raw string over a SecretStr field)
             #    and apply the legacy overlay onto the NEW resolved object.
-            #    This ordering dies with the preferences layer (Task 7/11).
-            prefs = await preferences_service.load_all()
-            preferences_service.apply_to_config(config, prefs)
+            #    Double application of identical values is harmless now that
+            #    the preferences layer and this overlay hold the same data;
+            #    the overlay dies in Task 11.
+            prefs = await preferences_store.load_all()
+            preferences_store.apply_to_config(config, prefs)
         except Exception as exc:
             logger.warning("Failed to load persisted preferences: {}", exc)
 

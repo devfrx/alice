@@ -45,6 +45,7 @@ from backend.core.config import (
     migrate_legacy_config_keys,
 )
 from backend.core.event_bus import EventBus
+from backend.services.config_policy import is_preference_writable, is_secret_path
 
 # ---------------------------------------------------------------------------
 # Layer enum
@@ -57,6 +58,7 @@ class ConfigLayer(StrEnum):
     DEFAULTS = "defaults"
     SYSTEM = "system"
     USER = "user"
+    PREFERENCES = "preferences"
     RUNTIME = "runtime"
 
 
@@ -64,6 +66,7 @@ _LAYER_ORDER: tuple[ConfigLayer, ...] = (
     ConfigLayer.DEFAULTS,
     ConfigLayer.SYSTEM,
     ConfigLayer.USER,
+    ConfigLayer.PREFERENCES,
     ConfigLayer.RUNTIME,
 )
 
@@ -231,8 +234,10 @@ class LayeredConfigService:
             ConfigLayer.DEFAULTS: {},
             ConfigLayer.SYSTEM: {},
             ConfigLayer.USER: {},
+            ConfigLayer.PREFERENCES: {},
             ConfigLayer.RUNTIME: {},
         }
+        self._preferences_store: Any | None = None
         self._resolved: AliceConfig | None = None
         self._lock = asyncio.Lock()
 
@@ -278,6 +283,25 @@ class LayeredConfigService:
         self._rebuild()
         assert self._resolved is not None
         return self._resolved
+
+    async def load_preferences_layer(self, store: Any) -> AliceConfig:
+        """Load the DB-backed preferences layer and keep the store for writes.
+
+        Args:
+            store: A :class:`~backend.services.preferences_service.
+                PreferencesLayerStore` (or anything with an async ``load()``
+                returning a nested dict).
+
+        Returns:
+            The newly resolved :class:`AliceConfig`.
+        """
+        data = await store.load()
+        async with self._lock:
+            self._preferences_store = store
+            self._layers[ConfigLayer.PREFERENCES] = migrate_legacy_config_keys(data)
+            self._rebuild()
+            assert self._resolved is not None
+            return self._resolved
 
     # -- merge / validation ----------------------------------------------
 
@@ -357,10 +381,18 @@ class LayeredConfigService:
             The new resolved :class:`AliceConfig`.
 
         Raises:
-            ValueError: when ``path`` is invalid or descends into a non-dict.
+            ValueError: when ``path`` is invalid or descends into a non-dict,
+                when ``path`` designates a secret (never written to any
+                layer), or when ``layer`` is ``PREFERENCES`` and ``path`` is
+                not preference-writable per policy.
             pydantic.ValidationError: when the resulting config fails
                 validation.  Disk and in-memory state remain unchanged.
         """
+        if is_secret_path(path):
+            raise ValueError(f"secret path '{path}' cannot be written to config layers")
+        if layer is ConfigLayer.PREFERENCES and not is_preference_writable(path):
+            raise ValueError(f"path '{path}' is not preference-writable (policy)")
+
         async with self._lock:
             tentative = copy.deepcopy(self._layers[layer])
             _set_dotted(tentative, path, value)
@@ -388,6 +420,9 @@ class LayeredConfigService:
                     "Persisted config change ({} = {!r}) to {}",
                     path, value, target_path,
                 )
+            elif layer is ConfigLayer.PREFERENCES and self._preferences_store is not None:
+                await self._preferences_store.save_paths({path: value})
+                logger.info("Persisted preference change ({} = {!r})", path, value)
             else:
                 logger.debug("Runtime config change ({} = {!r})", path, value)
 

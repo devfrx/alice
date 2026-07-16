@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -445,10 +445,30 @@ class LMStudioManagerProtocol(Protocol):
 
 @runtime_checkable
 class PreferencesServiceProtocol(Protocol):
-    """Protocol for user preferences persistence."""
+    """Protocol for the ``preferences`` config-layer store.
+
+    Mirrors :class:`backend.services.preferences_service.
+    PreferencesLayerStore`: the current store API (``load``/``save_paths``/
+    ``delete_paths``) plus the legacy shims still called by ``config.py``'s
+    PUT handler and ``bootstrap/platform.py`` until Task 11 removes them.
+    """
+
+    async def load(self) -> dict[str, Any]:
+        """Return all rows as a nested dict."""
+        ...
+
+    async def save_paths(self, changes: dict[str, Any]) -> None:
+        """Upsert one row per dotted path."""
+        ...
+
+    async def delete_paths(self, paths: Iterable[str]) -> int:
+        """Delete the given dotted paths; returns the number removed."""
+        ...
+
+    # -- Legacy shims (removed in Task 11) --------------------------------
 
     async def load_all(self) -> dict[str, Any]:
-        """Load all stored preferences."""
+        """Load all stored preferences (legacy alias for ``load``)."""
         ...
 
     def apply_to_config(

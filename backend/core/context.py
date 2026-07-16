@@ -74,7 +74,7 @@ class AppContext:
         "permission_rule_service", "terminal_session_manager",
         "plugin_local_state", "orchestrator", "model_downloader",
         "event_bus", "background_task_service", "attention_service",
-        "trigger_service", "secret_store",
+        "trigger_service", "secret_store", "preferences_store",
     )
 
     def __init__(
@@ -441,6 +441,16 @@ class AppContext:
     @secret_store.setter
     def secret_store(self, value: SecretStoreProtocol | None) -> None:
         self.platform.secret_store = value
+
+    @property
+    def preferences_store(self) -> PreferencesServiceProtocol | None:
+        return self.platform.preferences_store
+
+    @preferences_store.setter
+    def preferences_store(
+        self, value: PreferencesServiceProtocol | None,
+    ) -> None:
+        self.platform.preferences_store = value
 
     # ------------------------------------------------------------------
     # Plugin state helpers

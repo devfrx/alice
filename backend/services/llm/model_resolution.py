@@ -20,6 +20,7 @@ from loguru import logger
 from backend.core.config import LLMConfig
 from backend.services.model_capability_registry import (
     ModelCapabilityRegistry,
+    ModelNamespace,
     ModelProfile,
 )
 
@@ -48,6 +49,12 @@ class ModelResolver:
         self._http = http
         self._is_ollama = config.provider == "ollama"
         self._is_openrouter = config.provider == "openrouter"
+        # Registry namespace for capability lookups: OpenRouter models
+        # live in their own namespace so colliding org/model ids never
+        # bleed capabilities across providers.
+        self._registry_namespace: ModelNamespace = (
+            "openrouter" if self._is_openrouter else "local"
+        )
         # Cache for "auto" model resolution: (resolved_id, resolved_at_monotonic)
         self._auto_model_cache: tuple[str, float] | None = None
         self._auto_model_ttl: float = 300.0  # seconds
@@ -142,7 +149,9 @@ class ModelResolver:
         a profile built from static config flags.
         """
         if self._model_registry is not None:
-            return self._model_registry.get_profile(model_id)
+            return self._model_registry.get_profile(
+                model_id, namespace=self._registry_namespace,
+            )
         # Legacy fallback: build profile from static config flags.
         return ModelProfile(
             model_id=model_id,
@@ -164,10 +173,11 @@ class ModelResolver:
         if self._is_openrouter and self._model_registry is not None:
             return self._model_registry.get_profile(
                 self._config.openrouter_model or "openrouter/auto",
+                namespace="openrouter",
             ).supports_vision
         if self._model_registry is not None and self._auto_model_cache:
             profile = self._model_registry.get_profile(
-                self._auto_model_cache[0],
+                self._auto_model_cache[0], namespace="local",
             )
             return profile.supports_vision
         return self._config.supports_vision

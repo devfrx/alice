@@ -351,7 +351,7 @@ def serialise_model(
 
     # Resolve capabilities: registry → API response → KNOWN_MODELS
     if registry is not None:
-        profile = registry.get_profile(key)
+        profile = registry.get_profile(key, namespace="local")
         resolved_caps = {
             "vision": profile.supports_vision,
             "thinking": profile.supports_thinking,

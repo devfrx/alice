@@ -25,7 +25,7 @@ from backend.api.routes.chat._persist import _persist_final_turn
 from backend.api.routes.chat._shared import conversation_active
 from backend.services.turn.channel import HeadlessInteractionChannel
 from backend.services.turn.factory import create_turn_executor
-from backend.services.turn.sink import NullEventSink
+from backend.services.turn.sink import NullEventSink, WSEventSink
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -65,6 +65,7 @@ async def run_headless_turn(
     conversation_id: str | None,
     prompt: str,
     origin: str = "system",
+    sink: WSEventSink | None = None,
 ) -> TurnResult | None:
     """Run one autonomous turn through the normal pipeline and persist it.
 
@@ -73,6 +74,8 @@ async def run_headless_turn(
         conversation_id: Target conversation (``None`` creates a new one).
         prompt: The user-role content that starts the turn.
         origin: Provenance recorded in logs (``system`` for triggers).
+        sink: Event sink opzionale per osservare i frame del turno
+            (eval harness). Default: :class:`NullEventSink` (drop).
 
     Returns:
         The :class:`TurnResult`, or ``None`` when the turn could not start
@@ -99,13 +102,13 @@ async def run_headless_turn(
         turn = replace(
             assembly.turn, tools=_strip_ui_tools(ctx, assembly.turn.tools),
         )
-        sink = NullEventSink()
+        turn_sink: WSEventSink = sink if sink is not None else NullEventSink()
         channel = HeadlessInteractionChannel()
         cancel_event = asyncio.Event()
 
         executor = create_turn_executor(ctx, llm)
         with conversation_active(str(turn.conv_id)):
-            result = await executor.execute(turn, sink, cancel_event, session, channel)
+            result = await executor.execute(turn, turn_sink, cancel_event, session, channel)
 
         await _persist_final_turn(
             session=session,
@@ -113,7 +116,7 @@ async def run_headless_turn(
             conv_id=turn.conv_id,
             user_msg=assembly.user_msg,
             result=result,
-            sink=sink,
+            sink=turn_sink,
             ctx=ctx,
             llm=llm,
             user_content=prompt,

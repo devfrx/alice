@@ -31,13 +31,13 @@ export const configApi = {
    *
    * @param path  - Dotted path, e.g. `"agent.prompts.persona"`.
    * @param value - Any JSON-serialisable value.
-   * @param layer - Target layer (`user` default, persisted to user.yaml).
+   * @param layer - Target layer (`preferences` default, matching the backend default).
    * @returns The full resolved config after the change.
    */
   patchConfig: (
     path: string,
     value: unknown,
-    layer: string = 'user'
+    layer: 'preferences' | 'user' | 'system' | 'runtime' = 'preferences'
   ): Promise<Record<string, unknown>> =>
     request<Record<string, unknown>>('/config', {
       method: 'PATCH',

@@ -9,14 +9,18 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 from pydantic import SecretStr, ValidationError
 
+from backend.api.routes.config_reactions import (
+    _apply_email_changes,
+    _apply_llm_provider_change,
+    _apply_stt_changes,
+    _apply_tts_changes,
+)
 from backend.api.routes.models import serialise_model
 from backend.api.routes.voice import push_voice_ready
 from backend.core.config import KNOWN_MODELS, AliceConfig
 from backend.core.context import AppContext
 from backend.services.config_policy import is_secret_path
 from backend.services.config_service import ConfigLayer
-from backend.services.stt_service import STTService
-from backend.services.tts_service import TTSService
 
 router = APIRouter(tags=["config"])
 
@@ -775,134 +779,6 @@ async def update_config(request: Request) -> dict[str, Any]:
     return await get_config(request)
 
 
-async def _apply_stt_changes(ctx: AppContext, stt_updates: dict) -> None:
-    """Restart or stop the STT service when its config changes."""
-    cfg = ctx.config
-
-    # Disable → stop service
-    if "enabled" in stt_updates and not cfg.stt.enabled:
-        if ctx.stt_service is not None:
-            try:
-                await ctx.stt_service.stop()
-                logger.info("STT service stopped (disabled via config)")
-            except Exception as exc:
-                logger.warning("Failed to stop STT service: {}", exc)
-            ctx.stt_service = None
-        return
-
-    # Enable or model/device changed → restart service
-    needs_restart = any(
-        k in stt_updates for k in ("enabled", "model", "device")
-    )
-    if not needs_restart:
-        return
-
-    if not cfg.stt.enabled:
-        return
-
-    # Stop existing
-    if ctx.stt_service is not None:
-        try:
-            await ctx.stt_service.stop()
-        except Exception as exc:
-            logger.warning("Failed to stop STT service for restart: {}", exc)
-        ctx.stt_service = None
-
-    # Auto-correct compute_type for CPU (float16 not supported)
-    if cfg.stt.device == "cpu" and cfg.stt.compute_type == "float16":
-        object.__setattr__(cfg.stt, "compute_type", "int8")
-        logger.info("Auto-corrected STT compute_type to int8 for CPU device")
-
-    # Start new
-    try:
-        stt = STTService(cfg.stt)
-        await stt.start()
-        ctx.stt_service = stt
-        logger.info(
-            "STT service restarted (model={}, device={}, compute_type={})",
-            cfg.stt.model, cfg.stt.device, cfg.stt.compute_type,
-        )
-    except Exception as exc:
-        logger.warning("STT service failed to restart: {}", exc)
-
-
-async def _apply_tts_changes(ctx: AppContext, tts_updates: dict) -> None:
-    """Restart or stop the TTS service when its config changes."""
-    cfg = ctx.config
-
-    # Disable → stop service
-    if "enabled" in tts_updates and not cfg.tts.enabled:
-        if ctx.tts_service is not None:
-            try:
-                await ctx.tts_service.stop()
-                logger.info("TTS service stopped (disabled via config)")
-            except Exception as exc:
-                logger.warning("Failed to stop TTS service: {}", exc)
-            ctx.tts_service = None
-        return
-
-    # Engine, voice, or speed changed → restart service
-    needs_restart = any(
-        k in tts_updates for k in (
-            "enabled", "engine", "voice", "speed",
-            "kokoro_model", "kokoro_voices", "kokoro_voice", "kokoro_language",
-        )
-    )
-    if not needs_restart:
-        return
-
-    if not cfg.tts.enabled:
-        return
-
-    # Stop existing
-    if ctx.tts_service is not None:
-        try:
-            await ctx.tts_service.stop()
-        except Exception as exc:
-            logger.warning("Failed to stop TTS service for restart: {}", exc)
-        ctx.tts_service = None
-
-    # Start new
-    try:
-        tts = TTSService(cfg.tts)
-        await tts.start()
-        ctx.tts_service = tts
-        logger.info(
-            "TTS service restarted (engine={}, voice={})",
-            cfg.tts.engine, cfg.tts.voice,
-        )
-    except Exception as exc:
-        logger.warning("TTS service failed to restart: {}", exc)
-
-
-async def _apply_llm_provider_change(ctx: AppContext) -> None:
-    """Rebuild the LLM service after a provider or API-key change.
-
-    Auth headers on the shared httpx client and the provider-derived
-    flags in LLMClient/ModelResolver are fixed at construction time, so
-    an in-place config mutation is not enough — recreate the service,
-    mirroring the STT/TTS restart pattern.
-    """
-    from backend.services.llm_service import LLMService
-
-    old = ctx.llm_service
-    new_service = LLMService(ctx.config.llm, model_registry=ctx.model_registry)
-    ctx.llm_service = new_service
-    # add_models_changed_listener has no removal API: the old service's
-    # listener stays registered (harmless no-op on a closed service,
-    # bounded by user-initiated switches).
-    if ctx.lmstudio_manager is not None:
-        ctx.lmstudio_manager.add_models_changed_listener(
-            new_service.invalidate_context_window_cache
-        )
-    if old is not None:
-        try:
-            await old.close()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to close previous LLM service: {}", exc)
-    logger.info("LLM service rebuilt (provider={})", ctx.config.llm.provider)
-
-
 _SECRET_MAX_LEN = 512
 
 # Maps a dotted secret path (config_policy.SECRET_PATHS) to the
@@ -979,31 +855,6 @@ async def _apply_secret_updates(
             changed.add(path)
         _mirror_secret_to_config(cfg, path, value)
     return changed
-
-
-async def _apply_email_changes(ctx: AppContext) -> None:
-    """Restart or stop the email service after runtime config changes."""
-    if ctx.email_service is not None:
-        try:
-            await ctx.email_service.close()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to stop EmailService for restart: {}", exc)
-        ctx.email_service = None
-
-    if not ctx.config.email.enabled:
-        logger.info("Email service stopped (disabled via config)")
-        return
-
-    from backend.services.email_service import EmailService
-
-    email_service = EmailService(ctx.config.email, ctx.event_bus)
-    try:
-        await email_service.initialize()
-        ctx.email_service = email_service
-        logger.info("Email service restarted ({})", ctx.config.email.username)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Email service failed to restart: {}", exc)
-        await email_service.close()
 
 
 @router.post("/config/sync-model")

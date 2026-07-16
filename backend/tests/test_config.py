@@ -303,6 +303,53 @@ async def test_removed_legacy_key_is_dropped_not_rejected(client) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PUT /config misto — tutta la validazione PRIMA di ogni commit
+# (audit Triage#1 / Triage#4)
+# ---------------------------------------------------------------------------
+
+
+async def test_mixed_put_invalid_pref_does_not_commit_secret(client, app) -> None:
+    """Un segreto valido non deve atterrare se la parte preferenze 422a."""
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config",
+        json={"llm": {"temperature": 99, "openrouter_api_key": "sk-or-must-not-land"}},
+    )
+    assert resp.status_code == 422
+    assert "llm.openrouter_api_key" not in ctx.secret_store.cached()
+
+
+async def test_mixed_put_oversize_secret_does_not_commit_pref(client, app) -> None:
+    """Una preferenza valida non deve atterrare se il segreto 400a."""
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config",
+        json={"ui": {"theme": "light"}, "llm": {"openrouter_api_key": "x" * 600}},
+    )
+    assert resp.status_code == 400
+    prefs = await ctx.preferences_store.load()
+    assert prefs.get("ui", {}).get("theme") != "light"
+
+
+async def test_secret_update_without_store_returns_503(client, app) -> None:
+    """Store segreti assente = 503 esplicito, non un 200 silenzioso."""
+    ctx = app.state.context
+    saved = ctx.secret_store
+    ctx.secret_store = None
+    try:
+        resp = await client.put(
+            "/api/config",
+            json={"ui": {"theme": "light"}, "llm": {"openrouter_api_key": "sk-or-x"}},
+        )
+        assert resp.status_code == 503
+        # Pre-flight: neanche la parte preferenze del body misto è atterrata.
+        prefs = await ctx.preferences_store.load()
+        assert prefs.get("ui", {}).get("theme") != "light"
+    finally:
+        ctx.secret_store = saved
+
+
+# ---------------------------------------------------------------------------
 # PUT /config — nested bodies flatten to leaf paths (audit M2)
 # ---------------------------------------------------------------------------
 

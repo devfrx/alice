@@ -5,14 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from backend.core.config import (
     DEFAULT_MODEL,
     KNOWN_MODELS,
     PROJECT_ROOT,
     AliceConfig,
+    EmailConfig,
     LLMConfig,
+    STTConfig,
+    TTSConfig,
+    UIConfig,
+    VoiceConfig,
     load_config,
 )
 
@@ -278,3 +283,62 @@ async def test_email_password_lands_in_secret_store(client, app) -> None:
     assert ctx.secret_store.cached()["email.password"] == "s3cret"
     assert resp.json()["email"]["password_configured"] is True
     assert "use_keyring" not in resp.json()["email"]
+
+
+# ---------------------------------------------------------------------------
+# Declarative field constraints (Task 8) — replace hand-rolled route checks
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("model_cls", "field", "bad"),
+    [
+        (LLMConfig, "temperature", 2.5),
+        (LLMConfig, "temperature", -0.1),
+        (LLMConfig, "max_tokens", 0),
+        (LLMConfig, "max_tokens", -2),
+        (LLMConfig, "max_tool_iterations", 0),
+        (LLMConfig, "max_tool_iterations", 101),
+        (LLMConfig, "context_compression_threshold", 0.4),
+        (LLMConfig, "context_compression_threshold", 0.96),
+        (LLMConfig, "context_compression_reserve", 511),
+        (LLMConfig, "context_compression_reserve", 8193),
+        (LLMConfig, "tool_rag_top_k", 0),
+        (LLMConfig, "tool_rag_top_k", 101),
+        (LLMConfig, "user_preferred_name", "x" * 81),
+        (LLMConfig, "model", ""),
+        (LLMConfig, "model", "x" * 257),
+        (LLMConfig, "openrouter_model", "x" * 257),
+        (LLMConfig, "provider", "bogus"),
+        (STTConfig, "device", "tpu"),
+        (STTConfig, "model", ""),
+        (STTConfig, "language", "x" * 11),
+        (TTSConfig, "engine", "espeak"),
+        (TTSConfig, "speed", 0.4),
+        (TTSConfig, "speed", 2.1),
+        (TTSConfig, "sample_rate", 12345),
+        (TTSConfig, "voice", ""),
+        (UIConfig, "theme", "sepia"),
+        (UIConfig, "language", ""),
+        (VoiceConfig, "activation_mode", "telepathy"),
+        (VoiceConfig, "wake_word", ""),
+        (EmailConfig, "imap_port", 0),
+        (EmailConfig, "imap_port", 65536),
+        (EmailConfig, "fetch_last_n", 0),
+        (EmailConfig, "fetch_last_n", 501),
+        (EmailConfig, "max_fetch", 501),
+        (EmailConfig, "imap_host", "x" * 256),
+    ],
+)
+def test_field_constraints_reject_bad_values(model_cls, field, bad) -> None:
+    with pytest.raises(ValidationError):
+        model_cls(**{field: bad})
+
+
+def test_provider_is_normalized_lowercase() -> None:
+    assert LLMConfig(provider="OpenRouter").provider == "openrouter"
+
+
+def test_openrouter_favorites_capped_at_200() -> None:
+    with pytest.raises(ValidationError):
+        LLMConfig(openrouter_favorites=[f"m{i}" for i in range(201)])

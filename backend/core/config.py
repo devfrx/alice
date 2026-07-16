@@ -118,8 +118,8 @@ class LLMConfig(BaseSettings):
     provider: str = "lmstudio"
     """One of "lmstudio", "ollama", "openrouter"."""
     base_url: str = "http://localhost:1234"
-    model: str = DEFAULT_MODEL
-    temperature: float = 0.7
+    model: str = Field(default=DEFAULT_MODEL, min_length=1, max_length=256)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = -1
     api_token: SecretStr = Field(default=SecretStr(""))
     """LM Studio API authentication token (optional)."""
@@ -130,7 +130,7 @@ class LLMConfig(BaseSettings):
     system_prompt_file: str = "config/system_prompt.md"
     system_prompt_enabled: bool = True
     """Whether to include the system prompt in LLM requests."""
-    user_preferred_name: str = ""
+    user_preferred_name: str = Field(default="", max_length=80)
     """How the user wants the assistant to address them. Injected into the
     system prompt's environment block so the model uses it. Empty = unset."""
     tools_enabled: bool = True
@@ -143,7 +143,7 @@ class LLMConfig(BaseSettings):
     LM Studio and folding system prompts into user messages."""
     supports_vision: bool = False
     """Enable for multimodal models (LLaVA, Qwen2-VL) that accept images."""
-    max_tool_iterations: int = 25
+    max_tool_iterations: int = Field(default=25, ge=1, le=100)
     """Maximum number of tool calling rounds before forcing a final answer."""
     tool_execution_timeout: float = 1300.0
     """Timeout in seconds for parallel tool execution per iteration.
@@ -187,23 +187,23 @@ class LLMConfig(BaseSettings):
     """OpenRouter API key (Bearer). Empty = not configured."""
     openrouter_base_url: str = "https://openrouter.ai/api"
     """OpenRouter API origin. ``/v1/...`` paths are appended by the client."""
-    openrouter_model: str = ""
+    openrouter_model: str = Field(default="", max_length=256)
     """Active OpenRouter model id (e.g. ``anthropic/claude-sonnet-5``).
 
     Kept separate from ``model`` so switching provider back and forth
     preserves both the local and the cloud selection."""
-    openrouter_favorites: list[str] = Field(default_factory=list)
+    openrouter_favorites: list[str] = Field(default_factory=list, max_length=200)
     """Pinned OpenRouter model ids, shown first in the model selector."""
     tool_rag_enabled: bool = True
     """Use semantic search to select relevant tools instead of sending all tool definitions."""
-    tool_rag_top_k: int = 20
+    tool_rag_top_k: int = Field(default=20, ge=1, le=100)
     """Number of most relevant tools retrieved via Tool RAG per LLM request."""
     # -- Context compression options --
     context_compression_enabled: bool = True
     """Enable automatic context compression when approaching context window limit."""
-    context_compression_threshold: float = 0.75
+    context_compression_threshold: float = Field(default=0.75, ge=0.50, le=0.95)
     """Fraction of context window usage that triggers compression (0.50–0.95)."""
-    context_compression_reserve: int = 4096
+    context_compression_reserve: int = Field(default=4096, ge=512, le=8192)
     """Tokens always reserved for model output generation (minimum 512)."""
     context_compression_timeout: float = 120.0
     """Read timeout in seconds for the non-streaming LLM call used during compression.
@@ -219,17 +219,22 @@ class LLMConfig(BaseSettings):
             return self.openrouter_base_url.rstrip("/")
         return self.base_url
 
-    @field_validator("context_compression_threshold")
+    @field_validator("provider", mode="before")
     @classmethod
-    def _clamp_threshold(cls, v: float) -> float:
-        """Ensure compression threshold stays within [0.50, 0.95]."""
-        return max(0.50, min(0.95, v))
+    def _normalize_provider(cls, v: object) -> str:
+        """Lowercase/strip the provider and reject anything not supported."""
+        prov = str(v).strip().lower()
+        if prov not in ("lmstudio", "ollama", "openrouter"):
+            raise ValueError("provider must be one of: lmstudio, ollama, openrouter")
+        return prov
 
-    @field_validator("context_compression_reserve")
+    @field_validator("max_tokens")
     @classmethod
-    def _positive_reserve(cls, v: int) -> int:
-        """Ensure compression reserve is at least 512 tokens."""
-        return max(512, v)
+    def _validate_max_tokens(cls, v: int) -> int:
+        """Reject anything but a positive token cap or -1 (unlimited)."""
+        if v < -1 or v == 0:
+            raise ValueError("max_tokens must be a positive integer or -1 (unlimited)")
+        return v
 
     @model_validator(mode="before")
     @classmethod
@@ -253,9 +258,9 @@ class STTConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_STT__")
 
     engine: Literal["faster-whisper"] = "faster-whisper"
-    model: str = "large-v3"
-    language: str | None = None
-    device: str = "cuda"
+    model: str = Field(default="large-v3", min_length=1, max_length=64)
+    language: str | None = Field(default=None, max_length=10)
+    device: Literal["cpu", "cuda"] = "cuda"
     compute_type: str = "float16"
     vad_filter: bool = True
     vad_threshold: float = 0.5
@@ -266,6 +271,14 @@ class STTConfig(BaseSettings):
     max_audio_size_mb: int = 50
     """Maximum audio buffer size in megabytes."""
 
+    @field_validator("language", mode="before")
+    @classmethod
+    def _normalize_language(cls, v: object) -> object:
+        """Treat an empty/blank string as "auto-detect" (``None``)."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 
 class TTSConfig(BaseSettings):
     """Text-to-speech configuration."""
@@ -273,8 +286,8 @@ class TTSConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_TTS__")
 
     engine: Literal["piper", "xtts", "kokoro"] = "piper"
-    voice: str = "models/tts/piper/it_IT-paola-medium"
-    sample_rate: int = 22050
+    voice: str = Field(default="models/tts/piper/it_IT-paola-medium", min_length=1, max_length=256)
+    sample_rate: Literal[16000, 22050, 24000, 44100, 48000] = 22050
     enabled: bool = False
     """Whether TTS is enabled."""
     speed: float = Field(default=1.0, ge=0.5, le=2.0)
@@ -287,13 +300,13 @@ class TTSConfig(BaseSettings):
     xtts_language: str = "it"
     """Language for XTTS synthesis."""
     # Kokoro-specific options (ignored when engine != "kokoro")
-    kokoro_model: str = "models/tts/kokoro-v1.0.onnx"
+    kokoro_model: str = Field(default="models/tts/kokoro-v1.0.onnx", min_length=1, max_length=256)
     """Path to the Kokoro ONNX model file."""
-    kokoro_voices: str = "models/tts/voices-v1.0.bin"
+    kokoro_voices: str = Field(default="models/tts/voices-v1.0.bin", min_length=1, max_length=256)
     """Path to the Kokoro voices binary."""
-    kokoro_voice: str = "if_sara"
+    kokoro_voice: str = Field(default="if_sara", min_length=1, max_length=100)
     """Kokoro voice name (e.g. 'if_sara', 'im_nicola', 'if_lucia')."""
-    kokoro_language: str = "it"
+    kokoro_language: str = Field(default="it", min_length=1, max_length=10)
     """Language code for Kokoro (e.g. 'it', 'en', 'fr')."""
 
 
@@ -342,8 +355,8 @@ class VoiceConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ALICE_VOICE__")
 
-    wake_word: str = "alice"
-    activation_mode: str = "push_to_talk"
+    wake_word: str = Field(default="alice", min_length=1, max_length=50)
+    activation_mode: Literal["push_to_talk", "wake_word", "always_on"] = "push_to_talk"
     silence_timeout_ms: int = 1500
     auto_tts_response: bool = True
     """Automatically speak LLM responses when voice mode is active."""
@@ -534,9 +547,9 @@ class UIConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ALICE_UI__")
 
-    theme: str = "dark"
+    theme: Literal["dark", "light"] = "dark"
     global_hotkey: str = "Ctrl+Shift+O"
-    language: str = "it"
+    language: str = Field(default="it", min_length=1, max_length=10)
 
 
 class CalendarConfig(BaseSettings):
@@ -802,23 +815,23 @@ class EmailConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_EMAIL__")
 
     enabled: bool = False
-    imap_host: str = ""
-    imap_port: int = 993
+    imap_host: str = Field(default="", max_length=255)
+    imap_port: int = Field(default=993, ge=1, le=65535)
     imap_ssl: bool = True
-    smtp_host: str = ""
-    smtp_port: int = 587
+    smtp_host: str = Field(default="", max_length=255)
+    smtp_port: int = Field(default=587, ge=1, le=65535)
     smtp_ssl: bool = False
-    username: str = ""
+    username: str = Field(default="", max_length=255)
     password: SecretStr = Field(default=SecretStr(""))
-    fetch_last_n: int = 20
-    max_fetch: int = 50
+    fetch_last_n: int = Field(default=20, ge=1, le=500)
+    max_fetch: int = Field(default=50, ge=1, le=500)
     max_email_body_chars: int = 8_000
     cache_ttl_s: int = 300
     rate_limit_send_per_hour: int = 10
     allowed_recipients: list[str] = Field(default_factory=list)
     imap_idle_enabled: bool = True
     connection_timeout_s: int = 30
-    archive_folder: str = "Archive"
+    archive_folder: str = Field(default="Archive", max_length=255)
 
 
 class TrellisServiceConfig(BaseSettings):

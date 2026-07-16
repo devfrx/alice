@@ -20,7 +20,6 @@ from backend.core.plugin_models import (
     ToolResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Tracking plugin — records every lifecycle method call in order
 # ---------------------------------------------------------------------------

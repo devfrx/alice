@@ -12,9 +12,7 @@ from typing import Any
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
 from starlette.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Mock LLM helpers (same pattern as test_message_editing.py)

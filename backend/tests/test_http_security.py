@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import socket
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from backend.core.http_security import (
     async_validate_url_ssrf,

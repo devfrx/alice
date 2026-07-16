@@ -20,7 +20,6 @@ from starlette.testclient import TestClient
 
 from backend.api.routes.chat import _filter_messages_by_active_versions
 
-
 # ---------------------------------------------------------------------------
 # Mock LLM helpers (same pattern as test_websocket.py)
 # ---------------------------------------------------------------------------

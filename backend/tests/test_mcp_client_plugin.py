@@ -6,14 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.core.config import McpConfig, McpServerConfig, AliceConfig
+from backend.core.config import AliceConfig, McpConfig, McpServerConfig
 from backend.core.context import AppContext
-from backend.core.event_bus import EventBus, AliceEvent
+from backend.core.event_bus import AliceEvent, EventBus
 from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
-    ToolResult,
 )
 from backend.plugins.mcp_client.plugin import McpClientPlugin
 

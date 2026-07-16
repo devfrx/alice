@@ -329,7 +329,7 @@ class NetworkProbePlugin(BasePlugin):
                     return ToolResult.error(f"Unknown tool: {tool_name}")
         except LocalNetworkValidationError as exc:
             return ToolResult.error(str(exc))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             elapsed_ms = (time.perf_counter() - start) * 1000
             return ToolResult.error(
                 f"Tool {tool_name} timed out after {elapsed_ms:.0f}ms"

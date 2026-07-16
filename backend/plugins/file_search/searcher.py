@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from loguru import logger
@@ -166,7 +166,7 @@ def _sync_walk(
                 try:
                     stat = filepath.stat()
                     modified_dt = datetime.fromtimestamp(
-                        stat.st_mtime, tz=timezone.utc
+                        stat.st_mtime, tz=UTC
                     )
                     results.append({
                         "path": str(filepath),
@@ -242,7 +242,7 @@ async def search_files(
             ),
             timeout=60.0,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("File search timed out after 60 seconds")
         results = []
 

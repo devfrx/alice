@@ -14,7 +14,6 @@ from loguru import logger
 from backend.core.config import McpServerConfig
 from backend.core.plugin_models import ConnectionStatus, ToolDefinition
 
-
 # ---------------------------------------------------------------------------
 # Command resolution
 # ---------------------------------------------------------------------------
@@ -164,7 +163,7 @@ class McpSession:
             if not self._task.done():
                 try:
                     await asyncio.wait_for(asyncio.shield(self._task), timeout=5.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "MCP session '{}' did not stop in time, cancelling",
                         self._config.name,
@@ -280,8 +279,8 @@ class McpSession:
         assert self._stop_event is not None
 
         import mcp
-        import mcp.client.stdio
         import mcp.client.sse
+        import mcp.client.stdio
 
         try:
             async with contextlib.AsyncExitStack() as stack:

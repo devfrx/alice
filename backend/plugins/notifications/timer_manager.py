@@ -9,15 +9,16 @@ callback.  Timers survive application restarts via the
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import sqlalchemy as sa
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import Field, SQLModel, select
 
-from backend.core.event_bus import EventBus, AliceEvent
+from backend.core.event_bus import AliceEvent, EventBus
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -42,7 +43,7 @@ class ActiveTimer(SQLModel, table=True):
         sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
     )
     status: str = Field(default="pending", max_length=20)
 
@@ -91,7 +92,7 @@ class TimerManager:
         Returns:
             The UTC datetime when the timer will fire.
         """
-        fires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_s)
+        fires_at = datetime.now(UTC) + timedelta(seconds=duration_s)
 
         # Persist to DB
         async with self._db_factory() as session:
@@ -169,7 +170,7 @@ class TimerManager:
             results = await session.exec(stmt)
             rows = results.all()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         restored = 0
 
         for row in rows:

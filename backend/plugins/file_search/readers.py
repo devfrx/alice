@@ -5,8 +5,6 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from loguru import logger
-
 from backend.core.plugin_models import ToolResult
 
 # -- Lazy imports for optional dependencies --------------------------------

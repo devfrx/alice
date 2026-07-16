@@ -12,7 +12,7 @@ import contextlib
 import re
 import time
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 # Seconds between live HTTP health checks when TRELLIS is reachable.
 # Avoids hammering the server (and initialising its CUDA context) on
@@ -31,13 +31,17 @@ from backend.core.plugin_models import (
 )
 from backend.core.tool_progress import emit_tool_progress
 from backend.plugins.cad_generator.client import TrellisClient
-from backend.plugins.cad_generator.client_v2 import (
-    Trellis2Client,
-    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_PIPELINES,
+from backend.plugins.cad_generator.client_multiview import (
+    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_MULTIVIEW_PIPELINES,
 )
 from backend.plugins.cad_generator.client_multiview import (
     Trellis2MultiviewClient,
-    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_MULTIVIEW_PIPELINES,
+)
+from backend.plugins.cad_generator.client_v2 import (
+    _ALLOWED_PIPELINE_TYPES as _TRELLIS2_PIPELINES,
+)
+from backend.plugins.cad_generator.client_v2 import (
+    Trellis2Client,
 )
 from backend.plugins.cad_generator.glb_postprocess import patch_glb_materials
 

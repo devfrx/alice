@@ -1,8 +1,8 @@
 """Tests for tool confirmation audit system (Phase 5)."""
 
 import uuid
+
 import pytest
-from datetime import datetime, timezone
 
 from backend.db.models import ToolConfirmationAudit
 

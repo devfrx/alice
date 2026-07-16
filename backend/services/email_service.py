@@ -10,7 +10,6 @@ import html
 import re
 import time
 import uuid
-from email.message import Message
 from email.mime.text import MIMEText
 from typing import Any
 
@@ -22,7 +21,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 
 from backend.core.config import EmailConfig
-from backend.core.event_bus import EventBus, AliceEvent
+from backend.core.event_bus import AliceEvent, EventBus
 
 _TRUNCATION_SUFFIX = "\n[…troncato]"
 
@@ -675,7 +674,7 @@ class EmailService:
                         idle_imap.wait_server_push(), timeout=29 * 60,
                     )
                     new_mail = True
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Normal keepalive cycle
                 finally:
                     idle_imap.idle_done()

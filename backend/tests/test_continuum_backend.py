@@ -14,10 +14,8 @@ from backend.services.knowledge import (
     CompositeKnowledgeBackend,
     ContinuumBackend,
     KnowledgeDocCreate,
-    KnowledgeDocPatch,
 )
 from backend.services.knowledge.protocol import BackendHealth, KnowledgeHit
-
 
 _NOTE = {
     "id": "11111111-1111-1111-1111-111111111111",
@@ -172,7 +170,7 @@ async def test_composite_health_aggregates_worst_case(composite):
 # ---------------------------------------------------------------------------
 
 
-def _make_real_client() -> "ContinuumClient":
+def _make_real_client() -> ContinuumClient:
     from backend.services.knowledge.continuum_client import ContinuumClient
 
     return ContinuumClient(

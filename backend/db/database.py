@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import sqlalchemy as sa
+from loguru import logger
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_sessionmaker,
@@ -13,7 +14,6 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
-from loguru import logger
 
 
 def create_engine_and_session(

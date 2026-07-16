@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import subprocess
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
-
+from backend.core.plugin_models import ConnectionStatus, ExecutionContext
 
 # ---------------------------------------------------------------------------
 # Helpers

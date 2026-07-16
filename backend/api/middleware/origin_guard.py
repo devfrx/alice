@@ -16,7 +16,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-
 # Fallback trusted origins when none are provided via config.
 # NOTE: "null" is intentionally excluded — it is a known bypass vector
 # (sandboxed iframes send Origin: null).  The dev-mode config adds it

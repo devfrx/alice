@@ -12,7 +12,6 @@ from backend.core.config import EmailConfig
 from backend.core.event_bus import EventBus
 from backend.services.email_service import EmailService, _LRUCache
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

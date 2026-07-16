@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -31,7 +30,6 @@ def _make_httpx_response(
     status_code: int = 200,
 ) -> httpx.Response:
     """Create an httpx.Response from a dict payload."""
-    import json
 
     return httpx.Response(
         status_code=status_code,

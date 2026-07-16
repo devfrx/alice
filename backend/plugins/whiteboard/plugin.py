@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
@@ -271,7 +271,7 @@ class WhiteboardPlugin(BasePlugin):
             raise RuntimeError("Artifact registry non inizializzato.")
         return cast("ArtifactRegistry", registry)
 
-    async def initialize(self, ctx: "AppContext") -> None:
+    async def initialize(self, ctx: AppContext) -> None:
         await super().initialize(ctx)
         if not ctx.config.whiteboard.enabled:
             self.logger.info("Plugin whiteboard disabilitato dalla configurazione.")
@@ -410,7 +410,7 @@ class WhiteboardPlugin(BasePlugin):
             )
 
         aid = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         raw_shapes = args.get("shapes", [])
         shapes = [SimpleShape(**s) for s in raw_shapes] if raw_shapes else []

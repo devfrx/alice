@@ -7,7 +7,7 @@ report availability.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from backend.core.service_orchestrator import (
     ManagedService,
@@ -49,7 +49,7 @@ class LMStudioManagedService(ManagedService):
     async def health(self) -> ServiceHealth:
         """Probe ``/api/v1/models`` to determine availability."""
         ok = await self._manager.check_health()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if ok:
             return ServiceHealth(
                 status="up",

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from backend.core.plugin_base import BasePlugin
@@ -363,7 +363,7 @@ class MemoryPlugin(BasePlugin):
         expires_hours = args.get("expires_hours")
         if expires_hours is not None:
             if isinstance(expires_hours, int) and 1 <= expires_hours <= 8760:
-                expires_at = datetime.now(timezone.utc) + timedelta(
+                expires_at = datetime.now(UTC) + timedelta(
                     hours=expires_hours,
                 )
             else:

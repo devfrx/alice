@@ -7,12 +7,10 @@ WebSearchClient helper class.
 
 from __future__ import annotations
 
-import asyncio
-import time
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
@@ -20,8 +18,6 @@ from backend.core.event_bus import EventBus
 from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
-    ToolDefinition,
-    ToolResult,
 )
 
 
@@ -662,9 +658,8 @@ class TestWebSearchClient:
             "backend.plugins.web_search.client.async_validate_url_ssrf",
             new_callable=AsyncMock,
             side_effect=ValueError("resolves to private address"),
-        ):
-            with pytest.raises(ValueError, match="private address"):
-                await client.scrape("http://192.168.1.1/admin")
+        ), pytest.raises(ValueError, match="private address"):
+            await client.scrape("http://192.168.1.1/admin")
 
         await client.close()
 

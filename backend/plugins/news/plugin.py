@@ -8,7 +8,7 @@ on weather and calendar plugins).
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -20,7 +20,7 @@ from backend.core.plugin_models import (
     ToolDefinition,
     ToolResult,
 )
-from backend.plugins.news.feed_reader import FeedReader, _FEEDPARSER_AVAILABLE
+from backend.plugins.news.feed_reader import _FEEDPARSER_AVAILABLE, FeedReader
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -256,7 +256,7 @@ class NewsPlugin(BasePlugin):
             raise RuntimeError("News plugin not initialized")
 
         cfg = self.ctx.config.news
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
 
         # 1. Top news
         try:

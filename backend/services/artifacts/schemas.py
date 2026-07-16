@@ -37,7 +37,7 @@ class ArtifactRead(BaseModel):
         return f"/api/artifacts/{self.id}/download"
 
     @classmethod
-    def from_orm_artifact(cls, artifact: Artifact) -> "ArtifactRead":
+    def from_orm_artifact(cls, artifact: Artifact) -> ArtifactRead:
         """Build a schema instance from an ORM row."""
         return cls.model_validate(artifact, from_attributes=True)
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,7 +12,6 @@ from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
 from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -765,10 +763,9 @@ class TestFeedReader:
             patch(
                 "backend.plugins.news.feed_reader.validate_url_ssrf",
                 side_effect=ValueError("SSRF: blocked URL"),
-            ),
+            ),pytest.raises(ValueError, match="SSRF")
         ):
-            with pytest.raises(ValueError, match="SSRF"):
-                await reader.fetch_feed("http://127.0.0.1/secret")
+            await reader.fetch_feed("http://127.0.0.1/secret")
 
     @pytest.mark.asyncio
     async def test_feedparser_error_handling(self, reader):

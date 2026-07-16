@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal, Protocol, runtime_checkable
 
 from loguru import logger
@@ -152,7 +152,7 @@ class ServiceOrchestrator:
             last_health=ServiceHealth(
                 status="down",
                 detail="not started",
-                last_check=datetime.now(timezone.utc),
+                last_check=datetime.now(UTC),
             ),
         )
         logger.debug(
@@ -412,7 +412,7 @@ class ServiceOrchestrator:
             await asyncio.wait_for(
                 entry.service.stop(), timeout=_STOP_TIMEOUT_S,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 "Orchestrator: '{}' stop() exceeded {}s — wrapper must "
                 "have force-killed by now", name, _STOP_TIMEOUT_S,
@@ -502,7 +502,7 @@ class ServiceOrchestrator:
             health = ServiceHealth(
                 status="down",
                 detail=f"health probe error: {exc}",
-                last_check=datetime.now(timezone.utc),
+                last_check=datetime.now(UTC),
             )
         await self._apply_health(name, health)
 
@@ -527,7 +527,7 @@ class ServiceOrchestrator:
         health = ServiceHealth(
             status=status,
             detail=detail,
-            last_check=datetime.now(timezone.utc),
+            last_check=datetime.now(UTC),
         )
         prev = entry.last_health
         entry.last_health = health

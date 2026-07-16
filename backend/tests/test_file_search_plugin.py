@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import os
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,11 +18,9 @@ from backend.plugins.file_search.readers import (
 )
 from backend.plugins.file_search.searcher import (
     ForbiddenPathError,
-    _sync_walk,
     _validate_path,
     search_files,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

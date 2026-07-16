@@ -10,21 +10,22 @@ the plugin manager calls at well-defined moments.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger as _loguru_logger
 
 from backend.core.plugin_models import (
+    PLUGIN_API_VERSION,
     CommandDefinition,
     ConnectionStatus,
     ExecutionContext,
     ToolDefinition,
     ToolResult,
-    PLUGIN_API_VERSION,
 )
 
 if TYPE_CHECKING:
     from loguru import Logger
+
     from backend.core.context import AppContext
 
 

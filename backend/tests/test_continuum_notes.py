@@ -101,7 +101,7 @@ class TestNoteToolDefinitions:
 
     def test_all_six_note_tools_present(self, plugin):
         names = {t.name for t in plugin.get_tools()}
-        assert _NOTE_TOOLS <= names
+        assert names >= _NOTE_TOOLS
 
     def test_safe_tools_risk_level(self, plugin):
         tools = {t.name: t for t in plugin.get_tools()}

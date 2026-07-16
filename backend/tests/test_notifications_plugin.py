@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
-from backend.core.event_bus import EventBus, AliceEvent
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
-
+from backend.core.event_bus import AliceEvent, EventBus
+from backend.core.plugin_models import ConnectionStatus, ExecutionContext
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -342,7 +341,7 @@ class TestSetTimerTool:
 
         # Mock timer manager to avoid real DB usage
         plugin._timer_manager.list_active = AsyncMock(return_value=[])
-        fires_at = datetime.now(timezone.utc) + timedelta(seconds=60)
+        fires_at = datetime.now(UTC) + timedelta(seconds=60)
         plugin._timer_manager.create_timer = AsyncMock(return_value=fires_at)
 
         result = await plugin.execute_tool(
@@ -426,7 +425,7 @@ class TestSetTimerTool:
         await plugin.initialize(ctx)
 
         plugin._timer_manager.list_active = AsyncMock(return_value=[])
-        fires_at = datetime.now(timezone.utc) + timedelta(seconds=120)
+        fires_at = datetime.now(UTC) + timedelta(seconds=120)
         plugin._timer_manager.create_timer = AsyncMock(return_value=fires_at)
 
         result = await plugin.execute_tool(
@@ -722,7 +721,7 @@ class TestTimerManager:
             TimerManager,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = ActiveTimer(
             id="list-1",
             label="Pending",
@@ -746,7 +745,7 @@ class TestTimerManager:
             TimerManager,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         past_row = ActiveTimer(
             id="past-1",
             label="Already past",
@@ -773,7 +772,7 @@ class TestTimerManager:
             TimerManager,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         future_row = ActiveTimer(
             id="future-1",
             label="Future timer",
@@ -905,7 +904,7 @@ class TestRestoreAndShutdown:
             TimerManager,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         past_row = ActiveTimer(
             id="past-tracked",
             label="Track me",
@@ -993,7 +992,7 @@ class TestRestoreAndShutdown:
             TimerManager,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         future_row = ActiveTimer(
             id="fut-shutdown",
             label="Future",

@@ -34,8 +34,9 @@ Plugins should treat every field except ``type``, ``tool_name`` and
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from loguru import logger
 

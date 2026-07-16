@@ -356,7 +356,7 @@ async def _resolve_hostname(ip: str, timeout_s: float = 1.0) -> str | None:
             timeout=timeout_s,
         )
         return hostname
-    except (socket.herror, socket.gaierror, asyncio.TimeoutError, OSError):
+    except (TimeoutError, socket.herror, socket.gaierror, OSError):
         return None
 
 
@@ -472,7 +472,7 @@ class NetworkProber:
                         port=port, open=True,
                         service_hint=_SERVICE_HINTS.get(port),
                     )
-                except (asyncio.TimeoutError, OSError):
+                except (TimeoutError, OSError):
                     return PortResult(
                         port=port, open=False,
                         service_hint=_SERVICE_HINTS.get(port),
@@ -584,7 +584,7 @@ class NetworkProber:
                 detail=f"Banner: {banner}" if is_ssh else None,
                 error=None if is_ssh else "No SSH banner detected",
             )
-        except (asyncio.TimeoutError, OSError) as exc:
+        except (TimeoutError, OSError) as exc:
             elapsed_ms = (time.perf_counter() - t0) * 1000
             return ServiceResult(
                 host=host, port=port, protocol="ssh",
@@ -619,7 +619,7 @@ class NetworkProber:
                 detail=f"Banner: {banner}" if is_ftp else None,
                 error=None if is_ftp else "No FTP 220 greeting",
             )
-        except (asyncio.TimeoutError, OSError) as exc:
+        except (TimeoutError, OSError) as exc:
             elapsed_ms = (time.perf_counter() - t0) * 1000
             return ServiceResult(
                 host=host, port=port, protocol="ftp",
@@ -706,7 +706,7 @@ class NetworkProber:
                 query=hostname, query_type="forward",
                 error=f"DNS lookup failed: {exc}",
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return DnsResult(
                 query=hostname, query_type="forward",
                 error="DNS lookup timed out",
@@ -731,7 +731,7 @@ class NetworkProber:
                 query=ip, query_type="reverse",
                 error=f"Reverse DNS lookup failed: {exc}",
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return DnsResult(
                 query=ip, query_type="reverse",
                 error="Reverse DNS lookup timed out",

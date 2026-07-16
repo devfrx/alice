@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -11,10 +11,9 @@ import pytest
 from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
+from backend.core.plugin_models import ConnectionStatus, ExecutionContext
 from backend.plugins.weather.client import WeatherClient, _weather_code_text
 from backend.plugins.weather.plugin import WeatherPlugin
-
 
 # ---------------------------------------------------------------------------
 # Helpers

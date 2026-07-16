@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import (
@@ -14,7 +14,7 @@ from backend.core.plugin_models import (
 )
 
 if TYPE_CHECKING:
-    from backend.core.context import AppContext
+    pass
 
 _READ_EMAILS_SCHEMA: dict[str, Any] = {
     "type": "object",

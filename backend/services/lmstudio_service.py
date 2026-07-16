@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from loguru import logger
@@ -23,7 +23,7 @@ class ModelOperation:
         self.status = "in_progress"
         self.progress: float = -1.0  # indeterminate
         self.error: str | None = None
-        self.started_at = datetime.now(timezone.utc).isoformat()
+        self.started_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         """Return a serialisable snapshot of this operation."""

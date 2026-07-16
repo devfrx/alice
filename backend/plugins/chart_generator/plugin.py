@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
@@ -153,7 +153,7 @@ class ChartGeneratorPlugin(BasePlugin):
             raise RuntimeError("Artifact registry non inizializzato.")
         return cast("ArtifactRegistry", registry)
 
-    async def initialize(self, ctx: "AppContext") -> None:
+    async def initialize(self, ctx: AppContext) -> None:
         await super().initialize(ctx)
         if not ctx.config.chart.enabled:
             self.logger.info("Plugin chart_generator disabilitato dalla configurazione.")
@@ -294,7 +294,7 @@ class ChartGeneratorPlugin(BasePlugin):
             )
 
         aid = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         spec = ChartSpec(
             chart_id=str(aid),
             title=title,

@@ -40,7 +40,6 @@ from backend.core.config import load_config
 from backend.db.database import create_engine_and_session, init_db
 from backend.db.models import Artifact, ArtifactKind, Message
 
-
 _MODELS_DIR = _PROJECT_ROOT / "data" / "3d_models"
 
 

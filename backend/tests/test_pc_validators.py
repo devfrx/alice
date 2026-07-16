@@ -1,16 +1,17 @@
 """Tests for PC Automation validators module (Phase 5)."""
 
 import subprocess
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from backend.plugins.pc_automation.validators import (
-    safe_subprocess,
-    sanitize_text_input,
-)
+import pytest
+
 from backend.plugins.pc_automation.constants import (
     COMMAND_TIMEOUT_S,
     MAX_COMMAND_OUTPUT_CHARS,
+)
+from backend.plugins.pc_automation.validators import (
+    safe_subprocess,
+    sanitize_text_input,
 )
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -15,11 +15,10 @@ from backend.core.config import (
 )
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
+from backend.core.plugin_models import ExecutionContext
 from backend.plugins.cad_generator.client import GenerationResult
 from backend.plugins.cad_generator.client_v2 import Trellis2GenerationResult
 from backend.plugins.cad_generator.plugin import CadGeneratorPlugin
-
 
 # ---------------------------------------------------------------------------
 # Helpers

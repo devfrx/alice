@@ -76,7 +76,7 @@ async def _cancel_tts(
         tts_task.cancel()
         try:
             await asyncio.wait_for(tts_task, timeout=1.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+        except (TimeoutError, asyncio.CancelledError, Exception):
             pass
     return asyncio.Event()
 

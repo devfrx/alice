@@ -11,7 +11,7 @@ import asyncio
 import os
 import platform
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -280,7 +280,7 @@ class SystemInfoPlugin(BasePlugin):
             else "/"
         )
         disk = psutil.disk_usage(root)
-        boot_ts = datetime.fromtimestamp(psutil.boot_time(), tz=timezone.utc).isoformat()
+        boot_ts = datetime.fromtimestamp(psutil.boot_time(), tz=UTC).isoformat()
 
         data: dict[str, Any] = {
             "cpu_percent": psutil.cpu_percent(interval=0.1),

@@ -8,23 +8,21 @@ thread safety.
 from __future__ import annotations
 
 import asyncio
-import re
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.event_bus import EventBus, AliceEvent
+from backend.core.event_bus import AliceEvent, EventBus
 from backend.core.plugin_base import BasePlugin
 from backend.core.plugin_models import (
+    MAX_TOOL_RESULT_LENGTH,
     ConnectionStatus,
     ExecutionContext,
-    MAX_TOOL_RESULT_LENGTH,
     ToolDefinition,
     ToolResult,
 )
 from backend.core.tool_registry import ToolRegistry
-
 
 # ---------------------------------------------------------------------------
 # Helpers & Mocks

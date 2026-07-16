@@ -31,7 +31,6 @@ from loguru import logger
 # (``pipeline_type``, ``seed``) which we surface separately.
 from backend.plugins.cad_generator.client import GenerationResult
 
-
 # Pipeline types mirrored from ``trellis2_server.server._ALLOWED_PIPELINE_TYPES``.
 # Kept here as a local constant so the client can validate before going
 # over the wire (saves a 400 round-trip).

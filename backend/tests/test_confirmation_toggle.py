@@ -15,11 +15,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.services.turn.tool_loop import run_tool_loop
-from backend.services.turn.pipeline import ConfirmationOutcome
-from backend.services.permission_mode_service import PermissionMode, PermissionModeService
 from backend.core.plugin_models import ToolDefinition, ToolResult
 from backend.db.models import ToolConfirmationAudit
+from backend.services.permission_mode_service import PermissionMode, PermissionModeService
+from backend.services.turn.pipeline import ConfirmationOutcome
+from backend.services.turn.tool_loop import run_tool_loop
 
 # ---------------------------------------------------------------------------
 # Helpers

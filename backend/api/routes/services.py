@@ -25,8 +25,8 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from backend.core.managed_services import TrellisManagedService, resolve_trellis_launcher
 from backend.core.context import AppContext
+from backend.core.managed_services import TrellisManagedService, resolve_trellis_launcher
 from backend.services.model_downloader import CATALOG, list_catalog
 
 router = APIRouter(tags=["services"])

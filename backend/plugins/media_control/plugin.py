@@ -8,7 +8,7 @@ use pywin32 virtual key events, and brightness uses WMI via PowerShell.
 from __future__ import annotations
 
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -21,9 +21,6 @@ from backend.core.plugin_models import (
 )
 from backend.plugins.media_control.executor import (
     _IS_WINDOWS,
-    _PYCAW_AVAILABLE,
-    _WIN32_AVAILABLE,
-    check_dependencies as check_executor_deps,
     exec_get_volume,
     exec_media_next,
     exec_media_play_pause,
@@ -32,6 +29,9 @@ from backend.plugins.media_control.executor import (
     exec_set_brightness,
     exec_set_volume,
     exec_unmute,
+)
+from backend.plugins.media_control.executor import (
+    check_dependencies as check_executor_deps,
 )
 
 if TYPE_CHECKING:

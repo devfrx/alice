@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from dateutil import parser as dt_parser
 from dateutil.rrule import rrulestr
 from fastapi import APIRouter, HTTPException, Query, Request
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from sqlmodel import select
-from zoneinfo import ZoneInfo
 
 from backend.core.context import AppContext
 from backend.services.calendar_events import (
@@ -26,8 +26,8 @@ router = APIRouter(prefix="/calendar", tags=["calendar"])
 def _ensure_utc(dt: datetime) -> datetime:
     """Ensure a datetime is timezone-aware (UTC)."""
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _event_to_dict(event: CalendarEvent, tz: ZoneInfo) -> dict:
@@ -87,7 +87,7 @@ def _expand_recurring(
                 )
                 occurrences = occurrences[:_MAX_OCCURRENCES]
             for occ in occurrences:
-                occ_utc = occ.astimezone(timezone.utc)
+                occ_utc = occ.astimezone(UTC)
                 virtual = CalendarEvent(
                     id=ev.id,
                     title=ev.title,
@@ -136,7 +136,7 @@ async def list_events(
         if start_date
         else datetime.combine(
             now_local.date(), time.min, tzinfo=tz,
-        ).astimezone(timezone.utc)
+        ).astimezone(UTC)
     )
     end_utc = (
         _parse_to_utc(end_date, tz)
@@ -182,7 +182,7 @@ async def today_summary(request: Request) -> dict:
     ctx: AppContext = request.app.state.context
     tz = _get_tz(ctx)
     today = datetime.now(tz).date()
-    start_utc = datetime.combine(today, time.min, tzinfo=tz).astimezone(timezone.utc)
+    start_utc = datetime.combine(today, time.min, tzinfo=tz).astimezone(UTC)
     end_utc = start_utc + timedelta(days=1)
 
     stmt = (
@@ -226,7 +226,7 @@ async def upcoming_events(request: Request, limit: int = Query(5, ge=1, le=100))
     """
     ctx: AppContext = request.app.state.context
     tz = _get_tz(ctx)
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     horizon = now_utc + timedelta(days=90)
 
     stmt = (
@@ -274,7 +274,7 @@ def _parse_to_utc(value: str, tz: ZoneInfo) -> datetime:
         ) from exc
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tz)
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(UTC)
 
 
 # ---------------------------------------------------------------------------

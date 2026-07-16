@@ -51,7 +51,7 @@ async def stage_senses(ctx: AppContext) -> None:
             stt_service = STTService(config.stt)
             try:
                 await asyncio.wait_for(stt_service.start(), timeout=120)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "STT model pre-load timed out — will lazy-load on first use",
                 )

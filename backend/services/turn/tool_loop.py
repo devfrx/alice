@@ -1226,6 +1226,7 @@ async def _persist_tool_image(
         Relative path from the project root, or ``None`` on failure.
     """
     import base64
+
     from backend.core.config import PROJECT_ROOT
 
     ext_map = {

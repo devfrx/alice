@@ -12,7 +12,6 @@ import pytest
 
 from backend.core.config import STTConfig
 
-
 # ---------------------------------------------------------------------------
 # Mock faster_whisper module (avoids needing the real native package)
 # ---------------------------------------------------------------------------

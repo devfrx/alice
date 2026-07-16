@@ -5,19 +5,18 @@ from __future__ import annotations
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from backend.core.config import load_config
 from backend.core.context import AppContext
-from backend.core.event_bus import EventBus, AliceEvent
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
+from backend.core.event_bus import AliceEvent, EventBus
+from backend.core.plugin_models import ConnectionStatus, ExecutionContext
 from backend.plugins.calendar.plugin import CalendarPlugin
 from backend.services.calendar_events import CalendarEvent
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,7 +40,7 @@ def _make_event(
     **kwargs,
 ) -> CalendarEvent:
     """Build a CalendarEvent with sensible defaults."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return CalendarEvent(
         id=kwargs.get("id", uuid.uuid4()),
         title=title,
@@ -218,7 +217,7 @@ class TestCreateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start = (now + timedelta(hours=1)).isoformat()
         end = (now + timedelta(hours=2)).isoformat()
 
@@ -240,7 +239,7 @@ class TestCreateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, _ = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start = (now + timedelta(hours=2)).isoformat()
         end = (now + timedelta(hours=1)).isoformat()
 
@@ -259,7 +258,7 @@ class TestCreateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, _ = plugin_with_db
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
 
         result = await plugin.execute_tool(
             "create_event",
@@ -276,7 +275,7 @@ class TestCreateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start = (now + timedelta(hours=1)).isoformat()
         end = (now + timedelta(hours=2)).isoformat()
 
@@ -305,7 +304,7 @@ class TestCreateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, _ = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         result = await plugin.execute_tool(
             "create_event",
@@ -348,7 +347,7 @@ class TestListEvents:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ev = _make_event(
             title="Demo",
             start_dt=now + timedelta(hours=1),
@@ -430,7 +429,7 @@ class TestListEvents:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ev = _make_event(
             title="Standup",
             start_dt=now + timedelta(hours=1),
@@ -465,7 +464,7 @@ class TestUpdateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ev = _make_event(
             title="Old Title",
             start_dt=now + timedelta(hours=1),
@@ -509,7 +508,7 @@ class TestUpdateEvent:
     ) -> None:
         """Updating end to before start should error."""
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ev = _make_event(
             title="Workshop",
             start_dt=now + timedelta(hours=3),
@@ -535,7 +534,7 @@ class TestUpdateEvent:
         exec_context: ExecutionContext,
     ) -> None:
         plugin, session = plugin_with_db
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ev = _make_event(
             title="Sprint Review",
             description="Old desc",
@@ -621,13 +620,13 @@ class TestGetTodaySummary:
         ev1 = _make_event(
             title="Morning Call",
             description="Daily sync",
-            start_dt=now_local.replace(hour=9, minute=0).astimezone(timezone.utc),
-            end_dt=now_local.replace(hour=9, minute=30).astimezone(timezone.utc),
+            start_dt=now_local.replace(hour=9, minute=0).astimezone(UTC),
+            end_dt=now_local.replace(hour=9, minute=30).astimezone(UTC),
         )
         ev2 = _make_event(
             title="Lunch",
-            start_dt=now_local.replace(hour=12, minute=0).astimezone(timezone.utc),
-            end_dt=now_local.replace(hour=13, minute=0).astimezone(timezone.utc),
+            start_dt=now_local.replace(hour=12, minute=0).astimezone(UTC),
+            end_dt=now_local.replace(hour=13, minute=0).astimezone(UTC),
         )
         result_proxy = MagicMock()
         result_proxy.all.return_value = [ev1, ev2]
@@ -674,18 +673,18 @@ class TestTimezoneHandling:
         result = plugin._parse_to_utc("2026-06-15T10:00:00")
         expected = (
             datetime(2026, 6, 15, 10, 0, tzinfo=TZ_ROME)
-            .astimezone(timezone.utc)
+            .astimezone(UTC)
         )
         assert result == expected
-        assert result.tzinfo == timezone.utc
+        assert result.tzinfo == UTC
 
     def test_parse_utc_string(self, plugin: CalendarPlugin) -> None:
         result = plugin._parse_to_utc("2026-06-15T10:00:00Z")
-        assert result == datetime(2026, 6, 15, 10, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 6, 15, 10, 0, tzinfo=UTC)
 
     def test_parse_offset_string(self, plugin: CalendarPlugin) -> None:
         result = plugin._parse_to_utc("2026-06-15T12:00:00+02:00")
-        assert result == datetime(2026, 6, 15, 10, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 6, 15, 10, 0, tzinfo=UTC)
 
     def test_result_always_utc(self, plugin: CalendarPlugin) -> None:
         for iso in [
@@ -694,7 +693,7 @@ class TestTimezoneHandling:
             "2026-01-01T00:00:00+05:30",
         ]:
             dt = plugin._parse_to_utc(iso)
-            assert dt.tzinfo == timezone.utc
+            assert dt.tzinfo == UTC
 
 
 # ===================================================================
@@ -789,7 +788,7 @@ class TestReminderDedup:
         """Calling _check_reminders twice should only emit once."""
         plugin.ctx.db = lambda: _mock_db_session(mock_session)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Place start_time so trigger_at falls within the check window:
         # trigger_at = start_time - reminder_minutes = now - 10s (in the past)
         ev = _make_event(
@@ -825,7 +824,7 @@ class TestReminderDedup:
         """Reminder must emit AliceEvent.CALENDAR_REMINDER, not a raw string."""
         plugin.ctx.db = lambda: _mock_db_session(mock_session)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ev = _make_event(
             title="Enum Test",
             start_dt=now + timedelta(minutes=14, seconds=50),

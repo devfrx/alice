@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,9 +9,8 @@ import pytest
 from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import EventBus
-from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolResult
-from backend.plugins.clipboard.plugin import ClipboardPlugin, _MAX_SET_LENGTH
-
+from backend.core.plugin_models import ConnectionStatus, ExecutionContext
+from backend.plugins.clipboard.plugin import _MAX_SET_LENGTH, ClipboardPlugin
 
 # ---------------------------------------------------------------------------
 # Helpers

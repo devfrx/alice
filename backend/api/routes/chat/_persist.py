@@ -122,7 +122,10 @@ async def _persist_final_turn(
     # ------------------------------------------------------------------
     # Fast path: error (v3-4).  ``run_tool_loop`` may have flushed
     # intermediate messages; rollback to keep DB consistent with the
-    # legacy behaviour.
+    # legacy behaviour.  Any turn cost is discarded with them — the
+    # executor mirrors this by sending ``cost=None`` on the error
+    # ``turn.finished`` frame (``DirectTurnExecutor._finish``), so the
+    # frontend live chip never sums a cost this rollback won't back.
     # ------------------------------------------------------------------
     if finish_reason == "error":
         with contextlib.suppress(Exception):

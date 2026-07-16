@@ -76,6 +76,13 @@ Gate già verdi a fine sessione: `lint-imports` (6 contratti kept), `check-contr
    key-set in `test_turn_events.py` sono stati aggiornati; se aggiungi campi al frame, aggiornali.
 7. **Sottostima nota del costo**: subagent, summarization/compaction e reflection non sono tracciati
    (solo le generazioni del turno principale). Etichetta UI tenuta generica apposta.
+   Seconda classe (fix post-merge 2026-07-16): i turni che finiscono in **errore** vengono
+   rollbackati da `_persist_final_turn` (niente in DB), quindi `DirectTurnExecutor._finish` manda
+   `cost=None` sul frame `turn.finished` — il chip live non somma mai un costo che il reload non
+   può confermare (il costo degli step intermedi è speso davvero ma entra nella sottostima).
+   Restano due divergenze residue rare in cui il frame porta cost>0 non persistito: turno
+   **cancellato senza contenuto** e turno **solo-tool senza messaggio finale** (i due
+   `logger.debug` in `_persist.py`).
 8. **FE**: la API key NON vive mai nello stato reattivo (solo `openrouterKeyConfigured` boolean);
    `useOpenrouterStore` è un singleton condiviso tra i ModelSelector llm/embedding (il clear della
    searchQuery è guardato con `isOpenrouterProvider` — non rimuovere il guard).

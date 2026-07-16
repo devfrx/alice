@@ -28,12 +28,18 @@ def evaluate_check(
     - ``file_contains``: substring case-insensitive (``casefold``) di
       ``check.text`` nel contenuto di ``check.path``.
     - ``response_matches``: ``re.search`` di ``check.pattern`` su *response*
-      con i flag ``IGNORECASE | DOTALL``.
+      con i flag ``IGNORECASE | DOTALL``. Un pattern regex invalido non
+      solleva: il check fallisce con un detail dedicato.
     - ``tool_called`` / ``tool_not_called``: match sul nome namespaced esatto
       oppure sul suffisso ``_<check.name>`` (es. ``file_search_write_text_file``
       matcha ``name: write_text_file``).
     - ``max_steps``: ``trace.steps <= check.value``.
     - ``finished_ok``: ``trace.finish_reason == "stop"``.
+
+    Per i check su file, ``check.path`` deve risolvere dentro *sandbox*: un
+    path che esce dalla sandbox (es. assoluto o con ``..``) fa fallire il
+    check invece di essere valutato — non esiste passaggio implicito per
+    percorsi fuori dalla sandbox.
 
     Args:
         check: La specifica del check (i campi usati dipendono da ``kind``).
@@ -48,6 +54,12 @@ def evaluate_check(
     if kind in ("file_exists", "file_absent", "file_contains"):
         rel = check.path or ""
         target = (sandbox / rel).resolve()
+        if not target.is_relative_to(sandbox.resolve()):
+            return CheckResult(
+                kind=kind,
+                passed=False,
+                detail=f"{rel}: path fuori dalla sandbox",
+            )
         if kind == "file_exists":
             ok = target.is_file()
             return CheckResult(kind=kind, passed=ok, detail=f"{rel}: exists={ok}")
@@ -62,7 +74,14 @@ def evaluate_check(
 
     if kind == "response_matches":
         pattern = check.pattern or ""
-        ok = re.search(pattern, response, re.IGNORECASE | re.DOTALL) is not None
+        try:
+            ok = re.search(pattern, response, re.IGNORECASE | re.DOTALL) is not None
+        except re.error as exc:
+            return CheckResult(
+                kind=kind,
+                passed=False,
+                detail=f"pattern invalido {pattern!r}: {exc}",
+            )
         return CheckResult(kind=kind, passed=ok, detail=f"pattern={pattern!r} match={ok}")
 
     if kind in ("tool_called", "tool_not_called"):

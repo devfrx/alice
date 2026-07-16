@@ -69,3 +69,28 @@ def test_file_contains_missing_file(tmp_path: Path) -> None:
     )
     assert results[0].passed is False
     assert "no.txt" in results[0].detail
+
+
+def test_response_matches_invalid_regex() -> None:
+    results = evaluate_checks(
+        [CheckSpec(kind="response_matches", pattern="[non chiuso")],
+        sandbox=Path("."),
+        response="qualsiasi",
+        trace=_trace(),
+    )
+    assert results[0].passed is False
+    assert "pattern invalido" in results[0].detail
+
+
+def test_file_checks_reject_paths_outside_sandbox(tmp_path: Path) -> None:
+    results = evaluate_checks(
+        [
+            CheckSpec(kind="file_exists", path="../fuori.txt"),
+            CheckSpec(kind="file_absent", path="C:/Windows/system.ini"),
+        ],
+        sandbox=tmp_path,
+        response="",
+        trace=_trace(),
+    )
+    assert [r.passed for r in results] == [False, False]
+    assert "fuori dalla sandbox" in results[0].detail

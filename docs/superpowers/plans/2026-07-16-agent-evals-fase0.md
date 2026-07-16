@@ -902,8 +902,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from backend.evals.judge import judge_response
 from backend.evals.models import JudgeSpec
 
@@ -920,7 +918,6 @@ class _FakeLLM:
         return self._replies[len(self.calls) - 1]
 
 
-@pytest.mark.asyncio
 async def test_judge_parses_json() -> None:
     llm = _FakeLLM(['{"score": 8, "reason": "chiaro e corretto"}'])
     verdicts = await judge_response(
@@ -934,7 +931,6 @@ async def test_judge_parses_json() -> None:
     assert verdicts[0].criterion == "È chiaro?"
 
 
-@pytest.mark.asyncio
 async def test_judge_regex_fallback_and_clamp() -> None:
     llm = _FakeLLM(["Direi score: 15 perché ottimo", "nessun numero qui"])
     verdicts = await judge_response(
@@ -1274,10 +1270,9 @@ async def test_run_scenario_mock(app, scenario: Scenario, tmp_path: Path) -> Non
     assert trace_file.is_file()
 ```
 
-(La fixture `app` viene da `backend/tests/conftest.py`; pytest-asyncio è già
-configurato nel repo. Se il progetto richiede il marker esplicito, aggiungi
-`@pytest.mark.asyncio` come negli altri test async del repo — verifica in
-`backend/pyproject.toml` la modalità asyncio.)
+(La fixture `app` viene da `backend/tests/conftest.py`; il repo ha
+`asyncio_mode = "auto"` in `backend/pyproject.toml` — i test async NON
+richiedono marker.)
 
 - [ ] **Step 3: Verifica che fallisca**
 

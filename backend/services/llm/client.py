@@ -270,7 +270,7 @@ class LLMClient:
                     # Reasoning param was accepted — remember for next time.
                     if send_reasoning and self._model_registry:
                         self._model_registry.mark_reasoning_param_accepted(
-                            active_model,
+                            active_model, namespace="local",
                         )
                     return
         except httpx.HTTPStatusError as exc:
@@ -283,7 +283,7 @@ class LLMClient:
             # Model rejected the reasoning param — learn and retry once.
             if self._model_registry:
                 self._model_registry.mark_reasoning_param_rejected(
-                    active_model,
+                    active_model, namespace="local",
                 )
             else:
                 logger.warning(
@@ -383,7 +383,7 @@ class LLMClient:
                             # the model has thinking baked in — learn this.
                             if not explicit_reasoning and self._model_registry and active_model:
                                 self._model_registry.mark_emits_reasoning_natively(
-                                    active_model,
+                                    active_model, namespace="local",
                                 )
                         yield {
                             "type": "thinking",
@@ -414,7 +414,7 @@ class LLMClient:
                         # this model definitely doesn't reason natively.
                         if not explicit_reasoning and self._model_registry and active_model:
                             self._model_registry.mark_no_reasoning_natively(
-                                active_model,
+                                active_model, namespace="local",
                             )
                     result = data.get("result", {})
                     resp_id = result.get("response_id")

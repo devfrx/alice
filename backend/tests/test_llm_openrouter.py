@@ -154,15 +154,15 @@ async def test_openrouter_chat_uses_oai_path_with_usage_accounting() -> None:
 async def test_context_window_from_registry_for_openrouter() -> None:
     from backend.services.model_capability_registry import (
         ModelCapabilityRegistry,
-        ModelProfile,
     )
 
     registry = ModelCapabilityRegistry()
-    registry._profiles["anthropic/claude-sonnet-5"] = ModelProfile(
-        model_id="anthropic/claude-sonnet-5",
-        context_length=200000,
-        source="openrouter_api",
-    )
+    await registry.refresh_from_openrouter([{
+        "id": "anthropic/claude-sonnet-5",
+        "context_length": 200000,
+        "supported_parameters": [],
+        "architecture": {"input_modalities": ["text"]},
+    }])
     svc = LLMService(_openrouter_config(), model_registry=registry)
     assert svc.get_cached_context_window() == 200000
     await svc.close()

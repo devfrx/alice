@@ -59,14 +59,18 @@ async def test_list_models_caches_and_seeds_registry() -> None:
     await svc.list_models()
     assert svc._http.get.await_count == 1
 
-    profile = registry.get_profile("anthropic/claude-sonnet-5")
+    profile = registry.get_profile(
+        "anthropic/claude-sonnet-5", namespace="openrouter",
+    )
     assert profile.supports_tool_use is True
     assert profile.supports_vision is True
     assert profile.supports_thinking is True
     assert profile.context_length == 200000
     assert profile.source == "openrouter_api"
 
-    text_only = registry.get_profile("qwen/qwen3.5-72b")
+    text_only = registry.get_profile(
+        "qwen/qwen3.5-72b", namespace="openrouter",
+    )
     assert text_only.supports_vision is False
     assert text_only.supports_thinking is False
     await svc.close()
@@ -114,21 +118,20 @@ async def test_concurrent_list_models_fetches_once() -> None:
 
 
 async def test_refresh_from_openrouter_preserves_lmstudio_profiles() -> None:
-    from backend.services.model_capability_registry import ModelProfile
-
     registry = ModelCapabilityRegistry()
-    registry._profiles["qwen/qwen3.5-72b"] = ModelProfile(
-        model_id="qwen/qwen3.5-72b",
-        supports_vision=True,
-        context_length=8192,
-        accepts_reasoning_param=True,
-        source="lmstudio_api",
-    )
+    await registry.refresh_from_api([{
+        "path": "qwen/qwen3.5-72b",
+        "capabilities": {"vision": True},
+        "max_context_length": 8192,
+    }])
     await registry.refresh_from_openrouter(_CATALOG)
-    # Il profilo LM Studio non viene clobberato...
-    local = registry.get_profile("qwen/qwen3.5-72b")
+    # Il profilo LM Studio non viene clobberato: vive nel namespace
+    # locale, separato dal catalogo cloud anche a parità di id.
+    local = registry.get_profile("qwen/qwen3.5-72b", namespace="local")
     assert local.source == "lmstudio_api"
     assert local.context_length == 8192
-    # ...mentre i modelli nuovi vengono aggiunti normalmente.
-    cloud = registry.get_profile("anthropic/claude-sonnet-5")
+    # ...mentre il catalogo popola normalmente il namespace openrouter.
+    cloud = registry.get_profile(
+        "anthropic/claude-sonnet-5", namespace="openrouter",
+    )
     assert cloud.source == "openrouter_api"

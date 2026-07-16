@@ -252,6 +252,7 @@ class LLMService:
             if model_registry is not None:
                 profile = model_registry.get_profile(
                     config.openrouter_model or "openrouter/auto",
+                    namespace="openrouter",
                 )
                 if profile.context_length > 0:
                     return profile.context_length

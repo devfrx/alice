@@ -4,19 +4,35 @@ Single source of truth for what each model can do.  Populated from
 LM Studio's ``/api/v1/models`` response, enriched by runtime learning
 (e.g. whether a model accepts the ``reasoning`` parameter).
 
-Falls back to ``KNOWN_MODELS`` for Ollama or unknown models.
+Profiles live in per-provider **namespaces** (``"local"`` for
+LM Studio/Ollama, ``"openrouter"`` for the OpenRouter catalog) because
+``org/model`` ids genuinely collide across providers — the same id can
+name a locally-served checkpoint and a cloud model with different
+capabilities and context windows.  Fuzzy id matching only exists to
+bridge local naming conventions (Ollama tags vs LM Studio paths) and is
+therefore confined to the ``"local"`` namespace; OpenRouter ids are a
+canonical vocabulary and are always looked up verbatim.
+
+Falls back to ``KNOWN_MODELS`` for Ollama or unknown local models.
 """
 
 from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from loguru import logger
 
 from backend.core.config import KNOWN_MODELS
+
+ModelNamespace = Literal["local", "openrouter"]
+"""Provider family a profile belongs to.
+
+``"local"`` covers LM Studio and Ollama (plus ``KNOWN_MODELS`` and
+conservative defaults); ``"openrouter"`` covers the OpenRouter catalog.
+"""
 
 
 @dataclass
@@ -72,19 +88,23 @@ class ModelProfile:
 
 
 class ModelCapabilityRegistry:
-    """Dynamic per-model capability cache.
+    """Dynamic per-model capability cache, namespaced by provider family.
 
-    Populated from LM Studio v1 API responses.  The LLM service queries
-    this registry before every request to get the effective capabilities
-    for the resolved model, eliminating static config flags and wasteful
-    retry-on-error patterns.
+    Populated from LM Studio v1 API responses (``"local"`` namespace)
+    and the OpenRouter catalog (``"openrouter"`` namespace).  The LLM
+    service queries this registry before every request to get the
+    effective capabilities for the resolved model, eliminating static
+    config flags and wasteful retry-on-error patterns.
 
     Thread-safe via asyncio locks; all public methods are sync or have
     async variants where needed.
     """
 
     def __init__(self) -> None:
-        self._profiles: dict[str, ModelProfile] = {}
+        self._profiles: dict[ModelNamespace, dict[str, ModelProfile]] = {
+            "local": {},
+            "openrouter": {},
+        }
         self._lock = asyncio.Lock()
         self._last_refresh: float = 0.0
 
@@ -93,7 +113,7 @@ class ModelCapabilityRegistry:
     # ------------------------------------------------------------------
 
     async def refresh_from_api(self, models_data: list[dict[str, Any]]) -> int:
-        """Update profiles from the LM Studio ``/api/v1/models`` response.
+        """Update local profiles from the LM Studio ``/api/v1/models`` response.
 
         Each model entry is expected to have at least::
 
@@ -113,13 +133,14 @@ class ModelCapabilityRegistry:
         """
         updated = 0
         async with self._lock:
+            local = self._profiles["local"]
             for m in models_data:
                 model_id = m.get("path") or m.get("key") or m.get("id", "")
                 if not model_id:
                     continue
 
                 caps = m.get("capabilities", {})
-                old = self._profiles.get(model_id)
+                old = local.get(model_id)
 
                 profile = ModelProfile(
                     model_id=model_id,
@@ -138,7 +159,7 @@ class ModelCapabilityRegistry:
                         old.accepts_reasoning_param
                     )
 
-                self._profiles[model_id] = profile
+                local[model_id] = profile
                 updated += 1
 
             self._last_refresh = time.monotonic()
@@ -152,10 +173,12 @@ class ModelCapabilityRegistry:
     async def refresh_from_openrouter(
         self, models_data: list[dict[str, Any]],
     ) -> int:
-        """Update profiles from the OpenRouter ``GET /v1/models`` response.
+        """Update cloud profiles from the OpenRouter ``GET /v1/models`` response.
 
         Capabilities are derived from ``supported_parameters`` (tools,
         reasoning) and ``architecture.input_modalities`` (vision).
+        Writes only to the ``"openrouter"`` namespace, so locally
+        detected profiles are never touched even when ids collide.
 
         Args:
             models_data: The ``data`` list from the OpenRouter response.
@@ -165,17 +188,13 @@ class ModelCapabilityRegistry:
         """
         updated = 0
         async with self._lock:
+            cloud = self._profiles["openrouter"]
             for m in models_data:
                 model_id = m.get("id", "")
                 if not model_id:
                     continue
 
-                old = self._profiles.get(model_id)
-                # Never clobber a profile detected from the local LM Studio
-                # API: local capabilities win for locally-served models.
-                if old is not None and old.source == "lmstudio_api":
-                    continue
-
+                old = cloud.get(model_id)
                 params = m.get("supported_parameters") or []
                 arch = m.get("architecture") or {}
                 modalities = arch.get("input_modalities") or []
@@ -205,7 +224,7 @@ class ModelCapabilityRegistry:
                             old.emits_reasoning_natively
                         )
 
-                self._profiles[model_id] = profile
+                cloud[model_id] = profile
                 updated += 1
             self._last_refresh = time.monotonic()
         if updated:
@@ -219,82 +238,105 @@ class ModelCapabilityRegistry:
     # Single-model queries
     # ------------------------------------------------------------------
 
-    def get_profile(self, model_id: str) -> ModelProfile:
+    def get_profile(
+        self, model_id: str, *, namespace: ModelNamespace,
+    ) -> ModelProfile:
         """Return the capability profile for a model.
 
         Lookup order:
-        1. Exact match in cached profiles (from LM Studio API).
-        2. ``KNOWN_MODELS`` fallback (for Ollama / undetected models).
-        3. A conservative default profile (no special capabilities).
+
+        1. Exact match in the namespace's cached profiles.
+        2. (``"local"`` only) Fuzzy match across local naming
+           conventions — Ollama tags vs LM Studio paths.
+        3. (``"local"`` only) ``KNOWN_MODELS`` fallback.
+        4. A conservative default profile (no special capabilities).
+
+        Fuzzy matching and ``KNOWN_MODELS`` never apply to the
+        ``"openrouter"`` namespace: catalog ids are canonical and always
+        queried verbatim, and a local model must never inherit a cloud
+        profile (or vice versa) through a suffix collision such as
+        ``qwen3:32b`` vs ``qwen/qwen3-32b``.
 
         Args:
             model_id: The model identifier (path, key, or Ollama tag).
+            namespace: Provider family to look the model up in.
 
         Returns:
             A ``ModelProfile`` — never ``None``.
         """
+        profiles = self._profiles[namespace]
+
         # 1. Exact cache hit
-        profile = self._profiles.get(model_id)
+        profile = profiles.get(model_id)
         if profile is not None:
             return profile
 
-        # 2. Fuzzy match: try without prefix/suffix variations
-        for cached_id, cached_profile in self._profiles.items():
-            if self._ids_match(model_id, cached_id):
-                return cached_profile
+        if namespace == "local":
+            # 2. Fuzzy match: try without prefix/suffix variations
+            for cached_id, cached_profile in profiles.items():
+                if self._ids_match(model_id, cached_id):
+                    return cached_profile
 
-        # 3. KNOWN_MODELS fallback (Ollama-style keys, etc.)
-        known = KNOWN_MODELS.get(model_id)
-        if known is not None:
-            profile = ModelProfile(
-                model_id=model_id,
-                supports_thinking=known.get("thinking", False),
-                supports_vision=known.get("vision", False),
-                source="known_models",
-            )
-            self._profiles[model_id] = profile
-            return profile
+            # 3. KNOWN_MODELS fallback (Ollama-style keys, etc.)
+            known = KNOWN_MODELS.get(model_id)
+            if known is not None:
+                profile = ModelProfile(
+                    model_id=model_id,
+                    supports_thinking=known.get("thinking", False),
+                    supports_vision=known.get("vision", False),
+                    source="known_models",
+                )
+                profiles[model_id] = profile
+                return profile
 
         # 4. Conservative default
         logger.debug(
-            "No capability data for model '{}' — using conservative defaults",
+            "No capability data for model '{}' ({}) — using conservative "
+            "defaults",
             model_id,
+            namespace,
         )
         profile = ModelProfile(model_id=model_id, source="default")
-        self._profiles[model_id] = profile
+        profiles[model_id] = profile
         return profile
 
     # ------------------------------------------------------------------
     # Runtime learning
     # ------------------------------------------------------------------
 
-    def mark_reasoning_param_rejected(self, model_id: str) -> None:
+    def mark_reasoning_param_rejected(
+        self, model_id: str, *, namespace: ModelNamespace,
+    ) -> None:
         """Record that the model rejects ``"reasoning": "on"``.
 
         Called by the LLM service when LM Studio returns a 400 error
         for the reasoning parameter.  Future requests for this model
         will skip the param entirely.
         """
-        profile = self.get_profile(model_id)
+        profile = self.get_profile(model_id, namespace=namespace)
         if profile.accepts_reasoning_param is not False:
             profile.accepts_reasoning_param = False
             logger.info(
                 "Model '{}' marked as rejecting reasoning param", model_id,
             )
 
-    def mark_reasoning_param_accepted(self, model_id: str) -> None:
+    def mark_reasoning_param_accepted(
+        self, model_id: str, *, namespace: ModelNamespace,
+    ) -> None:
         """Record that the model accepts ``"reasoning": "on"``.
 
         Called when a request with the reasoning param succeeds.
         """
-        profile = self.get_profile(model_id)
+        profile = self.get_profile(model_id, namespace=namespace)
         if profile.accepts_reasoning_param is not True:
             profile.accepts_reasoning_param = True
             logger.debug(
                 "Model '{}' confirmed accepting reasoning param", model_id,
             )
 
-    def mark_emits_reasoning_natively(self, model_id: str) -> None:
+    def mark_emits_reasoning_natively(
+        self, model_id: str, *, namespace: ModelNamespace,
+    ) -> None:
         """Record that the model produces ``reasoning.delta`` events without
         the ``reasoning`` param being sent.
 
@@ -305,7 +347,7 @@ class ModelCapabilityRegistry:
 
         Called by the SSE parser in the LLM service.
         """
-        profile = self.get_profile(model_id)
+        profile = self.get_profile(model_id, namespace=namespace)
         if profile.emits_reasoning_natively is not True:
             profile.emits_reasoning_natively = True
             logger.info(
@@ -314,14 +356,16 @@ class ModelCapabilityRegistry:
                 model_id,
             )
 
-    def mark_no_reasoning_natively(self, model_id: str) -> None:
+    def mark_no_reasoning_natively(
+        self, model_id: str, *, namespace: ModelNamespace,
+    ) -> None:
         """Record that the model does NOT produce reasoning events natively.
 
         Called after a successful complete response with no ``reasoning.delta``
         events and no ``reasoning`` param was sent.  Confirms the model
         is a straightforward non-reasoning model.
         """
-        profile = self.get_profile(model_id)
+        profile = self.get_profile(model_id, namespace=namespace)
         if profile.emits_reasoning_natively is None:
             profile.emits_reasoning_natively = False
             logger.debug(
@@ -334,17 +378,25 @@ class ModelCapabilityRegistry:
     # ------------------------------------------------------------------
 
     def all_profiles(self) -> dict[str, ModelProfile]:
-        """Return a shallow copy of all cached profiles."""
-        return dict(self._profiles)
+        """Return a flat, merged view of all cached profiles.
+
+        On id collision across namespaces the local profile wins —
+        matching the pre-namespace behaviour where a locally detected
+        profile shadowed the catalog entry.  Used by display endpoints
+        (``/models/capabilities``); provider-aware consumers should use
+        :meth:`get_profile` with an explicit namespace instead.
+        """
+        return {**self._profiles["openrouter"], **self._profiles["local"]}
 
     @property
     def last_refresh(self) -> float:
-        """Monotonic timestamp of the last ``refresh_from_api`` call."""
+        """Monotonic timestamp of the last bulk refresh."""
         return self._last_refresh
 
     def clear(self) -> None:
-        """Remove all cached profiles (useful for testing)."""
-        self._profiles.clear()
+        """Remove all cached profiles in every namespace (useful for testing)."""
+        for profiles in self._profiles.values():
+            profiles.clear()
         self._last_refresh = 0.0
 
     # ------------------------------------------------------------------
@@ -353,10 +405,11 @@ class ModelCapabilityRegistry:
 
     @staticmethod
     def _ids_match(query: str, cached: str) -> bool:
-        """Fuzzy-match model IDs across naming conventions.
+        """Fuzzy-match model IDs across local naming conventions.
 
         Handles differences between Ollama tags (``qwen3.5:9b``) and
-        LM Studio paths (``qwen/qwen3.5-9b``).
+        LM Studio paths (``qwen/qwen3.5-9b``).  Only ever applied within
+        the ``"local"`` namespace — see :meth:`get_profile`.
         """
         q = query.lower().replace("/", "-").replace(":", "-").replace("_", "-")
         c = cached.lower().replace("/", "-").replace(":", "-").replace("_", "-")

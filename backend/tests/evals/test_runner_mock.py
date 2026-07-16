@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -64,3 +65,8 @@ async def test_run_scenario_mock(app: FastAPI, scenario: Scenario, tmp_path: Pat
     assert result.judge[0].score == 7
     trace_file = tmp_path / "mock-read-01.jsonl"
     assert trace_file.is_file()
+    lines = trace_file.read_text(encoding="utf-8").strip().splitlines()
+    frame_types = [json.loads(line)["type"] for line in lines]
+    assert "turn.started" in frame_types
+    assert "turn.finished" in frame_types
+    assert frame_types[-1] == "eval.final"

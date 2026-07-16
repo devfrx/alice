@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import shutil
 import tempfile
 import time
@@ -71,6 +72,7 @@ async def run_scenario(
 
     sandbox = Path(tempfile.mkdtemp(prefix=f"alice-eval-{scenario.id}-"))
     started = time.perf_counter()
+    sink = RecordingEventSink()
     try:
         _populate_sandbox(sandbox, scenario)
 
@@ -91,7 +93,6 @@ async def run_scenario(
             )
             await ctx.permission_mode_service.set_mode(conv_id, mode)
 
-        sink = RecordingEventSink()
         prompt = scenario.prompt.replace("{sandbox}", str(sandbox))
         result = await asyncio.wait_for(
             run_headless_turn(
@@ -146,7 +147,7 @@ async def run_scenario(
         return scenario_result
     except TimeoutError:
         logger.warning("Scenario {} in timeout ({}s)", scenario.id, scenario.budget.max_seconds)
-        return ScenarioResult(
+        failed = ScenarioResult(
             scenario_id=scenario.id,
             domain=scenario.domain,
             passed=False,
@@ -154,15 +155,29 @@ async def run_scenario(
             duration_seconds=round(time.perf_counter() - started, 2),
             error=f"timeout dopo {scenario.budget.max_seconds}s",
         )
+        with contextlib.suppress(Exception):
+            write_trace_jsonl(
+                output_dir / f"{scenario.id}.jsonl",
+                sink.events,
+                final=failed.model_dump(),
+            )
+        return failed
     except Exception as exc:
         logger.exception("Scenario {} fallito nell'harness", scenario.id)
-        return ScenarioResult(
+        failed = ScenarioResult(
             scenario_id=scenario.id,
             domain=scenario.domain,
             passed=False,
             duration_seconds=round(time.perf_counter() - started, 2),
             error=str(exc),
         )
+        with contextlib.suppress(Exception):
+            write_trace_jsonl(
+                output_dir / f"{scenario.id}.jsonl",
+                sink.events,
+                final=failed.model_dump(),
+            )
+        return failed
     finally:
         shutil.rmtree(sandbox, ignore_errors=True)
 

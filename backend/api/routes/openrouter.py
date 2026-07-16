@@ -124,17 +124,18 @@ async def list_openrouter_models(
         raise HTTPException(503, "OpenRouter service unavailable")
     try:
         models = await svc.list_models(force_refresh=force_refresh)
+        # Serializzazione DENTRO il try: entry malformate (context_length non
+        # numerico, item non-dict) devono mappare a 502, non a un 500 generico.
+        serialised = [_serialise_model(m) for m in models]
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
             502, f"OpenRouter returned {exc.response.status_code}",
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(503, "OpenRouter unreachable") from exc
-    except ValueError as exc:
+    except (ValueError, TypeError, AttributeError) as exc:
         raise HTTPException(502, "OpenRouter returned malformed data") from exc
-    return OpenRouterModelsResponse(
-        models=[_serialise_model(m) for m in models],
-    )
+    return OpenRouterModelsResponse(models=serialised)
 
 
 @router.get("/openrouter/credits", response_model=OpenRouterCreditsResponse)
@@ -148,6 +149,9 @@ async def get_openrouter_credits(request: Request) -> OpenRouterCreditsResponse:
         raise HTTPException(400, "OpenRouter API key not configured")
     try:
         data = await svc.get_credits()
+        # from_key_data DENTRO il try: una ValidationError pydantic su dati
+        # upstream malformati è un 502, non un 500 (ValidationError < ValueError).
+        response = OpenRouterCreditsResponse.from_key_data(data)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
             raise HTTPException(401, "OpenRouter API key invalid") from exc
@@ -156,6 +160,6 @@ async def get_openrouter_credits(request: Request) -> OpenRouterCreditsResponse:
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(503, "OpenRouter unreachable") from exc
-    except ValueError as exc:
+    except (ValueError, TypeError, AttributeError) as exc:
         raise HTTPException(502, "OpenRouter returned malformed data") from exc
-    return OpenRouterCreditsResponse.from_key_data(data)
+    return response

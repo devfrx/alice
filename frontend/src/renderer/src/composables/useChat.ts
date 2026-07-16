@@ -297,6 +297,10 @@ export function useChat(): UseChatReturn {
     'turn.usage': (msg) => agentRunStore.applyTurnUsage(msg),
     'turn.finished': (msg) => {
       agentRunStore.applyTurnFinished(msg)
+      // Il costo accumula sul chip della conversazione CORRENTE: a differenza
+      // dei frame run-scoped (keyed by turn_id) va gated come context_info.
+      if (store.streamGeneration !== activeGeneration) return
+      if (store.streamingConversationId !== store.currentConversation?.id) return
       store.addTurnCost(msg.cost ?? null)
     },
 

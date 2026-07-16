@@ -43,6 +43,70 @@ async def test_store_save_paths_upserts(session_factory) -> None:
 
 
 @pytest.mark.asyncio
+async def test_save_dict_row_replaces_subtree(session_factory) -> None:
+    """A dict-valued row (PATCH replace-subtree semantics) prunes stale leaves.
+
+    Real flow: the FE PATCHes ``agent.prompts.tier_guidance`` with a pruned
+    mapping expecting removed tiers to fall back to defaults — a leftover
+    per-tier leaf row would silently resurrect the old override.
+    """
+    store = PreferencesLayerStore(session_factory)
+    await store.save_paths({"agent.prompts.tier_guidance.strict": "old override"})
+    await store.save_paths({"agent.prompts.tier_guidance": {"plan": "new"}})
+    loaded = await store.load()
+    assert loaded == {"agent": {"prompts": {"tier_guidance": {"plan": "new"}}}}
+    async with session_factory() as session:
+        rows = (await session.exec(select(UserPreference))).all()
+    assert [r.key for r in rows] == ["agent.prompts.tier_guidance"]
+
+
+@pytest.mark.asyncio
+async def test_save_subtree_prune_escapes_like_wildcards(session_factory) -> None:
+    """``_`` in a dotted path is a LIKE wildcard — the prune must escape it.
+
+    Without escaping, writing ``agent.a_b`` deletes the rows of the UNRELATED
+    subtree ``agent.a.b.*`` (``_`` matches the dot).
+    """
+    store = PreferencesLayerStore(session_factory)
+    await store.save_paths({"agent.a.b.c": 1})
+    await store.save_paths({"agent.a_b": 2})
+    async with session_factory() as session:
+        keys = {r.key for r in (await session.exec(select(UserPreference))).all()}
+    assert keys == {"agent.a.b.c", "agent.a_b"}
+
+
+@pytest.mark.asyncio
+async def test_load_overlapping_legacy_rows_is_deterministic(
+    session_factory,
+) -> None:
+    """Pre-prune DBs may hold a dict row AND a deeper leaf row for the same
+    subtree; materialisation must be deterministic — most-specific wins —
+    instead of depending on row insertion order."""
+    from backend.db.models import _utcnow
+
+    now = _utcnow()
+    async with session_factory() as session:
+        # Leaf row inserted FIRST: before the depth-sort in load(), the
+        # dict row (inserted later) clobbered it.
+        session.add(UserPreference(
+            key="agent.prompts.tier_guidance.strict", value=json.dumps("leaf"),
+            updated_at=now,
+        ))
+        session.add(UserPreference(
+            key="agent.prompts.tier_guidance",
+            value=json.dumps({"strict": "dict", "plan": "p"}),
+            updated_at=now,
+        ))
+        await session.commit()
+
+    store = PreferencesLayerStore(session_factory)
+    loaded = await store.load()
+    assert loaded["agent"]["prompts"]["tier_guidance"] == {
+        "strict": "leaf", "plan": "p",
+    }
+
+
+@pytest.mark.asyncio
 async def test_preferences_layer_wins_over_user_yaml(
     session_factory, tmp_path,
 ) -> None:

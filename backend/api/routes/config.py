@@ -361,7 +361,16 @@ async def get_config(request: Request) -> dict[str, Any]:
 
 
 def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
-    """Flatten a nested update body into dotted paths (legacy aliases folded).
+    """Flatten a nested update body into dotted LEAF paths (legacy aliases folded).
+
+    Recurses into nested dicts at every depth, so a deeper body (e.g.
+    ``{"agent": {"reflection": {"enabled": true}}}``) lands as leaf rows
+    (``agent.reflection.enabled``) in the preferences store instead of a
+    dict-valued row that would overlap dotted rows persisted for the same
+    subtree. PUT is therefore a per-leaf merge; subtree REPLACE semantics
+    stay available via PATCH, whose value is stored as-is. An empty dict
+    value flattens to nothing — a no-op, same effect the layer deep-merge
+    would have had.
 
     Removed-legacy paths (``config.py``'s ``_REMOVED_LEGACY_PATHS`` — keys the
     system itself deprecated, e.g. ``email.use_keyring``) are dropped here
@@ -370,11 +379,19 @@ def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
     whole request, blocking unrelated fields from saving.
     """
     flat: dict[str, Any] = {}
+
+    def _walk(prefix: str, node: dict[str, Any]) -> None:
+        for key, value in node.items():
+            path = f"{prefix}.{key}"
+            if isinstance(value, dict):
+                _walk(path, value)
+            else:
+                flat[path] = value
+
     for section, updates in body.items():
         if not isinstance(updates, dict):
             raise HTTPException(400, f"'{section}' must be a JSON object")
-        for key, value in updates.items():
-            flat[f"{section}.{key}"] = value
+        _walk(str(section), updates)
     # Historical alias — the UI still sends the pc_automation shape.
     if "pc_automation.confirmations_enabled" in flat:
         flat["permissions.confirmations_enabled"] = flat.pop(

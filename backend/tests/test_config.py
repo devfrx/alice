@@ -303,6 +303,53 @@ async def test_removed_legacy_key_is_dropped_not_rejected(client) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PUT /config — nested bodies flatten to leaf paths (audit M2)
+# ---------------------------------------------------------------------------
+
+
+def test_flatten_update_body_recurses_to_leaves() -> None:
+    from backend.api.routes.config import _flatten_update_body
+
+    flat = _flatten_update_body(
+        {"agent": {"reflection": {"enabled": True}, "planning": False}},
+    )
+    assert flat == {"agent.reflection.enabled": True, "agent.planning": False}
+
+
+def test_flatten_update_body_preserves_list_values() -> None:
+    from backend.api.routes.config import _flatten_update_body
+
+    flat = _flatten_update_body({"llm": {"openrouter_favorites": ["org/model"]}})
+    assert flat == {"llm.openrouter_favorites": ["org/model"]}
+
+
+def test_flatten_update_body_empty_dict_is_noop() -> None:
+    from backend.api.routes.config import _flatten_update_body
+
+    assert _flatten_update_body({"agent": {"prompts": {}}}) == {}
+
+
+def test_flatten_update_body_non_dict_section_rejected() -> None:
+    from fastapi import HTTPException
+
+    from backend.api.routes.config import _flatten_update_body
+
+    with pytest.raises(HTTPException):
+        _flatten_update_body({"ui": 5})
+
+
+async def test_put_three_level_body_persists_leaf_rows(client, app) -> None:
+    ctx = app.state.context
+    resp = await client.put(
+        "/api/config", json={"agent": {"reflection": {"enabled": True}}},
+    )
+    assert resp.status_code == 200
+    assert ctx.config.agent.reflection.enabled is True
+    # The persisted row is the LEAF path — no dict-valued intermediate row.
+    assert await ctx.preferences_store.delete_paths(["agent.reflection.enabled"]) == 1
+
+
+# ---------------------------------------------------------------------------
 # PUT /config rewritten on the unified engine (Task 11)
 # ---------------------------------------------------------------------------
 

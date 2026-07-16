@@ -112,6 +112,18 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
         except Exception as exc:
             logger.warning("Failed to load persisted preferences: {}", exc)
 
+        from backend.services.config_migration import run_secret_migrations
+
+        try:
+            await run_secret_migrations(
+                secret_store, session_factory, config_service,
+                email_username=config.email.username,
+            )
+            ctx.config = await config_service.rebuild()
+            config = ctx.config
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Secret migration failed: {}", exc)
+
     # -- Restore persisted plugin toggle states -----------------------------
     from backend.db.plugin_state import PluginStateRepository
 

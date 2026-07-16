@@ -30,7 +30,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -419,3 +419,34 @@ class LayeredConfigService:
             self._rebuild()
             assert self._resolved is not None
             return self._resolved
+
+    async def strip_paths_from_disk_layer(
+        self, layer: ConfigLayer, paths: Iterable[str],
+    ) -> list[str]:
+        """Remove dotted ``paths`` from a disk layer and rewrite its file.
+
+        Returns the paths actually removed. No-op for paths not present.
+        """
+        if layer not in (ConfigLayer.SYSTEM, ConfigLayer.USER):
+            raise ValueError("only disk layers can be stripped")
+        removed: list[str] = []
+        async with self._lock:
+            data = copy.deepcopy(self._layers[layer])
+            for path in paths:
+                try:
+                    _get_dotted(data, path)
+                except KeyError:
+                    continue
+                parts = path.split(".")
+                node = data
+                for part in parts[:-1]:
+                    node = node[part]
+                del node[parts[-1]]
+                removed.append(path)
+            if not removed:
+                return []
+            self._layers[layer] = data
+            self._rebuild()
+            target = self._system_path if layer is ConfigLayer.SYSTEM else self._user_path
+            await asyncio.to_thread(_write_yaml_atomic, target, data)
+        return removed

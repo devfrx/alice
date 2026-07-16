@@ -90,12 +90,12 @@ async def safe_subprocess(
 
     try:
         return await asyncio.to_thread(_run)
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
         raise TimeoutError(
             f"Command '{command}' timed out after {timeout}s"
-        )
-    except FileNotFoundError:
-        raise OSError(f"Command '{command}' not found")
+        ) from exc
+    except FileNotFoundError as exc:
+        raise OSError(f"Command '{command}' not found") from exc
 
 
 def sanitize_text_input(text: str, max_length: int = 1000) -> str:

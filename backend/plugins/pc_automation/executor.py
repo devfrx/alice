@@ -297,7 +297,7 @@ async def exec_close_app(app_name: str) -> str:
         output = await safe_subprocess("taskkill", ["/IM", executable, "/F"], timeout=10)
         return f"Closed '{app_name}': {output}"
     except Exception as e:
-        raise RuntimeError(f"Failed to close '{app_name}': {e}")
+        raise RuntimeError(f"Failed to close '{app_name}': {e}") from e
 
 
 async def exec_type_text(text: str) -> str:

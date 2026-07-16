@@ -335,7 +335,7 @@ class STTService:
                     asyncio.to_thread(self._transcribe_sync, audio_path),
                     timeout=timeout,
                 )
-        except TimeoutError:
+        except TimeoutError as exc:
             logger.error(
                 "STT transcription timed out after {:.0f}s — invalidating model",
                 timeout,
@@ -343,7 +343,7 @@ class STTService:
             await self._invalidate_model()
             raise RuntimeError(
                 f"Transcription timed out after {timeout:.0f}s"
-            )
+            ) from exc
         except RuntimeError as exc:
             logger.error(
                 "STT RuntimeError during transcription: {} — invalidating model",

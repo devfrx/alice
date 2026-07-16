@@ -607,11 +607,11 @@ class CalendarPlugin(BasePlugin):
             raise ValueError("'event_id' is required")
         try:
             event_id = uuid.UUID(raw_id)
-        except ValueError:
+        except ValueError as exc:
             raise ValueError(
                 f"Invalid event_id: '{raw_id}' "
                 "is not a valid UUID"
-            )
+            ) from exc
 
         async with self.ctx.db() as session:
             event = await session.get(CalendarEvent, event_id)
@@ -666,11 +666,11 @@ class CalendarPlugin(BasePlugin):
             raise ValueError("'event_id' is required")
         try:
             event_id = uuid.UUID(raw_id)
-        except ValueError:
+        except ValueError as exc:
             raise ValueError(
                 f"Invalid event_id: '{raw_id}' "
                 "is not a valid UUID"
-            )
+            ) from exc
 
         async with self.ctx.db() as session:
             event = await session.get(CalendarEvent, event_id)

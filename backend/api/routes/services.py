@@ -152,10 +152,10 @@ async def stop_service(
     orch = _orchestrator(request)
     try:
         await orch.stop(name)
-    except KeyError:
+    except KeyError as exc:
         raise HTTPException(
             status_code=404, detail=f"Unknown service '{name}'",
-        )
+        ) from exc
     logger.info("Service stop requested: {}", name)
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
@@ -174,10 +174,10 @@ async def restart_service(
     orch = _orchestrator(request)
     try:
         await orch.restart(name)
-    except KeyError:
+    except KeyError as exc:
         raise HTTPException(
             status_code=404, detail=f"Unknown service '{name}'",
-        )
+        ) from exc
     logger.info("Service restart requested: {}", name)
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
@@ -523,8 +523,10 @@ async def configure_trellis(
         )
     try:
         body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid JSON body",
+        ) from exc
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Body must be an object")
 
@@ -551,7 +553,7 @@ async def configure_trellis(
             raise HTTPException(
                 status_code=400,
                 detail=f"Failed to set {path}: {exc}",
-            )
+            ) from exc
 
     logger.info("'{}' configuration updated: {}", name, list(updated))
     await _sync_trellis_service(request, name)

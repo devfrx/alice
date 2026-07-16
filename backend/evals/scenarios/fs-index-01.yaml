@@ -1,0 +1,28 @@
+id: fs-index-01
+title: Indice dei file per estensione
+domain: filesystem
+setup:
+  sandbox:
+    - path: "in/appunti.md"
+      content: "# Appunti"
+    - path: "in/dati.csv"
+      content: "a,b\n1,2"
+    - path: "in/lettera.txt"
+      content: "Ciao"
+    - path: "in/todo.md"
+      content: "- fare"
+prompt: >-
+  Esamina i file nella cartella {sandbox}/in e crea {sandbox}/indice.md:
+  un elenco dei file raggruppati per estensione.
+budget:
+  max_seconds: 240
+checks:
+  - kind: file_exists
+    path: indice.md
+  - kind: file_contains
+    path: indice.md
+    text: "appunti.md"
+  - kind: file_contains
+    path: indice.md
+    text: "dati.csv"
+  - kind: finished_ok

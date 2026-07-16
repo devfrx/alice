@@ -1,0 +1,22 @@
+id: multi-crossref-01
+title: Incrocia informazioni da due file
+domain: multistep
+setup:
+  sandbox:
+    - path: "rubrica.txt"
+      content: |
+        Anna - reparto vendite
+        Luca - reparto tecnico
+        Sara - amministrazione
+    - path: "turni.txt"
+      content: |
+        lunedì: Luca
+        martedì: Sara
+        mercoledì: Anna
+prompt: >-
+  Usando {sandbox}/rubrica.txt e {sandbox}/turni.txt, dimmi di quale
+  reparto è la persona di turno martedì.
+checks:
+  - kind: response_matches
+    pattern: "amministrazione"
+  - kind: finished_ok

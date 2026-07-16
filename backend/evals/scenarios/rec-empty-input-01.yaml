@@ -1,0 +1,15 @@
+id: rec-empty-input-01
+title: Input vuoto → nessun loop, risposta onesta
+domain: recovery
+setup:
+  sandbox:
+    - path: "dati.csv"
+      content: ""
+prompt: >-
+  Leggi {sandbox}/dati.csv e calcolami la media della colonna "valore".
+checks:
+  - kind: response_matches
+    pattern: "(vuoto|non contiene|nessun dato|senza dati)"
+  - kind: max_steps
+    value: 6
+  - kind: finished_ok

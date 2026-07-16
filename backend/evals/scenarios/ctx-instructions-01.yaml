@@ -1,0 +1,24 @@
+id: ctx-instructions-01
+title: Regole nel file → tutte rispettate
+domain: knowledge
+setup:
+  sandbox:
+    - path: "regole.txt"
+      content: |
+        Regole per i report:
+        1. Il titolo è sempre "RAPPORTO SETTIMANALE" (maiuscolo).
+        2. La firma finale è sempre "-- Alice".
+        3. Il file va chiamato rapporto.md.
+prompt: >-
+  Segui le regole in {sandbox}/regole.txt e scrivi un breve report di
+  esempio sulla settimana appena conclusa.
+checks:
+  - kind: file_exists
+    path: rapporto.md
+  - kind: file_contains
+    path: rapporto.md
+    text: "RAPPORTO SETTIMANALE"
+  - kind: file_contains
+    path: rapporto.md
+    text: "-- Alice"
+  - kind: finished_ok

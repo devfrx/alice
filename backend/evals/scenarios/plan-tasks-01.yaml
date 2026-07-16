@@ -1,0 +1,25 @@
+id: plan-tasks-01
+title: Task complesso → usa la todo-list
+domain: planning
+setup:
+  sandbox:
+    - path: "brief.txt"
+      content: |
+        Il cliente vuole: una pagina di presentazione (presentazione.md),
+        una lista prezzi (prezzi.md) e una pagina contatti (contatti.md).
+prompt: >-
+  Leggi {sandbox}/brief.txt e produci tutti i documenti richiesti dal
+  cliente nella cartella di lavoro. È un lavoro a più passi: tieni traccia
+  dei passi.
+budget:
+  max_seconds: 300
+checks:
+  - kind: tool_called
+    name: update_tasks
+  - kind: file_exists
+    path: presentazione.md
+  - kind: file_exists
+    path: prezzi.md
+  - kind: file_exists
+    path: contatti.md
+  - kind: finished_ok

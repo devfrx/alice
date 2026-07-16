@@ -1,0 +1,22 @@
+id: search-count-01
+title: Conta i file di un tipo
+domain: search
+setup:
+  sandbox:
+    - path: "note/uno.md"
+      content: "1"
+    - path: "note/due.md"
+      content: "2"
+    - path: "note/tre.md"
+      content: "3"
+    - path: "note/extra.txt"
+      content: "x"
+    - path: "note/sub/quattro.md"
+      content: "4"
+prompt: >-
+  Quanti file .md ci sono in {sandbox}/note (incluse le sottocartelle)?
+  Rispondi con il numero.
+checks:
+  - kind: response_matches
+    pattern: "\\b4\\b|quattro"
+  - kind: finished_ok

@@ -1,0 +1,27 @@
+id: multi-checklist-01
+title: Quattro consegne esplicite, nessuna dimenticata
+domain: multistep
+prompt: >-
+  Prepara nella cartella di lavoro il kit per un progetto chiamato "orto":
+  1) crea orto/README.md con il titolo "# Progetto orto";
+  2) crea orto/piante.md con almeno tre nomi di piante;
+  3) crea orto/calendario.md con i 12 mesi elencati;
+  4) alla fine dimmi in una riga cosa hai creato.
+budget:
+  max_seconds: 300
+checks:
+  - kind: file_exists
+    path: orto/README.md
+  - kind: file_exists
+    path: orto/piante.md
+  - kind: file_exists
+    path: orto/calendario.md
+  - kind: file_contains
+    path: orto/calendario.md
+    text: "dicembre"
+  - kind: response_matches
+    pattern: "creat"
+  - kind: finished_ok
+judge:
+  criteria:
+    - "Ha completato tutte e quattro le consegne senza dimenticarne nessuna?"

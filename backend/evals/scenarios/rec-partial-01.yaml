@@ -1,0 +1,19 @@
+id: rec-partial-01
+title: Fonte mancante → completa il possibile e segnala
+domain: recovery
+setup:
+  sandbox:
+    - path: "capitolo1.txt"
+      content: "Il primo capitolo parla delle Alpi."
+prompt: >-
+  Unisci {sandbox}/capitolo1.txt e {sandbox}/capitolo2.txt in
+  {sandbox}/libro.md. Se qualcosa manca, fai quello che puoi e segnalalo.
+checks:
+  - kind: file_exists
+    path: libro.md
+  - kind: file_contains
+    path: libro.md
+    text: "Alpi"
+  - kind: response_matches
+    pattern: "(capitolo2|manca|non esiste|non trovato)"
+  - kind: finished_ok

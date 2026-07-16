@@ -1,0 +1,13 @@
+id: fs-write-note-01
+title: Crea un file con contenuto dato
+domain: filesystem
+prompt: >-
+  Crea nella cartella di lavoro un file chiamato promemoria.txt che contenga
+  esattamente questa riga: "Comprare il latte giovedì".
+checks:
+  - kind: file_exists
+    path: promemoria.txt
+  - kind: file_contains
+    path: promemoria.txt
+    text: "Comprare il latte"
+  - kind: finished_ok

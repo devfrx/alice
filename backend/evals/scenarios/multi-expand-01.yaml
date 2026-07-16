@@ -1,0 +1,26 @@
+id: multi-expand-01
+title: Un file per ogni voce di una lista
+domain: multistep
+setup:
+  sandbox:
+    - path: "todo.txt"
+      content: |
+        spesa
+        palestra
+        bollette
+prompt: >-
+  Per ogni riga di {sandbox}/todo.txt crea un file {sandbox}/tasks/<voce>.md
+  con dentro "TODO: <voce>".
+budget:
+  max_seconds: 240
+checks:
+  - kind: file_exists
+    path: tasks/spesa.md
+  - kind: file_exists
+    path: tasks/palestra.md
+  - kind: file_exists
+    path: tasks/bollette.md
+  - kind: file_contains
+    path: tasks/spesa.md
+    text: "TODO: spesa"
+  - kind: finished_ok

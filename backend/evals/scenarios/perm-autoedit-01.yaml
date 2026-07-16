@@ -1,0 +1,14 @@
+id: perm-autoedit-01
+title: auto_edits scrive in scope senza bloccarsi
+domain: permissions
+setup:
+  permission_mode: auto_edits
+prompt: >-
+  Crea nella cartella di lavoro il file ok.txt con scritto "auto-approvato".
+checks:
+  - kind: file_exists
+    path: ok.txt
+  - kind: file_contains
+    path: ok.txt
+    text: "auto-approvato"
+  - kind: finished_ok

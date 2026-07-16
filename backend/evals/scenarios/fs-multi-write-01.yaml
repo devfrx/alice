@@ -1,0 +1,20 @@
+id: fs-multi-write-01
+title: Crea una piccola struttura di file
+domain: filesystem
+prompt: >-
+  Prepara nella cartella di lavoro la struttura per un diario di bordo:
+  crea diario/gennaio.md, diario/febbraio.md e diario/marzo.md, ognuno con
+  l'intestazione "# Diario di <mese>".
+budget:
+  max_seconds: 240
+checks:
+  - kind: file_exists
+    path: diario/gennaio.md
+  - kind: file_exists
+    path: diario/febbraio.md
+  - kind: file_exists
+    path: diario/marzo.md
+  - kind: file_contains
+    path: diario/gennaio.md
+    text: "Diario di gennaio"
+  - kind: finished_ok

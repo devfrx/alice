@@ -1,0 +1,24 @@
+id: fs-read-summarize-01
+title: Leggi un file e rispondi sul contenuto
+domain: filesystem
+setup:
+  sandbox:
+    - path: "verbale.txt"
+      content: |
+        Verbale riunione 12 marzo.
+        Decisione: il lancio del prodotto Aurora è spostato al 20 settembre.
+        Responsabile follow-up: Martina.
+prompt: >-
+  Leggi {sandbox}/verbale.txt e dimmi a quando è stato spostato il lancio
+  e chi è responsabile del follow-up.
+checks:
+  - kind: tool_called
+    name: read_text_file
+  - kind: response_matches
+    pattern: "20 settembre"
+  - kind: response_matches
+    pattern: "Martina"
+  - kind: finished_ok
+judge:
+  criteria:
+    - "La risposta è concisa e risponde a entrambe le domande senza divagare?"

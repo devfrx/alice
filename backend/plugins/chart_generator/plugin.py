@@ -70,10 +70,12 @@ _UPDATE_SCHEMA: dict[str, Any] = {
         "echarts_option": {
             "type": "object",
             "description": "Nuova configurazione ECharts completa che sostituisce la precedente. "
-                "STRUTTURA: le chiavi top-level (xAxis, yAxis, series, tooltip, legend, grid, ecc.) "
+                "STRUTTURA: le chiavi top-level (xAxis, yAxis, series, tooltip, "
+                "legend, grid, ecc.) "
                 "devono essere chiavi dell'oggetto radice. "
                 "legend NON va messa dentro series — è una chiave top-level separata. "
-                "series contiene SOLO oggetti con type in: 'bar','line','pie','scatter','gauge','radar'. "
+                "series contiene SOLO oggetti con type in: "
+                "'bar','line','pie','scatter','gauge','radar'. "
                 "Esempio: {\"xAxis\":{\"data\":[...]}, \"yAxis\":{\"type\":\"value\"}, "
                 "\"series\":[{\"type\":\"bar\",\"data\":[...]}], "
                 "\"legend\":{\"data\":[\"serie1\"]}, \"tooltip\":{\"trigger\":\"axis\"}}",
@@ -176,7 +178,8 @@ class ChartGeneratorPlugin(BasePlugin):
                     "(2) costruisci l'echarts_option JSON direttamente in questo tool — "
                     "NON scrivere codice Python/pseudocodice: non esiste un interprete, "
                     "tutto il processing avviene dentro echarts_option. "
-                    "REGOLE echarts_option: (1) series[].data deve avere la stessa lunghezza di xAxis/yAxis.data; "
+                    "REGOLE echarts_option: (1) series[].data deve avere "
+                    "la stessa lunghezza di xAxis/yAxis.data; "
                     "(2) non mischiare unità diverse nella stessa serie; "
                     "(3) NON includere 'title' — il titolo è già nell'header del viewer; "
                     "(4) pie chart: series[0].type='pie' con data=[{name,value}], no xAxis/yAxis."
@@ -276,7 +279,8 @@ class ChartGeneratorPlugin(BasePlugin):
         if len(option_str) > cfg.max_option_chars:
             return ToolResult.error(
                 f"La echarts_option supera il limite di {cfg.max_option_chars} caratteri "
-                f"(attuale: {len(option_str)}). Aggrega o riduci i dati prima di richiamare il tool."
+                f"(attuale: {len(option_str)}). "
+                "Aggrega o riduci i dati prima di richiamare il tool."
             )
 
         try:

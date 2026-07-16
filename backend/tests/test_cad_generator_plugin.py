@@ -170,9 +170,9 @@ class TestPluginLifecycle:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         assert plugin.is_initialized
@@ -185,10 +185,10 @@ class TestPluginLifecycle:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
             mock_instance.health_check = AsyncMock(return_value=False)
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         assert plugin.is_initialized
@@ -200,9 +200,9 @@ class TestPluginLifecycle:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         await plugin.cleanup()
@@ -243,9 +243,9 @@ class TestCadGenerate:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=False)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         result = await plugin.execute_tool(
@@ -268,9 +268,9 @@ class TestCadGenerate:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=False)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         # Now make health check fail
@@ -292,12 +292,12 @@ class TestCadGenerate:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=False)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
             mock_instance.generate_from_text = AsyncMock(
                 side_effect=Exception("GPU OOM"),
             )
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         result = await plugin.execute_tool(
@@ -315,7 +315,7 @@ class TestCadGenerate:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=False)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_gen = GenerationResult(
                 model_name="a_simple_box",
                 format="glb",
@@ -324,7 +324,7 @@ class TestCadGenerate:
             )
             mock_instance = _mock_client()
             mock_instance.generate_from_text = AsyncMock(return_value=mock_gen)
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         result = await plugin.execute_tool(
@@ -351,10 +351,10 @@ class TestCadGenerate:
             size_bytes=512,
             file_path="/outputs/test_model_v2.glb",
         )
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
             mock_instance.generate_from_text = AsyncMock(return_value=sanitized_gen)
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         result = await plugin.execute_tool(
@@ -385,9 +385,9 @@ class TestVRAMSwap:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=True)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         # Make list_models return loaded model for reload check
@@ -418,9 +418,9 @@ class TestVRAMSwap:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=False)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         await plugin.execute_tool(
@@ -440,12 +440,12 @@ class TestVRAMSwap:
         plugin = CadGeneratorPlugin()
         ctx = _make_app_context(tmp_path, auto_vram_swap=True)
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
             mock_instance = _mock_client()
             mock_instance.generate_from_text = AsyncMock(
                 side_effect=Exception("TRELLIS crashed"),
             )
-            MockClient.return_value = mock_instance
+            mock_client_cls.return_value = mock_instance
             await plugin.initialize(ctx)
 
         lmstudio = ctx.lmstudio_manager
@@ -507,8 +507,8 @@ class TestCadGenerateFromImage:
             trellis2_overrides={"enabled": False},
         )
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient:
-            MockClient.return_value = _mock_client()
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls:
+            mock_client_cls.return_value = _mock_client()
             await plugin.initialize(ctx)
 
         names = [t.name for t in plugin.get_tools()]
@@ -524,10 +524,10 @@ class TestCadGenerateFromImage:
             tmp_path, trellis2_overrides={"auto_vram_swap": False},
         )
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-             patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-            MockClient.return_value = _mock_client()
-            MockClient2.return_value = _mock_client_v2()
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+             patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+            mock_client_cls.return_value = _mock_client()
+            mock_client2_cls.return_value = _mock_client_v2()
             await plugin.initialize(ctx)
 
         tools = {t.name: t for t in plugin.get_tools()}
@@ -547,11 +547,11 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": False},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-                MockClient.return_value = _mock_client()
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 result = await plugin.execute_tool(
@@ -591,9 +591,9 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": False},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-                MockClient.return_value = _mock_client()
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
                 mock2.generate_from_image = AsyncMock(
                     side_effect=Exception("endpoint cancelled"),
@@ -601,7 +601,7 @@ class TestCadGenerateFromImage:
                 mock2.download_model = AsyncMock(
                     side_effect=Exception("service already stopped"),
                 )
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 result = await plugin.execute_tool(
@@ -627,11 +627,11 @@ class TestCadGenerateFromImage:
             tmp_path, trellis2_overrides={"auto_vram_swap": False},
         )
 
-        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-             patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-            MockClient.return_value = _mock_client()
+        with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+             patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+            mock_client_cls.return_value = _mock_client()
             mock2 = _mock_client_v2()
-            MockClient2.return_value = mock2
+            mock_client2_cls.return_value = mock2
             await plugin.initialize(ctx)
 
             result = await plugin.execute_tool(
@@ -655,11 +655,11 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": False},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-                MockClient.return_value = _mock_client()
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 result = await plugin.execute_tool(
@@ -685,11 +685,11 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": False},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-                MockClient.return_value = _mock_client()
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 result = await plugin.execute_tool(
@@ -715,12 +715,12 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": False},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-                MockClient.return_value = _mock_client()
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
                 mock2.health_check = AsyncMock(return_value=False)
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 result = await plugin.execute_tool(
@@ -746,14 +746,14 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": True},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2:
-                MockClient.return_value = _mock_client()
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls:
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
                 mock2.generate_from_image = AsyncMock(
                     side_effect=Exception("CUDA OOM"),
                 )
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 result = await plugin.execute_tool(
@@ -780,15 +780,15 @@ class TestCadGenerateFromImage:
                 tmp_path, trellis2_overrides={"auto_vram_swap": True},
             )
 
-            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as MockClient, \
-                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as MockClient2, \
+            with patch("backend.plugins.cad_generator.plugin.TrellisClient") as mock_client_cls, \
+                 patch("backend.plugins.cad_generator.plugin.Trellis2Client") as mock_client2_cls, \
                  patch("backend.plugins.cad_generator.plugin.asyncio.sleep", new=AsyncMock()):
-                MockClient.return_value = _mock_client()
+                mock_client_cls.return_value = _mock_client()
                 mock2 = _mock_client_v2()
                 mock2.generate_from_image = AsyncMock(
                     side_effect=asyncio.CancelledError(),
                 )
-                MockClient2.return_value = mock2
+                mock_client2_cls.return_value = mock2
                 await plugin.initialize(ctx)
 
                 with pytest.raises(asyncio.CancelledError):

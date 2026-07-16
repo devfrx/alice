@@ -158,7 +158,9 @@ async def test_send_allowed_recipient(
     svc = EmailService(email_config, event_bus)
     svc._password_resolved = "test-password"
 
-    with patch("backend.services.email_service.aiosmtplib.send", new_callable=AsyncMock) as mock_smtp:
+    with patch(
+        "backend.services.email_service.aiosmtplib.send", new_callable=AsyncMock,
+    ) as mock_smtp:
         result = await svc.send(
             to=["allowed@example.com"],
             subject="Test",

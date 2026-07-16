@@ -146,12 +146,18 @@ class TestCadModelList:
         assert isinstance(data, (list, dict))
         # If list, check names are present
         if isinstance(data, list):
-            names = [m if isinstance(m, str) else m.get("name", m.get("model_name", "")) for m in data]
+            names = [
+                m if isinstance(m, str) else m.get("name", m.get("model_name", ""))
+                for m in data
+            ]
             assert "cube_01" in names
             assert "sphere_02" in names
         else:
             # dict format with "models" key
             models = data.get("models", [])
-            names = [m if isinstance(m, str) else m.get("name", m.get("model_name", "")) for m in models]
+            names = [
+                m if isinstance(m, str) else m.get("name", m.get("model_name", ""))
+                for m in models
+            ]
             assert "cube_01" in names
             assert "sphere_02" in names

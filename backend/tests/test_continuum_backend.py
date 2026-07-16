@@ -6,6 +6,7 @@ these tests exercise the mapping/dispatch logic without a live server.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 import pytest
@@ -16,6 +17,9 @@ from backend.services.knowledge import (
     KnowledgeDocCreate,
 )
 from backend.services.knowledge.protocol import BackendHealth, KnowledgeHit
+
+if TYPE_CHECKING:
+    from backend.services.knowledge.continuum_client import ContinuumClient
 
 _NOTE = {
     "id": "11111111-1111-1111-1111-111111111111",

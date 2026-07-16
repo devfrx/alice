@@ -86,12 +86,12 @@ class TestMcpClientPluginInitialize:
 
         with patch(
             "backend.plugins.mcp_client.plugin.McpSession",
-        ) as MockSession:
+        ) as mock_session_cls:
             mock_instances = [
                 _make_mock_session("server_a"),
                 _make_mock_session("server_b"),
             ]
-            MockSession.side_effect = mock_instances
+            mock_session_cls.side_effect = mock_instances
 
             await plugin.initialize(ctx)
 
@@ -117,8 +117,8 @@ class TestMcpClientPluginInitialize:
 
         with patch(
             "backend.plugins.mcp_client.plugin.McpSession",
-        ) as MockSession:
-            MockSession.side_effect = [good_session, bad_session]
+        ) as mock_session_cls:
+            mock_session_cls.side_effect = [good_session, bad_session]
             await plugin.initialize(ctx)
 
         assert len(plugin._sessions) == 1
@@ -152,8 +152,8 @@ class TestMcpClientPluginInitialize:
 
         with patch(
             "backend.plugins.mcp_client.plugin.McpSession",
-        ) as MockSession:
-            MockSession.side_effect = [ok_session, fail_session]
+        ) as mock_session_cls:
+            mock_session_cls.side_effect = [ok_session, fail_session]
             await plugin.initialize(ctx)
 
         event_types = [e[0] for e in events_received]
@@ -274,7 +274,6 @@ class TestMcpClientPluginGetTools:
         }
         # Monkey-patch to make one ToolDefinition raise during construction
         original_get = plugin._sessions["srv"].get_tools
-        call_count = 0
 
         def patched_get_tools():
             raw = original_get()

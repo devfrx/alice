@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import email
 import email.header
 import email.utils
@@ -22,7 +23,6 @@ from loguru import logger
 
 from backend.core.config import EmailConfig
 from backend.core.event_bus import AliceEvent, EventBus
-import contextlib
 
 _TRUNCATION_SUFFIX = "\n[…troncato]"
 

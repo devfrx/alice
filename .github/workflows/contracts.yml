@@ -52,6 +52,11 @@ jobs:
           .\.venv\Scripts\lint-imports --config backend/pyproject.toml
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Backend lint (ruff)
+        run: |
+          .\.venv\Scripts\ruff check backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Generated artifacts are fresh
         run: .\scripts\check-contracts.ps1
 

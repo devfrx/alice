@@ -42,9 +42,12 @@ def _make_disk_usage(_path: str = "/") -> SimpleNamespace:
 def _make_process_iter(_attrs: list[str] | None = None) -> list[MagicMock]:
     """Return a list of fake process objects."""
     entries = [
-        {"pid": 1, "name": "systemd", "cpu_percent": 0.1, "memory_percent": 0.5, "status": "running"},
-        {"pid": 100, "name": "python", "cpu_percent": 5.0, "memory_percent": 2.0, "status": "running"},
-        {"pid": 200, "name": "chrome", "cpu_percent": 10.0, "memory_percent": 8.0, "status": "running"},
+        {"pid": 1, "name": "systemd", "cpu_percent": 0.1,
+         "memory_percent": 0.5, "status": "running"},
+        {"pid": 100, "name": "python", "cpu_percent": 5.0,
+         "memory_percent": 2.0, "status": "running"},
+        {"pid": 200, "name": "chrome", "cpu_percent": 10.0,
+         "memory_percent": 8.0, "status": "running"},
     ]
     mocks = []
     for entry in entries:

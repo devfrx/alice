@@ -8,6 +8,7 @@ interface enumeration.  All public methods are coroutines.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ipaddress
 import re
 import socket
@@ -17,7 +18,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from loguru import logger
-import contextlib
 
 if TYPE_CHECKING:
     from backend.core.config import NetworkProbeConfig

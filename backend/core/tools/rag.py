@@ -106,7 +106,7 @@ class ToolRag:
         # Upsert tool points
         from qdrant_client import models as qmodels
         points: list[Any] = []
-        for ns_name, vector in zip(names, vectors):
+        for ns_name, vector in zip(names, vectors, strict=True):
             tool_def = tools_snapshot[ns_name]
             fmt = tool_def.to_openai_format()
             fmt["function"]["name"] = ns_name

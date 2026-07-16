@@ -18,6 +18,7 @@ adapters live in ``backend.core.managed_services``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,7 +27,6 @@ from typing import Literal, Protocol, runtime_checkable
 from loguru import logger
 
 from backend.core.event_bus import AliceEvent, EventBus
-import contextlib
 
 # ---------------------------------------------------------------------------
 # Public types

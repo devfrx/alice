@@ -8,6 +8,7 @@ performed before execution via the security module.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import csv
 import io
 import re
@@ -29,7 +30,6 @@ from backend.plugins.pc_automation.validators import (
     safe_subprocess,
     sanitize_text_input,
 )
-import contextlib
 
 # -- Lazy imports for optional dependencies --------------------------------
 
@@ -234,7 +234,9 @@ async def exec_open_app(app_name: str, cwd: str | None = None) -> str:
     # Build the full candidate list for _find_executable so all alternates
     # (e.g. chrome.exe / Chrome.exe) are tried.
     _raw = ALLOWED_APPS.get(app_name.strip().lower().replace(" ", "_"))
-    candidates: list[str] = _raw if isinstance(_raw, list) else ([primary_exe] if primary_exe else [])
+    candidates: list[str] = (
+        _raw if isinstance(_raw, list) else ([primary_exe] if primary_exe else [])
+    )
 
     def _open() -> str:
         import os

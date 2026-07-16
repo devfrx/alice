@@ -136,11 +136,10 @@ class STTService:
         # Proportional timeout based on audio duration
         timeout = self._compute_timeout(audio_data)
 
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        tmp_path = Path(tmp.name)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
         try:
-            tmp.write(audio_data)
-            tmp.close()
+            tmp_path.write_bytes(audio_data)
 
             logger.debug(
                 "Transcribing {} bytes of audio (sample_rate={})",

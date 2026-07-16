@@ -620,7 +620,7 @@ class TestReloadPlugin:
         # Patch importlib.reload and sys.modules so reload succeeds
         with (
             patch("backend.core.plugin_manager.sys") as mock_sys,
-            patch("backend.core.plugin_manager.importlib") as mock_importlib,
+            patch("backend.core.plugin_manager.importlib"),
         ):
             mock_sys.modules.get.return_value = None
             PLUGIN_REGISTRY["stub"] = StubPlugin

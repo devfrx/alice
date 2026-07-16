@@ -7,6 +7,7 @@ with automatic expiry cleanup for session-scoped entries.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -17,7 +18,6 @@ from qdrant_client import models
 from backend.core.config import MemoryConfig
 from backend.core.protocols import EmbeddingClientProtocol, QdrantServiceProtocol
 from backend.services.qdrant_service import COLLECTION_MEMORY
-import contextlib
 
 # ---------------------------------------------------------------------------
 # Memory entry dataclass (lightweight, no SQLModel table mapping needed

@@ -803,7 +803,10 @@ class TestBrightnessTool:
             )
 
         assert not result.success
-        assert "not support" in result.error_message.lower() or "not found" in result.error_message.lower()
+        assert (
+            "not support" in result.error_message.lower()
+            or "not found" in result.error_message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_set_brightness_powershell_error(self):

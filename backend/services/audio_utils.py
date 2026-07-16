@@ -212,14 +212,11 @@ async def save_temp_audio(data: bytes, suffix: str = ".wav") -> Path:
     Returns:
         :class:`Path` to the newly created temp file.
     """
-    tmp = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         delete=False, suffix=suffix, prefix="alice_audio_"
-    )
-    tmp_path = Path(tmp.name)
-    try:
+    ) as tmp:
+        tmp_path = Path(tmp.name)
         tmp.write(data)
-    finally:
-        tmp.close()
 
     logger.debug("Saved temp audio file: {} ({} bytes)", tmp_path, len(data))
 

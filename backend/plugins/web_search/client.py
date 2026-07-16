@@ -12,6 +12,7 @@ plain ``httpx`` triggers on sites like trovaprezzi.it and idealo.it.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import time
 from typing import Any
@@ -26,7 +27,6 @@ from backend.core.http_security import (
     async_validate_url_ssrf,
     create_ssrf_safe_event_hooks,
 )
-import contextlib
 
 # -- Lazy DDGS import ------------------------------------------------------
 

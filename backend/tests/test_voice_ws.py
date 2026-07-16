@@ -329,7 +329,7 @@ class TestVoiceConnectionLimit:
             voice_module._MAX_VOICE_PER_IP
         )
         client = TestClient(voice_app)
-        with client.websocket_connect("/api/voice/ws/voice") as ws:
+        with client.websocket_connect("/api/voice/ws/voice"):
             # Server accepts then immediately closes.
             pass
 

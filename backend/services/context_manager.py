@@ -15,8 +15,9 @@ try:
 except ImportError:  # pragma: no cover
     _TIKTOKEN_AVAILABLE = False
 
-from backend.core.config import LLMConfig
 import contextlib
+
+from backend.core.config import LLMConfig
 
 
 class CompressionError(Exception):
@@ -202,7 +203,10 @@ class ContextManager:
         """
         if usage.percentage >= self._config.context_compression_threshold:
             return True
-        return bool(usage.available_tokens > 0 and usage.available_tokens <= self._config.context_compression_reserve)
+        return bool(
+            usage.available_tokens > 0
+            and usage.available_tokens <= self._config.context_compression_reserve
+        )
 
     async def compress(
         self,

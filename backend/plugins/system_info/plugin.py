@@ -275,7 +275,7 @@ class SystemInfoPlugin(BasePlugin):
 
         vm = psutil.virtual_memory()
         root = (
-            os.environ.get("SystemDrive", "C:") + "\\"
+            os.environ.get("SYSTEMDRIVE", "C:") + "\\"
             if platform.system() == "Windows"
             else "/"
         )

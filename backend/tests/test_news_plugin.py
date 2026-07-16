@@ -227,7 +227,10 @@ class TestGetNewsTool:
         plugin._reader.fetch_all_feeds.assert_awaited_once()
         call_kwargs = plugin._reader.fetch_all_feeds.call_args
         # feeds should match the config
-        assert len(call_kwargs.kwargs.get("urls", call_kwargs[1].get("urls", []))) > 0 or len(call_kwargs[0][0]) > 0
+        assert (
+            len(call_kwargs.kwargs.get("urls", call_kwargs[1].get("urls", []))) > 0
+            or len(call_kwargs[0][0]) > 0
+        )
 
     @pytest.mark.asyncio
     @patch("backend.plugins.news.plugin._FEEDPARSER_AVAILABLE", True)
@@ -634,17 +637,20 @@ class TestFeedReader:
     @pytest.mark.asyncio
     async def test_fetch_all_feeds_parallel(self, reader):
         """fetch_all_feeds calls multiple feeds and merges results."""
-        entries_a = [_make_feed_entry("From A")]
-        entries_b = [_make_feed_entry("From B")]
-
         call_count = 0
 
         async def _mock_fetch(url, max_articles=10, timeout_s=10):
             nonlocal call_count
             call_count += 1
             if "feed_a" in url:
-                return [{"title": "From A", "summary": "", "link": "", "published_iso": "", "source": url}]
-            return [{"title": "From B", "summary": "", "link": "", "published_iso": "", "source": url}]
+                return [
+                    {"title": "From A", "summary": "", "link": "",
+                     "published_iso": "", "source": url},
+                ]
+            return [
+                {"title": "From B", "summary": "", "link": "",
+                 "published_iso": "", "source": url},
+            ]
 
         with patch.object(reader, "fetch_feed", side_effect=_mock_fetch):
             articles = await reader.fetch_all_feeds(
@@ -663,7 +669,10 @@ class TestFeedReader:
         async def _mock_fetch(url, max_articles=10, timeout_s=10):
             if "bad" in url:
                 raise ConnectionError("DNS failed")
-            return [{"title": "Good", "summary": "", "link": "", "published_iso": "", "source": url}]
+            return [
+                {"title": "Good", "summary": "", "link": "",
+                 "published_iso": "", "source": url},
+            ]
 
         with patch.object(reader, "fetch_feed", side_effect=_mock_fetch):
             articles = await reader.fetch_all_feeds(
@@ -799,9 +808,9 @@ class TestFeedReader:
             patch("backend.plugins.news.feed_reader._FEEDPARSER_AVAILABLE", True),
             patch.object(reader._client, "get", new=AsyncMock(return_value=mock_response)),
             patch("backend.plugins.news.feed_reader.validate_url_ssrf"),
+            pytest.raises(httpx.HTTPStatusError),
         ):
-            with pytest.raises(httpx.HTTPStatusError):
-                await reader.fetch_feed("https://example.com/rss")
+            await reader.fetch_feed("https://example.com/rss")
 
     @pytest.mark.asyncio
     async def test_close_calls_aclose(self, reader):

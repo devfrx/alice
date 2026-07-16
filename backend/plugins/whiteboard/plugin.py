@@ -290,11 +290,14 @@ class WhiteboardPlugin(BasePlugin):
                 description=(
                     "Crea una nuova lavagna tldraw. Fornisci shapes per popolarla "
                     "subito (flowchart, mindmap, schemi). REGOLE DIAGRAMMI: "
-                    "1) OGNI shape geo/note/text DEVE avere 'text' non vuoto — shape senza testo vengono scartate. "
+                    "1) OGNI shape geo/note/text DEVE avere 'text' non vuoto — "
+                    "shape senza testo vengono scartate. "
                     "2) Testo breve: 2-5 parole per nodo, NO elenchi lunghi dentro una shape. "
                     "3) Usa coordinate (x,y) assolute con ~250px di spacing tra nodi collegati. "
-                    "4) Dimensiona w/h in base al testo: min 120x60 per 2 parole, 200x80 per 3-5 parole. "
-                    "5) NON creare shape decorative vuote — ogni shape deve comunicare informazione. "
+                    "4) Dimensiona w/h in base al testo: min 120x60 per 2 parole, "
+                    "200x80 per 3-5 parole. "
+                    "5) NON creare shape decorative vuote — "
+                    "ogni shape deve comunicare informazione. "
                     "6) Max ~25 shape per lavagna per mantenere leggibilità."
                 ),
                 parameters=_CREATE_SCHEMA,

@@ -254,7 +254,8 @@ class ContinuumPlugin(BasePlugin):
             "filter": args.get("filter") if isinstance(args.get("filter"), dict) else {
                 "type": "group", "id": "root", "combinator": "and", "children": [],
             },
-            "edgeSources": args.get("edge_sources") if isinstance(args.get("edge_sources"), dict) else {
+            "edgeSources": args.get("edge_sources")
+            if isinstance(args.get("edge_sources"), dict) else {
                 "includeLinks": True,
                 "allRelationProperties": True,
                 "relationPropertyKeys": [],

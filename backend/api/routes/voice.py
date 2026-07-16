@@ -142,7 +142,9 @@ async def ws_voice(websocket: WebSocket) -> None:
       - ``{"type": "ping"}``
 
     **Server → Client**
-      - ``{"type": "voice_ready", "stt_available": bool, "tts_available": bool, "stt_model": str|null, "stt_engine": str|null, "tts_engine": str|null, "sample_rate": int|null}``
+      - ``{"type": "voice_ready", "stt_available": bool, "tts_available": bool,
+        "stt_model": str|null, "stt_engine": str|null, "tts_engine": str|null,
+        "sample_rate": int|null}``
       - ``{"type": "recording_started"}``
       - ``{"type": "stt_processing"}``
       - ``{"type": "transcript", "text": "...", "language": "...", ...}``

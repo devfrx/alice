@@ -102,7 +102,7 @@ async def init_db(engine: AsyncEngine) -> None:
         await conn.run_sync(SQLModel.metadata.create_all)
 
     # -- Lightweight column migrations --------------------------------------
-    _COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
+    column_migrations: list[tuple[str, str, str]] = [
         ("messages", "thinking_content", "TEXT"),
         ("messages", "tool_calls", "TEXT"),
         ("messages", "tool_call_id", "VARCHAR(64)"),
@@ -124,7 +124,7 @@ async def init_db(engine: AsyncEngine) -> None:
         missing: list[tuple[str, str, str]] = []
         # Cache column names per table to avoid repeated introspection.
         table_columns: dict[str, set[str]] = {}
-        for table, column, col_type in _COLUMN_MIGRATIONS:
+        for table, column, col_type in column_migrations:
             if table not in table_columns:
                 if not inspector.has_table(table):
                     continue
@@ -146,7 +146,7 @@ async def init_db(engine: AsyncEngine) -> None:
     # -- Lightweight index migrations ---------------------------------------
     # Ensures indexes added after initial table creation are present in
     # existing databases (create_all only creates *missing tables*).
-    _INDEX_MIGRATIONS: list[tuple[str, str, list[str]]] = [
+    index_migrations: list[tuple[str, str, list[str]]] = [
         ("ix_message_conv_created", "messages", ["conversation_id", "created_at"]),
         ("ix_message_version_group", "messages", ["version_group_id"]),
         ("ix_attachment_message_id", "attachments", ["message_id"]),
@@ -162,7 +162,7 @@ async def init_db(engine: AsyncEngine) -> None:
                 if idx["name"]
             }
         )
-        for idx_name, table, columns in _INDEX_MIGRATIONS:
+        for idx_name, table, columns in index_migrations:
             if idx_name not in existing_indexes:
                 cols = ", ".join(columns)
                 await conn.execute(

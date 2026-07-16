@@ -9,6 +9,7 @@ notifications.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import copy
 import json
 import re
@@ -172,12 +173,11 @@ class ToolExecutor:
                 # dict/list/int/float → JSON string
                 args[key] = json.dumps(val, ensure_ascii=False)
             elif expected in ("number", "integer") and isinstance(val, str):
-                try:
+                # Non-numeric strings stay as-is; validation will catch them.
+                with contextlib.suppress(ValueError, TypeError):
                     args[key] = (
                         int(val) if expected == "integer" else float(val)
                     )
-                except (ValueError, TypeError):
-                    pass  # leave as-is; validation will catch it
             elif expected == "boolean" and not isinstance(val, bool):
                 # LLMs often send "true"/"false" strings or 0/1 ints
                 if isinstance(val, str):

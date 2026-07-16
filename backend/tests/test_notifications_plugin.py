@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,7 +13,6 @@ from backend.core.config import load_config
 from backend.core.context import AppContext
 from backend.core.event_bus import AliceEvent, EventBus
 from backend.core.plugin_models import ConnectionStatus, ExecutionContext
-import contextlib
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -622,6 +622,7 @@ class TestTimerManager:
             callback=callback,
         )
 
+        assert fires_at is not None
         assert "t-1" in manager._timers
         task = manager._timers["t-1"]
         assert not task.done()

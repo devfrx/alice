@@ -31,6 +31,7 @@ Frontend subscribes to these events via the existing event WebSocket.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,7 +39,6 @@ from typing import TYPE_CHECKING
 
 import httpx
 from loguru import logger
-import contextlib
 
 if TYPE_CHECKING:
     from backend.core.event_bus import EventBus

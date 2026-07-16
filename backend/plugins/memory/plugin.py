@@ -79,7 +79,8 @@ class MemoryPlugin(BasePlugin):
                     "personal facts (job, hobby, family, birthday, city) → category='fact'; "
                     "skills or interests → category='skill'. "
                     "The tool call is mandatory; replying verbally is NOT enough. "
-                    "Do NOT save: casual questions, search results, transient data, obvious conversation context."
+                    "Do NOT save: casual questions, search results, "
+                    "transient data, obvious conversation context."
                 ),
                 parameters={
                     "type": "object",

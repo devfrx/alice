@@ -8,6 +8,7 @@ delete_event, and get_today_summary.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -33,7 +34,6 @@ from backend.services.calendar_events import (
     CalendarEvent,
     validate_rrule,
 )
-import contextlib
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext

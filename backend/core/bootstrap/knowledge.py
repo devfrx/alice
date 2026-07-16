@@ -6,12 +6,12 @@ and the single-entry-point ``KnowledgeService``.
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from backend.core.context import AppContext
-import contextlib
 
 if TYPE_CHECKING:
     from backend.core.config import AliceConfig

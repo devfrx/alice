@@ -6,9 +6,56 @@ and the single-entry-point ``KnowledgeService``.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
 from backend.core.context import AppContext
+
+if TYPE_CHECKING:
+    from backend.core.config import AliceConfig
+    from backend.services.embedding_client import EmbeddingClient
+
+
+def build_embedding_client(config: AliceConfig) -> EmbeddingClient:
+    """Construct the embedding client, warning loudly when it can't encode.
+
+    api_enabled is decided once at bootstrap time: a runtime provider switch
+    does NOT rebuild the embedding client, so memory keeps using whatever
+    backend was active at startup until the process restarts.
+
+    With a cloud provider (OpenRouter) the API backend is disabled on purpose
+    to keep embeddings local; if fastembed is also inactive (embedding_dim
+    incompatible with its default model, or fallback disabled) every memory
+    encode would fail — surface that here instead of at each operation.
+
+    Args:
+        config: The full application config.
+
+    Returns:
+        The constructed embedding client (possibly with no usable backend).
+    """
+    from backend.services.embedding_client import EmbeddingClient
+
+    client = EmbeddingClient(
+        base_url=config.llm.base_url,
+        model=config.qdrant.embedding_model,
+        dimensions=config.qdrant.embedding_dim,
+        fallback_enabled=config.qdrant.embedding_fallback,
+        api_enabled=config.llm.provider != "openrouter",
+    )
+    if not client.has_active_backend:
+        logger.warning(
+            "No embedding backend available: llm.provider='{}' keeps embeddings "
+            "local (embedding API disabled) but the fastembed fallback is "
+            "inactive (qdrant.embedding_dim={}, embedding_fallback={}). Memory "
+            "encode operations WILL fail — set qdrant.embedding_dim to 384 and "
+            "enable qdrant.embedding_fallback, or switch to a local LLM provider.",
+            config.llm.provider,
+            config.qdrant.embedding_dim,
+            config.qdrant.embedding_fallback,
+        )
+    return client
 
 
 async def stage_knowledge(ctx: AppContext) -> None:
@@ -20,19 +67,9 @@ async def stage_knowledge(ctx: AppContext) -> None:
     config = ctx.config
 
     # -- Embedding client + Qdrant service (shared) -------------------------
-    from backend.services.embedding_client import EmbeddingClient
     from backend.services.qdrant_service import QdrantService
 
-    # api_enabled is decided once at bootstrap time: a runtime provider switch
-    # does NOT rebuild the embedding client, so memory keeps using whatever
-    # backend was active at startup until the process restarts.
-    embedding_client = EmbeddingClient(
-        base_url=config.llm.base_url,
-        model=config.qdrant.embedding_model,
-        dimensions=config.qdrant.embedding_dim,
-        fallback_enabled=config.qdrant.embedding_fallback,
-        api_enabled=config.llm.provider != "openrouter",
-    )
+    embedding_client = build_embedding_client(config)
     # Probe actual dims so ensure_collection uses the real vector size,
     # not the potentially stale config value.
     try:

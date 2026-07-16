@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import ValidationError
 
 from backend.core.config import AliceConfig, LLMConfig
 from backend.core.context import AppContext, create_context
@@ -282,19 +283,22 @@ async def test_compress_handles_none_content(cm: ContextManager) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_config_threshold_clamped_above_1() -> None:
-    cfg = LLMConfig(context_compression_threshold=1.5)
-    assert cfg.context_compression_threshold == 0.95
+def test_config_threshold_above_1_rejected() -> None:
+    """Config guards the compression bounds: threshold > 0.95 is rejected."""
+    with pytest.raises(ValidationError):
+        LLMConfig(context_compression_threshold=1.5)
 
 
-def test_config_threshold_clamped_below_0() -> None:
-    cfg = LLMConfig(context_compression_threshold=-0.5)
-    assert cfg.context_compression_threshold == 0.50
+def test_config_threshold_below_0_rejected() -> None:
+    """Config guards the compression bounds: threshold < 0.50 is rejected."""
+    with pytest.raises(ValidationError):
+        LLMConfig(context_compression_threshold=-0.5)
 
 
-def test_config_reserve_clamped_negative() -> None:
-    cfg = LLMConfig(context_compression_reserve=-100)
-    assert cfg.context_compression_reserve == 512
+def test_config_reserve_negative_rejected() -> None:
+    """Config guards the compression bounds: reserve < 512 is rejected."""
+    with pytest.raises(ValidationError):
+        LLMConfig(context_compression_reserve=-100)
 
 
 # ---------------------------------------------------------------------------

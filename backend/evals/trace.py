@@ -63,7 +63,7 @@ def write_trace_jsonl(
             riga con ``type: "eval.final"``.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
+    with path.open("w", encoding="utf-8", newline="\n") as fh:
         for event in events:
             fh.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
         fh.write(

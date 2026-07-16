@@ -69,3 +69,19 @@ def test_write_trace_jsonl(tmp_path: Path) -> None:
     lines = out.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == len(_EVENTS) + 1
     assert json.loads(lines[-1]) == {"type": "eval.final", "response": "fatto"}
+
+
+def test_write_trace_jsonl_uses_lf_only(tmp_path: Path) -> None:
+    out = tmp_path / "sc.jsonl"
+    write_trace_jsonl(out, [{"type": "a"}], final={"x": 1})
+    assert b"\r" not in out.read_bytes()
+
+
+def test_summarize_trace_last_usage_wins() -> None:
+    events: list[dict[str, object]] = [
+        {"type": "turn.usage", "input_tokens": 10, "output_tokens": 1},
+        {"type": "turn.usage", "input_tokens": 900, "output_tokens": 120},
+    ]
+    s = summarize_trace(events, finish_reason="stop", cost=0.0)
+    assert s.input_tokens == 900
+    assert s.output_tokens == 120

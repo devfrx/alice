@@ -9,6 +9,7 @@ import type {
   ModelOperationResponse,
   ToolCatalogPlugin
 } from '../types/settings'
+import type { LlmProvider } from '../types/openrouter'
 import { emptyTierGuidance, normaliseTierGuidance, pruneTierGuidance } from '../utils/agentPrompts'
 import { useChatStore } from './chat'
 import { useServicesStore } from './services'
@@ -25,6 +26,9 @@ export interface AliceSettings {
     toolRagEnabled: boolean
     toolRagTopK: number
     userPreferredName: string
+    provider: LlmProvider
+    openrouterModel: string
+    openrouterFavorites: string[]
   }
   stt: {
     language: string
@@ -70,7 +74,10 @@ export const useSettingsStore = defineStore('settings', () => {
       contextCompressionReserve: 4096,
       toolRagEnabled: true,
       toolRagTopK: 15,
-      userPreferredName: ''
+      userPreferredName: '',
+      provider: 'lmstudio',
+      openrouterModel: '',
+      openrouterFavorites: []
     },
     stt: {
       language: '',
@@ -112,6 +119,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Whether tool definitions are sent to the LLM. */
   const toolsEnabled = ref<boolean>(true)
+
+  /** Whether the backend already has an OpenRouter API key configured. */
+  const openrouterKeyConfigured = ref(false)
 
   /** Guard flag: skip watchers while loading from backend. */
   let _loadingToggles = false
@@ -322,6 +332,12 @@ export const useSettingsStore = defineStore('settings', () => {
           (llm.tool_rag_top_k as number) ?? settings.value.llm.toolRagTopK
         settings.value.llm.userPreferredName =
           (llm.user_preferred_name as string) ?? settings.value.llm.userPreferredName
+        settings.value.llm.provider = (llm.provider as LlmProvider) ?? settings.value.llm.provider
+        settings.value.llm.openrouterModel =
+          (llm.openrouter_model as string) ?? settings.value.llm.openrouterModel
+        settings.value.llm.openrouterFavorites =
+          (llm.openrouter_favorites as string[]) ?? settings.value.llm.openrouterFavorites
+        openrouterKeyConfigured.value = Boolean(llm.openrouter_api_key_configured)
       }
       if (config.stt) {
         const stt = config.stt as Record<string, unknown>
@@ -386,7 +402,10 @@ export const useSettingsStore = defineStore('settings', () => {
           context_compression_reserve: settings.value.llm.contextCompressionReserve,
           tool_rag_enabled: settings.value.llm.toolRagEnabled,
           tool_rag_top_k: settings.value.llm.toolRagTopK,
-          user_preferred_name: settings.value.llm.userPreferredName
+          user_preferred_name: settings.value.llm.userPreferredName,
+          provider: settings.value.llm.provider,
+          openrouter_model: settings.value.llm.openrouterModel,
+          openrouter_favorites: settings.value.llm.openrouterFavorites
         },
         stt: {
           ...(settings.value.stt.language ? { language: settings.value.stt.language } : {}),
@@ -433,6 +452,18 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch (err) {
       console.warn('[settings store] saveSettings failed:', err)
     }
+  }
+
+  /**
+   * Persist the OpenRouter API key once (not part of the deep-watched
+   * `settings` ref — the key itself is never read back from the backend,
+   * only the `openrouterKeyConfigured` flag is).
+   */
+  async function setOpenrouterApiKey(key: string): Promise<void> {
+    const trimmed = key.trim()
+    if (!trimmed) return
+    await configApi.updateConfig({ llm: { openrouter_api_key: trimmed } })
+    openrouterKeyConfigured.value = true
   }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -835,6 +866,8 @@ export const useSettingsStore = defineStore('settings', () => {
     toolConfirmations,
     systemPromptEnabled,
     toolsEnabled,
+    openrouterKeyConfigured,
+    setOpenrouterApiKey,
     toolCatalog,
     disabledTools,
     toolSelectionAvailable,

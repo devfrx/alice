@@ -149,6 +149,72 @@ class ModelCapabilityRegistry:
             )
         return updated
 
+    async def refresh_from_openrouter(
+        self, models_data: list[dict[str, Any]],
+    ) -> int:
+        """Update profiles from the OpenRouter ``GET /v1/models`` response.
+
+        Capabilities are derived from ``supported_parameters`` (tools,
+        reasoning) and ``architecture.input_modalities`` (vision).
+
+        Args:
+            models_data: The ``data`` list from the OpenRouter response.
+
+        Returns:
+            Number of profiles created or updated.
+        """
+        updated = 0
+        async with self._lock:
+            for m in models_data:
+                model_id = m.get("id", "")
+                if not model_id:
+                    continue
+
+                old = self._profiles.get(model_id)
+                # Never clobber a profile detected from the local LM Studio
+                # API: local capabilities win for locally-served models.
+                if old is not None and old.source == "lmstudio_api":
+                    continue
+
+                params = m.get("supported_parameters") or []
+                arch = m.get("architecture") or {}
+                modalities = arch.get("input_modalities") or []
+                top = m.get("top_provider") or {}
+                profile = ModelProfile(
+                    model_id=model_id,
+                    supports_thinking="reasoning" in params,
+                    supports_vision="image" in modalities,
+                    supports_tool_use="tools" in params,
+                    context_length=int(
+                        m.get("context_length")
+                        or top.get("context_length")
+                        or 0
+                    ),
+                    source="openrouter_api",
+                )
+
+                # Preserve runtime-learned knowledge (same policy as
+                # refresh_from_api).
+                if old is not None:
+                    if old.accepts_reasoning_param is not None:
+                        profile.accepts_reasoning_param = (
+                            old.accepts_reasoning_param
+                        )
+                    if old.emits_reasoning_natively is not None:
+                        profile.emits_reasoning_natively = (
+                            old.emits_reasoning_natively
+                        )
+
+                self._profiles[model_id] = profile
+                updated += 1
+            self._last_refresh = time.monotonic()
+        if updated:
+            logger.debug(
+                "Model registry refreshed from OpenRouter: {} profile(s)",
+                updated,
+            )
+        return updated
+
     # ------------------------------------------------------------------
     # Single-model queries
     # ------------------------------------------------------------------

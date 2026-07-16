@@ -20,6 +20,7 @@ import ScopeIndicator from './ScopeIndicator.vue'
 import MicrophoneButton from '../voice/MicrophoneButton.vue'
 import ContextBar from './ContextBar.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
+import { formatCost } from '../../utils/formatCost'
 import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
@@ -252,6 +253,14 @@ defineExpose({
           :context-info="chatStore.contextInfo"
           :is-compressing="chatStore.isCompressingContext"
         />
+
+        <span
+          v-if="chatStore.conversationCost != null"
+          class="conversation-cost"
+          :title="'Costo conversazione (crediti OpenRouter)'"
+        >
+          {{ formatCost(chatStore.conversationCost) }}
+        </span>
 
         <UiIconButton
           class="ci__mode"
@@ -551,6 +560,14 @@ defineExpose({
 }
 .ci__glabel--agent {
   margin-left: var(--space-1);
+}
+
+.conversation-cost {
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  user-select: none;
 }
 
 /* ============================================================

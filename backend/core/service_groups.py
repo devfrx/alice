@@ -61,6 +61,8 @@ class InferenceServices:
     """Dynamic per-model capability registry."""
     model_downloader: Any = None
     """STT/TTS model downloader with progress events."""
+    openrouter_service: Any = None
+    """OpenRouter catalog/credits service (always constructed, cheap)."""
     embedding_client: EmbeddingClientProtocol | None = None
     """Shared embedding client for all vector operations."""
 

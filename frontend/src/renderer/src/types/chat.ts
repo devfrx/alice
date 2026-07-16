@@ -85,6 +85,13 @@ export interface ConversationDetail {
     is_estimated: boolean
     breakdown?: ContextBreakdown
   } | null
+  /**
+   * Persisted total cost of the conversation, in OpenRouter credits.
+   * `null` when nothing billable has been reported (e.g. a local provider).
+   * Covers main-turn generations only — subagent/summarization calls are
+   * not tracked.
+   */
+  total_cost?: number | null
 }
 
 // ---------------------------------------------------------------------------

@@ -214,3 +214,27 @@ class TestCommandsConfig:
         cfg = CommandsConfig()
         assert cfg.enabled is False
         assert cfg.rpc_timeout_s == 3.5
+
+
+# ---------------------------------------------------------------------------
+# OpenRouter provider config
+# ---------------------------------------------------------------------------
+
+
+def test_effective_base_url_openrouter() -> None:
+    cfg = LLMConfig(provider="openrouter", base_url="http://localhost:1234")
+    assert cfg.effective_base_url == "https://openrouter.ai/api"
+
+
+def test_effective_base_url_local_providers() -> None:
+    cfg = LLMConfig(provider="lmstudio", base_url="http://localhost:1234")
+    assert cfg.effective_base_url == "http://localhost:1234"
+    cfg = LLMConfig(provider="ollama", base_url="http://localhost:11434")
+    assert cfg.effective_base_url == "http://localhost:11434"
+
+
+def test_openrouter_defaults() -> None:
+    cfg = LLMConfig()
+    assert cfg.openrouter_api_key == ""
+    assert cfg.openrouter_model == ""
+    assert cfg.openrouter_favorites == []

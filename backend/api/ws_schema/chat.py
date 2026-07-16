@@ -321,6 +321,7 @@ class WsTurnFinished(ChatServerFrame):
     input_tokens: int
     output_tokens: int
     steps: int
+    cost: float | None = None
 
 # ---------------------------------------------------------------------------
 # Reflective executor

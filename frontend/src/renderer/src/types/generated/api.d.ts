@@ -1364,6 +1364,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/openrouter/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Openrouter Credits
+         * @description Return credits/limits for the configured OpenRouter API key.
+         */
+        get: operations["get_openrouter_credits_api_openrouter_credits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/openrouter/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Openrouter Models
+         * @description Return the OpenRouter model catalog (cached server-side, TTL 1h).
+         */
+        get: operations["list_openrouter_models_api_openrouter_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permission-mode/{conversation_id}": {
         parameters: {
             query?: never;
@@ -2916,6 +2956,77 @@ export interface components {
         OpenNodesRequest: {
             /** Names */
             names: string[];
+        };
+        /**
+         * OpenRouterCreditsResponse
+         * @description Credits/limits state for the API key (from ``GET /v1/key``).
+         */
+        OpenRouterCreditsResponse: {
+            /** Is Free Tier */
+            is_free_tier?: boolean | null;
+            /** Limit */
+            limit?: number | null;
+            /** Limit Remaining */
+            limit_remaining?: number | null;
+            /**
+             * Usage
+             * @default 0
+             */
+            usage?: number;
+        };
+        /**
+         * OpenRouterModelOut
+         * @description An OpenRouter catalog model, reduced to the fields used by the UI.
+         */
+        OpenRouterModelOut: {
+            /**
+             * Context Length
+             * @default 0
+             */
+            context_length?: number;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            pricing: components["schemas"]["OpenRouterPricing"];
+            /**
+             * Supports Reasoning
+             * @default false
+             */
+            supports_reasoning?: boolean;
+            /**
+             * Supports Tools
+             * @default false
+             */
+            supports_tools?: boolean;
+            /**
+             * Supports Vision
+             * @default false
+             */
+            supports_vision?: boolean;
+        };
+        /**
+         * OpenRouterModelsResponse
+         * @description OpenRouter model catalog.
+         */
+        OpenRouterModelsResponse: {
+            /** Models */
+            models: components["schemas"]["OpenRouterModelOut"][];
+        };
+        /**
+         * OpenRouterPricing
+         * @description Per-token price (USD), ``None`` when not reported.
+         */
+        OpenRouterPricing: {
+            /** Completion */
+            completion?: number | null;
+            /** Prompt */
+            prompt?: number | null;
         };
         /**
          * PermissionMode
@@ -5307,6 +5418,11 @@ export interface components {
              */
             correlation_id?: string | null;
             /**
+             * Cost
+             * @default null
+             */
+            cost?: number | null;
+            /**
              * Finish Reason
              * @default null
              */
@@ -7646,6 +7762,57 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_openrouter_credits_api_openrouter_credits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenRouterCreditsResponse"];
+                };
+            };
+        };
+    };
+    list_openrouter_models_api_openrouter_models_get: {
+        parameters: {
+            query?: {
+                force_refresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenRouterModelsResponse"];
                 };
             };
             /** @description Validation Error */

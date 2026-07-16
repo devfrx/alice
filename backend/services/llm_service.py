@@ -50,6 +50,14 @@ class LLMService:
         # because tests patch ``svc._client.get`` / ``svc._client.stream``
         # directly expecting the raw httpx client (see Deviazioni in the
         # Task 5 report).
+        headers: dict[str, str] = {}
+        if config.provider == "openrouter" and config.openrouter_api_key:
+            headers = {
+                "Authorization": f"Bearer {config.openrouter_api_key}",
+                # Attribution opzionale OpenRouter (rankings).
+                "HTTP-Referer": "https://github.com/devfrx/alice",
+                "X-Title": "ALICE",
+            }
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(
                 connect=config.connect_timeout,
@@ -57,6 +65,7 @@ class LLMService:
                 write=10.0,
                 pool=10.0,
             ),
+            headers=headers,
         )
         self._resolver = ModelResolver(config, model_registry, http=self._client)
         self._prompts = PromptBuilder(config)
@@ -220,6 +229,8 @@ class LLMService:
         Serves the cached value (or the default) immediately. When the cache is
         empty or stale it schedules a background refresh so the *next* call is
         warm — the hot path (turn-start, conversation-open) never awaits LM Studio.
+        For OpenRouter, the value comes from the capability registry (catalog)
+        instead — no cache and no LM Studio probe involved.
 
         Args:
             lmstudio_manager: Optional LMStudioManager used by the background
@@ -228,6 +239,23 @@ class LLMService:
         Returns:
             Context window size in tokens (cached, last-known, or the default).
         """
+        # OpenRouter: the context window comes from the catalog (capability
+        # registry), not an LM Studio probe. ``getattr`` guards against
+        # ``tests/test_context_window_cache.py``, which builds the service
+        # via ``LLMService.__new__`` and never sets ``_config``.
+        config: LLMConfig | None = getattr(self, "_config", None)
+        if config is not None and config.provider == "openrouter":
+            model_registry: ModelCapabilityRegistry | None = getattr(
+                self, "_model_registry", None,
+            )
+            if model_registry is not None:
+                profile = model_registry.get_profile(
+                    config.openrouter_model or "openrouter/auto",
+                )
+                if profile.context_length > 0:
+                    return profile.context_length
+            return self._default_ctx_window
+
         now = time.monotonic()
         if self._ctx_window_cache is not None and now < self._ctx_window_expires:
             return self._ctx_window_cache

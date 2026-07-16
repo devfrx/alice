@@ -10,7 +10,11 @@ end against ``policy_for``.
 
 from __future__ import annotations
 
-from backend.api.routes.chat._assembly import _coerce_tier_guidance
+from backend.api.routes.chat._assembly import (
+    _coerce_tier_guidance,
+    _resolve_output_budget,
+)
+from backend.core.config import LLMConfig
 from backend.services.permission_mode_policy import policy_for
 from backend.services.permission_mode_service import PermissionMode
 
@@ -54,3 +58,33 @@ class TestCoerceTierGuidance:
         assert plan.guidance == "CUSTOM PLAN GUIDANCE"
         strict = policy_for(PermissionMode.STRICT, custom_guidance=custom)
         assert strict.guidance == policy_for(PermissionMode.STRICT).guidance
+
+
+class TestResolveOutputBudget:
+    def test_local_provider_gets_remaining_context_as_budget(self) -> None:
+        cfg = LLMConfig(
+            provider="lmstudio", max_tokens=-1,
+            context_compression_reserve=2048,
+        )
+        assert _resolve_output_budget(cfg, available_tokens=10_000) == 7_952
+
+    def test_local_provider_budget_floors_at_1024(self) -> None:
+        cfg = LLMConfig(
+            provider="lmstudio", max_tokens=-1,
+            context_compression_reserve=2048,
+        )
+        assert _resolve_output_budget(cfg, available_tokens=100) == 1024
+
+    def test_openrouter_never_derives_a_budget(self) -> None:
+        # max_tokens is a hard output commitment on OpenRouter (validated
+        # against the serving endpoint's real limits): with the global cap
+        # unset the field must be omitted, not derived from the context
+        # window.
+        cfg = LLMConfig(provider="openrouter", max_tokens=-1)
+        assert _resolve_output_budget(cfg, available_tokens=985_000) is None
+
+    def test_explicit_global_cap_disables_derivation(self) -> None:
+        # The client itself applies config.max_tokens when > 0.
+        for provider in ("lmstudio", "ollama", "openrouter"):
+            cfg = LLMConfig(provider=provider, max_tokens=4096)
+            assert _resolve_output_budget(cfg, available_tokens=10_000) is None

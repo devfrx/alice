@@ -15,6 +15,7 @@ import ContextBar from '../chat/ContextBar.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
+import { formatCost } from '../../utils/formatCost'
 import { useChatStore } from '../../stores/chat'
 import { useSettingsStore } from '../../stores/settings'
 import { useVoiceStore } from '../../stores/voice'
@@ -116,6 +117,14 @@ defineExpose({
         :is-compressing="chatStore.isCompressingContext"
       />
 
+      <span
+        v-if="chatStore.conversationCost != null"
+        class="hz-cockpit__cost"
+        :title="'Costo conversazione (crediti OpenRouter)'"
+      >
+        {{ formatCost(chatStore.conversationCost) }}
+      </span>
+
       <MicrophoneButton
         v-if="voiceStore.isReady"
         :available="voiceStore.sttAvailable"
@@ -208,6 +217,14 @@ defineExpose({
 
 .hz-cockpit__file-input {
   display: none;
+}
+
+.hz-cockpit__cost {
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .hz-cockpit__rail {

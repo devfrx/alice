@@ -77,10 +77,9 @@ async def ws_chat(websocket: WebSocket) -> None:
         await websocket.accept()
         _ws_connections[client_ip] += 1
 
-    llm: LLMService = ctx.llm_service  # type: ignore[assignment]
     session_factory = ctx.db
 
-    if llm is None or session_factory is None:
+    if ctx.llm_service is None or session_factory is None:
         await websocket.send_json(
             {"type": "error", "content": "Server not ready \u2014 services not initialized"}
         )
@@ -96,10 +95,6 @@ async def ws_chat(websocket: WebSocket) -> None:
     # Continuum-only persona and always-injected Continuum tools.
     agent_scope = (websocket.query_params.get("scope") or "").strip().lower()
     continuum_scope = agent_scope == "continuum"
-
-    assembler = TurnAssembler(
-        ctx, llm, continuum_scope=continuum_scope, client_ip=client_ip,
-    )
 
     # Single inbound read-pump: it owns ``receive`` for the whole connection
     # and demultiplexes interaction responses / cancel / user messages, so
@@ -132,6 +127,20 @@ async def ws_chat(websocket: WebSocket) -> None:
                     {"type": "error", "content": "Message too long"}
                 )
                 continue
+
+            # Re-read the LLM service (and rebuild the cheap assembler) for
+            # every turn: a provider/API-key change via PUT /api/config
+            # replaces ``ctx.llm_service`` and CLOSES the old instance, so a
+            # snapshot taken at connection time would break open sockets.
+            llm: LLMService = ctx.llm_service  # type: ignore[assignment]
+            if llm is None:
+                await websocket.send_json(
+                    {"type": "error", "content": "LLM service unavailable"}
+                )
+                continue
+            assembler = TurnAssembler(
+                ctx, llm, continuum_scope=continuum_scope, client_ip=client_ip,
+            )
 
             async with session_factory() as session:
                 # Assemble the turn (conversation, history, tools, context,

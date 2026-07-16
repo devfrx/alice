@@ -12,6 +12,7 @@ import contextlib
 import json
 import shutil
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +97,20 @@ class DeleteAllConversationsResponse(BaseModel):
     """Response of the delete-all endpoint."""
 
     status: str
+
+
+def _sum_usage_cost(messages: Sequence[Any]) -> float:
+    """Sum provider-credit costs from the usage payloads persisted on messages."""
+    total = 0.0
+    for m in messages:
+        usage = getattr(m, "usage", None)
+        if not isinstance(usage, dict):
+            continue
+        try:
+            total += float(usage.get("cost") or 0.0)
+        except (TypeError, ValueError):
+            continue
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +393,8 @@ async def get_conversation(
                     "breakdown": _rest_bd,
                 }
 
+        total_cost = _sum_usage_cost(messages)
+
         return {
             "id": str(conv.id),
             "title": conv.title,
@@ -385,6 +402,7 @@ async def get_conversation(
             "updated_at": conv.updated_at.isoformat(),
             "active_versions": conv.active_versions or {},
             "context_info": context_info,
+            "total_cost": round(total_cost, 6) if total_cost > 0 else None,
             "messages": [
                 {
                     "id": str(m.id),
@@ -393,6 +411,7 @@ async def get_conversation(
                     "thinking_content": m.thinking_content,
                     "tool_calls": m.tool_calls,
                     "tool_call_id": m.tool_call_id,
+                    "usage": m.usage,
                     "created_at": m.created_at.isoformat(),
                     "attachments": att_map.get(m.id, []) or None,
                     "version_group_id": str(m.version_group_id)

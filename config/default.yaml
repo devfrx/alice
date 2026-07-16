@@ -35,6 +35,11 @@ llm:
   num_ctx: 8192
   num_gpu: -1
   keep_alive: "5m"
+  # OpenRouter (provider: "openrouter") — cloud provider di pari rango
+  openrouter_base_url: "https://openrouter.ai/api"
+  openrouter_api_key: ""       # impostata dalla UI; env: ALICE_LLM__OPENROUTER_API_KEY
+  openrouter_model: ""         # es. "anthropic/claude-sonnet-5"
+  openrouter_favorites: []
   tool_rag_enabled: true
   tool_rag_top_k: 20          # was 15 — raised to reduce chance of relevant tools being cut off
   context_compression_enabled: true

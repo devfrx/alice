@@ -1657,6 +1657,145 @@
         "title": "OpenNodesRequest",
         "type": "object"
       },
+      "OpenRouterCreditsResponse": {
+        "description": "Credits/limits state for the API key (from ``GET /v1/key``).",
+        "properties": {
+          "is_free_tier": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Free Tier"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "limit_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Remaining"
+          },
+          "usage": {
+            "default": 0.0,
+            "title": "Usage",
+            "type": "number"
+          }
+        },
+        "title": "OpenRouterCreditsResponse",
+        "type": "object"
+      },
+      "OpenRouterModelOut": {
+        "description": "An OpenRouter catalog model, reduced to the fields used by the UI.",
+        "properties": {
+          "context_length": {
+            "default": 0,
+            "title": "Context Length",
+            "type": "integer"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/OpenRouterPricing"
+          },
+          "supports_reasoning": {
+            "default": false,
+            "title": "Supports Reasoning",
+            "type": "boolean"
+          },
+          "supports_tools": {
+            "default": false,
+            "title": "Supports Tools",
+            "type": "boolean"
+          },
+          "supports_vision": {
+            "default": false,
+            "title": "Supports Vision",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "pricing"
+        ],
+        "title": "OpenRouterModelOut",
+        "type": "object"
+      },
+      "OpenRouterModelsResponse": {
+        "description": "OpenRouter model catalog.",
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/OpenRouterModelOut"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "OpenRouterModelsResponse",
+        "type": "object"
+      },
+      "OpenRouterPricing": {
+        "description": "Per-token price (USD), ``None`` when not reported.",
+        "properties": {
+          "completion": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          }
+        },
+        "title": "OpenRouterPricing",
+        "type": "object"
+      },
       "PermissionMode": {
         "description": "The authorization tier governing a conversation's tool-calls.",
         "enum": [
@@ -6202,6 +6341,18 @@
             "default": null,
             "title": "Correlation Id"
           },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cost"
+          },
           "finish_reason": {
             "anyOf": [
               {
@@ -9663,6 +9814,72 @@
         "summary": "Unload Model",
         "tags": [
           "models"
+        ]
+      }
+    },
+    "/api/openrouter/credits": {
+      "get": {
+        "description": "Return credits/limits for the configured OpenRouter API key.",
+        "operationId": "get_openrouter_credits_api_openrouter_credits_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenRouterCreditsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Openrouter Credits",
+        "tags": [
+          "openrouter"
+        ]
+      }
+    },
+    "/api/openrouter/models": {
+      "get": {
+        "description": "Return the OpenRouter model catalog (cached server-side, TTL 1h).",
+        "operationId": "list_openrouter_models_api_openrouter_models_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "force_refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Force Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenRouterModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Openrouter Models",
+        "tags": [
+          "openrouter"
         ]
       }
     },

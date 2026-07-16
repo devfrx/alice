@@ -295,7 +295,14 @@ export function useChat(): UseChatReturn {
     'interaction.requested': (msg) => agentRunStore.applyInteractionRequested(msg),
     'interaction.resolved': (msg) => agentRunStore.applyInteractionResolved(msg),
     'turn.usage': (msg) => agentRunStore.applyTurnUsage(msg),
-    'turn.finished': (msg) => agentRunStore.applyTurnFinished(msg),
+    'turn.finished': (msg) => {
+      agentRunStore.applyTurnFinished(msg)
+      // Il costo accumula sul chip della conversazione CORRENTE: a differenza
+      // dei frame run-scoped (keyed by turn_id) va gated come context_info.
+      if (store.streamGeneration !== activeGeneration) return
+      if (store.streamingConversationId !== store.currentConversation?.id) return
+      store.addTurnCost(msg.cost ?? null)
+    },
 
     // Reflective-executor telemetry frames — no UI surface yet (backlog).
     'agent.critic_invoked': noop,

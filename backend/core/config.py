@@ -116,6 +116,7 @@ class LLMConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ALICE_LLM__")
 
     provider: str = "lmstudio"
+    """One of "lmstudio", "ollama", "openrouter"."""
     base_url: str = "http://localhost:1234"
     model: str = DEFAULT_MODEL
     temperature: float = 0.7
@@ -181,6 +182,18 @@ class LLMConfig(BaseSettings):
     """-1 = offload all layers to GPU. Set to 0 to force CPU."""
     keep_alive: str = "5m"
     """How long Ollama keeps the model loaded in memory after a request."""
+    # -- OpenRouter-specific options (used when provider == "openrouter") --
+    openrouter_api_key: str = ""
+    """OpenRouter API key (Bearer). Empty = not configured."""
+    openrouter_base_url: str = "https://openrouter.ai/api"
+    """OpenRouter API origin. ``/v1/...`` paths are appended by the client."""
+    openrouter_model: str = ""
+    """Active OpenRouter model id (e.g. ``anthropic/claude-sonnet-5``).
+
+    Kept separate from ``model`` so switching provider back and forth
+    preserves both the local and the cloud selection."""
+    openrouter_favorites: list[str] = Field(default_factory=list)
+    """Pinned OpenRouter model ids, shown first in the model selector."""
     tool_rag_enabled: bool = True
     """Use semantic search to select relevant tools instead of sending all tool definitions."""
     tool_rag_top_k: int = 20
@@ -198,6 +211,13 @@ class LLMConfig(BaseSettings):
     Reasoning models (QwQ-32B, DeepSeek-R1) can generate slowly (~10 tok/s);
     512 output tokens alone may take ~51 s.  120 s gives a safe margin.
     """
+
+    @property
+    def effective_base_url(self) -> str:
+        """Base URL for the active provider (OpenRouter or local server)."""
+        if self.provider == "openrouter":
+            return self.openrouter_base_url.rstrip("/")
+        return self.base_url
 
     @field_validator("context_compression_threshold")
     @classmethod

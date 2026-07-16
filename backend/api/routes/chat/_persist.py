@@ -151,8 +151,19 @@ async def _persist_final_turn(
                 version_group_id=user_msg_version_group_id,
                 version_index=user_msg_version_index,
             )
+            if result.cost > 0:
+                cancel_msg.usage = {
+                    "prompt_tokens": result.input_tokens,
+                    "completion_tokens": result.output_tokens,
+                    "cost": round(result.cost, 8),
+                }
             session.add(cancel_msg)
             asst_msg_id = str(cancel_msg.id)
+        elif result.cost > 0:
+            logger.debug(
+                "Turn cost {} not persisted (cancelled turn without content)",
+                result.cost,
+            )
         if result.had_tool_calls or result.content or result.thinking:
             conv.updated_at = _utcnow()
             if conv.title is None and user_content:
@@ -218,6 +229,21 @@ async def _persist_final_turn(
                 asst_msg.token_count = result.input_tokens
                 session.add(asst_msg)
                 await session.flush()
+
+        # Usage accounting (OpenRouter): persisti il costo del turno sul
+        # messaggio assistant finale. La SUM per conversazione è on-read.
+        if asst_msg is not None and result.cost > 0:
+            asst_msg.usage = {
+                "prompt_tokens": result.input_tokens,
+                "completion_tokens": result.output_tokens,
+                "cost": round(result.cost, 8),
+            }
+            session.add(asst_msg)
+        elif result.cost > 0:
+            logger.debug(
+                "Turn cost {} not persisted (tool-only turn without final message)",
+                result.cost,
+            )
 
         conv.updated_at = _utcnow()
         if conv.title is None and user_content:

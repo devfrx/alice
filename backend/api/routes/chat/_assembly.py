@@ -30,7 +30,7 @@ from fastapi import WebSocket
 from loguru import logger
 from sqlmodel import select
 
-from backend.core.config import PROJECT_ROOT
+from backend.core.config import PROJECT_ROOT, LLMConfig
 from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
 from backend.services.context_manager import CompressionResult, ContextUsage
@@ -86,6 +86,37 @@ def _coerce_tier_guidance(
             continue
         result[mode] = str(text)
     return result
+
+
+def _resolve_output_budget(
+    llm_cfg: LLMConfig, available_tokens: int,
+) -> int | None:
+    """Output-token budget for the initial stream, or ``None`` to omit.
+
+    With the global cap unset (``max_tokens <= 0``), local providers get
+    the remaining context as their output budget (LM Studio treats
+    ``max_tokens`` as a soft ceiling on free space).  OpenRouter must NOT
+    receive a derived budget: there ``max_tokens`` is a hard output
+    commitment, validated against the serving endpoint's real context
+    limit (often smaller than the catalog ``context_length`` feeding
+    ``available_tokens``) and weighed by the credit pre-authorisation —
+    omitting the field lets the provider apply its per-model default.
+
+    Args:
+        llm_cfg: The active LLM configuration.
+        available_tokens: Estimated context tokens still free for output.
+
+    Returns:
+        The budget for local providers, ``None`` when the field must be
+        omitted (explicit global cap, handled by the client, or OpenRouter).
+    """
+    if llm_cfg.max_tokens > 0:
+        return None
+    if llm_cfg.provider == "openrouter":
+        return None
+    return max(
+        1024, available_tokens - llm_cfg.context_compression_reserve,
+    )
 
 
 def _apply_voice_trim(
@@ -728,15 +759,9 @@ class TurnAssembler:
         # Resolve max_output_tokens once when the global cap is
         # unset — mirrors the legacy ``_stream_and_collect`` logic.
         resolved_max: int | None = None
-        if (
-            ctx.config.llm.max_tokens <= 0
-            and context_window > 0
-            and ctx.context_manager is not None
-        ):
-            resolved_max = max(
-                1024,
-                usage_est.available_tokens
-                - ctx.config.llm.context_compression_reserve,
+        if context_window > 0 and ctx.context_manager is not None:
+            resolved_max = _resolve_output_budget(
+                ctx.config.llm, usage_est.available_tokens,
             )
 
         # Build the immutable turn input.  When pre-gen

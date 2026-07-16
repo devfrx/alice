@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import uuid
+from dataclasses import replace
 from typing import Any
 
 from fastapi import WebSocketDisconnect
@@ -111,7 +112,7 @@ class DirectTurnExecutor:
                 finish_reason,
                 in_tok,
                 out_tok,
-            ) = await self._stream_initial(turn, sink, cancel_event)
+            ) = await self._stream_initial(turn, sink, cancel_event, progress)
         except WebSocketDisconnect:
             # v2-4 / v3-1: disconnect during initial stream.  No content
             # has been collected yet — bubble up as "disconnected" with
@@ -317,18 +318,23 @@ class DirectTurnExecutor:
         Routing every :meth:`execute` exit through this helper guarantees a
         single ``turn.finished`` per turn, carrying the result's real
         ``finish_reason`` / token usage and the per-turn step count. The
-        emission is best-effort (wrapped in :func:`contextlib.suppress`) so
-        it can never alter the existing control flow or return value.
+        accumulated ``progress.cost`` is stamped onto the returned result via
+        :func:`dataclasses.replace` (the sole construction site that sets
+        ``cost`` — the seven :class:`TurnResult` call sites in :meth:`execute`
+        stay untouched). The emission is best-effort (wrapped in
+        :func:`contextlib.suppress`) so it can never alter the existing
+        control flow or return value.
 
         Args:
             sink: Outbound event sink for the turn.
-            progress: Mutable per-turn counters (supplies ``turn_id`` and
-                ``steps``).
+            progress: Mutable per-turn counters (supplies ``turn_id``,
+                ``steps`` and the accumulated ``cost``).
             result: The :class:`TurnResult` about to be returned.
 
         Returns:
-            The unmodified ``result`` argument.
+            ``result`` with ``cost`` stamped from ``progress.cost``.
         """
+        result = replace(result, cost=progress.cost)
         with contextlib.suppress(Exception):
             await sink.send(events.turn_finished(
                 turn_id=progress.turn_id,
@@ -336,6 +342,7 @@ class DirectTurnExecutor:
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
                 steps=progress.steps,
+                cost=result.cost if result.cost > 0 else None,
             ))
         return result
 
@@ -348,6 +355,7 @@ class DirectTurnExecutor:
         turn: TurnInput,
         sink: WSEventSink,
         cancel_event: asyncio.Event,
+        progress: TurnProgress,
     ) -> tuple[str, str, list[dict[str, Any]], str, int, int]:
         """Stream the first LLM response and relay events to ``sink``.
 
@@ -411,6 +419,7 @@ class DirectTurnExecutor:
                 elif etype == "usage":
                     in_tok = int(event.get("input_tokens", 0) or 0)
                     out_tok = int(event.get("output_tokens", 0) or 0)
+                    progress.cost += float(event.get("cost") or 0.0)
                 elif etype == "error":
                     # v3-5: capture LLM error here, emit to sink, and
                     # stop without raising.  ws_chat reads finish_reason.

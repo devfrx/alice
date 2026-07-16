@@ -15,7 +15,7 @@ from typing import Any
 import sqlalchemy as sa
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlmodel import select
+from sqlmodel import col, select
 
 from backend.db.models import UserPreference, _utcnow
 
@@ -70,7 +70,7 @@ class PreferencesLayerStore:
                 await session.execute(
                     sa.delete(UserPreference).where(
                         # autoescape: "_" in a dotted path is a LIKE wildcard.
-                        UserPreference.key.startswith(  # type: ignore[attr-defined]
+                        col(UserPreference.key).startswith(
                             path + ".", autoescape=True,
                         )
                     )
@@ -99,7 +99,7 @@ class PreferencesLayerStore:
         async with self._session_factory() as session:
             rows = (await session.exec(select(UserPreference))).all()
             count = len(rows)
-            await session.execute(sa.delete(UserPreference))  # type: ignore[arg-type]
+            await session.execute(sa.delete(UserPreference))
             await session.commit()
         logger.info("Deleted {} persisted preferences", count)
         return count

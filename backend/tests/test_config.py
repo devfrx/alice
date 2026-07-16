@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import SecretStr, ValidationError
@@ -314,7 +315,7 @@ async def test_sync_model_survives_config_rebuild(client, app) -> None:
     ctx = app.state.context
 
     class _StubManager:
-        async def list_models(self) -> dict:
+        async def list_models(self) -> dict[str, Any]:
             return {
                 "models": [{
                     "key": "org/synced-model",

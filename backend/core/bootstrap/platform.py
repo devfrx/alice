@@ -34,13 +34,29 @@ async def stage_platform(ctx: AppContext, *, testing: bool) -> None:
     orchestrator = ServiceOrchestrator(ctx.event_bus)
     ctx.orchestrator = orchestrator
 
+    # -- Secret store (OS keyring) -------------------------------------------
+    # Built before the config service so its synchronous ``cached()`` reader
+    # can be passed straight in as the secrets provider.
+    from backend.services.secret_store import create_secret_store
+
+    secret_store = create_secret_store(prefer_memory=testing)
+    if not testing:
+        try:
+            await secret_store.load_cache()
+        except Exception as exc:  # noqa: BLE001 — keyring failure must not kill boot
+            logger.warning("Secret cache load failed: {}", exc)
+    ctx.secret_store = secret_store
+
     # -- Layered configuration service (defaults/system/user/runtime) -------
     # Built early so any subsequent service can read merged config through
     # ``ctx.config`` exactly as before.  The service rebuilds ``ctx.config``
     # whenever a layer mutation succeeds.
     from backend.services.config_service import LayeredConfigService
 
-    config_service = LayeredConfigService(event_bus=ctx.event_bus)
+    config_service = LayeredConfigService(
+        event_bus=ctx.event_bus,
+        secrets_provider=secret_store.cached,
+    )
     ctx.config_service = config_service
     ctx.config = config_service.get_resolved()
     config = ctx.config  # keep local alias in sync for the rest of this stage

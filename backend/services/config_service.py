@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import os
+from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -218,11 +219,13 @@ class LayeredConfigService:
         defaults_path: Path | None = None,
         system_path: Path | None = None,
         user_path: Path | None = None,
+        secrets_provider: Callable[[], dict[str, str]] | None = None,
     ) -> None:
         self._event_bus = event_bus
         self._defaults_path = defaults_path or DEFAULT_CONFIG_PATH
         self._system_path = system_path or get_system_config_path()
         self._user_path = user_path or get_user_config_path()
+        self._secrets_provider = secrets_provider
 
         self._layers: dict[ConfigLayer, dict[str, Any]] = {
             ConfigLayer.DEFAULTS: {},
@@ -288,11 +291,16 @@ class LayeredConfigService:
     def _rebuild(self) -> None:
         """Validate the merged dict into a new :class:`AliceConfig`.
 
-        Env vars (``ALICE_*``) override the merged dict because
-        :meth:`AliceConfig.settings_customise_sources` returns
-        ``env_settings`` before ``init_settings``.
+        Secrets are hydrated from ``self._secrets_provider`` (a synchronous
+        cache read, e.g. :meth:`SecretStore.cached`) AFTER the layer merge
+        but BEFORE validation, so they win over YAML but still lose to
+        ``ALICE_*`` env vars — :meth:`AliceConfig.settings_customise_sources`
+        returns ``env_settings`` before ``init_settings``.
         """
         merged = self._merged_dict()
+        if self._secrets_provider is not None:
+            for path, value in self._secrets_provider().items():
+                _set_dotted(merged, path, value)
         self._resolved = AliceConfig(**merged)
 
     # -- public read API -------------------------------------------------
@@ -401,6 +409,13 @@ class LayeredConfigService:
         """Drop every runtime override and revalidate."""
         async with self._lock:
             self._layers[ConfigLayer.RUNTIME] = {}
+            self._rebuild()
+            assert self._resolved is not None
+            return self._resolved
+
+    async def rebuild(self) -> AliceConfig:
+        """Re-validate the merged config (e.g. after a secret write)."""
+        async with self._lock:
             self._rebuild()
             assert self._resolved is not None
             return self._resolved

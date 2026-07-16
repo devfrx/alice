@@ -37,6 +37,7 @@ from backend.core.protocols import (
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     QdrantServiceProtocol,
+    SecretStoreProtocol,
     STTServiceProtocol,
     ToolRegistryProtocol,
     TTSServiceProtocol,
@@ -135,3 +136,6 @@ class PlatformServices:
     """Single decision point for agent-initiated user attention (Fase 8)."""
     trigger_service: Any = None
     """Autonomous-turn trigger sources: schedule/event/manual (Fase 8)."""
+    secret_store: SecretStoreProtocol | None = None
+    """OS-keyring-backed secret storage (synchronous cache for config
+    hydration; see :class:`backend.services.config_service.LayeredConfigService`)."""

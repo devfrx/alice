@@ -31,6 +31,7 @@ from backend.core.protocols import (
     PluginManagerProtocol,
     PreferencesServiceProtocol,
     QdrantServiceProtocol,
+    SecretStoreProtocol,
     STTServiceProtocol,
     ToolRegistryProtocol,
     TTSServiceProtocol,
@@ -73,7 +74,7 @@ class AppContext:
         "permission_rule_service", "terminal_session_manager",
         "plugin_local_state", "orchestrator", "model_downloader",
         "event_bus", "background_task_service", "attention_service",
-        "trigger_service",
+        "trigger_service", "secret_store",
     )
 
     def __init__(
@@ -432,6 +433,14 @@ class AppContext:
     @trigger_service.setter
     def trigger_service(self, value: Any) -> None:
         self.platform.trigger_service = value
+
+    @property
+    def secret_store(self) -> SecretStoreProtocol | None:
+        return self.platform.secret_store
+
+    @secret_store.setter
+    def secret_store(self, value: SecretStoreProtocol | None) -> None:
+        self.platform.secret_store = value
 
     # ------------------------------------------------------------------
     # Plugin state helpers

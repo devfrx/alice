@@ -303,6 +303,60 @@ async def test_removed_legacy_key_is_dropped_not_rejected(client) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Overlay in-place → layer (audit I1)
+# ---------------------------------------------------------------------------
+
+
+async def test_sync_model_survives_config_rebuild(client, app) -> None:
+    """sync-model scrive il layer preferences: un rebuild non lo perde più."""
+    ctx = app.state.context
+
+    class _StubManager:
+        async def list_models(self) -> dict:
+            return {
+                "models": [{
+                    "key": "org/synced-model",
+                    "loaded_instances": [{"id": "i1"}],
+                    "capabilities": {"thinking": True, "vision": False},
+                }],
+            }
+
+    saved = ctx.lmstudio_manager
+    ctx.lmstudio_manager = _StubManager()
+    try:
+        resp = await client.post("/api/config/sync-model")
+        assert resp.status_code == 200
+        assert resp.json() == {"synced": True, "model": "org/synced-model"}
+        assert ctx.config.llm.model == "org/synced-model"
+        assert ctx.config.llm.supports_thinking is True
+
+        # Prima: object.__setattr__ in-place, clobberato dal primo rebuild.
+        rebuilt = await ctx.config_service.rebuild()
+        assert rebuilt.llm.model == "org/synced-model"
+
+        prefs = await ctx.preferences_store.load()
+        assert prefs["llm"]["model"] == "org/synced-model"
+    finally:
+        ctx.lmstudio_manager = saved
+
+
+async def test_plugin_toggle_survives_config_rebuild(client, app) -> None:
+    """Il toggle plugin scrive il layer runtime: un rebuild non lo perde più."""
+    ctx = app.state.context
+    target = "system_info"
+    if target not in ctx.config.plugins.enabled:
+        pytest.skip("system_info not enabled in the test app")
+
+    resp = await client.patch(f"/api/plugins/{target}", json={"enabled": False})
+    assert resp.status_code == 200
+    assert target not in ctx.config.plugins.enabled
+
+    # Prima: lista mutata in-place, clobberata dal primo rebuild.
+    rebuilt = await ctx.config_service.rebuild()
+    assert target not in rebuilt.plugins.enabled
+
+
+# ---------------------------------------------------------------------------
 # PUT /config misto — tutta la validazione PRIMA di ogni commit
 # (audit Triage#1 / Triage#4)
 # ---------------------------------------------------------------------------

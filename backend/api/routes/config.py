@@ -602,9 +602,22 @@ async def sync_model(request: Request) -> dict[str, Any]:
         "vision", known.get("vision", False),
     )
 
-    object.__setattr__(cfg.llm, "model", loaded_key)
-    object.__setattr__(cfg.llm, "supports_thinking", supports_thinking)
-    object.__setattr__(cfg.llm, "supports_vision", supports_vision)
+    if ctx.config_service is None:
+        return {"synced": False, "reason": "config service unavailable"}
+
+    # Preferences layer, NOT runtime: a runtime override on llm.model would
+    # mask every later preferences write of the same path — and this is the
+    # same value the FE snapshot would persist on its next diff-save anyway.
+    # (The old in-place mutation was clobbered by the first config rebuild.)
+    await ctx.config_service.set_many(
+        {
+            "llm.model": loaded_key,
+            "llm.supports_thinking": supports_thinking,
+            "llm.supports_vision": supports_vision,
+        },
+        layer=ConfigLayer.PREFERENCES,
+    )
+    ctx.config = ctx.config_service.get_resolved()
 
     # Invalidate auto-model cache so the next chat request uses the new model.
     if ctx.llm_service is not None:

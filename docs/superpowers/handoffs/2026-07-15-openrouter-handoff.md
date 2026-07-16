@@ -1,6 +1,6 @@
 # Handoff — Provider OpenRouter (feat/openrouter-provider)
 
-**Data:** 2026-07-15 · **Aggiornato:** 2026-07-16 (audit post-merge)
+**Data:** 2026-07-15 · **Aggiornato:** 2026-07-16 sera (audit follow-up, merge `410b84f`)
 **Branch:** `feat/openrouter-provider` — **MERGIATO in main** (`394d8d4`) **e pushato**
 **Spec:** `docs/superpowers/specs/2026-07-15-openrouter-provider-design.md`
 **Piano:** `docs/superpowers/plans/2026-07-15-openrouter-provider.md` (16 task)
@@ -12,17 +12,21 @@ Feature completa end-to-end nel codice: OpenRouter è il terzo provider LLM di p
 (catalogo con prezzi/capacità, saldo crediti, preferiti, costo per conversazione live+persistito,
 switch provider a runtime, guardia embedding). Docs identità aggiornati (CLAUDE.md, README).
 
-### Task 16 — stato post-audit (2026-07-16)
+### Task 16 — stato finale (audit follow-up 2026-07-16 sera): CHIUSO
 
-1. **`pytest tests/` COMPLETO**: rilanciato nell'audit del 2026-07-16 — esito annotato in §Post-merge.
-   Tutti i sottoinsiemi mirati eseguiti per-task e per-fix sono verdi.
-2. ~~ruff/mypy globali interrotti~~ → censiti nell'audit: **0 errori B904 su tutto il backend**
-   (bonifica `185b371`); residuo preesistente aggiornato in §Debito sotto.
+1. **`pytest tests/` COMPLETO: non completabile su questa macchina** — la suite integrale
+   si APPENDE deterministicamente dopo un fail a ~91%, in zona
+   `tests/test_voice_tool_calling.py`; riprodotto IDENTICO anche sulla baseline di main
+   pre-fix, quindi pre-esistente e non imputabile ai branch (censito come AUD-008 aperto in
+   `docs/superpowers/audits/2026-07-16-followups-audit.md`). Tutti i sottoinsiemi mirati
+   eseguiti per-task, per-fix e nell'audit follow-up (~550 test) sono verdi.
+2. ~~ruff/mypy globali interrotti~~ → **bonifica ruff COMPLETA a zero** + gate
+   "Backend lint (ruff)" in `contracts.yml` (vedi §Debito sotto); mypy a parità con main
+   sui file toccati.
 3. ~~Review finale olistica da rifare~~ → **FATTA** (2026-07-16): 4 finding, tutti risolti e
    mergiati (vedi §Post-merge).
-4. **Verifica e2e con API key reale** (serve l'utente): ANCORA DA FARE — switch a openrouter →
-   chiave → catalogo → crediti → messaggio in chat con chip costo → riavvio (persistenza) →
-   ritorno a lmstudio intatto → log memoria solo fastembed.
+4. ~~Verifica e2e con API key reale~~ → **VERIFICATA FUNZIONANTE dall'utente** (2026-07-16):
+   switch a openrouter, chiave, catalogo, crediti, chat, persistenza.
 5. ~~Push del branch + merge~~ → **FATTO**: merge `394d8d4`, tutto pushato su origin/main.
 
 Gate già verdi a fine sessione: `lint-imports` (6 contratti kept), `check-contracts.ps1`,
@@ -112,7 +116,14 @@ punta ancora a `omnia` (il redirect funziona) — aggiornare con
    searchQuery è guardato con `isOpenrouterProvider` — non rimuovere il guard).
 9. **UI kit**: leggere SEMPRE le prop reali (UiEmptyState usa `subtitle` non `description`;
    UiIconButton richiede `label`; icona `star` unica con `active`, non esiste `star-filled`).
-10. **Line endings**: un Edit su file LF può produrre CRLF — controllare il diff prima di committare.
+10. **Line endings**: un Edit su file LF può produrre CRLF — controllare il diff prima di
+    committare. Il repo ha EOL MISTI per file (52 file backend sono CRLF in HEAD): anche
+    `ruff --fix` riscrive con EOL nativi — dopo ogni fix massivo ripristinare l'EOL per-file
+    di HEAD.
+11. **Suite pytest integrale**: su questa macchina si APPENDE dopo un fail a ~91% (zona
+    `test_voice_tool_calling.py`), anche su main pulito — AUD-008 aperto. Verificare SEMPRE
+    per sottoinsiemi mirati; mai aspettare la suite intera, e mai due run pytest concorrenti
+    (contendono sul data dir).
 
 ## Debito preesistente censito (aggiornato all'audit follow-up 2026-07-16 sera)
 
@@ -134,8 +145,9 @@ punta ancora a `omnia` (il redirect funziona) — aggiornare con
 
 1. Leggi questo handoff, poi spec e piano (le deviazioni dal piano sono documentate nei messaggi
    di commit e sono tutte sanzionate dalle review).
-2. Resta solo: **e2e con API key reale insieme all'utente** (punto 4 del task 16) e l'eventuale
-   esito della pytest integrale se non annotato in §Post-merge.
+2. La feature OpenRouter è CHIUSA (task 16 compreso, e2e verificato dall'utente). Il lavoro
+   aperto vive altrove: AUD-008 (hang della suite integrale in zona voice) e il debito censito
+   in §Debito — vedi `docs/superpowers/audits/2026-07-16-followups-audit.md`.
 3. Convenzioni vincolanti: endpoint nuovi con `response_model` (ratchet), frame WS nel vocabolario
-   congelato, `gen-contracts.ps1` dopo ogni modifica contratto, import-linter, niente `any` FE,
-   token-only styling dual-theme.
+   congelato, `gen-contracts.ps1` dopo ogni modifica contratto, import-linter, **ruff = 0 (ora
+   gate in CI)**, niente `any` FE, token-only styling dual-theme.

@@ -1,6 +1,6 @@
 # Handoff — Rework settings-core (rework/settings-core)
 
-**Data:** 2026-07-16 · **Aggiornato:** 2026-07-16 sera (audit post-merge)
+**Data:** 2026-07-16 · **Aggiornato:** 2026-07-16 sera (audit follow-up, merge `410b84f`)
 **Branch:** `rework/settings-core` — **MERGIATO in main** (`f24afe1`) **e pushato**
 **Spec:** `docs/superpowers/specs/2026-07-16-settings-core-rework-design.md`
 **Piano:** `docs/superpowers/plans/2026-07-16-settings-core-rework.md` (15 task)
@@ -8,19 +8,21 @@
 review olistica finale sull'intero branch (modello top-tier) con triage dei finding differiti.
 Ledger completo: `.superpowers/sdd/progress.md` (gitignored, locale).
 
-## Stato: task 1–14 COMPLETI e approvati; task 15 quasi chiuso
+## Stato: CHIUSO — feature completa, e2e verificato, follow-up risolti
 
 Feature completa end-to-end: config a 5 layer con layer `preferences` formale (DB), tutti e sei
 i segreti nel Credential Manager di Windows via SecretStore, PUT/PATCH sul motore unico
 `set_many` + registry reazioni, migrazione one-shot idempotente, FE diff-save con flag derivati.
 Il doppio sistema e lo split-brain sono morti strutturalmente (test di regressione dedicato).
 
-### Cosa resta del task 16 (equivalente) — stato post-audit
+### Cosa resta del task 16 (equivalente) — stato finale (audit follow-up 2026-07-16 sera)
 
-1. **Suite pytest integrale**: rilanciata nell'audit del 2026-07-16 su main aggiornato
-   (post-merge di entrambi i branch + fix F1–F4 + bonifica B904) — esito nell'handoff OpenRouter,
-   §Post-merge.
-2. **E2E con l'utente** (checklist al §E2E sotto) — ANCORA da eseguire su macchina reale.
+1. **Suite pytest integrale: non completabile su questa macchina** — si appende dopo un fail
+   a ~91% in zona `test_voice_tool_calling.py`, identico anche sulla baseline di main
+   (pre-esistente, AUD-008 aperto — vedi handoff OpenRouter, Task 16 punto 1, e
+   `docs/superpowers/audits/2026-07-16-followups-audit.md`). Sottoinsiemi mirati tutti verdi.
+2. ~~E2E con l'utente~~ → **VERIFICATO FUNZIONANTE dall'utente** (2026-07-16, checklist al
+   §E2E sotto).
 3. ~~Merge in main~~ → **FATTO** (`f24afe1`) e pushato.
 
 ## Gate verdi a fine sessione
@@ -115,7 +117,7 @@ Dettaglio completo in `docs/superpowers/audits/2026-07-16-followups-audit.md`.
   **risolto** (`13a7bd0`, audit 2026-07-16 sera: via il conteggio hardcoded, resta
   l'invariante niente-duplicati).
 
-## E2E (da eseguire con l'utente, post-merge o su branch)
+## E2E (ESEGUITO e verificato dall'utente il 2026-07-16 — checklist di riferimento)
 
 1. Avvia backend+frontend. Al primo boot: log di migrazione (prune `agent.enabled`, eventuale
    migrazione key). Verifica che le preferenze siano intatte (provider openrouter, nome, email).

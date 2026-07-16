@@ -102,6 +102,27 @@ Rimosso `backend/debug_test.py` (scratch autodescritto, mai importato).
 (500+ test mirati); mypy a parità con main sui file toccati (3 errori nuovi introdotti e
 richiusi; il confronto normalizzato branch-vs-main esclude gli artefatti `backend/dist/`).
 
+### [AUD-008] Suite pytest integrale non completabile — MEDIO (test) — APERTO
+
+**Dove:** `backend/tests/test_voice_tool_calling.py` (e possibile interazione col resto
+della suite).
+**Cosa:** su questa macchina la suite integrale (`pytest tests/`) si APPENDE
+deterministicamente dopo un fail a ~91%. Riprodotto IDENTICO sulla baseline di main
+(`415d649`, pre-fix) e sull'albero finale → **pre-esistente, non introdotto dal branch**.
+Dettaglio dal run verboso del singolo file:
+`TestVoiceTranscription::test_no_stt_service_returns_empty` fallisce su
+`assert stopped["empty"] is True` (arriva `empty=False`); l'hang della suite si manifesta
+più avanti (zona TTS/WS — sospetta attesa WebSocket/TestClient senza timeout).
+Contesto ambientale rilevante: l'extra voice NON è installato in questo venv
+(`faster-whisper` assente → STT degradato al boot del test-lifespan) e il data dir Qdrant
+può risultare lockato da altre istanze (fallback in-memory) — il fail/hang è quindi
+probabilmente ambiente-dipendente, non necessariamente riproducibile in CI. Due run
+pytest concorrenti contendono sul data dir e si bloccano a vicenda: mai in parallelo.
+**Fix:** APERTO con piano — sessione dedicata: riprodurre con extra voice installato e
+data dir libero; isolare l'hang con `-v -x` dal test incriminato in poi; valutare
+`pytest-timeout` come guardrail di suite.
+**Mitigazione attuale:** verifica per sottoinsiemi mirati (tutti verdi in questo audit).
+
 ## Debito censito NON in scope (dichiarato, non toccato)
 
 - **EOL misti per file:** 52 file backend sono CRLF in HEAD, il resto LF; nessuna
@@ -127,5 +148,6 @@ richiusi; il confronto normalizzato branch-vs-main esclude gli artefatti `backen
 | AUD-007 (bonifica+gate) | `2349be2`, `1fa5d28`, `9e0bab9`, `f801635` |
 
 **Gate finali:** ruff = 0 · import-linter 6/6 kept · contratti generati senza drift ·
-mypy a parità con main sui file toccati · pytest integrale: esito annotato nel messaggio
-di merge (run finale su albero definitivo).
+mypy a parità con main sui file toccati · pytest: ~550 test mirati verdi su tutti i moduli
+toccati; la suite INTEGRALE non è completabile su questa macchina per l'hang pre-esistente
+AUD-008 (riprodotto identico sulla baseline di main — vedi sopra).

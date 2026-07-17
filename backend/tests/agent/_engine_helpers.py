@@ -131,7 +131,8 @@ async def _run_with_compaction(
     *,
     llm_steps: list[list[ports.LLMEvent]],
     exec_tools: dict[str, ports.ToolExecutionOutput],
-    compaction: ports.CompactionResult,
+    compaction: ports.CompactionResult | None = None,
+    context_port: ports.ContextPort | None = None,
     verdicts: dict[str, ports.GateVerdict] | None = None,
     confirm: ports.InteractionOutcome = ports.InteractionOutcome.APPROVED,
     delays: dict[str, float] | None = None,
@@ -140,15 +141,23 @@ async def _run_with_compaction(
     max_steps: int = 8,
     max_tool_calls: int | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, ScriptedLLMPort]:
-    """Come ``_run_with`` ma con un ``TriggeringContextPort`` iniettato, esponendo l'LLMPort."""
+    """Come ``_run_with`` ma con un ``ContextPort`` iniettato, esponendo l'LLMPort.
+
+    Se ``context_port`` è None, usa ``TriggeringContextPort(compaction)``; altrimenti
+    usa il context_port fornito (compaction viene ignorato in questo caso).
+    """
     persistence = InMemoryPersistence()
     rec = RecordingEventPort()
     llm = ScriptedLLMPort(steps=llm_steps)
     exec_port = MapExecutionPort(tools=exec_tools, meta=meta, delays=delays)
+    if context_port is None:
+        if compaction is None:
+            raise ValueError("Almeno uno tra context_port e compaction deve essere fornito")
+        context_port = TriggeringContextPort(compaction)
     engine = _engine(
         llm=llm, events=rec, persistence=persistence, execution=exec_port,
         verdicts=verdicts, confirm=confirm,
-        context=TriggeringContextPort(compaction),
+        context=context_port,
     )
     request = _request(max_steps=max_steps, max_tool_calls=max_tool_calls)
     outcome = await engine.run(request, cancel=cancel or asyncio.Event())

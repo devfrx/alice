@@ -193,6 +193,21 @@ class TriggeringContextPort:
         return self._result
 
 
+class RaisingContextPort:
+    """ContextPort double: compact() solleva sempre (copre il ramo fail-open)."""
+
+    def estimate_tokens(self, messages: list[dict[str, Any]]) -> int:
+        return 99999
+
+    def should_compact(self, *, tokens: int, context_window: int) -> bool:
+        return True
+
+    async def compact(
+        self, *, messages: list[dict[str, Any]], context_window: int,
+    ) -> ports.CompactionResult:
+        raise RuntimeError("compaction esplosa")
+
+
 class MapExecutionPort:
     """ExecutionPort: risultati/metadati/ritardi/errori mappati per nome tool."""
 

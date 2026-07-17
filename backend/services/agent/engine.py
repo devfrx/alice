@@ -299,7 +299,8 @@ class AgentEngine:
         if not result.performed:
             await self._events.emit(ev.CompactionEvent(
                 turn_id=turn_id, phase="failed",
-                tokens_before=None, tokens_after=None, error=result.error,
+                tokens_before=result.tokens_before, tokens_after=result.tokens_after,
+                error=result.error,
             ))
             return
         summary_text = result.summary_text or ""

@@ -8,6 +8,7 @@ from backend.tests.agent._engine_helpers import (
     _run_with_compaction,
     _tool_step,
 )
+from backend.tests.agent.doubles import RaisingContextPort
 
 
 async def test_compaction_triggers_between_steps_and_rewrites_history() -> None:
@@ -48,3 +49,24 @@ async def test_context_usage_emitted_each_extra_step() -> None:
         exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
     )
     assert any(e.type == "context.usage" for e in rec.events)
+
+
+async def test_compaction_raise_is_fail_open() -> None:
+    """Quando compact() solleva, il turno completa comunque (fail-open)."""
+    calls = (ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec, llm = await _run_with_compaction(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+        context_port=RaisingContextPort(),
+    )
+    phases = [e.phase for e in rec.events if e.type == "context.compaction"]
+    assert phases == ["started", "failed"]
+    # Verifica che l'errore sia presente nell'evento failed
+    failed_events = [
+        e for e in rec.events
+        if e.type == "context.compaction" and e.phase == "failed"
+    ]
+    assert failed_events, "Dovrebbe esserci un evento compaction con phase=failed"
+    assert "compaction esplosa" in failed_events[0].error
+    # Il turno completa comunque (fail-open)
+    assert outcome.finish_reason == "stop"

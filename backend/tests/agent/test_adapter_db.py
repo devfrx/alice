@@ -65,6 +65,64 @@ async def test_assistant_and_tool_rows_share_call_id(db_session, conv: Conversat
     assert rows[-1].role == "tool" and rows[-1].tool_call_id == "call_z"
 
 
+async def test_save_final_message_writes_row_and_returns_id(
+    db_session, conv: Conversation,
+) -> None:
+    """save_final_message scrive la riga assistant finale (role/content/version)
+    e ritorna l'id; ``usage`` solo con cost>0, ``token_count`` solo con
+    input_tokens>0 (carry #2)."""
+    vg = str(uuid.uuid4())
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=None, version_group_id=vg, version_index=2,
+    )
+    msg_id = await p.save_final_message(
+        content="risposta finale", thinking="ragiono",
+        input_tokens=120, output_tokens=15, cost=0.004,
+    )
+    await p.checkpoint()
+
+    row = (
+        await db_session.exec(
+            select(Message).where(Message.id == uuid.UUID(msg_id))
+        )
+    ).one()
+    assert row.role == "assistant"
+    assert row.content == "risposta finale"
+    assert row.thinking_content == "ragiono"
+    assert str(row.version_group_id) == vg
+    assert row.version_index == 2
+    assert row.token_count == 120
+    assert row.usage == {
+        "prompt_tokens": 120, "completion_tokens": 15, "cost": round(0.004, 8),
+    }
+
+
+async def test_save_final_message_omits_usage_and_token_count_when_zero(
+    db_session, conv: Conversation,
+) -> None:
+    """Nessun ``usage`` senza costo e nessun ``token_count`` senza input_tokens."""
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=None, version_group_id=None, version_index=None,
+    )
+    msg_id = await p.save_final_message(
+        content="senza token", thinking="",
+        input_tokens=0, output_tokens=0, cost=0.0,
+    )
+    await p.checkpoint()
+
+    row = (
+        await db_session.exec(
+            select(Message).where(Message.id == uuid.UUID(msg_id))
+        )
+    ).one()
+    assert row.token_count is None
+    assert row.usage is None
+    assert row.thinking_content is None
+    assert row.version_index == 0
+
+
 async def test_archive_compacted_excludes_from_history(db_session, conv: Conversation) -> None:
     """archive_compacted esclude gli ID archiviati e inserisce il summary (§6.4.11)."""
     p = SqlModelPersistence(

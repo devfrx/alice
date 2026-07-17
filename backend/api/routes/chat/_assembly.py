@@ -798,6 +798,7 @@ class TurnAssembler:
                 else None
             ),
             version_index=user_msg.version_index,
+            user_message_id=str(user_msg.id),
             max_tool_calls=max_tool_calls,
         )
 

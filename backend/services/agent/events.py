@@ -198,15 +198,21 @@ class TurnUsageEvent(BaseModel):
 
 
 class TurnFinishedEvent(BaseModel):
-    """Evento: turno completato."""
+    """Evento: turno completato (payload completo, carry #2)."""
 
     type: Literal["turn.finished"] = "turn.finished"
     turn_id: str
     finish_reason: str
+    conversation_id: str
+    final_message_id: str | None
+    user_message_id: str | None
+    version_group_id: str | None
+    version_index: int
     steps: int
     tool_calls: int
+    input_tokens: int
+    output_tokens: int
     cost: float
-    final_message_id: str | None
     model_config = ConfigDict(frozen=True)
 
 

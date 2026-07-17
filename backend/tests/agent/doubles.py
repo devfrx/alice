@@ -46,15 +46,19 @@ class RecordingEventPort:
 class InMemoryPersistence:
     """PersistencePort: stato in-memoria, ordine di chiamata tracciato."""
 
-    def __init__(self, history: list[dict[str, Any]] | None = None) -> None:
+    def __init__(
+        self, history: list[dict[str, Any]] | None = None, *, fail_final: bool = False,
+    ) -> None:
         self._history = history or []
         self.assistant_steps: list[dict[str, Any]] = []
         self.tool_results: list[dict[str, Any]] = []
         self.audits: list[dict[str, Any]] = []
+        self.final_messages: list[dict[str, Any]] = []
         self.checkpoints = 0
         self.order: list[tuple[str, str]] = []
         self.archived: list[tuple[str, list[str]]] = []
         self._next_id = 0
+        self._fail_final = fail_final
 
     async def save_assistant_step(
         self, *, content: str, thinking: str,
@@ -75,6 +79,20 @@ class InMemoryPersistence:
             "call_id": call.call_id, "call": call, "content": content, "status": status,
         })
         self.order.append(("tool_result", call.call_id))
+
+    async def save_final_message(
+        self, *, content: str, thinking: str,
+        input_tokens: int, output_tokens: int, cost: float,
+    ) -> str:
+        if self._fail_final:
+            raise RuntimeError("persist boom")
+        self.final_messages.append({
+            "content": content, "thinking": thinking,
+            "input_tokens": input_tokens, "output_tokens": output_tokens,
+            "cost": cost,
+        })
+        self.order.append(("final_message", "final-msg-1"))
+        return "final-msg-1"
 
     async def save_audit(
         self, *, call: ToolInvocation, verdict: ports.GateVerdict,

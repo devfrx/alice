@@ -71,8 +71,10 @@ def _one_sample_per_event_class() -> list[ev.AgentEvent]:
             tool_calls=1, max_steps=8,
         ),
         ev.TurnFinishedEvent(
-            turn_id="t", finish_reason="stop", steps=2, tool_calls=1, cost=0.02,
-            final_message_id="m1",
+            turn_id="t", finish_reason="stop", conversation_id="conv",
+            final_message_id="m1", user_message_id="u1", version_group_id="vg",
+            version_index=0, steps=2, tool_calls=1,
+            input_tokens=30, output_tokens=8, cost=0.02,
         ),
         ev.RawToolCallDeltaEvent(
             turn_id="t",
@@ -126,11 +128,27 @@ def test_llm_step_one_emits_no_requery() -> None:
 def test_turn_finished_only_no_done() -> None:
     """TurnFinishedEvent → solo turn.finished; `done` lo emette ws.py, non qui."""
     e = ev.TurnFinishedEvent(
-        turn_id="t", finish_reason="stop", steps=1, tool_calls=0, cost=0.0,
-        final_message_id=None,
+        turn_id="t", finish_reason="stop", conversation_id="conv",
+        final_message_id=None, user_message_id=None, version_group_id=None,
+        version_index=0, steps=1, tool_calls=0,
+        input_tokens=0, output_tokens=0, cost=0.0,
     )
     types = [f["type"] for f in to_wire_frames(e)]
     assert types == ["turn.finished"]
+
+
+def test_turn_finished_carries_real_tokens() -> None:
+    """Il frame turn.finished porta i token/cost reali del turno (carry #2)."""
+    e = ev.TurnFinishedEvent(
+        turn_id="t", finish_reason="stop", conversation_id="conv",
+        final_message_id="m1", user_message_id="u1", version_group_id=None,
+        version_index=0, steps=1, tool_calls=0,
+        input_tokens=300, output_tokens=30, cost=0.05,
+    )
+    frame = to_wire_frames(e)[0]
+    assert frame["input_tokens"] == 300
+    assert frame["output_tokens"] == 30
+    assert frame["cost"] == 0.05
 
 
 def test_interaction_kind_is_mapped_to_wire_vocab() -> None:

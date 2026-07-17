@@ -233,6 +233,42 @@ class SqlModelPersistence:
         await self._session.flush()
         self._tool_message_ids[call.call_id] = message.id
 
+    async def save_final_message(
+        self, *, content: str, thinking: str,
+        input_tokens: int, output_tokens: int, cost: float,
+    ) -> str:
+        """Persiste il messaggio assistant FINALE del turno (flush, no commit).
+
+        La DECISIONE di salvare è del motore (matrice in ``engine._finish``);
+        qui solo la scrittura: version fields del turno, ``token_count`` quando
+        i token reali sono noti, ``usage`` (accounting OpenRouter) quando il
+        turno ha un costo. Divergenza minore censita: il legacy legava
+        ``token_count`` alla presenza di context_manager/context_window (era il
+        gate del frame context_info, non della colonna) — qui si persiste
+        sempre che ``input_tokens > 0``.
+        """
+        message = Message(
+            conversation_id=self._conversation_id,
+            role="assistant",
+            content=content,
+            thinking_content=thinking or None,
+            version_group_id=self._version_group_id,
+            version_index=(
+                self._version_index if self._version_index is not None else 0
+            ),
+        )
+        if input_tokens > 0:
+            message.token_count = input_tokens
+        if cost > 0:
+            message.usage = {
+                "prompt_tokens": input_tokens,
+                "completion_tokens": output_tokens,
+                "cost": round(cost, 8),
+            }
+        self._session.add(message)
+        await self._session.flush()
+        return str(message.id)
+
     async def save_audit(
         self, *, call: ToolInvocation, verdict: GateVerdict,
         interaction: InteractionOutcome | None,

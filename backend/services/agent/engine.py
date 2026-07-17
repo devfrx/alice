@@ -787,7 +787,8 @@ class AgentEngine:
         state: _TurnState,
         budget: BudgetTracker,
     ) -> TurnOutcome:
-        """Emette ``TurnFinishedEvent`` e costruisce il ``TurnOutcome`` finale.
+        """Persiste il messaggio finale (matrice sotto), emette
+        ``TurnFinishedEvent`` e costruisce il ``TurnOutcome``.
 
         Chiamato SEMPRE, indipendentemente da come il loop si è fermato.
         """
@@ -798,15 +799,10 @@ class AgentEngine:
                 turn_id=turn_id, code="max_steps",
                 message="Budget di step esaurito con tool call in sospeso.",
             ))
-        await self._events.emit(ev.TurnFinishedEvent(
-            turn_id=turn_id, finish_reason=finish_reason, steps=budget.steps,
-            tool_calls=state.tool_calls, cost=state.cost,
-            final_message_id=state.final_assistant_message_id,
-        ))
-        # Fix review T16: `TurnOutcome.content` = testo dell'ULTIMO step, non
-        # il cumulato di tutti gli step (altrimenti la prosa pre-tool, già
-        # persistita da `save_assistant_step`, verrebbe ri-scritta dal persist
-        # path come messaggio finale — duplicata).
+        # Fix review T16: `final_content` = testo dell'ULTIMO step, non il
+        # cumulato di tutti gli step (altrimenti la prosa pre-tool, già
+        # persistita da `save_assistant_step`, verrebbe ri-scritta come
+        # messaggio finale — duplicata).
         #
         # - COMPLETED / LENGTH / MAX_STEPS: `state.content` è ESATTAMENTE il
         #   testo dello step che ha determinato lo stop (letterale, anche se
@@ -824,6 +820,52 @@ class AgentEngine:
             final_content = state.content or state.last_step_content
         else:
             final_content = state.content
+
+        # Matrice di salvataggio del messaggio finale (carry #2/#3):
+        #   COMPLETED/LENGTH/MAX_STEPS -> prosa finale, o turno senza tool
+        #   CANCELLED                  -> parziale (content o thinking)
+        #   DISCONNECTED               -> recovery message (era in ws.py)
+        #   ERROR                      -> mai (il persist path fa solo rollback)
+        if resolved_stop in (
+            StopReason.COMPLETED, StopReason.LENGTH, StopReason.MAX_STEPS,
+        ):
+            should_save = bool(final_content.strip()) or state.tool_calls == 0
+        elif resolved_stop is StopReason.CANCELLED:
+            should_save = bool(final_content or state.thinking)
+        elif resolved_stop is StopReason.DISCONNECTED:
+            should_save = bool(final_content)
+        else:  # ERROR
+            should_save = False
+        if should_save:
+            try:
+                state.final_assistant_message_id = (
+                    await self._persistence.save_final_message(
+                        content=final_content, thinking=state.thinking,
+                        input_tokens=state.input_tokens,
+                        output_tokens=state.output_tokens, cost=state.cost,
+                    )
+                )
+                await self._persistence.checkpoint()
+            except Exception as exc:
+                logger.exception("AgentEngine: persistenza finale fallita")
+                await self._events.emit(ev.TurnErrorEvent(
+                    turn_id=turn_id, code="persist_failed", message=str(exc),
+                ))
+                resolved_stop = StopReason.ERROR
+                finish_reason = STOP_TO_FINISH[resolved_stop]
+                state.final_assistant_message_id = None
+
+        await self._events.emit(ev.TurnFinishedEvent(
+            turn_id=turn_id, finish_reason=finish_reason,
+            conversation_id=state.request.conversation_id,
+            final_message_id=state.final_assistant_message_id,
+            user_message_id=state.request.user_message_id,
+            version_group_id=state.request.version_group_id,
+            version_index=state.request.version_index or 0,
+            steps=budget.steps, tool_calls=state.tool_calls,
+            input_tokens=state.input_tokens, output_tokens=state.output_tokens,
+            cost=state.cost,
+        ))
         return TurnOutcome(
             content=final_content, thinking=state.thinking,
             finish_reason=finish_reason, stop_reason=resolved_stop,

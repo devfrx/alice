@@ -207,6 +207,11 @@ class PersistencePort(Protocol):
         self, *, call: ToolInvocation, content: str, status: str,
     ) -> None: ...
 
+    async def save_final_message(
+        self, *, content: str, thinking: str,
+        input_tokens: int, output_tokens: int, cost: float,
+    ) -> str: ...
+
     async def save_audit(
         self, *, call: ToolInvocation, verdict: GateVerdict,
         interaction: InteractionOutcome | None,

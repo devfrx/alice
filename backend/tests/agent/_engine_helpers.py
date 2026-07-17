@@ -44,13 +44,17 @@ def _final_step() -> list[ports.LLMEvent]:
 
 def _request(
     *, max_steps: int = 8, max_tool_calls: int | None = None,
+    user_message_id: str | None = None,
+    version_group_id: str | None = None,
+    version_index: int | None = None,
 ) -> TurnRequest:
     return TurnRequest(
         conversation_id="c1", system_prompt="sp",
         history=[{"role": "user", "content": "ciao"}], tools=[],
         source=TurnSource.CHAT, max_steps=max_steps, context_window=32768,
         resolved_max_tokens=None, client_ip=None,
-        version_group_id=None, version_index=None,
+        version_group_id=version_group_id, version_index=version_index,
+        user_message_id=user_message_id,
         max_tool_calls=max_tool_calls,
     )
 
@@ -99,9 +103,13 @@ async def _run_with_port(
     client_result: ports.ToolExecutionOutput | None = None,
     ask_user_result: ports.ToolExecutionOutput | None = None,
     progress: dict[str, dict] | None = None,
+    fail_final: bool = False,
+    user_message_id: str | None = None,
+    version_group_id: str | None = None,
+    version_index: int | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, MapExecutionPort]:
     """Costruisce l'engine coi double e lo esegue, esponendo anche l'ExecutionPort."""
-    persistence = InMemoryPersistence()
+    persistence = InMemoryPersistence(fail_final=fail_final)
     rec = RecordingEventPort()
     llm = ScriptedLLMPort(steps=llm_steps)
     exec_port = MapExecutionPort(
@@ -112,7 +120,11 @@ async def _run_with_port(
         verdicts=verdicts, confirm=confirm, client_result=client_result,
         ask_user_result=ask_user_result,
     )
-    request = _request(max_steps=max_steps, max_tool_calls=max_tool_calls)
+    request = _request(
+        max_steps=max_steps, max_tool_calls=max_tool_calls,
+        user_message_id=user_message_id, version_group_id=version_group_id,
+        version_index=version_index,
+    )
     outcome = await engine.run(request, cancel=cancel or asyncio.Event())
     return persistence, outcome, rec, exec_port
 
@@ -132,13 +144,19 @@ async def _run_with(
     client_result: ports.ToolExecutionOutput | None = None,
     ask_user_result: ports.ToolExecutionOutput | None = None,
     progress: dict[str, dict] | None = None,
+    fail_final: bool = False,
+    user_message_id: str | None = None,
+    version_group_id: str | None = None,
+    version_index: int | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort]:
     """Come ``_run_with_port`` ma senza esporre l'ExecutionPort."""
     persistence, outcome, rec, _ = await _run_with_port(
         llm_steps=llm_steps, exec_tools=exec_tools, verdicts=verdicts,
         confirm=confirm, delays=delays, errors=errors, meta=meta, cancel=cancel,
         max_steps=max_steps, max_tool_calls=max_tool_calls, client_result=client_result,
-        ask_user_result=ask_user_result, progress=progress,
+        ask_user_result=ask_user_result, progress=progress, fail_final=fail_final,
+        user_message_id=user_message_id, version_group_id=version_group_id,
+        version_index=version_index,
     )
     return persistence, outcome, rec
 

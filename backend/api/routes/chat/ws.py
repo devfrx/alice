@@ -15,13 +15,10 @@ only the post-turn ``done`` / ``context_info`` / compression frames.
 
 from __future__ import annotations
 
-import contextlib
-
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 
 from backend.api.ws_schema.guard import chat_frame_validator
-from backend.db.models import Message
 from backend.services.agent.adapters.ws import WsTransport
 from backend.services.agent.models import TurnOutcome
 from backend.services.agent.runner import run_agent_turn
@@ -32,7 +29,6 @@ from ._persist import _persist_final_turn
 from ._shared import (
     _ctx,
     _get_ws_lock,
-    _utcnow,
     _ws_connections,
     conversation_active,
     router,
@@ -177,22 +173,9 @@ async def ws_chat(websocket: WebSocket) -> None:
                         cancel=cancel_event,
                     )
 
-                # FIX v2-4: disconnect recovery — save partial content
-                # then propagate so the outer WS loop exits cleanly.
                 if result.finish_reason == "disconnected":
-                    if result.content:
-                        recovery_msg = Message(
-                            conversation_id=conv_id,
-                            role="assistant",
-                            content=result.content,
-                            thinking_content=result.thinking or None,
-                            version_group_id=user_msg.version_group_id,
-                            version_index=user_msg.version_index,
-                        )
-                        session.add(recovery_msg)
-                        conv.updated_at = _utcnow()
-                        with contextlib.suppress(Exception):
-                            await session.commit()
+                    # Il recovery message parziale è già stato persistito dal
+                    # motore (matrice _finish, carry #3): qui si esce e basta.
                     raise WebSocketDisconnect()
 
                 await _persist_final_turn(

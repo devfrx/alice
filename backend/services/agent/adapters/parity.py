@@ -234,13 +234,12 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
         }]
 
     if isinstance(event, ev.TurnFinishedEvent):
-        # TurnFinishedEvent non porta i token del passo finale → 0.
         return [{
             "type": "turn.finished",
             "turn_id": event.turn_id,
             "finish_reason": event.finish_reason,
-            "input_tokens": 0,
-            "output_tokens": 0,
+            "input_tokens": event.input_tokens,
+            "output_tokens": event.output_tokens,
             "steps": event.steps,
             "cost": event.cost,
         }]

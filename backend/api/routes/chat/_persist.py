@@ -146,33 +146,14 @@ async def _persist_final_turn(
         return
 
     # ------------------------------------------------------------------
-    # Fast path: cancelled (v3-4).  Two sub-cases depending on whether
-    # the tool loop ran (legacy behaviour preserved exactly).
+    # Fast path: cancelled (v3-4).  The AgentEngine already persisted the
+    # partial assistant message (matrice ``_finish``: CANCELLED saves when
+    # content or thinking is present, including usage) — the persist path
+    # only refreshes the conversation metadata and emits ``done`` with the
+    # engine-returned ``final_message_id``.
     # ------------------------------------------------------------------
     if finish_reason == "cancelled":
-        asst_msg_id = ""
-        if result.content or result.thinking:
-            cancel_msg = Message(
-                conversation_id=conv_id,
-                role="assistant",
-                content=result.content,
-                thinking_content=result.thinking or None,
-                version_group_id=user_msg_version_group_id,
-                version_index=user_msg_version_index,
-            )
-            if result.cost > 0:
-                cancel_msg.usage = {
-                    "prompt_tokens": result.input_tokens,
-                    "completion_tokens": result.output_tokens,
-                    "cost": round(result.cost, 8),
-                }
-            session.add(cancel_msg)
-            asst_msg_id = str(cancel_msg.id)
-        elif result.cost > 0:
-            logger.debug(
-                "Turn cost {} not persisted (cancelled turn without content)",
-                result.cost,
-            )
+        asst_msg_id = result.final_assistant_message_id or ""
         if result.tool_calls > 0 or result.content or result.thinking:
             conv.updated_at = _utcnow()
             if conv.title is None and user_content:
@@ -188,27 +169,15 @@ async def _persist_final_turn(
         return
 
     # ------------------------------------------------------------------
-    # Normal path: persist final assistant message + post-stream work.
+    # Normal path: the AgentEngine already persisted the final assistant
+    # message (matrice ``_finish``: content/token_count/usage all written
+    # via ``PersistencePort.save_final_message``).  The persist path now
+    # only emits ``context_info`` (v2-6), refreshes conversation metadata
+    # (v2-5), commits and runs the post-stream compression.
     # ------------------------------------------------------------------
-    asst_msg_id = ""
-    asst_msg: Message | None = None
+    asst_msg_id = result.final_assistant_message_id or ""
 
     try:
-        # Skip the final save when the tool loop already produced
-        # intermediate assistant messages and the LLM emitted no
-        # additional text (matches legacy semantics).
-        if result.content.strip() or result.tool_calls == 0:
-            asst_msg = Message(
-                conversation_id=conv_id,
-                role="assistant",
-                content=result.content,
-                thinking_content=result.thinking or None,
-                version_group_id=user_msg_version_group_id,
-                version_index=user_msg_version_index,
-            )
-            session.add(asst_msg)
-            asst_msg_id = str(asst_msg.id)
-
         # v2-6: emit context_info with REAL token counts when available.
         if (
             result.input_tokens > 0
@@ -233,26 +202,6 @@ async def _persist_final_turn(
                     messages, tool_tokens, ctx.context_manager,
                 ),
             })
-            # v2-7: persist token count on the assistant message.
-            if asst_msg is not None:
-                asst_msg.token_count = result.input_tokens
-                session.add(asst_msg)
-                await session.flush()
-
-        # Usage accounting (OpenRouter): persisti il costo del turno sul
-        # messaggio assistant finale. La SUM per conversazione è on-read.
-        if asst_msg is not None and result.cost > 0:
-            asst_msg.usage = {
-                "prompt_tokens": result.input_tokens,
-                "completion_tokens": result.output_tokens,
-                "cost": round(result.cost, 8),
-            }
-            session.add(asst_msg)
-        elif result.cost > 0:
-            logger.debug(
-                "Turn cost {} not persisted (tool-only turn without final message)",
-                result.cost,
-            )
 
         conv.updated_at = _utcnow()
         if conv.title is None and user_content:

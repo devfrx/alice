@@ -80,6 +80,116 @@ async def test_final_content_excludes_pre_tool_prose() -> None:
     assert "".join(deltas) == "Sto per usare un tool. Ecco il risultato."
 
 
+# --- Matrice di salvataggio del messaggio finale (carry #2/#3) --------------
+#   COMPLETED/LENGTH/MAX_STEPS -> content.strip() non vuoto OPPURE tool_calls == 0
+#   CANCELLED                  -> content o thinking non vuoti
+#   DISCONNECTED               -> content non vuoto (recovery message)
+#   ERROR                      -> mai
+
+
+async def test_finish_saves_final_message_on_completed() -> None:
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_final_step()],
+        exec_tools={},
+    )
+    assert outcome.stop_reason is StopReason.COMPLETED
+    assert len(persistence.final_messages) == 1
+    assert persistence.final_messages[0]["content"] == "fatto"
+    assert outcome.final_assistant_message_id == "final-msg-1"
+    finished = rec.events[-1]
+    assert finished.type == "turn.finished"
+    assert finished.final_message_id == "final-msg-1"
+
+
+async def test_finish_skips_save_on_tool_only_turn() -> None:
+    # content vuoto (lo step con tool non produce prosa) + tool_calls>0:
+    # MAX_STEPS con budget esaurito su tool call -> nessun messaggio finale.
+    call = (ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(call)],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+        max_steps=1,
+    )
+    assert outcome.stop_reason is StopReason.MAX_STEPS
+    assert outcome.tool_calls == 1
+    assert persistence.final_messages == []
+    assert outcome.final_assistant_message_id is None
+    finished = rec.events[-1]
+    assert finished.type == "turn.finished" and finished.final_message_id is None
+
+
+async def test_finish_saves_recovery_on_disconnect() -> None:
+    # step con prosa parziale + tool call che il gate manda a conferma;
+    # il client cade (DISCONNECTED) -> recovery message col parziale.
+    step1 = [ports.LLMTextDelta(text="parziale"),
+             ports.LLMStepDone(finish_reason="tool_calls", tool_calls=(
+                 ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),))]
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[step1],
+        exec_tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        verdicts={"write": ports.GateVerdict(action=ports.GateAction.CONFIRM,
+                                             outcome="needs_confirmation")},
+        confirm=ports.InteractionOutcome.DISCONNECTED,
+    )
+    assert outcome.finish_reason == "disconnected"
+    assert len(persistence.final_messages) == 1
+    assert persistence.final_messages[0]["content"] == "parziale"
+    assert outcome.final_assistant_message_id == "final-msg-1"
+
+
+async def test_finish_never_saves_on_error() -> None:
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[[ports.LLMFailure(message="boom", status_code=None, retryable=False)]],
+        exec_tools={},
+    )
+    assert outcome.finish_reason == "error"
+    assert persistence.final_messages == []
+    assert outcome.final_assistant_message_id is None
+
+
+async def test_turn_finished_event_carries_ids_and_totals() -> None:
+    step1 = [ports.LLMTextDelta(text="ciao"),
+             ports.LLMUsage(input_tokens=100, output_tokens=10, cost=0.01),
+             ports.LLMStepDone(finish_reason="stop", tool_calls=())]
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[step1],
+        exec_tools={},
+        user_message_id="user-42",
+        version_group_id="vg-7",
+        version_index=3,
+    )
+    finished = rec.events[-1]
+    assert finished.type == "turn.finished"
+    # final_message_id = id ritornato dal save; ids/version dalla request;
+    # token/cost = totali accumulati; emesso DOPO save+checkpoint.
+    assert finished.final_message_id == "final-msg-1"
+    assert finished.conversation_id == "c1"
+    assert finished.user_message_id == "user-42"
+    assert finished.version_group_id == "vg-7"
+    assert finished.version_index == 3
+    assert finished.input_tokens == 100 and finished.output_tokens == 10
+    assert round(finished.cost, 4) == 0.01
+    assert finished.tool_calls == 0
+    # save + checkpoint accadono PRIMA dell'emissione di turn.finished
+    assert ("final_message", "final-msg-1") in persistence.order
+    assert persistence.order[-1] == ("checkpoint", "")
+
+
+async def test_save_failure_degrades_to_error() -> None:
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_final_step()],
+        exec_tools={},
+        fail_final=True,
+    )
+    assert outcome.finish_reason == "error"
+    assert outcome.final_assistant_message_id is None
+    assert any(
+        e.type == "turn.error" and e.code == "persist_failed" for e in rec.events
+    )
+    finished = rec.events[-1]
+    assert finished.type == "turn.finished" and finished.finish_reason == "error"
+
+
 async def test_cost_and_usage_accumulate_across_steps() -> None:
     step1 = [ports.LLMUsage(input_tokens=100, output_tokens=10, cost=0.01),
              ports.LLMStepDone(finish_reason="tool_calls", tool_calls=(

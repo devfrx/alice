@@ -29,6 +29,15 @@ Fix review T12 (bare tool name): la ``ToolDefinition`` è recuperata con
 (quindi lo stesso ``risk_level``/capability nel gate) che produrrebbe il nome
 namespaced completo, invece di gated con ``tool_def=None`` (decisione più
 debole).
+
+Fix review olistica M1 (nome nudo passato a ``PermissionService.decide``):
+il nome RISOLTO (namespaced) — non più ``call.name`` — è passato come
+``tool_name`` a ``PermissionService.decide``. Rules/grants per-conversazione
+sono keyed sul nome namespaced (es. ``"memory_remember"``); passare il nome
+nudo emesso dal modello (``"remember"``) faceva sì che una regola/grant su
+``memory_remember`` non facesse mai match. Se la risoluzione fallisce (nome
+sconosciuto o suffisso ambiguo), fallback al nome nudo originale — stesso
+comportamento di prima per i tool non risolvibili.
 """
 
 from __future__ import annotations
@@ -92,9 +101,10 @@ class PermissionServiceAdapter:
         """
         mode = self._mode_service.get_mode(conversation_id)
         resolved = resolve_tool_definition(self._tool_registry, call.name)
+        tool_name = resolved[0] if resolved is not None else call.name
         tool_def = resolved[1] if resolved is not None else None
         decision = self._permission_service.decide(
-            tool_name=call.name,
+            tool_name=tool_name,
             args=call.args,
             tool_def=tool_def,
             conversation_id=conversation_id,

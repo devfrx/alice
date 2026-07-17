@@ -1,8 +1,10 @@
 """Contract tests: chat-channel WS frames validate against ws_schema.
 
-Representative frames copied VERBATIM from the emit sites (llm_service
-stream forwarding, tool_loop/pipeline, chat _persist/_assembly, turn
-events builders, reflective executor, interaction channel).
+Representative frames copied VERBATIM from the emit sites: llm_service
+stream forwarding, the v2 AgentEngine's WS adapters (``services/agent/
+adapters/ws.py``'s ``WsTransport``, ``services/agent/adapters/parity.py``
+for legacy-shape parity), and chat ``_persist``/``_assembly`` (which still
+builds the final ``done`` event from the engine's ``TurnOutcome``).
 """
 
 from __future__ import annotations

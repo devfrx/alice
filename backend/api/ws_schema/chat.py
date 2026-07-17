@@ -1,12 +1,14 @@
 """AL\\CE — Typed schema of the chat WebSocket channel (``/api/ws/chat``).
 
-One Pydantic model per frame. Field shapes audited from the emit sites on
-2026-06-11: LLM stream forwarding (``services/turn/direct_executor.py`` —
-``usage`` and the LLM-level ``done`` are consumed internally and never
-reach the client), tool loop (``tool_loop.py``/``pipeline.py``), turn
-persistence (``api/routes/chat/_persist.py`` builds the final ``done``),
-canonical turn events (``services/turn/events.py``), interaction frames
-(``services/turn/channel.py`` ``_REQUEST_SPECS``), reflective executor.
+One Pydantic model per frame. Field shapes originally audited from the
+legacy emit sites on 2026-06-11 (LLM stream forwarding, ``tool_loop.py``/
+``pipeline.py``, ``services/turn/events.py``, ``services/turn/channel.py``
+``_REQUEST_SPECS``, reflective executor); those modules were demolished by
+the v2 AgentEngine migration. The current frame producers are the
+``services/agent`` engine via its WS adapters (``services/agent/adapters/
+ws.py``'s ``WsTransport``, ``services/agent/adapters/parity.py`` for
+legacy-shape parity) and ``api/routes/chat/_persist.py`` (which still
+builds the final ``done`` event after the engine's ``TurnOutcome``).
 """
 
 from __future__ import annotations

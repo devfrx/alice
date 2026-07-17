@@ -1,9 +1,23 @@
 """AgentEngine: loop agentico unificato, I/O solo attraverso le porte.
 
-Questo modulo copre, per ora, SOLO il percorso senza tool call (Task 8 del
-piano Fase 1 Mossa 1): stream di uno step LLM, retry su risposta vuota,
-cancel cooperativo, fallimento LLM non recuperabile. La gestione delle tool
-call (gate permessi, interazione, esecuzione, dedup) arriva col Task 9.
+Orchestratore centrale del turno: per ogni step, stream della risposta LLM
+(con retry su risposta vuota via ``RetryPolicy`` e cancel cooperativo),
+seguito — se il modello ha emesso tool call — dal gate permessi per-call
+(``PermissionPort.decide``: EXECUTE / DENY / CONFIRM) e dal routing di ogni
+call risolta verso uno di tre percorsi: interattiva (conferma utente via
+``InteractionPort``), client-executed (``app_command`` e simili, delegati al
+frontend), o batch server-side greenlit — eseguito in PARALLELO
+(``asyncio.gather``, ``_run_tool_batch``) dopo il dedup (``DedupRegistry``).
+Prima di ogni step successivo al primo, valuta ed eventualmente esegue la
+compaction del contesto (``ContextPort.should_compact``/``compact``,
+fail-open: un errore di compaction non affonda il turno). Lo stop del turno
+(budget step/token, finish naturale, errore LLM non recuperabile, cancel) è
+risolto da ``resolve_stop``/``BudgetTracker`` (``stop.py``). Tutto l'I/O
+verso piattaforma — LLM, permessi, esecuzione tool, interazione utente,
+persistenza, contesto, eventi — passa esclusivamente attraverso le
+``Port`` Protocol di ``services/agent/ports.py``; il motore non conosce le
+implementazioni concrete di piattaforma (quelle vivono negli adapter,
+``services/agent/adapters/``).
 """
 
 from __future__ import annotations

@@ -113,3 +113,75 @@ async def test_verdict_risk_level_and_description_none_when_tool_unknown() -> No
 
     assert verdict.risk_level is None
     assert verdict.description is None
+
+
+async def test_decide_passes_resolved_namespaced_name_for_bare_tool_call() -> None:
+    """Un nome "nudo" emesso dal modello (es. ``remember``) deve arrivare a
+    ``PermissionService.decide`` come nome namespaced risolto (``memory_remember``),
+    non come nome nudo — altrimenti rules/grants per-conversazione keyed sul nome
+    namespaced non fanno mai match.
+    """
+    tool_def = MagicMock(risk_level="safe", description="ricorda un fatto")
+    permission_service = MagicMock()
+    permission_service.decide.return_value = GateDecision.allow()
+    mode_service = MagicMock()
+    mode_service.get_mode.return_value = PermissionMode.STRICT
+    tool_registry = MagicMock()
+
+    def get_tool_definition(name: str) -> object | None:
+        if name == "memory_remember":
+            return tool_def
+        return None
+
+    tool_registry.get_tool_definition.side_effect = get_tool_definition
+    tool_registry.get_all_tools.return_value = [
+        {"function": {"name": "memory_remember"}},
+        {"function": {"name": "other_tool"}},
+    ]
+    adapter = PermissionServiceAdapter(
+        permission_service=permission_service,
+        mode_service=mode_service,
+        tool_registry=tool_registry,
+        conversation_id="conv-1",
+    )
+    call = _call(name="remember", args={"fact": "x"})
+
+    await adapter.decide(call, conversation_id="conv-1")
+
+    permission_service.decide.assert_called_once_with(
+        tool_name="memory_remember",
+        args={"fact": "x"},
+        tool_def=tool_def,
+        conversation_id="conv-1",
+        mode=PermissionMode.STRICT,
+    )
+
+
+async def test_decide_falls_back_to_bare_name_when_unresolvable() -> None:
+    """Nome nudo ambiguo o sconosciuto -> fallback al nome nudo originale (nessuna
+    regressione rispetto al comportamento pre-fix per i nomi non risolvibili).
+    """
+    permission_service = MagicMock()
+    permission_service.decide.return_value = GateDecision.allow()
+    mode_service = MagicMock()
+    mode_service.get_mode.return_value = PermissionMode.STRICT
+    tool_registry = MagicMock()
+    tool_registry.get_tool_definition.return_value = None
+    tool_registry.get_all_tools.return_value = []
+    adapter = PermissionServiceAdapter(
+        permission_service=permission_service,
+        mode_service=mode_service,
+        tool_registry=tool_registry,
+        conversation_id="conv-1",
+    )
+    call = _call(name="totally_unknown", args={})
+
+    await adapter.decide(call, conversation_id="conv-1")
+
+    permission_service.decide.assert_called_once_with(
+        tool_name="totally_unknown",
+        args={},
+        tool_def=None,
+        conversation_id="conv-1",
+        mode=PermissionMode.STRICT,
+    )

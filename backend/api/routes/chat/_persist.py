@@ -121,12 +121,17 @@ async def _persist_final_turn(
     user_msg_version_index = user_msg.version_index
 
     # ------------------------------------------------------------------
-    # Fast path: error (v3-4).  ``run_tool_loop`` may have flushed
-    # intermediate messages; rollback to keep DB consistent with the
-    # legacy behaviour.  Any turn cost is discarded with them — the
-    # the AgentEngine mirrors this by sending ``cost=None`` on the error
-    # ``turn.finished`` frame, so the frontend live chip never sums a cost
-    # this rollback won't back.
+    # Fast path: error.  The AgentEngine already checkpoints intermediate
+    # rows as it goes (``PersistencePort.checkpoint()`` after every
+    # ``save_assistant_step``/``save_tool_result``, see ``engine.py``) —
+    # those are durable regardless of how the turn ends. This rollback
+    # only discards whatever uncommitted work this final-persist call
+    # itself had started on ``session`` before the error was observed
+    # (e.g. a partially-built assistant message), keeping the DB
+    # consistent without touching the already-committed checkpoints. The
+    # AgentEngine sends ``cost=None`` on the error ``turn.finished``
+    # frame, so the frontend live chip never sums a cost this rollback
+    # won't back.
     # ------------------------------------------------------------------
     if finish_reason == "error":
         with contextlib.suppress(Exception):

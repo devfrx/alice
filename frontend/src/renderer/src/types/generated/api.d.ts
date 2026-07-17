@@ -2007,7 +2007,9 @@ export interface paths {
          * Reset Preferences
          * @description Reset all persisted user preferences to defaults.
          *
-         *     The next restart will use only YAML defaults.
+         *     Deletes every preference row, drops the in-memory preferences layer
+         *     (re-loading the now-empty store) and re-applies config reactions, so
+         *     YAML defaults are live immediately — no restart required.
          */
         delete: operations["reset_preferences_api_settings_preferences_delete"];
         options?: never;

@@ -11270,7 +11270,7 @@
     },
     "/api/settings/preferences": {
       "delete": {
-        "description": "Reset all persisted user preferences to defaults.\n\nThe next restart will use only YAML defaults.",
+        "description": "Reset all persisted user preferences to defaults.\n\nDeletes every preference row, drops the in-memory preferences layer\n(re-loading the now-empty store) and re-applies config reactions, so\nYAML defaults are live immediately — no restart required.",
         "operationId": "reset_preferences_api_settings_preferences_delete",
         "responses": {
           "200": {

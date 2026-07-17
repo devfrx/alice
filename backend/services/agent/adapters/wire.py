@@ -34,11 +34,6 @@ def normalize_questions(raw: Any) -> list[dict[str, Any]]:
     ``WsAskUserQuestion`` (extra='forbid') richiede esattamente
     id/text/type/options/allow_free_text: chiavi estranee filtrate, default
     riempiti, tipi coartati in modo difensivo.
-
-    NOTA: una copia della stessa logica vive ancora in ``adapters/ws.py`` per
-    i frame legacy ``ask_user_required`` — quella muore nel Task 8, quando il
-    round-trip interattivo passa al vocabolario v2 e ``ws.py`` non costruisce
-    più frame di richiesta.
     """
     questions: list[dict[str, Any]] = []
     if not isinstance(raw, list):

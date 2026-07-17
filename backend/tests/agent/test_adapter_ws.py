@@ -45,7 +45,6 @@ class FakeWebSocket:
 
     def __init__(self) -> None:
         self._inbound: asyncio.Queue[Any] = asyncio.Queue()
-        self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self.sent: list[dict[str, Any]] = []
         self._closed = False
 
@@ -64,11 +63,6 @@ class FakeWebSocket:
         if self._closed:
             raise RuntimeError('Cannot call "send" once a close message has been sent.')
         self.sent.append(payload)
-        await self._outbound.put(payload)
-
-    async def next_sent(self) -> dict[str, Any]:
-        """Attende e ritorna il prossimo frame outbound."""
-        return await self._outbound.get()
 
     async def disconnect(self) -> None:
         """Simula la caduta del client: receive solleva, send fallisce."""

@@ -112,7 +112,7 @@ class WsTransport:
             )
 
     async def aclose(self) -> None:
-        """Ferma il pump e marca il trasporto chiuso (request pendenti sbloccate)."""
+        """Ferma il pump e marca il trasporto chiuso (attese pendenti sbloccate)."""
         task = self._pump_task
         self._pump_task = None
         if task is not None and not task.done():

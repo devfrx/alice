@@ -75,10 +75,10 @@ parziale è recuperato (recovery message in `ws.py`, fuori dal motore).**
 
 | Parte | Test |
 |---|---|
-| Precedenza (disconnect > cancel > timeout) | `test_adapter_ws.py::test_disconnect_during_request_raises_engine_disconnected`, `test_confirm_tool_timeout_and_cancel_outcomes`, `test_confirm_tool_disconnect_returns_disconnected_as_data` — insieme, i tre test fissano la mappatura deterministica implementata in `adapters/ws.py::WsTransport.request`/`_interrupted_output` (disconnect solleva sempre per prima; a parità di `None`, `cancel.is_set()` è controllato prima di dichiarare timeout) |
+| Precedenza (disconnect > cancel > timeout) | `test_adapter_ws.py::test_disconnect_during_request_raises_engine_disconnected`, `test_confirm_tool_timeout_and_cancel_outcomes`, `test_confirm_tool_disconnect_returns_disconnected_as_data` — ciascuno esercita UNA condizione isolata (solo disconnect, solo cancel, solo timeout). La precedenza è garantita dalla STRUTTURA del codice, non da un test di race: `adapters/ws.py::WsTransport.request` controlla `future.done()` prima, poi `disconnect_waiter.done()` (→ solleva `EngineDisconnected`) prima di ricadere sul ramo cancel/timeout (`_interrupted_output` guarda poi `cancel.is_set()` per distinguere i due) — è un ordine di `if` sequenziale (exception-first), non una risoluzione a runtime tra condizioni concorrenti. Nessun test imposta DUE condizioni vere insieme (es. disconnect *e* cancel segnalati nello stesso istante) per dimostrare quale vince quando corrono in parallelo davvero: l'invariante "disconnect > cancel > timeout" è quindi garantito per costruzione (ordine dei check nel codice) e verificato singolarmente per ciascuna condizione, non da un test di precedenza a condizioni concorrenti. |
 | Recupero contenuto parziale su disconnect | **COPERTO ALTROVE**: `backend/api/routes/chat/ws.py` (route WS, kernel — non `services/agent`), per design invariato tra v1/v2 (la logica di recovery non dipende dal motore). Test legacy: `backend/tests/test_direct_executor_disconnect.py` (comportamento del canale, non del motore) |
 
-Verdetto: **COPERTO (precedenza), COPERTO ALTROVE (recovery, per design fuori
+Verdetto: **COPERTO (precedenza garantita per costruzione del codice + test a condizione singola, nessun test di race concorrente), COPERTO ALTROVE (recovery, per design fuori
 scope motore)**.
 
 **6. Un solo lettore del socket (read-pump unico); il lato send non
@@ -251,7 +251,7 @@ nuovi aggiunti in totale.
 ## Tabella 2 — Test legacy → destino
 
 `grep -rl "services.turn" backend/tests --include="*.py"` (eseguito da
-`backend/`) restituisce 18 file. Esclusi per istruzione esplicita del
+`backend/`) restituisce 19 file. Esclusi per istruzione esplicita del
 brief: `backend/tests/agent/test_parity.py` (harness di parità sanzionato,
 vive per design accanto al motore nuovo finché `services/turn/` non muore).
 
@@ -274,7 +274,7 @@ parità — azione da includere nel piano di demolizione.
 | `tests/test_headless_turn.py` | `test_run_headless_turn_persists_a_normal_turn` → `test_runner_integration.py::test_headless_turn_runs_on_v2_engine`. `test_headless_channel_satisfies_protocol` / `test_null_sink_satisfies_protocol_and_drops` → `test_runner_integration.py::test_auto_decline_interaction_port_declines_all` + `test_sink_event_port_noop_when_sink_disconnected` (stesso invariante di conformità/comportamento, riformulato sulle classi nuove `AutoDeclineInteractionPort`/`SinkEventPort`). `test_headless_channel_request_returns_none` → coperto dalla stessa coppia di test (nessuna UI da servire → esito sintetico, mai un round-trip reale). |
 | `tests/test_interaction_channel.py` | Mapping quasi 1:1 sul trasporto nuovo: request/correlation/timeout/cancel/stale/disconnect/client_tool/unknown-kind → `test_adapter_ws.py` (intero file: `test_request_roundtrip_with_correlation`, `test_stale_response_is_discarded`, `test_timeout_returns_none_cancel_returns_none`, `test_cancel_frame_resolves_pending_request_to_none`, `test_disconnect_during_request_raises_engine_disconnected`, `test_run_client_tool_roundtrip_and_disconnect_raises`, ecc.). `test_scripted_*` (double scriptato del canale legacy) → DECADE: il motore nuovo ha il proprio double (`ScriptedInteractionPort` in `doubles.py`, testato da `test_doubles.py`), non riusa quello legacy per pillar. |
 | `tests/test_permission_liveness.py` | `test_mode_change_takes_effect_on_next_call` → `test_adapter_permission.py::test_mode_and_tool_def_resolved_on_every_call` (stesso invariante §6.9: mode interrogato per-call, non cachato per-turno). |
-| `tests/test_pipeline.py` | File più grande, mapping per gruppo: `TestDedup` → `test_dedup.py` + `test_engine_tools.py::test_duplicate_call_yields_synthetic_result_not_execution`. `TestPermission` → `test_adapter_permission.py` + `test_engine_tools.py` (rami DENY/audit). `TestConfirmation` → `test_engine_tools.py::test_confirmation_flow_events_and_audit`/`test_rejection_still_persists_tool_response` + `test_adapter_ws.py` (timeout/cancel/disconnect di conferma). `TestInteraction`/`TestAskUser*` (client tool, ask_user round-trip) → `test_adapter_ws.py::test_run_client_tool_roundtrip_and_disconnect_raises` + `test_ask_user_roundtrip_timeout_and_frame_shape` + `test_engine_tools.py::test_client_executed_tool_routes_through_interaction_port`. `TestExecute` → `test_adapter_execution.py`. `TestPipelineOrdering` (ordine dei middleware del gate) → DECADE: l'astrazione "pipeline di middleware" (`pipeline.py`) muore col design — il motore nuovo ha un flusso lineare (`engine.py::_gate_call`/`_run_tool_step`), non componibile a middleware; l'ordine delle fasi è fissato nel codice e coperto indirettamente da tutta `test_engine_tools.py`, non da un test di "ordinamento" dedicato (non esiste più l'astrazione da ordinare). |
+| `tests/test_pipeline.py` | File più grande, mapping per gruppo: `TestDedup` → `test_dedup.py` + `test_engine_tools.py::test_duplicate_call_yields_synthetic_result_not_execution`. `TestPermission` → `test_adapter_permission.py` + `test_engine_tools.py` (rami DENY/audit). `TestConfirmation` → `test_engine_tools.py::test_confirmation_flow_events_and_audit`/`test_rejection_still_persists_tool_response` + `test_adapter_ws.py` (timeout/cancel/disconnect di conferma). `TestInteraction`/`TestUserInteraction` (client tool, ask_user round-trip) → `test_adapter_ws.py::test_run_client_tool_roundtrip_and_disconnect_raises` + `test_ask_user_roundtrip_timeout_and_frame_shape` + `test_engine_tools.py::test_client_executed_tool_routes_through_interaction_port`. `TestExecute` → `test_adapter_execution.py`. `TestPipelineOrdering` (ordine dei middleware del gate) → DECADE: l'astrazione "pipeline di middleware" (`pipeline.py`) muore col design — il motore nuovo ha un flusso lineare (`engine.py::_gate_call`/`_run_tool_step`), non componibile a middleware; l'ordine delle fasi è fissato nel codice e coperto indirettamente da tutta `test_engine_tools.py`, non da un test di "ordinamento" dedicato (non esiste più l'astrazione da ordinare). |
 | `tests/test_reflective_executor.py` | DECADE INTEGRALE: la reflection è eliminata per decisione esplicita (spec §2, tabella decisioni — feature off-by-default rimossa; l'anti-degenerazione strutturale arriva in Fase 3 dentro il motore, non come wrapper esterno). Nessun equivalente nel motore nuovo, per design. |
 | `tests/test_tool_loop.py` | Il cuore del loop legacy, mapping per gruppo: `TestMaxIterations` → `test_engine_loop.py::test_max_steps_stops_loop_with_warning`. `TestParallelExecution` → `test_engine_tools.py::test_parallel_execution_of_greenlit_batch`. `TestDeduplication` → `test_dedup.py` + `test_engine_tools.py`. `TestErrorRecovery` → `test_engine_tools.py::test_tool_exception_yields_error_result_not_crash` + `test_adapter_execution.py::test_execute_timeout_returns_ok_false_with_timeout_message`. `TestTransientErrorRetry` → `test_retry.py` + `test_adapter_llm.py` (4xx non-retryable, 5xx retryable). `TestCancellation` → `test_engine_tools.py::test_cancel_checked_only_after_persistence`. `TestConfirmation` → `test_engine_tools.py` (confirm/reject). `TestClientExecutedTools` → `test_engine_tools.py::test_client_executed_tool_routes_through_interaction_port` + `test_adapter_ws.py::test_run_client_tool_roundtrip_and_disconnect_raises`. `TestEmptyResponseRetry` → `test_engine_single_step.py::test_empty_response_retried_with_nudge` + `test_retry.py`. Nota: questo file è anche la fonte dei double `MockSession`/`MockToolRegistry`/`MockWebSocket` importati da `test_parity.py` per pilotare v1 — vedi nota preliminare sopra. |
 | `tests/test_turn_cost.py` | Accumulo costo/usage per turno → `test_engine_loop.py::test_cost_and_usage_accumulate_across_steps` + `test_parity.py` (cost in `turn.finished` confrontato v1/v2). `test_message_model_has_usage_column` / `test_usage_round_trips_through_db_and_sums` → DECADE come test del *motore*: lo schema `Message.usage` è piattaforma (`db/models.py`), non ridisegnato da questa fase — resta verificato dai test di piattaforma esistenti (fuori demolizione). |
@@ -286,13 +286,13 @@ parità — azione da includere nel piano di demolizione.
 
 ### Riepilogo Tabella 2
 
-- 18 file trovati dal grep; 1 escluso per istruzione (`test_parity.py`).
-- Dei 17 restanti: **16 sono legacy puri** con destino assegnato (mappato o
+- 19 file trovati dal grep; 1 escluso per istruzione (`test_parity.py`).
+- Dei 18 restanti: **17 sono legacy puri** con destino assegnato (mappato o
   DECADE); **1** (`test_runner_integration.py`) è un file della suite nuova
   con un'azione di scollegamento da eseguire prima della demolizione (non
   un "destino" nel senso della domanda, ma un prerequisito).
-- Distribuzione destini tra i 16 file legacy: 2 file DECADE integrale
-  (`test_reflective_executor.py`, `test_turn_factory.py`); gli altri 14
+- Distribuzione destini tra i 17 file legacy: 2 file DECADE integrale
+  (`test_reflective_executor.py`, `test_turn_factory.py`); gli altri 15
   hanno mapping misto (alcuni test → equivalente nel motore nuovo, alcuni
   → DECADE puntuale con motivazione) o mapping quasi totale (es.
   `test_interaction_channel.py`, `test_ask_user_multi.py`).
@@ -300,6 +300,18 @@ parità — azione da includere nel piano di demolizione.
   `MockSession`/`MockToolRegistry`/`MockWebSocket` usati da `test_parity.py`
   vivono oggi in `tests/test_tool_loop.py` (che decade) — vanno estratti
   prima della rimozione.
+- Azioni pre-demolizione aggiuntive identificate dalla review T17:
+  (a) `backend/evals/runner.py` — importava `RecordingEventSink` da
+  `services.turn.sink`, rompendo l'eval harness (il gate che valida la
+  demolizione stessa) appena `services/turn/` muore in Task 19. **RISOLTO
+  da questa fix**: l'harness ora usa un sink proprio,
+  `backend.evals.sink.RecordingSink` (stesso contratto strutturale
+  `send`/`is_connected`, nessun import da `services.turn`).
+  (b) `backend/api/routes/chat/_persist.py` (`from backend.services.turn
+  import TurnResult, WSEventSink`) e `backend/api/routes/chat/_shared.py`
+  (`from backend.services.turn import is_websocket_closed_runtime_error`)
+  — entrambi da nominare esplicitamente come file T19-modify (import da
+  recidere/reindirizzare quando `services/turn/` viene demolito).
 
 ---
 

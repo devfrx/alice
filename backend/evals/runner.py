@@ -67,12 +67,12 @@ async def run_scenario(
     """
     from backend.api.routes.chat.headless import run_headless_turn
     from backend.db.models import Conversation
+    from backend.evals.sink import RecordingSink
     from backend.services.permission_mode_service import PermissionMode
-    from backend.services.turn.sink import RecordingEventSink
 
     sandbox = Path(tempfile.mkdtemp(prefix=f"alice-eval-{scenario.id}-"))
     started = time.perf_counter()
-    sink = RecordingEventSink()
+    sink = RecordingSink()
     try:
         _populate_sandbox(sandbox, scenario)
 

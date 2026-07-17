@@ -3,7 +3,7 @@
 import asyncio
 
 from backend.services.agent import ports
-from backend.services.agent.models import ToolInvocation
+from backend.services.agent.models import ToolInvocation, ToolMeta
 from backend.tests.agent._engine_helpers import (
     _final_step,
     _run_with,
@@ -113,6 +113,49 @@ async def test_artifact_registered_after_checkpoint_of_the_batch() -> None:
         if entry == ("checkpoint", "") and i > tool_result_index
     )
     assert tool_result_index < checkpoint_index < artifact_index
+
+
+async def test_tool_exception_yields_error_result_not_crash() -> None:
+    # §6.1.1: un'eccezione dell'ExecutionPort non affonda le altre call né
+    # il turno — viene sintetizzata in una tool response di status "error".
+    calls = (ToolInvocation(call_id="c1", name="boom", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"boom": ports.ToolExecutionOutput(ok=True, content="unreachable")},
+        errors={"boom": RuntimeError("kaboom")},
+    )
+    saved = [r for r in persistence.tool_results if r["call_id"] == "c1"]
+    assert saved and saved[0]["status"] == "error"
+    assert "kaboom" in saved[0]["content"]
+    assert outcome.finish_reason == "stop"
+
+
+async def test_client_executed_tool_routes_through_interaction_port() -> None:
+    # ramo "client-executed" di §6.1.1: la call non passa dall'ExecutionPort
+    # server-side, ma dall'InteractionPort (run_client_tool).
+    calls = (ToolInvocation(call_id="c1", name="ui_pick_file", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={},
+        meta={"ui_pick_file": ToolMeta(exists=True, client_executed=True)},
+        client_result=ports.ToolExecutionOutput(ok=True, content="scelto.txt"),
+    )
+    saved = [r for r in persistence.tool_results if r["call_id"] == "c1"]
+    assert saved and saved[0]["status"] == "ok" and saved[0]["content"] == "scelto.txt"
+
+
+async def test_deny_verdict_is_audited() -> None:
+    # §6.7: ogni gate di negazione è auditato (interaction=None: nessun
+    # round-trip di conferma, la negazione è decisa a monte).
+    calls = (ToolInvocation(call_id="c1", name="rm", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"rm": ports.ToolExecutionOutput(ok=True, content="")},
+        verdicts={"rm": ports.GateVerdict(action=ports.GateAction.DENY,
+                                          outcome="plan_denied", reason="plan mode")},
+    )
+    assert persistence.audits and persistence.audits[0]["interaction"] is None
+    assert persistence.audits[0]["verdict"].outcome == "plan_denied"
 
 
 async def test_cancel_checked_only_after_persistence() -> None:

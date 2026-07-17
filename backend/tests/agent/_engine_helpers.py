@@ -64,6 +64,7 @@ def _engine(
     verdicts: dict[str, ports.GateVerdict] | None,
     confirm: ports.InteractionOutcome,
     context: ports.ContextPort | None = None,
+    client_result: ports.ToolExecutionOutput | None = None,
 ) -> AgentEngine:
     return AgentEngine(
         llm=llm,
@@ -71,7 +72,7 @@ def _engine(
             verdicts=verdicts or {},
             default=ports.GateVerdict(action=ports.GateAction.EXECUTE, outcome="allow"),
         ),
-        interaction=ScriptedInteractionPort(confirm=confirm),
+        interaction=ScriptedInteractionPort(confirm=confirm, client_result=client_result),
         events=events,
         persistence=persistence,
         context=context or NoopContextPort(),
@@ -87,19 +88,21 @@ async def _run_with_port(
     verdicts: dict[str, ports.GateVerdict] | None = None,
     confirm: ports.InteractionOutcome = ports.InteractionOutcome.APPROVED,
     delays: dict[str, float] | None = None,
+    errors: dict[str, Exception] | None = None,
     meta: dict[str, ToolMeta] | None = None,
     cancel: asyncio.Event | None = None,
     max_steps: int = 8,
     max_tool_calls: int | None = None,
+    client_result: ports.ToolExecutionOutput | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, MapExecutionPort]:
     """Costruisce l'engine coi double e lo esegue, esponendo anche l'ExecutionPort."""
     persistence = InMemoryPersistence()
     rec = RecordingEventPort()
     llm = ScriptedLLMPort(steps=llm_steps)
-    exec_port = MapExecutionPort(tools=exec_tools, meta=meta, delays=delays)
+    exec_port = MapExecutionPort(tools=exec_tools, meta=meta, delays=delays, errors=errors)
     engine = _engine(
         llm=llm, events=rec, persistence=persistence, execution=exec_port,
-        verdicts=verdicts, confirm=confirm,
+        verdicts=verdicts, confirm=confirm, client_result=client_result,
     )
     request = _request(max_steps=max_steps, max_tool_calls=max_tool_calls)
     outcome = await engine.run(request, cancel=cancel or asyncio.Event())
@@ -113,16 +116,18 @@ async def _run_with(
     verdicts: dict[str, ports.GateVerdict] | None = None,
     confirm: ports.InteractionOutcome = ports.InteractionOutcome.APPROVED,
     delays: dict[str, float] | None = None,
+    errors: dict[str, Exception] | None = None,
     meta: dict[str, ToolMeta] | None = None,
     cancel: asyncio.Event | None = None,
     max_steps: int = 8,
     max_tool_calls: int | None = None,
+    client_result: ports.ToolExecutionOutput | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort]:
     """Come ``_run_with_port`` ma senza esporre l'ExecutionPort."""
     persistence, outcome, rec, _ = await _run_with_port(
         llm_steps=llm_steps, exec_tools=exec_tools, verdicts=verdicts,
-        confirm=confirm, delays=delays, meta=meta, cancel=cancel,
-        max_steps=max_steps, max_tool_calls=max_tool_calls,
+        confirm=confirm, delays=delays, errors=errors, meta=meta, cancel=cancel,
+        max_steps=max_steps, max_tool_calls=max_tool_calls, client_result=client_result,
     )
     return persistence, outcome, rec
 

@@ -11,6 +11,7 @@ dall'adapter e dalla piattaforma reale (``backend/core/tool_registry.py``).
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
@@ -28,6 +29,7 @@ class StubToolRegistry:
         self._tools_by_name = tools
         self.execute_calls: list[tuple[str, dict[str, Any], ExecutionContext]] = []
         self.execute_result: ToolResult = ToolResult.ok("ok")
+        self.execute_delay_s: float = 0.0
 
     def get_tool_definition(self, name: str) -> ToolDefinition | None:
         return self._tools_by_name.get(name)
@@ -45,6 +47,8 @@ class StubToolRegistry:
         self, tool_name: str, args: dict[str, Any], context: ExecutionContext,
     ) -> ToolResult:
         self.execute_calls.append((tool_name, args, context))
+        if self.execute_delay_s:
+            await asyncio.sleep(self.execute_delay_s)
         return self.execute_result
 
 
@@ -56,8 +60,8 @@ def _registry_with(**tools: ToolDefinition) -> StubToolRegistry:
     return StubToolRegistry(tools=tools)
 
 
-def _tool_def(name: str) -> ToolDefinition:
-    return ToolDefinition(name=name, description="d")
+def _tool_def(name: str, *, timeout_ms: int = 30_000) -> ToolDefinition:
+    return ToolDefinition(name=name, description="d", timeout_ms=timeout_ms)
 
 
 def _adapter(registry: StubToolRegistry) -> ToolRegistryAdapter:
@@ -143,3 +147,17 @@ async def test_execute_unknown_tool_still_delegates_no_short_circuit() -> None:
     assert registry.execute_calls[0][0] == "ghost"
     assert output.ok is False
     assert "not found" in (output.error or "")
+
+
+async def test_execute_timeout_returns_ok_false_with_timeout_message() -> None:
+    """Timeout per-tool (§6.13): ``asyncio.wait_for`` scade -> ``ToolExecutionOutput``
+    ``ok=False`` con messaggio di timeout, MAI un'eccezione che risale — la call
+    produce comunque una risposta sintetica pulita (§6.1: ramo "timeout")."""
+    registry = _registry_with(slow=_tool_def("slow", timeout_ms=10))
+    registry.execute_delay_s = 0.05
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("slow"), client_ip=None, conversation_id="c1")
+
+    assert output.ok is False
+    assert output.error is not None and "timeout" in output.error.lower()

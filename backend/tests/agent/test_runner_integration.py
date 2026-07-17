@@ -14,12 +14,16 @@ consumata da ``LLMServiceAdapter``.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
 
 from backend.core.app import create_app
+from backend.services.agent.models import ToolInvocation
+from backend.services.agent.ports import GateAction, GateVerdict, InteractionOutcome
+from backend.services.agent.runner import AutoDeclineInteractionPort, SinkEventPort
 
 
 class _ScriptedLLMShim:
@@ -140,3 +144,53 @@ async def test_headless_turn_runs_on_v2_engine(v2_app: Any) -> None:
     types = [f["type"] for f in sink.events]
     assert "turn.llm_step" in types
     assert "turn.finished" in types
+
+
+# ---------------------------------------------------------------------------
+# Unit: le due porte headless del composition root (§6.14).
+# ---------------------------------------------------------------------------
+
+_CALL = ToolInvocation(call_id="c1", name="write_file", args={}, raw_args="{}")
+_VERDICT = GateVerdict(action=GateAction.CONFIRM, outcome="needs_confirmation")
+
+
+async def test_auto_decline_interaction_port_declines_all() -> None:
+    """Headless (§6.14): nessuna UI da servire — ``confirm_tool`` rifiuta
+    pulito, ``run_client_tool``/``ask_user`` tornano un ``ToolExecutionOutput``
+    d'errore esplicito (mai un'eccezione: il motore riceve comunque un dato)."""
+    port = AutoDeclineInteractionPort()
+
+    outcome = await port.confirm_tool(
+        _CALL, verdict=_VERDICT, timeout_s=1, cancel=asyncio.Event(),
+    )
+    assert outcome is InteractionOutcome.REJECTED
+
+    client_out = await port.run_client_tool(_CALL, timeout_s=1, cancel=asyncio.Event())
+    assert client_out.ok is False and client_out.error
+
+    ask_out = await port.ask_user(_CALL, timeout_s=1, cancel=asyncio.Event())
+    assert ask_out.ok is False and ask_out.error
+
+
+async def test_sink_event_port_noop_when_sink_disconnected() -> None:
+    """``SinkEventPort`` rispetta ``sink.is_connected`` (§6.14: contratto
+    eval — ``RecordingEventSink`` parte con ``is_connected=True``, ma un sink
+    disconnesso non deve ricevere frame)."""
+
+    class _DisconnectedSink:
+        def __init__(self) -> None:
+            self.sent: list[dict[str, Any]] = []
+
+        async def send(self, event: dict[str, Any]) -> None:
+            self.sent.append(event)
+
+        @property
+        def is_connected(self) -> bool:
+            return False
+
+    sink = _DisconnectedSink()
+    port = SinkEventPort(sink, lambda _event: [{"type": "token", "content": "x"}])
+
+    await port.emit(object())  # type: ignore[arg-type] — translator banale
+
+    assert sink.sent == []

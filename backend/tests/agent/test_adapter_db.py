@@ -1,8 +1,14 @@
 """Test ``SqlModelPersistence`` — ``PersistencePort`` sopra SQLModel/SQLite.
 
-Copre le tre invarianti chiave del binding (spec Fase 1):
+Copre le invarianti chiave del binding (spec Fase 1):
 
 - §6.1: assistant/tool rows condividono lo stesso ``call_id`` normalizzato.
+- §6.3: ``load_history`` preserva l'ordine ``created_at`` indipendentemente
+  dall'ordine di inserimento.
+- §6.10: ``version_group_id``/``version_index`` (assegnati fuori dal motore)
+  sono applicati invariati alla riga ``Message`` assistant.
+- §6.11: ``register_artifacts`` delega ad ``ArtifactRegistry`` coi parametri
+  corretti (``tool_call_id``, ``message_id`` risolto, ``payload``).
 - §6.15: ``checkpoint()`` è l'UNICO punto di ``commit()`` — ``save_*`` fanno
   solo ``flush()``, quindi un ``rollback()`` prima del checkpoint deve poter
   annullare le righe, mentre uno dopo il checkpoint non le tocca più.
@@ -12,14 +18,32 @@ Copre le tre invarianti chiave del binding (spec Fase 1):
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import uuid
+from typing import Any
 
 from sqlmodel import select
 
 from backend.db.models import Conversation, Message
+from backend.services.agent import ports
 from backend.services.agent.adapters.db import SqlModelPersistence
 from backend.services.agent.models import ToolInvocation
+
+
+class _StubArtifactRegistry:
+    """Double locale: registra le chiamate, non tocca il DB reale."""
+
+    def __init__(self, artifact_id: str | None = "art-1") -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._artifact_id = artifact_id
+
+    async def register_from_tool_result(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        if self._artifact_id is None:
+            return None
+        from types import SimpleNamespace
+        return SimpleNamespace(id=self._artifact_id)
 
 
 async def test_assistant_and_tool_rows_share_call_id(db_session, conv: Conversation) -> None:
@@ -98,3 +122,86 @@ async def test_checkpoint_commits_and_survives_rollback(
     ).all()
     assert len(rows2) == 1
     assert rows2[0].content == "hi again"
+
+
+async def test_load_history_preserves_created_at_order(
+    db_session, conv: Conversation,
+) -> None:
+    """``load_history`` ordina per ``created_at``, non per ordine di INSERT
+    (§6.3: la history ricostruita preserva l'ordine)."""
+    base = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    later = Message(
+        conversation_id=conv.id, role="user", content="later",
+        created_at=base + dt.timedelta(seconds=10),
+    )
+    earlier = Message(
+        conversation_id=conv.id, role="user", content="earlier", created_at=base,
+    )
+    # Inserite fuori ordine: "later" per prima.
+    db_session.add(later)
+    db_session.add(earlier)
+    await db_session.flush()
+
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=None, version_group_id=None, version_index=None,
+    )
+    history = await p.load_history()
+    contents = [m["content"] for m in history]
+    assert contents.index("earlier") < contents.index("later")
+
+
+async def test_version_group_and_index_applied_to_assistant_message(
+    db_session, conv: Conversation,
+) -> None:
+    """``version_group_id``/``version_index`` (assegnati fuori dal motore,
+    §6.10) sono applicati invariati alla riga ``Message`` assistant."""
+    vg = str(uuid.uuid4())
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=None, version_group_id=vg, version_index=3,
+    )
+    await p.save_assistant_step(content="hi", thinking="", tool_calls=())
+    await p.checkpoint()
+
+    rows = (
+        await db_session.exec(select(Message).order_by(Message.created_at))
+    ).all()
+    assert str(rows[-1].version_group_id) == vg
+    assert rows[-1].version_index == 3
+
+
+async def test_register_artifacts_delegates_to_registry_with_call_id(
+    db_session, conv: Conversation,
+) -> None:
+    """``register_artifacts`` (§6.11) delega ad ``ArtifactRegistry`` passando
+    ``tool_call_id``/``tool_name``/``payload`` e il ``message_id`` risolto
+    dal tool result appena salvato; no-op se il tool ha fallito o non porta
+    payload strutturato."""
+    registry = _StubArtifactRegistry(artifact_id="art-1")
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=registry, version_group_id=None, version_index=None,
+    )
+    call = ToolInvocation(call_id="call_art", name="cad_generate", args={}, raw_args="{}")
+    await p.save_tool_result(call=call, content="ok", status="ok")
+    await p.checkpoint()
+
+    artifact_id = await p.register_artifacts(
+        call=call,
+        output=ports.ToolExecutionOutput(ok=True, content="ok", payload={"a": 1}),
+    )
+
+    assert artifact_id == "art-1"
+    assert len(registry.calls) == 1
+    assert registry.calls[0]["tool_call_id"] == "call_art"
+    assert registry.calls[0]["tool_name"] == "cad_generate"
+    assert registry.calls[0]["payload"] == {"a": 1}
+    assert registry.calls[0]["message_id"] is not None
+
+    # Nessun payload strutturato -> no-op, nessuna chiamata al registry.
+    no_payload = await p.register_artifacts(
+        call=call, output=ports.ToolExecutionOutput(ok=True, content="ok"),
+    )
+    assert no_payload is None
+    assert len(registry.calls) == 1

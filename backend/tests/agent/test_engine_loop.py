@@ -20,6 +20,16 @@ async def test_max_steps_stops_loop_with_warning() -> None:
     assert any(e.type == "turn.warning" for e in rec.events)
 
 
+async def test_clean_final_answer_on_last_step_has_no_warning() -> None:
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_final_step()],
+        exec_tools={},
+        max_steps=1,
+    )
+    assert outcome.finish_reason == "stop"
+    assert not [e for e in rec.events if e.type == "turn.warning"]
+
+
 async def test_disconnect_from_interaction_port_stops_after_persist() -> None:
     calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
     persistence, outcome, rec = await _run_with(

@@ -77,6 +77,7 @@ class _TurnState:
     failure_attempts: int = 0
     errored: bool = False
     final_assistant_message_id: str | None = None
+    pending_tool_intent: bool = False
 
     def __post_init__(self) -> None:
         self.working_messages = list(self.request.history)
@@ -394,6 +395,10 @@ class AgentEngine:
                 out_of_steps=False, errored=False,
             )
         if budget.out_of_steps():
+            # Il budget si esaurisce PROPRIO su uno step con tool call: il
+            # loop si sarebbe fermato con intent pendente, non su una
+            # risposta finale pulita (§ fix review T10).
+            state.pending_tool_intent = True
             return resolve_stop(
                 llm_finish=None, cancelled=False, disconnected=False,
                 out_of_steps=True, errored=False,
@@ -607,7 +612,7 @@ class AgentEngine:
         """
         resolved_stop = stop if stop is not None else StopReason.ERROR
         finish_reason = STOP_TO_FINISH[resolved_stop]
-        if resolved_stop is StopReason.MAX_STEPS:
+        if resolved_stop is StopReason.MAX_STEPS and state.pending_tool_intent:
             await self._events.emit(ev.TurnWarningEvent(
                 turn_id=turn_id, code="max_steps",
                 message="Budget di step esaurito con tool call in sospeso.",

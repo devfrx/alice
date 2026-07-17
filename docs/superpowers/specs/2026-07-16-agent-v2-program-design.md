@@ -43,12 +43,19 @@ uno solo —
 
 ## 3. Principi normativi del programma
 
-1. **Greenfield sul motore.** Il motore nuovo si progetta da principi primi — il riferimento è
+1. **Greenfield sul motore — PRINCIPIO PILASTRO (rafforzato dall'utente, brainstorming Fase 1
+   2026-07-17).** Il legacy NON influenza in nessun modo il nuovo sviluppo, né in logica né in
+   professionalità. Il motore nuovo si progetta da principi primi — il riferimento è
    l'architettura di Claude Code, NON il codice attuale. Il legacy entra nel design solo come
    **checklist di invarianti comportamentali** (contratto WS congelato, invarianti API OpenAI
    — una tool response per ogni `tool_call_id` —, semantica cancel/disconnect/recovery, gate
    permessi/scope/audit, version groups, artifact registry) estratta UNA volta nella spec della
-   Fase 1. Chi progetta e implementa il motore non usa `tool_loop.py` come modello di design.
+   Fase 1. **Zero riuso di codice del vecchio percorso**: anche i componenti recenti e ben
+   fatti di `services/turn/` (pipeline middleware, channel, sink) si riprogettano e il vecchio
+   muore per intero a fine Fase 1; i servizi di dominio della piattaforma (permessi, scope,
+   context manager, DB, LLM service) non sono "legacy del motore" e si consumano via porte.
+   Chi progetta e implementa il motore non usa `tool_loop.py` né alcun file di
+   `services/turn/` come modello di design. Il principio vale come bias per tutte le fasi.
 2. **Un solo percorso vivo.** Il fork motore-nuovo/motore-vecchio dura una fase, dietro flag;
    swap e cancellazione del vecchio avvengono nella stessa fase. Mai due sistemi mantenuti in
    parallelo oltre quella finestra (lezione del risanamento).

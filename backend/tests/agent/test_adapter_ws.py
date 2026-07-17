@@ -1,17 +1,18 @@
-"""Test del trasporto WS greenfield (``adapters/ws.py``).
+"""Test del trasporto WS greenfield (``adapters/ws.py``), vocabolario v2.
 
 ``FakeWebSocket`` è un doppio locale del ``WebSocket`` Starlette: coda inbound
-controllata dal test (``feed``), coda outbound osservabile (``next_sent``),
+controllata dal test (``feed``), coda outbound osservabile (``sent``),
 ``disconnect()`` che fa sollevare ``WebSocketDisconnect`` dal ``receive_json``
 del pump e ``RuntimeError`` dai ``send_json`` successivi (stesso contratto del
 socket reale dopo la close).
 
-I 6 test del brief sono verbatim; gli extra coprono i comportamenti vincolanti
-non coperti: cancel che non trapela tra turni, cancel-frame che risolve le
-request pendenti a ``None``, ``confirm_tool`` che ritorna ``DISCONNECTED``
-come DATO (adjudicazione T4), client/ask_user che propagano
-``EngineDisconnected``, forma dei frame legacy validata contro i modelli
-Pydantic reali di ``api/ws_schema/chat.py``.
+Round-trip interattivo v2 (Task 8): il frame di RICHIESTA è l'evento
+``interaction.requested`` del motore (emesso dall'``EventPort``, testato in
+``test_wire.py``), NON un frame costruito dalla porta. ``WsInteractionPort``
+attende solo la ``interaction.response`` correlata per ``interaction_id`` e non
+invia NULLA sul socket. Il read-pump smista ``cancel`` /
+``interaction.response`` / messaggi utente; il bridge ``correlation_id``/
+``alt_key`` è morto.
 """
 
 from __future__ import annotations
@@ -23,11 +24,6 @@ from typing import Any
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from backend.api.ws_schema.chat import (
-    WsAskUserRequired,
-    WsClientToolCall,
-    WsToolConfirmationRequired,
-)
 from backend.services.agent.adapters.ws import (
     WsEventPort,
     WsInteractionPort,
@@ -86,8 +82,15 @@ async def _until(cond: Callable[[], bool]) -> None:
         await asyncio.sleep(0.005)
 
 
+async def _registered(t: WsTransport, interaction_id: str) -> None:
+    """Attende che il waiter di ``interaction_id`` sia registrato nel transport."""
+    await asyncio.wait_for(
+        _until(lambda: interaction_id in t._pending), timeout=1,  # noqa: SLF001
+    )
+
+
 # ---------------------------------------------------------------------------
-# Test del brief (verbatim)
+# Transport: pump, cancel, wait_response
 # ---------------------------------------------------------------------------
 
 
@@ -98,119 +101,115 @@ async def test_single_reader_and_cancel_dispatch() -> None:
     await t.start()
     await ws.feed({"type": "cancel"})
     await asyncio.wait_for(_until(lambda: cancel.is_set()), timeout=1)
+    await t.aclose()
 
 
-async def test_request_roundtrip_with_correlation() -> None:
+async def test_wait_response_resolves_by_interaction_id() -> None:
+    """Registrazione sincrona: wait_response, POI il pump riceve la
+    interaction.response correlata → il future risolve col frame."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
-
-    async def _answer() -> None:
-        sent = await ws.next_sent()          # frame outbound della request
-        await ws.feed({"type": "tool_confirmation_response",
-                       "correlation_id": sent["correlation_id"], "approved": True})
-
-    task = asyncio.create_task(_answer())
-    resp = await t.request("tool_confirmation", {"type": "tool_confirmation_required"},
-                           timeout_s=2, cancel=asyncio.Event())
-    await task
-    assert resp is not None and resp["approved"] is True
-
-
-async def test_request_resolves_by_alt_key_when_correlation_absent() -> None:
-    """Correlation bridge (Task 16): la FE risponde con ``execution_id`` e NON
-    riecheggia il ``correlation_id``. Con ``alt_key`` registrato, il pump risolve
-    la request pendente quando l'``execution_id`` inbound combacia e il
-    ``correlation_id`` è assente.
-    """
-    ws = FakeWebSocket()
-    t = WsTransport(ws)
-    await t.start()
-
-    async def _answer() -> None:
-        await ws.next_sent()  # frame outbound della request
-        # Risposta della FE: SOLO execution_id, nessun correlation_id.
-        await ws.feed({"type": "tool_confirmation_response",
-                       "execution_id": "exec-9", "approved": True})
-
-    task = asyncio.create_task(_answer())
-    resp = await t.request(
-        "tool_confirmation",
-        {"type": "tool_confirmation_required", "execution_id": "exec-9"},
-        timeout_s=2, cancel=asyncio.Event(), alt_key="exec-9",
+    task = asyncio.create_task(
+        t.wait_response("i1", timeout_s=2, cancel=asyncio.Event())
     )
-    await task
+    await _registered(t, "i1")
+    await ws.feed({"type": "interaction.response", "interaction_id": "i1", "approved": True})
+    resp = await asyncio.wait_for(task, timeout=1)
     assert resp is not None and resp["approved"] is True
     await t.aclose()
 
 
-async def test_correlation_id_wins_over_alt_key() -> None:
-    """Quando entrambe le chiavi sono presenti, il ``correlation_id`` vince
-    (l'alt_key resta solo un fallback per la FE che non lo riecheggia).
-    """
+async def test_interaction_response_stale_is_dropped() -> None:
+    """Una interaction.response con interaction_id sconosciuto è scartata con
+    log, NON accodata come messaggio utente."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
     await t.start()
-
-    async def _answer() -> None:
-        sent = await ws.next_sent()
-        await ws.feed({"type": "tool_confirmation_response",
-                       "correlation_id": sent["correlation_id"],
-                       "execution_id": "exec-7", "approved": False})
-
-    task = asyncio.create_task(_answer())
-    resp = await t.request(
-        "tool_confirmation",
-        {"type": "tool_confirmation_required", "execution_id": "exec-7"},
-        timeout_s=2, cancel=asyncio.Event(), alt_key="exec-7",
-    )
-    await task
-    assert resp is not None and resp["approved"] is False
+    await ws.feed({"type": "interaction.response", "interaction_id": "ignota", "approved": True})
+    # Un vero messaggio utente successivo deve arrivare per primo: la stale
+    # è stata scartata, non messa in coda davanti a lui.
+    await ws.feed({"content": "ciao"})
+    msg = await asyncio.wait_for(t.next_user_message(), timeout=1)
+    assert msg == {"content": "ciao"}
     await t.aclose()
 
 
-async def test_stale_response_is_discarded() -> None:
+async def test_wait_response_disconnect_raises_engine_disconnected() -> None:
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
-    await ws.feed({"type": "tool_confirmation_response",
-                   "correlation_id": "ignota", "approved": True})   # stale: no crash
-
-    async def _answer() -> None:
-        sent = await ws.next_sent()
-        await ws.feed({"type": "tool_confirmation_response",
-                       "correlation_id": sent["correlation_id"], "approved": False})
-
-    task = asyncio.create_task(_answer())
-    resp = await t.request("tool_confirmation", {"type": "tool_confirmation_required"},
-                           timeout_s=2, cancel=asyncio.Event())
-    await task
-    assert resp is not None and resp["approved"] is False
-
-
-async def test_disconnect_during_request_raises_engine_disconnected() -> None:
-    ws = FakeWebSocket()
-    t = WsTransport(ws)
-    await t.start()
-    task = asyncio.create_task(t.request("tool_confirmation", {"type": "x"},
-                                         timeout_s=5, cancel=asyncio.Event()))
+    task = asyncio.create_task(
+        t.wait_response("i1", timeout_s=5, cancel=asyncio.Event())
+    )
+    await _registered(t, "i1")
     await ws.disconnect()
     with pytest.raises(EngineDisconnected):
-        await task
+        await asyncio.wait_for(task, timeout=1)
 
 
-async def test_timeout_returns_none_cancel_returns_none() -> None:
+async def test_wait_response_already_disconnected_fast_path() -> None:
+    """Registrazione a socket già caduto: esito disconnect immediato, nessun
+    waiter lasciato in ``_pending``."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
     await t.start()
-    resp = await t.request("tool_confirmation", {"type": "tool_confirmation_required"},
-                           timeout_s=0.05, cancel=asyncio.Event())
+    await ws.disconnect()
+    await asyncio.wait_for(_until(lambda: not t.connected), timeout=1)
+    with pytest.raises(EngineDisconnected):
+        await t.wait_response("i1", timeout_s=5, cancel=asyncio.Event())
+    assert "i1" not in t._pending  # noqa: SLF001
+
+
+async def test_wait_response_precedence_disconnect_over_cancel() -> None:
+    """Precedenza invariata: disconnect > cancel > timeout. Cancel armato e
+    disconnect nello stesso giro: il future risolto eccezionalmente dal
+    disconnect è controllato per primo → vince."""
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    cancel = asyncio.Event()
+    task = asyncio.create_task(t.wait_response("i1", timeout_s=5, cancel=cancel))
+    await _registered(t, "i1")
+    cancel.set()  # cancel armato...
+    t._mark_disconnected()  # ...e disconnect nello stesso giro  # noqa: SLF001
+    with pytest.raises(EngineDisconnected):
+        await asyncio.wait_for(task, timeout=1)
+    await t.aclose()
+
+
+async def test_wait_response_timeout_and_cancel_return_none() -> None:
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    resp = await t.wait_response("i1", timeout_s=0.05, cancel=asyncio.Event())
     assert resp is None
     cancelled = asyncio.Event()
     cancelled.set()
-    resp2 = await t.request("tool_confirmation", {"type": "tool_confirmation_required"},
-                            timeout_s=5, cancel=cancelled)
+    resp2 = await t.wait_response("i2", timeout_s=5, cancel=cancelled)
     assert resp2 is None
+    await t.aclose()
+
+
+async def test_cancel_frame_resolves_pending_interaction_to_none() -> None:
+    """Il frame ``cancel`` risolve a ``None`` le interazioni pendenti
+    (percorso ``_resolve_all_pending_to_none`` preservato — review T6)."""
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    task = asyncio.create_task(
+        t.wait_response("i1", timeout_s=5, cancel=asyncio.Event())
+    )
+    await _registered(t, "i1")
+    await ws.feed({"type": "cancel"})
+    resp = await asyncio.wait_for(task, timeout=1)
+    assert resp is None
+    await t.aclose()
 
 
 async def test_send_after_close_never_raises() -> None:
@@ -218,13 +217,8 @@ async def test_send_after_close_never_raises() -> None:
     t = WsTransport(ws)
     await t.start()
     await ws.disconnect()
-    await t.send_json({"type": "token", "content": "x"})   # non deve sollevare
+    await t.send_json({"type": "turn.delta", "text": "x"})  # non deve sollevare
     assert t.connected is False
-
-
-# ---------------------------------------------------------------------------
-# Extra: comportamenti vincolanti del trasporto
-# ---------------------------------------------------------------------------
 
 
 async def test_cancel_does_not_leak_across_turns() -> None:
@@ -240,27 +234,11 @@ async def test_cancel_does_not_leak_across_turns() -> None:
     await t.aclose()
 
 
-async def test_cancel_frame_resolves_pending_request_to_none() -> None:
-    ws = FakeWebSocket()
-    t = WsTransport(ws)
-    t.begin_turn()
-    await t.start()
-    task = asyncio.create_task(t.request(
-        "tool_confirmation", {"type": "tool_confirmation_required"},
-        timeout_s=5, cancel=asyncio.Event(),
-    ))
-    await ws.next_sent()                       # la request è in volo
-    await ws.feed({"type": "cancel"})
-    resp = await asyncio.wait_for(task, timeout=1)
-    assert resp is None
-    await t.aclose()
-
-
 async def test_unmatched_frames_queue_as_user_messages_and_none_on_disconnect() -> None:
     ws = FakeWebSocket()
     t = WsTransport(ws)
     await t.start()
-    await ws.feed({"content": "ciao"})         # frame utente non taggato
+    await ws.feed({"content": "ciao"})  # frame utente non taggato
     msg = await asyncio.wait_for(t.next_user_message(), timeout=1)
     assert msg == {"content": "ciao"}
     await ws.disconnect()
@@ -270,15 +248,15 @@ async def test_unmatched_frames_queue_as_user_messages_and_none_on_disconnect() 
     assert await asyncio.wait_for(t.next_user_message(), timeout=1) is None
 
 
-async def test_aclose_cancels_pump_and_unblocks_pending_request() -> None:
+async def test_aclose_cancels_pump_and_unblocks_pending_interaction() -> None:
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
-    task = asyncio.create_task(t.request(
-        "tool_confirmation", {"type": "tool_confirmation_required"},
-        timeout_s=30, cancel=asyncio.Event(),
-    ))
-    await ws.next_sent()
+    task = asyncio.create_task(
+        t.wait_response("i1", timeout_s=30, cancel=asyncio.Event())
+    )
+    await _registered(t, "i1")
     await t.aclose()
     with pytest.raises(EngineDisconnected):
         await asyncio.wait_for(task, timeout=1)
@@ -295,13 +273,13 @@ async def test_event_port_translates_and_sends_each_frame() -> None:
     t = WsTransport(ws)
     await t.start()
     port = WsEventPort(t, lambda event: [
-        {"type": "token", "content": "a"},
-        {"type": "token", "content": "b"},
+        {"type": "turn.delta", "text": "a"},
+        {"type": "turn.delta", "text": "b"},
     ])
     await port.emit(object())  # type: ignore[arg-type] — translator banale
     assert ws.sent == [
-        {"type": "token", "content": "a"},
-        {"type": "token", "content": "b"},
+        {"type": "turn.delta", "text": "a"},
+        {"type": "turn.delta", "text": "b"},
     ]
     await t.aclose()
 
@@ -312,13 +290,13 @@ async def test_event_port_never_raises_after_disconnect() -> None:
     await t.start()
     await ws.disconnect()
     await asyncio.wait_for(_until(lambda: not t.connected), timeout=1)
-    port = WsEventPort(t, lambda event: [{"type": "token", "content": "x"}])
+    port = WsEventPort(t, lambda event: [{"type": "turn.delta", "text": "x"}])
     await port.emit(object())  # type: ignore[arg-type] — non deve sollevare
     await t.aclose()
 
 
 # ---------------------------------------------------------------------------
-# WsInteractionPort
+# WsInteractionPort (vocabolario v2: nessun frame outbound dalla porta)
 # ---------------------------------------------------------------------------
 
 _CALL = ToolInvocation(
@@ -335,109 +313,54 @@ def _port(t: WsTransport) -> WsInteractionPort:
     return WsInteractionPort(t)
 
 
-async def test_confirm_tool_maps_approved_and_rejected() -> None:
+async def test_confirm_tool_builds_no_frame() -> None:
+    """La conferma NON invia frame outbound: il frame di richiesta è l'evento
+    ``interaction.requested`` del motore. Il transport double non registra send."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
     port = _port(t)
-
-    async def _respond(approved: bool) -> dict[str, Any]:
-        sent = await ws.next_sent()
-        await ws.feed({"type": "tool_confirmation_response",
-                       "correlation_id": sent["correlation_id"],
-                       "approved": approved})
-        return sent
-
-    answer = asyncio.create_task(_respond(True))
-    outcome = await port.confirm_tool(
+    task = asyncio.create_task(port.confirm_tool(
         _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
-    )
-    sent = await answer
+    ))
+    await _registered(t, "ix")
+    await ws.feed({"type": "interaction.response", "interaction_id": "ix", "approved": True})
+    outcome = await asyncio.wait_for(task, timeout=1)
     assert outcome is InteractionOutcome.APPROVED
-    # il frame legacy valida contro il modello Pydantic reale del contratto
-    frame = WsToolConfirmationRequired.model_validate(sent)
-    assert frame.execution_id == "exec-1"
-    assert frame.tool_name == "write_file"
-    assert frame.args == {"path": "x.txt"}
-    assert frame.risk_level == "dangerous"
-
-    answer2 = asyncio.create_task(_respond(False))
-    outcome2 = await port.confirm_tool(
-        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
-    )
-    await answer2
-    assert outcome2 is InteractionOutcome.REJECTED
+    assert ws.sent == []  # nessun frame costruito dalla porta
     await t.aclose()
 
 
-async def test_tool_confirmation_request_frame_matches_legacy_contract() -> None:
-    """Il frame di RICHIESTA che WsInteractionPort invia per una ToolInvocation
-    + GateVerdict pinna la superficie consumata dal contratto legacy.
-
-    Fix review T15 §6: i frame di request delle interazioni sono posseduti
-    dall'InteractionPort (non dal translator di parità), quindi la parità su di
-    essi si asserisce QUI, sui valori-campo, non nel harness. Non serve il
-    motore legacy: si valida contro il modello Pydantic reale del contratto
-    (``WsToolConfirmationRequired``) E si asseriscono i valori specifici.
-    """
+async def test_confirm_tool_maps_response() -> None:
+    """approved True/False → APPROVED/REJECTED."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
     port = _port(t)
 
-    async def _respond() -> dict[str, Any]:
-        sent = await ws.next_sent()
-        await ws.feed({"type": "tool_confirmation_response",
-                       "correlation_id": sent["correlation_id"], "approved": True})
-        return sent
+    task = asyncio.create_task(port.confirm_tool(
+        _CALL, interaction_id="ia", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    ))
+    await _registered(t, "ia")
+    await ws.feed({"type": "interaction.response", "interaction_id": "ia", "approved": True})
+    assert await asyncio.wait_for(task, timeout=1) is InteractionOutcome.APPROVED
 
-    answer = asyncio.create_task(_respond())
-    await port.confirm_tool(
-        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
-    )
-    sent = await answer
-
-    # 1. Valida contro il modello Pydantic reale del contratto (extra='forbid').
-    frame = WsToolConfirmationRequired.model_validate(sent)
-    # 2. Asserisce i VALORI-campo che il contratto legacy richiede.
-    assert frame.execution_id == _CALL.call_id          # execution_id == call_id
-    assert frame.tool_name == _CALL.name
-    assert frame.args == _CALL.args
-    assert frame.risk_level == _VERDICT.risk_level       # "dangerous" ∈ vocab
-    assert frame.description == _VERDICT.description      # presente, non vuota
-    assert frame.description
-    assert frame.reasoning == _VERDICT.reason            # reasoning presente
-    await t.aclose()
-
-
-async def test_confirm_tool_resolves_on_execution_id_only_reply() -> None:
-    """Correlation bridge end-to-end: ``WsInteractionPort`` registra
-    ``alt_key=call_id``, così una risposta FE con SOLO ``execution_id`` (nessun
-    ``correlation_id``, come fa il frontend attuale) risolve la conferma.
-    """
-    ws = FakeWebSocket()
-    t = WsTransport(ws)
-    await t.start()
-    port = _port(t)
-
-    async def _respond() -> None:
-        sent = await ws.next_sent()
-        assert sent["execution_id"] == _CALL.call_id
-        await ws.feed({"type": "tool_confirmation_response",
-                       "execution_id": _CALL.call_id, "approved": True})
-
-    answer = asyncio.create_task(_respond())
-    outcome = await port.confirm_tool(
-        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
-    )
-    await answer
-    assert outcome is InteractionOutcome.APPROVED
+    task2 = asyncio.create_task(port.confirm_tool(
+        _CALL, interaction_id="ib", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    ))
+    await _registered(t, "ib")
+    await ws.feed({"type": "interaction.response", "interaction_id": "ib", "approved": False})
+    assert await asyncio.wait_for(task2, timeout=1) is InteractionOutcome.REJECTED
     await t.aclose()
 
 
 async def test_confirm_tool_timeout_and_cancel_outcomes() -> None:
+    """None + cancel set → CANCELLED; None (timeout) → TIMEOUT."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
     port = _port(t)
     outcome = await port.confirm_tool(
@@ -447,91 +370,118 @@ async def test_confirm_tool_timeout_and_cancel_outcomes() -> None:
     cancelled = asyncio.Event()
     cancelled.set()
     outcome2 = await port.confirm_tool(
-        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=5, cancel=cancelled,
+        _CALL, interaction_id="iy", verdict=_VERDICT, timeout_s=5, cancel=cancelled,
     )
     assert outcome2 is InteractionOutcome.CANCELLED
     await t.aclose()
 
 
 async def test_confirm_tool_disconnect_returns_disconnected_as_data() -> None:
-    """Adjudicazione T4: su disconnect la conferma NON propaga l'eccezione."""
+    """Adjudicazione T4: su disconnect la conferma NON propaga l'eccezione,
+    ritorna ``DISCONNECTED`` come DATO."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
     port = _port(t)
     task = asyncio.create_task(port.confirm_tool(
         _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=5, cancel=asyncio.Event(),
     ))
-    await ws.next_sent()
+    await _registered(t, "ix")
     await ws.disconnect()
     outcome = await asyncio.wait_for(task, timeout=1)
     assert outcome is InteractionOutcome.DISCONNECTED
     await t.aclose()
 
 
-async def test_run_client_tool_roundtrip_and_disconnect_raises() -> None:
+async def test_ask_user_and_client_parse_v2_response() -> None:
+    """answers → testo via _format_answers; success/result/error →
+    ToolExecutionOutput (string passthrough, dict/list json-dumped, error)."""
     ws = FakeWebSocket()
     t = WsTransport(ws)
-    await t.start()
-    port = _port(t)
-
-    async def _respond() -> dict[str, Any]:
-        sent = await ws.next_sent()
-        await ws.feed({"type": "client_tool_result",
-                       "correlation_id": sent["correlation_id"],
-                       "success": True, "result": "fatto"})
-        return sent
-
-    answer = asyncio.create_task(_respond())
-    out = await port.run_client_tool(
-        _CALL, interaction_id="ix", timeout_s=2, cancel=asyncio.Event(),
-    )
-    sent = await answer
-    assert out.ok is True and out.content == "fatto"
-    frame = WsClientToolCall.model_validate(sent)
-    assert frame.execution_id == "exec-1" and frame.tool_name == "write_file"
-
-    task = asyncio.create_task(
-        port.run_client_tool(_CALL, interaction_id="ix", timeout_s=5, cancel=asyncio.Event())
-    )
-    await ws.next_sent()
-    await ws.disconnect()
-    with pytest.raises(EngineDisconnected):
-        await asyncio.wait_for(task, timeout=1)
-    await t.aclose()
-
-
-async def test_ask_user_roundtrip_timeout_and_frame_shape() -> None:
-    ws = FakeWebSocket()
-    t = WsTransport(ws)
+    t.begin_turn()
     await t.start()
     port = _port(t)
     call = ToolInvocation(
         call_id="exec-2", name="ask_user",
-        args={"questions": [{"id": "q1", "text": "Quale?", "type": "radio",
-                             "options": ["a", "b"]}]},
-        raw_args="{}",
+        args={"questions": [{"id": "q1", "text": "Quale?"}]}, raw_args="{}",
     )
 
-    async def _respond() -> dict[str, Any]:
-        sent = await ws.next_sent()
-        await ws.feed({"type": "ask_user_response",
-                       "correlation_id": sent["correlation_id"],
-                       "answers": [{"question_id": "q1", "selected": ["a"],
-                                    "free_text": None}]})
-        return sent
-
-    answer = asyncio.create_task(_respond())
-    out = await port.ask_user(call, interaction_id="ix", timeout_s=2, cancel=asyncio.Event())
-    sent = await answer
+    # ask_user: answers → testo formattato, nessun frame outbound.
+    task = asyncio.create_task(
+        port.ask_user(call, interaction_id="ia", timeout_s=2, cancel=asyncio.Event())
+    )
+    await _registered(t, "ia")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "ia",
+        "answers": [{"question_id": "q1", "selected": ["a"], "free_text": None}],
+    })
+    out = await asyncio.wait_for(task, timeout=1)
     assert out.ok is True and "q1" in out.content and "a" in out.content
-    frame = WsAskUserRequired.model_validate(sent)
-    assert frame.execution_id == "exec-2"
-    assert frame.questions[0].id == "q1"
-    assert frame.questions[0].options == ["a", "b"]
+    assert ws.sent == []
 
-    timed_out = await port.ask_user(
-        call, interaction_id="ix", timeout_s=0.05, cancel=asyncio.Event(),
+    # client tool: success + string result → passthrough.
+    task = asyncio.create_task(
+        port.run_client_tool(_CALL, interaction_id="ib", timeout_s=2, cancel=asyncio.Event())
     )
-    assert timed_out.ok is False and timed_out.error is not None
+    await _registered(t, "ib")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "ib",
+        "success": True, "result": "fatto",
+    })
+    out = await asyncio.wait_for(task, timeout=1)
+    assert out.ok is True and out.content == "fatto"
+
+    # client tool: dict result → json dump.
+    task = asyncio.create_task(
+        port.run_client_tool(_CALL, interaction_id="ic", timeout_s=2, cancel=asyncio.Event())
+    )
+    await _registered(t, "ic")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "ic",
+        "success": True, "result": {"k": "v"},
+    })
+    out = await asyncio.wait_for(task, timeout=1)
+    assert out.ok is True and '"k"' in out.content and '"v"' in out.content
+
+    # client tool: error string.
+    task = asyncio.create_task(
+        port.run_client_tool(_CALL, interaction_id="id", timeout_s=2, cancel=asyncio.Event())
+    )
+    await _registered(t, "id")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "id",
+        "success": False, "error": "boom",
+    })
+    out = await asyncio.wait_for(task, timeout=1)
+    assert out.ok is False and out.error == "boom"
+    await t.aclose()
+
+
+async def test_client_and_ask_user_propagate_disconnect() -> None:
+    """run_client_tool/ask_user PROPAGANO ``EngineDisconnected`` (il loro tipo
+    di ritorno non può codificarla — §6.5)."""
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    port = _port(t)
+    task = asyncio.create_task(
+        port.run_client_tool(_CALL, interaction_id="ix", timeout_s=5, cancel=asyncio.Event())
+    )
+    await _registered(t, "ix")
+    await ws.disconnect()
+    with pytest.raises(EngineDisconnected):
+        await asyncio.wait_for(task, timeout=1)
+
+
+async def test_ask_user_timeout_returns_interrupted_output() -> None:
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    port = _port(t)
+    call = ToolInvocation(call_id="exec-2", name="ask_user", args={}, raw_args="{}")
+    out = await port.ask_user(call, interaction_id="ix", timeout_s=0.05, cancel=asyncio.Event())
+    assert out.ok is False and out.error is not None
     await t.aclose()

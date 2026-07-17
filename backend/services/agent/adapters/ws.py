@@ -1,40 +1,43 @@
-"""Trasporto WS greenfield: read-pump unico, request correlate, send fail-safe.
+"""Trasporto WS greenfield: read-pump unico, attese correlate, send fail-safe.
 
 ``WsTransport`` è il PROPRIETARIO del socket (invariante §6.6: un solo lettore).
 Un unico task asyncio (il read-pump) consuma ``receive_json()`` e smista per
 ``type``:
 
 * ``cancel`` → set dell'evento cancel del turno corrente + risoluzione a
-  ``None`` di tutte le request pendenti (esito cancel);
-* frame con ``correlation_id`` noto → risolve il Future della request; se la
-  correlation è sconosciuta (risposta stale) il frame è scartato con log;
+  ``None`` di tutte le attese pendenti (esito cancel);
+* ``interaction.response`` → risolve il Future dell'interazione correlata per
+  ``interaction_id``; se l'id è sconosciuto (risposta stale) il frame è
+  scartato con log, NON accodato come messaggio utente;
 * qualsiasi altro frame → coda consumata da ``next_user_message()`` (giro
   turni in ``ws.py``).
 
+Il frame di RICHIESTA di un'interazione NON nasce qui: è l'evento canonico
+``interaction.requested`` che il motore emette via ``EventPort`` (tradotto da
+``wire.to_v2_frames``) PRIMA di chiamare la porta. Le porte non costruiscono
+alcun frame outbound; il bridge ``correlation_id``/``alt_key`` è morto.
+
 Su ``WebSocketDisconnect``/``RuntimeError`` (socket chiuso) il pump marca il
-trasporto disconnesso, risolve tutte le request pendenti con
+trasporto disconnesso, risolve tutte le attese pendenti con
 ``EngineDisconnected`` e spinge una sentinella ``None`` nella coda utente.
 
 ``send_json`` non solleva MAI: su qualunque errore di invio marca disconnesso
-e inghiotte — il motore apprende della disconnessione dai percorsi request
+e inghiotte — il motore apprende della disconnessione dai percorsi d'attesa
 delle porte (o da ``connected``), mai dall'emissione eventi (fire-and-forget).
 
-Precedenza nella race di ``request``: disconnect > cancel > timeout. La
+Precedenza nella race di ``wait_response``: disconnect > cancel > timeout. La
 disconnessione risolve il Future pendente in modo eccezionale, quindi vince
 anche quando cancel/timeout scattano nello stesso giro di loop.
 
 Le porte:
 
 * ``WsEventPort`` implementa ``EventPort``: traduce ogni ``AgentEvent`` in
-  zero o più frame wire (il translator di parità arriva col Task 15) e li
-  invia best-effort via ``send_json``.
-* ``WsInteractionPort`` implementa ``InteractionPort`` costruendo i frame
-  legacy del contratto chat (``api/ws_schema/chat.py``):
-  ``tool_confirmation_required``, ``client_tool_call``, ``ask_user_required``.
-  NON emette gli eventi canonici ``interaction.requested``/``resolved``: quelli
-  sono fatti del turno e li emette il motore (Task 9) — emetterli anche qui
-  li duplicherebbe sul canale.
-  ``confirm_tool`` cattura ``EngineDisconnected`` e ritorna
+  zero o più frame wire v2 (il translator è ``wire.to_v2_frames``) e li invia
+  best-effort via ``send_json``.
+* ``WsInteractionPort`` implementa ``InteractionPort`` attendendo la
+  ``interaction.response`` correlata per ``interaction_id``. NON emette e NON
+  costruisce frame: la richiesta è l'evento del motore (un evento = un fatto
+  del turno). ``confirm_tool`` cattura ``EngineDisconnected`` e ritorna
   ``InteractionOutcome.DISCONNECTED`` come DATO (adjudicazione review T4: il
   motore persiste la tool response sintetica prima di fermarsi);
   ``run_client_tool``/``ask_user`` la PROPAGANO (§6.5: il loro tipo di ritorno
@@ -45,7 +48,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import uuid
 from collections.abc import Callable
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
@@ -66,12 +68,9 @@ if TYPE_CHECKING:
 
     from backend.services.agent.events import AgentEvent
 
-_RISK_LEVELS = frozenset({"safe", "medium", "dangerous", "forbidden"})
-_DEFAULT_RISK = "medium"
-
 
 class WsTransport:
-    """Proprietario del socket: UNICO lettore, send fail-safe, request correlate."""
+    """Proprietario del socket: UNICO lettore, send fail-safe, attese correlate."""
 
     def __init__(self, websocket: WebSocket) -> None:
         """Inizializza il trasporto sopra un socket già accettato.
@@ -81,13 +80,10 @@ class WsTransport:
                 contratto ``receive_json``/``send_json``).
         """
         self._ws = websocket
+        # Attese pendenti keyed by ``interaction_id`` (la chiave di
+        # correlazione wire v2: motore genera → emette in interaction.requested
+        # → passa alla porta → il pump risolve sulla interaction.response).
         self._pending: dict[str, asyncio.Future[dict[str, Any] | None]] = {}
-        # Correlation bridge (Task 16): la FE risponde con ``execution_id`` e
-        # NON riecheggia il ``correlation_id``. ``_alt_keys`` mappa una chiave
-        # alternativa (l'execution_id del frame outbound) al correlation_id
-        # della request, così il pump può risolvere anche una risposta priva
-        # di correlation_id.
-        self._alt_keys: dict[str, str] = {}
         self._user_messages: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         self._connected = True
         self._disconnected_event = asyncio.Event()
@@ -140,53 +136,53 @@ class WsTransport:
             logger.debug("WsTransport: send fallito ({}); marco disconnesso", exc)
             self._mark_disconnected()
 
-    async def request(
+    async def wait_response(
         self,
-        kind: str,
-        frame_out: dict[str, Any],
+        interaction_id: str,
         *,
         timeout_s: float,
         cancel: asyncio.Event,
-        alt_key: str | None = None,
     ) -> dict[str, Any] | None:
-        """Invia ``frame_out`` con ``correlation_id`` e attende la risposta.
+        """Attende il frame ``interaction.response`` correlato a ``interaction_id``.
 
-        Race con precedenza disconnect > cancel > timeout:
+        Il frame di RICHIESTA è già sul wire (l'evento ``interaction.requested``
+        del motore, emesso via ``EventPort`` PRIMA di chiamare la porta): qui si
+        registra il waiter e si attende. La registrazione è SINCRONA (prima di
+        qualunque await): unita all'invariante del motore "nessun await tra
+        l'emit del requested e la chiamata alla porta", garantisce che una
+        risposta non possa arrivare al pump prima che il waiter esista.
 
-        * disconnessione → solleva ``EngineDisconnected``;
+        Race con precedenza disconnect > cancel > timeout (invariata):
+
+        * disconnessione → solleva ``EngineDisconnected`` (anche se registrata a
+          socket già caduto: fast path immediato dopo cleanup);
         * cancel (evento o frame ``cancel``) → ``None``;
         * timeout → ``None``.
 
         L'entry pendente è ripulita in TUTTI i percorsi di uscita.
 
         Args:
-            kind: Etichetta diagnostica della richiesta (solo log).
-            frame_out: Frame outbound; il ``correlation_id`` è assegnato qui.
+            interaction_id: Chiave di correlazione dell'interazione.
             timeout_s: Timeout di attesa della risposta.
             cancel: Evento cooperativo di cancellazione del turno.
-            alt_key: Chiave alternativa (tipicamente l'``execution_id`` del
-                frame outbound) sotto cui registrare anche questa request. Il
-                pump la usa per risolvere una risposta priva di
-                ``correlation_id`` (correlation bridge Task 16). ``None`` la
-                disabilita (comportamento storico: solo correlation_id).
 
         Returns:
             Il frame di risposta, oppure ``None`` su cancel/timeout.
 
         Raises:
-            EngineDisconnected: se il client cade prima della risposta.
+            EngineDisconnected: se il client cade prima della risposta (o è
+                già caduto quando si registra il waiter).
         """
-        correlation_id = uuid.uuid4().hex
-        outbound = {**frame_out, "correlation_id": correlation_id}
         loop = asyncio.get_running_loop()
         future: asyncio.Future[dict[str, Any] | None] = loop.create_future()
-        self._pending[correlation_id] = future
-        if alt_key is not None:
-            self._alt_keys[alt_key] = correlation_id
+        self._pending[interaction_id] = future
+        if not self._connected:
+            # Registrato a socket già caduto: esito disconnect immediato.
+            self._pending.pop(interaction_id, None)
+            raise EngineDisconnected("client WS disconnesso")
         disconnect_waiter = asyncio.create_task(self._disconnected_event.wait())
         cancel_waiter = asyncio.create_task(cancel.wait())
         try:
-            await self.send_json(outbound)
             waiters: set[asyncio.Future[Any]] = {future, disconnect_waiter, cancel_waiter}
             await asyncio.wait(
                 waiters, timeout=timeout_s, return_when=asyncio.FIRST_COMPLETED,
@@ -197,18 +193,18 @@ class WsTransport:
                 return future.result()
             if disconnect_waiter.done():
                 raise EngineDisconnected(
-                    f"client WS caduto in attesa della risposta '{kind}'"
+                    f"client WS caduto in attesa di interaction.response "
+                    f"({interaction_id})"
                 )
             # cancel o timeout: entrambi → None.
             if not cancel_waiter.done():
                 logger.debug(
-                    "WsTransport: request '{}' scaduta dopo {}s", kind, timeout_s,
+                    "WsTransport: interaction {} scaduta dopo {}s",
+                    interaction_id, timeout_s,
                 )
             return None
         finally:
-            self._pending.pop(correlation_id, None)
-            if alt_key is not None:
-                self._alt_keys.pop(alt_key, None)
+            self._pending.pop(interaction_id, None)
             if not future.done():
                 future.cancel()
             disconnect_waiter.cancel()
@@ -251,47 +247,29 @@ class WsTransport:
             self._mark_disconnected()
 
     def _dispatch(self, frame: dict[str, Any]) -> None:
-        """Smista un frame inbound: cancel, risposta correlata, o messaggio utente."""
+        """Smista un frame inbound: cancel, interaction.response, o messaggio utente."""
         if frame.get("type") == "cancel":
             self._cancel.set()
             self._resolve_all_pending_to_none()
             return
-        correlation_id = frame.get("correlation_id")
-        if correlation_id is not None:
-            future = self._pending.pop(correlation_id, None)
-            self._forget_alt_key(correlation_id)
+        if frame.get("type") == "interaction.response":
+            interaction_id = frame.get("interaction_id")
+            future = self._pending.pop(str(interaction_id), None)
             if future is None:
                 logger.warning(
-                    "WsTransport: risposta stale scartata (correlation_id={})",
-                    correlation_id,
+                    "WsTransport: interaction.response stale scartata "
+                    "(interaction_id={})", interaction_id,
                 )
                 return
             if not future.done():
                 future.set_result(frame)
             return
-        # Correlation bridge (Task 16): nessun correlation_id → prova a
-        # risolvere via ``execution_id`` contro le alt_key registrate (la FE
-        # risponde con l'execution_id ma non riecheggia il correlation_id).
-        alt = frame.get("execution_id")
-        if alt is not None and alt in self._alt_keys:
-            resolved_cid = self._alt_keys.pop(alt)
-            future = self._pending.pop(resolved_cid, None)
-            if future is not None and not future.done():
-                future.set_result(frame)
-            return
         self._user_messages.put_nowait(frame)
 
-    def _forget_alt_key(self, correlation_id: str) -> None:
-        """Rimuove l'eventuale alt_key che punta a ``correlation_id``."""
-        stale = [k for k, v in self._alt_keys.items() if v == correlation_id]
-        for key in stale:
-            self._alt_keys.pop(key, None)
-
     def _resolve_all_pending_to_none(self) -> None:
-        """Risoluzione a ``None`` (esito cancel) di tutte le request pendenti."""
+        """Risoluzione a ``None`` (esito cancel) di tutte le attese pendenti."""
         pending = list(self._pending.values())
         self._pending.clear()
-        self._alt_keys.clear()
         for future in pending:
             if not future.done():
                 future.set_result(None)
@@ -304,7 +282,6 @@ class WsTransport:
         self._disconnected_event.set()
         pending = list(self._pending.values())
         self._pending.clear()
-        self._alt_keys.clear()
         for future in pending:
             if not future.done():
                 future.set_exception(
@@ -325,8 +302,8 @@ class WsEventPort:
 
         Args:
             transport: Il trasporto WS proprietario del socket.
-            translator: Mappa un ``AgentEvent`` in zero o più frame wire
-                (in Mossa 1 sarà l'adapter di parità, Task 15).
+            translator: Mappa un ``AgentEvent`` in zero o più frame wire v2
+                (``wire.to_v2_frames``, l'adapter wire definitivo).
         """
         self._transport = transport
         self._translator = translator
@@ -347,11 +324,12 @@ class WsEventPort:
 
 
 class WsInteractionPort:
-    """``InteractionPort`` sul trasporto WS: frame legacy + request correlate.
+    """``InteractionPort`` sul trasporto WS, vocabolario v2.
 
-    Non riceve la ``EventPort``: gli eventi canonici
-    ``interaction.requested``/``resolved`` sono emessi dal MOTORE (un evento =
-    un fatto del turno); questa porta possiede solo il giro wire legacy.
+    NON costruisce frame outbound: il frame di richiesta è l'evento
+    ``interaction.requested`` emesso dal MOTORE (un evento = un fatto del
+    turno). Qui solo l'attesa correlata per ``interaction_id`` e la decodifica
+    della ``interaction.response``.
     """
 
     def __init__(self, transport: WsTransport) -> None:
@@ -371,34 +349,14 @@ class WsInteractionPort:
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> InteractionOutcome:
-        """Chiede la conferma utente per una tool call rischiosa.
+        """Attende l'esito della conferma per ``interaction_id``.
 
         Su disconnessione ritorna ``DISCONNECTED`` come DATO (adjudicazione
         T4): il motore persiste la tool response sintetica prima di fermarsi.
-
-        ``interaction_id`` sarà usata dal Task 8 per la correlazione
-        ``interaction.response``; per ora la correlazione resta su
-        ``alt_key=call.call_id`` e l'id è ignorato.
         """
-        risk_level = (
-            verdict.risk_level
-            if verdict.risk_level in _RISK_LEVELS
-            else _DEFAULT_RISK
-        )
-        frame = {
-            "type": "tool_confirmation_required",
-            "execution_id": call.call_id,
-            "tool_name": call.name,
-            "args": call.args,
-            "risk_level": risk_level,
-            "description": verdict.description or "",
-            "reasoning": verdict.reason,
-            "allow_remember": True,
-        }
         try:
-            response = await self._transport.request(
-                "tool_confirmation", frame, timeout_s=timeout_s, cancel=cancel,
-                alt_key=call.call_id,
+            response = await self._transport.wait_response(
+                interaction_id, timeout_s=timeout_s, cancel=cancel,
             )
         except EngineDisconnected:
             return InteractionOutcome.DISCONNECTED
@@ -418,25 +376,14 @@ class WsInteractionPort:
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> ToolExecutionOutput:
-        """Delegazione al client di un tool UI-side (``client_tool_call``).
-
-        ``interaction_id`` sarà usata dal Task 8 per la correlazione
-        ``interaction.response``; per ora è ignorata (correlazione su
-        ``alt_key=call.call_id``).
+        """Delegazione al client di un tool UI-side; attende per ``interaction_id``.
 
         Raises:
             EngineDisconnected: se il client cade prima del risultato (il
                 tipo di ritorno non può codificarla; il motore la gestisce).
         """
-        frame = {
-            "type": "client_tool_call",
-            "execution_id": call.call_id,
-            "tool_name": call.name,
-            "args": call.args,
-        }
-        response = await self._transport.request(
-            "client_tool_call", frame, timeout_s=timeout_s, cancel=cancel,
-            alt_key=call.call_id,
+        response = await self._transport.wait_response(
+            interaction_id, timeout_s=timeout_s, cancel=cancel,
         )
         if response is None:
             return self._interrupted_output(call, cancel)
@@ -465,23 +412,13 @@ class WsInteractionPort:
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> ToolExecutionOutput:
-        """Pone all'utente le domande del wizard ``ask_user_required``.
-
-        ``interaction_id`` sarà usata dal Task 8 per la correlazione
-        ``interaction.response``; per ora è ignorata (correlazione su
-        ``alt_key=call.call_id``).
+        """Attende le risposte del wizard ``ask_user`` per ``interaction_id``.
 
         Raises:
             EngineDisconnected: se il client cade prima delle risposte.
         """
-        frame = {
-            "type": "ask_user_required",
-            "execution_id": call.call_id,
-            "questions": _normalize_questions(call.args.get("questions")),
-        }
-        response = await self._transport.request(
-            "ask_user", frame, timeout_s=timeout_s, cancel=cancel,
-            alt_key=call.call_id,
+        response = await self._transport.wait_response(
+            interaction_id, timeout_s=timeout_s, cancel=cancel,
         )
         if response is None:
             return self._interrupted_output(call, cancel)
@@ -501,31 +438,6 @@ class WsInteractionPort:
         else:
             reason = f"Interazione '{call.name}' scaduta (timeout)."
         return ToolExecutionOutput(ok=False, content=reason, error=reason)
-
-
-def _normalize_questions(raw: Any) -> list[dict[str, Any]]:
-    """Normalizza le domande di ``ask_user`` alla forma del contratto wire.
-
-    Il contratto (``WsAskUserQuestion``, extra='forbid') richiede esattamente
-    ``id``/``text``/``type``/``options``/``allow_free_text``: chiavi estranee
-    sono filtrate, default riempiti, tipi coartati in modo difensivo.
-    """
-    questions: list[dict[str, Any]] = []
-    if not isinstance(raw, list):
-        return questions
-    for index, item in enumerate(raw):
-        if not isinstance(item, dict):
-            continue
-        qtype = item.get("type")
-        options = item.get("options")
-        questions.append({
-            "id": str(item.get("id") or f"q{index + 1}"),
-            "text": str(item.get("text") or ""),
-            "type": qtype if qtype in ("radio", "checkbox") else "radio",
-            "options": [str(o) for o in options] if isinstance(options, list) else [],
-            "allow_free_text": bool(item.get("allow_free_text", False)),
-        })
-    return questions
 
 
 def _format_answers(answers: list[Any]) -> str:

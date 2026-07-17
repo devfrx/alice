@@ -7,6 +7,7 @@ from backend.services.agent.models import ToolInvocation, ToolMeta
 from backend.tests.agent.doubles import (
     MapExecutionPort,
     RecordingEventPort,
+    ScriptedInteractionPort,
     ScriptedLLMPort,
 )
 
@@ -39,3 +40,13 @@ async def test_recording_event_port_never_raises() -> None:
     from backend.services.agent.events import TurnStartedEvent
     await port.emit(TurnStartedEvent(turn_id="t", conversation_id="c", source="chat"))
     assert len(port.events) == 1
+
+
+async def test_scripted_interaction_confirm_returns_disconnected_as_data() -> None:
+    port = ScriptedInteractionPort(confirm=ports.InteractionOutcome.DISCONNECTED)
+    call = ToolInvocation(call_id="c1", name="t", args={}, raw_args="{}")
+    verdict = ports.GateVerdict(action=ports.GateAction.CONFIRM, outcome="needs_confirmation")
+    out = await port.confirm_tool(
+        call, verdict=verdict, timeout_s=1.0, cancel=asyncio.Event()
+    )
+    assert out is ports.InteractionOutcome.DISCONNECTED

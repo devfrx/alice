@@ -132,8 +132,7 @@ class ScriptedInteractionPort:
         self, call: ToolInvocation, *, verdict: ports.GateVerdict, timeout_s: float,
         cancel: asyncio.Event,
     ) -> ports.InteractionOutcome:
-        if self._confirm is ports.InteractionOutcome.DISCONNECTED:
-            raise ports.EngineDisconnected("client disconnesso durante conferma")
+        # DISCONNECTED torna come dato: il motore persiste prima di fermarsi (spec §6.5)
         return self._confirm
 
     async def run_client_tool(

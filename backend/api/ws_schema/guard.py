@@ -6,9 +6,16 @@ turn); under ``ALICE_WS_STRICT_CONTRACTS=1`` (set by the test suite) it
 raises so drift fails loudly.
 
 The validators are plain callables meant to be INJECTED into the send
-chokepoints (``WSConnectionManager``, ``WebSocketEventSink``, the agent
-``WsTransport``) by the api layer / composition root — ``services`` modules
-must never import this package (spec §4).
+chokepoints (``WSConnectionManager``, ``WebSocketEventSink``) by the api
+layer / composition root — ``services`` modules must never import this
+package (spec §4).
+
+The AgentEngine's own wire (``services/agent/adapters/ws.py``'s
+``WsTransport``) is NOT one of those chokepoints: it is not wired to these
+validators. Its guarantee is at unit level instead — ``test_parity.py``
+Part A validates every emitted frame against its Pydantic event class
+directly. ``WebSocketEventSink`` (the persist path) is the one that applies
+this runtime validator.
 """
 
 from __future__ import annotations

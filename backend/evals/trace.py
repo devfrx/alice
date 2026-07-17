@@ -19,8 +19,8 @@ def summarize_trace(
 
     Args:
         events: Frame emessi dal turno (vocabolario canonico + legacy).
-        finish_reason: ``TurnResult.finish_reason`` del turno.
-        cost: ``TurnResult.cost`` del turno (crediti provider).
+        finish_reason: ``TurnOutcome.finish_reason`` del turno.
+        cost: ``TurnOutcome.cost`` del turno (crediti provider).
 
     Returns:
         La sintesi numerica della trace. I token sono sommati su tutti gli

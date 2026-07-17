@@ -9,6 +9,12 @@ the v2 AgentEngine migration. The current frame producers are the
 ws.py``'s ``WsTransport``, ``services/agent/adapters/parity.py`` for
 legacy-shape parity) and ``api/routes/chat/_persist.py`` (which still
 builds the final ``done`` event after the engine's ``TurnOutcome``).
+
+The "Canonical v2 (Mossa 2)" section below is an ADDITIVE contract widening
+(Task 6): new frame types plus optional ``# v2`` fields on existing models.
+No emitter changes yet — the wire is unchanged. Emitters switch to the v2
+vocabulary in Tasks 7-9; the legacy types and ``adapters/parity.py`` are
+purged in Task 10.
 """
 
 from __future__ import annotations
@@ -116,7 +122,7 @@ class WsToolExecutionDone(ChatServerFrame):
     artifact_id: str | None = None
 
 
-class WsToolProgress(ChatServerFrame):
+class WsToolProgressLegacy(ChatServerFrame):
     """Incremental progress; tools merge arbitrary extra keys (extra=allow)."""
 
     model_config = ConfigDict(extra="allow")
@@ -249,6 +255,7 @@ class WsTurnStarted(ChatServerFrame):
     type: Literal["turn.started"]
     turn_id: str
     conversation_id: str
+    source: Literal["chat", "voice", "headless"] | None = None  # v2
 
 
 class WsTurnLlmStep(ChatServerFrame):
@@ -267,6 +274,7 @@ class WsTurnToolCall(ChatServerFrame):
     execution_id: str
     tool_name: str
     args: dict[str, Any]
+    step: int | None = None  # v2
 
 
 class WsTurnToolResult(ChatServerFrame):
@@ -280,6 +288,7 @@ class WsTurnToolResult(ChatServerFrame):
     result: str
     content_type: str | None = None
     artifact_id: str | None = None
+    status: str | None = None  # v2
 
 
 class WsInteractionRequested(ChatServerFrame):
@@ -290,6 +299,13 @@ class WsInteractionRequested(ChatServerFrame):
     execution_id: str
     kind: InteractionKind
     tool_name: str | None = None
+    interaction_id: str | None = None  # v2
+    args: dict[str, Any] | None = None  # v2
+    risk_level: RiskLevel | None = None  # v2
+    description: str | None = None  # v2
+    reasoning: str | None = None  # v2
+    allow_remember: bool | None = None  # v2
+    questions: list[WsAskUserQuestion] | None = None  # v2
 
 
 class WsInteractionResolved(ChatServerFrame):
@@ -300,6 +316,7 @@ class WsInteractionResolved(ChatServerFrame):
     execution_id: str
     kind: InteractionKind
     outcome: InteractionOutcome
+    interaction_id: str | None = None  # v2
 
 
 class WsTurnUsage(ChatServerFrame):
@@ -312,6 +329,7 @@ class WsTurnUsage(ChatServerFrame):
     output_tokens: int
     tool_calls: int
     max_steps: int
+    cost: float | None = None  # v2
 
 
 class WsTurnFinished(ChatServerFrame):
@@ -324,6 +342,91 @@ class WsTurnFinished(ChatServerFrame):
     output_tokens: int
     steps: int
     cost: float | None = None
+    conversation_id: str | None = None  # v2
+    message_id: str | None = None  # v2
+    user_message_id: str | None = None  # v2
+    version_group_id: str | None = None  # v2
+    version_index: int | None = None  # v2
+    tool_calls: int | None = None  # v2
+
+# ---------------------------------------------------------------------------
+# Canonical v2 (Mossa 2)
+# ---------------------------------------------------------------------------
+
+
+class WsTurnDelta(ChatServerFrame):
+    """A turn output delta (text or thinking)."""
+
+    type: Literal["turn.delta"]
+    turn_id: str
+    step: int
+    kind: Literal["text", "thinking"]
+    text: str
+
+
+class WsToolStarted(ChatServerFrame):
+    """A greenlit tool call has started server-side execution."""
+
+    type: Literal["tool.started"]
+    turn_id: str
+    execution_id: str
+    tool_name: str
+
+
+class WsToolProgress(ChatServerFrame):
+    """Incremental progress of a long-running tool (typed, nested payload)."""
+
+    type: Literal["tool.progress"]
+    turn_id: str
+    execution_id: str
+    tool_name: str
+    progress: dict[str, Any]
+
+
+class WsContextUsage(ChatServerFrame):
+    """Context-window utilisation (``percentage`` is a fraction in [0, 1])."""
+
+    type: Literal["context.usage"]
+    turn_id: str | None = None
+    used: int
+    available: int
+    context_window: int
+    percentage: float
+    was_compressed: bool = False
+    messages_summarized: int = 0
+    is_estimated: bool = True
+    breakdown: WsContextBreakdown | None = None
+
+
+class WsContextCompaction(ChatServerFrame):
+    """A context-compaction cycle (started/done/failed)."""
+
+    type: Literal["context.compaction"]
+    turn_id: str | None = None
+    phase: Literal["started", "done", "failed"]
+    messages_summarized: int | None = None
+    summary_message_id: str | None = None
+    tokens_before: int | None = None
+    tokens_after: int | None = None
+    error: str | None = None
+
+
+class WsTurnWarning(ChatServerFrame):
+    """A non-fatal turn warning."""
+
+    type: Literal["turn.warning"]
+    turn_id: str
+    code: str
+    message: str
+
+
+class WsTurnError(ChatServerFrame):
+    """A turn error; ``turn_id`` is absent for pre-turn errors (validation)."""
+
+    type: Literal["turn.error"]
+    turn_id: str | None = None
+    code: str
+    message: str
 
 # ---------------------------------------------------------------------------
 # Reflective executor
@@ -410,6 +513,23 @@ class WsAskUserResponse(ClientFrame):
     execution_id: str
     answers: list[WsAskUserAnswer]
 
+
+class WsInteractionResponse(ClientFrame):
+    """Unified response to interactions (kind-discriminated payload)."""
+
+    type: Literal["interaction.response"]
+    interaction_id: str
+    kind: InteractionKind
+    # tool_confirmation
+    approved: bool | None = None
+    remember: RememberChoice = "none"
+    # ask_user
+    answers: list[WsAskUserAnswer] | None = None
+    # client_tool_call
+    success: bool | None = None
+    result: str | list[Any] | dict[str, Any] | None = None
+    error: str | None = None
+
 # ---------------------------------------------------------------------------
 # Channel unions
 # ---------------------------------------------------------------------------
@@ -422,7 +542,7 @@ ChatServerMessage = Annotated[
     | WsDone
     | WsToolExecutionStart
     | WsToolExecutionDone
-    | WsToolProgress
+    | WsToolProgressLegacy
     | WsContextInfo
     | WsContextCompressionStart
     | WsContextCompressionDone
@@ -441,11 +561,22 @@ ChatServerMessage = Annotated[
     | WsTurnUsage
     | WsTurnFinished
     | WsAgentCriticInvoked
-    | WsAgentWarning,
+    | WsAgentWarning
+    | WsTurnDelta
+    | WsToolStarted
+    | WsToolProgress
+    | WsContextUsage
+    | WsContextCompaction
+    | WsTurnWarning
+    | WsTurnError,
     Field(discriminator="type"),
 ]
 
 ChatClientMessage = Annotated[
-    WsCancel | WsToolConfirmationResponse | WsClientToolResult | WsAskUserResponse,
+    WsCancel
+    | WsToolConfirmationResponse
+    | WsClientToolResult
+    | WsAskUserResponse
+    | WsInteractionResponse,
     Field(discriminator="type"),
 ]

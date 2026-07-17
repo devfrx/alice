@@ -1,9 +1,13 @@
-"""AL\\CE — Chat turn persistence and post-stream compression.
+"""AL\\CE — Post-turn conversation maintenance and ``done`` emission.
 
-Owns the post-turn pipeline extracted verbatim from the legacy
-``chat.py``: the ``done`` event builder, the final assistant-message
-persistence (with fast paths for error/cancelled), and the post-stream
-context compression pass.
+The final assistant message is persisted by the AgentEngine itself
+(``engine._finish`` saving matrix via ``PersistencePort.save_final_message``,
+carry #2/#3) — this module no longer creates it.  What it owns is the
+post-turn pipeline around that fact: emitting the ``done`` event with the
+engine-returned ``final_message_id``, refreshing conversation metadata
+(``title``/``updated_at``/``context_snapshot``), emitting the real
+``context_info`` frame, and running the post-stream context compression
+pass.
 """
 
 from __future__ import annotations
@@ -78,18 +82,21 @@ async def _persist_final_turn(
     av_map: dict[str, int],
     cached_sys_prompt: str | None,
 ) -> None:
-    """Persist the final assistant message and run post-stream side effects.
+    """Run post-turn conversation maintenance and emit the ``done`` event.
 
-    Owns the full post-turn pipeline that previously lived inline in
-    ``ws_chat`` (~lines 1480–1830 of the legacy implementation):
+    The final assistant message is already persisted (or deliberately
+    skipped) by the AgentEngine — ``engine._finish`` saving matrix via
+    ``PersistencePort.save_final_message`` (carry #2/#3) — so this
+    pipeline never creates it; ``result.final_assistant_message_id``
+    is relayed as the ``done`` frame's ``message_id``:
 
-    * Fast paths for ``finish_reason in {"cancelled", "error"}`` —
-      identical behaviour to the legacy cancel/error branches (v3-4).
-    * Normal path: save assistant ``Message`` (when content or no tool
-      calls), emit real ``context_info`` (v2-6), update
+    * Fast path ``error``: defensive rollback + ``done`` error frame.
+    * Fast path ``cancelled``: refresh ``Conversation.title``/
+      ``updated_at`` when the turn produced anything, commit, ``done``.
+    * Normal path: emit real ``context_info`` (v2-6), update
       ``Conversation.title``/``updated_at``/``context_snapshot`` (v2-5),
-      commit, optionally trigger post-stream compression
-      (v2-1), then emit the WS ``done`` event.
+      commit, optionally trigger post-stream compression (v2-1), then
+      emit the WS ``done`` event.
 
     Args:
         session: Active async DB session.

@@ -47,7 +47,8 @@ class InMemoryPersistence:
     """PersistencePort: stato in-memoria, ordine di chiamata tracciato."""
 
     def __init__(
-        self, history: list[dict[str, Any]] | None = None, *, fail_final: bool = False,
+        self, history: list[dict[str, Any]] | None = None, *,
+        fail_final: bool = False, fail_final_checkpoint: bool = False,
     ) -> None:
         self._history = history or []
         self.assistant_steps: list[dict[str, Any]] = []
@@ -59,6 +60,11 @@ class InMemoryPersistence:
         self.archived: list[tuple[str, list[str]]] = []
         self._next_id = 0
         self._fail_final = fail_final
+        # ``fail_final_checkpoint``: il save finale riesce (id ritornato), ma
+        # il checkpoint SUCCESSIVO solleva. Armato dentro save_final_message
+        # cosi' i checkpoint degli step tool intermedi restano sani.
+        self._fail_final_checkpoint = fail_final_checkpoint
+        self._checkpoint_armed = False
 
     async def save_assistant_step(
         self, *, content: str, thinking: str,
@@ -86,6 +92,8 @@ class InMemoryPersistence:
     ) -> str:
         if self._fail_final:
             raise RuntimeError("persist boom")
+        if self._fail_final_checkpoint:
+            self._checkpoint_armed = True
         self.final_messages.append({
             "content": content, "thinking": thinking,
             "input_tokens": input_tokens, "output_tokens": output_tokens,
@@ -107,6 +115,8 @@ class InMemoryPersistence:
         return None
 
     async def checkpoint(self) -> None:
+        if self._checkpoint_armed:
+            raise RuntimeError("checkpoint boom")
         self.checkpoints += 1
         self.order.append(("checkpoint", ""))
 

@@ -190,6 +190,31 @@ async def test_save_failure_degrades_to_error() -> None:
     assert finished.type == "turn.finished" and finished.finish_reason == "error"
 
 
+async def test_checkpoint_failure_after_final_save_degrades_to_error() -> None:
+    # Il save finale RIESCE ma il checkpoint successivo solleva: stessa
+    # degradazione del save fallito (turn.error persist_failed, finish_reason
+    # "error", final_message_id azzerato, nessuna eccezione fuori). I
+    # checkpoint degli step tool intermedi restano sani (flag armato solo
+    # da save_final_message).
+    call = (ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(call), _final_step()],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+        fail_final_checkpoint=True,
+    )
+    assert outcome.finish_reason == "error"
+    assert outcome.final_assistant_message_id is None
+    # il save era riuscito (registrato), la degradazione arriva dal checkpoint
+    assert len(persistence.final_messages) == 1
+    assert persistence.checkpoints >= 2      # gli step tool hanno committato
+    assert any(
+        e.type == "turn.error" and e.code == "persist_failed" for e in rec.events
+    )
+    finished = rec.events[-1]
+    assert finished.type == "turn.finished" and finished.finish_reason == "error"
+    assert finished.final_message_id is None
+
+
 async def test_cost_and_usage_accumulate_across_steps() -> None:
     step1 = [ports.LLMUsage(input_tokens=100, output_tokens=10, cost=0.01),
              ports.LLMStepDone(finish_reason="tool_calls", tool_calls=(

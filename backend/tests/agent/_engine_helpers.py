@@ -104,12 +104,15 @@ async def _run_with_port(
     ask_user_result: ports.ToolExecutionOutput | None = None,
     progress: dict[str, dict] | None = None,
     fail_final: bool = False,
+    fail_final_checkpoint: bool = False,
     user_message_id: str | None = None,
     version_group_id: str | None = None,
     version_index: int | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, MapExecutionPort]:
     """Costruisce l'engine coi double e lo esegue, esponendo anche l'ExecutionPort."""
-    persistence = InMemoryPersistence(fail_final=fail_final)
+    persistence = InMemoryPersistence(
+        fail_final=fail_final, fail_final_checkpoint=fail_final_checkpoint,
+    )
     rec = RecordingEventPort()
     llm = ScriptedLLMPort(steps=llm_steps)
     exec_port = MapExecutionPort(
@@ -145,6 +148,7 @@ async def _run_with(
     ask_user_result: ports.ToolExecutionOutput | None = None,
     progress: dict[str, dict] | None = None,
     fail_final: bool = False,
+    fail_final_checkpoint: bool = False,
     user_message_id: str | None = None,
     version_group_id: str | None = None,
     version_index: int | None = None,
@@ -155,6 +159,7 @@ async def _run_with(
         confirm=confirm, delays=delays, errors=errors, meta=meta, cancel=cancel,
         max_steps=max_steps, max_tool_calls=max_tool_calls, client_result=client_result,
         ask_user_result=ask_user_result, progress=progress, fail_final=fail_final,
+        fail_final_checkpoint=fail_final_checkpoint,
         user_message_id=user_message_id, version_group_id=version_group_id,
         version_index=version_index,
     )

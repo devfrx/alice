@@ -58,6 +58,28 @@ async def test_voice_trim_caps_tool_calls() -> None:
     assert outcome.tool_calls == 1        # solo la eseguita conta
 
 
+async def test_final_content_excludes_pre_tool_prose() -> None:
+    # fix review T16: TurnOutcome.content = solo l'ultimo step, non il
+    # cumulato — altrimenti la prosa pre-tool (già persistita come step
+    # intermedio) verrebbe ri-scritta dal persist path come messaggio finale.
+    step1 = [ports.LLMTextDelta(text="Sto per usare un tool. "),
+             ports.LLMUsage(input_tokens=10, output_tokens=5, cost=0.001),
+             ports.LLMStepDone(finish_reason="tool_calls", tool_calls=(
+                 ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),))]
+    step2 = [ports.LLMTextDelta(text="Ecco il risultato."),
+             ports.LLMStepDone(finish_reason="stop", tool_calls=())]
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[step1, step2],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+    )
+    assert outcome.content == "Ecco il risultato."          # solo l'ultimo step
+    # la prosa pre-tool e' persistita UNA volta, nello step intermedio
+    assert persistence.assistant_steps[0]["content"] == "Sto per usare un tool. "
+    # lo stream wire resta completo: tutti i delta emessi
+    deltas = [e.text for e in rec.events if e.type == "turn.delta" and e.kind == "text"]
+    assert "".join(deltas) == "Sto per usare un tool. Ecco il risultato."
+
+
 async def test_cost_and_usage_accumulate_across_steps() -> None:
     step1 = [ports.LLMUsage(input_tokens=100, output_tokens=10, cost=0.01),
              ports.LLMStepDone(finish_reason="tool_calls", tool_calls=(

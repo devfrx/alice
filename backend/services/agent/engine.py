@@ -62,12 +62,26 @@ _STATUS_BUDGET = "budget_exhausted"
 
 @dataclass(slots=True)
 class _TurnState:
-    """Stato mutabile di un turno, accumulato attraverso gli step."""
+    """Stato mutabile di un turno, accumulato attraverso gli step.
+
+    ``content`` NON è cumulativo attraverso gli step (fix review T16): è
+    resettato a inizio di ogni ``_run_llm_step`` e accumula SOLO i delta
+    di QUELLO step, cosicché rifletta il testo dello step corrente (o, se
+    l'eccezione arriva a metà stream, il testo parziale di quello step in
+    corso). ``last_step_content`` è il testo dell'ULTIMO step che ne ha
+    prodotto uno non vuoto — non viene mai sovrascritto da uno step vuoto
+    (retry/nudge) — usato SOLO come fallback nei rami di stop
+    cancelled/disconnected/error quando lo step interrotto non ha
+    accumulato nulla di suo (recovery message, §ws.py `full_content`).
+    ``thinking`` resta cumulativo su tutto il turno (nessun requisito di
+    finale-solo per il ragionamento).
+    """
 
     request: TurnRequest
     working_messages: list[dict[str, Any]] = field(default_factory=list)
     dedup: DedupRegistry = field(default_factory=DedupRegistry)
     content: str = ""
+    last_step_content: str = ""
     thinking: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
@@ -194,6 +208,14 @@ class AgentEngine:
                     await self._maybe_compact(turn_id, step, state)
                 await self._events.emit(ev.LlmStepEvent(turn_id=turn_id, step=step))
                 step_result = await self._run_llm_step(turn_id, step, state, cancel)
+                # `state.content` = testo di QUESTO step (fix review T16, vedi
+                # `_TurnState`); `last_step_content` si aggiorna SOLO se non
+                # vuoto, per non essere sovrascritto da uno step vuoto
+                # (retry/nudge) — resta il fallback per i rami di stop
+                # cancelled/disconnected/error in `_finish`.
+                state.content = step_result.step_content
+                if step_result.step_content:
+                    state.last_step_content = step_result.step_content
                 stop = await self._after_step(
                     turn_id, step, step_result, state, budget, cancel,
                 )
@@ -222,6 +244,11 @@ class AgentEngine:
         finish_reason: str | None = None
         tool_calls: tuple[ToolInvocation, ...] = ()
         failure: LLMFailure | None = None
+        # Reset PRIMA dello stream (fix review T16): `state.content` deve
+        # riflettere SOLO questo step (non il cumulato) — se un'eccezione
+        # arriva a metà stream, resta comunque il parziale di QUESTO step,
+        # non un residuo di step precedenti.
+        state.content = ""
 
         stream = self._llm.stream_step(
             system_prompt=state.request.system_prompt,
@@ -705,8 +732,29 @@ class AgentEngine:
             tool_calls=state.tool_calls, cost=state.cost,
             final_message_id=state.final_assistant_message_id,
         ))
+        # Fix review T16: `TurnOutcome.content` = testo dell'ULTIMO step, non
+        # il cumulato di tutti gli step (altrimenti la prosa pre-tool, già
+        # persistita da `save_assistant_step`, verrebbe ri-scritta dal persist
+        # path come messaggio finale — duplicata).
+        #
+        # - COMPLETED / LENGTH / MAX_STEPS: `state.content` è ESATTAMENTE il
+        #   testo dello step che ha determinato lo stop (letterale, anche se
+        #   vuoto — nessun fallback: uno step con tool call e senza prosa
+        #   nuova chiude con content="").
+        # - CANCELLED / DISCONNECTED / ERROR: lo stop può arrivare a metà
+        #   dello step (interazione interrotta, eccezione non gestita) — si
+        #   usa il parziale accumulato da QUELLO step, e SOLO se quello step
+        #   non ha prodotto nulla di suo si ripiega sull'ultimo step non
+        #   vuoto (preserva il recovery message parziale su disconnect,
+        #   §ws.py `full_content`).
+        if resolved_stop in (
+            StopReason.CANCELLED, StopReason.DISCONNECTED, StopReason.ERROR,
+        ):
+            final_content = state.content or state.last_step_content
+        else:
+            final_content = state.content
         return TurnOutcome(
-            content=state.content, thinking=state.thinking,
+            content=final_content, thinking=state.thinking,
             finish_reason=finish_reason, stop_reason=resolved_stop,
             steps=budget.steps, tool_calls=state.tool_calls,
             input_tokens=state.input_tokens, output_tokens=state.output_tokens,

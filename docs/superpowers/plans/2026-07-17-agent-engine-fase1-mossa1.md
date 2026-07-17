@@ -196,6 +196,10 @@ class InteractionPort(Protocol):
         self, call: ToolInvocation, *, verdict: GateVerdict, timeout_s: float,
         cancel: asyncio.Event,
     ) -> InteractionOutcome: ...
+    # confirm_tool NON solleva su disconnect: ritorna DISCONNECTED come dato,
+    # così il motore persiste la tool response sintetica PRIMA di fermarsi
+    # (§6.5; adjudicato in review T4). Le implementazioni WS catturano
+    # EngineDisconnected dal transport e lo mappano a DISCONNECTED.
     async def run_client_tool(
         self, call: ToolInvocation, *, timeout_s: float, cancel: asyncio.Event,
     ) -> ToolExecutionOutput: ...   # DISCONNECTED → solleva EngineDisconnected

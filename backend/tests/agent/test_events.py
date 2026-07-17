@@ -12,7 +12,7 @@ CALL = ToolInvocation(call_id="call_1", name="t", args={}, raw_args="{}")
 def test_every_event_has_literal_type() -> None:
     e = ev.ToolResultEvent(
         turn_id="t1", call_id="call_1", name="t", status="ok",
-        content_preview="x", artifact_id=None,
+        result="x", artifact_id=None,
     )
     assert e.type == "tool.result"
 

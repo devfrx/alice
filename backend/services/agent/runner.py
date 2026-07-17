@@ -8,7 +8,7 @@ viene cablato ai servizi reali.
 Due configurazioni di porte, selezionate dalla presenza di un ``transport``:
 
 * **WebSocket** (``transport`` fornito): eventi via :class:`WsEventPort`
-  (tradotti in frame wire dal translator di parità), interazioni via
+  (tradotti in frame wire v2 da ``to_v2_frames``), interazioni via
   :class:`WsInteractionPort` (conferme/ask_user/client tool sul socket).
 * **Headless/eval** (``transport is None``): eventi via
   :class:`SinkEventPort` sopra un ``WSEventSink`` iniettato (tipicamente il
@@ -33,8 +33,8 @@ from backend.services.agent.adapters.context import ContextManagerAdapter
 from backend.services.agent.adapters.db import SqlModelPersistence
 from backend.services.agent.adapters.execution import ToolRegistryAdapter
 from backend.services.agent.adapters.llm import LLMServiceAdapter
-from backend.services.agent.adapters.parity import to_wire_frames
 from backend.services.agent.adapters.permission import PermissionServiceAdapter
+from backend.services.agent.adapters.wire import to_v2_frames
 from backend.services.agent.adapters.ws import (
     WsEventPort,
     WsInteractionPort,
@@ -80,7 +80,7 @@ class _EventSink(Protocol):
 class SinkEventPort:
     """``EventPort`` sopra un ``WSEventSink`` iniettato (headless/eval).
 
-    Traduce ogni ``AgentEvent`` in frame wire (translator di parità) e li
+    Traduce ogni ``AgentEvent`` in frame wire v2 (``to_v2_frames``) e li
     consegna via ``sink.send``. Best-effort come da contratto ``EventPort``:
     non solleva MAI. Rispetta ``sink.is_connected`` (contratto eval §6.14:
     ``RecordingSink`` parte con ``is_connected=True``).
@@ -96,7 +96,7 @@ class SinkEventPort:
         Args:
             sink: Il sink di destinazione (recording/null/…).
             translator: Mappa un ``AgentEvent`` in zero o più frame wire
-                (``to_wire_frames``, l'adapter di parità).
+                (``to_v2_frames``, l'adapter wire v2 definitivo).
         """
         self._sink = sink
         self._translator = translator
@@ -222,11 +222,11 @@ async def run_agent_turn(
     )
 
     if transport is not None:
-        event_port: Any = WsEventPort(transport, to_wire_frames)
+        event_port: Any = WsEventPort(transport, to_v2_frames)
         interaction_port: Any = WsInteractionPort(transport)
     else:
         sink = sink_fallback if sink_fallback is not None else _DropSink()
-        event_port = SinkEventPort(sink, to_wire_frames)
+        event_port = SinkEventPort(sink, to_v2_frames)
         interaction_port = AutoDeclineInteractionPort()
 
     engine = AgentEngine(

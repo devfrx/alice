@@ -7,6 +7,12 @@ LLM scriptato, socket WS REALE (``starlette.testclient.TestClient``): esercita
 È il sismografo del cambio contratto della Mossa 2: i task 7-9 lo aggiornano
 deliberatamente al vocabolario v2 — quando lo fanno, questo file è IL posto
 dove il diff del wire deve saltare all'occhio.
+
+Stato al Task 7 (wire v2 switch): il MOTORE emette ora SOLO frame v2
+(``turn.delta`` al posto di ``token``, niente ``llm_requery``, niente
+``tool_execution_*``), mentre ``done``/``context_info``/compressione arrivano
+ANCORA dal persist path legacy (fino al Task 9). Le richieste interattive
+legacy restano su ``WsInteractionPort`` (Task 8).
 """
 
 from __future__ import annotations
@@ -31,7 +37,11 @@ def _drain_until(ws: Any, terminal_type: str, limit: int = 200) -> list[dict[str
 
 
 def test_text_turn_full_wire_sequence(app: FastAPI) -> None:
-    """Turno di solo testo: pin dell'ordine dei frame salienti sul wire attuale."""
+    """Turno di solo testo: pin dell'ordine dei frame salienti sul wire v2.
+
+    Il motore emette ``turn.delta`` (non più ``token``); ``done`` è ancora del
+    persist path legacy (Task 9 lo sostituirà con ``turn.finished`` come frame
+    finale)."""
     ctx = app.state.context
     ctx.llm_service = ScriptedLLMShim([
         {"type": "token", "content": "Ciao dal wire live."},
@@ -44,18 +54,26 @@ def test_text_turn_full_wire_sequence(app: FastAPI) -> None:
         frames = _drain_until(ws, "done")
 
     types = [f["type"] for f in frames]
-    # Ordine saliente del wire ATTUALE (Mossa 1, parity): il turno apre con
-    # turn.started, ogni step annuncia turn.llm_step, i token streammano, lo
-    # usage per-step arriva, turn.finished chiude il motore, done chiude il
-    # persist path.
+    # Ordine saliente del wire v2: il turno apre con turn.started, ogni step
+    # annuncia turn.llm_step, il testo streamma via turn.delta (NON più token),
+    # lo usage per-step arriva, turn.finished chiude il motore, done chiude
+    # ancora il persist path legacy.
     assert types.index("turn.started") < types.index("turn.llm_step")
-    assert "token" in types
+    assert "token" not in types  # vocabolario legacy morto sul motore
+    assert "turn.delta" in types
     assert "turn.usage" in types
     assert types.index("turn.finished") < types.index("done")
+    # Il testo streammato arriva nel/nei turn.delta (kind=text).
+    text = "".join(
+        f["text"] for f in frames
+        if f["type"] == "turn.delta" and f["kind"] == "text"
+    )
+    assert text == "Ciao dal wire live."
     done = frames[-1]
     assert done["finish_reason"] == "stop"
     assert done["conversation_id"]
     assert done["message_id"]  # messaggio assistant persistito
+    assert ctx.llm_service.chat_calls == 1
 
 
 def test_tool_step_turn_wire_sequence(app: FastAPI) -> None:
@@ -92,7 +110,13 @@ def test_tool_step_turn_wire_sequence(app: FastAPI) -> None:
     assert "tool.result" in types
     tool_result = next(f for f in frames if f["type"] == "tool.result")
     assert tool_result["execution_id"] == "call_live_1"
-    # llm_requery legacy compare solo dallo step 2 in poi (wire attuale).
-    assert "llm_requery" in types
+    # Tool response sintetica (§6.1.1): status v2 e corpo COMPLETO sul wire.
+    assert tool_result["status"] == "unknown_tool"
+    assert tool_result["result"] == "Tool sconosciuto: tool_inesistente."
+    # Vocabolario legacy morto sul motore: niente più llm_requery né
+    # tool_execution_start/done nello stream v2.
+    assert "llm_requery" not in types
+    assert "tool_execution_start" not in types
+    assert "tool_execution_done" not in types
     assert frames[-1]["finish_reason"] == "stop"
     assert ctx.llm_service.chat_calls == 2

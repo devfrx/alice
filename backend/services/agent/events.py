@@ -71,15 +71,14 @@ class ToolProgressEvent(BaseModel):
 
 
 class ToolResultEvent(BaseModel):
-    """Evento: risultato di esecuzione tool.
+    """Evento: risultato di esecuzione tool (corpo completo, anche sintetico).
 
-    ``content_preview`` è il troncamento (200 char) del corpo, sempre presente.
-    ``result`` porta il corpo COMPLETO ma SOLO per gli esiti di successo
-    (``status == "ok"``): per i rami sintetici (rejection/deny/error/dedup/
-    budget) è ``None``, perché quel testo è prosa engine-authored che diverge
-    legittimamente dal wording legacy e non va confrontato verbatim.
-    ``content_type`` è il MIME della tool response quando la piattaforma lo
-    espone (threaded da ``ToolExecutionOutput``), altrimenti ``None``.
+    ``result`` porta SEMPRE il corpo COMPLETO della tool response, inclusa la
+    prosa sintetica dei rami di rifiuto/deny/error/dedup/budget: la distinzione
+    result-solo-sui-success era un artefatto del confronto di parità (morto con
+    ``adapters/parity.py`` nel Task 7). ``content_type`` è il MIME della tool
+    response quando la piattaforma lo espone (threaded da
+    ``ToolExecutionOutput``), altrimenti ``None``.
     """
 
     type: Literal["tool.result"] = "tool.result"
@@ -87,9 +86,8 @@ class ToolResultEvent(BaseModel):
     call_id: str
     name: str
     status: str
-    content_preview: str
+    result: str
     artifact_id: str | None
-    result: str | None = None
     content_type: str | None = None
     model_config = ConfigDict(frozen=True)
 

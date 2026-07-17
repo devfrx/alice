@@ -487,14 +487,10 @@ class AgentEngine:
                     call=call, output=resolution.output,
                 )
             state.working_messages.append(_tool_message(call, resolution.content))
-            is_ok = resolution.status == _STATUS_OK
             await self._events.emit(ev.ToolResultEvent(
                 turn_id=turn_id, call_id=call.call_id, name=call.name,
-                status=resolution.status, content_preview=resolution.content[:200],
+                status=resolution.status, result=resolution.content,
                 artifact_id=artifact_id,
-                # Corpo COMPLETO solo per gli esiti di successo: i rami sintetici
-                # portano prosa engine-authored che non va confrontata verbatim.
-                result=resolution.content if is_ok else None,
                 content_type=(
                     resolution.output.content_type
                     if resolution.output is not None else None

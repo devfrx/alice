@@ -1,0 +1,189 @@
+"""Vocabolario eventi interni: type letterali, frozen, union esaustiva."""
+
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict
+
+from backend.services.agent.models import ToolInvocation
+
+
+class TurnStartedEvent(BaseModel):
+    """Evento: turno avviato."""
+
+    type: Literal["turn.started"] = "turn.started"
+    turn_id: str
+    conversation_id: str
+    source: str
+    model_config = ConfigDict(frozen=True)
+
+
+class TurnDeltaEvent(BaseModel):
+    """Evento: delta di output del turno."""
+
+    type: Literal["turn.delta"] = "turn.delta"
+    turn_id: str
+    step: int
+    kind: Literal["text", "thinking"]
+    text: str
+    model_config = ConfigDict(frozen=True)
+
+
+class LlmStepEvent(BaseModel):
+    """Evento: step LLM completato."""
+
+    type: Literal["turn.llm_step"] = "turn.llm_step"
+    turn_id: str
+    step: int
+    model_config = ConfigDict(frozen=True)
+
+
+class ToolCallEvent(BaseModel):
+    """Evento: tool call emesso dal modello."""
+
+    type: Literal["tool.call"] = "tool.call"
+    turn_id: str
+    step: int
+    call: ToolInvocation
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+
+class ToolStartedEvent(BaseModel):
+    """Evento: tool avviato."""
+
+    type: Literal["tool.started"] = "tool.started"
+    turn_id: str
+    call_id: str
+    model_config = ConfigDict(frozen=True)
+
+
+class ToolProgressEvent(BaseModel):
+    """Evento: progresso di esecuzione tool."""
+
+    type: Literal["tool.progress"] = "tool.progress"
+    turn_id: str
+    call_id: str
+    progress: dict[str, Any]
+    model_config = ConfigDict(frozen=True)
+
+
+class ToolResultEvent(BaseModel):
+    """Evento: risultato di esecuzione tool."""
+
+    type: Literal["tool.result"] = "tool.result"
+    turn_id: str
+    call_id: str
+    name: str
+    status: str
+    content_preview: str
+    artifact_id: str | None
+    model_config = ConfigDict(frozen=True)
+
+
+class InteractionRequestedEvent(BaseModel):
+    """Evento: interazione richiesta."""
+
+    type: Literal["interaction.requested"] = "interaction.requested"
+    turn_id: str
+    interaction_id: str
+    kind: str
+    call_id: str
+    payload: dict[str, Any]
+    model_config = ConfigDict(frozen=True)
+
+
+class InteractionResolvedEvent(BaseModel):
+    """Evento: interazione risolta."""
+
+    type: Literal["interaction.resolved"] = "interaction.resolved"
+    turn_id: str
+    interaction_id: str
+    kind: str
+    outcome: str
+    model_config = ConfigDict(frozen=True)
+
+
+class ContextUsageEvent(BaseModel):
+    """Evento: utilizzo contesto."""
+
+    type: Literal["context.usage"] = "context.usage"
+    turn_id: str
+    tokens: int
+    context_window: int
+    model_config = ConfigDict(frozen=True)
+
+
+class CompactionEvent(BaseModel):
+    """Evento: compattazione contesto."""
+
+    type: Literal["context.compaction"] = "context.compaction"
+    turn_id: str
+    phase: Literal["started", "done", "failed"]
+    tokens_before: int | None
+    tokens_after: int | None
+    error: str | None
+    model_config = ConfigDict(frozen=True)
+
+
+class TurnWarningEvent(BaseModel):
+    """Evento: avvertimento durante turno."""
+
+    type: Literal["turn.warning"] = "turn.warning"
+    turn_id: str
+    code: str
+    message: str
+    model_config = ConfigDict(frozen=True)
+
+
+class TurnErrorEvent(BaseModel):
+    """Evento: errore durante turno."""
+
+    type: Literal["turn.error"] = "turn.error"
+    turn_id: str
+    code: str
+    message: str
+    model_config = ConfigDict(frozen=True)
+
+
+class TurnUsageEvent(BaseModel):
+    """Evento: utilizzo tokenico del turno."""
+
+    type: Literal["turn.usage"] = "turn.usage"
+    turn_id: str
+    step: int
+    input_tokens: int
+    output_tokens: int
+    cost: float
+    model_config = ConfigDict(frozen=True)
+
+
+class TurnFinishedEvent(BaseModel):
+    """Evento: turno completato."""
+
+    type: Literal["turn.finished"] = "turn.finished"
+    turn_id: str
+    finish_reason: str
+    steps: int
+    tool_calls: int
+    cost: float
+    final_message_id: str | None
+    model_config = ConfigDict(frozen=True)
+
+
+class RawToolCallDeltaEvent(BaseModel):
+    """Evento diagnostico: delta grezzo di tool call (solo Mossa 1)."""
+
+    type: Literal["diag.tool_call_delta"] = "diag.tool_call_delta"
+    turn_id: str
+    payload: dict[str, Any]
+    model_config = ConfigDict(frozen=True)
+
+
+AgentEvent = (
+    TurnStartedEvent | TurnDeltaEvent | LlmStepEvent | ToolCallEvent
+    | ToolStartedEvent | ToolProgressEvent | ToolResultEvent
+    | InteractionRequestedEvent | InteractionResolvedEvent
+    | ContextUsageEvent | CompactionEvent | TurnWarningEvent | TurnErrorEvent
+    | TurnUsageEvent | TurnFinishedEvent | RawToolCallDeltaEvent
+)

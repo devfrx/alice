@@ -30,3 +30,17 @@ def test_length_and_completed() -> None:
     common = dict(cancelled=False, disconnected=False, out_of_steps=False, errored=False)
     assert resolve_stop(llm_finish="length", **common) is StopReason.LENGTH
     assert resolve_stop(llm_finish="stop", **common) is StopReason.COMPLETED
+
+
+def test_precedence_error_beats_budget() -> None:
+    assert resolve_stop(
+        llm_finish=None, cancelled=False, disconnected=False,
+        out_of_steps=True, errored=True,
+    ) is StopReason.ERROR
+
+
+def test_precedence_budget_beats_length() -> None:
+    assert resolve_stop(
+        llm_finish="length", cancelled=False, disconnected=False,
+        out_of_steps=True, errored=False,
+    ) is StopReason.MAX_STEPS

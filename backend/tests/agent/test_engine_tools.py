@@ -81,6 +81,15 @@ async def test_confirmation_flow_events_and_audit() -> None:
     )
     types = [e.type for e in rec.events]
     assert "interaction.requested" in types and "interaction.resolved" in types
+    # Ordine pinnato (invariante engine): requested < resolved < tool.result
+    # per la STESSA call.
+    req_i = next(i for i, e in enumerate(rec.events)
+                 if isinstance(e, ev.InteractionRequestedEvent) and e.call_id == "c1")
+    res_i = next(i for i, e in enumerate(rec.events)
+                 if isinstance(e, ev.InteractionResolvedEvent) and e.call_id == "c1")
+    result_i = next(i for i, e in enumerate(rec.events)
+                    if isinstance(e, ev.ToolResultEvent) and e.call_id == "c1")
+    assert req_i < res_i < result_i
     assert persistence.audits and persistence.audits[0]["interaction"] == "approved"
     assert any(r["call_id"] == "c1" and r["status"] == "ok"
                for r in persistence.tool_results)
@@ -116,6 +125,10 @@ async def test_confirm_event_payload_is_complete() -> None:
     }
     res = resolved[0]
     assert res.kind == "confirm" and res.call_id == "c1" and res.outcome == "approved"
+    # Ordine pinnato (invariante engine): requested < resolved < tool.result.
+    assert (rec.events.index(req) < rec.events.index(res)
+            < next(i for i, e in enumerate(rec.events)
+                   if isinstance(e, ev.ToolResultEvent) and e.call_id == "c1"))
 
 
 async def test_ask_user_emits_interaction_events() -> None:
@@ -138,6 +151,10 @@ async def test_ask_user_emits_interaction_events() -> None:
     assert req.payload == {"questions": questions}
     res = resolved[0]
     assert res.kind == "ask_user" and res.call_id == "c1" and res.outcome == "answered"
+    # Ordine pinnato (invariante engine): requested < resolved < tool.result.
+    assert (rec.events.index(req) < rec.events.index(res)
+            < next(i for i, e in enumerate(rec.events)
+                   if isinstance(e, ev.ToolResultEvent) and e.call_id == "c1"))
     assert outcome.finish_reason == "stop"
 
 
@@ -160,6 +177,10 @@ async def test_client_tool_emits_interaction_events_on_success() -> None:
     assert req.payload == {"args": {"k": "v"}}
     res = resolved[0]
     assert res.kind == "client" and res.call_id == "c1" and res.outcome == "executed"
+    # Ordine pinnato (invariante engine): requested < resolved < tool.result.
+    assert (rec.events.index(req) < rec.events.index(res)
+            < next(i for i, e in enumerate(rec.events)
+                   if isinstance(e, ev.ToolResultEvent) and e.call_id == "c1"))
 
 
 async def test_client_tool_failure_emits_failed_outcome() -> None:

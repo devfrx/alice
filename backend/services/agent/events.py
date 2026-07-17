@@ -99,7 +99,9 @@ class InteractionRequestedEvent(BaseModel):
 
     ``payload`` per kind:
       * ``confirm``: args, risk_level, description, reasoning, allow_remember.
-      * ``ask_user``: questions (raw dagli args del tool, normalizzate al wire).
+      * ``ask_user``: questions RAW dagli args del tool, NON ancora
+        normalizzate al wire (la normalizzazione è responsabilità del layer
+        wire: oggi ``adapters/ws.py``, dal Task 7 ``wire.py``).
       * ``client``: args.
     """
 

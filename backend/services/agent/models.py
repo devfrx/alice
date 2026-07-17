@@ -80,6 +80,8 @@ class TurnRequest:
         client_ip: IP del client, None se headless.
         version_group_id: ID del gruppo versione della conversazione.
         version_index: Indice della versione.
+        max_tool_calls: Budget di tool call ESEGUITE nel turno (trim voce,
+            `agent.voice.max_tools`). None = illimitato (default).
     """
 
     conversation_id: str
@@ -93,6 +95,7 @@ class TurnRequest:
     client_ip: str | None
     version_group_id: str | None
     version_index: int | None
+    max_tool_calls: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

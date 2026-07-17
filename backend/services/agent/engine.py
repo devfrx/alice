@@ -57,6 +57,7 @@ _STATUS_DENIED = "denied"
 _STATUS_REJECTED = "rejected"
 _STATUS_TIMEOUT = "timeout"
 _STATUS_CANCELLED = "cancelled"
+_STATUS_BUDGET = "budget_exhausted"
 
 
 @dataclass(slots=True)
@@ -292,7 +293,7 @@ class AgentEngine:
             )
 
         if step_result.tool_calls:
-            return await self._run_tool_step(turn_id, step, step_result, state, cancel)
+            return await self._run_tool_step(turn_id, step, step_result, state, budget, cancel)
 
         if not step_result.step_content:
             state.empty_attempts += 1
@@ -320,13 +321,15 @@ class AgentEngine:
         step: int,
         step_result: _StepResult,
         state: _TurnState,
+        budget: BudgetTracker,
         cancel: asyncio.Event,
     ) -> StopReason | None:
         """Esegue lo step con tool secondo il flusso normativo 1-5 (§6).
 
         Ritorna una ``StopReason`` per fermare il loop (cancel/disconnect
-        DOPO la persistenza) oppure ``None`` per proseguire con un nuovo step:
-        la working history si è arricchita di assistant + tool messages.
+        DOPO la persistenza, o budget di step esaurito) oppure ``None`` per
+        proseguire con un nuovo step: la working history si è arricchita di
+        assistant + tool messages.
         """
         calls = step_result.tool_calls
         # 1. save_assistant_step PRIMA di tutto (§6.1.2), poi checkpoint (§6.15:
@@ -375,11 +378,11 @@ class AgentEngine:
                 status=resolution.status, content_preview=resolution.content[:200],
                 artifact_id=artifact_id,
             ))
-            state.tool_calls += 1
             disconnect = disconnect or resolution.disconnect
         await self._persistence.checkpoint()
 
-        # 5. SOLO DOPO la persistenza: disconnect / cancel (§6.4) → stop.
+        # 5. SOLO DOPO la persistenza: disconnect / cancel (§6.4) / budget
+        #    di step esaurito → stop.
         if disconnect:
             return resolve_stop(
                 llm_finish=None, cancelled=False, disconnected=True,
@@ -389,6 +392,11 @@ class AgentEngine:
             return resolve_stop(
                 llm_finish=None, cancelled=True, disconnected=False,
                 out_of_steps=False, errored=False,
+            )
+        if budget.out_of_steps():
+            return resolve_stop(
+                llm_finish=None, cancelled=False, disconnected=False,
+                out_of_steps=True, errored=False,
             )
         return None
 
@@ -423,6 +431,16 @@ class AgentEngine:
             return _CallResolution(
                 content=f"Tool sconosciuto: {call.name}.", status=_STATUS_UNKNOWN,
             )
+        # c.bis trim voce: budget di tool call ESEGUITE raggiunto (§10) →
+        # result sintetico, niente gate. Contatore = ``state.tool_calls``,
+        # incrementato SOLO alle call che raggiungono l'esecuzione reale
+        # (routing, sotto), così una duplicata/negata non consuma budget.
+        max_tool_calls = state.request.max_tool_calls
+        if max_tool_calls is not None and state.tool_calls >= max_tool_calls:
+            return _CallResolution(
+                content="Budget voce esaurito: chiamata non eseguita.",
+                status=_STATUS_BUDGET,
+            )
         # d. gate permessi, per-call (§6.9).
         verdict = await self._permissions.decide(
             call, conversation_id=state.request.conversation_id,
@@ -440,7 +458,10 @@ class AgentEngine:
             if confirm_res is not None:
                 return confirm_res
             # APPROVED → prosegue al routing.
-        # e. routing: ask_user / client_executed / batch server-side.
+        # e. routing: ask_user / client_executed / batch server-side. Da qui
+        # in poi la call è ESEGUITA per davvero: conta verso outcome.tool_calls
+        # (e verso il budget voce del prossimo controllo trim).
+        state.tool_calls += 1
         timeout_s = meta.timeout_s or self._confirmation_timeout_s
         if meta.interactive == "ask_user":
             return await self._run_interactive(
@@ -586,6 +607,11 @@ class AgentEngine:
         """
         resolved_stop = stop if stop is not None else StopReason.ERROR
         finish_reason = STOP_TO_FINISH[resolved_stop]
+        if resolved_stop is StopReason.MAX_STEPS:
+            await self._events.emit(ev.TurnWarningEvent(
+                turn_id=turn_id, code="max_steps",
+                message="Budget di step esaurito con tool call in sospeso.",
+            ))
         await self._events.emit(ev.TurnFinishedEvent(
             turn_id=turn_id, finish_reason=finish_reason, steps=budget.steps,
             tool_calls=state.tool_calls, cost=state.cost,

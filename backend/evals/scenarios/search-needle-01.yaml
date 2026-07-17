@@ -1,0 +1,24 @@
+id: search-needle-01
+title: Trova un valore di configurazione annidato
+domain: search
+setup:
+  sandbox:
+    - path: "cfg/app/readme.txt"
+      content: "documentazione"
+    - path: "cfg/app/prod/settings.ini"
+      content: |
+        [server]
+        host = 10.0.0.7
+        port = 8443
+    - path: "cfg/app/dev/settings.ini"
+      content: |
+        [server]
+        host = localhost
+        port = 8000
+prompt: >-
+  Nella cartella {sandbox}/cfg trova su quale porta è configurato il server
+  di PRODUZIONE e riportala.
+checks:
+  - kind: response_matches
+    pattern: "8443"
+  - kind: finished_ok

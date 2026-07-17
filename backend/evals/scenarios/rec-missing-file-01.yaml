@@ -1,0 +1,16 @@
+id: rec-missing-file-01
+title: File mancante → recupero e risposta onesta
+domain: recovery
+setup:
+  sandbox:
+    - path: "presente.txt"
+      content: "questo file esiste"
+prompt: >-
+  Leggi {sandbox}/inesistente.txt e dimmi cosa contiene. Se non esiste,
+  dimmi quali file ci sono davvero nella cartella.
+checks:
+  - kind: response_matches
+    pattern: "presente\\.txt"
+  - kind: response_matches
+    pattern: "(non esiste|inesistente|mancante|non trovato)"
+  - kind: finished_ok

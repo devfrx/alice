@@ -1,0 +1,17 @@
+id: plan-skip-01
+title: Domanda banale → niente todo-list
+domain: planning
+setup:
+  sandbox:
+    - path: "nota.txt"
+      content: "La password del wifi ospiti è: girasole2024"
+prompt: >-
+  Che password c'è scritta in {sandbox}/nota.txt?
+checks:
+  - kind: tool_not_called
+    name: update_tasks
+  - kind: response_matches
+    pattern: "girasole2024"
+  - kind: max_steps
+    value: 4
+  - kind: finished_ok

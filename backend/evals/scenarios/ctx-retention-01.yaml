@@ -1,0 +1,22 @@
+id: ctx-retention-01
+title: Fatti distanti nello stesso file
+domain: knowledge
+setup:
+  sandbox:
+    - path: "storia.txt"
+      content: |
+        Il progetto Falco nasce nel 2019 a Torino.
+        (segue lungo testo di riempimento: capitoli su fornitori, sedi,
+        assunzioni, bilanci, eventi aziendali, aneddoti di ufficio,
+        riorganizzazioni, trasferte, fiere di settore, premi vinti,
+        cambi di logo, aggiornamenti dei sistemi informativi interni.)
+        Nel 2025 il progetto Falco viene rinominato in Astore.
+prompt: >-
+  Leggi {sandbox}/storia.txt: in che città è nato il progetto e come si
+  chiama oggi?
+checks:
+  - kind: response_matches
+    pattern: "Torino"
+  - kind: response_matches
+    pattern: "Astore"
+  - kind: finished_ok

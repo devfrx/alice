@@ -1,0 +1,26 @@
+id: multi-pipeline-01
+title: Leggi dati, calcola, scrivi report
+domain: multistep
+setup:
+  sandbox:
+    - path: "vendite.csv"
+      content: |
+        prodotto,quantita
+        mele,10
+        pere,5
+        banane,25
+prompt: >-
+  Leggi {sandbox}/vendite.csv, calcola la quantità totale venduta e scrivi
+  {sandbox}/report.md con il totale e il prodotto più venduto.
+budget:
+  max_seconds: 240
+checks:
+  - kind: file_exists
+    path: report.md
+  - kind: file_contains
+    path: report.md
+    text: "40"
+  - kind: file_contains
+    path: report.md
+    text: "banane"
+  - kind: finished_ok

@@ -63,6 +63,16 @@ npm run build:win        # NSIS installer
 .\scripts\check-contracts.ps1    # fail if committed contract artifacts are stale
 ```
 
+### Agent evals (Fase 0 Agent v2)
+```powershell
+python -m backend.evals list             # elenca gli scenari
+python -m backend.evals run              # run ufficiale (OpenRouter, modello pinnato z-ai/glm-5.2, costa denaro)
+python -m backend.evals run --filter fs- --no-judge   # subset economico
+python -m backend.evals run --baseline docs/superpowers/evals/<ultimo>/report.json
+```
+I run veri richiedono la API key OpenRouter (keyring o env). Il subset mock
+gira in CI dentro pytest (`backend/tests/evals/`).
+
 ### Service ports
 Backend `8000`, frontend dev `5173`, LM Studio `1234`, Ollama `11434`, TRELLIS `8090`.
 

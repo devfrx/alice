@@ -1,0 +1,20 @@
+id: search-find-01
+title: Trova quale file contiene una stringa
+domain: search
+setup:
+  sandbox:
+    - path: "docs/a.txt"
+      content: "niente qui"
+    - path: "docs/b.txt"
+      content: "il codice segreto è ZX-99"
+    - path: "docs/c.txt"
+      content: "nemmeno qui"
+prompt: >-
+  In {sandbox}/docs uno dei file contiene un codice segreto. Trovalo e
+  dimmi in quale file si trova e qual è il codice.
+checks:
+  - kind: response_matches
+    pattern: "b\\.txt"
+  - kind: response_matches
+    pattern: "ZX-99"
+  - kind: finished_ok

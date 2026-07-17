@@ -1,0 +1,13 @@
+id: plan-doc-01
+title: Richiesta di piano → write_plan, non testo in chat
+domain: planning
+prompt: >-
+  Preparami un piano dettagliato per organizzare un trasloco in 4 settimane:
+  fasi, priorità e cosa fare ogni settimana.
+checks:
+  - kind: tool_called
+    name: write_plan
+  - kind: finished_ok
+judge:
+  criteria:
+    - "La risposta in chat è una sintesi breve (non il piano intero riversato)?"

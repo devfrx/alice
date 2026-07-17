@@ -1,0 +1,24 @@
+id: fs-edit-01
+title: Modifica un file preservando il resto
+domain: filesystem
+setup:
+  sandbox:
+    - path: "lista.md"
+      content: |
+        # Lista della spesa
+        - pane
+        - uova
+prompt: >-
+  Aggiungi "latte" alla lista in {sandbox}/lista.md, senza perdere le voci
+  già presenti.
+checks:
+  - kind: file_contains
+    path: lista.md
+    text: "pane"
+  - kind: file_contains
+    path: lista.md
+    text: "uova"
+  - kind: file_contains
+    path: lista.md
+    text: "latte"
+  - kind: finished_ok

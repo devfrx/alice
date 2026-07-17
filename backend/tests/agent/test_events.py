@@ -23,6 +23,13 @@ def test_events_are_frozen() -> None:
         e.turn_id = "other"  # type: ignore[misc]
 
 
+def test_tool_call_event_embeds_invocation() -> None:
+    e = ev.ToolCallEvent(turn_id="t1", step=1, call=CALL)
+    assert e.type == "tool.call"
+    assert e.call.call_id == "call_1"
+    assert e.call.name == "t"
+
+
 def test_union_covers_all_event_classes() -> None:
     classes = {
         c for n, c in vars(ev).items()

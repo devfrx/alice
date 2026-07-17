@@ -125,12 +125,12 @@ Estratto dal ledger (`.superpowers/sdd/progress.md`), voci "Minor da triage" pi�
 3. **Echo single-step su terminazione anomala di un tool step**: residuo accettato in T16,
    il persist path nuovo lo risolve strutturalmente ma non è stato retro-portato come fix
    isolato in Mossa 1.
-4. **Bare-name pass-through a rules/grants**: `PermissionPort.decide()` riceve il nome
-   bare del tool, non risolto — `rules`/`grants` non sono suffix-tolerant. One-liner
-   candidato, non urgente (T12).
-5. **Drift contratti pre-esistente**: bump di pydantic/fastapi ha introdotto drift nei
-   contratti congelati prima ancora di questa fase — serve un commit `gen-contracts`
-   separato, fuori scope Mossa 1 (annotato post-merge T19).
+4. ~~Bare-name pass-through a rules/grants~~ — **RISOLTO** in `a006214` (fix wave
+   post-review olistica): `decide()` riceve ora il nome risolto; rules/grants
+   suffix-tolerant.
+5. ~~Drift contratti pre-esistente~~ — **RISOLTO** in `5b6d673`: `gen-contracts`
+   rieseguito e drift committato in commit separato; `check-contracts.ps1` verde. La
+   Mossa 2 parte da baseline codegen pulita.
 6. **`ask_user_required` senza value-pin**: il frame di interazione per `ask_user` non ha
    un test che ne fissa i valori (a differenza della conferma tool, value-pinned in T15) —
    da aggiungere quando quel path viene esercitato più a fondo.
@@ -161,16 +161,16 @@ trim di compaction non forza step senza tool (candidato Fase 3).
    promemoria per rinforzare il divieto nei dispatch successivi (nessuna azione correttiva
    sul codice necessaria).
 
-## Gate verificati (Task 20, 2026-07-17)
+## Gate verificati (chiusura sessione, 2026-07-17, HEAD `72125b8`+fix)
 
-- `cd backend; pytest tests/agent/ tests/evals/ -v` → atteso 148 green (foreground, venv
-  ROOT).
-- `cd backend; ruff check .` → atteso 0.
-- da repo root: `lint-imports --config backend/pyproject.toml` → atteso 7 contratti KEPT
-  (incluso `agent ↛ turn`, ancora attivo finché `services/turn` non è del tutto assente
-  dal grafo — vedi nota T1 sul contratto lint che copre solo `services/agent`, non
-  `tests/agent`).
-- Esiti puntuali di questa run: vedi `.superpowers/sdd/task-20-report.md`.
+- `cd backend; pytest tests/agent/ tests/evals/ -q` → **150 passed** (111 agent + 39
+  evals; verificato dal controller a fine sessione, foreground, venv ROOT).
+- `cd backend; ruff check .` → 0 (fix wave finale inclusa).
+- da repo root: `lint-imports --config backend/pyproject.toml` → 7 contratti KEPT
+  (incluso `agent ↛ turn`, ancora attivo finché il contratto non si ritira in Mossa 2 —
+  nota T1: il contratto lint copre solo `services/agent`, non `tests/agent`).
+- `.\scripts\check-contracts.ps1` → verde (post `5b6d673`).
+- Esiti puntuali: `.superpowers/sdd/task-20-report.md` (+ append fix wave finale).
 
 ## Prossimo passo del programma
 
@@ -212,3 +212,41 @@ nel PermissionPort; igiene docstring post-demolizione; riallineamento codegen co
    test TestClient WS del percorso completo PRIMA di muovere il vocabolario.
 6. Mismatch role del summary di compaction (system in-engine vs assistant
    `is_context_summary` in assembly) — check consapevole quando si tocca il contesto.
+
+## Istruzioni operative per la prossima sessione (metodo e principi — NON derogare)
+
+**Principi:**
+1. **PRINCIPIO PILASTRO** (memoria utente + programma §3.1): il legacy non influenza il
+   nuovo, né in logica né in professionalità. `services/turn` non esiste più, ma il
+   principio resta per Mossa 2 e le fasi successive: niente scorciatoie, niente debiti non
+   censiti, "la soluzione meno pigra e più professionale". Vale anche per i test double.
+2. **Contratti**: ogni modifica al wire passa da `api/ws_schema/` (Pydantic) +
+   `.\scripts\gen-contracts.ps1` + aggiornamento dei frozen test in
+   `backend/tests/contracts/` + FE `ChatHandlerMap` esaustiva. MAI tipi TS a mano.
+   La Mossa 2 È il cambio di contratto deliberato previsto dal programma.
+3. **Eval come gate**: ogni milestone chiude con `python -m backend.evals run` (repo root,
+   venv ROOT, key OpenRouter in keyring; costa pochi dollari → SEMPRE OK esplicito
+   dell'utente prima). Gate: 23/23, zero regressioni vs baseline.
+
+**Metodo (subagent-driven, skill superpowers):**
+- `writing-plans` per il piano Mossa 2, poi `subagent-driven-development` per l'esecuzione:
+  un implementer per task + task review (spec+quality) + fixer sui finding + re-review.
+  Ledger in `.superpowers/sdd/progress.md` (quello attuale contiene tutta la Mossa 1 —
+  archiviarlo e ripartire). Script: `task-brief` e `review-package` nella dir della skill.
+- Modelli: implementer economico sui task meccanici con codice completo nel piano; medio
+  sugli adapter/integrazione; top su motore/concorrenza/review ad alto rischio e sulla
+  review olistica finale. SEMPRE specificare il modello nel dispatch.
+- Review package con BASE = commit pre-implementer (mai HEAD~1). Diff giganti (demolizioni):
+  pacchetto focalizzato (lista dei file morti + diff dei soli modificati).
+
+**Gotcha macchina (si sono ripetuti — metterli nei dispatch):**
+- pytest SEMPRE foreground nei dispatch subagent; MAI due pytest concorrenti; MAI la suite
+  integrale (AUD-008) — solo sottoinsiemi mirati.
+- SEMPRE venv ROOT (`C:\Users\zagor\Desktop\alice\.venv`), MAI `backend\.venv` (esiste e
+  inganna: `qdrant_client` mancante, `ModuleNotFoundError: backend`). Comandi da repo root
+  con `.\.venv\Scripts\Activate.ps1`, pytest da `backend/`.
+- Console Windows cp1252: niente Unicode nei print delle CLI (già gestito nell'harness).
+- Subagent che crasha per errore API o stallo: NON rilanciare da zero — riprendere con
+  `SendMessage` sull'agent id (2 crash + 1 stallo recuperati così in questa sessione).
+- Il remote è stato rinominato `devfrx/omnia` → `devfrx/alice` (push funziona via
+  redirect; l'utente può aggiornare l'URL quando vuole).

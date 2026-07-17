@@ -1,5 +1,11 @@
 # Agent v2 Fase 1 — Mossa 1: Motore greenfield + parità + swap — Implementation Plan
 
+> **STATO: ESEGUITO E COMPLETO (2026-07-17).** 20/20 task chiusi con review, eval gate
+> 23/23 zero variazioni, demolizione fatta, review olistica READY FOR MOSSA 2.
+> Commit range: `1a41849..72125b8` su `feat/agent-engine-fase1`. Esecuzione documentata in
+> `docs/superpowers/handoffs/2026-07-17-agent-engine-fase1-handoff.md` (+ ledger
+> `.superpowers/sdd/progress.md`). Questo file resta come riferimento storico del piano.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.

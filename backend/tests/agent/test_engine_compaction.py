@@ -24,8 +24,15 @@ async def test_compaction_triggers_between_steps_and_rewrites_history() -> None:
     phases = [e.phase for e in rec.events if e.type == "context.compaction"]
     assert phases == ["started", "done"]
     assert persistence.archived == [("RIASSUNTO", ["m1", "m2"])]
-    # il secondo step LLM vede il summary in testa alla working history
-    assert any("RIASSUNTO" in str(m) for m in llm.calls[1]["messages"])
+    # il secondo step LLM vede il summary in testa alla working history, nella
+    # STESSA forma con cui la piattaforma lo persiste e ricarica (role=assistant
+    # + prefisso "[Context summary of N earlier messages]:", vedi
+    # adapters/db.py::archive_compacted e _assembly._filter_history_for_llm) —
+    # così la history in-turn e quella ricostruita al turno dopo coincidono.
+    assert llm.calls[1]["messages"][0] == {
+        "role": "assistant",
+        "content": "[Context summary of 2 earlier messages]:\nRIASSUNTO",
+    }
 
 
 async def test_compaction_failure_is_fail_open() -> None:

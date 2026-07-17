@@ -353,10 +353,18 @@ class AgentEngine:
             upto_message_ids=list(result.archived_message_ids),
         )
         await self._persistence.checkpoint()
-        state.working_messages = [
-            {"role": "system", "content": summary_text},
-            *result.kept_messages,
-        ]
+        # Stessa forma con cui la piattaforma persiste e ricarica il summary
+        # (role=assistant + prefisso "[Context summary of N...]" — vedi
+        # adapters/db.py archive_compacted e _assembly._filter_history_for_llm):
+        # la history in-turn e quella ricostruita al turno dopo coincidono.
+        summary_entry = {
+            "role": "assistant",
+            "content": (
+                f"[Context summary of {len(result.archived_message_ids)} "
+                f"earlier messages]:\n{summary_text}"
+            ),
+        }
+        state.working_messages = [summary_entry, *result.kept_messages]
         await self._events.emit(ev.CompactionEvent(
             turn_id=turn_id, phase="done",
             tokens_before=result.tokens_before, tokens_after=result.tokens_after,

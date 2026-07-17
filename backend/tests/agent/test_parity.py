@@ -31,7 +31,10 @@ def _one_sample_per_event_class() -> list[ev.AgentEvent]:
         ev.LlmStepEvent(turn_id="t", step=2),
         ev.ToolCallEvent(turn_id="t", step=1, call=call),
         ev.ToolStartedEvent(turn_id="t", call_id="c1", name="read"),
-        ev.ToolProgressEvent(turn_id="t", call_id="c1", progress={"phase": "run", "percent": 50.0}),
+        ev.ToolProgressEvent(
+            turn_id="t", call_id="c1", name="read",
+            progress={"phase": "run", "percent": 50.0},
+        ),
         ev.ToolResultEvent(
             turn_id="t", call_id="c1", name="read", status="ok",
             content_preview="risultato", artifact_id=None,
@@ -93,6 +96,22 @@ def test_tool_result_produces_legacy_and_canonical_pair() -> None:
     )
     types = [f["type"] for f in to_wire_frames(e)]
     assert types == ["tool_execution_done", "tool.result"]
+
+
+def test_tool_progress_carries_real_name_and_nested_payload() -> None:
+    """ToolProgressEvent → frame tool_progress con tool_name reale + payload annidato."""
+    e = ev.ToolProgressEvent(
+        turn_id="t", call_id="c9", name="cad_generate_from_image",
+        progress={"phase": "sampling", "percent": 50, "step": 7},
+    )
+    frame = to_wire_frames(e)[0]
+    assert frame["type"] == "tool_progress"
+    assert frame["tool_name"] == "cad_generate_from_image"
+    assert frame["execution_id"] == "c9"
+    # il payload del tool viene appiattito nel frame (chiavi best-effort)
+    assert frame["phase"] == "sampling"
+    assert frame["percent"] == 50
+    assert frame["step"] == 7
 
 
 def test_llm_step_one_emits_no_requery() -> None:

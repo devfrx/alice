@@ -65,6 +65,7 @@ class ToolProgressEvent(BaseModel):
     type: Literal["tool.progress"] = "tool.progress"
     turn_id: str
     call_id: str
+    name: str
     progress: dict[str, Any]
     model_config = ConfigDict(frozen=True)
 

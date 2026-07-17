@@ -33,6 +33,8 @@ Gli eventi greenfield sono stati ARRICCHITI (fix review T15) così che i frame
 tradotti portino i valori reali, non placeholder:
 
 * ``ToolStartedEvent.name`` → ``tool_execution_start.tool_name``.
+* ``ToolProgressEvent.name`` → ``tool_progress.tool_name`` (nome reale del tool
+  lungo, non più placeholder — carry #1: emitter ora wired nell'engine).
 * ``InteractionRequestedEvent.tool_name`` → ``interaction.requested.tool_name``.
 * ``TurnUsageEvent.tool_calls``/``max_steps`` → ``turn.usage`` (conteggio tool
   EMESSE "issued so far" + budget di step del turno).
@@ -135,7 +137,7 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
         frame: dict[str, Any] = {
             **event.progress,
             "type": "tool_progress",
-            "tool_name": "",
+            "tool_name": event.name,
             "execution_id": event.call_id,
         }
         return [frame]

@@ -210,7 +210,12 @@ class RaisingContextPort:
 
 
 class MapExecutionPort:
-    """ExecutionPort: risultati/metadati/ritardi/errori mappati per nome tool."""
+    """ExecutionPort: risultati/metadati/ritardi/errori mappati per nome tool.
+
+    ``progress`` mappa il nome tool a un payload di progresso: quando presente e
+    ``on_progress`` è fornito, ``execute`` invoca ``await on_progress(payload)``
+    prima di ritornare l'output (simula un tool lungo che streamma progresso).
+    """
 
     def __init__(
         self,
@@ -218,11 +223,13 @@ class MapExecutionPort:
         meta: dict[str, ToolMeta] | None = None,
         delays: dict[str, float] | None = None,
         errors: dict[str, Exception] | None = None,
+        progress: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self._tools = tools
         self._meta = meta or {}
         self._delays = delays or {}
         self._errors = errors or {}
+        self._progress = progress or {}
         self.started_at: dict[str, float] = {}
 
     def describe(self, name: str) -> ToolMeta:
@@ -231,6 +238,7 @@ class MapExecutionPort:
     async def execute(
         self, call: ToolInvocation, *, client_ip: str | None,
         conversation_id: str,
+        on_progress: ports.ProgressCallback | None = None,
     ) -> ports.ToolExecutionOutput:
         loop = asyncio.get_running_loop()
         self.started_at.setdefault(call.name, loop.time())
@@ -239,4 +247,7 @@ class MapExecutionPort:
             await asyncio.sleep(delay)
         if call.name in self._errors:
             raise self._errors[call.name]
+        payload = self._progress.get(call.name)
+        if payload is not None and on_progress is not None:
+            await on_progress(payload)
         return self._tools[call.name]

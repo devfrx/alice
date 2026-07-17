@@ -15,6 +15,7 @@ import asyncio
 from typing import Any
 
 from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolResult
+from backend.core.tool_progress import current_progress_emitter, emit_tool_progress
 from backend.services.agent.adapters.execution import ToolRegistryAdapter
 from backend.services.agent.models import ToolInvocation
 
@@ -161,3 +162,75 @@ async def test_execute_timeout_returns_ok_false_with_timeout_message() -> None:
 
     assert output.ok is False
     assert output.error is not None and "timeout" in output.error.lower()
+
+
+# ---------------------------------------------------------------------------
+# tool progress: ContextVar wiring (carry #1)
+# ---------------------------------------------------------------------------
+
+
+class _ProgressEmittingRegistry(StubToolRegistry):
+    """``execute_tool`` chiama ``emit_tool_progress`` prima di ritornare, come
+    farebbe un tool lungo (es. ``cad_generate_from_image``)."""
+
+    def __init__(self, tools: dict[str, ToolDefinition], payload: dict[str, Any]) -> None:
+        super().__init__(tools)
+        self._payload = payload
+
+    async def execute_tool(
+        self, tool_name: str, args: dict[str, Any], context: ExecutionContext,
+    ) -> ToolResult:
+        await emit_tool_progress(self._payload)
+        return await super().execute_tool(tool_name, args, context)
+
+
+async def test_execute_forwards_tool_progress_to_on_progress() -> None:
+    """(a) Un tool che chiama ``emit_tool_progress`` fa arrivare il payload alla
+    callback ``on_progress`` passata dall'engine (ContextVar wired)."""
+    registry = _ProgressEmittingRegistry(
+        {"cad": _tool_def("cad")}, payload={"phase": "sampling", "percent": 25},
+    )
+    adapter = _adapter(registry)
+    received: list[dict[str, Any]] = []
+
+    async def _cb(payload: dict[str, Any]) -> None:
+        received.append(payload)
+
+    output = await adapter.execute(
+        _call("cad"), client_ip=None, conversation_id="c1", on_progress=_cb,
+    )
+
+    assert received == [{"phase": "sampling", "percent": 25}]
+    assert output.ok is True
+
+
+async def test_execute_resets_context_var_after_return() -> None:
+    """(b) Dopo il ritorno di ``execute`` il ContextVar è di nuovo None."""
+    registry = _registry_with(cad=_tool_def("cad"))
+    adapter = _adapter(registry)
+
+    async def _cb(payload: dict[str, Any]) -> None:
+        return None
+
+    assert current_progress_emitter.get() is None
+    await adapter.execute(
+        _call("cad"), client_ip=None, conversation_id="c1", on_progress=_cb,
+    )
+    assert current_progress_emitter.get() is None
+
+
+async def test_execute_resets_context_var_after_timeout() -> None:
+    """(c) Il reset avviene anche quando la call va in timeout (ramo finally)."""
+    registry = _registry_with(slow=_tool_def("slow", timeout_ms=10))
+    registry.execute_delay_s = 0.05
+    adapter = _adapter(registry)
+
+    async def _cb(payload: dict[str, Any]) -> None:
+        return None
+
+    output = await adapter.execute(
+        _call("slow"), client_ip=None, conversation_id="c1", on_progress=_cb,
+    )
+
+    assert output.ok is False
+    assert current_progress_emitter.get() is None

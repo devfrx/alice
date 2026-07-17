@@ -94,12 +94,15 @@ async def _run_with_port(
     max_steps: int = 8,
     max_tool_calls: int | None = None,
     client_result: ports.ToolExecutionOutput | None = None,
+    progress: dict[str, dict] | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, MapExecutionPort]:
     """Costruisce l'engine coi double e lo esegue, esponendo anche l'ExecutionPort."""
     persistence = InMemoryPersistence()
     rec = RecordingEventPort()
     llm = ScriptedLLMPort(steps=llm_steps)
-    exec_port = MapExecutionPort(tools=exec_tools, meta=meta, delays=delays, errors=errors)
+    exec_port = MapExecutionPort(
+        tools=exec_tools, meta=meta, delays=delays, errors=errors, progress=progress,
+    )
     engine = _engine(
         llm=llm, events=rec, persistence=persistence, execution=exec_port,
         verdicts=verdicts, confirm=confirm, client_result=client_result,
@@ -122,12 +125,14 @@ async def _run_with(
     max_steps: int = 8,
     max_tool_calls: int | None = None,
     client_result: ports.ToolExecutionOutput | None = None,
+    progress: dict[str, dict] | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort]:
     """Come ``_run_with_port`` ma senza esporre l'ExecutionPort."""
     persistence, outcome, rec, _ = await _run_with_port(
         llm_steps=llm_steps, exec_tools=exec_tools, verdicts=verdicts,
         confirm=confirm, delays=delays, errors=errors, meta=meta, cancel=cancel,
         max_steps=max_steps, max_tool_calls=max_tool_calls, client_result=client_result,
+        progress=progress,
     )
     return persistence, outcome, rec
 

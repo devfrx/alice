@@ -702,10 +702,19 @@ class AgentEngine:
             await self._events.emit(ev.ToolStartedEvent(
                 turn_id=turn_id, call_id=call.call_id, name=call.name,
             ))
+
+            async def _on_progress(payload: dict[str, Any]) -> None:
+                # Best-effort: il progresso non puo affondare il tool.
+                await self._events.emit(ev.ToolProgressEvent(
+                    turn_id=turn_id, call_id=call.call_id, name=call.name,
+                    progress=dict(payload),
+                ))
+
             try:
                 output = await self._execution.execute(
                     call, client_ip=state.request.client_ip,
                     conversation_id=state.request.conversation_id,
+                    on_progress=_on_progress,
                 )
             except Exception as exc:  # §6.1.1: la call fallisce da sola
                 logger.exception("AgentEngine: tool {} ha sollevato", call.name)

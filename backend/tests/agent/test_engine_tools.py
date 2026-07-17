@@ -2,6 +2,7 @@
 
 import asyncio
 
+from backend.services.agent import events as ev
 from backend.services.agent import ports
 from backend.services.agent.models import ToolInvocation, ToolMeta
 from backend.tests.agent._engine_helpers import (
@@ -156,6 +157,24 @@ async def test_deny_verdict_is_audited() -> None:
     )
     assert persistence.audits and persistence.audits[0]["interaction"] is None
     assert persistence.audits[0]["verdict"].outcome == "plan_denied"
+
+
+async def test_tool_progress_callback_emits_event() -> None:
+    """La callback on_progress passata all'ExecutionPort produce ToolProgressEvent
+    con turn_id/call_id/name reali e il payload del tool (carry #1)."""
+    calls = (ToolInvocation(call_id="c_cad", name="cad", args={}, raw_args="{}"),)
+    _persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"cad": ports.ToolExecutionOutput(ok=True, content="done")},
+        progress={"cad": {"phase": "sampling", "percent": 50}},
+    )
+    progress_events = [e for e in rec.events if isinstance(e, ev.ToolProgressEvent)]
+    assert len(progress_events) == 1
+    pe = progress_events[0]
+    assert pe.call_id == "c_cad"
+    assert pe.name == "cad"
+    assert pe.progress == {"phase": "sampling", "percent": 50}
+    assert outcome.finish_reason == "stop"
 
 
 async def test_cancel_checked_only_after_persistence() -> None:

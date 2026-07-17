@@ -7,15 +7,16 @@ the synchronous ``ToolResult`` contract.
 Mechanism
 ---------
 The currently-active emitter is stored in a :class:`contextvars.ContextVar`.
-In the legacy tool loop it was set by ``backend.api.routes._tool_loop._exec_one``
-for the duration of every tool invocation; that module no longer exists.
-As of the v2 AgentEngine (``backend.services.agent.engine``) nothing sets
-this ContextVar yet — re-wiring tool progress into the engine's tool
-execution path is a Mossa 2 item, so :func:`emit_tool_progress` is
-currently always a no-op in production. The ContextVar itself is kept
-because plugins call :func:`emit_tool_progress` directly and unconditionally
-(e.g. ``cad_generate_from_image``); it remains a safe no-op for them until
-an adapter wires an emitter in.
+Under the v2 AgentEngine (``backend.services.agent.engine``) it is set by
+``ToolRegistryAdapter.execute`` (``backend.services.agent.adapters.execution``)
+for the duration of every tool invocation: the engine passes an ``on_progress``
+callback to the ``ExecutionPort``, the adapter publishes it in this ContextVar
+(token-based, reset always — even on timeout), and the callback emits a
+``ToolProgressEvent`` from the engine, which is forwarded onto the wire. Plugins
+call :func:`emit_tool_progress` directly and unconditionally (e.g.
+``cad_generate_from_image``); when no emitter is set (tool invoked outside the
+engine's execution path, such as REST endpoints or unit tests) it is a safe
+no-op for them.
 
 Frame shape on the wire (``WsToolProgressMessage``):
 

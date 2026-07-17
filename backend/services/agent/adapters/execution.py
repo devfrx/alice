@@ -63,9 +63,10 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from backend.core.plugin_models import ExecutionContext
+from backend.core.tool_progress import current_progress_emitter
 from backend.services.agent.adapters._tool_lookup import resolve_tool_definition
 from backend.services.agent.models import ToolInvocation, ToolMeta
-from backend.services.agent.ports import ToolExecutionOutput
+from backend.services.agent.ports import ProgressCallback, ToolExecutionOutput
 
 if TYPE_CHECKING:
     from backend.core.tool_registry import ToolRegistry
@@ -112,6 +113,7 @@ class ToolRegistryAdapter:
 
     async def execute(
         self, call: ToolInvocation, *, client_ip: str | None, conversation_id: str,
+        on_progress: ProgressCallback | None = None,
     ) -> ToolExecutionOutput:
         """Esegue un tool server-side con timeout esterno; non solleva mai.
 
@@ -121,6 +123,14 @@ class ToolRegistryAdapter:
         nomi davvero sconosciuti o ambigui — non solleva mai.
         ``describe()`` è comunque consultato per l'hint di timeout per-tool
         (fallback al default quando il tool non è risolvibile).
+
+        Quando ``on_progress`` è fornito, l'adapter lo pubblica nel ContextVar
+        ``core.tool_progress.current_progress_emitter`` per la durata
+        dell'invocazione: i tool lunghi (es. ``cad_generate_from_image``) che
+        chiamano ``emit_tool_progress`` streammano così il progresso attraverso
+        la callback del motore. Il ContextVar è token-based e viene resettato
+        SEMPRE (anche su timeout); ``asyncio.gather`` esegue ogni call in un
+        Task figlio, quindi l'emitter è isolato per-call.
         """
         meta = self.describe(call.name)
         timeout_s = meta.timeout_s if meta.timeout_s is not None else self._default_timeout_s
@@ -129,15 +139,22 @@ class ToolRegistryAdapter:
             conversation_id=conversation_id,
             execution_id=call.call_id,
         )
+        token = None
+        if on_progress is not None:
+            token = current_progress_emitter.set(on_progress)
         try:
-            result = await asyncio.wait_for(
-                self._tool_registry.execute_tool(call.name, dict(call.args), exec_ctx),
-                timeout=timeout_s,
-            )
-        except TimeoutError:
-            return ToolExecutionOutput(
-                ok=False, content="", error=f"timeout dopo {timeout_s}s",
-            )
+            try:
+                result = await asyncio.wait_for(
+                    self._tool_registry.execute_tool(call.name, dict(call.args), exec_ctx),
+                    timeout=timeout_s,
+                )
+            except TimeoutError:
+                return ToolExecutionOutput(
+                    ok=False, content="", error=f"timeout dopo {timeout_s}s",
+                )
+        finally:
+            if token is not None:
+                current_progress_emitter.reset(token)
 
         content: str
         payload: dict[str, Any] | None = None

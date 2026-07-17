@@ -9,7 +9,7 @@ import circolare: le porte interaction/event la sollevano su socket caduto,
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
@@ -135,6 +135,11 @@ class CompactionResult:
     archived_message_ids: tuple[str, ...] = ()
 
 
+#: Callback di progresso tool: riceve il payload parziale del tool
+#: (senza type/tool_name/execution_id, che aggiunge chi emette il frame).
+ProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
+
+
 # --- le 7 porte --------------------------------------------------------------
 
 
@@ -233,4 +238,5 @@ class ExecutionPort(Protocol):
     async def execute(
         self, call: ToolInvocation, *, client_ip: str | None,
         conversation_id: str,
+        on_progress: ProgressCallback | None = None,
     ) -> ToolExecutionOutput: ...

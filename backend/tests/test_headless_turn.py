@@ -104,6 +104,7 @@ async def test_run_headless_turn_persists_a_normal_turn() -> None:
     ctx.config.llm.max_tokens = 1024
     ctx.config.mcp = SimpleNamespace(servers=[])
     ctx.config.agent = SimpleNamespace(
+        engine="v1",
         prompts=SimpleNamespace(persona=None),
         reflection=SimpleNamespace(enabled=False),
     )

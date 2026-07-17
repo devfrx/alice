@@ -36,6 +36,7 @@ feature servono ENTRAMBI.
 | `trellis.enabled` | true | bootstrap (`stage_senses`), route services | microservizio 3D |
 | `trellis2.enabled` | true | bootstrap (`stage_senses`), plugin `cad_generator` | |
 | `trellis2multiview.enabled` | true | bootstrap (`stage_senses`), plugin `cad_generator` | |
+| `agent.engine` | v1 | `api/routes/chat/ws.py`, `api/routes/chat/headless.py` | **TEMPORANEO Fase 1**: v1=`DirectTurnExecutor` legacy, v2=`AgentEngine` greenfield (`services/agent/runner.py`). Muore col Task 19 |
 | `agent.reflection.enabled` | false | `turn/factory.py` | ReflectiveTurnExecutor |
 | `agent.reflection.degeneration_detector_enabled` | true | `turn/_reflection.py` | |
 | `mcp.servers[].enabled` | true (per server) | plugin `mcp_client`, `chat/_helpers.py`, route mcp | per-server |

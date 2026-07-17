@@ -155,6 +155,7 @@ agent:
   # update_plan / spawn_subagent meta-tools for structure and an optional
   # final-answer self-check (reflection). There is no enable switch and no
   # legacy structured pipeline.
+  engine: "v1"                    # TEMPORANEO Fase 1: v1=legacy executor, v2=AgentEngine greenfield
   planning: true                  # expose update_plan (visible mutable todo-list)
   delegation: true                # expose spawn_subagent (isolated-context delegation)
   clarification: true             # expose ask_user (clarifying question, client-answered)

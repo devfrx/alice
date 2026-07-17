@@ -103,12 +103,41 @@ async def run_headless_turn(
             assembly.turn, tools=_strip_ui_tools(ctx, assembly.turn.tools),
         )
         turn_sink: WSEventSink = sink if sink is not None else NullEventSink()
-        channel = HeadlessInteractionChannel()
         cancel_event = asyncio.Event()
 
-        executor = create_turn_executor(ctx, llm)
-        with conversation_active(str(turn.conv_id)):
-            result = await executor.execute(turn, turn_sink, cancel_event, session, channel)
+        if ctx.config.agent.engine == "v2":
+            # Fase 1 Task 16: motore greenfield. Nessuna UI headless → eventi
+            # sul ``turn_sink`` (SinkEventPort), interazioni auto-declinate
+            # (AutoDeclineInteractionPort). Il mapping TurnInput→TurnRequest /
+            # TurnOutcome→TurnResult vive nell'api layer (_engine_bridge, muore
+            # col Task 19).
+            from backend.api.routes.chat._engine_bridge import (
+                build_turn_request,
+                outcome_to_turn_result,
+            )
+            from backend.services.agent.models import TurnSource
+            from backend.services.agent.runner import run_agent_turn
+
+            request = build_turn_request(
+                ctx, turn, source=TurnSource.HEADLESS, max_tool_calls=None,
+            )
+            with conversation_active(str(turn.conv_id)):
+                outcome = await run_agent_turn(
+                    ctx,
+                    request=request,
+                    session=session,
+                    transport=None,
+                    sink_fallback=turn_sink,
+                    cancel=cancel_event,
+                )
+            result = outcome_to_turn_result(outcome)
+        else:
+            channel = HeadlessInteractionChannel()
+            executor = create_turn_executor(ctx, llm)
+            with conversation_active(str(turn.conv_id)):
+                result = await executor.execute(
+                    turn, turn_sink, cancel_event, session, channel,
+                )
 
         await _persist_final_turn(
             session=session,

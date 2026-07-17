@@ -18,6 +18,7 @@ from loguru import logger
 
 from backend.api.ws_schema.guard import chat_frame_validator
 from backend.db.models import Message
+from backend.services.agent.adapters.ws import WsTransport
 from backend.services.llm_service import LLMService
 from backend.services.turn import (
     TurnResult,
@@ -96,17 +97,35 @@ async def ws_chat(websocket: WebSocket) -> None:
     agent_scope = (websocket.query_params.get("scope") or "").strip().lower()
     continuum_scope = agent_scope == "continuum"
 
+    # Turn engine selector (flag ``agent.engine``, TEMPORANEO Fase 1). Constant
+    # per connection: read once here so the read-pump ownership is decided a
+    # single time (single-reader invariant — NEVER two readers on the socket).
+    engine_v2 = ctx.config.agent.engine == "v2"
+
     # Single inbound read-pump: it owns ``receive`` for the whole connection
     # and demultiplexes interaction responses / cancel / user messages, so
-    # there is never more than one concurrent reader on the socket.
-    channel = WebSocketInteractionChannel(websocket, frame_validator=chat_frame_validator)
-    channel.start()
+    # there is never more than one concurrent reader on the socket. In v2 the
+    # ``WsTransport`` IS that single reader (it replaces the legacy channel);
+    # ``reader`` exposes the shared surface both use (``next_user_message`` /
+    # ``begin_turn``).
+    channel: WebSocketInteractionChannel | None = None
+    transport: WsTransport | None = None
+    if engine_v2:
+        transport = WsTransport(websocket)
+        await transport.start()
+        reader: Any = transport
+    else:
+        channel = WebSocketInteractionChannel(
+            websocket, frame_validator=chat_frame_validator,
+        )
+        channel.start()
+        reader = channel
 
     try:
         while True:
             # The pump delivers only non-interaction (user/idle) frames here,
             # already JSON-parsed; ``None`` means the socket disconnected.
-            data = await channel.next_user_message()
+            data = await reader.next_user_message()
             if data is None:
                 break
             if data.get(MALFORMED_FRAME_KEY):
@@ -165,36 +184,74 @@ async def ws_chat(websocket: WebSocket) -> None:
                 thinking_content = ""
                 tool_calls_collected: list[dict[str, Any]] = []
                 finish_reason = "stop"
-                cancel_event = channel.begin_turn()
+                cancel_event = reader.begin_turn()
 
-                executor = create_turn_executor(ctx, llm)
                 sink = WebSocketEventSink(websocket, frame_validator=chat_frame_validator)
 
-                executor_task = asyncio.create_task(
-                    executor.execute(
-                        turn, sink, cancel_event, session, channel,
-                    ),
-                )
+                result: TurnResult
+                if engine_v2:
+                    # Fase 1 Task 16: greenfield engine. ``WsTransport`` (the
+                    # single reader) also serves interactions; the engine emits
+                    # its own wire frames via ``WsEventPort``. The ``sink`` is
+                    # reused only by the shared persist path below (``done`` +
+                    # context frames). No second reader — see connection setup.
+                    from backend.api.routes.chat._engine_bridge import (
+                        build_turn_request,
+                        outcome_to_turn_result,
+                    )
+                    from backend.services.agent.models import TurnSource
+                    from backend.services.agent.runner import run_agent_turn
 
-                # Idle-guard (Fase 6b): mark the conversation busy for the
-                # executor's lifetime so scope mutations are rejected (409)
-                # while a turn is running.  Persist below runs idle — it does
-                # not touch the workspace scope.
-                with conversation_active(str(conv_id)):
-                    try:
-                        result: TurnResult = await executor_task
-                    except asyncio.CancelledError:
-                        cancel_event.set()
-                        logger.debug("Executor task cancelled")
-                        result = TurnResult(
-                            content=full_content,
-                            thinking=thinking_content,
-                            input_tokens=0,
-                            output_tokens=0,
-                            finish_reason="cancelled",
-                            final_assistant_message_id=None,
-                            had_tool_calls=bool(tool_calls_collected),
+                    source = (
+                        TurnSource.VOICE
+                        if (data.get("source") or "").strip().lower() == "voice"
+                        else TurnSource.CHAT
+                    )
+                    voice_cap = ctx.config.agent.voice.max_tools
+                    max_tool_calls = (
+                        voice_cap
+                        if source is TurnSource.VOICE and voice_cap > 0
+                        else None
+                    )
+                    request = build_turn_request(
+                        ctx, turn, source=source, max_tool_calls=max_tool_calls,
+                    )
+                    with conversation_active(str(conv_id)):
+                        outcome = await run_agent_turn(
+                            ctx,
+                            request=request,
+                            session=session,
+                            transport=transport,
+                            cancel=cancel_event,
                         )
+                    result = outcome_to_turn_result(outcome)
+                else:
+                    executor = create_turn_executor(ctx, llm)
+                    executor_task = asyncio.create_task(
+                        executor.execute(
+                            turn, sink, cancel_event, session, channel,
+                        ),
+                    )
+
+                    # Idle-guard (Fase 6b): mark the conversation busy for the
+                    # executor's lifetime so scope mutations are rejected (409)
+                    # while a turn is running.  Persist below runs idle — it
+                    # does not touch the workspace scope.
+                    with conversation_active(str(conv_id)):
+                        try:
+                            result = await executor_task
+                        except asyncio.CancelledError:
+                            cancel_event.set()
+                            logger.debug("Executor task cancelled")
+                            result = TurnResult(
+                                content=full_content,
+                                thinking=thinking_content,
+                                input_tokens=0,
+                                output_tokens=0,
+                                finish_reason="cancelled",
+                                final_assistant_message_id=None,
+                                had_tool_calls=bool(tool_calls_collected),
+                            )
 
                 # Mirror legacy behaviour: feed locals from the result so
                 # disconnect-recovery has access to partial content.
@@ -244,7 +301,10 @@ async def ws_chat(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("WebSocket unexpected error")
     finally:
-        await channel.aclose()
+        if transport is not None:
+            await transport.aclose()
+        if channel is not None:
+            await channel.aclose()
         async with ws_lock:
             _ws_connections[client_ip] = max(
                 0, _ws_connections[client_ip] - 1,

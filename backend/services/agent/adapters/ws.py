@@ -82,6 +82,12 @@ class WsTransport:
         """
         self._ws = websocket
         self._pending: dict[str, asyncio.Future[dict[str, Any] | None]] = {}
+        # Correlation bridge (Task 16): la FE risponde con ``execution_id`` e
+        # NON riecheggia il ``correlation_id``. ``_alt_keys`` mappa una chiave
+        # alternativa (l'execution_id del frame outbound) al correlation_id
+        # della request, così il pump può risolvere anche una risposta priva
+        # di correlation_id.
+        self._alt_keys: dict[str, str] = {}
         self._user_messages: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         self._connected = True
         self._disconnected_event = asyncio.Event()
@@ -141,6 +147,7 @@ class WsTransport:
         *,
         timeout_s: float,
         cancel: asyncio.Event,
+        alt_key: str | None = None,
     ) -> dict[str, Any] | None:
         """Invia ``frame_out`` con ``correlation_id`` e attende la risposta.
 
@@ -157,6 +164,11 @@ class WsTransport:
             frame_out: Frame outbound; il ``correlation_id`` è assegnato qui.
             timeout_s: Timeout di attesa della risposta.
             cancel: Evento cooperativo di cancellazione del turno.
+            alt_key: Chiave alternativa (tipicamente l'``execution_id`` del
+                frame outbound) sotto cui registrare anche questa request. Il
+                pump la usa per risolvere una risposta priva di
+                ``correlation_id`` (correlation bridge Task 16). ``None`` la
+                disabilita (comportamento storico: solo correlation_id).
 
         Returns:
             Il frame di risposta, oppure ``None`` su cancel/timeout.
@@ -169,6 +181,8 @@ class WsTransport:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[dict[str, Any] | None] = loop.create_future()
         self._pending[correlation_id] = future
+        if alt_key is not None:
+            self._alt_keys[alt_key] = correlation_id
         disconnect_waiter = asyncio.create_task(self._disconnected_event.wait())
         cancel_waiter = asyncio.create_task(cancel.wait())
         try:
@@ -193,6 +207,8 @@ class WsTransport:
             return None
         finally:
             self._pending.pop(correlation_id, None)
+            if alt_key is not None:
+                self._alt_keys.pop(alt_key, None)
             if not future.done():
                 future.cancel()
             disconnect_waiter.cancel()
@@ -243,6 +259,7 @@ class WsTransport:
         correlation_id = frame.get("correlation_id")
         if correlation_id is not None:
             future = self._pending.pop(correlation_id, None)
+            self._forget_alt_key(correlation_id)
             if future is None:
                 logger.warning(
                     "WsTransport: risposta stale scartata (correlation_id={})",
@@ -252,12 +269,29 @@ class WsTransport:
             if not future.done():
                 future.set_result(frame)
             return
+        # Correlation bridge (Task 16): nessun correlation_id → prova a
+        # risolvere via ``execution_id`` contro le alt_key registrate (la FE
+        # risponde con l'execution_id ma non riecheggia il correlation_id).
+        alt = frame.get("execution_id")
+        if alt is not None and alt in self._alt_keys:
+            resolved_cid = self._alt_keys.pop(alt)
+            future = self._pending.pop(resolved_cid, None)
+            if future is not None and not future.done():
+                future.set_result(frame)
+            return
         self._user_messages.put_nowait(frame)
+
+    def _forget_alt_key(self, correlation_id: str) -> None:
+        """Rimuove l'eventuale alt_key che punta a ``correlation_id``."""
+        stale = [k for k, v in self._alt_keys.items() if v == correlation_id]
+        for key in stale:
+            self._alt_keys.pop(key, None)
 
     def _resolve_all_pending_to_none(self) -> None:
         """Risoluzione a ``None`` (esito cancel) di tutte le request pendenti."""
         pending = list(self._pending.values())
         self._pending.clear()
+        self._alt_keys.clear()
         for future in pending:
             if not future.done():
                 future.set_result(None)
@@ -270,6 +304,7 @@ class WsTransport:
         self._disconnected_event.set()
         pending = list(self._pending.values())
         self._pending.clear()
+        self._alt_keys.clear()
         for future in pending:
             if not future.done():
                 future.set_exception(
@@ -358,6 +393,7 @@ class WsInteractionPort:
         try:
             response = await self._transport.request(
                 "tool_confirmation", frame, timeout_s=timeout_s, cancel=cancel,
+                alt_key=call.call_id,
             )
         except EngineDisconnected:
             return InteractionOutcome.DISCONNECTED
@@ -390,6 +426,7 @@ class WsInteractionPort:
         }
         response = await self._transport.request(
             "client_tool_call", frame, timeout_s=timeout_s, cancel=cancel,
+            alt_key=call.call_id,
         )
         if response is None:
             return self._interrupted_output(call, cancel)
@@ -429,6 +466,7 @@ class WsInteractionPort:
         }
         response = await self._transport.request(
             "ask_user", frame, timeout_s=timeout_s, cancel=cancel,
+            alt_key=call.call_id,
         )
         if response is None:
             return self._interrupted_output(call, cancel)

@@ -117,6 +117,58 @@ async def test_request_roundtrip_with_correlation() -> None:
     assert resp is not None and resp["approved"] is True
 
 
+async def test_request_resolves_by_alt_key_when_correlation_absent() -> None:
+    """Correlation bridge (Task 16): la FE risponde con ``execution_id`` e NON
+    riecheggia il ``correlation_id``. Con ``alt_key`` registrato, il pump risolve
+    la request pendente quando l'``execution_id`` inbound combacia e il
+    ``correlation_id`` è assente.
+    """
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    await t.start()
+
+    async def _answer() -> None:
+        await ws.next_sent()  # frame outbound della request
+        # Risposta della FE: SOLO execution_id, nessun correlation_id.
+        await ws.feed({"type": "tool_confirmation_response",
+                       "execution_id": "exec-9", "approved": True})
+
+    task = asyncio.create_task(_answer())
+    resp = await t.request(
+        "tool_confirmation",
+        {"type": "tool_confirmation_required", "execution_id": "exec-9"},
+        timeout_s=2, cancel=asyncio.Event(), alt_key="exec-9",
+    )
+    await task
+    assert resp is not None and resp["approved"] is True
+    await t.aclose()
+
+
+async def test_correlation_id_wins_over_alt_key() -> None:
+    """Quando entrambe le chiavi sono presenti, il ``correlation_id`` vince
+    (l'alt_key resta solo un fallback per la FE che non lo riecheggia).
+    """
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    await t.start()
+
+    async def _answer() -> None:
+        sent = await ws.next_sent()
+        await ws.feed({"type": "tool_confirmation_response",
+                       "correlation_id": sent["correlation_id"],
+                       "execution_id": "exec-7", "approved": False})
+
+    task = asyncio.create_task(_answer())
+    resp = await t.request(
+        "tool_confirmation",
+        {"type": "tool_confirmation_required", "execution_id": "exec-7"},
+        timeout_s=2, cancel=asyncio.Event(), alt_key="exec-7",
+    )
+    await task
+    assert resp is not None and resp["approved"] is False
+    await t.aclose()
+
+
 async def test_stale_response_is_discarded() -> None:
     ws = FakeWebSocket()
     t = WsTransport(ws)
@@ -353,6 +405,31 @@ async def test_tool_confirmation_request_frame_matches_legacy_contract() -> None
     assert frame.description == _VERDICT.description      # presente, non vuota
     assert frame.description
     assert frame.reasoning == _VERDICT.reason            # reasoning presente
+    await t.aclose()
+
+
+async def test_confirm_tool_resolves_on_execution_id_only_reply() -> None:
+    """Correlation bridge end-to-end: ``WsInteractionPort`` registra
+    ``alt_key=call_id``, così una risposta FE con SOLO ``execution_id`` (nessun
+    ``correlation_id``, come fa il frontend attuale) risolve la conferma.
+    """
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    await t.start()
+    port = _port(t)
+
+    async def _respond() -> None:
+        sent = await ws.next_sent()
+        assert sent["execution_id"] == _CALL.call_id
+        await ws.feed({"type": "tool_confirmation_response",
+                       "execution_id": _CALL.call_id, "approved": True})
+
+    answer = asyncio.create_task(_respond())
+    outcome = await port.confirm_tool(
+        _CALL, verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    )
+    await answer
+    assert outcome is InteractionOutcome.APPROVED
     await t.aclose()
 
 

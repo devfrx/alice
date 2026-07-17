@@ -1241,6 +1241,11 @@ class AgentConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
 
+    engine: Literal["v1", "v2"] = "v1"
+    """Turn engine selector (TEMPORANEO Fase 1). ``v1`` = legacy
+    :class:`DirectTurnExecutor`; ``v2`` = greenfield ``AgentEngine``
+    (``services/agent``). Muore col Task 19 quando v2 diventa l'unico path."""
+
     planning: bool = True
     """Expose the ``update_tasks`` todo-list tool in the model-driven loop."""
 

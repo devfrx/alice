@@ -12,7 +12,7 @@ Due configurazioni di porte, selezionate dalla presenza di un ``transport``:
   :class:`WsInteractionPort` (conferme/ask_user/client tool sul socket).
 * **Headless/eval** (``transport is None``): eventi via
   :class:`SinkEventPort` sopra un ``WSEventSink`` iniettato (tipicamente il
-  ``RecordingEventSink`` dell'eval harness o un ``NullEventSink``);
+  ``RecordingSink`` dell'eval harness o un ``NullEventSink``);
   interazioni auto-declinate da :class:`AutoDeclineInteractionPort` (nessuna
   UI da servire — la conferma diventa una negazione pulita, i tool
   client/ask_user un ``ToolResult`` d'errore).
@@ -83,7 +83,7 @@ class SinkEventPort:
     Traduce ogni ``AgentEvent`` in frame wire (translator di parità) e li
     consegna via ``sink.send``. Best-effort come da contratto ``EventPort``:
     non solleva MAI. Rispetta ``sink.is_connected`` (contratto eval §6.14:
-    ``RecordingEventSink`` parte con ``is_connected=True``).
+    ``RecordingSink`` parte con ``is_connected=True``).
     """
 
     def __init__(
@@ -180,7 +180,7 @@ async def run_agent_turn(
         transport: Il :class:`WsTransport` proprietario del socket, oppure
             ``None`` per un turno headless (eventi via ``sink_fallback``).
         sink_fallback: Sink degli eventi per il path headless/eval
-            (``RecordingEventSink``/``NullEventSink``). Ignorato quando
+            (``RecordingSink``/``NullEventSink``). Ignorato quando
             ``transport`` è fornito.
         cancel: Evento cooperativo di cancellazione del turno.
 

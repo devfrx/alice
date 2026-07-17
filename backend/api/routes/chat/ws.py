@@ -5,13 +5,17 @@ control-frame handling and message validation live here; the heavy turn
 assembly (history, tools, context, compression) is delegated to
 :class:`._assembly.TurnAssembler`, and the post-turn persistence to
 :mod:`._persist`.
+
+The turn itself runs on the greenfield :class:`AgentEngine`
+(``services/agent``), wired by ``run_agent_turn``: the :class:`WsTransport`
+owns the socket (single reader) and serves interactions, the engine emits
+its own wire frames, and the api-layer :class:`WebSocketEventSink` carries
+only the post-turn ``done`` / ``context_info`` / compression frames.
 """
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
-from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -19,14 +23,9 @@ from loguru import logger
 from backend.api.ws_schema.guard import chat_frame_validator
 from backend.db.models import Message
 from backend.services.agent.adapters.ws import WsTransport
+from backend.services.agent.models import TurnOutcome
+from backend.services.agent.runner import run_agent_turn
 from backend.services.llm_service import LLMService
-from backend.services.turn import (
-    TurnResult,
-    WebSocketEventSink,
-    WebSocketInteractionChannel,
-    create_turn_executor,
-)
-from backend.services.turn.channel import MALFORMED_FRAME_KEY
 
 from ._assembly import TurnAssembler
 from ._persist import _persist_final_turn
@@ -38,6 +37,7 @@ from ._shared import (
     conversation_active,
     router,
 )
+from ._sink import WebSocketEventSink
 
 #: Hard cap on a single inbound user message (characters).
 _MAX_USER_MESSAGE_LENGTH = 50_000
@@ -82,7 +82,7 @@ async def ws_chat(websocket: WebSocket) -> None:
 
     if ctx.llm_service is None or session_factory is None:
         await websocket.send_json(
-            {"type": "error", "content": "Server not ready \u2014 services not initialized"}
+            {"type": "error", "content": "Server not ready — services not initialized"}
         )
         await websocket.close(code=1011)
         async with ws_lock:
@@ -97,42 +97,20 @@ async def ws_chat(websocket: WebSocket) -> None:
     agent_scope = (websocket.query_params.get("scope") or "").strip().lower()
     continuum_scope = agent_scope == "continuum"
 
-    # Turn engine selector (flag ``agent.engine``, TEMPORANEO Fase 1). Constant
-    # per connection: read once here so the read-pump ownership is decided a
-    # single time (single-reader invariant — NEVER two readers on the socket).
-    engine_v2 = ctx.config.agent.engine == "v2"
-
-    # Single inbound read-pump: it owns ``receive`` for the whole connection
-    # and demultiplexes interaction responses / cancel / user messages, so
-    # there is never more than one concurrent reader on the socket. In v2 the
-    # ``WsTransport`` IS that single reader (it replaces the legacy channel);
-    # ``reader`` exposes the shared surface both use (``next_user_message`` /
-    # ``begin_turn``).
-    channel: WebSocketInteractionChannel | None = None
-    transport: WsTransport | None = None
-    if engine_v2:
-        transport = WsTransport(websocket)
-        await transport.start()
-        reader: Any = transport
-    else:
-        channel = WebSocketInteractionChannel(
-            websocket, frame_validator=chat_frame_validator,
-        )
-        channel.start()
-        reader = channel
+    # Single inbound read-pump: ``WsTransport`` OWNS ``receive`` for the whole
+    # connection and demultiplexes interaction responses / cancel / user
+    # messages, so there is never more than one concurrent reader on the
+    # socket (invariant §6.6). Malformed JSON is dropped in the pump.
+    transport = WsTransport(websocket)
+    await transport.start()
 
     try:
         while True:
             # The pump delivers only non-interaction (user/idle) frames here,
             # already JSON-parsed; ``None`` means the socket disconnected.
-            data = await reader.next_user_message()
+            data = await transport.next_user_message()
             if data is None:
                 break
-            if data.get(MALFORMED_FRAME_KEY):
-                await websocket.send_json(
-                    {"type": "error", "content": "Invalid JSON"}
-                )
-                continue
 
             user_content: str = data.get("content", "").strip()
             if not user_content:
@@ -174,100 +152,40 @@ async def ws_chat(websocket: WebSocket) -> None:
                 if assembly is None:
                     continue
 
-                turn = assembly.turn
                 conv = assembly.conv
-                conv_id = turn.conv_id
+                conv_id = conv.id
                 user_msg = assembly.user_msg
-                comp = assembly.comp
 
-                full_content = ""
-                thinking_content = ""
-                tool_calls_collected: list[dict[str, Any]] = []
-                finish_reason = "stop"
-                cancel_event = reader.begin_turn()
+                cancel_event = transport.begin_turn()
 
+                # The persist path emits its own ``done`` / context frames
+                # through this sink; the engine emits its wire stream via the
+                # transport's ``WsEventPort``. No second reader — the
+                # transport is the single owner of the socket.
                 sink = WebSocketEventSink(websocket, frame_validator=chat_frame_validator)
 
-                result: TurnResult
-                if engine_v2:
-                    # Fase 1 Task 16: greenfield engine. ``WsTransport`` (the
-                    # single reader) also serves interactions; the engine emits
-                    # its own wire frames via ``WsEventPort``. The ``sink`` is
-                    # reused only by the shared persist path below (``done`` +
-                    # context frames). No second reader — see connection setup.
-                    from backend.api.routes.chat._engine_bridge import (
-                        build_turn_request,
-                        outcome_to_turn_result,
+                # Fase 1: greenfield engine is the only path. ``run_agent_turn``
+                # mounts the ports (WsEventPort/WsInteractionPort over the
+                # transport) and drives the turn; it never raises — every
+                # failure is mapped into the ``TurnOutcome``.
+                with conversation_active(str(conv_id)):
+                    result: TurnOutcome = await run_agent_turn(
+                        ctx,
+                        request=assembly.request,
+                        session=session,
+                        transport=transport,
+                        cancel=cancel_event,
                     )
-                    from backend.services.agent.models import TurnSource
-                    from backend.services.agent.runner import run_agent_turn
-
-                    source = (
-                        TurnSource.VOICE
-                        if (data.get("source") or "").strip().lower() == "voice"
-                        else TurnSource.CHAT
-                    )
-                    voice_cap = ctx.config.agent.voice.max_tools
-                    max_tool_calls = (
-                        voice_cap
-                        if source is TurnSource.VOICE and voice_cap > 0
-                        else None
-                    )
-                    request = build_turn_request(
-                        ctx, turn, source=source, max_tool_calls=max_tool_calls,
-                    )
-                    with conversation_active(str(conv_id)):
-                        outcome = await run_agent_turn(
-                            ctx,
-                            request=request,
-                            session=session,
-                            transport=transport,
-                            cancel=cancel_event,
-                        )
-                    result = outcome_to_turn_result(outcome)
-                else:
-                    executor = create_turn_executor(ctx, llm)
-                    executor_task = asyncio.create_task(
-                        executor.execute(
-                            turn, sink, cancel_event, session, channel,
-                        ),
-                    )
-
-                    # Idle-guard (Fase 6b): mark the conversation busy for the
-                    # executor's lifetime so scope mutations are rejected (409)
-                    # while a turn is running.  Persist below runs idle — it
-                    # does not touch the workspace scope.
-                    with conversation_active(str(conv_id)):
-                        try:
-                            result = await executor_task
-                        except asyncio.CancelledError:
-                            cancel_event.set()
-                            logger.debug("Executor task cancelled")
-                            result = TurnResult(
-                                content=full_content,
-                                thinking=thinking_content,
-                                input_tokens=0,
-                                output_tokens=0,
-                                finish_reason="cancelled",
-                                final_assistant_message_id=None,
-                                had_tool_calls=bool(tool_calls_collected),
-                            )
-
-                # Mirror legacy behaviour: feed locals from the result so
-                # disconnect-recovery has access to partial content.
-                full_content = result.content
-                thinking_content = result.thinking
-                finish_reason = result.finish_reason
 
                 # FIX v2-4: disconnect recovery — save partial content
                 # then propagate so the outer WS loop exits cleanly.
-                if finish_reason == "disconnected":
-                    if full_content:
+                if result.finish_reason == "disconnected":
+                    if result.content:
                         recovery_msg = Message(
                             conversation_id=conv_id,
                             role="assistant",
-                            content=full_content,
-                            thinking_content=thinking_content or None,
+                            content=result.content,
+                            thinking_content=result.thinking or None,
                             version_group_id=user_msg.version_group_id,
                             version_index=user_msg.version_index,
                         )
@@ -287,8 +205,8 @@ async def ws_chat(websocket: WebSocket) -> None:
                     ctx=ctx,
                     llm=llm,
                     user_content=user_content,
-                    was_compressed=comp is not None,
-                    pre_comp=comp,
+                    was_compressed=assembly.comp is not None,
+                    pre_comp=assembly.comp,
                     context_window=assembly.context_window,
                     tool_tokens=assembly.tool_tokens,
                     messages=assembly.messages,
@@ -301,10 +219,7 @@ async def ws_chat(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("WebSocket unexpected error")
     finally:
-        if transport is not None:
-            await transport.aclose()
-        if channel is not None:
-            await channel.aclose()
+        await transport.aclose()
         async with ws_lock:
             _ws_connections[client_ip] = max(
                 0, _ws_connections[client_ip] - 1,

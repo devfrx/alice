@@ -10,8 +10,9 @@ pre-generation context compression — into a single cohesive
 :class:`TurnAssembler`.
 
 The assembler returns an :class:`AssemblyResult` bundling the immutable
-:class:`TurnInput` together with the few stateful objects the WebSocket
-handler still needs for execution and persistence.  Validation failures
+:class:`TurnRequest` (the AgentEngine input) together with the few stateful
+objects the WebSocket handler still needs for execution and persistence.
+Validation failures
 emit a WS ``error`` frame and return ``None`` so the caller skips the turn
 (identical to the legacy ``continue`` branches).
 """
@@ -33,6 +34,7 @@ from sqlmodel import select
 from backend.core.config import PROJECT_ROOT, LLMConfig
 from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
+from backend.services.agent.models import TurnRequest, TurnSource
 from backend.services.context_manager import CompressionResult, ContextUsage
 from backend.services.llm_service import LLMService
 from backend.services.permission_mode_policy import ModePolicy, policy_for
@@ -43,7 +45,6 @@ from backend.services.prompt_composer import (
     build_orchestration_block,
     compose_dynamic_context,
 )
-from backend.services.turn import TurnInput
 
 from ._helpers import (
     _archive_messages_in_db,
@@ -146,14 +147,14 @@ def _apply_voice_trim(
 class AssemblyResult:
     """Bundle returned by :meth:`TurnAssembler.assemble`.
 
-    Carries the immutable :class:`TurnInput` plus the live objects the
-    WebSocket handler still needs after assembly (the ORM conversation /
-    user message, the active-version map, the assembled prompt, the
-    pre-generation compression result and the context-window / tool-token
-    figures, and the cached system prompt for re-compression).
+    Carries the immutable :class:`TurnRequest` (the AgentEngine input) plus
+    the live objects the WebSocket handler still needs after assembly (the
+    ORM conversation / user message, the active-version map, the assembled
+    prompt, the pre-generation compression result and the context-window /
+    tool-token figures, and the cached system prompt for re-compression).
     """
 
-    turn: TurnInput
+    request: TurnRequest
     conv: Conversation
     user_msg: Message
     av_map: dict[str, int]
@@ -165,7 +166,7 @@ class AssemblyResult:
 
 
 class TurnAssembler:
-    """Build a :class:`TurnInput` for one user turn over a shared session."""
+    """Build a :class:`TurnRequest` for one user turn over a shared session."""
 
     def __init__(
         self,
@@ -764,39 +765,44 @@ class TurnAssembler:
                 ctx.config.llm, usage_est.available_tokens,
             )
 
-        # Build the immutable turn input.  When pre-gen
-        # compression ran, the executor must use the compressed
-        # history (so the tool loop does not re-compress) and the
-        # OAI-compat path (forced by user_content=None inside
-        # the executor when ``was_compressed=True``).
-        turn = TurnInput(
-            conv_id=conv_id,
-            user_msg_id=user_msg.id,
-            user_content=user_content,
-            history=history,
-            messages=messages,
-            tools=tools,
-            memory_context=memory_context,
-            cached_sys_prompt=cached_sys_prompt,
-            attachment_info=attachment_info or None,
+        # Build the immutable AgentEngine request.  ``history`` is the
+        # FULLY assembled prompt (system + memory + history + user), already
+        # compacted in pre-gen when compression ran — the engine consumes it
+        # as ``messages`` on the OpenAI-compatible path (``system_prompt`` is
+        # redundant there but populated for completeness). ``max_steps`` =
+        # ``max_tool_iterations + 1`` (identical to the legacy budget).
+        #
+        # Source/voice trim: a voice turn (frame ``source: "voice"``) caps
+        # the number of EXECUTED tool calls (``agent.voice.max_tools``); the
+        # offered toolset was already trimmed above. Headless callers
+        # override ``source``/``max_tool_calls`` on the returned request.
+        source_str = (data.get("source") or "").strip().lower()
+        source = TurnSource.VOICE if source_str == "voice" else TurnSource.CHAT
+        voice_cap = ctx.config.agent.voice.max_tools
+        max_tool_calls = (
+            voice_cap if source is TurnSource.VOICE and voice_cap > 0 else None
+        )
+        request = TurnRequest(
+            conversation_id=str(conv_id),
+            system_prompt=cached_sys_prompt or "",
+            history=messages,
+            tools=tools or [],
+            source=source,
+            max_steps=ctx.config.llm.max_tool_iterations + 1,
             context_window=context_window,
-            version_group_id=user_msg.version_group_id,
-            version_index=user_msg.version_index,
-            client_ip=client_ip,
             resolved_max_tokens=resolved_max,
-            was_compressed=comp is not None,
-            compressed_history=(
-                [
-                    m for m in comp.messages
-                    if m.get("role") != "system"
-                ]
-                if comp is not None else None
+            client_ip=client_ip,
+            version_group_id=(
+                str(user_msg.version_group_id)
+                if user_msg.version_group_id
+                else None
             ),
-            tool_tokens=_tool_tokens if context_window > 0 else 0,
+            version_index=user_msg.version_index,
+            max_tool_calls=max_tool_calls,
         )
 
         return AssemblyResult(
-            turn=turn,
+            request=request,
             conv=conv,
             user_msg=user_msg,
             av_map=av_map,

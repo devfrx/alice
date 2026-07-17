@@ -152,20 +152,13 @@ triggers:
 
 agent:
   # Single model-driven loop: the model decides step-by-step, with the
-  # update_plan / spawn_subagent meta-tools for structure and an optional
-  # final-answer self-check (reflection). There is no enable switch and no
-  # legacy structured pipeline.
-  engine: "v1"                    # TEMPORANEO Fase 1: v1=legacy executor, v2=AgentEngine greenfield
+  # update_plan / spawn_subagent meta-tools for structure. There is no
+  # enable switch and no legacy structured pipeline — the turn runs on the
+  # greenfield AgentEngine (services/agent).
+  engine: "v2"                    # TEMPORANEO Fase 1: solo v2=AgentEngine greenfield (v1 rimosso in Task 19); flag inerte, rimosso a fine Mossa 2
   planning: true                  # expose update_plan (visible mutable todo-list)
   delegation: true                # expose spawn_subagent (isolated-context delegation)
   clarification: true             # expose ask_user (clarifying question, client-answered)
-  reflection:
-    enabled: false                # opt-in final-answer self-check (adds 1 LLM call)
-    tool_turns_only: true         # only verify turns that actually used tools
-    max_output_tokens: 80         # cap on the reflection verdict response
-    temperature: 0.0              # deterministic verdicts
-    fail_open: true               # LLM/parse error → treat answer as OK
-    degeneration_detector_enabled: true   # local pre-LLM detector for repetition / fake tool_code
   subagent:
     max_steps: 6                  # tool-call iterations cap inside one sub-agent run
     max_output_tokens: 1024

@@ -1138,41 +1138,6 @@ class AgentVoiceConfig(BaseSettings):
     coverage; trimming the toolset keeps the first token quick."""
 
 
-class AgentReflectionConfig(BaseSettings):
-    """Optional self-check (reflection) for the model-driven loop.
-
-    Reflection is the lightweight, opt-in replacement for structured mode's
-    per-step critic: instead of grading every step, a single verification
-    pass runs on the final answer and surfaces a non-blocking warning when
-    the output looks degenerate. It costs one extra LLM call on the turns
-    it covers, so it is OFF by default.
-    """
-
-    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__REFLECTION__")
-
-    enabled: bool = False
-    """Run a reflection (self-check) pass on the final answer (opt-in)."""
-
-    tool_turns_only: bool = True
-    """When True, only verify turns that actually used tools (where a mistake
-    is most likely); when False, verify every turn."""
-
-    max_output_tokens: int = 80
-    """Cap on the reflection LLM response (verdict + brief reason)."""
-
-    temperature: float = 0.0
-    """Sampling temperature for the reflection call (0.0 = deterministic)."""
-
-    fail_open: bool = True
-    """On LLM/parse error, treat the answer as OK so the user is not blocked."""
-
-    degeneration_detector_enabled: bool = True
-    """If True, run a local rule-based degeneration detector BEFORE the LLM
-    call.  Saves one round-trip when an obvious pathological output
-    (paragraph repetition, inline ``<tool_code>`` / fake JSON tool calls,
-    ``finish_reason=length``) is present."""
-
-
 class AgentSubagentConfig(BaseSettings):
     """Runtime limits for the ``spawn_subagent`` delegation tool.
 
@@ -1232,19 +1197,19 @@ class AgentConfig(BaseSettings):
     """Configuration for the (only) model-driven agentic chat path.
 
     The model itself decides step-by-step what to do, with the
-    ``update_tasks`` and ``spawn_subagent`` meta-tools for structure and an
-    optional, non-blocking reflection pass on the final answer. There is no
-    separate ``enabled`` switch and no legacy structured pipeline: the engine
-    is always :class:`DirectTurnExecutor`, optionally wrapped by
-    :class:`ReflectiveTurnExecutor` when :attr:`reflection` is enabled.
+    ``update_tasks`` and ``spawn_subagent`` meta-tools for structure. There
+    is no separate ``enabled`` switch and no legacy structured pipeline: the
+    turn runs on the greenfield ``AgentEngine`` (``services/agent``).
     """
 
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
 
-    engine: Literal["v1", "v2"] = "v1"
-    """Turn engine selector (TEMPORANEO Fase 1). ``v1`` = legacy
-    :class:`DirectTurnExecutor`; ``v2`` = greenfield ``AgentEngine``
-    (``services/agent``). Muore col Task 19 quando v2 diventa l'unico path."""
+    engine: Literal["v2"] = "v2"
+    """Turn engine selector (TEMPORANEO Fase 1). ``v2`` = greenfield
+    ``AgentEngine`` (``services/agent``) è l'UNICO path: il legacy
+    ``DirectTurnExecutor`` (v1) e il suo ramo sono stati rimossi in Task 19.
+    Il campo resta come config inerte (nessun branch lo legge più) e viene
+    rimosso a fine Mossa 2 (spec §2)."""
 
     planning: bool = True
     """Expose the ``update_tasks`` todo-list tool in the model-driven loop."""
@@ -1254,11 +1219,6 @@ class AgentConfig(BaseSettings):
 
     clarification: bool = True
     """Expose the ``ask_user`` clarifying-question tool in the model-driven loop."""
-
-    reflection: AgentReflectionConfig = Field(
-        default_factory=AgentReflectionConfig
-    )
-    """Optional final-answer self-check (non-blocking reflection pass)."""
 
     subagent: AgentSubagentConfig = Field(default_factory=AgentSubagentConfig)
     """Runtime limits for ``spawn_subagent``."""

@@ -121,7 +121,7 @@ async def v2_app(monkeypatch: pytest.MonkeyPatch):
 
 async def test_headless_turn_runs_on_v2_engine(v2_app: Any) -> None:
     from backend.api.routes.chat.headless import run_headless_turn
-    from backend.services.turn.sink import RecordingEventSink
+    from backend.evals.sink import RecordingSink
 
     ctx = v2_app.state.context
     assert ctx.config.agent.engine == "v2"
@@ -131,7 +131,7 @@ async def test_headless_turn_runs_on_v2_engine(v2_app: Any) -> None:
         {"type": "usage", "input_tokens": 12, "output_tokens": 6, "cost": 0.0},
         {"type": "done", "finish_reason": "stop"},
     ])
-    sink = RecordingEventSink()
+    sink = RecordingSink()
 
     result = await run_headless_turn(
         ctx, conversation_id=None, prompt="ciao", sink=sink,

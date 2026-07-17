@@ -1,10 +1,10 @@
 """AL\\CE — Headless (autonomous) turn runner (Fase 8, spec §8).
 
-An autonomous turn IS a normal turn: same assembly, executor, permission
+An autonomous turn IS a normal turn: same assembly, engine, permission
 mode and scope of the conversation it belongs to. The only differences are
 the missing surfaces: chat-stream events go to a :class:`NullEventSink`
 (observability rides the background-task events) and interactive requests
-are auto-declined by a :class:`HeadlessInteractionChannel`.
+are auto-declined by the engine's :class:`AutoDeclineInteractionPort`.
 
 Lives in the api layer because it reuses :class:`TurnAssembler` and
 ``_persist_final_turn``; the TriggerService (services layer) receives it as
@@ -23,13 +23,13 @@ from loguru import logger
 from backend.api.routes.chat._assembly import TurnAssembler
 from backend.api.routes.chat._persist import _persist_final_turn
 from backend.api.routes.chat._shared import conversation_active
-from backend.services.turn.channel import HeadlessInteractionChannel
-from backend.services.turn.factory import create_turn_executor
-from backend.services.turn.sink import NullEventSink, WSEventSink
+from backend.api.routes.chat._sink import NullEventSink, WSEventSink
+from backend.services.agent.models import TurnSource
+from backend.services.agent.runner import run_agent_turn
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
-    from backend.services.turn.models import TurnResult
+    from backend.services.agent.models import TurnOutcome
 
 
 def _strip_ui_tools(
@@ -38,8 +38,8 @@ def _strip_ui_tools(
     """Drop UI-dependent tools: a headless turn has no UI to serve them.
 
     Covers both client-executed tools and user-interaction tools
-    (``ask_user``): the channel would collapse them to clean errors anyway,
-    but not offering them avoids wasted loop iterations.
+    (``ask_user``): the engine would auto-decline them to clean errors
+    anyway, but not offering them avoids wasted loop iterations.
     """
     if not tools:
         return tools
@@ -66,7 +66,7 @@ async def run_headless_turn(
     prompt: str,
     origin: str = "system",
     sink: WSEventSink | None = None,
-) -> TurnResult | None:
+) -> TurnOutcome | None:
     """Run one autonomous turn through the normal pipeline and persist it.
 
     Args:
@@ -78,7 +78,7 @@ async def run_headless_turn(
             (eval harness). Default: :class:`NullEventSink` (drop).
 
     Returns:
-        The :class:`TurnResult`, or ``None`` when the turn could not start
+        The :class:`TurnOutcome`, or ``None`` when the turn could not start
         (no DB / no LLM / assembly validation failure).
     """
     llm = ctx.llm_service
@@ -99,50 +99,35 @@ async def run_headless_turn(
             logger.warning("Headless turn: assembly failed (origin={})", origin)
             return None
 
-        turn = replace(
-            assembly.turn, tools=_strip_ui_tools(ctx, assembly.turn.tools),
+        # Headless overrides the request: strip UI-dependent tools, force the
+        # HEADLESS source, and clear any voice tool-call cap.
+        request = replace(
+            assembly.request,
+            tools=_strip_ui_tools(ctx, assembly.request.tools) or [],
+            source=TurnSource.HEADLESS,
+            max_tool_calls=None,
         )
         turn_sink: WSEventSink = sink if sink is not None else NullEventSink()
         cancel_event = asyncio.Event()
 
-        if ctx.config.agent.engine == "v2":
-            # Fase 1 Task 16: motore greenfield. Nessuna UI headless → eventi
-            # sul ``turn_sink`` (SinkEventPort), interazioni auto-declinate
-            # (AutoDeclineInteractionPort). Il mapping TurnInput→TurnRequest /
-            # TurnOutcome→TurnResult vive nell'api layer (_engine_bridge, muore
-            # col Task 19).
-            from backend.api.routes.chat._engine_bridge import (
-                build_turn_request,
-                outcome_to_turn_result,
+        # Fase 1: greenfield engine, no UI. Events flow to ``turn_sink``
+        # (SinkEventPort); interactions are auto-declined
+        # (AutoDeclineInteractionPort). ``transport=None`` selects the
+        # headless port configuration in ``run_agent_turn``.
+        with conversation_active(str(assembly.conv.id)):
+            result = await run_agent_turn(
+                ctx,
+                request=request,
+                session=session,
+                transport=None,
+                sink_fallback=turn_sink,
+                cancel=cancel_event,
             )
-            from backend.services.agent.models import TurnSource
-            from backend.services.agent.runner import run_agent_turn
-
-            request = build_turn_request(
-                ctx, turn, source=TurnSource.HEADLESS, max_tool_calls=None,
-            )
-            with conversation_active(str(turn.conv_id)):
-                outcome = await run_agent_turn(
-                    ctx,
-                    request=request,
-                    session=session,
-                    transport=None,
-                    sink_fallback=turn_sink,
-                    cancel=cancel_event,
-                )
-            result = outcome_to_turn_result(outcome)
-        else:
-            channel = HeadlessInteractionChannel()
-            executor = create_turn_executor(ctx, llm)
-            with conversation_active(str(turn.conv_id)):
-                result = await executor.execute(
-                    turn, turn_sink, cancel_event, session, channel,
-                )
 
         await _persist_final_turn(
             session=session,
             conv=assembly.conv,
-            conv_id=turn.conv_id,
+            conv_id=assembly.conv.id,
             user_msg=assembly.user_msg,
             result=result,
             sink=turn_sink,

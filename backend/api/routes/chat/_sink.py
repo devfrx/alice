@@ -1,22 +1,24 @@
-"""AL\\CE — WebSocket event sinks for turn execution.
+"""AL\\CE — Chat done-frame event sink (api-layer owned).
 
-Defines the :class:`WSEventSink` protocol used by the turn executors
-together with two concrete implementations:
+The AgentEngine (``services/agent``) emits its own wire frames through the
+:class:`~backend.services.agent.adapters.ws.WsEventPort`.  The post-turn
+persistence path (:mod:`._persist`), however, still needs a thin outbound
+sink to deliver the ``done`` / ``context_info`` / compression frames it
+builds itself — a concern that belongs to the api layer, not to the engine.
 
-*   :class:`WebSocketEventSink` — production sink wrapping a FastAPI
-    :class:`fastapi.WebSocket`.  It still exposes ``_ws`` for any caller
-    that needs the raw socket, but the turn engine
-    (:func:`backend.services.turn.tool_loop.run_tool_loop`) now consumes
-    only the :class:`WSEventSink` (out) + ``InteractionChannel`` (in).
-*   :class:`RecordingEventSink` — in-memory test double that captures
-    every event emitted by an executor.
+This module owns that sink after the demolition of ``services/turn`` (Task
+19).  It intentionally lives in the api layer: it wraps a FastAPI
+``WebSocket`` and is consumed only by the chat route package.
 
-See ``alice/agent_loop_plan.md`` §3.3 for the full contract.
+Public surface:
+    * :class:`WSEventSink` — structural protocol (``send`` + ``is_connected``).
+    * :class:`WebSocketEventSink` — production sink over a FastAPI WebSocket.
+    * :class:`NullEventSink` — drop sink for headless (autonomous) turns.
+    * :func:`is_websocket_closed_runtime_error` — closed-socket detector.
 """
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -50,11 +52,11 @@ def is_websocket_closed_runtime_error(exc: RuntimeError) -> bool:
 
 @runtime_checkable
 class WSEventSink(Protocol):
-    """Structural type for outbound event sinks used by turn executors.
+    """Structural type for outbound event sinks used by the persist path.
 
-    Executors emit events as plain JSON-serialisable dicts (``token``,
-    ``thinking``, ``tool_call``, ``done``, ``error``, ``agent.*`` …).
-    Implementations decide how to deliver them (WebSocket, buffer, …).
+    The persist path emits events as plain JSON-serialisable dicts
+    (``done``, ``context_info``, ``context_compression_*`` …).
+    Implementations decide how to deliver them (WebSocket, drop, buffer).
     """
 
     async def send(self, event: dict[str, Any]) -> None:
@@ -70,16 +72,10 @@ class WSEventSink(Protocol):
 class WebSocketEventSink:
     """Production sink that forwards events to a FastAPI WebSocket.
 
-    The raw WebSocket is still exposed via :attr:`_ws` for callers that
-    need it, but the turn engine no longer reaches through the sink — it
-    takes an explicit ``InteractionChannel`` for inbound interactions.
-
     Args:
         ws: The accepted FastAPI ``WebSocket`` to forward events to.
         frame_validator: Optional callable injected by the api layer to
-            validate outbound frames against the typed contract.  The
-            ``services`` layer must never import ``backend.api.ws_schema``
-            directly (spec §4).
+            validate outbound frames against the typed contract.
     """
 
     def __init__(
@@ -94,9 +90,9 @@ class WebSocketEventSink:
     async def send(self, event: dict[str, Any]) -> None:
         """Send ``event`` as JSON; swallow disconnect / runtime errors.
 
-        The executor inspects :attr:`is_connected` (or its own cancel
-        signal) to decide whether to keep streaming after a failure, so
-        this method never raises on transport-level issues.
+        Callers inspect :attr:`is_connected` to decide whether to keep
+        emitting after a failure, so this method never raises on
+        transport-level issues.
         """
         if self._validate is not None:
             self._validate(event)
@@ -127,48 +123,12 @@ class WebSocketEventSink:
             return False
 
 
-class RecordingEventSink:
-    """Test double that records every event in :attr:`events`.
-
-    Args:
-        is_connected: Initial connection flag (default ``True``).  Tests
-            can flip :attr:`_is_connected` to simulate a disconnect.
-    """
-
-    _ws: None = None  # No real WebSocket — the executor must handle this.
-
-    def __init__(self, *, is_connected: bool = True) -> None:
-        self.events: list[dict[str, Any]] = []
-        self._is_connected = is_connected
-
-    async def send(self, event: dict[str, Any]) -> None:
-        """Append ``event`` to :attr:`events`.
-
-        The event is shallow-copied so subsequent caller-side mutations
-        do not affect the recorded history.
-        """
-        with contextlib.suppress(Exception):
-            event = dict(event)
-        self.events.append(event)
-
-    @property
-    def is_connected(self) -> bool:
-        """Mirror the configurable connection flag."""
-        return self._is_connected
-
-    @is_connected.setter
-    def is_connected(self, value: bool) -> None:
-        self._is_connected = value
-
-
 class NullEventSink:
-    """Sink for headless (autonomous) turns: no surface, events are dropped.
+    """Sink for headless (autonomous) turns: no surface, events dropped.
 
     Observability of autonomous turns rides the background-task events
     (Fase 8), not the chat stream — there is no client on the other side.
     """
-
-    _ws: None = None  # No real WebSocket — mirrors RecordingEventSink.
 
     async def send(self, event: dict[str, Any]) -> None:
         """Drop ``event``; a headless turn has no outbound transport."""
@@ -182,7 +142,6 @@ class NullEventSink:
 
 __all__ = [
     "NullEventSink",
-    "RecordingEventSink",
     "WSEventSink",
     "WebSocketEventSink",
     "is_websocket_closed_runtime_error",

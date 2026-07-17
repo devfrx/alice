@@ -17,9 +17,9 @@ from sqlmodel import select
 
 from backend.core.context import AppContext
 from backend.db.models import Conversation, Message
+from backend.services.agent.models import TurnOutcome
 from backend.services.context_manager import CompressionResult
 from backend.services.llm_service import LLMService
-from backend.services.turn import TurnResult, WSEventSink
 
 from ._helpers import (
     _archive_messages_in_db,
@@ -28,6 +28,7 @@ from ._helpers import (
     _msg_to_raw_dict,
 )
 from ._shared import _utcnow
+from ._sink import WSEventSink
 
 
 def _build_done_event(
@@ -63,7 +64,7 @@ async def _persist_final_turn(
     conv: Conversation,
     conv_id: uuid.UUID,
     user_msg: Message,
-    result: TurnResult,
+    result: TurnOutcome,
     sink: WSEventSink,
     *,
     ctx: AppContext,
@@ -95,7 +96,7 @@ async def _persist_final_turn(
         conv: Conversation ORM instance.
         conv_id: Conversation UUID.
         user_msg: User ORM message that triggered the turn.
-        result: Outcome from the executor.
+        result: Outcome produced by the AgentEngine.
         sink: WebSocket event sink.
         ctx: Application context.
         llm: Active LLM service.
@@ -123,9 +124,9 @@ async def _persist_final_turn(
     # Fast path: error (v3-4).  ``run_tool_loop`` may have flushed
     # intermediate messages; rollback to keep DB consistent with the
     # legacy behaviour.  Any turn cost is discarded with them — the
-    # executor mirrors this by sending ``cost=None`` on the error
-    # ``turn.finished`` frame (``DirectTurnExecutor._finish``), so the
-    # frontend live chip never sums a cost this rollback won't back.
+    # the AgentEngine mirrors this by sending ``cost=None`` on the error
+    # ``turn.finished`` frame, so the frontend live chip never sums a cost
+    # this rollback won't back.
     # ------------------------------------------------------------------
     if finish_reason == "error":
         with contextlib.suppress(Exception):
@@ -167,7 +168,7 @@ async def _persist_final_turn(
                 "Turn cost {} not persisted (cancelled turn without content)",
                 result.cost,
             )
-        if result.had_tool_calls or result.content or result.thinking:
+        if result.tool_calls > 0 or result.content or result.thinking:
             conv.updated_at = _utcnow()
             if conv.title is None and user_content:
                 conv.title = user_content[:100]
@@ -191,7 +192,7 @@ async def _persist_final_turn(
         # Skip the final save when the tool loop already produced
         # intermediate assistant messages and the LLM emitted no
         # additional text (matches legacy semantics).
-        if result.content.strip() or not result.had_tool_calls:
+        if result.content.strip() or result.tool_calls == 0:
             asst_msg = Message(
                 conversation_id=conv_id,
                 role="assistant",

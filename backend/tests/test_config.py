@@ -415,9 +415,9 @@ def test_flatten_update_body_recurses_to_leaves() -> None:
     from backend.api.routes.config import _flatten_update_body
 
     flat = _flatten_update_body(
-        {"agent": {"reflection": {"enabled": True}, "planning": False}},
+        {"agent": {"subagent": {"max_steps": 8}, "planning": False}},
     )
-    assert flat == {"agent.reflection.enabled": True, "agent.planning": False}
+    assert flat == {"agent.subagent.max_steps": 8, "agent.planning": False}
 
 
 def test_flatten_update_body_preserves_list_values() -> None:
@@ -445,12 +445,12 @@ def test_flatten_update_body_non_dict_section_rejected() -> None:
 async def test_put_three_level_body_persists_leaf_rows(client, app) -> None:
     ctx = app.state.context
     resp = await client.put(
-        "/api/config", json={"agent": {"reflection": {"enabled": True}}},
+        "/api/config", json={"agent": {"subagent": {"max_steps": 8}}},
     )
     assert resp.status_code == 200
-    assert ctx.config.agent.reflection.enabled is True
+    assert ctx.config.agent.subagent.max_steps == 8
     # The persisted row is the LEAF path — no dict-valued intermediate row.
-    assert await ctx.preferences_store.delete_paths(["agent.reflection.enabled"]) == 1
+    assert await ctx.preferences_store.delete_paths(["agent.subagent.max_steps"]) == 1
 
 
 # ---------------------------------------------------------------------------

@@ -364,8 +364,8 @@ def _flatten_update_body(body: dict[str, Any]) -> dict[str, Any]:
     """Flatten a nested update body into dotted LEAF paths (legacy aliases folded).
 
     Recurses into nested dicts at every depth, so a deeper body (e.g.
-    ``{"agent": {"reflection": {"enabled": true}}}``) lands as leaf rows
-    (``agent.reflection.enabled``) in the preferences store instead of a
+    ``{"agent": {"subagent": {"max_steps": 8}}}``) lands as leaf rows
+    (``agent.subagent.max_steps``) in the preferences store instead of a
     dict-valued row that would overlap dotted rows persisted for the same
     subtree. PUT is therefore a per-leaf merge; subtree REPLACE semantics
     stay available via PATCH, whose value is stored as-is. An empty dict

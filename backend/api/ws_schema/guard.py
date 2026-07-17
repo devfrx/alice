@@ -6,9 +6,9 @@ turn); under ``ALICE_WS_STRICT_CONTRACTS=1`` (set by the test suite) it
 raises so drift fails loudly.
 
 The validators are plain callables meant to be INJECTED into the send
-chokepoints (``WSConnectionManager``, ``WebSocketEventSink``,
-``WebSocketInteractionChannel``) by the api layer / composition root —
-``services`` modules must never import this package (spec §4).
+chokepoints (``WSConnectionManager``, ``WebSocketEventSink``, the agent
+``WsTransport``) by the api layer / composition root — ``services`` modules
+must never import this package (spec §4).
 """
 
 from __future__ import annotations

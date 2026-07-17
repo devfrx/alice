@@ -414,14 +414,27 @@ class AgentEngine:
         if batch:
             resolutions.update(await self._run_tool_batch(turn_id, batch, state))
 
-        # 4. persistenza: UNA tool response per OGNI call_id (§6.1.1), in ordine;
-        #    register_artifacts per i success; checkpoint() a fine batch.
-        disconnect = False
+        # 4. persistenza: UNA tool response per OGNI call_id (§6.1.1), in ordine.
+        #    TUTTI i save_tool_result PRIMA del checkpoint, e SOLO DOPO il
+        #    checkpoint si registrano gli artifact (§ fix review T13):
+        #    ``register_artifacts`` committa su una sessione propria
+        #    (ArtifactRegistry, non l'adapter del motore) e la riga Artifact
+        #    porta una FK verso la riga Message del tool result. Se si
+        #    registrasse PRIMA del checkpoint, un crash tra la registrazione
+        #    e il checkpoint lascerebbe un Artifact durevole con FK verso un
+        #    Message poi rollback-ato — dangling, silenzioso perché SQLite ha
+        #    l'enforcement dei FK disattivato. Registrando dopo il
+        #    checkpoint, la FK punta SEMPRE a righe già durevoli.
         for call in calls:
             resolution = resolutions[call.call_id]
             await self._persistence.save_tool_result(
                 call=call, content=resolution.content, status=resolution.status,
             )
+        await self._persistence.checkpoint()
+
+        disconnect = False
+        for call in calls:
+            resolution = resolutions[call.call_id]
             artifact_id: str | None = None
             if resolution.output is not None and resolution.output.ok:
                 artifact_id = await self._persistence.register_artifacts(
@@ -434,9 +447,9 @@ class AgentEngine:
                 artifact_id=artifact_id,
             ))
             disconnect = disconnect or resolution.disconnect
-        await self._persistence.checkpoint()
 
-        # 5. SOLO DOPO la persistenza: disconnect / cancel (§6.4) / budget
+        # 5. SOLO DOPO la persistenza (checkpoint + registrazione artifact):
+        #    disconnect / cancel (§6.4) / budget
         #    di step esaurito → stop.
         if disconnect:
             return resolve_stop(

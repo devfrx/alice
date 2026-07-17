@@ -85,6 +85,7 @@ class InMemoryPersistence:
     async def register_artifacts(
         self, *, call: ToolInvocation, output: ports.ToolExecutionOutput,
     ) -> str | None:
+        self.order.append(("artifact", call.call_id))
         return None
 
     async def checkpoint(self) -> None:

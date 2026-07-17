@@ -9,12 +9,24 @@ di invarianti, mai come sorgente di comportamento copiato).
 Unit-of-work esplicita (invariante §6.15): ``save_assistant_step`` e
 ``save_tool_result`` fanno solo ``session.flush()`` (serve l'id subito per
 correlare assistant/tool via ``tool_call_id``, ma NIENTE commit). L'unico
-punto che fa ``session.commit()`` è :meth:`SqlModelPersistence.checkpoint`.
-Motivazione: la connessione SQLite di scrittura è condivisa con i plugin
-(ognuno apre la propria sessione/connessione verso lo stesso file), quindi
-tenere una transazione aperta più a lungo del necessario rischia
-``database is locked``; il motore chiama ``checkpoint()`` ai confini di step
-espliciti dove è sicuro rilasciare il write-lock.
+punto di QUESTO adapter che fa ``session.commit()`` è
+:meth:`SqlModelPersistence.checkpoint` — non è però l'unico commit del
+turno in assoluto: ``register_artifacts`` delega ad
+``ArtifactRegistry.register_from_tool_result``
+(``backend/services/artifacts/registry.py``), che apre e committa sulla
+PROPRIA sessione (per design del registry, non di questo adapter — vedi la
+sua docstring). Per questo il motore (``backend/services/agent/engine.py``,
+``_run_tool_step``) chiama ``register_artifacts`` SOLO DOPO ``checkpoint()``
+del batch: la riga ``Artifact`` porta una FK verso la riga ``Message`` del
+tool result, quindi va registrata solo quando quella riga è già durevole
+(altrimenti un crash tra registrazione e checkpoint lascerebbe un Artifact
+con FK verso un Message rollback-ato — dangling, silenzioso perché SQLite ha
+l'enforcement dei FK disattivato; fix review T13).
+Motivazione del flush-only qui: la connessione SQLite di scrittura è
+condivisa con i plugin (ognuno apre la propria sessione/connessione verso lo
+stesso file), quindi tenere una transazione aperta più a lungo del
+necessario rischia ``database is locked``; il motore chiama ``checkpoint()``
+ai confini di step espliciti dove è sicuro rilasciare il write-lock.
 
 Divergenze dal brief (documentate, non "corrette" silenziosamente):
 

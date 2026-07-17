@@ -98,6 +98,23 @@ async def test_rejection_still_persists_tool_response() -> None:
     assert saved and saved[0]["status"] == "rejected"
 
 
+async def test_artifact_registered_after_checkpoint_of_the_batch() -> None:
+    # fix review T13: register_artifacts deve avvenire DOPO il checkpoint che
+    # committa la riga Message del tool result, non prima (niente FK orfane).
+    calls = (ToolInvocation(call_id="c1", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+    )
+    tool_result_index = persistence.order.index(("tool_result", "c1"))
+    artifact_index = persistence.order.index(("artifact", "c1"))
+    checkpoint_index = next(
+        i for i, entry in enumerate(persistence.order)
+        if entry == ("checkpoint", "") and i > tool_result_index
+    )
+    assert tool_result_index < checkpoint_index < artifact_index
+
+
 async def test_cancel_checked_only_after_persistence() -> None:
     # cancel scatta DURANTE l'esecuzione del tool: il result va comunque su DB
     calls = (ToolInvocation(call_id="c1", name="slow", args={}, raw_args="{}"),)

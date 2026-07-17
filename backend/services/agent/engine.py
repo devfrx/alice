@@ -16,6 +16,7 @@ from typing import Any
 from loguru import logger
 
 from backend.services.agent import events as ev
+from backend.services.agent.dedup import DedupRegistry
 from backend.services.agent.models import (
     STOP_TO_FINISH,
     StopReason,
@@ -28,6 +29,9 @@ from backend.services.agent.ports import (
     EngineDisconnected,
     EventPort,
     ExecutionPort,
+    GateAction,
+    GateVerdict,
+    InteractionOutcome,
     InteractionPort,
     LLMFailure,
     LLMPort,
@@ -38,9 +42,21 @@ from backend.services.agent.ports import (
     LLMUsage,
     PermissionPort,
     PersistencePort,
+    ToolExecutionOutput,
 )
 from backend.services.agent.retry import RetryPolicy
 from backend.services.agent.stop import BudgetTracker, resolve_stop
+
+# Etichette di stato per la tool response, per ramo del gate (§6.1.1).
+_STATUS_OK = "ok"
+_STATUS_ERROR = "error"
+_STATUS_PARSE_ERROR = "parse_error"
+_STATUS_DUPLICATE = "duplicate"
+_STATUS_UNKNOWN = "unknown_tool"
+_STATUS_DENIED = "denied"
+_STATUS_REJECTED = "rejected"
+_STATUS_TIMEOUT = "timeout"
+_STATUS_CANCELLED = "cancelled"
 
 
 @dataclass(slots=True)
@@ -49,6 +65,7 @@ class _TurnState:
 
     request: TurnRequest
     working_messages: list[dict[str, Any]] = field(default_factory=list)
+    dedup: DedupRegistry = field(default_factory=DedupRegistry)
     content: str = ""
     thinking: str = ""
     input_tokens: int = 0
@@ -72,6 +89,49 @@ class _StepResult:
     tool_calls: tuple[ToolInvocation, ...]
     failure: LLMFailure | None
     step_content: str
+    step_thinking: str = ""
+
+
+@dataclass(slots=True)
+class _CallResolution:
+    """Esito di UNA tool call: la tool response da persistire (§6.1.1).
+
+    Attributi:
+        content: Contenuto testuale della tool response (sintetico o reale).
+        status: Etichetta di stato del ramo (ok/denied/rejected/...).
+        output: L'output d'esecuzione, solo per i success con artefatti; None
+            per i rami sintetici (parse_error, dedup, deny, ...).
+        disconnect: True se il ramo impone lo stop per disconnessione DOPO che
+            la tool response è stata persistita (§6.5 persist-prima-di-cancel).
+    """
+
+    content: str
+    status: str
+    output: ToolExecutionOutput | None = None
+    disconnect: bool = False
+
+
+def _assistant_tool_message(
+    content: str, calls: tuple[ToolInvocation, ...],
+) -> dict[str, Any]:
+    """Messaggio assistant con ``tool_calls`` in formato OpenAI per la working history."""
+    return {
+        "role": "assistant",
+        "content": content or None,
+        "tool_calls": [
+            {
+                "id": call.call_id,
+                "type": "function",
+                "function": {"name": call.name, "arguments": call.raw_args},
+            }
+            for call in calls
+        ],
+    }
+
+
+def _tool_message(call: ToolInvocation, content: str) -> dict[str, Any]:
+    """Messaggio ``tool`` (una per call_id) in formato OpenAI per la working history."""
+    return {"role": "tool", "tool_call_id": call.call_id, "content": content}
 
 
 class AgentEngine:
@@ -153,6 +213,7 @@ class AgentEngine:
         un eventuale ``LLMFailure``.
         """
         step_content = ""
+        step_thinking = ""
         finish_reason: str | None = None
         tool_calls: tuple[ToolInvocation, ...] = ()
         failure: LLMFailure | None = None
@@ -173,6 +234,7 @@ class AgentEngine:
                 ))
             elif isinstance(event, LLMThinkingDelta):
                 state.thinking += event.text
+                step_thinking += event.text
                 await self._events.emit(ev.TurnDeltaEvent(
                     turn_id=turn_id, step=step, kind="thinking", text=event.text,
                 ))
@@ -198,7 +260,7 @@ class AgentEngine:
 
         return _StepResult(
             finish_reason=finish_reason, tool_calls=tool_calls,
-            failure=failure, step_content=step_content,
+            failure=failure, step_content=step_content, step_thinking=step_thinking,
         )
 
     async def _after_step(
@@ -230,8 +292,7 @@ class AgentEngine:
             )
 
         if step_result.tool_calls:
-            # Task 9: gate permessi, interazione, esecuzione, dedup.
-            raise NotImplementedError("Task 9")
+            return await self._run_tool_step(turn_id, step, step_result, state, cancel)
 
         if not step_result.step_content:
             state.empty_attempts += 1
@@ -252,6 +313,265 @@ class AgentEngine:
             disconnected=False, out_of_steps=budget.out_of_steps(),
             errored=False,
         )
+
+    async def _run_tool_step(
+        self,
+        turn_id: str,
+        step: int,
+        step_result: _StepResult,
+        state: _TurnState,
+        cancel: asyncio.Event,
+    ) -> StopReason | None:
+        """Esegue lo step con tool secondo il flusso normativo 1-5 (§6).
+
+        Ritorna una ``StopReason`` per fermare il loop (cancel/disconnect
+        DOPO la persistenza) oppure ``None`` per proseguire con un nuovo step:
+        la working history si è arricchita di assistant + tool messages.
+        """
+        calls = step_result.tool_calls
+        # 1. save_assistant_step PRIMA di tutto (§6.1.2), poi checkpoint (§6.15:
+        #    rilascia il write-lock prima dell'esecuzione parallela).
+        await self._persistence.save_assistant_step(
+            content=step_result.step_content,
+            thinking=step_result.step_thinking,
+            tool_calls=calls,
+        )
+        await self._persistence.checkpoint()
+        state.working_messages.append(
+            _assistant_tool_message(step_result.step_content, calls)
+        )
+
+        # 2. gate per-call, in ordine: ogni ramo produce una _CallResolution;
+        #    i greenlit server-side (None) confluiscono nel batch parallelo.
+        resolutions: dict[str, _CallResolution] = {}
+        batch: list[ToolInvocation] = []
+        for call in calls:
+            resolution = await self._gate_call(turn_id, step, call, state, cancel)
+            if resolution is None:
+                batch.append(call)
+            else:
+                resolutions[call.call_id] = resolution
+
+        # 3. batch server-side greenlit in PARALLELO (asyncio.gather).
+        if batch:
+            resolutions.update(await self._run_tool_batch(turn_id, batch, state))
+
+        # 4. persistenza: UNA tool response per OGNI call_id (§6.1.1), in ordine;
+        #    register_artifacts per i success; checkpoint() a fine batch.
+        disconnect = False
+        for call in calls:
+            resolution = resolutions[call.call_id]
+            await self._persistence.save_tool_result(
+                call=call, content=resolution.content, status=resolution.status,
+            )
+            artifact_id: str | None = None
+            if resolution.output is not None and resolution.output.ok:
+                artifact_id = await self._persistence.register_artifacts(
+                    call=call, output=resolution.output,
+                )
+            state.working_messages.append(_tool_message(call, resolution.content))
+            await self._events.emit(ev.ToolResultEvent(
+                turn_id=turn_id, call_id=call.call_id, name=call.name,
+                status=resolution.status, content_preview=resolution.content[:200],
+                artifact_id=artifact_id,
+            ))
+            state.tool_calls += 1
+            disconnect = disconnect or resolution.disconnect
+        await self._persistence.checkpoint()
+
+        # 5. SOLO DOPO la persistenza: disconnect / cancel (§6.4) → stop.
+        if disconnect:
+            return resolve_stop(
+                llm_finish=None, cancelled=False, disconnected=True,
+                out_of_steps=False, errored=False,
+            )
+        if cancel.is_set():
+            return resolve_stop(
+                llm_finish=None, cancelled=True, disconnected=False,
+                out_of_steps=False, errored=False,
+            )
+        return None
+
+    async def _gate_call(
+        self,
+        turn_id: str,
+        step: int,
+        call: ToolInvocation,
+        state: _TurnState,
+        cancel: asyncio.Event,
+    ) -> _CallResolution | None:
+        """Applica il gate a UNA call. Ritorna la resolution, o ``None`` se
+        la call è greenlit server-side e va nel batch parallelo.
+        """
+        # a. parse_error → result sintetico d'errore (niente gate).
+        if call.parse_error is not None:
+            return _CallResolution(
+                content=f"Argomenti non validi: {call.parse_error}",
+                status=_STATUS_PARSE_ERROR,
+            )
+        # tool.call per OGNI call ben formata, prima del gate.
+        await self._events.emit(ev.ToolCallEvent(turn_id=turn_id, step=step, call=call))
+        # b. dedup → result sintetico "duplicata".
+        if state.dedup.seen_before(call):
+            return _CallResolution(
+                content="Chiamata duplicata: riusa il risultato precedente.",
+                status=_STATUS_DUPLICATE,
+            )
+        # c. tool sconosciuto → result "tool sconosciuto".
+        meta = self._execution.describe(call.name)
+        if not meta.exists:
+            return _CallResolution(
+                content=f"Tool sconosciuto: {call.name}.", status=_STATUS_UNKNOWN,
+            )
+        # d. gate permessi, per-call (§6.9).
+        verdict = await self._permissions.decide(
+            call, conversation_id=state.request.conversation_id,
+        )
+        if verdict.action == GateAction.DENY:
+            await self._persistence.save_audit(
+                call=call, verdict=verdict, interaction=None,
+            )
+            reason = verdict.reason or verdict.outcome
+            return _CallResolution(
+                content=f"Chiamata negata: {reason}.", status=_STATUS_DENIED,
+            )
+        if verdict.action == GateAction.CONFIRM:
+            confirm_res = await self._confirm_call(turn_id, call, verdict, cancel)
+            if confirm_res is not None:
+                return confirm_res
+            # APPROVED → prosegue al routing.
+        # e. routing: ask_user / client_executed / batch server-side.
+        timeout_s = meta.timeout_s or self._confirmation_timeout_s
+        if meta.interactive == "ask_user":
+            return await self._run_interactive(
+                call, kind="ask_user", timeout_s=timeout_s, cancel=cancel,
+            )
+        if meta.client_executed:
+            return await self._run_interactive(
+                call, kind="client", timeout_s=timeout_s, cancel=cancel,
+            )
+        return None
+
+    async def _confirm_call(
+        self,
+        turn_id: str,
+        call: ToolInvocation,
+        verdict: GateVerdict,
+        cancel: asyncio.Event,
+    ) -> _CallResolution | None:
+        """Flusso di conferma: eventi requested/resolved, audit, mappatura esito.
+
+        Ritorna ``None`` se APPROVED (la call prosegue al routing); altrimenti
+        la resolution sintetica. DISCONNECTED è un DATO: result sintetico +
+        flag disconnect (lo stop scatta DOPO la persistenza, §6.5).
+        """
+        interaction_id = uuid.uuid4().hex
+        await self._events.emit(ev.InteractionRequestedEvent(
+            turn_id=turn_id, interaction_id=interaction_id, kind="confirm",
+            call_id=call.call_id,
+            payload={
+                "outcome": verdict.outcome,
+                "risk_level": verdict.risk_level,
+                "description": verdict.description,
+            },
+        ))
+        outcome = await self._interaction.confirm_tool(
+            call, verdict=verdict, timeout_s=self._confirmation_timeout_s, cancel=cancel,
+        )
+        await self._events.emit(ev.InteractionResolvedEvent(
+            turn_id=turn_id, interaction_id=interaction_id, kind="confirm",
+            outcome=outcome.value,
+        ))
+        await self._persistence.save_audit(
+            call=call, verdict=verdict, interaction=outcome,
+        )
+        if outcome == InteractionOutcome.APPROVED:
+            return None
+        if outcome == InteractionOutcome.REJECTED:
+            return _CallResolution(
+                content="Chiamata rifiutata dall'utente.", status=_STATUS_REJECTED,
+            )
+        if outcome == InteractionOutcome.TIMEOUT:
+            return _CallResolution(
+                content="Conferma scaduta (timeout).", status=_STATUS_TIMEOUT,
+            )
+        if outcome == InteractionOutcome.CANCELLED:
+            return _CallResolution(
+                content="Chiamata annullata.", status=_STATUS_CANCELLED,
+            )
+        # DISCONNECTED
+        return _CallResolution(
+            content="Chiamata annullata (disconnesso).", status=_STATUS_CANCELLED,
+            disconnect=True,
+        )
+
+    async def _run_interactive(
+        self,
+        call: ToolInvocation,
+        *,
+        kind: str,
+        timeout_s: float,
+        cancel: asyncio.Event,
+    ) -> _CallResolution:
+        """Esegue una call interattiva (ask_user o client-side).
+
+        La disconnessione arriva come eccezione dalla porta: la si cattura,
+        si sintetizza la tool response e si segnala lo stop DOPO la
+        persistenza (§6.5), senza sollevare fuori dal motore.
+        """
+        try:
+            if kind == "ask_user":
+                output = await self._interaction.ask_user(
+                    call, timeout_s=timeout_s, cancel=cancel,
+                )
+            else:
+                output = await self._interaction.run_client_tool(
+                    call, timeout_s=timeout_s, cancel=cancel,
+                )
+        except EngineDisconnected:
+            return _CallResolution(
+                content="Chiamata annullata (disconnesso).",
+                status=_STATUS_CANCELLED, disconnect=True,
+            )
+        status = _STATUS_OK if output.ok else _STATUS_ERROR
+        return _CallResolution(content=output.content, status=status, output=output)
+
+    async def _run_tool_batch(
+        self,
+        turn_id: str,
+        batch: list[ToolInvocation],
+        state: _TurnState,
+    ) -> dict[str, _CallResolution]:
+        """Esegue il batch greenlit server-side in PARALLELO (asyncio.gather).
+
+        Per ciascuna call: ``ToolStartedEvent`` prima dell'esecuzione. Un
+        errore di una call viene catturato e sintetizzato (§6.1.1): nessuna
+        call può affondare le altre.
+        """
+        async def _one(call: ToolInvocation) -> tuple[str, _CallResolution]:
+            await self._events.emit(ev.ToolStartedEvent(
+                turn_id=turn_id, call_id=call.call_id,
+            ))
+            try:
+                output = await self._execution.execute(
+                    call, client_ip=state.request.client_ip,
+                    conversation_id=state.request.conversation_id,
+                )
+            except Exception as exc:  # §6.1.1: la call fallisce da sola
+                logger.exception("AgentEngine: tool {} ha sollevato", call.name)
+                return call.call_id, _CallResolution(
+                    content=f"Errore nell'esecuzione del tool: {exc}",
+                    status=_STATUS_ERROR,
+                )
+            status = _STATUS_OK if output.ok else _STATUS_ERROR
+            return call.call_id, _CallResolution(
+                content=output.content, status=status, output=output,
+            )
+
+        pairs: list[tuple[str, _CallResolution]] = await asyncio.gather(
+            *(_one(call) for call in batch)
+        )
+        return dict(pairs)
 
     async def _finish(
         self,

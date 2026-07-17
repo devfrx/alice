@@ -71,7 +71,9 @@ class InMemoryPersistence:
     async def save_tool_result(
         self, *, call: ToolInvocation, content: str, status: str,
     ) -> None:
-        self.tool_results.append({"call": call, "content": content, "status": status})
+        self.tool_results.append({
+            "call_id": call.call_id, "call": call, "content": content, "status": status,
+        })
         self.order.append(("tool_result", call.call_id))
 
     async def save_audit(
@@ -205,7 +207,7 @@ class MapExecutionPort:
         self._meta = meta or {}
         self._delays = delays or {}
         self._errors = errors or {}
-        self.started_at: dict[str, list[float]] = {}
+        self.started_at: dict[str, float] = {}
 
     def describe(self, name: str) -> ToolMeta:
         return self._meta.get(name, ToolMeta(exists=name in self._tools))
@@ -215,7 +217,7 @@ class MapExecutionPort:
         conversation_id: str,
     ) -> ports.ToolExecutionOutput:
         loop = asyncio.get_running_loop()
-        self.started_at.setdefault(call.name, []).append(loop.time())
+        self.started_at.setdefault(call.name, loop.time())
         delay = self._delays.get(call.name, 0)
         if delay:
             await asyncio.sleep(delay)

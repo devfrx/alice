@@ -20,13 +20,22 @@ Mapping ``GateAction`` (piattaforma -> motore), come da brief:
 ``GateVerdict.outcome`` = ``decision.outcome.value`` (stringa dell'enum
 ``PermissionOutcome``); ``reason`` propagato verbatim. ``risk_level`` e
 ``description`` sono popolati best-effort dalla ``ToolDefinition`` (``None``
-se il tool non esiste nel registry).
+se il tool non è risolvibile nel registry).
+
+Fix review T12 (bare tool name): la ``ToolDefinition`` è recuperata con
+``_tool_lookup.resolve_tool_definition`` (condivisa con
+``ToolRegistryAdapter``), non più con un match esatto — un nome "nudo" (es.
+``"remember"`` per ``"memory_remember"``) ora produce lo stesso ``tool_def``
+(quindi lo stesso ``risk_level``/capability nel gate) che produrrebbe il nome
+namespaced completo, invece di gated con ``tool_def=None`` (decisione più
+debole).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backend.services.agent.adapters._tool_lookup import resolve_tool_definition
 from backend.services.agent.models import ToolInvocation
 from backend.services.agent.ports import GateAction, GateVerdict
 from backend.services.permission_service import GateAction as PlatformGateAction
@@ -76,10 +85,14 @@ class PermissionServiceAdapter:
         """Risolve una ``ToolInvocation`` a ``EXECUTE``/``DENY``/``CONFIRM``.
 
         Recupera mode e ``ToolDefinition`` correnti a OGNI chiamata (nessuna
-        cache), poi delega a ``PermissionService.decide``.
+        cache), poi delega a ``PermissionService.decide``. La
+        ``ToolDefinition`` è risolta tollerando i bare tool name (stessa
+        regola unique-suffix della piattaforma — vedi
+        ``_tool_lookup.resolve_tool_definition``).
         """
         mode = self._mode_service.get_mode(conversation_id)
-        tool_def = self._tool_registry.get_tool_definition(call.name)
+        resolved = resolve_tool_definition(self._tool_registry, call.name)
+        tool_def = resolved[1] if resolved is not None else None
         decision = self._permission_service.decide(
             tool_name=call.name,
             args=call.args,

@@ -39,6 +39,21 @@ la Port è fissa per questo task):
   opzionale): un ``ToolResult.content`` dict/list viene serializzato JSON;
   il dict originale (quando è un dict) è comunque preservato in
   ``payload`` per i consumer che vogliono la struttura.
+
+Fix review T12 (bare tool name): ``describe()`` faceva match esatto soltanto,
+quindi un nome "nudo" (es. ``"remember"`` per ``"memory_remember"``) veniva
+riportato come ``exists=False`` — e ``execute()`` usava quell'esito come
+pre-gate, ritornando "non trovato" PRIMA di provare ``execute_tool``, che
+invece risolve internamente per suffisso univoco
+(``core/tools/execution.py:240-256``). Questo vanificava la tolleranza della
+piattaforma ai bare name (il motore emetteva "tool sconosciuto" per una call
+che la piattaforma avrebbe eseguito con successo). Fix: ``describe()`` ora
+applica la stessa regola di risoluzione (``_tool_lookup.resolve_tool_definition``,
+condivisa con ``PermissionServiceAdapter``); ``execute()`` non pre-gate più su
+``exists`` — delega sempre a ``execute_tool``, che non solleva mai e ritorna
+un ``ToolResult`` d'errore pulito per i nomi davvero sconosciuti/ambigui.
+``describe()`` resta consultato in ``execute()`` solo per l'hint di timeout
+per-tool (fallback al default quando il tool non è risolvibile).
 """
 
 from __future__ import annotations
@@ -48,6 +63,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from backend.core.plugin_models import ExecutionContext
+from backend.services.agent.adapters._tool_lookup import resolve_tool_definition
 from backend.services.agent.models import ToolInvocation, ToolMeta
 from backend.services.agent.ports import ToolExecutionOutput
 
@@ -73,12 +89,19 @@ class ToolRegistryAdapter:
         self._default_timeout_s = default_timeout_s
 
     def describe(self, name: str) -> ToolMeta:
-        """Descrive un tool dal catalogo (senza eseguirlo)."""
-        tool_def = self._tool_registry.get_tool_definition(name)
-        if tool_def is None:
+        """Descrive un tool dal catalogo (senza eseguirlo).
+
+        Risolve *name* come farebbe la piattaforma in ``execute_tool``: match
+        esatto, altrimenti unique-suffix fallback per i bare name (vedi
+        ``_tool_lookup.resolve_tool_definition``).
+        """
+        resolved = resolve_tool_definition(self._tool_registry, name)
+        if resolved is None:
             return ToolMeta(exists=False)
+        resolved_name, tool_def = resolved
         interactive = (
-            "ask_user" if name == "ask_user" or name.endswith("_ask_user") else None
+            "ask_user" if resolved_name.endswith("_ask_user") or resolved_name == "ask_user"
+            else None
         )
         return ToolMeta(
             exists=True,
@@ -90,12 +113,16 @@ class ToolRegistryAdapter:
     async def execute(
         self, call: ToolInvocation, *, client_ip: str | None, conversation_id: str,
     ) -> ToolExecutionOutput:
-        """Esegue un tool server-side con timeout esterno; non solleva mai."""
+        """Esegue un tool server-side con timeout esterno; non solleva mai.
+
+        Nessun pre-gate su ``describe().exists``: delega sempre a
+        ``execute_tool``, che risolve i bare name internamente (stessa regola
+        di ``describe()``) e ritorna un ``ToolResult`` d'errore pulito per i
+        nomi davvero sconosciuti o ambigui — non solleva mai.
+        ``describe()`` è comunque consultato per l'hint di timeout per-tool
+        (fallback al default quando il tool non è risolvibile).
+        """
         meta = self.describe(call.name)
-        if not meta.exists:
-            return ToolExecutionOutput(
-                ok=False, content="", error=f"tool '{call.name}' non trovato nel registry",
-            )
         timeout_s = meta.timeout_s if meta.timeout_s is not None else self._default_timeout_s
         exec_ctx = ExecutionContext(
             session_id=conversation_id,

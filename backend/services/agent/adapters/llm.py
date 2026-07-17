@@ -39,6 +39,17 @@ spec) — ``backend/services/llm/client.py``:
   compatibile con un futuro arricchimento del contratto), ma con il
   comportamento ATTUALE del servizio questi campi sono sempre assenti, quindi
   ``retryable`` sarà sempre ``True`` per gli errori di streaming reali oggi.
+  **Divergenza documentata dal legacy fail-fast** (Minor da review): poiché
+  nessun errore di streaming reale porta oggi uno status code, un errore
+  permanente (es. un 4xx del provider mascherato da messaggio testuale senza
+  status strutturato) viene comunque riprovato — ``RetryPolicy.on_failure``
+  ritenta fino a ``max_transient_retries`` tentativi (default 2, vedi
+  ``backend/services/agent/retry.py``) prima di fallire il turno, invece di
+  fallire immediatamente come faceva la pipeline legacy sugli errori 4xx. Se
+  il servizio LLM viene arricchito in futuro con lo status code reale nel
+  chunk ``error``, questo adapter lo userà già correttamente (``retryable``
+  diventerebbe ``False`` per i 4xx, ripristinando il fail-fast) senza alcuna
+  modifica.
 - ``{"type": "done", "finish_reason": str}`` — ``finish_reason`` è il valore
   grezzo del provider (``"stop"``, ``"length"``, ``"cancelled"``,
   ``"tool_calls"``, ...), propagato verbatim.

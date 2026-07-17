@@ -99,3 +99,24 @@ async def test_non_retryable_failure_is_error() -> None:
     assert outcome.finish_reason == "error"
     assert any(e.type == "turn.error" for e in rec.events)
     assert rec.events[-1].type == "turn.finished"
+
+
+async def test_failure_followed_by_trailing_done_is_not_double_processed() -> None:
+    """Pin: l'adapter LLM reale emette SEMPRE un ``LLMStepDone`` finale anche
+    dopo un ``LLMFailure`` (lo stream ``done`` chiude comunque il ciclo SSE).
+    Il motore deve trattare questo come UN solo step fallito — non deve
+    processare anche il ``done`` finale come se fosse uno step riuscito
+    (niente doppio ``turn.error``/``turn.finished``, nessun secondo step)."""
+    llm = ScriptedLLMPort(steps=[[
+        ports.LLMFailure(message="boom", status_code=None, retryable=False),
+        ports.LLMStepDone(finish_reason="error", tool_calls=()),
+    ]])
+    rec = RecordingEventPort()
+    outcome = await _engine(llm, rec).run(_request(), cancel=asyncio.Event())
+    assert outcome.finish_reason == "error"
+    assert outcome.steps == 1
+    error_events = [e for e in rec.events if e.type == "turn.error"]
+    finished_events = [e for e in rec.events if e.type == "turn.finished"]
+    assert len(error_events) == 1
+    assert len(finished_events) == 1
+    assert rec.events[-1].type == "turn.finished"

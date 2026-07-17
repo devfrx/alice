@@ -1,39 +1,46 @@
 # Handoff — Agent v2 Fase 0: Eval harness + baseline (feat/agent-evals-fase0)
 
-**Data:** 2026-07-17
-**Branch:** `feat/agent-evals-fase0` — **NON ancora mergiato**, pushato su origin (19 commit, HEAD `7bedd10`)
+**Data:** 2026-07-17 (aggiornato lo stesso giorno, post-baseline)
+**Branch:** `feat/agent-evals-fase0` — **MERGIATO in main** (merge `0c5b966`, 20 commit, HEAD branch `9ad36dd`)
 **Programma:** `docs/superpowers/specs/2026-07-16-agent-v2-program-design.md` (Agent v2 — parità Claude Code, 9 fasi)
 **Spec di fase:** `docs/superpowers/specs/2026-07-16-agent-evals-fase0-design.md`
 **Piano:** `docs/superpowers/plans/2026-07-16-agent-evals-fase0.md` (13 task)
 **Metodo:** subagent-driven — ogni task: implementer + spec review + quality review; 8 fix di
 review applicati in-branch; review olistica finale: **Ready to merge**.
 
-## Stato: IMPLEMENTAZIONE COMPLETA (task 1-12); manca SOLO il Task 13
+## Stato: FASE 0 COMPLETA — Task 13 eseguito, baseline committata, branch mergiato
 
-Il Task 13 è il **run baseline reale** (OpenRouter, `z-ai/glm-5.2`, ~23 scenari + judge,
-pochi dollari, 15-40 min) — richiede l'OK esplicito dell'utente sulla spesa, ancora NON dato.
-Dopo il run: baseline committata in `docs/superpowers/evals/`, merge in main, aggiornamento di
-questo handoff.
+Il **run baseline reale** (Task 13) è stato eseguito il 2026-07-17 con OK esplicito
+dell'utente sulla spesa:
 
-## Come riprendere su un'altra macchina
+- Prova economica (`--filter fs- --no-judge`): 5/5 scenari, 20/20 check, $0.0925.
+- Run completo (run id `20260717-060213`): **23/23 scenari PASS, 79/79 check, $0.2843,
+  ~11.5 min, exit code 0** — CONTRARIAMENTE all'atteso (si prevedevano fallimenti): la
+  suite è **satura alla baseline**. Funziona da subito come guardia di regressione, ma per
+  misurare i miglioramenti delle fasi 1-4 servono scenari più difficili.
+- Judge: 5 criteri, 3 score 10, 2 **verdetti non parsabili** (completion vuota → 0
+  fail-closed; le risposte dell'agente erano corrette — rumore del judge, follow-up
+  candidato: retry sul verdetto vuoto in `evals/judge.py`).
+- Baseline in `docs/superpowers/evals/2026-07-17-baseline-fase0/` (report.json + README
+  con tabella per-dominio e osservazioni complete).
+- Caveat ambiente: con provider openrouter e fallback fastembed inattivo il boot harness
+  disabilita embeddings/tool-RAG — la baseline non esercita il ranking RAG dei tool.
 
-1. `git fetch && git checkout feat/agent-evals-fase0`
-2. Setup standard (CLAUDE.md): venv root, `cd backend; uv pip install -e ".[dev,memory]"`,
+**Prossimo passo del programma:** Fase 1 (vedi
+`docs/superpowers/specs/2026-07-16-agent-v2-program-design.md`).
+
+## Come rilanciare un run eval
+
+1. Setup standard (CLAUDE.md): venv root, `cd backend; uv pip install -e ".[dev,memory]"`,
    `uv pip install sqlite-vec`.
-3. Sanity: da `backend/`: `pytest tests/evals/ -v` → **39 passed** attesi (l'e2e mock
+2. Sanity: da `backend/`: `pytest tests/evals/ -v` → **39 passed** attesi (l'e2e mock
    `test_runner_mock.py` boota l'app completa, ~30s).
-4. Smoke CLI da repo root: `python -m backend.evals list` → 23 scenari.
-5. **Task 13** (con OK dell'utente sulla spesa):
-   - la API key OpenRouter deve essere nel Credential Manager (`alice /
-     llm.openrouter_api_key`, c'è già se la macchina ha fatto l'e2e del programma OpenRouter)
-     o in env `ALICE_LLM__OPENROUTER_API_KEY`;
-   - prova economica: `python -m backend.evals run --filter fs- --no-judge` (5 scenari);
-   - run completo: `python -m backend.evals run` (23 scenari; **exit code 1 è ATTESO** — la
-     baseline fotografa i limiti dell'agente attuale, alcuni scenari falliranno);
-   - copia `evals_output/<run_id>/report.json` in
-     `docs/superpowers/evals/<data>-baseline-fase0/` + README con: data, modello, run_id,
-     tabella per-dominio, costo totale, osservazioni sui fallimenti (alimentano le fasi 1-4);
-   - commit baseline, merge del branch in main, push, aggiorna questo handoff.
+3. Smoke CLI da repo root: `python -m backend.evals list` → 23 scenari.
+4. Run (a pagamento, OK utente): key OpenRouter nel Credential Manager (`alice /
+   llm.openrouter_api_key`) o env `ALICE_LLM__OPENROUTER_API_KEY`; da repo root col venv
+   ROOT (`.\.venv\`, NON `backend\.venv`): `python -m backend.evals run`
+   (`--baseline docs/superpowers/evals/2026-07-17-baseline-fase0/report.json` per il
+   confronto REGRESSIONE/MIGLIORATO).
 
 ## Cosa contiene il branch (architettura)
 

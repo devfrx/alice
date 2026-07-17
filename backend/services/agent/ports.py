@@ -126,6 +126,8 @@ class CompactionResult:
     tokens_before: int
     tokens_after: int
     error: str | None = None
+    kept_messages: tuple[dict[str, Any], ...] = ()
+    archived_message_ids: tuple[str, ...] = ()
 
 
 # --- le 7 porte --------------------------------------------------------------

@@ -1,0 +1,50 @@
+"""Compaction tra gli step: trigger, archiviazione, fail-open."""
+
+from backend.services.agent import ports
+from backend.services.agent.models import ToolInvocation
+from backend.tests.agent._engine_helpers import (
+    _final_step,
+    _run_with,
+    _run_with_compaction,
+    _tool_step,
+)
+
+
+async def test_compaction_triggers_between_steps_and_rewrites_history() -> None:
+    calls = (ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec, llm = await _run_with_compaction(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+        compaction=ports.CompactionResult(
+            performed=True, summary_text="RIASSUNTO", tokens_before=30000,
+            tokens_after=500, kept_messages=(),
+            archived_message_ids=("m1", "m2")),
+    )
+    phases = [e.phase for e in rec.events if e.type == "context.compaction"]
+    assert phases == ["started", "done"]
+    assert persistence.archived == [("RIASSUNTO", ["m1", "m2"])]
+    # il secondo step LLM vede il summary in testa alla working history
+    assert any("RIASSUNTO" in str(m) for m in llm.calls[1]["messages"])
+
+
+async def test_compaction_failure_is_fail_open() -> None:
+    calls = (ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec, llm = await _run_with_compaction(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+        compaction=ports.CompactionResult(
+            performed=False, summary_text=None, tokens_before=30000,
+            tokens_after=30000, error="boom"),
+    )
+    phases = [e.phase for e in rec.events if e.type == "context.compaction"]
+    assert phases == ["started", "failed"]
+    assert outcome.finish_reason == "stop"     # il turno completa comunque
+
+
+async def test_context_usage_emitted_each_extra_step() -> None:
+    calls = (ToolInvocation(call_id="c", name="echo", args={}, raw_args="{}"),)
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")},
+    )
+    assert any(e.type == "context.usage" for e in rec.events)

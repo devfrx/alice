@@ -26,6 +26,7 @@ from backend.tests.agent.doubles import (
     ScriptedInteractionPort,
     ScriptedLLMPort,
     StaticPermissionPort,
+    TriggeringContextPort,
 )
 
 # helper: uno ScriptedLLMPort a 2 step — step 1 emette le tool call date,
@@ -62,6 +63,7 @@ def _engine(
     execution: MapExecutionPort,
     verdicts: dict[str, ports.GateVerdict] | None,
     confirm: ports.InteractionOutcome,
+    context: ports.ContextPort | None = None,
 ) -> AgentEngine:
     return AgentEngine(
         llm=llm,
@@ -72,7 +74,7 @@ def _engine(
         interaction=ScriptedInteractionPort(confirm=confirm),
         events=events,
         persistence=persistence,
-        context=NoopContextPort(),
+        context=context or NoopContextPort(),
         execution=execution,
         retry=RetryPolicy(),
     )
@@ -123,3 +125,31 @@ async def _run_with(
         max_steps=max_steps, max_tool_calls=max_tool_calls,
     )
     return persistence, outcome, rec
+
+
+async def _run_with_compaction(
+    *,
+    llm_steps: list[list[ports.LLMEvent]],
+    exec_tools: dict[str, ports.ToolExecutionOutput],
+    compaction: ports.CompactionResult,
+    verdicts: dict[str, ports.GateVerdict] | None = None,
+    confirm: ports.InteractionOutcome = ports.InteractionOutcome.APPROVED,
+    delays: dict[str, float] | None = None,
+    meta: dict[str, ToolMeta] | None = None,
+    cancel: asyncio.Event | None = None,
+    max_steps: int = 8,
+    max_tool_calls: int | None = None,
+) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, ScriptedLLMPort]:
+    """Come ``_run_with`` ma con un ``TriggeringContextPort`` iniettato, esponendo l'LLMPort."""
+    persistence = InMemoryPersistence()
+    rec = RecordingEventPort()
+    llm = ScriptedLLMPort(steps=llm_steps)
+    exec_port = MapExecutionPort(tools=exec_tools, meta=meta, delays=delays)
+    engine = _engine(
+        llm=llm, events=rec, persistence=persistence, execution=exec_port,
+        verdicts=verdicts, confirm=confirm,
+        context=TriggeringContextPort(compaction),
+    )
+    request = _request(max_steps=max_steps, max_tool_calls=max_tool_calls)
+    outcome = await engine.run(request, cancel=cancel or asyncio.Event())
+    return persistence, outcome, rec, llm

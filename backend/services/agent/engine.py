@@ -189,6 +189,8 @@ class AgentEngine:
                     stop = StopReason.CANCELLED
                     break
                 step = budget.begin_step()
+                if step > 1:
+                    await self._maybe_compact(turn_id, step, state)
                 await self._events.emit(ev.LlmStepEvent(turn_id=turn_id, step=step))
                 step_result = await self._run_llm_step(turn_id, step, state, cancel)
                 stop = await self._after_step(
@@ -264,6 +266,57 @@ class AgentEngine:
             finish_reason=finish_reason, tool_calls=tool_calls,
             failure=failure, step_content=step_content, step_thinking=step_thinking,
         )
+
+    async def _maybe_compact(self, turn_id: str, step: int, state: _TurnState) -> None:
+        """Valuta ed eventualmente esegue la compaction PRIMA di uno step LLM.
+
+        Chiamato solo per gli step successivi al primo (§ compaction, flusso
+        1-5). Fail-open: un errore, o un ``CompactionResult(performed=False)``,
+        non interrompe il turno — si prosegue senza compattare.
+        """
+        context_window = state.request.context_window
+        tokens = self._context.estimate_tokens(state.working_messages)
+        await self._events.emit(ev.ContextUsageEvent(
+            turn_id=turn_id, tokens=tokens, context_window=context_window,
+        ))
+        if not self._context.should_compact(tokens=tokens, context_window=context_window):
+            return
+        await self._events.emit(ev.CompactionEvent(
+            turn_id=turn_id, phase="started",
+            tokens_before=None, tokens_after=None, error=None,
+        ))
+        try:
+            result = await self._context.compact(
+                messages=state.working_messages, context_window=context_window,
+            )
+        except Exception as exc:  # fail-open: la compaction non affonda il turno
+            logger.exception("AgentEngine: context.compact ha sollevato")
+            await self._events.emit(ev.CompactionEvent(
+                turn_id=turn_id, phase="failed",
+                tokens_before=None, tokens_after=None, error=str(exc),
+            ))
+            return
+        if not result.performed:
+            await self._events.emit(ev.CompactionEvent(
+                turn_id=turn_id, phase="failed",
+                tokens_before=None, tokens_after=None, error=result.error,
+            ))
+            return
+        summary_text = result.summary_text or ""
+        await self._persistence.archive_compacted(
+            summary_text=summary_text,
+            upto_message_ids=list(result.archived_message_ids),
+        )
+        await self._persistence.checkpoint()
+        state.working_messages = [
+            {"role": "system", "content": summary_text},
+            *result.kept_messages,
+        ]
+        await self._events.emit(ev.CompactionEvent(
+            turn_id=turn_id, phase="done",
+            tokens_before=result.tokens_before, tokens_after=result.tokens_after,
+            error=None,
+        ))
 
     async def _after_step(
         self,

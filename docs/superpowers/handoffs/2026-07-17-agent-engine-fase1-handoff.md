@@ -187,3 +187,28 @@ trim di compaction non forza step senza tool (candidato Fase 3).
 
 Stesso branch `feat/agent-engine-fase1` — la fase chiude (ed eventualmente si merge) solo a
 fine Mossa 2.
+
+## Addendum — Review olistica di fine Mossa 1 (post-handoff)
+
+Verdetto: **READY FOR MOSSA 2** (review whole-branch su modello top, dopo i 20 task).
+Fix eseguiti in coda (commit `a006214`, `5b6d673`): nome risolto passato a rules/grants
+nel PermissionPort; igiene docstring post-demolizione; riallineamento codegen contratti
+(drift pre-esistente da bump pydantic/fastapi) in commit separato.
+
+**Da portare ESPLICITAMENTE nel piano Mossa 2** (trovati dalla review olistica):
+
+1. **Pipeline `tool_progress` orfana** (Important): la demolizione ha lasciato l'emitter
+   ContextVar mai settato — i tool lunghi (cad_generator) non streammano più progresso.
+   Re-wiring nell'adapter ExecutionPort → ToolProgressEvent, presto in Mossa 2.
+   (Gap della checklist §6: il tool progress non era censito — lezione per le prossime fasi.)
+2. `turn.finished` payload gap: `final_message_id` mai popolato dal motore; token hardcoded
+   a 0 nel parity frame. Il vocabolario v2 richiede message_id/version/cost → decidere come
+   il persist finale rientra nel motore (o feed-back del message id).
+3. Ownership split dei frame `done`/`context_info`/compression (emessi da `_persist.py` su
+   sink separato) da collassare: la "fonte unica di verità" FE presuppone UNO stream.
+4. `InteractionRequestedEvent` più sottile della spec §4 (mancano args/reasoning/questions;
+   ask_user/client non emettono requested/resolved) → arricchire per i dialog FE.
+5. Test di integrazione WS live assente (solo headless è coperto end-to-end): aggiungere un
+   test TestClient WS del percorso completo PRIMA di muovere il vocabolario.
+6. Mismatch role del summary di compaction (system in-engine vs assistant
+   `is_context_summary` in assembly) — check consapevole quando si tocca il contesto.

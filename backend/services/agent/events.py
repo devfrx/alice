@@ -55,6 +55,7 @@ class ToolStartedEvent(BaseModel):
     type: Literal["tool.started"] = "tool.started"
     turn_id: str
     call_id: str
+    name: str
     model_config = ConfigDict(frozen=True)
 
 
@@ -69,7 +70,16 @@ class ToolProgressEvent(BaseModel):
 
 
 class ToolResultEvent(BaseModel):
-    """Evento: risultato di esecuzione tool."""
+    """Evento: risultato di esecuzione tool.
+
+    ``content_preview`` è il troncamento (200 char) del corpo, sempre presente.
+    ``result`` porta il corpo COMPLETO ma SOLO per gli esiti di successo
+    (``status == "ok"``): per i rami sintetici (rejection/deny/error/dedup/
+    budget) è ``None``, perché quel testo è prosa engine-authored che diverge
+    legittimamente dal wording legacy e non va confrontato verbatim.
+    ``content_type`` è il MIME della tool response quando la piattaforma lo
+    espone (threaded da ``ToolExecutionOutput``), altrimenti ``None``.
+    """
 
     type: Literal["tool.result"] = "tool.result"
     turn_id: str
@@ -78,6 +88,8 @@ class ToolResultEvent(BaseModel):
     status: str
     content_preview: str
     artifact_id: str | None
+    result: str | None = None
+    content_type: str | None = None
     model_config = ConfigDict(frozen=True)
 
 
@@ -90,6 +102,7 @@ class InteractionRequestedEvent(BaseModel):
     kind: str
     call_id: str
     payload: dict[str, Any]
+    tool_name: str | None = None
     model_config = ConfigDict(frozen=True)
 
 
@@ -147,7 +160,14 @@ class TurnErrorEvent(BaseModel):
 
 
 class TurnUsageEvent(BaseModel):
-    """Evento: utilizzo tokenico del turno."""
+    """Evento: utilizzo tokenico del turno.
+
+    ``tool_calls`` è il conteggio corrente delle tool call EMESSE nel turno
+    ("issued so far": ogni call ben formata presentata al gate, indipendente
+    dalla disposizione — distinto dal conteggio delle sole ESEGUITE che governa
+    il budget); ``max_steps`` è il budget di step del turno
+    (``TurnRequest.max_steps``). Entrambi accompagnano ogni snapshot di usage.
+    """
 
     type: Literal["turn.usage"] = "turn.usage"
     turn_id: str
@@ -155,6 +175,8 @@ class TurnUsageEvent(BaseModel):
     input_tokens: int
     output_tokens: int
     cost: float
+    tool_calls: int
+    max_steps: int
     model_config = ConfigDict(frozen=True)
 
 

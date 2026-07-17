@@ -156,4 +156,5 @@ class ToolRegistryAdapter:
             content=content,
             error=result.error_message,
             payload=payload,
+            content_type=result.content_type,
         )

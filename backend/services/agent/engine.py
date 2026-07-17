@@ -73,6 +73,7 @@ class _TurnState:
     output_tokens: int = 0
     cost: float = 0.0
     tool_calls: int = 0
+    issued_tool_calls: int = 0
     empty_attempts: int = 0
     failure_attempts: int = 0
     errored: bool = False
@@ -255,6 +256,8 @@ class AgentEngine:
                     input_tokens=event.input_tokens,
                     output_tokens=event.output_tokens,
                     cost=event.cost,
+                    tool_calls=state.issued_tool_calls,
+                    max_steps=state.request.max_steps,
                 ))
             elif isinstance(event, LLMStepDone):
                 finish_reason = event.finish_reason
@@ -441,10 +444,18 @@ class AgentEngine:
                     call=call, output=resolution.output,
                 )
             state.working_messages.append(_tool_message(call, resolution.content))
+            is_ok = resolution.status == _STATUS_OK
             await self._events.emit(ev.ToolResultEvent(
                 turn_id=turn_id, call_id=call.call_id, name=call.name,
                 status=resolution.status, content_preview=resolution.content[:200],
                 artifact_id=artifact_id,
+                # Corpo COMPLETO solo per gli esiti di successo: i rami sintetici
+                # portano prosa engine-authored che non va confrontata verbatim.
+                result=resolution.content if is_ok else None,
+                content_type=(
+                    resolution.output.content_type
+                    if resolution.output is not None else None
+                ),
             ))
             disconnect = disconnect or resolution.disconnect
 
@@ -491,6 +502,11 @@ class AgentEngine:
             )
         # tool.call per OGNI call ben formata, prima del gate.
         await self._events.emit(ev.ToolCallEvent(turn_id=turn_id, step=step, call=call))
+        # "issued": ogni call ben formata presentata al gate conta come EMESSA
+        # (indipendentemente dalla disposizione: dedup/deny/reject/exec). È il
+        # contatore che alimenta lo snapshot turn.usage (semantica "issued so
+        # far"), distinto da ``tool_calls`` che conta le sole ESEGUITE (budget).
+        state.issued_tool_calls += 1
         # b. dedup → result sintetico "duplicata".
         if state.dedup.seen_before(call):
             return _CallResolution(
@@ -561,7 +577,7 @@ class AgentEngine:
         interaction_id = uuid.uuid4().hex
         await self._events.emit(ev.InteractionRequestedEvent(
             turn_id=turn_id, interaction_id=interaction_id, kind="confirm",
-            call_id=call.call_id,
+            call_id=call.call_id, tool_name=call.name,
             payload={
                 "outcome": verdict.outcome,
                 "risk_level": verdict.risk_level,
@@ -643,7 +659,7 @@ class AgentEngine:
         """
         async def _one(call: ToolInvocation) -> tuple[str, _CallResolution]:
             await self._events.emit(ev.ToolStartedEvent(
-                turn_id=turn_id, call_id=call.call_id,
+                turn_id=turn_id, call_id=call.call_id, name=call.name,
             ))
             try:
                 output = await self._execution.execute(

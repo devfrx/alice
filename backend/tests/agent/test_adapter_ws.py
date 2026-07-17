@@ -318,6 +318,44 @@ async def test_confirm_tool_maps_approved_and_rejected() -> None:
     await t.aclose()
 
 
+async def test_tool_confirmation_request_frame_matches_legacy_contract() -> None:
+    """Il frame di RICHIESTA che WsInteractionPort invia per una ToolInvocation
+    + GateVerdict pinna la superficie consumata dal contratto legacy.
+
+    Fix review T15 §6: i frame di request delle interazioni sono posseduti
+    dall'InteractionPort (non dal translator di parità), quindi la parità su di
+    essi si asserisce QUI, sui valori-campo, non nel harness. Non serve il
+    motore legacy: si valida contro il modello Pydantic reale del contratto
+    (``WsToolConfirmationRequired``) E si asseriscono i valori specifici.
+    """
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    await t.start()
+    port = _port(t)
+
+    async def _respond() -> dict[str, Any]:
+        sent = await ws.next_sent()
+        await ws.feed({"type": "tool_confirmation_response",
+                       "correlation_id": sent["correlation_id"], "approved": True})
+        return sent
+
+    answer = asyncio.create_task(_respond())
+    await port.confirm_tool(_CALL, verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event())
+    sent = await answer
+
+    # 1. Valida contro il modello Pydantic reale del contratto (extra='forbid').
+    frame = WsToolConfirmationRequired.model_validate(sent)
+    # 2. Asserisce i VALORI-campo che il contratto legacy richiede.
+    assert frame.execution_id == _CALL.call_id          # execution_id == call_id
+    assert frame.tool_name == _CALL.name
+    assert frame.args == _CALL.args
+    assert frame.risk_level == _VERDICT.risk_level       # "dangerous" ∈ vocab
+    assert frame.description == _VERDICT.description      # presente, non vuota
+    assert frame.description
+    assert frame.reasoning == _VERDICT.reason            # reasoning presente
+    await t.aclose()
+
+
 async def test_confirm_tool_timeout_and_cancel_outcomes() -> None:
     ws = FakeWebSocket()
     t = WsTransport(ws)

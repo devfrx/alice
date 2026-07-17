@@ -73,19 +73,22 @@ def _one_sample_per_event_class() -> list[ev.AgentEvent]:
         ev.LlmStepEvent(turn_id="t", step=1),
         ev.LlmStepEvent(turn_id="t", step=2),
         ev.ToolCallEvent(turn_id="t", step=1, call=call),
-        ev.ToolStartedEvent(turn_id="t", call_id="c1"),
+        ev.ToolStartedEvent(turn_id="t", call_id="c1", name="read"),
         ev.ToolProgressEvent(turn_id="t", call_id="c1", progress={"phase": "run", "percent": 50.0}),
         ev.ToolResultEvent(
             turn_id="t", call_id="c1", name="read", status="ok",
             content_preview="risultato", artifact_id=None,
+            result="risultato", content_type="text/plain",
         ),
         ev.ToolResultEvent(
             turn_id="t", call_id="c1", name="cad", status="ok",
             content_preview="art", artifact_id="art-1",
+            result="art", content_type="model/gltf-binary",
         ),
         ev.InteractionRequestedEvent(
             turn_id="t", interaction_id="i1", kind="confirm", call_id="c1",
             payload={"outcome": "ask", "risk_level": "medium", "description": "d"},
+            tool_name="read",
         ),
         ev.InteractionResolvedEvent(
             turn_id="t", interaction_id="i1", kind="confirm", outcome="approved",
@@ -102,7 +105,10 @@ def _one_sample_per_event_class() -> list[ev.AgentEvent]:
         ),
         ev.TurnWarningEvent(turn_id="t", code="max_steps", message="attenzione"),
         ev.TurnErrorEvent(turn_id="t", code="engine_error", message="errore"),
-        ev.TurnUsageEvent(turn_id="t", step=1, input_tokens=10, output_tokens=5, cost=0.01),
+        ev.TurnUsageEvent(
+            turn_id="t", step=1, input_tokens=10, output_tokens=5, cost=0.01,
+            tool_calls=1, max_steps=8,
+        ),
         ev.TurnFinishedEvent(
             turn_id="t", finish_reason="stop", steps=2, tool_calls=1, cost=0.02,
             final_message_id="m1",
@@ -198,41 +204,24 @@ _COLLAPSE_TYPES = {"token", "thinking", "tool_call"}
 #: con una motivazione. NON sono papered-over: sono ESPLICITAMENTE tolte dal
 #: confronto (campo o intero frame) e portate in review. La chiave codifica la
 #: forma della differenza:
-#:   ``field:<type>#<field>`` — quel campo è tolto dai frame di quel ``type``;
-#:   ``type:<type>``          — l'intero frame di quel ``type`` è escluso;
-#:   ``dropkey:<key>``        — chiave volatile aggiunta alle drop_keys.
+#:   ``field:<type>#<field>``     — quel campo è tolto dai frame di quel ``type``;
+#:   ``synthetic:<type>#<field>`` — quel campo è tolto SOLO dai frame di quel
+#:                                  ``type`` con ``success == False`` (prosa
+#:                                  sintetica engine-authored);
+#:   ``type:<type>``              — l'intero frame di quel ``type`` è escluso;
+#:   ``dropkey:<key>``            — chiave volatile aggiunta alle drop_keys.
 KNOWN_DIFFERENCES: dict[str, str] = {
-    "field:turn.usage#tool_calls": (
-        "TurnUsageEvent greenfield non porta tool_calls (i contatori veri "
-        "vivono su turn.finished e sui contatori di turno); v2 riempie 0."
+    "synthetic:tool_execution_done#result": (
+        "Il corpo della tool response è confrontato VERBATIM per gli esiti di "
+        "successo (ToolResultEvent.result porta il corpo completo). SOLO per i "
+        "frame non-success (success=False) il result è prosa sintetica "
+        "engine-authored (rejection/deny/error/dedup/budget) che diverge per "
+        "wording/lingua dal legacy: lì si asserisce success + framing, non il "
+        "testo. Strip condizionato allo status del frame."
     ),
-    "field:turn.usage#max_steps": (
-        "TurnUsageEvent greenfield non porta max_steps (budget noto al motore, "
-        "non allo snapshot usage); v2 riempie 0."
-    ),
-    "field:tool_execution_start#tool_name": (
-        "ToolStartedEvent greenfield porta solo call_id: il nome tool vive sul "
-        "tool.call correlato per execution_id; v2 emette tool_name vuoto."
-    ),
-    "field:tool_execution_done#content_type": (
-        "ToolResultEvent greenfield non porta content_type (vive sull'artifact "
-        "registrato); v2 lo omette."
-    ),
-    "field:tool_execution_done#result": (
-        "Il corpo testuale della tool response è prosa scritta dal motore (i "
-        "messaggi sintetici v2 differiscono per wording/lingua); la parità "
-        "asserisce success + framing, non il testo verbatim."
-    ),
-    "field:tool.result#content_type": (
-        "Come tool_execution_done#content_type: l'evento greenfield lo ha "
-        "scartato."
-    ),
-    "field:tool.result#result": (
-        "Come tool_execution_done#result: corpo prosa engine-authored."
-    ),
-    "field:interaction.requested#tool_name": (
-        "InteractionRequestedEvent greenfield non porta il nome tool (il FE lo "
-        "correla via execution_id col tool.call); v2 lo omette."
+    "synthetic:tool.result#result": (
+        "Come tool_execution_done#result: corpo confrontato per i success, "
+        "strippato solo sui frame non-success (prosa sintetica)."
     ),
     "type:context_info": (
         "Il motore greenfield emette uno snapshot context-usage PRIMA di ogni "
@@ -263,18 +252,23 @@ _EXCLUDED_TYPES: frozenset[str] = frozenset(
 )
 
 
-def _stripped_fields() -> dict[str, set[str]]:
-    """Deriva {type -> {campi da togliere}} dalle voci ``field:`` note."""
+def _fields_for_prefix(prefix: str) -> dict[str, set[str]]:
+    """Deriva {type -> {campi da togliere}} dalle voci col dato ``prefix:``."""
     out: dict[str, set[str]] = {}
     for key in KNOWN_DIFFERENCES:
-        if not key.startswith("field:"):
+        if not key.startswith(f"{prefix}:"):
             continue
         frame_type, field = key.split(":", 1)[1].split("#", 1)
         out.setdefault(frame_type, set()).add(field)
     return out
 
 
-_STRIP_FIELDS = _stripped_fields()
+#: Campi strippati SEMPRE (voci ``field:``).
+_STRIP_FIELDS = _fields_for_prefix("field")
+
+#: Campi strippati SOLO sui frame non-success (voci ``synthetic:``): il corpo
+#: reale dei success è confrontato verbatim, la prosa sintetica no.
+_SYNTHETIC_STRIP_FIELDS = _fields_for_prefix("synthetic")
 
 
 def _normalized(frames: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -292,6 +286,11 @@ def _normalized(frames: list[dict[str, Any]]) -> list[dict[str, Any]]:
         norm = {k: v for k, v in frame.items() if k not in _DROP_KEYS}
         for field in _STRIP_FIELDS.get(frame_type or "", set()):
             norm.pop(field, None)
+        # Strip condizionato: solo sui frame ESPLICITAMENTE non-success la prosa
+        # sintetica (result) è tolta; per i success il corpo è confrontato.
+        if frame.get("success") is False:
+            for field in _SYNTHETIC_STRIP_FIELDS.get(frame_type or "", set()):
+                norm.pop(field, None)
         if frame_type in _COLLAPSE_TYPES and out and out[-1].get("type") == frame_type:
             _merge_collapsed(out[-1], norm)
             continue
@@ -414,7 +413,9 @@ def _v2_request() -> TurnRequest:
     return TurnRequest(
         conversation_id=_CONV, system_prompt="sys",
         history=[{"role": "user", "content": "ciao"}], tools=[],
-        source=TurnSource.CHAT, max_steps=8, context_window=32768,
+        # max_steps allineato a v1: legacy usa max_tool_iterations (4) + 1 = 5,
+        # così i frame turn.usage (che ora portano max_steps) combaciano.
+        source=TurnSource.CHAT, max_steps=5, context_window=32768,
         resolved_max_tokens=None, client_ip=None,
         version_group_id=None, version_index=None,
     )
@@ -506,7 +507,11 @@ async def test_parity_scenario_one_tool_ok() -> None:
              ports.LLMStepDone(finish_reason="stop", tool_calls=())],
         ],
         execution=MapExecutionPort(
-            tools={"read": ports.ToolExecutionOutput(ok=True, content="result:read")},
+            # content_type allineato al default della piattaforma legacy
+            # (MockToolRegistry → ToolResult.ok → "text/plain").
+            tools={"read": ports.ToolExecutionOutput(
+                ok=True, content="result:read", content_type="text/plain",
+            )},
             meta={"read": ToolMeta(exists=True)},
         ),
     )
@@ -583,7 +588,9 @@ async def test_parity_scenario_cancel_mid_turn() -> None:
             self, call: ToolInvocation, *, client_ip: str | None, conversation_id: str,
         ) -> ports.ToolExecutionOutput:
             cancel_v2.set()
-            return ports.ToolExecutionOutput(ok=True, content="result:read")
+            return ports.ToolExecutionOutput(
+                ok=True, content="result:read", content_type="text/plain",
+            )
 
     inv = ToolInvocation(call_id="call_read", name="read", args={}, raw_args="{}")
     v2 = await _run_v2(
@@ -608,4 +615,4 @@ def test_known_differences_all_have_motivation() -> None:
     assert KNOWN_DIFFERENCES, "il registro delle differenze note non è vuoto"
     for key, reason in KNOWN_DIFFERENCES.items():
         assert reason.strip(), f"differenza nota senza motivazione: {key}"
-        assert key.split(":", 1)[0] in {"field", "type", "dropkey"}
+        assert key.split(":", 1)[0] in {"field", "synthetic", "type", "dropkey"}

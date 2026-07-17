@@ -108,13 +108,18 @@ class InteractionOutcome(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ToolExecutionOutput:
-    """Risultato dell'esecuzione di un tool."""
+    """Risultato dell'esecuzione di un tool.
+
+    ``content_type`` è il MIME della tool response quando la piattaforma lo
+    espone (``ToolResult.content_type``); ``None`` se non disponibile.
+    """
 
     ok: bool
     content: str
     error: str | None = None
     images: tuple[dict[str, str], ...] = ()
     payload: dict[str, Any] | None = None
+    content_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -29,14 +29,19 @@ Tabella normativa (evento interno → frame wire attuali, legacy + canonici):
     TurnFinishedEvent         → [turn.finished]             # `done` lo emette
                                 # _persist_final_turn in ws.py, NON il translator
 
-Note su campi assenti nell'evento greenfield rispetto al frame legacy (il
-motore ha scartato deliberatamente campi ridondanti, recuperabili altrove):
+Gli eventi greenfield sono stati ARRICCHITI (fix review T15) così che i frame
+tradotti portino i valori reali, non placeholder:
 
-* ``ToolStartedEvent`` porta solo ``call_id`` → ``tool_execution_start.tool_name``
-  è ``""`` (il nome vive sul ``tool.call`` correlato per ``execution_id``).
-* ``InteractionRequestedEvent`` non porta il nome tool → ``tool_name`` omesso.
-* ``TurnUsageEvent`` non porta ``tool_calls``/``max_steps`` → riempiti a ``0``
-  (i contatori veri vivono su ``turn.finished`` e sui contatori di turno).
+* ``ToolStartedEvent.name`` → ``tool_execution_start.tool_name``.
+* ``InteractionRequestedEvent.tool_name`` → ``interaction.requested.tool_name``.
+* ``TurnUsageEvent.tool_calls``/``max_steps`` → ``turn.usage`` (conteggio tool
+  EMESSE "issued so far" + budget di step del turno).
+* ``ToolResultEvent.result`` → il corpo COMPLETO della tool response per gli
+  esiti di successo; per i rami sintetici (rejection/deny/error) resta ``None``
+  e il translator ripiega sul preview, poi strippato dal confronto sui frame
+  non-success (differenza legittima: prosa engine-authored).
+* ``ToolResultEvent.content_type`` → ``content_type`` (threaded dalla
+  piattaforma via ``ToolExecutionOutput``).
 
 Le chiavi opzionali ``None`` (``content_type``/``artifact_id``/``tool_name``)
 sono OMESSE dai frame, come fanno i builder canonici legacy, così i frame
@@ -120,10 +125,9 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
         }]
 
     if isinstance(event, ev.ToolStartedEvent):
-        # ToolStartedEvent porta solo call_id: il nome vive sul tool.call.
         return [{
             "type": "tool_execution_start",
-            "tool_name": "",
+            "tool_name": event.name,
             "execution_id": event.call_id,
         }]
 
@@ -138,10 +142,14 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
 
     if isinstance(event, ev.ToolResultEvent):
         success = event.status == "ok"
+        # Corpo COMPLETO per i success (``event.result``); per i rami sintetici
+        # ripiega sul preview (prosa engine-authored, poi strippata dal
+        # confronto sui frame non-success — vedi KNOWN_DIFFERENCES ``synthetic``).
+        result_body = event.result if event.result is not None else event.content_preview
         done: dict[str, Any] = {
             "type": "tool_execution_done",
             "tool_name": event.name,
-            "result": event.content_preview,
+            "result": result_body,
             "execution_id": event.call_id,
             "success": success,
         }
@@ -151,21 +159,26 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
             "execution_id": event.call_id,
             "tool_name": event.name,
             "success": success,
-            "result": event.content_preview,
+            "result": result_body,
         }
+        if event.content_type is not None:
+            done["content_type"] = event.content_type
+            canonical["content_type"] = event.content_type
         if event.artifact_id is not None:
             done["artifact_id"] = event.artifact_id
             canonical["artifact_id"] = event.artifact_id
         return [done, canonical]
 
     if isinstance(event, ev.InteractionRequestedEvent):
-        # Il nome tool non è nell'evento greenfield → chiave omessa.
-        return [{
+        frame_req: dict[str, Any] = {
             "type": "interaction.requested",
             "turn_id": event.turn_id,
             "execution_id": event.call_id,
             "kind": _interaction_kind(event.kind),
-        }]
+        }
+        if event.tool_name is not None:
+            frame_req["tool_name"] = event.tool_name
+        return [frame_req]
 
     if isinstance(event, ev.InteractionResolvedEvent):
         # L'evento greenfield non porta call_id: usa interaction_id come
@@ -208,15 +221,14 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
         return [{"type": "error", "content": event.message}]
 
     if isinstance(event, ev.TurnUsageEvent):
-        # tool_calls/max_steps non sono nell'evento greenfield → 0.
         return [{
             "type": "turn.usage",
             "turn_id": event.turn_id,
             "step": event.step,
             "input_tokens": event.input_tokens,
             "output_tokens": event.output_tokens,
-            "tool_calls": 0,
-            "max_steps": 0,
+            "tool_calls": event.tool_calls,
+            "max_steps": event.max_steps,
         }]
 
     if isinstance(event, ev.TurnFinishedEvent):

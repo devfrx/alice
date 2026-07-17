@@ -183,12 +183,12 @@ def to_wire_frames(event: AgentEvent) -> list[dict[str, Any]]:
         return [frame_req]
 
     if isinstance(event, ev.InteractionResolvedEvent):
-        # L'evento greenfield non porta call_id: usa interaction_id come
-        # execution_id (id volatile, normalizzato via drop nel harness).
+        # ``call_id`` correla la risoluzione all'attività della tool call: è
+        # l'execution_id del wire legacy (stesso valore del frame di request).
         return [{
             "type": "interaction.resolved",
             "turn_id": event.turn_id,
-            "execution_id": event.interaction_id,
+            "execution_id": event.call_id,
             "kind": _interaction_kind(event.kind),
             "outcome": event.outcome,
         }]

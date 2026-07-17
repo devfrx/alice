@@ -95,7 +95,13 @@ class ToolResultEvent(BaseModel):
 
 
 class InteractionRequestedEvent(BaseModel):
-    """Evento: interazione richiesta."""
+    """Evento: interazione richiesta (payload COMPLETO, spec §4).
+
+    ``payload`` per kind:
+      * ``confirm``: args, risk_level, description, reasoning, allow_remember.
+      * ``ask_user``: questions (raw dagli args del tool, normalizzate al wire).
+      * ``client``: args.
+    """
 
     type: Literal["interaction.requested"] = "interaction.requested"
     turn_id: str
@@ -108,12 +114,20 @@ class InteractionRequestedEvent(BaseModel):
 
 
 class InteractionResolvedEvent(BaseModel):
-    """Evento: interazione risolta."""
+    """Evento: interazione risolta.
+
+    ``call_id`` correla la risoluzione all'attività della tool call lato FE
+    (il ``request`` porta lo stesso ``call_id``); ``outcome`` è l'esito wire
+    per kind: ``confirm`` → approved/rejected/timeout/cancelled/disconnected;
+    ``ask_user`` → answered/failed/disconnected; ``client`` →
+    executed/failed/disconnected.
+    """
 
     type: Literal["interaction.resolved"] = "interaction.resolved"
     turn_id: str
     interaction_id: str
     kind: str
+    call_id: str
     outcome: str
     model_config = ConfigDict(frozen=True)
 

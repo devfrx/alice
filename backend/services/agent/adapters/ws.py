@@ -366,6 +366,7 @@ class WsInteractionPort:
         self,
         call: ToolInvocation,
         *,
+        interaction_id: str,
         verdict: GateVerdict,
         timeout_s: float,
         cancel: asyncio.Event,
@@ -374,6 +375,10 @@ class WsInteractionPort:
 
         Su disconnessione ritorna ``DISCONNECTED`` come DATO (adjudicazione
         T4): il motore persiste la tool response sintetica prima di fermarsi.
+
+        ``interaction_id`` sarà usata dal Task 8 per la correlazione
+        ``interaction.response``; per ora la correlazione resta su
+        ``alt_key=call.call_id`` e l'id è ignorato.
         """
         risk_level = (
             verdict.risk_level
@@ -409,10 +414,15 @@ class WsInteractionPort:
         self,
         call: ToolInvocation,
         *,
+        interaction_id: str,
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> ToolExecutionOutput:
         """Delegazione al client di un tool UI-side (``client_tool_call``).
+
+        ``interaction_id`` sarà usata dal Task 8 per la correlazione
+        ``interaction.response``; per ora è ignorata (correlazione su
+        ``alt_key=call.call_id``).
 
         Raises:
             EngineDisconnected: se il client cade prima del risultato (il
@@ -451,10 +461,15 @@ class WsInteractionPort:
         self,
         call: ToolInvocation,
         *,
+        interaction_id: str,
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> ToolExecutionOutput:
         """Pone all'utente le domande del wizard ``ask_user_required``.
+
+        ``interaction_id`` sarà usata dal Task 8 per la correlazione
+        ``interaction.response``; per ora è ignorata (correlazione su
+        ``alt_key=call.call_id``).
 
         Raises:
             EngineDisconnected: se il client cade prima delle risposte.

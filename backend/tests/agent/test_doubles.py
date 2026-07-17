@@ -47,6 +47,6 @@ async def test_scripted_interaction_confirm_returns_disconnected_as_data() -> No
     call = ToolInvocation(call_id="c1", name="t", args={}, raw_args="{}")
     verdict = ports.GateVerdict(action=ports.GateAction.CONFIRM, outcome="needs_confirmation")
     out = await port.confirm_tool(
-        call, verdict=verdict, timeout_s=1.0, cancel=asyncio.Event()
+        call, interaction_id="ix", verdict=verdict, timeout_s=1.0, cancel=asyncio.Event()
     )
     assert out is ports.InteractionOutcome.DISCONNECTED

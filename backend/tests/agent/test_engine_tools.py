@@ -86,6 +86,97 @@ async def test_confirmation_flow_events_and_audit() -> None:
                for r in persistence.tool_results)
 
 
+async def test_confirm_event_payload_is_complete() -> None:
+    """Il requested del confirm porta il payload COMPLETO (carry #4, spec §4):
+    args/risk_level/description/reasoning/allow_remember, non più minimale; il
+    resolved porta il call_id per la correlazione FE."""
+    calls = (ToolInvocation(call_id="c1", name="write",
+                            args={"path": "x.txt"}, raw_args="{}"),)
+    verdict = ports.GateVerdict(
+        action=ports.GateAction.CONFIRM, outcome="needs_confirmation",
+        reason="fuori scope", risk_level="dangerous", description="scrive un file",
+    )
+    _persistence, _outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        verdicts={"write": verdict},
+        confirm=ports.InteractionOutcome.APPROVED,
+    )
+    requested = [e for e in rec.events if isinstance(e, ev.InteractionRequestedEvent)]
+    resolved = [e for e in rec.events if isinstance(e, ev.InteractionResolvedEvent)]
+    assert len(requested) == 1 and len(resolved) == 1
+    req = requested[0]
+    assert req.kind == "confirm" and req.call_id == "c1" and req.tool_name == "write"
+    assert req.payload == {
+        "args": {"path": "x.txt"},
+        "risk_level": "dangerous",
+        "description": "scrive un file",
+        "reasoning": "fuori scope",
+        "allow_remember": True,
+    }
+    res = resolved[0]
+    assert res.kind == "confirm" and res.call_id == "c1" and res.outcome == "approved"
+
+
+async def test_ask_user_emits_interaction_events() -> None:
+    """ask_user emette interaction.requested/resolved con payload completo
+    (questions) e outcome 'answered' sul successo (carry #4)."""
+    questions = [{"id": "q1", "text": "Quale?", "type": "radio", "options": ["a", "b"]}]
+    calls = (ToolInvocation(call_id="c1", name="ask_user",
+                            args={"questions": questions}, raw_args="{}"),)
+    _persistence, outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={},
+        meta={"ask_user": ToolMeta(exists=True, interactive="ask_user")},
+        ask_user_result=ports.ToolExecutionOutput(ok=True, content="a"),
+    )
+    requested = [e for e in rec.events if isinstance(e, ev.InteractionRequestedEvent)]
+    resolved = [e for e in rec.events if isinstance(e, ev.InteractionResolvedEvent)]
+    assert len(requested) == 1 and len(resolved) == 1
+    req = requested[0]
+    assert req.kind == "ask_user" and req.call_id == "c1" and req.tool_name == "ask_user"
+    assert req.payload == {"questions": questions}
+    res = resolved[0]
+    assert res.kind == "ask_user" and res.call_id == "c1" and res.outcome == "answered"
+    assert outcome.finish_reason == "stop"
+
+
+async def test_client_tool_emits_interaction_events_on_success() -> None:
+    """client tool emette requested/resolved con payload={args} e outcome
+    'executed' sul successo (carry #4)."""
+    calls = (ToolInvocation(call_id="c1", name="ui_pick",
+                            args={"k": "v"}, raw_args="{}"),)
+    _persistence, _outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={},
+        meta={"ui_pick": ToolMeta(exists=True, client_executed=True)},
+        client_result=ports.ToolExecutionOutput(ok=True, content="scelto"),
+    )
+    requested = [e for e in rec.events if isinstance(e, ev.InteractionRequestedEvent)]
+    resolved = [e for e in rec.events if isinstance(e, ev.InteractionResolvedEvent)]
+    assert len(requested) == 1 and len(resolved) == 1
+    req = requested[0]
+    assert req.kind == "client" and req.call_id == "c1" and req.tool_name == "ui_pick"
+    assert req.payload == {"args": {"k": "v"}}
+    res = resolved[0]
+    assert res.kind == "client" and res.call_id == "c1" and res.outcome == "executed"
+
+
+async def test_client_tool_failure_emits_failed_outcome() -> None:
+    """client tool con ok=False → resolved outcome 'failed' e tool response error."""
+    calls = (ToolInvocation(call_id="c1", name="ui_pick", args={}, raw_args="{}"),)
+    persistence, _outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={},
+        meta={"ui_pick": ToolMeta(exists=True, client_executed=True)},
+        client_result=ports.ToolExecutionOutput(ok=False, content="ko", error="boom"),
+    )
+    resolved = [e for e in rec.events if isinstance(e, ev.InteractionResolvedEvent)]
+    assert len(resolved) == 1 and resolved[0].outcome == "failed"
+    saved = [r for r in persistence.tool_results if r["call_id"] == "c1"]
+    assert saved and saved[0]["status"] == "error"
+
+
 async def test_rejection_still_persists_tool_response() -> None:
     calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
     persistence, outcome, rec = await _run_with(

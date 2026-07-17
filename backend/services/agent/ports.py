@@ -166,19 +166,26 @@ class PermissionPort(Protocol):
 
 
 class InteractionPort(Protocol):
-    """Interazioni con l'utente: conferma, esecuzione client-side, ask_user."""
+    """Interazioni con l'utente: conferma, esecuzione client-side, ask_user.
+
+    ``interaction_id`` è la chiave di correlazione wire della richiesta: il
+    motore la genera, la emette nell'evento ``interaction.requested`` e la
+    passa alla porta, che DEVE usarla per correlare la risposta del client.
+    """
 
     async def confirm_tool(
-        self, call: ToolInvocation, *, verdict: GateVerdict, timeout_s: float,
-        cancel: asyncio.Event,
+        self, call: ToolInvocation, *, interaction_id: str, verdict: GateVerdict,
+        timeout_s: float, cancel: asyncio.Event,
     ) -> InteractionOutcome: ...
 
     async def run_client_tool(
-        self, call: ToolInvocation, *, timeout_s: float, cancel: asyncio.Event,
+        self, call: ToolInvocation, *, interaction_id: str, timeout_s: float,
+        cancel: asyncio.Event,
     ) -> ToolExecutionOutput: ...
 
     async def ask_user(
-        self, call: ToolInvocation, *, timeout_s: float, cancel: asyncio.Event,
+        self, call: ToolInvocation, *, interaction_id: str, timeout_s: float,
+        cancel: asyncio.Event,
     ) -> ToolExecutionOutput: ...
 
 

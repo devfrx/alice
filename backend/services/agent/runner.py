@@ -130,6 +130,7 @@ class AutoDeclineInteractionPort:
         self,
         call: ToolInvocation,
         *,
+        interaction_id: str,
         verdict: GateVerdict,
         timeout_s: float,
         cancel: asyncio.Event,
@@ -141,6 +142,7 @@ class AutoDeclineInteractionPort:
         self,
         call: ToolInvocation,
         *,
+        interaction_id: str,
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> ToolExecutionOutput:
@@ -153,6 +155,7 @@ class AutoDeclineInteractionPort:
         self,
         call: ToolInvocation,
         *,
+        interaction_id: str,
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> ToolExecutionOutput:

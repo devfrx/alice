@@ -596,11 +596,11 @@ class AgentEngine:
         timeout_s = meta.timeout_s or self._confirmation_timeout_s
         if meta.interactive == "ask_user":
             return await self._run_interactive(
-                call, kind="ask_user", timeout_s=timeout_s, cancel=cancel,
+                turn_id, call, kind="ask_user", timeout_s=timeout_s, cancel=cancel,
             )
         if meta.client_executed:
             return await self._run_interactive(
-                call, kind="client", timeout_s=timeout_s, cancel=cancel,
+                turn_id, call, kind="client", timeout_s=timeout_s, cancel=cancel,
             )
         return None
 
@@ -616,23 +616,32 @@ class AgentEngine:
         Ritorna ``None`` se APPROVED (la call prosegue al routing); altrimenti
         la resolution sintetica. DISCONNECTED è un DATO: result sintetico +
         flag disconnect (lo stop scatta DOPO la persistenza, §6.5).
+
+        INVARIANTE: nessun ``await`` tra il ritorno di
+        ``emit(InteractionRequestedEvent)`` e la chiamata alla porta
+        (``confirm_tool``) — la porta registra il proprio waiter in modo
+        sincrono prima del suo primo await (Task 8), così una risposta del
+        client non può andare persa nella finestra tra emissione e attesa.
         """
         interaction_id = uuid.uuid4().hex
         await self._events.emit(ev.InteractionRequestedEvent(
             turn_id=turn_id, interaction_id=interaction_id, kind="confirm",
             call_id=call.call_id, tool_name=call.name,
             payload={
-                "outcome": verdict.outcome,
+                "args": call.args,
                 "risk_level": verdict.risk_level,
                 "description": verdict.description,
+                "reasoning": verdict.reason,
+                "allow_remember": True,
             },
         ))
         outcome = await self._interaction.confirm_tool(
-            call, verdict=verdict, timeout_s=self._confirmation_timeout_s, cancel=cancel,
+            call, interaction_id=interaction_id, verdict=verdict,
+            timeout_s=self._confirmation_timeout_s, cancel=cancel,
         )
         await self._events.emit(ev.InteractionResolvedEvent(
             turn_id=turn_id, interaction_id=interaction_id, kind="confirm",
-            outcome=outcome.value,
+            call_id=call.call_id, outcome=outcome.value,
         ))
         await self._persistence.save_audit(
             call=call, verdict=verdict, interaction=outcome,
@@ -659,32 +668,69 @@ class AgentEngine:
 
     async def _run_interactive(
         self,
+        turn_id: str,
         call: ToolInvocation,
         *,
         kind: str,
         timeout_s: float,
         cancel: asyncio.Event,
     ) -> _CallResolution:
-        """Esegue una call interattiva (ask_user o client-side).
+        """Esegue una call interattiva (ask_user o client-side) con eventi
+        requested/resolved (carry #4).
 
         La disconnessione arriva come eccezione dalla porta: la si cattura,
         si sintetizza la tool response e si segnala lo stop DOPO la
         persistenza (§6.5), senza sollevare fuori dal motore.
+
+        INVARIANTE: nessun ``await`` tra il ritorno di
+        ``emit(InteractionRequestedEvent)`` e la chiamata alla porta
+        (``ask_user``/``run_client_tool``) — la porta registra il proprio
+        waiter in modo sincrono prima del suo primo await (Task 8), così una
+        risposta del client non può andare persa nella finestra tra emissione
+        e attesa.
         """
+        interaction_id = uuid.uuid4().hex
+        if kind == "ask_user":
+            payload: dict[str, Any] = {"questions": call.args.get("questions")}
+        else:
+            payload = {"args": call.args}
+        await self._events.emit(ev.InteractionRequestedEvent(
+            turn_id=turn_id, interaction_id=interaction_id, kind=kind,
+            call_id=call.call_id, tool_name=call.name, payload=payload,
+        ))
         try:
             if kind == "ask_user":
                 output = await self._interaction.ask_user(
-                    call, timeout_s=timeout_s, cancel=cancel,
+                    call, interaction_id=interaction_id,
+                    timeout_s=timeout_s, cancel=cancel,
                 )
             else:
                 output = await self._interaction.run_client_tool(
-                    call, timeout_s=timeout_s, cancel=cancel,
+                    call, interaction_id=interaction_id,
+                    timeout_s=timeout_s, cancel=cancel,
                 )
         except EngineDisconnected:
+            await self._events.emit(ev.InteractionResolvedEvent(
+                turn_id=turn_id, interaction_id=interaction_id, kind=kind,
+                call_id=call.call_id, outcome="disconnected",
+            ))
             return _CallResolution(
                 content="Chiamata annullata (disconnesso).",
                 status=_STATUS_CANCELLED, disconnect=True,
             )
+        # timeout/cancel/errore client convergono su "failed": la porta ritorna
+        # un ToolExecutionOutput e non distingue l'esito wire (residuo
+        # deliberato, censito nel ledger).
+        if not output.ok:
+            outcome = "failed"
+        elif kind == "ask_user":
+            outcome = "answered"
+        else:
+            outcome = "executed"
+        await self._events.emit(ev.InteractionResolvedEvent(
+            turn_id=turn_id, interaction_id=interaction_id, kind=kind,
+            call_id=call.call_id, outcome=outcome,
+        ))
         status = _STATUS_OK if output.ok else _STATUS_ERROR
         return _CallResolution(content=output.content, status=status, output=output)
 

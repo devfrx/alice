@@ -132,21 +132,23 @@ class ScriptedInteractionPort:
         self._ask_user_result = ask_user_result
 
     async def confirm_tool(
-        self, call: ToolInvocation, *, verdict: ports.GateVerdict, timeout_s: float,
-        cancel: asyncio.Event,
+        self, call: ToolInvocation, *, interaction_id: str, verdict: ports.GateVerdict,
+        timeout_s: float, cancel: asyncio.Event,
     ) -> ports.InteractionOutcome:
         # DISCONNECTED torna come dato: il motore persiste prima di fermarsi (spec §6.5)
         return self._confirm
 
     async def run_client_tool(
-        self, call: ToolInvocation, *, timeout_s: float, cancel: asyncio.Event,
+        self, call: ToolInvocation, *, interaction_id: str, timeout_s: float,
+        cancel: asyncio.Event,
     ) -> ports.ToolExecutionOutput:
         if self._client_result is None:
             raise ports.EngineDisconnected("client disconnesso durante tool client")
         return self._client_result
 
     async def ask_user(
-        self, call: ToolInvocation, *, timeout_s: float, cancel: asyncio.Event,
+        self, call: ToolInvocation, *, interaction_id: str, timeout_s: float,
+        cancel: asyncio.Event,
     ) -> ports.ToolExecutionOutput:
         if self._ask_user_result is None:
             raise ports.EngineDisconnected("client disconnesso durante ask_user")

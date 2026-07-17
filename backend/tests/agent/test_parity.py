@@ -51,7 +51,8 @@ def _one_sample_per_event_class() -> list[ev.AgentEvent]:
             tool_name="read",
         ),
         ev.InteractionResolvedEvent(
-            turn_id="t", interaction_id="i1", kind="confirm", outcome="approved",
+            turn_id="t", interaction_id="i1", kind="confirm", call_id="c1",
+            outcome="approved",
         ),
         ev.ContextUsageEvent(turn_id="t", tokens=1000, context_window=32768),
         ev.CompactionEvent(

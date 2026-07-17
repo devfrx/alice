@@ -350,7 +350,7 @@ async def test_confirm_tool_maps_approved_and_rejected() -> None:
 
     answer = asyncio.create_task(_respond(True))
     outcome = await port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
     )
     sent = await answer
     assert outcome is InteractionOutcome.APPROVED
@@ -363,7 +363,7 @@ async def test_confirm_tool_maps_approved_and_rejected() -> None:
 
     answer2 = asyncio.create_task(_respond(False))
     outcome2 = await port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
     )
     await answer2
     assert outcome2 is InteractionOutcome.REJECTED
@@ -392,7 +392,9 @@ async def test_tool_confirmation_request_frame_matches_legacy_contract() -> None
         return sent
 
     answer = asyncio.create_task(_respond())
-    await port.confirm_tool(_CALL, verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event())
+    await port.confirm_tool(
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    )
     sent = await answer
 
     # 1. Valida contro il modello Pydantic reale del contratto (extra='forbid').
@@ -426,7 +428,7 @@ async def test_confirm_tool_resolves_on_execution_id_only_reply() -> None:
 
     answer = asyncio.create_task(_respond())
     outcome = await port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
     )
     await answer
     assert outcome is InteractionOutcome.APPROVED
@@ -439,13 +441,13 @@ async def test_confirm_tool_timeout_and_cancel_outcomes() -> None:
     await t.start()
     port = _port(t)
     outcome = await port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=0.05, cancel=asyncio.Event(),
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=0.05, cancel=asyncio.Event(),
     )
     assert outcome is InteractionOutcome.TIMEOUT
     cancelled = asyncio.Event()
     cancelled.set()
     outcome2 = await port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=5, cancel=cancelled,
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=5, cancel=cancelled,
     )
     assert outcome2 is InteractionOutcome.CANCELLED
     await t.aclose()
@@ -458,7 +460,7 @@ async def test_confirm_tool_disconnect_returns_disconnected_as_data() -> None:
     await t.start()
     port = _port(t)
     task = asyncio.create_task(port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=5, cancel=asyncio.Event(),
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=5, cancel=asyncio.Event(),
     ))
     await ws.next_sent()
     await ws.disconnect()
@@ -481,14 +483,16 @@ async def test_run_client_tool_roundtrip_and_disconnect_raises() -> None:
         return sent
 
     answer = asyncio.create_task(_respond())
-    out = await port.run_client_tool(_CALL, timeout_s=2, cancel=asyncio.Event())
+    out = await port.run_client_tool(
+        _CALL, interaction_id="ix", timeout_s=2, cancel=asyncio.Event(),
+    )
     sent = await answer
     assert out.ok is True and out.content == "fatto"
     frame = WsClientToolCall.model_validate(sent)
     assert frame.execution_id == "exec-1" and frame.tool_name == "write_file"
 
     task = asyncio.create_task(
-        port.run_client_tool(_CALL, timeout_s=5, cancel=asyncio.Event())
+        port.run_client_tool(_CALL, interaction_id="ix", timeout_s=5, cancel=asyncio.Event())
     )
     await ws.next_sent()
     await ws.disconnect()
@@ -518,7 +522,7 @@ async def test_ask_user_roundtrip_timeout_and_frame_shape() -> None:
         return sent
 
     answer = asyncio.create_task(_respond())
-    out = await port.ask_user(call, timeout_s=2, cancel=asyncio.Event())
+    out = await port.ask_user(call, interaction_id="ix", timeout_s=2, cancel=asyncio.Event())
     sent = await answer
     assert out.ok is True and "q1" in out.content and "a" in out.content
     frame = WsAskUserRequired.model_validate(sent)
@@ -526,6 +530,8 @@ async def test_ask_user_roundtrip_timeout_and_frame_shape() -> None:
     assert frame.questions[0].id == "q1"
     assert frame.questions[0].options == ["a", "b"]
 
-    timed_out = await port.ask_user(call, timeout_s=0.05, cancel=asyncio.Event())
+    timed_out = await port.ask_user(
+        call, interaction_id="ix", timeout_s=0.05, cancel=asyncio.Event(),
+    )
     assert timed_out.ok is False and timed_out.error is not None
     await t.aclose()

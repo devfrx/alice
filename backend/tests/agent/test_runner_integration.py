@@ -78,14 +78,18 @@ async def test_auto_decline_interaction_port_declines_all() -> None:
     port = AutoDeclineInteractionPort()
 
     outcome = await port.confirm_tool(
-        _CALL, verdict=_VERDICT, timeout_s=1, cancel=asyncio.Event(),
+        _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=1, cancel=asyncio.Event(),
     )
     assert outcome is InteractionOutcome.REJECTED
 
-    client_out = await port.run_client_tool(_CALL, timeout_s=1, cancel=asyncio.Event())
+    client_out = await port.run_client_tool(
+        _CALL, interaction_id="ix", timeout_s=1, cancel=asyncio.Event(),
+    )
     assert client_out.ok is False and client_out.error
 
-    ask_out = await port.ask_user(_CALL, timeout_s=1, cancel=asyncio.Event())
+    ask_out = await port.ask_user(
+        _CALL, interaction_id="ix", timeout_s=1, cancel=asyncio.Event(),
+    )
     assert ask_out.ok is False and ask_out.error
 
 

@@ -111,11 +111,15 @@ def to_v2_frames(event: AgentEvent) -> list[dict[str, Any]]:
     if isinstance(event, ev.InteractionRequestedEvent):
         payload = event.payload
         questions = payload.get("questions")
+        # Lookup STRICT: un kind interno non mappato deve fallire FORTE qui
+        # (KeyError in test/dev), non produrre un Literal fuori vocabolario
+        # che il modello rifiuta, l'EventPort scarta, e il motore resta
+        # appeso in attesa di una risposta che il client non ha mai visto.
         return [_dump(ws.WsInteractionRequested(
             type="interaction.requested", turn_id=event.turn_id,
             interaction_id=event.interaction_id,
             execution_id=event.call_id,
-            kind=_INTERACTION_KIND.get(event.kind, event.kind),
+            kind=_INTERACTION_KIND[event.kind],
             tool_name=event.tool_name,
             args=payload.get("args"),
             risk_level=payload.get("risk_level"),
@@ -130,11 +134,15 @@ def to_v2_frames(event: AgentEvent) -> list[dict[str, Any]]:
         return [_dump(ws.WsInteractionResolved(
             type="interaction.resolved", turn_id=event.turn_id,
             interaction_id=event.interaction_id, execution_id=event.call_id,
-            kind=_INTERACTION_KIND.get(event.kind, event.kind),
+            # Lookup STRICT come sul requested: kind non mappato → KeyError.
+            kind=_INTERACTION_KIND[event.kind],
             outcome=event.outcome,
         ))]
     if isinstance(event, ev.ContextUsageEvent):
         window = event.context_window or 1
+        # was_compressed/messages_summarized restano ai default del modello
+        # (False/0) DELIBERATAMENTE: il segnale di compattazione viaggia su
+        # context.compaction, non sullo snapshot di usage del motore.
         return [_dump(ws.WsContextUsage(
             type="context.usage", turn_id=event.turn_id, used=event.tokens,
             available=max(window - event.tokens, 0),

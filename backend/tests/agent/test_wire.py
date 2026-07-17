@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from backend.api.ws_schema import validate_chat_server
 from backend.services.agent import events as ev
 from backend.services.agent.adapters.wire import normalize_questions, to_v2_frames
@@ -181,6 +183,18 @@ def test_interaction_requested_client_value_pinned() -> None:
         "tool_name": "ui_pick", "args": {"choice": 1},
     }]
     _assert_valid(frames)
+
+
+def test_interaction_requested_unmapped_kind_raises() -> None:
+    """Lookup kind STRICT: un kind interno non mappato deve fallire FORTE
+    (KeyError) alla traduzione, non produrre un frame fuori vocabolario che
+    l'EventPort scarterebbe lasciando il motore appeso."""
+    event = ev.InteractionRequestedEvent(
+        turn_id="t1", interaction_id="i1", kind="nuovo_kind", call_id="c1",
+        payload={},
+    )
+    with pytest.raises(KeyError):
+        to_v2_frames(event)
 
 
 def test_interaction_resolved_frame() -> None:

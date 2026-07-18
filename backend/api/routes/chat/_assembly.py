@@ -12,9 +12,8 @@ pre-generation context compression — into a single cohesive
 The assembler returns an :class:`AssemblyResult` bundling the immutable
 :class:`TurnRequest` (the AgentEngine input) together with the few stateful
 objects the WebSocket handler still needs for execution and persistence.
-Validation failures
-emit a WS ``error`` frame and return ``None`` so the caller skips the turn
-(identical to the legacy ``continue`` branches).
+Validation failures emit a typed ``turn.error`` frame and return ``None``
+so the caller skips the turn.
 """
 
 from __future__ import annotations
@@ -31,6 +30,7 @@ from fastapi import WebSocket
 from loguru import logger
 from sqlmodel import select
 
+from backend.api.ws_schema import chat as ws_chat
 from backend.core.config import PROJECT_ROOT, LLMConfig
 from backend.core.context import AppContext
 from backend.db.models import Attachment, Conversation, Message
@@ -56,6 +56,7 @@ from ._helpers import (
     _filter_history_for_llm,
     _format_memory_context,
 )
+from ._shared import _error_frame
 
 
 def _coerce_tier_guidance(
@@ -192,9 +193,8 @@ class TurnAssembler:
         """Assemble the turn input, or ``None`` to skip the turn.
 
         On a validation failure (bad conversation id, edit target) the
-        method sends a WS ``error`` frame and returns ``None`` — the caller
-        should ``continue`` to the next message, mirroring the legacy
-        inline branches exactly.
+        method sends a typed ``turn.error`` frame and returns ``None`` — the
+        caller should ``continue`` to the next message.
 
         When ``websocket`` is ``None`` (headless turns) validation-failure
         frames are skipped and the method just returns ``None``.
@@ -215,7 +215,9 @@ class TurnAssembler:
             except ValueError:
                 if websocket is not None:
                     await websocket.send_json(
-                        {"type": "error", "content": "Invalid conversation_id"}
+                        _error_frame(
+                            "invalid_conversation_id", "Invalid conversation_id",
+                        )
                     )
                 return None
             conv = await session.get(Conversation, conv_id)
@@ -237,7 +239,9 @@ class TurnAssembler:
             except ValueError:
                 if websocket is not None:
                     await websocket.send_json(
-                        {"type": "error", "content": "Invalid edit_message_id"},
+                        _error_frame(
+                            "invalid_edit_message_id", "Invalid edit_message_id",
+                        ),
                     )
                 return None
             original_msg = await session.get(Message, original_msg_id)
@@ -248,7 +252,7 @@ class TurnAssembler:
             ):
                 if websocket is not None:
                     await websocket.send_json(
-                        {"type": "error", "content": "Invalid edit target"},
+                        _error_frame("invalid_edit_target", "Invalid edit target"),
                     )
                 return None
 
@@ -685,7 +689,9 @@ class TurnAssembler:
             ):
                 if websocket is not None:
                     await websocket.send_json(
-                        {"type": "context_compression_start"},
+                        ws_chat.WsContextCompaction(
+                            type="context.compaction", phase="started",
+                        ).model_dump(mode="json", exclude_none=True),
                     )
                 try:
                     comp = await ctx.context_manager.compress(
@@ -720,13 +726,15 @@ class TurnAssembler:
                     await session.flush()
 
                     if websocket is not None:
-                        await websocket.send_json({
-                            "type": "context_compression_done",
-                            "messages_summarized": (
-                                comp.usage.messages_summarized
-                            ),
-                            "summary_message_id": str(summary_msg.id),
-                        })
+                        await websocket.send_json(
+                            ws_chat.WsContextCompaction(
+                                type="context.compaction", phase="done",
+                                messages_summarized=(
+                                    comp.usage.messages_summarized
+                                ),
+                                summary_message_id=str(summary_msg.id),
+                            ).model_dump(mode="json", exclude_none=True),
+                        )
                     # Re-estimate after compression.
                     usage_est = comp.usage
                 except Exception as exc:
@@ -735,27 +743,35 @@ class TurnAssembler:
                     )
                     if websocket is not None:
                         await websocket.send_json(
-                            {"type": "context_compression_failed"},
+                            ws_chat.WsContextCompaction(
+                                type="context.compaction", phase="failed",
+                            ).model_dump(mode="json", exclude_none=True),
                         )
                     comp = None
 
-            # Send initial context_info.
+            # Send initial context.usage.  ``usage_est.percentage`` is a
+            # fraction in [0, 1] (context_manager convention) — the v2
+            # contract.
             if websocket is not None:
-                await websocket.send_json({
-                    "type": "context_info",
-                    "used": usage_est.used_tokens,
-                    "available": usage_est.available_tokens,
-                    "context_window": context_window,
-                    "percentage": usage_est.percentage,
-                    "was_compressed": comp is not None,
-                    "messages_summarized": (
-                        comp.usage.messages_summarized if comp else 0
-                    ),
-                    "is_estimated": usage_est.is_estimated,
-                    "breakdown": _compute_context_breakdown(
-                        messages, _tool_tokens, ctx.context_manager,
-                    ),
-                })
+                await websocket.send_json(
+                    ws_chat.WsContextUsage(
+                        type="context.usage",
+                        used=usage_est.used_tokens,
+                        available=usage_est.available_tokens,
+                        context_window=context_window,
+                        percentage=usage_est.percentage,
+                        was_compressed=comp is not None,
+                        messages_summarized=(
+                            comp.usage.messages_summarized if comp else 0
+                        ),
+                        is_estimated=usage_est.is_estimated,
+                        breakdown=ws_chat.WsContextBreakdown(
+                            **_compute_context_breakdown(
+                                messages, _tool_tokens, ctx.context_manager,
+                            )
+                        ),
+                    ).model_dump(mode="json", exclude_none=True),
+                )
 
         # Resolve max_output_tokens once when the global cap is
         # unset — mirrors the legacy ``_stream_and_collect`` logic.

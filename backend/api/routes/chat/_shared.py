@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import weakref
 from collections import defaultdict
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -19,6 +20,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.api.ws_schema.chat import WsTurnError
 from backend.core.context import AppContext
 
 from ._sink import is_websocket_closed_runtime_error
@@ -27,10 +29,15 @@ router = APIRouter(tags=["chat"])
 
 # Active WebSocket connections per IP (for rate limiting).
 _ws_connections: dict[str, int] = defaultdict(int)
-# Per-loop WS locks: maps event-loop id → asyncio.Lock.  This allows tests
-# that run in multiple event loops (e.g. threads with TestClient) to each
-# get a lock bound to the correct loop.
-_ws_locks: dict[int, asyncio.Lock] = {}
+# Per-loop WS locks, keyed on the loop OBJECT via weak references.  Keying on
+# ``id(loop)`` is unsound: CPython reuses addresses, so a fresh loop (e.g. a
+# new TestClient portal) could inherit the — possibly still acquired — lock of
+# a dead loop and deadlock forever (censused Mossa 2 T9: non-deterministic
+# second-connection hangs on Windows).  With weak keys a dead loop's entry
+# vanishes with the loop and every live loop always gets its own lock.
+_ws_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
+    weakref.WeakKeyDictionary()
+)
 
 # Conversations with an in-flight turn (Fase 6b idle-guard).  A conversation
 # in this set is "busy": workspace-scope mutations are rejected (409) until the
@@ -75,15 +82,33 @@ def conversation_active(conversation_id: str) -> Iterator[None]:
 def _get_ws_lock() -> asyncio.Lock:
     """Return an ``asyncio.Lock`` bound to the *current* event loop."""
     loop = asyncio.get_running_loop()
-    lock = _ws_locks.get(id(loop))
+    lock = _ws_locks.get(loop)
     if lock is None:
         lock = asyncio.Lock()
-        _ws_locks[id(loop)] = lock
+        _ws_locks[loop] = lock
     return lock
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _error_frame(code: str, message: str) -> dict[str, Any]:
+    """Build a pre-turn ``turn.error`` frame (validated by-construction).
+
+    Used by both the WS route and the assembler for validation / readiness
+    failures that occur outside an active turn, so ``turn_id`` is absent.
+
+    Args:
+        code: Machine-readable error code (e.g. ``"empty_message"``).
+        message: Human-readable error description.
+
+    Returns:
+        The JSON-serialisable ``turn.error`` frame dict.
+    """
+    return WsTurnError(
+        type="turn.error", code=code, message=message,
+    ).model_dump(mode="json", exclude_none=True)
 
 
 def _ctx(ws_or_request: Any) -> AppContext:

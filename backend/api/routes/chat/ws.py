@@ -9,8 +9,9 @@ assembly (history, tools, context, compression) is delegated to
 The turn itself runs on the greenfield :class:`AgentEngine`
 (``services/agent``), wired by ``run_agent_turn``: the :class:`WsTransport`
 owns the socket (single reader) and serves interactions, the engine emits
-its own wire frames, and the api-layer :class:`WebSocketEventSink` carries
-only the post-turn ``done`` / ``context_info`` / compression frames.
+its own wire frames, and the api-layer :class:`TransportEventSink` carries
+only the post-turn ``context.usage`` / ``context.compaction`` frames — over
+the SAME transport, so the chat channel has a single writer (carry #3).
 """
 
 from __future__ import annotations
@@ -28,12 +29,13 @@ from ._assembly import TurnAssembler
 from ._persist import _persist_final_turn
 from ._shared import (
     _ctx,
+    _error_frame,
     _get_ws_lock,
     _ws_connections,
     conversation_active,
     router,
 )
-from ._sink import WebSocketEventSink
+from ._sink import TransportEventSink
 
 #: Hard cap on a single inbound user message (characters).
 _MAX_USER_MESSAGE_LENGTH = 50_000
@@ -47,9 +49,9 @@ async def ws_chat(websocket: WebSocket) -> None:
 
         {"content": "user message", "conversation_id": "optional-uuid"}
 
-    Outgoing JSON (one per frame)::
+    Outgoing JSON (one per frame, canonical v2 vocabulary)::
 
-        {"type": "token", "content": "..."} | {"type": "done",
+        {"type": "turn.delta", "text": "..."} | {"type": "turn.finished",
          "conversation_id": "...", "message_id": "..."}
     """
     ctx = _ctx(websocket)
@@ -78,7 +80,9 @@ async def ws_chat(websocket: WebSocket) -> None:
 
     if ctx.llm_service is None or session_factory is None:
         await websocket.send_json(
-            {"type": "error", "content": "Server not ready — services not initialized"}
+            _error_frame(
+                "server_not_ready", "Server not ready — services not initialized",
+            )
         )
         await websocket.close(code=1011)
         async with ws_lock:
@@ -111,13 +115,13 @@ async def ws_chat(websocket: WebSocket) -> None:
             user_content: str = data.get("content", "").strip()
             if not user_content:
                 await websocket.send_json(
-                    {"type": "error", "content": "Empty message"}
+                    _error_frame("empty_message", "Empty message")
                 )
                 continue
 
             if len(user_content) > _MAX_USER_MESSAGE_LENGTH:
                 await websocket.send_json(
-                    {"type": "error", "content": "Message too long"}
+                    _error_frame("message_too_long", "Message too long")
                 )
                 continue
 
@@ -128,7 +132,7 @@ async def ws_chat(websocket: WebSocket) -> None:
             llm: LLMService = ctx.llm_service  # type: ignore[assignment]
             if llm is None:
                 await websocket.send_json(
-                    {"type": "error", "content": "LLM service unavailable"}
+                    _error_frame("llm_unavailable", "LLM service unavailable")
                 )
                 continue
             assembler = TurnAssembler(
@@ -154,11 +158,13 @@ async def ws_chat(websocket: WebSocket) -> None:
 
                 cancel_event = transport.begin_turn()
 
-                # The persist path emits its own ``done`` / context frames
-                # through this sink; the engine emits its wire stream via the
-                # transport's ``WsEventPort``. No second reader — the
-                # transport is the single owner of the socket.
-                sink = WebSocketEventSink(websocket, frame_validator=chat_frame_validator)
+                # The persist path emits its post-turn ``context.*`` frames
+                # through this sink, which rides the SAME transport as the
+                # engine's wire stream (single writer, carry #3). No second
+                # reader either — the transport owns the socket.
+                sink = TransportEventSink(
+                    transport, frame_validator=chat_frame_validator,
+                )
 
                 # Fase 1: greenfield engine is the only path. ``run_agent_turn``
                 # mounts the ports (WsEventPort/WsInteractionPort over the

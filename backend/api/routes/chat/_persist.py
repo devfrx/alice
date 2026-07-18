@@ -1,13 +1,14 @@
-"""AL\\CE — Post-turn conversation maintenance and ``done`` emission.
+"""AL\\CE — Post-turn conversation maintenance and ``context.*`` emission.
 
 The final assistant message is persisted by the AgentEngine itself
 (``engine._finish`` saving matrix via ``PersistencePort.save_final_message``,
-carry #2/#3) — this module no longer creates it.  What it owns is the
-post-turn pipeline around that fact: emitting the ``done`` event with the
-engine-returned ``final_message_id``, refreshing conversation metadata
+carry #2/#3) and the turn's final frame is the engine's ``turn.finished`` —
+this module no longer creates the message nor emits ``done``.  What it owns
+is the post-turn pipeline around that fact: refreshing conversation metadata
 (``title``/``updated_at``/``context_snapshot``), emitting the real
-``context_info`` frame, and running the post-stream context compression
-pass.
+``context.usage`` frame, and running the post-stream context compression
+pass.  All its frames are typed v2 models emitted through the SAME transport
+as the engine (single writer, carry #3).
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from typing import Any
 from loguru import logger
 from sqlmodel import select
 
+from backend.api.ws_schema import chat as ws_chat
 from backend.core.context import AppContext
 from backend.db.models import Conversation, Message
 from backend.services.agent.models import TurnOutcome
@@ -33,34 +35,6 @@ from ._helpers import (
 )
 from ._shared import _utcnow
 from ._sink import WSEventSink
-
-
-def _build_done_event(
-    *,
-    conv_id: uuid.UUID,
-    user_msg_id: uuid.UUID,
-    version_group_id: uuid.UUID | None,
-    version_index: int,
-    asst_msg_id: str,
-    finish_reason: str,
-) -> dict[str, Any]:
-    """Build the standard ``done`` WS event payload.
-
-    Takes primitives instead of the ORM ``Message`` so callers can run
-    it after a commit (which expires SQLAlchemy attributes and would
-    otherwise trigger a sync lazy-load → ``MissingGreenlet``).
-    """
-    return {
-        "type": "done",
-        "conversation_id": str(conv_id),
-        "message_id": asst_msg_id,
-        "user_message_id": str(user_msg_id),
-        "finish_reason": finish_reason,
-        "version_group_id": (
-            str(version_group_id) if version_group_id else None
-        ),
-        "version_index": version_index,
-    }
 
 
 async def _persist_final_turn(
@@ -82,29 +56,31 @@ async def _persist_final_turn(
     av_map: dict[str, int],
     cached_sys_prompt: str | None,
 ) -> None:
-    """Run post-turn conversation maintenance and emit the ``done`` event.
+    """Run post-turn conversation maintenance and emit ``context.*`` frames.
 
     The final assistant message is already persisted (or deliberately
     skipped) by the AgentEngine — ``engine._finish`` saving matrix via
-    ``PersistencePort.save_final_message`` (carry #2/#3) — so this
-    pipeline never creates it; ``result.final_assistant_message_id``
-    is relayed as the ``done`` frame's ``message_id``:
+    ``PersistencePort.save_final_message`` (carry #2/#3) — and the turn's
+    final frame is the engine's ``turn.finished``.  This pipeline never
+    creates the message and never emits ``done``:
 
-    * Fast path ``error``: defensive rollback + ``done`` error frame.
+    * Fast path ``error``: defensive rollback only (the engine already sent
+      the error ``turn.finished``).
     * Fast path ``cancelled``: refresh ``Conversation.title``/
-      ``updated_at`` when the turn produced anything, commit, ``done``.
-    * Normal path: emit real ``context_info`` (v2-6), update
+      ``updated_at`` when the turn produced anything, commit.
+    * Normal path: emit real ``context.usage`` (v2-6), update
       ``Conversation.title``/``updated_at``/``context_snapshot`` (v2-5),
-      commit, optionally trigger post-stream compression (v2-1), then
-      emit the WS ``done`` event.
+      commit, optionally trigger post-stream compression (v2-1).
 
     Args:
         session: Active async DB session.
         conv: Conversation ORM instance.
         conv_id: Conversation UUID.
-        user_msg: User ORM message that triggered the turn.
+        user_msg: User ORM message that triggered the turn (retained for
+            signature stability; ids now travel on the engine's
+            ``turn.finished`` frame).
         result: Outcome produced by the AgentEngine.
-        sink: WebSocket event sink.
+        sink: Outbound event sink (rides the engine transport).
         ctx: Application context.
         llm: Active LLM service.
         user_content: Raw user text (used for default title).
@@ -118,15 +94,6 @@ async def _persist_final_turn(
     """
     finish_reason = result.finish_reason
 
-    # Snapshot user_msg primitives ONCE up front.  After ``session.commit()``
-    # SQLAlchemy expires loaded attributes; reading them later from this
-    # async-session-bound ORM object would trigger a sync lazy-load and
-    # raise ``MissingGreenlet``.  Capturing here is safe — these fields
-    # are immutable for the lifetime of the turn.
-    user_msg_id = user_msg.id
-    user_msg_version_group_id = user_msg.version_group_id
-    user_msg_version_index = user_msg.version_index
-
     # ------------------------------------------------------------------
     # Fast path: error.  The AgentEngine already checkpoints intermediate
     # rows as it goes (``PersistencePort.checkpoint()`` after every
@@ -136,56 +103,41 @@ async def _persist_final_turn(
     # itself had started on ``session`` before the error was observed
     # (e.g. a partially-built assistant message), keeping the DB
     # consistent without touching the already-committed checkpoints. The
-    # AgentEngine sends ``cost=None`` on the error ``turn.finished``
-    # frame, so the frontend live chip never sums a cost this rollback
-    # won't back.
+    # engine already emitted the error ``turn.finished`` (the turn's final
+    # frame), so this path emits nothing.
     # ------------------------------------------------------------------
     if finish_reason == "error":
         with contextlib.suppress(Exception):
             await session.rollback()
-        await sink.send(_build_done_event(
-            conv_id=conv_id,
-            user_msg_id=user_msg_id,
-            version_group_id=user_msg_version_group_id,
-            version_index=user_msg_version_index,
-            asst_msg_id="", finish_reason="error",
-        ))
         return
 
     # ------------------------------------------------------------------
     # Fast path: cancelled (v3-4).  The AgentEngine already persisted the
     # partial assistant message (matrice ``_finish``: CANCELLED saves when
-    # content or thinking is present, including usage) — the persist path
-    # only refreshes the conversation metadata and emits ``done`` with the
-    # engine-returned ``final_message_id``.
+    # content or thinking is present, including usage) and emitted
+    # ``turn.finished`` — the persist path only refreshes the conversation
+    # metadata.
     # ------------------------------------------------------------------
     if finish_reason == "cancelled":
-        asst_msg_id = result.final_assistant_message_id or ""
         if result.tool_calls > 0 or result.content or result.thinking:
             conv.updated_at = _utcnow()
             if conv.title is None and user_content:
                 conv.title = user_content[:100]
             await session.commit()
-        await sink.send(_build_done_event(
-            conv_id=conv_id,
-            user_msg_id=user_msg_id,
-            version_group_id=user_msg_version_group_id,
-            version_index=user_msg_version_index,
-            asst_msg_id=asst_msg_id, finish_reason="cancelled",
-        ))
         return
 
     # ------------------------------------------------------------------
     # Normal path: the AgentEngine already persisted the final assistant
     # message (matrice ``_finish``: content/token_count/usage all written
-    # via ``PersistencePort.save_final_message``).  The persist path now
-    # only emits ``context_info`` (v2-6), refreshes conversation metadata
-    # (v2-5), commits and runs the post-stream compression.
+    # via ``PersistencePort.save_final_message``) and emitted
+    # ``turn.finished``.  The persist path now only emits ``context.usage``
+    # (v2-6), refreshes conversation metadata (v2-5), commits and runs the
+    # post-stream compression.
     # ------------------------------------------------------------------
-    asst_msg_id = result.final_assistant_message_id or ""
-
     try:
-        # v2-6: emit context_info with REAL token counts when available.
+        # v2-6: emit context.usage with REAL token counts when available.
+        # ``percentage`` from ``get_usage_real`` is already a fraction in
+        # [0, 1] (``input_tokens / context_window``) — the v2 contract.
         if (
             result.input_tokens > 0
             and ctx.context_manager
@@ -194,21 +146,23 @@ async def _persist_final_turn(
             real_usage = ctx.context_manager.get_usage_real(
                 result.input_tokens, context_window,
             )
-            await sink.send({
-                "type": "context_info",
-                "used": real_usage.used_tokens,
-                "available": real_usage.available_tokens,
-                "context_window": context_window,
-                "percentage": real_usage.percentage,
-                "was_compressed": was_compressed,
-                "messages_summarized": (
+            await sink.send(ws_chat.WsContextUsage(
+                type="context.usage",
+                used=real_usage.used_tokens,
+                available=real_usage.available_tokens,
+                context_window=context_window,
+                percentage=real_usage.percentage,
+                was_compressed=was_compressed,
+                messages_summarized=(
                     pre_comp.usage.messages_summarized if pre_comp else 0
                 ),
-                "is_estimated": False,
-                "breakdown": _compute_context_breakdown(
-                    messages, tool_tokens, ctx.context_manager,
+                is_estimated=False,
+                breakdown=ws_chat.WsContextBreakdown(
+                    **_compute_context_breakdown(
+                        messages, tool_tokens, ctx.context_manager,
+                    )
                 ),
-            })
+            ).model_dump(mode="json", exclude_none=True))
 
         conv.updated_at = _utcnow()
         if conv.title is None and user_content:
@@ -271,25 +225,11 @@ async def _persist_final_turn(
         logger.exception("DB commit error after streaming")
         with contextlib.suppress(Exception):
             await session.rollback()
-        await sink.send({
-            "type": "error", "content": "Failed to save response",
-        })
-        await sink.send(_build_done_event(
-            conv_id=conv_id,
-            user_msg_id=user_msg_id,
-            version_group_id=user_msg_version_group_id,
-            version_index=user_msg_version_index,
-            asst_msg_id="", finish_reason="error",
-        ))
+        await sink.send(ws_chat.WsTurnError(
+            type="turn.error", code="save_failed",
+            message="Failed to save response",
+        ).model_dump(mode="json", exclude_none=True))
         return
-
-    await sink.send(_build_done_event(
-        conv_id=conv_id,
-        user_msg_id=user_msg_id,
-        version_group_id=user_msg_version_group_id,
-        version_index=user_msg_version_index,
-        asst_msg_id=asst_msg_id, finish_reason=finish_reason,
-    ))
 
 
 async def _run_post_stream_compression(
@@ -310,9 +250,10 @@ async def _run_post_stream_compression(
 ) -> None:
     """Run a compression pass after the final assistant message is saved.
 
-    Mirrors the legacy "post-stream compression" block from ``ws_chat``
-    1:1.  Failures are caught and surfaced as a
-    ``context_compression_failed`` WS event so the turn still completes.
+    Emits the compaction lifecycle as typed v2 ``context.compaction`` frames
+    (started/done/failed) plus a final ``context.usage``.  Failures are
+    caught and surfaced as a ``context.compaction`` ``failed`` frame so the
+    turn still completes.
     """
     try:
         logger.info(
@@ -322,7 +263,9 @@ async def _run_post_stream_compression(
             input_tokens + output_tokens,
             context_window,
         )
-        await sink.send({"type": "context_compression_start"})
+        await sink.send(ws_chat.WsContextCompaction(
+            type="context.compaction", phase="started",
+        ).model_dump(mode="json", exclude_none=True))
         post_stmt = (
             select(Message)
             .where(Message.conversation_id == conv_id)
@@ -362,24 +305,27 @@ async def _run_post_stream_compression(
         session.add(post_sum_msg)
         await session.commit()
 
-        await sink.send({
-            "type": "context_compression_done",
-            "messages_summarized": post_comp.usage.messages_summarized,
-            "summary_message_id": str(post_sum_msg.id),
-        })
-        await sink.send({
-            "type": "context_info",
-            "used": post_comp.usage.used_tokens,
-            "available": post_comp.usage.available_tokens,
-            "context_window": context_window,
-            "percentage": post_comp.usage.percentage,
-            "was_compressed": True,
-            "messages_summarized": post_comp.usage.messages_summarized,
-            "is_estimated": True,
-            "breakdown": _compute_context_breakdown(
-                post_comp.messages, tool_tokens, ctx.context_manager,
+        await sink.send(ws_chat.WsContextCompaction(
+            type="context.compaction", phase="done",
+            messages_summarized=post_comp.usage.messages_summarized,
+            summary_message_id=str(post_sum_msg.id),
+        ).model_dump(mode="json", exclude_none=True))
+        # ``percentage`` is a fraction in [0, 1] (context_manager convention).
+        await sink.send(ws_chat.WsContextUsage(
+            type="context.usage",
+            used=post_comp.usage.used_tokens,
+            available=post_comp.usage.available_tokens,
+            context_window=context_window,
+            percentage=post_comp.usage.percentage,
+            was_compressed=True,
+            messages_summarized=post_comp.usage.messages_summarized,
+            is_estimated=True,
+            breakdown=ws_chat.WsContextBreakdown(
+                **_compute_context_breakdown(
+                    post_comp.messages, tool_tokens, ctx.context_manager,
+                )
             ),
-        })
+        ).model_dump(mode="json", exclude_none=True))
         logger.info(
             "Post-stream compression done: {} messages archived",
             post_comp.split_index,
@@ -393,4 +339,6 @@ async def _run_post_stream_compression(
     except Exception as exc:
         logger.warning("Post-stream compression failed: {}", exc)
         with contextlib.suppress(Exception):
-            await sink.send({"type": "context_compression_failed"})
+            await sink.send(ws_chat.WsContextCompaction(
+                type="context.compaction", phase="failed",
+            ).model_dump(mode="json", exclude_none=True))

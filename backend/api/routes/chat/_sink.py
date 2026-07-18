@@ -1,17 +1,19 @@
-"""AL\\CE — Chat done-frame event sink (api-layer owned).
+"""AL\\CE — Chat conversation-maintenance event sink (api-layer owned).
 
 The AgentEngine (``services/agent``) emits its own wire frames through the
 :class:`~backend.services.agent.adapters.ws.WsEventPort`.  The post-turn
 persistence path (:mod:`._persist`), however, still needs a thin outbound
-sink to deliver the ``done`` / ``context_info`` / compression frames it
+sink to deliver the ``context.usage`` / ``context.compaction`` frames it
 builds itself — a concern that belongs to the api layer, not to the engine.
 
-This module owns that sink after the demolition of ``services/turn`` (Task
-19).  It intentionally lives in the api layer: it wraps a FastAPI
-``WebSocket`` and is consumed only by the chat route package.
+Since Mossa 2 (carry #3) those frames ride the SAME transport as the engine:
+:class:`TransportEventSink` wraps the engine's ``WsTransport`` so the chat
+channel has a single writer.  This module owns that sink; it lives in the api
+layer and is consumed only by the chat route package.
 
 Public surface:
     * :class:`WSEventSink` — structural protocol (``send`` + ``is_connected``).
+    * :class:`TransportEventSink` — persist-path sink over the engine transport.
     * :class:`WebSocketEventSink` — production sink over a FastAPI WebSocket.
     * :class:`NullEventSink` — drop sink for headless (autonomous) turns.
     * :func:`is_websocket_closed_runtime_error` — closed-socket detector.
@@ -123,6 +125,42 @@ class WebSocketEventSink:
             return False
 
 
+class TransportEventSink:
+    """Persist-path sink over the engine's ``WsTransport``.
+
+    Ownership collapse (carry #3): the api layer writes the last
+    conversation-maintenance frames (``context.*``) through the SAME transport
+    as the engine — a single writer for the chat channel.  The constructor
+    accepts any object exposing ``send_json`` / ``connected`` (structural, no
+    import from the ``agent`` package), so this module stays api-owned.
+
+    Args:
+        transport: The engine transport (structural: ``send_json`` coroutine
+            plus a ``connected`` boolean property).
+        frame_validator: Optional callable injected by the api layer to
+            validate outbound frames against the typed contract.
+    """
+
+    def __init__(
+        self,
+        transport: Any,
+        frame_validator: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
+        self._transport = transport
+        self._validate = frame_validator
+
+    async def send(self, event: dict[str, Any]) -> None:
+        """Validate ``event`` then hand it to the transport's ``send_json``."""
+        if self._validate is not None:
+            self._validate(event)
+        await self._transport.send_json(event)
+
+    @property
+    def is_connected(self) -> bool:
+        """Whether the underlying transport is still connected."""
+        return bool(self._transport.connected)
+
+
 class NullEventSink:
     """Sink for headless (autonomous) turns: no surface, events dropped.
 
@@ -142,6 +180,7 @@ class NullEventSink:
 
 __all__ = [
     "NullEventSink",
+    "TransportEventSink",
     "WSEventSink",
     "WebSocketEventSink",
     "is_websocket_closed_runtime_error",

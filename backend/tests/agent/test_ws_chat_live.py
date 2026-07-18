@@ -4,15 +4,13 @@ Boot dell'app di test (lifespan via la fixture ``app`` di ``tests/conftest.py``)
 LLM scriptato, socket WS REALE (``starlette.testclient.TestClient``): esercita
 ``WsTransport`` (read-pump), ``run_agent_turn``, ``_persist_final_turn`` e il DB.
 
-È il sismografo del cambio contratto della Mossa 2: i task 7-9 lo aggiornano
-deliberatamente al vocabolario v2 — quando lo fanno, questo file è IL posto
-dove il diff del wire deve saltare all'occhio.
-
-Stato al Task 7 (wire v2 switch): il MOTORE emette ora SOLO frame v2
-(``turn.delta`` al posto di ``token``, niente ``llm_requery``, niente
-``tool_execution_*``), mentre ``done``/``context_info``/compressione arrivano
-ANCORA dal persist path legacy (fino al Task 9). Le richieste interattive
-legacy restano su ``WsInteractionPort`` (Task 8).
+È il sismografo del cambio contratto della Mossa 2. Stato al Task 9 (stream
+unico): il canale chat parla SOLO il vocabolario v2. Il MOTORE emette i fatti
+del turno (``turn.started``/``turn.delta``/``turn.usage``/``turn.finished``,
+``tool.call``/``tool.result``); il persist path emette gli ultimi frame di
+manutenzione (``context.usage``) attraverso lo STESSO trasporto. ``done``,
+``context_info`` e ``error`` legacy sono MORTI: il frame finale del turno è
+``turn.finished``.
 """
 
 from __future__ import annotations
@@ -37,11 +35,10 @@ def _drain_until(ws: Any, terminal_type: str, limit: int = 200) -> list[dict[str
 
 
 def test_text_turn_full_wire_sequence(app: FastAPI) -> None:
-    """Turno di solo testo: pin dell'ordine dei frame salienti sul wire v2.
-
-    Il motore emette ``turn.delta`` (non più ``token``); ``done`` è ancora del
-    persist path legacy (Task 9 lo sostituirà con ``turn.finished`` come frame
-    finale)."""
+    """Turno di solo testo: il turno chiude con ``turn.finished`` (nessun
+    ``done``). Il ``context.usage`` reale post-turno arriva DOPO
+    ``turn.finished`` — si drena fino al terminale e si asserisce sul prefisso.
+    """
     ctx = app.state.context
     ctx.llm_service = ScriptedLLMShim([
         {"type": "token", "content": "Ciao dal wire live."},
@@ -51,34 +48,38 @@ def test_text_turn_full_wire_sequence(app: FastAPI) -> None:
     client = TestClient(app)
     with client.websocket_connect("/api/ws/chat") as ws:
         ws.send_json({"content": "ciao"})
-        frames = _drain_until(ws, "done")
+        frames = _drain_until(ws, "turn.finished")
 
     types = [f["type"] for f in frames]
-    # Ordine saliente del wire v2: il turno apre con turn.started, ogni step
-    # annuncia turn.llm_step, il testo streamma via turn.delta (NON più token),
-    # lo usage per-step arriva, turn.finished chiude il motore, done chiude
-    # ancora il persist path legacy.
+    # Vocabolario legacy MORTO: nessun done/context_info/error sul canale.
+    assert "done" not in types
+    assert "context_info" not in types
+    assert "error" not in types
+    assert "token" not in types  # motore emette turn.delta
+    # Ordine saliente del wire v2.
     assert types.index("turn.started") < types.index("turn.llm_step")
-    assert "token" not in types  # vocabolario legacy morto sul motore
     assert "turn.delta" in types
     assert "turn.usage" in types
-    assert types.index("turn.finished") < types.index("done")
     # Il testo streammato arriva nel/nei turn.delta (kind=text).
     text = "".join(
         f["text"] for f in frames
         if f["type"] == "turn.delta" and f["kind"] == "text"
     )
     assert text == "Ciao dal wire live."
-    done = frames[-1]
-    assert done["finish_reason"] == "stop"
-    assert done["conversation_id"]
-    assert done["message_id"]  # messaggio assistant persistito
+    # turn.finished è il frame finale del turno: id valorizzati.
+    finished = frames[-1]
+    assert finished["type"] == "turn.finished"
+    assert finished["finish_reason"] == "stop"
+    assert finished["conversation_id"]
+    assert finished["message_id"]  # messaggio assistant persistito
+    assert "user_message_id" in finished
     assert ctx.llm_service.chat_calls == 1
 
 
 def test_tool_step_turn_wire_sequence(app: FastAPI) -> None:
     """Turno con tool call verso un tool sconosciuto: esercita il gate, la
-    tool response sintetica (§6.1.1), il secondo step e la persistenza."""
+    tool response sintetica (§6.1.1), il secondo step e la persistenza. Chiude
+    con ``turn.finished`` (nessun ``done``)."""
     ctx = app.state.context
     ctx.llm_service = ScriptedLLMShim([
         # step 1: il modello chiama un tool inesistente. Formato chunk
@@ -103,7 +104,7 @@ def test_tool_step_turn_wire_sequence(app: FastAPI) -> None:
     client = TestClient(app)
     with client.websocket_connect("/api/ws/chat") as ws:
         ws.send_json({"content": "usa il tool"})
-        frames = _drain_until(ws, "done")
+        frames = _drain_until(ws, "turn.finished")
 
     types = [f["type"] for f in frames]
     assert "tool.call" in types
@@ -113,10 +114,29 @@ def test_tool_step_turn_wire_sequence(app: FastAPI) -> None:
     # Tool response sintetica (§6.1.1): status v2 e corpo COMPLETO sul wire.
     assert tool_result["status"] == "unknown_tool"
     assert tool_result["result"] == "Tool sconosciuto: tool_inesistente."
-    # Vocabolario legacy morto sul motore: niente più llm_requery né
-    # tool_execution_start/done nello stream v2.
+    # Vocabolario legacy morto su TUTTO il canale (motore + persist path).
     assert "llm_requery" not in types
     assert "tool_execution_start" not in types
     assert "tool_execution_done" not in types
+    assert "done" not in types
+    assert frames[-1]["type"] == "turn.finished"
     assert frames[-1]["finish_reason"] == "stop"
     assert ctx.llm_service.chat_calls == 2
+
+
+def test_empty_message_emits_turn_error(app: FastAPI) -> None:
+    """Messaggio vuoto: errore di validazione pre-turno → ``turn.error`` con
+    ``code`` = ``empty_message`` e nessun ``turn_id`` (errore pre-turno)."""
+    ctx = app.state.context
+    ctx.llm_service = ScriptedLLMShim([
+        {"type": "token", "content": "mai raggiunto"},
+        {"type": "done", "finish_reason": "stop"},
+    ])
+    client = TestClient(app)
+    with client.websocket_connect("/api/ws/chat") as ws:
+        ws.send_json({"content": ""})
+        frame = ws.receive_json()
+
+    assert frame["type"] == "turn.error"
+    assert frame["code"] == "empty_message"
+    assert "turn_id" not in frame  # errore pre-turno: turn_id assente

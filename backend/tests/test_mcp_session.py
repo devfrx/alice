@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -238,6 +239,218 @@ class TestMcpSessionCallTool:
 
         with pytest.raises(RuntimeError, match="not connected"):
             await session.call_tool("read_file", {})
+
+
+class TestMcpSessionRoots:
+    """Tests for the workspace-scope → MCP roots bridge."""
+
+    def test_static_root_dirs_extracts_existing_dirs(
+        self, tmp_path: Path,
+    ) -> None:
+        """Only command tokens that resolve to existing directories count."""
+        real_dir = tmp_path / "allowed"
+        real_dir.mkdir()
+        a_file = tmp_path / "file.txt"
+        a_file.write_text("x")
+        missing = tmp_path / "missing"
+
+        config = _make_config(
+            command=[
+                "npx",
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                str(real_dir),
+                str(a_file),
+                str(missing),
+            ],
+        )
+        session = McpSession(config)
+
+        assert session._static_root_dirs() == [real_dir.resolve()]
+
+    def test_static_root_dirs_expands_home(self) -> None:
+        """``~`` (the default filesystem-server CLI dir) expands to home."""
+        config = _make_config(command=["npx", "~"])
+        session = McpSession(config)
+
+        assert session._static_root_dirs() == [Path.home().resolve()]
+
+    @pytest.mark.asyncio
+    async def test_list_roots_callback_returns_union(
+        self, tmp_path: Path,
+    ) -> None:
+        """Callback returns static CLI dirs ∪ provider dirs, deduplicated
+        and deterministically ordered, as a ListRootsResult."""
+        import mcp.types
+
+        static_dir = tmp_path / "static"
+        static_dir.mkdir()
+        scoped_dir = tmp_path / "scoped"
+        scoped_dir.mkdir()
+
+        config = _make_config(command=["npx", str(static_dir)])
+        session = McpSession(
+            config,
+            roots_provider=lambda: [scoped_dir.resolve(), static_dir.resolve()],
+        )
+
+        result = await session._list_roots(None)
+
+        assert isinstance(result, mcp.types.ListRootsResult)
+        expected = sorted(
+            {static_dir.resolve(), scoped_dir.resolve()}, key=str,
+        )
+        assert [str(r.uri) for r in result.roots] == [
+            p.as_uri() for p in expected
+        ]
+
+    @pytest.mark.asyncio
+    async def test_list_roots_callback_provider_error_falls_back(
+        self, tmp_path: Path,
+    ) -> None:
+        """A raising provider must not propagate: static dirs only."""
+        import mcp.types
+
+        static_dir = tmp_path / "static"
+        static_dir.mkdir()
+
+        def _boom() -> list[Path]:
+            raise RuntimeError("provider exploded")
+
+        config = _make_config(command=["npx", str(static_dir)])
+        session = McpSession(config, roots_provider=_boom)
+
+        result = await session._list_roots(None)
+
+        assert isinstance(result, mcp.types.ListRootsResult)
+        assert [str(r.uri) for r in result.roots] == [
+            static_dir.resolve().as_uri()
+        ]
+
+    @pytest.mark.asyncio
+    async def test_start_passes_list_roots_callback_with_provider(
+        self,
+    ) -> None:
+        """With a roots_provider the ClientSession gets the roots callback
+        (which makes the SDK declare the roots capability at initialize)."""
+        config = _make_config(command=["echo", "test"])
+        session = McpSession(config, roots_provider=lambda: [])
+
+        mock_session = AsyncMock()
+        mock_session.initialize = AsyncMock()
+        mock_session.list_tools = AsyncMock(
+            return_value=_mock_tools_response(),
+        )
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/echo"),
+            patch("mcp.client.stdio.stdio_client") as mock_stdio,
+            patch("mcp.ClientSession") as mock_cs_class,
+        ):
+            stdio_cm = AsyncMock()
+            stdio_cm.__aenter__ = AsyncMock(
+                return_value=(MagicMock(), MagicMock()),
+            )
+            stdio_cm.__aexit__ = AsyncMock(return_value=False)
+            mock_stdio.return_value = stdio_cm
+
+            session_cm = AsyncMock()
+            session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            session_cm.__aexit__ = AsyncMock(return_value=False)
+            mock_cs_class.return_value = session_cm
+
+            await session.start()
+
+            kwargs = mock_cs_class.call_args.kwargs
+            assert kwargs["list_roots_callback"] == session._list_roots
+
+        await session.stop()
+
+    @pytest.mark.asyncio
+    async def test_start_without_provider_passes_no_callback(self) -> None:
+        """Without a roots_provider the SDK default is kept (None) so the
+        roots capability is NOT declared and CLI dirs stay authoritative."""
+        config = _make_config(command=["echo", "test"])
+        session = McpSession(config)
+
+        mock_session = AsyncMock()
+        mock_session.initialize = AsyncMock()
+        mock_session.list_tools = AsyncMock(
+            return_value=_mock_tools_response(),
+        )
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/echo"),
+            patch("mcp.client.stdio.stdio_client") as mock_stdio,
+            patch("mcp.ClientSession") as mock_cs_class,
+        ):
+            stdio_cm = AsyncMock()
+            stdio_cm.__aenter__ = AsyncMock(
+                return_value=(MagicMock(), MagicMock()),
+            )
+            stdio_cm.__aexit__ = AsyncMock(return_value=False)
+            mock_stdio.return_value = stdio_cm
+
+            session_cm = AsyncMock()
+            session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            session_cm.__aexit__ = AsyncMock(return_value=False)
+            mock_cs_class.return_value = session_cm
+
+            await session.start()
+
+            kwargs = mock_cs_class.call_args.kwargs
+            assert kwargs.get("list_roots_callback") is None
+
+        await session.stop()
+
+    @pytest.mark.asyncio
+    async def test_notify_roots_changed_noop_without_provider(self) -> None:
+        config = _make_config()
+        session = McpSession(config)
+
+        mock_sess = AsyncMock()
+        session._session = mock_sess
+        session._status = ConnectionStatus.CONNECTED
+
+        await session.notify_roots_changed()
+
+        mock_sess.send_roots_list_changed.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_notify_roots_changed_noop_when_disconnected(self) -> None:
+        config = _make_config()
+        session = McpSession(config, roots_provider=lambda: [])
+
+        # No connected session at all — must be a silent no-op.
+        await session.notify_roots_changed()
+
+    @pytest.mark.asyncio
+    async def test_notify_roots_changed_sends_notification(self) -> None:
+        config = _make_config()
+        session = McpSession(config, roots_provider=lambda: [])
+
+        mock_sess = AsyncMock()
+        session._session = mock_sess
+        session._status = ConnectionStatus.CONNECTED
+
+        await session.notify_roots_changed()
+
+        mock_sess.send_roots_list_changed.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_notify_roots_changed_swallows_errors(self) -> None:
+        config = _make_config()
+        session = McpSession(config, roots_provider=lambda: [])
+
+        mock_sess = AsyncMock()
+        mock_sess.send_roots_list_changed = AsyncMock(
+            side_effect=RuntimeError("socket gone"),
+        )
+        session._session = mock_sess
+        session._status = ConnectionStatus.CONNECTED
+
+        # Best-effort: never propagates.
+        await session.notify_roots_changed()
 
 
 class TestMcpSessionStop:

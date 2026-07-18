@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -428,6 +429,114 @@ class TestMcpClientPluginConnectionStatus:
         plugin._sessions = {}
         status = await plugin.get_connection_status()
         assert status == ConnectionStatus.CONNECTED
+
+
+class TestMcpClientPluginRoots:
+    """Tests for the workspace-scope → MCP roots bridge (plugin side)."""
+
+    @pytest.mark.asyncio
+    async def test_initialize_injects_roots_provider(self, tmp_path) -> None:
+        """Sessions are built with a roots_provider reading the global
+        union of workspace scopes from ScopeService.all_scope_folders."""
+        ctx = _make_context([_make_server_config("fs")])
+        scoped = tmp_path / "scoped"
+        scoped.mkdir()
+        scope_service = MagicMock()
+        scope_service.all_scope_folders.return_value = [scoped.resolve()]
+        ctx.scope_service = scope_service
+
+        plugin = McpClientPlugin()
+
+        with patch(
+            "backend.plugins.mcp_client.plugin.McpSession",
+        ) as mock_session_cls:
+            mock_session_cls.return_value = _make_mock_session("fs")
+            await plugin.initialize(ctx)
+
+        kwargs = mock_session_cls.call_args.kwargs
+        provider = kwargs["roots_provider"]
+        assert provider() == [scoped.resolve()]
+        scope_service.all_scope_folders.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_roots_provider_without_scope_service_is_empty(
+        self,
+    ) -> None:
+        """Before stage_workspace wires ScopeService (or if it is absent),
+        the provider degrades to an empty list — static CLI dirs only."""
+        ctx = _make_context([_make_server_config("fs")])
+        assert ctx.scope_service is None
+
+        plugin = McpClientPlugin()
+
+        with patch(
+            "backend.plugins.mcp_client.plugin.McpSession",
+        ) as mock_session_cls:
+            mock_session_cls.return_value = _make_mock_session("fs")
+            await plugin.initialize(ctx)
+
+        provider = mock_session_cls.call_args.kwargs["roots_provider"]
+        assert provider() == []
+
+    @pytest.mark.asyncio
+    async def test_reconnect_injects_roots_provider(self) -> None:
+        ctx = _make_context([])
+        plugin = McpClientPlugin()
+        await plugin.initialize(ctx)
+
+        with patch(
+            "backend.plugins.mcp_client.plugin.McpSession",
+        ) as mock_session_cls:
+            mock_session_cls.return_value = _make_mock_session("fs")
+            await plugin.reconnect_server(
+                "fs", _make_server_config("fs"),
+            )
+
+        assert "roots_provider" in mock_session_cls.call_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_scope_updated_notifies_all_sessions(self) -> None:
+        """On SCOPE_UPDATED every session gets notify_roots_changed();
+        one failing session must not block the others."""
+        ctx = _make_context([])
+        plugin = McpClientPlugin()
+        await plugin.initialize(ctx)
+        await plugin.on_app_startup()
+
+        session_a = _make_mock_session("a")
+        session_a.notify_roots_changed = AsyncMock(
+            side_effect=RuntimeError("boom"),
+        )
+        session_b = _make_mock_session("b")
+        session_b.notify_roots_changed = AsyncMock()
+        plugin._sessions = {"a": session_a, "b": session_b}
+
+        await ctx.event_bus.emit(
+            AliceEvent.SCOPE_UPDATED,
+            conversation_id="conv",
+            folders=[str(Path.cwd())],
+        )
+
+        session_a.notify_roots_changed.assert_awaited_once()
+        session_b.notify_roots_changed.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_unsubscribes_scope_updated(self) -> None:
+        ctx = _make_context([])
+        plugin = McpClientPlugin()
+        await plugin.initialize(ctx)
+        await plugin.on_app_startup()
+
+        session = _make_mock_session("a")
+        session.notify_roots_changed = AsyncMock()
+        plugin._sessions = {"a": session}
+
+        await plugin.cleanup()
+
+        await ctx.event_bus.emit(
+            AliceEvent.SCOPE_UPDATED, conversation_id="c", folders=[],
+        )
+        session.notify_roots_changed.assert_not_awaited()
 
 
 class TestMcpClientPluginCleanup:

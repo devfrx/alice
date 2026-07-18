@@ -80,6 +80,8 @@ class AliceEvent(StrEnum):
     BACKGROUND_TASK_UPDATED = "background_task.updated"
     ATTENTION_RAISED = "attention.raised"
     TRIGGER_FIRED = "trigger.fired"
+    # -- Workspace scope (Fase 6) --
+    SCOPE_UPDATED = "scope.updated"
 
 # Type alias for async handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]

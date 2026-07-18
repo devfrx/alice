@@ -222,6 +222,152 @@ async def test_clear_scope_emits_empty_event(
 
 
 # ---------------------------------------------------------------------------
+# all_scope_folders (global union across conversations, for MCP roots)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_all_scope_folders_empty_when_no_scopes(service):
+    assert service.all_scope_folders() == []
+
+
+@pytest.mark.asyncio
+async def test_all_scope_folders_union_dedup_sorted(
+    service, session_factory, tmp_path,
+):
+    # Two conversations sharing one folder; union must be deduplicated and
+    # deterministically ordered (sorted by str).
+    async with session_factory() as session:
+        conv_a = Conversation(title="a")
+        conv_b = Conversation(title="b")
+        session.add(conv_a)
+        session.add(conv_b)
+        await session.commit()
+        await session.refresh(conv_a)
+        await session.refresh(conv_b)
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    only_b = tmp_path / "only_b"
+    only_b.mkdir()
+
+    await service.set_scope(conv_a.id, [str(shared)])
+    await service.set_scope(conv_b.id, [str(only_b), str(shared)])
+
+    expected = sorted(
+        {shared.resolve(), only_b.resolve()}, key=str,
+    )
+    assert service.all_scope_folders() == expected
+
+
+@pytest.mark.asyncio
+async def test_all_scope_folders_follows_set_and_clear(
+    service, conversation_id, ws_folder,
+):
+    assert service.all_scope_folders() == []
+
+    await service.set_scope(conversation_id, [str(ws_folder)])
+    assert service.all_scope_folders() == [ws_folder.resolve()]
+
+    await service.clear_scope(conversation_id)
+    assert service.all_scope_folders() == []
+
+
+# ---------------------------------------------------------------------------
+# Bootstrap wiring: scope.updated is mirrored onto the event bus
+# ---------------------------------------------------------------------------
+
+
+def _make_bootstrap_ctx(session_factory):
+    """Minimal AppContext for running ``stage_workspace`` in isolation."""
+    from unittest.mock import MagicMock
+
+    from backend.core.context import AppContext
+    from backend.core.event_bus import EventBus
+
+    config = MagicMock()
+    config.scope = WorkspaceScopeConfig()
+    config.permissions.default_mode = "strict"
+    config.commands.enabled = False
+    config.commands.rpc_timeout_s = 5.0
+    config.commands.disabled_commands = []
+    config.terminal.interactive_shell = None
+    config.terminal.max_sessions = 2
+
+    ctx = AppContext(config=config, event_bus=EventBus())
+    ctx.db = session_factory
+    ctx.ws_connection_manager = None
+    ctx.tool_registry = None
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_stage_workspace_publishes_scope_updated_on_bus(
+    session_factory, conversation_id, ws_folder,
+):
+    """A scope mutation must be published on the in-process event bus too."""
+    from backend.core.bootstrap.workspace import stage_workspace
+    from backend.core.event_bus import AliceEvent
+
+    ctx = _make_bootstrap_ctx(session_factory)
+    await stage_workspace(ctx)
+
+    received: list[dict[str, Any]] = []
+
+    async def _handler(**kwargs: Any) -> None:
+        received.append(kwargs)
+
+    ctx.event_bus.subscribe(AliceEvent.SCOPE_UPDATED, _handler)
+
+    await ctx.scope_service.set_scope(conversation_id, [str(ws_folder)])
+
+    assert received == [
+        {
+            "conversation_id": str(conversation_id),
+            "folders": [str(ws_folder.resolve())],
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_stage_workspace_replays_persisted_scopes_on_startup(
+    session_factory, conversation_id, ws_folder,
+):
+    """Scopes persisted in earlier runs are replayed as one SCOPE_UPDATED.
+
+    MCP sessions connect during ``stage_plugins`` (before ``stage_workspace``
+    loads persisted scopes), so the stage nudges roots-aware listeners once
+    after ``load_all`` when any scope exists.
+    """
+    from backend.core.bootstrap.workspace import stage_workspace
+    from backend.core.event_bus import AliceEvent
+
+    # Persist a scope as a previous run would have.
+    writer = ScopeService(
+        session_factory=session_factory, config=WorkspaceScopeConfig(),
+    )
+    await writer.set_scope(conversation_id, [str(ws_folder)])
+
+    ctx = _make_bootstrap_ctx(session_factory)
+
+    received: list[dict[str, Any]] = []
+
+    async def _handler(**kwargs: Any) -> None:
+        received.append(kwargs)
+
+    ctx.event_bus.subscribe(AliceEvent.SCOPE_UPDATED, _handler)
+
+    await stage_workspace(ctx)
+
+    assert received == [
+        {
+            "conversation_id": None,
+            "folders": [str(ws_folder.resolve())],
+        }
+    ]
+
+
+# ---------------------------------------------------------------------------
 # validate_folder
 # ---------------------------------------------------------------------------
 

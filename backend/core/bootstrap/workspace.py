@@ -9,6 +9,7 @@ manager.  Hard ordering: ``permission_service`` needs scope + rules;
 from __future__ import annotations
 
 from backend.core.context import AppContext
+from backend.core.event_bus import AliceEvent
 
 
 async def stage_workspace(ctx: AppContext) -> None:
@@ -31,10 +32,29 @@ async def stage_workspace(ctx: AppContext) -> None:
     async def _broadcast_scope_event(event: dict) -> None:
         if ctx.ws_connection_manager:
             await ctx.ws_connection_manager.broadcast(event)
+        # Mirror onto the in-process event bus so backend listeners react
+        # to scope changes too (e.g. the mcp_client plugin nudges its
+        # servers to re-request the MCP ``roots``).
+        await ctx.event_bus.emit(
+            AliceEvent.SCOPE_UPDATED,
+            conversation_id=event.get("conversation_id"),
+            folders=event.get("folders"),
+        )
 
     scope_service.set_event_callback(_broadcast_scope_event)
     await scope_service.load_all()
     ctx.scope_service = scope_service
+
+    # MCP sessions connect during stage_plugins — BEFORE the persisted
+    # scopes above are loaded — so their first roots/list answer could not
+    # include them.  Replay once so roots-aware servers catch up.
+    persisted_folders = scope_service.all_scope_folders()
+    if persisted_folders:
+        await ctx.event_bus.emit(
+            AliceEvent.SCOPE_UPDATED,
+            conversation_id=None,
+            folders=[str(p) for p in persisted_folders],
+        )
 
     # -- Permission mode service (per-conversation tier, Fase 7) --------
     from backend.services.permission_mode_service import (

@@ -197,6 +197,31 @@ class ScopeService:
             return explicit
         return [self.sandbox_root_for(conversation_id)]
 
+    def all_scope_folders(self) -> list[Path]:
+        """Return the union of every conversation's scope folders (**SYNC**).
+
+        Reads the in-memory mirror (kept in sync by :meth:`set_scope`,
+        :meth:`clear_scope` and :meth:`load_all`), deduplicates across
+        conversations and returns a deterministic order (sorted by ``str``).
+
+        This is the feed for the MCP ``roots`` bridge (see
+        :mod:`backend.services.mcp_session`): MCP servers are a single
+        process shared by all conversations, so they receive the *global*
+        union of explicit scopes — per-conversation confinement of MCP tools
+        stays with the permission gate, not with the server's roots.
+        Ephemeral sandboxes (:meth:`sandbox_root_for`) are deliberately
+        excluded: only explicit, user-chosen folders are exposed.
+
+        Returns:
+            The deduplicated, ``str``-sorted union of all explicit scope
+            folders (``[]`` when no conversation has a scope).
+        """
+        unique: dict[str, Path] = {}
+        for folders in self._scopes.values():
+            for folder in folders:
+                unique.setdefault(str(folder), folder)
+        return [unique[key] for key in sorted(unique)]
+
     async def get_scope(self, conversation_id: uuid.UUID | str) -> list[str]:
         """Return the conversation's scope folders as strings (for the REST API).
 

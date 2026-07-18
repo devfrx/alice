@@ -1,4 +1,32 @@
-"""AL\\CE — Single MCP server session manager."""
+"""AL\\CE — Single MCP server session manager.
+
+Workspace-scope → MCP ``roots`` bridge
+--------------------------------------
+
+MCP servers that confine themselves to a set of allowed directories (e.g.
+``@modelcontextprotocol/server-filesystem``) traditionally receive those
+directories as **static CLI args** at launch — which means a folder added to
+a conversation's workspace scope mid-session is rejected by the server
+("Access denied - path outside allowed directories").  The MCP ``roots``
+capability closes that gap: when the client declares it, a roots-aware
+server requests ``roots/list`` at initialize and **REPLACES** its allowed
+directories with the returned roots (when non-empty), and re-requests them
+on every ``notifications/roots/list_changed``.
+
+:class:`McpSession` implements the client side: an optional
+``roots_provider`` callable (injected by the ``mcp_client`` plugin, wired to
+:meth:`backend.services.scope_service.ScopeService.all_scope_folders`) turns
+on the capability.  The roots served are always
+``static CLI dirs ∪ provider dirs``: the static launch dirs MUST be included
+because a roots-capable server *substitutes* (does not extend) its CLI dirs
+with the roots — omitting them would silently revoke the directories the
+server was launched with.
+
+Deliberate limit: roots are **GLOBAL to the server process** (the union of
+all conversations' scopes plus the static launch dirs), not per-conversation.
+Per-conversation confinement of MCP tools is out of scope here — it is a
+censused gap of the permission gate (fase 2+).
+"""
 
 from __future__ import annotations
 
@@ -7,12 +35,17 @@ import contextlib
 import os
 import sys
 import traceback
-from typing import Any
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from backend.core.config import McpServerConfig
 from backend.core.plugin_models import ConnectionStatus, ToolDefinition
+
+if TYPE_CHECKING:
+    import mcp.types
 
 # ---------------------------------------------------------------------------
 # Command resolution
@@ -88,8 +121,24 @@ class McpSession:
     awaits its completion.
     """
 
-    def __init__(self, config: McpServerConfig) -> None:
+    def __init__(
+        self,
+        config: McpServerConfig,
+        roots_provider: Callable[[], list[Path]] | None = None,
+    ) -> None:
+        """Build a session manager for one configured MCP server.
+
+        Args:
+            config: The server's transport/command configuration.
+            roots_provider: Optional **sync** callable returning the extra
+                directories (typically the global union of workspace scopes,
+                :meth:`ScopeService.all_scope_folders`) to expose as MCP
+                ``roots`` on top of the static CLI dirs.  When ``None`` the
+                roots capability is not declared and the server keeps its
+                CLI-provided allowed directories (legacy behaviour).
+        """
         self._config = config
+        self._roots_provider = roots_provider
         self._status: ConnectionStatus = ConnectionStatus.DISCONNECTED
         self._cached_tools: list[ToolDefinition] = []
         self._session: Any = None  # mcp.ClientSession, set by _session_task
@@ -217,6 +266,31 @@ class McpSession:
             if hasattr(block, "text")
         )
 
+    async def notify_roots_changed(self) -> None:
+        """Send ``notifications/roots/list_changed`` to the server (best-effort).
+
+        Called by the ``mcp_client`` plugin whenever a workspace scope
+        changes (``AliceEvent.SCOPE_UPDATED``); a roots-aware server reacts
+        by re-requesting ``roots/list``, which lands in :meth:`_list_roots`.
+
+        A no-op when the session has no ``roots_provider`` (capability never
+        declared) or is not connected.  Any transport error is logged and
+        swallowed — a failed nudge must never break the caller.
+        """
+        if self._roots_provider is None:
+            return
+        session = self._session
+        if session is None or self._status != ConnectionStatus.CONNECTED:
+            return
+        try:
+            await session.send_roots_list_changed()
+        except Exception as exc:
+            logger.warning(
+                "MCP '{}': roots/list_changed notification failed: {}",
+                self._config.name,
+                exc,
+            )
+
     @property
     def status(self) -> ConnectionStatus:
         """Current connection status."""
@@ -230,6 +304,82 @@ class McpSession:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _static_root_dirs(self) -> list[Path]:
+        """Return the launch-command tokens that are existing directories.
+
+        Every token of the resolved stdio command *after* the executable
+        (index 1 onwards) that resolves — after ``~`` expansion — to an
+        existing directory is treated as a static allowed dir.  For the
+        filesystem server these are exactly its CLI allowed directories
+        (e.g. the home dir expanded from ``~``); for other servers this is
+        typically empty.
+
+        These dirs MUST be part of every ``roots/list`` answer: a
+        roots-capable server *replaces* its CLI dirs with the roots, so
+        omitting them would revoke the directories the server was
+        launched with.
+
+        Returns:
+            The existing-directory tokens, resolved, in command order.
+        """
+        if self._config.transport != "stdio" or not self._config.command:
+            return []
+        resolved_command = _resolve_command(list(self._config.command))
+        dirs: list[Path] = []
+        for token in resolved_command[1:]:
+            try:
+                candidate = Path(token).expanduser()
+                if candidate.is_dir():
+                    dirs.append(candidate.resolve())
+            except (OSError, ValueError):
+                continue
+        return dirs
+
+    async def _list_roots(self, context: Any) -> mcp.types.ListRootsResult:
+        """Answer a ``roots/list`` request from the server.
+
+        Handed to :class:`mcp.ClientSession` as ``list_roots_callback`` when
+        a ``roots_provider`` is configured — which is also what makes the
+        SDK declare the ``roots`` capability at initialize (the SDK only
+        declares it for a non-default callback).
+
+        The result is ``static CLI dirs ∪ provider dirs``, deduplicated and
+        deterministically ordered (sorted by ``str``).  The provider is
+        best-effort: if it raises, the error is logged and only the static
+        dirs are served — this callback must never propagate an exception
+        back into the SDK's request handling.
+
+        Args:
+            context: The SDK's ``RequestContext`` (unused).
+
+        Returns:
+            The current roots as a ``ListRootsResult``.
+        """
+        import mcp.types
+        from pydantic import FileUrl
+
+        dirs = self._static_root_dirs()
+        if self._roots_provider is not None:
+            try:
+                dirs.extend(self._roots_provider())
+            except Exception as exc:
+                logger.warning(
+                    "MCP '{}': roots provider failed, serving static "
+                    "dirs only: {}",
+                    self._config.name,
+                    exc,
+                )
+        unique: dict[str, Path] = {}
+        for path in dirs:
+            unique.setdefault(str(path), path)
+        ordered = [unique[key] for key in sorted(unique)]
+        return mcp.types.ListRootsResult(
+            roots=[
+                mcp.types.Root(uri=FileUrl(p.as_uri()), name=p.name)
+                for p in ordered
+            ],
+        )
 
     def _log_exception(self, exc: BaseException, depth: int = 0) -> None:
         """Recursively log all leaf exceptions inside an ExceptionGroup.
@@ -325,8 +475,19 @@ class McpSession:
                         mcp.client.sse.sse_client(self._config.url)
                     )
 
+                # Passing a list_roots_callback makes the SDK declare the
+                # ``roots`` capability at initialize; ``None`` keeps the SDK
+                # default (capability NOT declared, CLI dirs authoritative).
                 session = await stack.enter_async_context(
-                    mcp.ClientSession(read, write)
+                    mcp.ClientSession(
+                        read,
+                        write,
+                        list_roots_callback=(
+                            self._list_roots
+                            if self._roots_provider is not None
+                            else None
+                        ),
+                    )
                 )
                 await session.initialize()
 

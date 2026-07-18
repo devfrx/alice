@@ -3,11 +3,24 @@
 Bridges AL\\CE to external MCP servers. Each server's tools are
 namespaced as ``mcp_{server_name}_{tool_name}`` and exposed via
 ``get_tools()``, making them available to the LLM automatically.
+
+Workspace-scope → MCP ``roots`` bridge: every session is built with a
+``roots_provider`` reading the **global union** of workspace scopes
+(:meth:`ScopeService.all_scope_folders`), and on ``AliceEvent.SCOPE_UPDATED``
+the plugin nudges every session with ``notify_roots_changed()`` so
+roots-aware servers (e.g. the filesystem server) re-request ``roots/list``
+and accept folders added to a scope mid-session.  Deliberate limit: MCP
+servers are one process shared by all conversations, so the roots are
+global (union of all scopes + static launch dirs), not per-conversation —
+per-conversation confinement of MCP tools is a censused gap of the
+permission gate (fase 2+).  See :mod:`backend.services.mcp_session` for the
+session-side details (why the static CLI dirs must ride along).
 """
 
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 from backend.core.context import AppContext
@@ -56,7 +69,9 @@ class McpClientPlugin(BasePlugin):
                 )
                 continue
 
-            session = McpSession(server_cfg)
+            session = McpSession(
+                server_cfg, roots_provider=self._scope_roots_provider,
+            )
             try:
                 await session.start()
                 self._sessions[server_cfg.name] = session
@@ -81,8 +96,61 @@ class McpClientPlugin(BasePlugin):
                     reason=str(exc),
                 )
 
+    async def on_app_startup(self) -> None:
+        """Subscribe the roots bridge to workspace-scope changes.
+
+        Runs after all plugins are initialised (inside ``stage_plugins``,
+        i.e. *before* ``stage_workspace`` wires ``ctx.scope_service`` — the
+        provider is lazy, so that is fine; ``stage_workspace`` replays one
+        ``SCOPE_UPDATED`` after loading persisted scopes to catch us up).
+        """
+        self.ctx.event_bus.subscribe(
+            AliceEvent.SCOPE_UPDATED, self._on_scope_updated,
+        )
+
+    def _scope_roots_provider(self) -> list[Path]:
+        """Return the global union of workspace-scope folders (lazy).
+
+        Injected into every :class:`McpSession` as its ``roots_provider``.
+        Degrades to ``[]`` when :class:`ScopeService` is not (yet) wired —
+        MCP sessions connect during ``stage_plugins``, before
+        ``stage_workspace`` sets ``ctx.scope_service`` — leaving only the
+        servers' static CLI dirs in the roots.
+        """
+        ctx = self._ctx
+        scope_service = (
+            getattr(ctx, "scope_service", None) if ctx is not None else None
+        )
+        if scope_service is None:
+            return []
+        folders: list[Path] = list(scope_service.all_scope_folders())
+        return folders
+
+    async def _on_scope_updated(self, **kwargs: Any) -> None:
+        """Nudge every session to re-request roots (best-effort each)."""
+        for session in list(self._sessions.values()):
+            try:
+                await session.notify_roots_changed()
+            except Exception as exc:
+                self.logger.warning(
+                    "MCP '{}': roots change notification failed: {}",
+                    session.server_name,
+                    exc,
+                )
+
     async def cleanup(self) -> None:
         """Disconnect all MCP sessions."""
+        # Drop the scope subscription first so a scope change during
+        # shutdown cannot touch half-stopped sessions (and the event bus
+        # does not retain this defunct instance across hot-reloads).
+        try:
+            self.ctx.event_bus.unsubscribe(
+                AliceEvent.SCOPE_UPDATED, self._on_scope_updated,
+            )
+        except Exception as exc:
+            self.logger.debug(
+                "Scope-updated unsubscribe skipped: {}", exc,
+            )
         for session in self._sessions.values():
             try:
                 await session.stop()
@@ -283,7 +351,9 @@ class McpClientPlugin(BasePlugin):
                     exc,
                 )
 
-        session = McpSession(config)
+        session = McpSession(
+            config, roots_provider=self._scope_roots_provider,
+        )
         await session.start()
         self._sessions[server_name] = session
         return session

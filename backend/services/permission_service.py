@@ -1,13 +1,16 @@
-"""AL\\CE — Central tool-permission authority (Fase 2, foundation D).
+"""AL\\CE — Central tool-permission authority.
+
+(Laid down as "foundation D" in Fase 2 of the original agent rework — not to
+be confused with Fase 2 of the Agent v2 program.)
 
 ``PermissionService`` is the single place that answers *"may this tool-call
 run?"* for the turn engine. It replaces the per-plugin, easily-forgotten
-checks that let a new tool silently escape a sandbox. The turn engine's
-``PermissionMiddleware`` delegates here for:
+checks that let a new tool silently escape a sandbox. The AgentEngine's
+permission gate delegates here for:
 
 * **risk policy** — a ``risk_level="forbidden"`` tool is always blocked;
   ``requires_confirmation`` tools are *classified* here (the actual user
-  round-trip lives in ``ConfirmationMiddleware``);
+  round-trip is the engine's gate flow, over ``InteractionPort``);
 * **scope confinement (by construction)** — any tool tagged with a filesystem
   capability (``fs_read`` / ``fs_write``) has every declared ``path_args``
   argument resolved against the conversation's workspace scope; a path outside

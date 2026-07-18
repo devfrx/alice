@@ -115,7 +115,9 @@ def test_allow_rule_bypasses_out_of_scope_but_not_forbidden(tmp_path) -> None:
 
     # Forbidden still wins over an allow rule.
     forbidden = _tool(risk_level="forbidden")
-    assert svc.decide(
+    d = svc.decide(
         tool_name="t", args={}, tool_def=forbidden,
         conversation_id=CONV, mode=PermissionMode.STRICT,
-    ).action is GateAction.DENY
+    )
+    assert d.action is GateAction.DENY
+    assert d.outcome is PermissionOutcome.DENY_FORBIDDEN

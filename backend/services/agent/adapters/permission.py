@@ -32,9 +32,9 @@ debole).
 
 Fix review olistica M1 (nome nudo passato a ``PermissionService.decide``):
 il nome RISOLTO (namespaced) — non più ``call.name`` — è passato come
-``tool_name`` a ``PermissionService.decide``. Rules/grants per-conversazione
+``tool_name`` a ``PermissionService.decide``. Le rules per-conversazione
 sono keyed sul nome namespaced (es. ``"memory_remember"``); passare il nome
-nudo emesso dal modello (``"remember"``) faceva sì che una regola/grant su
+nudo emesso dal modello (``"remember"``) faceva sì che una regola su
 ``memory_remember`` non facesse mai match. Se la risoluzione fallisce (nome
 sconosciuto o suffisso ambiguo), fallback al nome nudo originale — stesso
 comportamento di prima per i tool non risolvibili.
@@ -143,7 +143,7 @@ class PermissionServiceAdapter:
         * ``NONE``         → no-op.
 
         La regola è keyed sul nome NAMESPACED risolto (stessa regola del fix
-        M1 su ``decide``: rules/grants keyed sul nome bare non farebbero mai
+        M1 su ``decide``: rules keyed sul nome bare non farebbero mai
         match nel gate). Best-effort come da contratto ``PermissionPort``: un
         errore di persistenza è loggato, mai propagato — la call è già stata
         approvata dall'utente e deve proseguire.

@@ -1,11 +1,11 @@
 """AL\\CE — Persistent per-tool permission rules (Fase 7).
 
 A small, independently-testable layer that persists *"always allow / ask /
-deny tool X"* decisions so they survive restarts — the durable counterpart to
-:class:`~backend.services.permission_service.PermissionService`'s ephemeral
-in-memory *session grants*.  It is injected into the permission gate as a
-**synchronous** ``match`` provider (mirroring the scope provider) so the hot
-tool-call path never awaits.
+deny tool X"* decisions so they survive restarts — the "remember" of a
+confirmation, consulted by
+:class:`~backend.services.permission_service.PermissionService`.  It is
+injected into the permission gate as a **synchronous** ``match`` provider
+(mirroring the scope provider) so the hot tool-call path never awaits.
 
 Resolution semantics:
 

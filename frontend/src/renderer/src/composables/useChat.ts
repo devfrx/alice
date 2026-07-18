@@ -189,9 +189,12 @@ export function useChat(): UseChatReturn {
     'interaction.resolved': (msg) => agentRunStore.applyInteractionResolved(msg),
 
     'context.usage': (msg) => {
-      // Gated ONLY on the conversation (not the generation): the post-turn
-      // usage frame arrives after finalizeStream has advanced the generation.
-      if (store.streamingConversationId !== store.currentConversation?.id) return
+      // Gated ONLY on the conversation (not the generation): the real
+      // post-turn usage frame arrives AFTER turn.finished — by then
+      // finalizeStream has advanced the generation AND nulled
+      // streamingConversationId, so the gate uses the sticky
+      // lastStreamedConversationId (review T11).
+      if (store.lastStreamedConversationId !== store.currentConversation?.id) return
       store.updateContextInfo({
         used: msg.used,
         available: msg.available,
@@ -205,7 +208,9 @@ export function useChat(): UseChatReturn {
     },
 
     'context.compaction': (msg) => {
-      if (store.streamingConversationId !== store.currentConversation?.id) return
+      // Same sticky-id gate as context.usage: post-stream compaction frames
+      // arrive after finalizeStream has nulled streamingConversationId.
+      if (store.lastStreamedConversationId !== store.currentConversation?.id) return
       if (msg.phase === 'started') store.setCompressingContext(true)
       else if (msg.phase === 'done') store.setCompressionDone(msg.messages_summarized ?? 0)
       else store.setCompressingContext(false)

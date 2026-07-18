@@ -129,6 +129,18 @@ export const useChatStore = defineStore('chat', () => {
   /** The conversation ID for which streaming is currently active. */
   const streamingConversationId = ref<string | null>(null)
 
+  /**
+   * The conversation ID of the most recently started stream.
+   *
+   * Unlike {@link streamingConversationId} this is NOT cleared when the
+   * stream finalizes/cancels — the backend emits the real post-turn
+   * `context.usage` / `context.compaction` frames AFTER `turn.finished`
+   * (which nulls `streamingConversationId` via `finalizeStream`), so the
+   * post-turn tail must be gated against this sticky id instead. It is only
+   * overwritten by the next stream.
+   */
+  const lastStreamedConversationId = ref<string | null>(null)
+
   /** Tokens accumulated so far for the in-progress assistant response. */
   const currentStreamContent = ref('')
 
@@ -608,6 +620,7 @@ export const useChatStore = defineStore('chat', () => {
     isWaitingForResponse.value = true
     isCancelling.value = false
     streamingConversationId.value = currentConversation.value.id
+    lastStreamedConversationId.value = currentConversation.value.id
     currentStreamContent.value = ''
     currentThinkingContent.value = ''
     contextInfo.value = null
@@ -844,6 +857,7 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     lastStreamEndedAt,
     streamingConversationId,
+    lastStreamedConversationId,
     currentStreamContent,
     currentThinkingContent,
     streamGeneration,

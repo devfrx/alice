@@ -14,6 +14,7 @@ from backend.core.plugin_models import ConnectionStatus, ExecutionContext, ToolR
 from backend.plugins.file_search.plugin import FileSearchPlugin
 from backend.plugins.file_search.readers import (
     _TEXT_EXTENSIONS,
+    format_numbered,
     read_text_file,
 )
 from backend.plugins.file_search.searcher import (
@@ -539,6 +540,7 @@ class TestReadTextFileTool:
 
         assert result.success is True
         assert result.content["truncated"] is True
+        assert result.content["next_offset"] > 1
         assert "output troncato a max_chars" in result.content["content"]
         # 500 chars of numbered output + the truncation note
         assert len(result.content["content"]) < 600
@@ -601,6 +603,99 @@ class TestReadTextFileTool:
         content = result.content["content"]
         assert "[riga troncata]" in content
         assert "     2\tshort" in content
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_max_chars_cuts_at_line_boundary(self, tmp_path):
+        """Char-cap: cut at a complete line, real next_offset, continuation loop."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "src.txt"
+        target.write_text(
+            "\n".join(f"line{i}-" + "a" * 30 + "END" for i in range(1, 301)),
+            encoding="utf-8",
+        )
+
+        first = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert first.success is True
+        assert first.content["truncated"] is True
+        next_offset = first.content["next_offset"]
+        assert next_offset > 1
+        content = first.content["content"]
+        data_lines = [ln for ln in content.split("\n") if "\t" in ln]
+        # every rendered line is COMPLETE — never cut mid-line
+        assert all(ln.endswith("END") for ln in data_lines)
+        assert data_lines[-1].startswith(f"{next_offset - 1:>6}\t")
+        assert first.content["lines_read"] == len(data_lines)
+
+        # the continuation loop resumes from exactly the right line
+        second = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target), "offset": next_offset},
+            _make_exec_ctx(),
+        )
+        assert second.success is True
+        second_lines = [
+            ln for ln in second.content["content"].split("\n") if "\t" in ln
+        ]
+        expected = f"{next_offset:>6}\tline{next_offset}-" + "a" * 30 + "END"
+        assert second_lines[0] == expected
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_form_feed_stays_one_line(self, tmp_path):
+        """A form feed inside a line must NOT split the numbering (cat -n parity)."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "notes.txt"
+        target.write_text("foo\x0cbar\nbaz\n", encoding="utf-8", newline="")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["total_lines"] == 2
+        assert "     1\tfoo\x0cbar" in result.content["content"]
+        assert "     2\tbaz" in result.content["content"]
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_offset_beyond_eof_notes(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "small.txt"
+        target.write_text("only\n", encoding="utf-8")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target), "offset": 10},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["lines_read"] == 0
+        content = result.content["content"]
+        assert "nessuna riga" in content
+        assert "offset 10" in content
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_empty_file_notes(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "empty.txt"
+        target.write_text("", encoding="utf-8")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["total_lines"] == 0
+        assert result.content["truncated"] is False
+        assert "file vuoto" in result.content["content"]
 
     @pytest.mark.asyncio
     async def test_file_too_large_returns_error(self):
@@ -1152,6 +1247,52 @@ class TestReaders:
         assert result.success is False
         assert "python-docx" in result.error_message
 
+    @pytest.mark.asyncio
+    async def test_read_byte_cap_adds_note(self, tmp_path):
+        """When the byte cap cuts the file, the payload explains the wall."""
+        target = tmp_path / "big.log"
+        target.write_bytes(b"A" * 50 + b"\n" + b"B" * 100)
+
+        result = await read_text_file(path=target, max_bytes=60, max_chars=8000)
+
+        assert isinstance(result, dict)
+        assert result["truncated"] is True
+        assert result["next_offset"] == 0
+        assert "max_file_size_read_bytes" in result["content"]
+
     def test_text_extensions_include_common_types(self):
         for ext in [".txt", ".md", ".py", ".json", ".yaml", ".csv", ".log"]:
             assert ext in _TEXT_EXTENSIONS
+
+
+class TestFormatNumbered:
+    """Direct unit tests on the pure format_numbered formatter."""
+
+    def test_empty_text(self):
+        content, meta = format_numbered("", limit=10, max_line_chars=100)
+        assert content == ""
+        assert meta == {
+            "total_lines": 0,
+            "lines_read": 0,
+            "truncated": False,
+            "next_offset": 0,
+        }
+
+    def test_offset_beyond_eof(self):
+        content, meta = format_numbered(
+            "a\nb\n", offset=10, limit=5, max_line_chars=100,
+        )
+        assert content == ""
+        assert meta["total_lines"] == 2
+        assert meta["lines_read"] == 0
+        assert meta["truncated"] is False
+        assert meta["next_offset"] == 0
+
+    def test_window_ends_exactly_at_eof(self):
+        content, meta = format_numbered(
+            "a\nb\nc\n", offset=2, limit=2, max_line_chars=100,
+        )
+        assert content == "     2\tb\n     3\tc"
+        assert meta["lines_read"] == 2
+        assert meta["truncated"] is False
+        assert meta["next_offset"] == 0

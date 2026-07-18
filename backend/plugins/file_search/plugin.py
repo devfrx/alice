@@ -218,8 +218,7 @@ class FileSearchPlugin(BasePlugin):
                             "type": "integer",
                             "description": (
                                 "Maximum number of lines to read (text "
-                                "files only). Defaults to configured "
-                                "max_read_lines."
+                                "files only). Default 2000."
                             ),
                             "minimum": 1,
                         },

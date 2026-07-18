@@ -43,6 +43,12 @@ def format_numbered(
 ) -> tuple[str, dict[str, int | bool]]:
     """Render a ``cat -n`` style numbered slice of *text*.
 
+    Splits on ``"\\n"`` only (a trailing ``"\\r"`` from CRLF files is
+    stripped per line) so the numbering matches editors and ``cat -n``
+    exactly — ``splitlines()`` would also break on form feeds and other
+    unicode separators, diverging on real-world sources and logs.  A
+    trailing newline does not count as an extra (empty) line.
+
     Args:
         text: Full decoded text to slice.
         offset: 1-based line number to start from.
@@ -56,12 +62,15 @@ def format_numbered(
         ``truncated`` and ``next_offset`` (0 when the slice reaches
         the end of the text).
     """
-    lines = text.splitlines()
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
     total = len(lines)
     start = max(offset, 1) - 1
     window = lines[start:start + limit]
     rendered = []
     for i, line in enumerate(window, start=start + 1):
+        line = line.removesuffix("\r")
         if len(line) > max_line_chars:
             line = line[:max_line_chars] + " …[riga troncata]"
         rendered.append(f"{i:>6}\t{line}")
@@ -90,7 +99,12 @@ def _read_plain_text(
     Opens in binary mode so *max_bytes* truly limits bytes read from
     disk, then decodes to UTF-8 and renders a ``cat -n`` style window
     of lines via :func:`format_numbered`.  *max_chars* caps the
-    characters of the rendered output as a final safety net.
+    characters of the rendered output as a final safety net: when it
+    fires, the output is cut at the last COMPLETE rendered line (never
+    mid-line) and ``next_offset`` points at the first line cut, so the
+    payload stays self-consistent for the continuation loop.  Empty
+    windows (empty file, offset beyond EOF) and the byte-cap wall are
+    explained with an in-band note in the content.
 
     Args:
         path: Absolute path to the file.
@@ -104,7 +118,8 @@ def _read_plain_text(
         A dict with the numbered content, path and the slice metadata
         (``total_lines``, ``lines_read``, ``truncated``,
         ``next_offset``).  ``total_lines`` counts decoded lines only:
-        if the byte cap cut the file, the tail is not counted.
+        if the byte cap cut the file, the tail is not counted and is
+        NOT reachable via ``offset``.
     """
     with open(path, "rb") as fh:
         raw_bytes = fh.read(max_bytes)
@@ -115,21 +130,51 @@ def _read_plain_text(
     content, meta = format_numbered(
         raw, offset=offset, limit=limit, max_line_chars=max_line_chars,
     )
+    first = max(offset, 1)
+    total_lines = int(meta["total_lines"])
+    lines_read = int(meta["lines_read"])
     truncated = bool(meta["truncated"]) or bytes_truncated
+    next_offset = int(meta["next_offset"])
+
     if len(content) > max_chars:
-        content = (
-            content[:max_chars]
-            + "\n… [output troncato a max_chars: riduci limit o continua con offset]"
-        )
+        # Cut at the last complete rendered line so the payload never
+        # ends mid-line; next_offset points at the first line cut.
+        cut = content.rfind("\n", 0, max_chars)
+        if cut == -1:
+            content = ""
+            lines_read = 0
+        else:
+            content = content[:cut]
+            lines_read = content.count("\n") + 1
         truncated = True
+        next_offset = first + lines_read
+        note = (
+            "… [output troncato a max_chars: continua con "
+            f"offset={next_offset}]"
+        )
+        content = f"{content}\n{note}" if content else note
+    elif lines_read == 0:
+        if total_lines == 0:
+            content = "… [file vuoto]"
+        else:
+            content = (
+                f"… [nessuna riga: offset {first} oltre la fine, "
+                f"il file ha {total_lines} righe]"
+            )
+
+    if bytes_truncated and next_offset == 0:
+        content += (
+            "\n… [file oltre max_file_size_read_bytes: letti solo i primi "
+            f"{max_bytes:,} byte; la coda non è raggiungibile via offset]"
+        )
 
     return {
         "content": content,
         "path": str(path),
-        "total_lines": meta["total_lines"],
-        "lines_read": meta["lines_read"],
+        "total_lines": total_lines,
+        "lines_read": lines_read,
         "truncated": truncated,
-        "next_offset": meta["next_offset"],
+        "next_offset": next_offset,
     }
 
 

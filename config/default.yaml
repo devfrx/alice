@@ -370,6 +370,7 @@ mcp:
         edit_file: [path]
         create_directory: [path]
         list_directory: [path]
+        list_directory_with_sizes: [path]
         directory_tree: [path]
         move_file: [source, destination]
         search_files: [path]

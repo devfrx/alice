@@ -9,6 +9,13 @@ from pathlib import Path
 
 from loguru import logger
 
+from backend.core.path_safety import (
+    is_forbidden,
+    is_relative_to,
+    is_unc_path,
+    safe_resolve,
+)
+
 
 class ForbiddenPathError(ValueError):
     """Raised when a path is in a forbidden directory."""
@@ -40,11 +47,13 @@ def _validate_path(
     raw = str(path)
 
     # Block UNC paths (network shares)
-    if raw.startswith("\\\\"):
+    if is_unc_path(raw):
         raise ValueError(f"UNC paths are not allowed: {raw}")
 
     p = Path(raw)
-    resolved = p.resolve()
+    resolved = safe_resolve(p)
+    if resolved is None:
+        raise ValueError(f"Invalid path: {raw}")
 
     # When symlinks should not be followed, reject symlinks.
     # Wrap is_symlink() to handle TypeError from Python 3.13 pathlib when
@@ -57,30 +66,20 @@ def _validate_path(
         if is_symlink:
             raise ValueError(f"Symlinks not allowed: {raw}")
 
-    # Block forbidden directories
+    # Block forbidden directories (checked BEFORE containment)
     for fb in forbidden:
         fb_resolved = fb.resolve()
-        try:
-            resolved.relative_to(fb_resolved)
+        if is_relative_to(resolved, fb_resolved):
             raise ForbiddenPathError(
                 f"Path is inside forbidden directory {fb_resolved}: {resolved}"
             )
-        except ValueError as exc:
-            if isinstance(exc, ForbiddenPathError):
-                raise
-            # relative_to failed → path is not inside forbidden dir
-            continue
 
     # Must be inside at least one allowed root
     inside_allowed = False
     for root in allowed_roots:
-        root_resolved = root.resolve()
-        try:
-            resolved.relative_to(root_resolved)
+        if is_relative_to(resolved, root.resolve()):
             inside_allowed = True
             break
-        except ValueError:
-            continue
 
     if not inside_allowed:
         raise ValueError(
@@ -112,7 +111,7 @@ def _sync_walk(
         A list of file-info dicts.
     """
     query_lower = query.lower()
-    forbidden_resolved = {fb.resolve() for fb in forbidden}
+    forbidden_resolved = [fb.resolve() for fb in forbidden]
     results: list[dict] = []
 
     # Normalize extensions to lowercase with leading dot
@@ -132,25 +131,16 @@ def _sync_walk(
             current = Path(dirpath).resolve()
 
             # Skip forbidden directories
-            skip = False
-            for fb in forbidden_resolved:
-                try:
-                    current.relative_to(fb)
-                    skip = True
-                    break
-                except ValueError:
-                    continue
-            if skip:
+            if is_forbidden(current, forbidden_resolved):
                 dirnames.clear()
                 continue
 
-            # Prune forbidden from subdirectories
+            # Prune forbidden from subdirectories. The join is resolved at
+            # the call site (is_forbidden compares already-resolved paths):
+            # this is what catches a symlink pointing into a forbidden tree.
             dirnames[:] = [
                 d for d in dirnames
-                if not any(
-                    _is_relative_to(current / d, fb)
-                    for fb in forbidden_resolved
-                )
+                if not is_forbidden((current / d).resolve(), forbidden_resolved)
             ]
 
             for filename in filenames:
@@ -190,23 +180,6 @@ def _sync_walk(
                     return results
 
     return results
-
-
-def _is_relative_to(path: Path, parent: Path) -> bool:
-    """Check if *path* is relative to *parent* (compat helper).
-
-    Args:
-        path: The path to test.
-        parent: The potential parent directory.
-
-    Returns:
-        True if *path* is inside *parent*.
-    """
-    try:
-        path.resolve().relative_to(parent)
-        return True
-    except ValueError:
-        return False
 
 
 async def search_files(

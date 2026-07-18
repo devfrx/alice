@@ -816,6 +816,17 @@ class McpServerConfig(BaseModel):
     enabled: bool = True
     """Set to false to skip this server without removing it from config."""
 
+    trust_annotations: bool = True
+    """Honour the server's MCP tool annotations (readOnlyHint/destructiveHint) when
+    mapping tools onto the permission gate.  ``False`` demotes every tool of this
+    server to the conservative fallback (treated as destructive, always confirmed)."""
+
+    path_args: dict[str, list[str]] = Field(default_factory=dict)
+    """Optional map ``tool name -> argument names that carry filesystem paths``.
+    A listed tool receives real fs capabilities + ``path_args`` in its
+    ToolDefinition, so the per-conversation scope confinement of the permission
+    gate applies to it by construction (spec Fase 2 §3.3)."""
+
     @model_validator(mode="after")
     def _validate_transport_fields(self) -> McpServerConfig:
         if self.transport == "stdio" and not self.command:

@@ -1,10 +1,10 @@
 """AL\\CE — Pins for the single path-safety module (Fase 2, Blocco B).
 
-These tests port the edge cases already covered by the suites of the four
+These tests port the edge cases already covered by the suites of the five
 deliberate replicas (``file_search/searcher.py``, ``terminal/security.py``,
-``permission_service.py``, ``pc_automation/security.py``) so that the unified
-``backend.core.path_safety`` module keeps IDENTICAL semantics when Task 7
-migrates the consumers onto it.
+``permission_service.py``, ``pc_automation/security.py`` and
+``scope_service``) so that the unified ``backend.core.path_safety`` module
+keeps IDENTICAL semantics when Task 7 migrates the consumers onto it.
 
 Contract reminder (mirrors the replicas): ``within_any_root`` and
 ``is_forbidden`` compare paths that the CALLER has already resolved — they do
@@ -14,8 +14,11 @@ explicitly (pytest's ``tmp_path`` on Windows can go through an 8.3 shortname).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from backend.core.path_safety import (
     is_forbidden,
@@ -196,3 +199,11 @@ def test_forbidden_windows_system_dirs() -> None:
 def test_forbidden_empty_list_blocks_nothing(tmp_path: Path) -> None:
     assert not is_forbidden(tmp_path.resolve(), ())
     assert not is_forbidden(tmp_path.resolve(), [])
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows case-insensitive filesystem semantics")
+def test_forbidden_is_case_insensitive_on_windows() -> None:
+    """Load-bearing on Windows: ``C:\\WINDOWS`` must not bypass ``C:\\Windows``."""
+    forbidden = (Path(r"C:\Windows"),)
+    assert is_forbidden(Path(r"C:\WINDOWS\System32"), forbidden)
+    assert is_forbidden(Path(r"c:\windows"), forbidden)

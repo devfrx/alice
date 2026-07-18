@@ -17,6 +17,12 @@ Note: some replicas (terminal, pc_automation) additionally refuse a *single*
 leading backslash because their normalisation could degrade it into a UNC
 path.  That stricter check is a caller-side concern and deliberately NOT part
 of :func:`is_unc_path` (which pins the shared ``\\\\`` / ``//`` rejection).
+
+Migration note (Task 7): ``file_search/searcher.py::_is_relative_to`` resolves
+INTERNALLY (``path.resolve().relative_to(parent)``) while this module's
+:func:`is_relative_to` does not — the file_search call sites must add the
+``.resolve()`` themselves when migrating (it is what catches a symlink into a
+forbidden tree), otherwise the check degrades to a purely lexical one.
 """
 
 from __future__ import annotations
@@ -53,6 +59,14 @@ def safe_resolve(raw: str | Path) -> Path | None:
     Best-effort absolute resolution (``strict=False`` semantics): a
     non-existent path still resolves lexically (collapsing ``..``); an
     *invalid* path (e.g. an embedded NUL) yields ``None``.
+
+    Fail-closed rule for callers: ``None`` must be treated as
+    out-of-scope/forbidden (deny), and ``None`` entries must be filtered out
+    BEFORE building root/forbidden lists — the containment helpers take
+    ``Path``, never ``None``.  Migration warning (Task 7): the replica
+    ``permission_service._safe_resolve`` never returns ``None`` (it lets
+    ``resolve`` raise), so a mechanical swap without the ``None`` handling
+    would feed ``None`` into :func:`is_relative_to` → ``TypeError``.
 
     Args:
         raw: The raw path string or ``Path`` to resolve.
@@ -121,4 +135,7 @@ def is_forbidden(target: Path, forbidden: list[Path] | tuple[Path, ...]) -> bool
     Returns:
         ``True`` when *target* matches or descends from a forbidden directory.
     """
-    return any(target == f or is_relative_to(target, f) for f in forbidden)
+    # The exact-match case is already covered: is_relative_to(f, f) is True
+    # (relative_to succeeds on itself, same case-normalisation), so a separate
+    # ``target == f`` check would be redundant.
+    return any(is_relative_to(target, f) for f in forbidden)

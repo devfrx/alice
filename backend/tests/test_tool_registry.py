@@ -603,6 +603,28 @@ class TestResultProcessing:
         assert "/home/john" not in (result.content or "")
 
     @pytest.mark.asyncio
+    async def test_result_image_content_untouched(self, make_registry, ctx):
+        """image/* payloads are base64: neither the path-redaction pass
+        nor truncation may touch them — a '/home/…' or '/tmp/…' can occur
+        by pure chance inside base64 and the redaction regex would then
+        eat the whole remainder of the payload (base64 has no whitespace),
+        corrupting the image."""
+        payload = "abc/home/user" + "A" * (MAX_TOOL_RESULT_LENGTH + 100)
+
+        async def img_fn(tool_name, args, context):
+            return ToolResult.ok(payload, content_type="image/png")
+
+        tool = _make_tool("img")
+        plugin = MockPlugin(tools=[tool], name="plug", execute_fn=img_fn)
+        registry = make_registry({"plug": plugin})
+        await registry.refresh()
+
+        result = await registry.execute_tool("plug_img", {}, ctx)
+        assert result.success is True
+        assert result.truncated is False
+        assert result.content == payload
+
+    @pytest.mark.asyncio
     async def test_result_sanitization_strips_tracebacks(
         self, make_registry, ctx,
     ):

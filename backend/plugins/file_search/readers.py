@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,13 @@ except ImportError:
 _TEXT_EXTENSIONS: set[str] = {
     ".txt", ".md", ".py", ".js", ".ts", ".json", ".yaml",
     ".csv", ".log", ".xml", ".html", ".css", ".ini", ".cfg", ".toml",
+}
+
+# -- Supported image extensions → MIME type --------------------------------
+
+_IMAGE_CONTENT_TYPES: dict[str, str] = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp",
 }
 
 
@@ -141,17 +149,24 @@ def _read_plain_text(
         # ends mid-line; next_offset points at the first line cut.
         cut = content.rfind("\n", 0, max_chars)
         if cut == -1:
+            # Not even ONE rendered line fits: suggesting the same
+            # offset again would loop the agent — ask for a bigger cap.
             content = ""
             lines_read = 0
+            next_offset = first
+            note = (
+                "… [output troncato a max_chars: nessuna riga intera "
+                "rientra nel limite; aumenta max_chars]"
+            )
         else:
             content = content[:cut]
             lines_read = content.count("\n") + 1
+            next_offset = first + lines_read
+            note = (
+                "… [output troncato a max_chars: continua con "
+                f"offset={next_offset}]"
+            )
         truncated = True
-        next_offset = first + lines_read
-        note = (
-            "… [output troncato a max_chars: continua con "
-            f"offset={next_offset}]"
-        )
         content = f"{content}\n{note}" if content else note
     elif lines_read == 0:
         if total_lines == 0:
@@ -176,6 +191,34 @@ def _read_plain_text(
         "truncated": truncated,
         "next_offset": next_offset,
     }
+
+
+def _read_image(path: Path, max_image_bytes: int) -> ToolResult:
+    """Read an image file and return it as base64.
+
+    The generic text byte-cap (``max_file_size_read_bytes``) does NOT
+    apply to images; only *max_image_bytes* does.
+
+    Args:
+        path: Absolute path to the image file.
+        max_image_bytes: Maximum image size in bytes.
+
+    Returns:
+        ``ToolResult.ok`` with the base64-encoded bytes and the image
+        MIME type as ``content_type``, or ``ToolResult.error`` when the
+        image exceeds *max_image_bytes*.
+    """
+    size = path.stat().st_size
+    if size > max_image_bytes:
+        return ToolResult.error(
+            f"Immagine troppo grande ({size:,} byte): il limite per le "
+            f"immagini (max_image_bytes) è {max_image_bytes:,} byte."
+        )
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return ToolResult.ok(
+        content=b64,
+        content_type=_IMAGE_CONTENT_TYPES[path.suffix.lower()],
+    )
 
 
 def _read_pdf(path: Path, max_chars: int) -> dict[str, Any]:
@@ -253,12 +296,15 @@ async def read_text_file(
     offset: int = 1,
     limit: int = 2000,
     max_line_chars: int = 2000,
+    max_image_bytes: int = 5_242_880,
 ) -> dict[str, Any] | ToolResult:
     """Read file content, dispatching by extension.
 
-    Supports plain text formats, PDF (via pdfplumber) and DOCX
-    (via python-docx).  Unsupported extensions return a ToolResult error.
-    Plain-text files are returned as a ``cat -n`` style numbered slice
+    Supports plain text formats, images (png/jpg/jpeg/gif/webp,
+    returned as a base64 ``ToolResult`` with an ``image/*``
+    content type), PDF (via pdfplumber) and DOCX (via python-docx).
+    Unsupported extensions return a ToolResult error.  Plain-text
+    files are returned as a ``cat -n`` style numbered slice
     (*offset*/*limit* are line-based); PDF and DOCX return plain
     extracted text without line numbers.
 
@@ -269,12 +315,18 @@ async def read_text_file(
         offset: 1-based start line for text files.
         limit: Maximum lines to return for text files.
         max_line_chars: Per-line character cap for text files.
+        max_image_bytes: Maximum size for image files (the text
+            byte-cap *max_bytes* does not apply to images).
 
     Returns:
-        A dict with content info on success, or a ``ToolResult.error``
-        for unsupported formats or missing dependencies.
+        A dict with content info on success, a ``ToolResult.ok`` with
+        base64 content for images, or a ``ToolResult.error`` for
+        unsupported formats, oversized images or missing dependencies.
     """
     ext = path.suffix.lower()
+
+    if ext in _IMAGE_CONTENT_TYPES:
+        return await asyncio.to_thread(_read_image, path, max_image_bytes)
 
     if ext in _TEXT_EXTENSIONS:
         return await asyncio.to_thread(

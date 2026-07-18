@@ -367,8 +367,17 @@ class ToolExecutor:
         # when ``sanitise_output`` is enabled for LLM-facing content.
         result.raw_content = _deep_copy_content(result.content)
 
+        # Binary payloads (base64 images) are exempt from BOTH the
+        # sanitise pass and truncation: the path-redaction regexes can
+        # match by pure chance inside base64 (e.g. a '/tmp/…' run) and
+        # would corrupt the payload; truncation would break decoding.
+        is_binary = (
+            result.content_type is not None
+            and result.content_type.startswith("image/")
+        )
+
         # --- sanitise (conditional) ---
-        if tool_def.sanitise_output:
+        if tool_def.sanitise_output and not is_binary:
             if isinstance(result.content, str):
                 result.content = _sanitise_content(result.content)
             elif isinstance(result.content, dict):
@@ -382,10 +391,6 @@ class ToolExecutor:
                 ]
 
         # --- truncate (always active, except binary content) ---
-        is_binary = (
-            result.content_type is not None
-            and result.content_type.startswith("image/")
-        )
         limit = tool_def.max_result_chars
         if isinstance(result.content, str) and not is_binary:
             if len(result.content) > limit:

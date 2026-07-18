@@ -28,6 +28,7 @@ from backend.core.plugin_models import (
 )
 from backend.plugins.file_search.readers import (
     _DOCX_AVAILABLE,
+    _IMAGE_CONTENT_TYPES,
     _PDF_AVAILABLE,
     read_text_file,
 )
@@ -189,14 +190,17 @@ class FileSearchPlugin(BasePlugin):
             ToolDefinition(
                 name="read_text_file",
                 description=(
-                    "Read the text content of a file. Supports plain text "
-                    "formats (.txt, .md, .py, .json, etc.), PDF and DOCX. "
-                    "Text files are returned with cat -n style line numbers; "
-                    "use 'offset' and 'limit' to read a window of lines and, "
-                    "when the result is truncated, continue from the returned "
-                    "'next_offset'. Line numbering and offset/limit apply to "
-                    "text files only — PDF and DOCX return plain extracted "
-                    "text. Content may be truncated for large files."
+                    "Read the content of a file. Supports plain text "
+                    "formats (.txt, .md, .py, .json, etc.), PDF, DOCX and "
+                    "images (.png, .jpg, .jpeg, .gif, .webp — returned as "
+                    "base64, subject to a size cap). Text files are "
+                    "returned with cat -n style line numbers; use 'offset' "
+                    "and 'limit' to read a window of lines and, when the "
+                    "result is truncated, continue from the returned "
+                    "'next_offset'. Line numbering and offset/limit apply "
+                    "to text files only — PDF and DOCX return plain "
+                    "extracted text. Content may be truncated for large "
+                    "files."
                 ),
                 parameters={
                     "type": "object",
@@ -473,7 +477,8 @@ class FileSearchPlugin(BasePlugin):
                 and "max_chars".
 
         Returns:
-            A dict with file content or a ToolResult error.
+            A dict with file content, a ``ToolResult.ok`` with base64
+            content for images, or a ``ToolResult`` error.
         """
         raw_path: str = args.get("path", "")
         if not raw_path:
@@ -493,7 +498,10 @@ class FileSearchPlugin(BasePlugin):
             return resolved.stat().st_size
 
         file_size = await asyncio.to_thread(_pre_check)
-        if file_size > cfg.max_file_size_read_bytes:
+        is_image = resolved.suffix.lower() in _IMAGE_CONTENT_TYPES
+        if not is_image and file_size > cfg.max_file_size_read_bytes:
+            # Images are exempt from the text byte-cap: only
+            # max_image_bytes applies (checked in the reader).
             return ToolResult.error(
                 f"File too large ({file_size:,} bytes). "
                 f"Maximum is {cfg.max_file_size_read_bytes:,} bytes."
@@ -516,6 +524,7 @@ class FileSearchPlugin(BasePlugin):
             offset=offset,
             limit=limit,
             max_line_chars=cfg.max_line_chars,
+            max_image_bytes=cfg.max_image_bytes,
         )
 
     async def _exec_open_file(self, args: dict[str, Any]) -> str:

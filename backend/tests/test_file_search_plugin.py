@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -645,6 +646,30 @@ class TestReadTextFileTool:
         assert second_lines[0] == expected
 
     @pytest.mark.asyncio
+    async def test_read_text_file_max_chars_below_one_line_suggests_raise(
+        self, tmp_path,
+    ):
+        """When not even ONE rendered line fits max_chars, the note must
+        suggest raising max_chars — never 'continua con offset=' at the
+        same offset (agent loop)."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "wide.txt"
+        target.write_text("y" * 300 + "\nnext\n", encoding="utf-8")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target), "max_chars": 100},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["truncated"] is True
+        assert result.content["lines_read"] == 0
+        content = result.content["content"]
+        assert "aumenta max_chars" in content
+        assert "offset=" not in content
+
+    @pytest.mark.asyncio
     async def test_read_text_file_form_feed_stays_one_line(self, tmp_path):
         """A form feed inside a line must NOT split the numbering (cat -n parity)."""
         plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
@@ -736,6 +761,90 @@ class TestReadTextFileTool:
 
         assert result.success is False
         assert "not a file" in result.error_message.lower()
+
+
+# ===========================================================================
+# 4b. read_text_file tool — images
+# ===========================================================================
+
+# 1x1 transparent PNG (67 bytes).
+_PNG_1PX = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQAB"
+    "h6FO1AAAAABJRU5ErkJggg=="
+)
+
+
+class TestReadImageFiles:
+    """read_text_file on image extensions returns base64 with an image MIME."""
+
+    @pytest.mark.asyncio
+    async def test_read_image_returns_base64(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "dot.png"
+        target.write_bytes(_PNG_1PX)
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content_type == "image/png"
+        assert base64.b64decode(result.content) == _PNG_1PX
+
+    @pytest.mark.asyncio
+    async def test_read_image_jpeg_content_type(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "photo.jpg"
+        target.write_bytes(b"\xff\xd8\xff\xe0fakejpegdata")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content_type == "image/jpeg"
+
+    @pytest.mark.asyncio
+    async def test_read_image_over_cap_fails(self, tmp_path):
+        plugin = FileSearchPlugin()
+        ctx = _make_app_context(allowed_paths=[str(tmp_path)], forbidden_paths=[])
+        ctx.config.file_search.max_image_bytes = 10
+        await plugin.initialize(ctx)
+
+        target = tmp_path / "dot.png"
+        target.write_bytes(_PNG_1PX)
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "immagine" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_read_image_exempt_from_text_byte_cap(self, tmp_path):
+        """An image over max_file_size_read_bytes (1 MiB) but under
+        max_image_bytes (5 MiB) must read fine — only the image cap applies."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "big.png"
+        payload = _PNG_1PX + b"\x00" * 2_000_000  # ~2 MB
+        target.write_bytes(payload)
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content_type == "image/png"
+        assert base64.b64decode(result.content) == payload
 
 
 # ===========================================================================

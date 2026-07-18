@@ -109,7 +109,7 @@ def test_no_provider_is_fail_conservative() -> None:
     )
 
 
-def test_rules_and_grants_still_apply() -> None:
+def test_rules_still_apply() -> None:
     deny = PermissionService(
         command_capability_provider=_CAPS.get,
         rule_provider=lambda conv, tool: RuleEffect.DENY,
@@ -125,27 +125,29 @@ def test_rules_and_grants_still_apply() -> None:
         is GateAction.NEEDS_CONFIRMATION
     )
 
-    granted = _service()
-    granted.grant("c1", "app_command")
+    allow = PermissionService(
+        command_capability_provider=_CAPS.get,
+        rule_provider=lambda conv, tool: RuleEffect.ALLOW,
+    )
     assert (
-        _decide(granted, "conversation.delete", PermissionMode.STRICT)
+        _decide(allow, "conversation.delete", PermissionMode.STRICT)
         is GateAction.ALLOW
     )
 
 
-def test_plan_deny_beats_grants_and_allow_rules() -> None:
-    """Plan mode read-only stance holds even against grants/allow rules.
+def test_plan_deny_beats_allow_rules() -> None:
+    """Plan mode read-only stance holds even against allow rules.
 
-    Mirrors the documented fs invariant (decide() step 5): grants do not
-    reopen mutations in plan mode.
+    Mirrors the documented fs invariant (decide() step 5): allow rules do
+    not reopen mutations in plan mode.
     """
-    granted = _service()
-    granted.grant("c1", "app_command")
-    assert _decide(granted, "conversation.new", PermissionMode.PLAN) is GateAction.DENY
-
     allow_rule = PermissionService(
         command_capability_provider=_CAPS.get,
         rule_provider=lambda conv, tool: RuleEffect.ALLOW,
+    )
+    assert (
+        _decide(allow_rule, "conversation.new", PermissionMode.PLAN)
+        is GateAction.DENY
     )
     assert (
         _decide(allow_rule, "conversation.delete", PermissionMode.PLAN)

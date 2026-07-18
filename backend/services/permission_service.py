@@ -14,13 +14,13 @@ checks that let a new tool silently escape a sandbox. The turn engine's
   the scope is **denied by default**. A tool that forgets a manual check still
   cannot escape, because the guard is generic (capability-driven), not
   per-plugin;
-* **per-conversation grants** — an *"always allow X here"* override that bypasses
-  the scope check for a specific tool within one conversation.
+* **persisted rule overrides** — the "remember" of a confirmation is a
+  ``PermissionRule`` (conversation-scoped or global), surfaced to the gate via
+  the injected ``rule_provider``; an ``allow`` rule may bypass *only* the
+  out-of-scope check, never the forbidden or no-scope breakers.
 
-Fase 2 wires the *mechanism*; the workspace scope itself arrives in Fase 6
-(``ScopeService``). Until a ``scope_provider`` yields folders for a conversation
-there is **no confinement** — so this service introduces *no new denials* and
-the turn behaviour is preserved.
+The single policy function is :meth:`PermissionService.decide`; its docstring
+documents the full precedence (breakers → rules → scope → tier defaults).
 """
 
 from __future__ import annotations
@@ -89,32 +89,6 @@ class GateAction(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class PermissionDecision:
-    """Result of :meth:`PermissionService.evaluate`.
-
-    Attributes:
-        allowed: ``True`` if the tool-call may proceed.
-        outcome: The classification behind the decision.
-        reason: Short machine-friendly reason (used for audit rows /
-            user-facing messages) when denied; ``None`` when allowed.
-    """
-
-    allowed: bool
-    outcome: PermissionOutcome
-    reason: str | None = None
-
-    @classmethod
-    def allow(cls) -> PermissionDecision:
-        """Return an allowing decision."""
-        return cls(allowed=True, outcome=PermissionOutcome.ALLOW, reason=None)
-
-    @classmethod
-    def deny(cls, outcome: PermissionOutcome, reason: str) -> PermissionDecision:
-        """Return a denying decision with *reason*."""
-        return cls(allowed=False, outcome=outcome, reason=reason)
-
-
-@dataclass(frozen=True, slots=True)
 class GateDecision:
     """The three-valued verdict returned by :meth:`PermissionService.decide`.
 
@@ -146,7 +120,7 @@ class GateDecision:
 
 
 class PermissionService:
-    """Central authority for tool risk policy, scope confinement and grants."""
+    """Central authority for tool risk policy, scope confinement and rules."""
 
     def __init__(
         self,
@@ -182,9 +156,6 @@ class PermissionService:
         self._forbidden_paths: tuple[Path, ...] = tuple(
             self._safe_resolve(p) for p in forbidden_paths
         )
-        # Per-conversation grants: conversation_id -> set of granted keys
-        # (a key is typically a tool name). An *"always allow"* override.
-        self._grants: dict[str, set[str]] = {}
 
     # ------------------------------------------------------------------
     # Risk classification
@@ -207,35 +178,8 @@ class PermissionService:
         return tool_def is not None and tool_def.requires_confirmation
 
     # ------------------------------------------------------------------
-    # Combined evaluation (forbidden + scope confinement)
+    # Gate decision (the single policy function)
     # ------------------------------------------------------------------
-
-    def evaluate(
-        self,
-        *,
-        tool_name: str,
-        args: dict[str, object],
-        tool_def: ToolDefinition | None,
-        conversation_id: str,
-    ) -> PermissionDecision:
-        """Decide whether a tool-call may run.
-
-        Order: forbidden risk wins first, then by-construction scope
-        confinement. Returns :meth:`PermissionDecision.allow` when neither
-        applies (always, in Fase 2, for non-forbidden tools — no scope yet).
-
-        Args:
-            tool_name: Namespaced tool name.
-            args: Parsed tool arguments.
-            tool_def: The tool's definition (``None`` ⇒ unknown tool, allowed
-                here; the registry rejects truly unknown tools at execution).
-            conversation_id: Conversation the call belongs to (scope + grants).
-        """
-        if self.is_forbidden(tool_def):
-            return PermissionDecision.deny(
-                PermissionOutcome.DENY_FORBIDDEN, "forbidden_tool",
-            )
-        return self._check_scope(tool_name, args, tool_def, conversation_id)
 
     def decide(
         self,
@@ -261,12 +205,12 @@ class PermissionService:
            capabilities falls through to the scope guard / plan block below.
         3. fs tool with no scope set → DENY (scope is the workspace boundary —
            holds even in autopilot).
-        4. fs tool whose path is out of scope → DENY (a session grant or an
-           explicit ``allow`` rule bypasses *only* this check, never #3).
+        4. fs tool whose path is out of scope → DENY (an explicit ``allow``
+           rule bypasses *only* this check, never #3).
         5. ``plan`` tier + write/exec/MCP-write → DENY (read-only stance;
-           allow-rules and grants do not reopen writes in plan mode).
+           allow-rules do not reopen writes in plan mode).
         6. read-only fs in scope → ALLOW (reads never prompt, any tier).
-        7. session grant / ``allow`` rule → ALLOW; ``ask`` rule → confirmation.
+        7. ``allow`` rule → ALLOW; ``ask`` rule → confirmation.
         8. ``autopilot`` → ALLOW.
         9. ``auto_edits`` → confirmation for exec/dangerous, ALLOW for safe
            in-scope writes, confirmation for other confirmation-required tools.
@@ -277,7 +221,7 @@ class PermissionService:
             tool_name: Namespaced tool name.
             args: Parsed tool arguments.
             tool_def: The tool's definition (``None`` ⇒ unknown tool).
-            conversation_id: Conversation the call belongs to (scope/rules/grants).
+            conversation_id: Conversation the call belongs to (scope/rules).
             mode: The conversation's permission tier.
 
         Returns:
@@ -298,7 +242,6 @@ class PermissionService:
             if self._rule_provider is not None
             else None
         )
-        granted = self.is_granted(conversation_id, tool_name)
 
         # 2. explicit deny rule — a user prohibition wins in every tier.
         if rule is RuleEffect.DENY:
@@ -306,16 +249,16 @@ class PermissionService:
 
         # 2-bis. UI commands (Fase 7, spec §7): the EFFECTIVE capability is
         # the invoked command's manifest tag, not the tool's own — resolve it
-        # per-call and apply the §7 matrix. Grants and allow/ask rules keep
-        # their usual precedence; the deny rule above already won. A hybrid
-        # declaring ui_command TOGETHER with fs/exec/MCP-write capabilities
-        # does NOT take this branch: it falls through to scope confinement /
-        # the plan block below, so the tag can never be used to skip the
+        # per-call and apply the §7 matrix. Allow/ask rules keep their usual
+        # precedence; the deny rule above already won. A hybrid declaring
+        # ui_command TOGETHER with fs/exec/MCP-write capabilities does NOT
+        # take this branch: it falls through to scope confinement / the plan
+        # block below, so the tag can never be used to skip the
         # by-construction fs guard nor the read-only stance for MCP writes.
         if UI_COMMAND_CAPABILITY in caps and not (
             is_fs or is_exec or MCP_WRITE_CAPABILITY in caps
         ):
-            return self._decide_ui_command(args, mode, granted=granted, rule=rule)
+            return self._decide_ui_command(args, mode, rule=rule)
 
         # 3 + 4. filesystem scope confinement (by construction).
         if is_fs:
@@ -323,9 +266,9 @@ class PermissionService:
             if not scope_roots:
                 # No workspace boundary ⇒ no filesystem access, even in autopilot.
                 return GateDecision.deny(PermissionOutcome.DENY_NO_SCOPE, "no_scope")
-            # A session grant or an explicit allow-rule bypasses ONLY the
-            # out-of-scope path check (never the no-scope breaker above).
-            if not granted and rule is not RuleEffect.ALLOW:
+            # An explicit allow-rule bypasses ONLY the out-of-scope path
+            # check (never the no-scope breaker above).
+            if rule is not RuleEffect.ALLOW:
                 path_args = tool_def.path_args if tool_def is not None else ()
                 for arg_name in path_args:
                     raw = args.get(arg_name)
@@ -351,8 +294,8 @@ class PermissionService:
         if is_read_only_fs:
             return GateDecision.allow()
 
-        # 7. explicit user grant / rule override the tier default.
-        if granted or rule is RuleEffect.ALLOW:
+        # 7. explicit user rule overrides the tier default.
+        if rule is RuleEffect.ALLOW:
             return GateDecision.allow()
         if rule is RuleEffect.ASK:
             return GateDecision.confirm()
@@ -416,7 +359,6 @@ class PermissionService:
         args: dict[str, object],
         mode: PermissionMode,
         *,
-        granted: bool,
         rule: RuleEffect | None,
     ) -> GateDecision:
         """Spec §7 matrix for ``app_command``: gate on the command's tag.
@@ -446,7 +388,7 @@ class PermissionService:
                 command, capability,
             )
             return GateDecision.deny(PermissionOutcome.DENY_PLAN_MODE, "plan_mode")
-        if granted or rule is RuleEffect.ALLOW:
+        if rule is RuleEffect.ALLOW:
             return GateDecision.allow()
         if rule is RuleEffect.ASK:
             return GateDecision.confirm()
@@ -455,71 +397,6 @@ class PermissionService:
         if mode is PermissionMode.AUTO_EDITS and capability == "mutate":
             return GateDecision.allow()
         return GateDecision.confirm()
-
-    def _check_scope(
-        self,
-        tool_name: str,
-        args: dict[str, object],
-        tool_def: ToolDefinition | None,
-        conversation_id: str,
-    ) -> PermissionDecision:
-        """Confine a filesystem tool's path arguments to the conversation scope.
-
-        Allows when: the tool is not filesystem-tagged, no scope is configured,
-        the call is explicitly granted, or every declared path argument
-        resolves inside the scope. Denies by default otherwise.
-        """
-        if tool_def is None:
-            return PermissionDecision.allow()
-        if not (set(tool_def.capabilities) & self._fs_capabilities):
-            # Not a path-confined tool — no scope policy applies.
-            return PermissionDecision.allow()
-
-        scope_roots = self._resolve_scope(conversation_id)
-        if not scope_roots:
-            # Fase 2: no workspace scope set ⇒ no confinement (allow).
-            return PermissionDecision.allow()
-
-        if self.is_granted(conversation_id, tool_name):
-            # Explicit per-conversation override ("always allow X here").
-            return PermissionDecision.allow()
-
-        for arg_name in tool_def.path_args:
-            raw = args.get(arg_name)
-            if raw is None:
-                continue
-            if not self._within_scope(str(raw), scope_roots):
-                logger.warning(
-                    "Permission: '{}' arg '{}'={!r} is outside conversation "
-                    "scope (conv={})",
-                    tool_name, arg_name, raw, conversation_id,
-                )
-                return PermissionDecision.deny(
-                    PermissionOutcome.DENY_SCOPE, "outside_scope",
-                )
-        return PermissionDecision.allow()
-
-    # ------------------------------------------------------------------
-    # Per-conversation grants
-    # ------------------------------------------------------------------
-
-    def grant(self, conversation_id: str, key: str) -> None:
-        """Record an *"always allow ``key`` in this conversation"* override."""
-        self._grants.setdefault(conversation_id, set()).add(key)
-
-    def revoke(self, conversation_id: str, key: str) -> None:
-        """Remove a previously-recorded grant (no-op if absent)."""
-        grants = self._grants.get(conversation_id)
-        if grants is not None:
-            grants.discard(key)
-
-    def is_granted(self, conversation_id: str, key: str) -> bool:
-        """Return ``True`` if *key* was granted in *conversation_id*."""
-        return key in self._grants.get(conversation_id, ())
-
-    def clear_grants(self, conversation_id: str) -> None:
-        """Drop every grant recorded for *conversation_id*."""
-        self._grants.pop(conversation_id, None)
 
     # ------------------------------------------------------------------
     # Internals

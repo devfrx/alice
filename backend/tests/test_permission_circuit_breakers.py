@@ -2,8 +2,8 @@
 
 The breakers hold in **every** tier — even ``autopilot``: a forbidden tool, a
 filesystem tool with no workspace scope set, and an out-of-scope path are always
-denied. A session grant or an explicit ``allow`` rule may bypass *only* the
-out-of-scope check, never the forbidden or no-scope breakers.
+denied. An explicit ``allow`` rule may bypass *only* the out-of-scope check,
+never the forbidden or no-scope breakers.
 """
 
 from __future__ import annotations
@@ -73,23 +73,24 @@ def test_out_of_scope_path_blocked_in_every_tier(tmp_path, mode) -> None:
     assert d.outcome is PermissionOutcome.DENY_SCOPE
 
 
-def test_grant_bypasses_out_of_scope_but_not_no_scope(tmp_path) -> None:
+def test_allow_rule_bypasses_out_of_scope_but_not_no_scope(tmp_path) -> None:
     scope = tmp_path / "ws"
     scope.mkdir()
-    svc = PermissionService(scope_provider=lambda _c: [scope])
-    svc.grant(CONV, "t")
+    svc = PermissionService(
+        scope_provider=lambda _c: [scope],
+        rule_provider=lambda _c, _t: RuleEffect.ALLOW,
+    )
     tool = _tool(capabilities=("fs_write",), path_args=("path",))
 
-    # Out-of-scope path: the grant lets it through (in autopilot → ALLOW).
+    # Out-of-scope path: the allow rule lets it through (in autopilot → ALLOW).
     d = svc.decide(
         tool_name="t", args={"path": str(tmp_path / "outside" / "f")},
         tool_def=tool, conversation_id=CONV, mode=PermissionMode.AUTOPILOT,
     )
     assert d.action is GateAction.ALLOW
 
-    # But a grant cannot conjure a scope: with NO scope set, still denied.
-    svc_noscope = PermissionService()
-    svc_noscope.grant(CONV, "t")
+    # But an allow rule cannot conjure a scope: with NO scope set, still denied.
+    svc_noscope = PermissionService(rule_provider=lambda _c, _t: RuleEffect.ALLOW)
     d2 = svc_noscope.decide(
         tool_name="t", args={"path": "C:/x/f"}, tool_def=tool,
         conversation_id=CONV, mode=PermissionMode.AUTOPILOT,

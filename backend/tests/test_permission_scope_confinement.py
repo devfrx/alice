@@ -2,11 +2,12 @@
 
 Wires a **real** :class:`~backend.services.scope_service.ScopeService` into a
 real :class:`~backend.services.permission_service.PermissionService` (no mock
-provider) and proves the Fase 6 contract end-to-end:
+provider) and proves the confinement contract end-to-end through
+:meth:`~backend.services.permission_service.PermissionService.decide`:
 
 * a filesystem-tagged tool is denied a path outside the conversation scope;
 * the same tool is allowed a path inside the scope;
-* a conversation with **no** scope set is not confined (behaviour preserved);
+* a conversation with **no** scope set hits the no-scope breaker (deny);
 * a tool that is *not* filesystem-tagged is never confined;
 * ``..`` traversal escaping the scope is denied (the layer resolves first).
 """
@@ -25,7 +26,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 from backend.core.config import WorkspaceScopeConfig
 from backend.core.plugin_models import ToolDefinition
 from backend.db.models import Conversation
+from backend.services.permission_mode_service import PermissionMode
 from backend.services.permission_service import (
+    GateAction,
     PermissionOutcome,
     PermissionService,
 )
@@ -107,14 +110,15 @@ async def test_in_scope_path_is_allowed(
     perm = PermissionService(
         scope_provider=scope_service.scope_roots, forbidden_paths=[],
     )
-    decision = perm.evaluate(
+    decision = perm.decide(
         tool_name="fs_tool",
         args={"path": str(inside / "f.txt")},
         tool_def=_fs_tool(),
         conversation_id=str(conversation_id),
+        mode=PermissionMode.STRICT,
     )
 
-    assert decision.allowed is True
+    assert decision.action is GateAction.ALLOW
     assert decision.outcome is PermissionOutcome.ALLOW
 
 
@@ -131,22 +135,24 @@ async def test_out_of_scope_path_is_denied(
     perm = PermissionService(
         scope_provider=scope_service.scope_roots, forbidden_paths=[],
     )
-    decision = perm.evaluate(
+    decision = perm.decide(
         tool_name="fs_tool",
         args={"path": str(outside / "f.txt")},
         tool_def=_fs_tool(),
         conversation_id=str(conversation_id),
+        mode=PermissionMode.STRICT,
     )
 
-    assert decision.allowed is False
+    assert decision.action is GateAction.DENY
     assert decision.outcome is PermissionOutcome.DENY_SCOPE
 
 
 @pytest.mark.asyncio
-async def test_conversation_without_scope_is_not_confined(
+async def test_conversation_without_scope_hits_no_scope_breaker(
     scope_service, conversation_id, tmp_path,
 ):
-    # One conversation has a scope; a *different* one has none ⇒ no confinement.
+    # One conversation has a scope; a *different* one has none ⇒ for a
+    # filesystem-tagged tool the no-scope breaker denies (any tier).
     inside = tmp_path / "inside"
     inside.mkdir()
     outside = tmp_path / "outside"
@@ -157,14 +163,16 @@ async def test_conversation_without_scope_is_not_confined(
         scope_provider=scope_service.scope_roots, forbidden_paths=[],
     )
     other = uuid.uuid4()
-    decision = perm.evaluate(
+    decision = perm.decide(
         tool_name="fs_tool",
         args={"path": str(outside / "f.txt")},
         tool_def=_fs_tool(),
         conversation_id=str(other),
+        mode=PermissionMode.STRICT,
     )
 
-    assert decision.allowed is True
+    assert decision.action is GateAction.DENY
+    assert decision.outcome is PermissionOutcome.DENY_NO_SCOPE
 
 
 @pytest.mark.asyncio
@@ -187,14 +195,15 @@ async def test_non_fs_tagged_tool_is_never_confined(
         capabilities=(),
         path_args=("path",),
     )
-    decision = perm.evaluate(
+    decision = perm.decide(
         tool_name="plain_tool",
         args={"path": str(outside / "f.txt")},
         tool_def=untagged,
         conversation_id=str(conversation_id),
+        mode=PermissionMode.STRICT,
     )
 
-    assert decision.allowed is True
+    assert decision.action is GateAction.ALLOW
 
 
 @pytest.mark.asyncio
@@ -212,12 +221,13 @@ async def test_dotdot_traversal_escaping_scope_is_denied(
     )
     # Resolves to <tmp>/outside/f.txt — outside the scope (proves resolve-first).
     traversal = str(inside / ".." / "outside" / "f.txt")
-    decision = perm.evaluate(
+    decision = perm.decide(
         tool_name="fs_tool",
         args={"path": traversal},
         tool_def=_fs_tool(),
         conversation_id=str(conversation_id),
+        mode=PermissionMode.STRICT,
     )
 
-    assert decision.allowed is False
+    assert decision.action is GateAction.DENY
     assert decision.outcome is PermissionOutcome.DENY_SCOPE

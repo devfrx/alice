@@ -123,6 +123,38 @@ def test_path_args_promote_to_fs_capability() -> None:
     assert read_td.path_args == ("path",)
 
 
+def test_path_args_with_null_properties_fail_closed() -> None:
+    """``"properties": null`` in a malformed schema must not raise — the
+    declared args count as all-missing and the conservative fallback wins."""
+    server = _server(path_args={"write_file": ["path"]})
+    tool = Tool(
+        name="write_file",
+        inputSchema={"type": "object", "properties": None},
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )
+    td = map_mcp_tool(tool, server)
+    assert td.capabilities == ("mcp_write",)
+    assert td.risk_level == "dangerous"
+    assert td.requires_confirmation is True
+    assert td.path_args == ()
+
+
+def test_path_args_with_string_properties_fail_closed() -> None:
+    """A garbage string ``properties`` must not promote via substring
+    membership (``"path" in "path stuff"``) — fail-closed instead."""
+    server = _server(path_args={"write_file": ["path"]})
+    tool = Tool(
+        name="write_file",
+        inputSchema={"type": "object", "properties": "path stuff"},
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )
+    td = map_mcp_tool(tool, server)
+    assert td.capabilities == ("mcp_write",)
+    assert td.risk_level == "dangerous"
+    assert td.requires_confirmation is True
+    assert td.path_args == ()
+
+
 def test_path_args_missing_from_schema_fail_closed() -> None:
     """A declared path arg that the tool schema does not expose (typo in
     config, or the server renamed the argument) must NOT produce a vacuous

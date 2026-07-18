@@ -67,7 +67,13 @@ def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:
 
     declared_paths = tuple(server.path_args.get(tool.name, ()))
     if declared_paths:
-        schema_properties = (tool.inputSchema or {}).get("properties", {})
+        schema_properties = (tool.inputSchema or {}).get("properties")
+        if not isinstance(schema_properties, dict):
+            # Malformed schema (``properties`` null, string, list, …): a
+            # ``in`` check against a non-dict would raise or, worse, match
+            # by substring.  Treat every declared arg as missing instead —
+            # same fail-closed path, same warning.
+            schema_properties = {}
         missing = [arg for arg in declared_paths if arg not in schema_properties]
         if missing:
             # Fail-closed: promoting anyway would give the gate a vacuous

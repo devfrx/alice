@@ -20,6 +20,7 @@ session-side details (why the static CLI dirs must ride along).
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -206,18 +207,25 @@ class McpClientPlugin(BasePlugin):
                     continue
                 full_desc = f"[{server_name}] {tool.description}"
                 try:
+                    # ``replace`` keeps every mapped field (capabilities,
+                    # risk_level, requires_confirmation, path_args, …) —
+                    # rebuilding from scratch would silently strip the
+                    # permission-gate metadata set by map_mcp_tool().
                     tools.append(
-                        ToolDefinition(
+                        replace(
+                            tool,
                             name=full_name,
                             description=full_desc[:512],
-                            parameters=tool.parameters,
                             max_result_chars=self._MCP_MAX_RESULT_CHARS,
                         )
                     )
                     # Map display name → (server, original tool name)
                     # so truncated names dispatch to the correct tool.
                     dispatch_map[full_name] = (server_name, tool.name)
-                except ValueError as exc:
+                except (TypeError, ValueError) as exc:
+                    # ValueError: __post_init__ re-validation of the renamed
+                    # tool failed.  TypeError: the session handed us something
+                    # that is not a ToolDefinition dataclass at all.
                     self.logger.warning(
                         "Skipping invalid MCP tool '{}': {}",
                         full_name, exc,

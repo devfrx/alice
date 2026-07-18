@@ -261,6 +261,38 @@ class TestMcpClientPluginGetTools:
         # And the dispatch map must contain a single entry for that name.
         assert len(plugin._tool_dispatch_map) == 1
 
+    def test_get_tools_preserves_gate_fields(self) -> None:
+        """Re-namespacing must NOT drop the permission-gate fields set by
+        the annotations→ToolDefinition mapping (Fase 2): capabilities,
+        risk_level, requires_confirmation and path_args ride along."""
+        plugin = McpClientPlugin()
+        mapped = ToolDefinition(
+            name="write_file",
+            description="Write a file",
+            parameters={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+            },
+            capabilities=("fs_write",),
+            risk_level="dangerous",
+            requires_confirmation=True,
+            path_args=("path",),
+        )
+        plugin._sessions = {
+            "srv": _make_mock_session("srv", tools=[mapped]),
+        }
+
+        tools = plugin.get_tools()
+        assert len(tools) == 1
+        td = tools[0]
+        assert td.name == "mcp_srv_write_file"
+        assert td.capabilities == ("fs_write",)
+        assert td.risk_level == "dangerous"
+        assert td.requires_confirmation is True
+        assert td.path_args == ("path",)
+        # The MCP-specific result ceiling must still be applied.
+        assert td.max_result_chars == plugin._MCP_MAX_RESULT_CHARS
+
     def test_get_tools_isolates_invalid_tool(self) -> None:
         """A single invalid tool doesn't crash the entire get_tools()."""
         plugin = McpClientPlugin()

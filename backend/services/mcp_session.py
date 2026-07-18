@@ -43,6 +43,7 @@ from loguru import logger
 
 from backend.core.config import McpServerConfig
 from backend.core.plugin_models import ConnectionStatus, ToolDefinition
+from backend.services.mcp_tool_mapping import map_mcp_tool
 
 if TYPE_CHECKING:
     import mcp.types
@@ -493,17 +494,7 @@ class McpSession:
 
                 tools_response = await session.list_tools()
                 self._cached_tools = [
-                    ToolDefinition(
-                        name=tool.name,
-                        # MCP servers can have very long descriptions; truncate to
-                        # the 1024-char limit enforced by ToolDefinition.validate().
-                        description=(tool.description or "")[:1024],
-                        parameters=(
-                            tool.inputSchema
-                            if tool.inputSchema
-                            else {"type": "object", "properties": {}}
-                        ),
-                    )
+                    map_mcp_tool(tool, self._config)
                     for tool in tools_response.tools
                 ]
                 self._session = session

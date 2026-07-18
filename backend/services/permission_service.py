@@ -35,6 +35,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from backend.core.path_safety import is_forbidden as is_path_forbidden
+from backend.core.path_safety import safe_resolve, within_any_root
 from backend.core.plugin_models import ToolDefinition
 from backend.services.permission_mode_service import PermissionMode
 from backend.services.permission_rules import RuleEffect
@@ -156,8 +158,13 @@ class PermissionService:
         self._rule_provider = rule_provider
         self._fs_capabilities = frozenset(fs_capabilities)
         self._command_capability_provider = command_capability_provider
+        # Invalid entries resolve to ``None`` and are filtered out here —
+        # the containment helpers take ``Path``, never ``None`` (fail-closed
+        # contract of ``backend.core.path_safety``).
         self._forbidden_paths: tuple[Path, ...] = tuple(
-            self._safe_resolve(p) for p in forbidden_paths
+            resolved
+            for resolved in (safe_resolve(p) for p in forbidden_paths)
+            if resolved is not None
         )
 
     # ------------------------------------------------------------------
@@ -406,36 +413,34 @@ class PermissionService:
     # ------------------------------------------------------------------
 
     def _resolve_scope(self, conversation_id: str) -> list[Path]:
-        """Return the resolved scope roots for a conversation (empty ⇒ none)."""
+        """Return the resolved scope roots for a conversation (empty ⇒ none).
+
+        Invalid roots resolve to ``None`` and are dropped (fail-closed: the
+        gate confines to the remaining valid roots, and an all-invalid scope
+        degrades to the no-scope breaker at the call site).
+        """
         if self._scope_provider is None:
             return []
         roots = self._scope_provider(conversation_id)
         if not roots:
             return []
-        return [self._safe_resolve(r) for r in roots]
+        return [
+            resolved
+            for resolved in (safe_resolve(r) for r in roots)
+            if resolved is not None
+        ]
 
-    def _within_scope(self, raw_path: str, scope_roots: Iterable[Path]) -> bool:
+    def _within_scope(self, raw_path: str, scope_roots: list[Path]) -> bool:
         """Return ``True`` iff *raw_path* resolves inside a scope root.
 
         Resolves symlinks/``..`` first (so traversal cannot escape), then
-        rejects anything under a configured forbidden path.
+        rejects anything under a configured forbidden path (forbidden is
+        checked BEFORE containment). An unresolvable path is out of scope
+        (fail-closed).
         """
-        target = self._safe_resolve(raw_path)
-        for forbidden in self._forbidden_paths:
-            if self._is_relative_to(target, forbidden):
-                return False
-        return any(self._is_relative_to(target, root) for root in scope_roots)
-
-    @staticmethod
-    def _safe_resolve(path: str | Path) -> Path:
-        """Best-effort absolute resolution (``strict=False``)."""
-        return Path(path).resolve()
-
-    @staticmethod
-    def _is_relative_to(target: Path, root: Path) -> bool:
-        """``Path.is_relative_to`` without raising (3.9+ compatible)."""
-        try:
-            target.relative_to(root)
-            return True
-        except ValueError:
+        target = safe_resolve(raw_path)
+        if target is None:
             return False
+        if is_path_forbidden(target, self._forbidden_paths):
+            return False
+        return within_any_root(target, scope_roots)

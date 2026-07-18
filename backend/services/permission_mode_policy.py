@@ -30,11 +30,11 @@ from backend.services.permission_mode_service import PermissionMode
 
 # Capability tags withheld from the offered toolset in a read-only tier.  These
 # are exactly the capabilities the gate denies in ``plan`` mode
-# (``PermissionService.decide`` step 5: ``is_write or is_exec``), so withholding
-# them keeps the toolset honest — the model is never shown an action it cannot
-# take in this tier.
+# (``PermissionService.decide`` step 5: ``is_write or is_exec`` or an MCP write
+# — ``mcp_write``, Fase 2 MCP perimeter), so withholding them keeps the toolset
+# honest — the model is never shown an action it cannot take in this tier.
 _READ_ONLY_BLOCKED_CAPABILITIES: frozenset[str] = frozenset(
-    {"fs_write", "process_exec"}
+    {"fs_write", "process_exec", "mcp_write"}
 )
 
 # Plugin owning the planning meta-tools.  Floated to the front in ``plan``

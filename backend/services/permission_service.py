@@ -53,6 +53,12 @@ CommandCapabilityProvider = Callable[[str], "str | None"]
 #: the injected ``command_capability_provider``.
 UI_COMMAND_CAPABILITY = "ui_command"
 
+#: Capability tag marking an MCP tool that (potentially) mutates state (Fase 2
+#: MCP perimeter). Treated by the plan tier exactly like ``fs_write`` /
+#: ``process_exec``: denied, and withheld from the offered toolset
+#: (``permission_mode_policy``).
+MCP_WRITE_CAPABILITY = "mcp_write"
+
 # Capability tags that mark a tool as filesystem-path-confined.
 _DEFAULT_FS_CAPABILITIES: frozenset[str] = frozenset({"fs_read", "fs_write"})
 
@@ -251,8 +257,8 @@ class PermissionService:
            holds even in autopilot).
         4. fs tool whose path is out of scope → DENY (a session grant or an
            explicit ``allow`` rule bypasses *only* this check, never #3).
-        5. ``plan`` tier + write/exec → DENY (read-only stance; allow-rules and
-           grants do not reopen writes in plan mode).
+        5. ``plan`` tier + write/exec/MCP-write → DENY (read-only stance;
+           allow-rules and grants do not reopen writes in plan mode).
         6. read-only fs in scope → ALLOW (reads never prompt, any tier).
         7. session grant / ``allow`` rule → ALLOW; ``ask`` rule → confirmation.
         8. ``autopilot`` → ALLOW.
@@ -326,8 +332,10 @@ class PermissionService:
                             PermissionOutcome.DENY_SCOPE, "outside_scope",
                         )
 
-        # 5. plan tier is read-only: block writes / process-exec.
-        if mode is PermissionMode.PLAN and (is_write or is_exec):
+        # 5. plan tier is read-only: block writes / process-exec / MCP writes.
+        if mode is PermissionMode.PLAN and (
+            is_write or is_exec or MCP_WRITE_CAPABILITY in caps
+        ):
             return GateDecision.deny(PermissionOutcome.DENY_PLAN_MODE, "plan_mode")
 
         # 6. reads inside scope never prompt, in any tier.

@@ -47,9 +47,18 @@ def _registry(
 class TestPolicyFor:
     def test_plan_is_read_only_and_leads_with_planning(self) -> None:
         policy = policy_for(PermissionMode.PLAN)
-        assert policy.blocked_capabilities == frozenset({"fs_write", "process_exec"})
+        assert policy.blocked_capabilities == frozenset(
+            {"fs_write", "process_exec", "mcp_write"}
+        )
         assert policy.priority_plugins == ("agent",)
         assert "plan" in policy.guidance.lower()
+
+    def test_plan_blocks_mcp_writes_but_not_mcp_reads(self) -> None:
+        # Fase 2: MCP writes are withheld in plan (the gate denies them
+        # anyway); MCP reads stay offered.
+        policy = policy_for(PermissionMode.PLAN)
+        assert "mcp_write" in policy.blocked_capabilities
+        assert "mcp_read" not in policy.blocked_capabilities
 
     def test_non_plan_tiers_keep_full_toolset_but_still_steer(self) -> None:
         for mode in (

@@ -4,14 +4,25 @@ import asyncio
 
 from backend.services.agent import events as ev
 from backend.services.agent import ports
+from backend.services.agent.engine import AgentEngine
 from backend.services.agent.models import ToolInvocation, ToolMeta
+from backend.services.agent.retry import RetryPolicy
 from backend.tests.agent._engine_helpers import (
     _final_step,
+    _request,
     _run_with,
     _run_with_port,
     _tool_step,
 )
-from backend.tests.agent.doubles import StaticPermissionPort
+from backend.tests.agent.doubles import (
+    InMemoryPersistence,
+    MapExecutionPort,
+    NoopContextPort,
+    RecordingEventPort,
+    ScriptedInteractionPort,
+    ScriptedLLMPort,
+    StaticPermissionPort,
+)
 
 
 def _confirm_permission_port(tool: str = "write") -> StaticPermissionPort:
@@ -240,6 +251,61 @@ async def test_approved_confirmation_without_remember_persists_no_rule() -> None
         confirm=ports.InteractionOutcome.APPROVED,
     )
     assert perm.remember_calls == []
+
+
+async def test_remember_persisted_only_after_batch_checkpoint() -> None:
+    """La scelta remember si persiste SOLO dopo il checkpoint del batch
+    (§6.15, stesso principio di register_artifacts/T13): remember_approval
+    scrive su una sessione PROPRIA — chiamarla mentre la UoW del turno ha
+    flush non committati (l'audit della conferma) collide sul single-writer
+    SQLite ('database is locked', riprodotto nello smoke di fase 1). Pin:
+    al momento della chiamata la persistence ha già visto il tool_result
+    della call e almeno DUE checkpoint (post-assistant + post-batch)."""
+    calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
+    persistence = InMemoryPersistence()
+    order_at_call: list[list[tuple[str, str]]] = []
+
+    class _SnapshotPermissionPort(StaticPermissionPort):
+        async def remember_approval(
+            self, call: ToolInvocation, *, conversation_id: str,
+            scope: ports.RememberScope,
+        ) -> None:
+            order_at_call.append(list(persistence.order))
+            await super().remember_approval(
+                call, conversation_id=conversation_id, scope=scope,
+            )
+
+    perm = _SnapshotPermissionPort(
+        verdicts={"write": ports.GateVerdict(action=ports.GateAction.CONFIRM,
+                                             outcome="needs_confirmation")},
+        default=ports.GateVerdict(action=ports.GateAction.EXECUTE, outcome="allow"),
+    )
+    engine = AgentEngine(
+        llm=ScriptedLLMPort(steps=[_tool_step(calls), _final_step()]),
+        permissions=perm,
+        interaction=ScriptedInteractionPort(
+            confirm=ports.InteractionOutcome.APPROVED,
+            confirm_remember=ports.RememberScope.CONVERSATION,
+        ),
+        events=RecordingEventPort(),
+        persistence=persistence,
+        context=NoopContextPort(),
+        execution=MapExecutionPort(
+            tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        ),
+        retry=RetryPolicy(),
+    )
+    outcome = await engine.run(_request(), cancel=asyncio.Event())
+
+    assert outcome.finish_reason == "stop"
+    assert perm.remember_calls == [
+        {"name": "write", "conversation_id": "c1",
+         "scope": ports.RememberScope.CONVERSATION},
+    ]
+    assert len(order_at_call) == 1
+    snapshot = order_at_call[0]
+    assert ("tool_result", "c1") in snapshot
+    assert snapshot.count(("checkpoint", "")) >= 2
 
 
 async def test_rejected_confirmation_ignores_remember_choice() -> None:

@@ -107,6 +107,14 @@ class _TurnState:
     errored: bool = False
     final_assistant_message_id: str | None = None
     pending_tool_intent: bool = False
+    # Scelte "ricorda" delle conferme APPROVATE nello step corrente:
+    # raccolte in _confirm_call, persistite da _run_tool_step SOLO dopo il
+    # checkpoint del batch (§6.15 — remember_approval scrive su una sessione
+    # propria: con la UoW del turno in flush non committato collide sul
+    # single-writer SQLite).
+    pending_remembers: list[tuple[ToolInvocation, RememberScope]] = field(
+        default_factory=list,
+    )
 
     def __post_init__(self) -> None:
         self.working_messages = list(self.request.history)
@@ -474,6 +482,21 @@ class AgentEngine:
             )
         await self._persistence.checkpoint()
 
+        # 4-bis. Le scelte "ricorda" delle conferme approvate si persistono
+        # SOLO qui, a UoW committata (stesso principio di
+        # register_artifacts/T13): remember_approval scrive su una sessione
+        # propria e col write-lock del turno ancora tenuto (audit flushato,
+        # non committato) collideva sul single-writer SQLite ("database is
+        # locked", smoke fase 1). Best-effort per contratto della porta.
+        if state.pending_remembers:
+            for remembered_call, scope in state.pending_remembers:
+                await self._permissions.remember_approval(
+                    remembered_call,
+                    conversation_id=state.request.conversation_id,
+                    scope=scope,
+                )
+            state.pending_remembers.clear()
+
         disconnect = False
         for call in calls:
             resolution = resolutions[call.call_id]
@@ -578,8 +601,7 @@ class AgentEngine:
             )
         if verdict.action == GateAction.CONFIRM:
             confirm_res = await self._confirm_call(
-                turn_id, call, verdict, cancel,
-                conversation_id=state.request.conversation_id,
+                turn_id, call, verdict, cancel, state=state,
             )
             if confirm_res is not None:
                 return confirm_res
@@ -606,7 +628,7 @@ class AgentEngine:
         verdict: GateVerdict,
         cancel: asyncio.Event,
         *,
-        conversation_id: str,
+        state: _TurnState,
     ) -> _CallResolution | None:
         """Flusso di conferma: eventi requested/resolved, audit, mappatura esito.
 
@@ -614,10 +636,14 @@ class AgentEngine:
         la resolution sintetica. DISCONNECTED è un DATO: result sintetico +
         flag disconnect (lo stop scatta DOPO la persistenza, §6.5).
 
-        Su APPROVED con scelta ``remember`` la persistenza della regola passa
-        dalla ``PermissionPort`` (``remember_approval``, best-effort) — è
-        l'unico ramo che la consuma: una call non approvata non viene mai
-        ricordata.
+        Su APPROVED con scelta ``remember`` la coppia (call, scope) è solo
+        ACCODATA in ``state.pending_remembers``: la persistenza via
+        ``PermissionPort.remember_approval`` avviene in ``_run_tool_step``
+        DOPO il checkpoint del batch (§6.15 — qui l'audit è appena stato
+        flushato sulla UoW del turno senza commit: scrivere subito su una
+        sessione propria collide sul single-writer SQLite, "database is
+        locked"). È l'unico ramo che la consuma: una call non approvata non
+        viene mai ricordata.
 
         INVARIANTE: nessun ``await`` tra il ritorno di
         ``emit(InteractionRequestedEvent)`` e la chiamata alla porta
@@ -651,9 +677,7 @@ class AgentEngine:
         )
         if outcome == InteractionOutcome.APPROVED:
             if result.remember is not RememberScope.NONE:
-                await self._permissions.remember_approval(
-                    call, conversation_id=conversation_id, scope=result.remember,
-                )
+                state.pending_remembers.append((call, result.remember))
             return None
         if outcome == InteractionOutcome.REJECTED:
             return _CallResolution(

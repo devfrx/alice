@@ -160,12 +160,20 @@ class PermissionService:
         self._command_capability_provider = command_capability_provider
         # Invalid entries resolve to ``None`` and are filtered out here —
         # the containment helpers take ``Path``, never ``None`` (fail-closed
-        # contract of ``backend.core.path_safety``).
-        self._forbidden_paths: tuple[Path, ...] = tuple(
-            resolved
-            for resolved in (safe_resolve(p) for p in forbidden_paths)
-            if resolved is not None
-        )
+        # contract of ``backend.core.path_safety``).  A dropped entry is a
+        # degraded security config: it must leave a trace.
+        resolved_forbidden: list[Path] = []
+        for entry in forbidden_paths:
+            resolved = safe_resolve(entry)
+            if resolved is None:
+                logger.warning(
+                    "Permission: unresolvable forbidden path dropped from "
+                    "security config: {!r}",
+                    entry,
+                )
+                continue
+            resolved_forbidden.append(resolved)
+        self._forbidden_paths: tuple[Path, ...] = tuple(resolved_forbidden)
 
     # ------------------------------------------------------------------
     # Risk classification
@@ -424,11 +432,18 @@ class PermissionService:
         roots = self._scope_provider(conversation_id)
         if not roots:
             return []
-        return [
-            resolved
-            for resolved in (safe_resolve(r) for r in roots)
-            if resolved is not None
-        ]
+        resolved_roots: list[Path] = []
+        for root in roots:
+            resolved = safe_resolve(root)
+            if resolved is None:
+                logger.warning(
+                    "Permission: unresolvable scope root dropped (conv={}): {!r}",
+                    conversation_id,
+                    root,
+                )
+                continue
+            resolved_roots.append(resolved)
+        return resolved_roots
 
     def _within_scope(self, raw_path: str, scope_roots: list[Path]) -> bool:
         """Return ``True`` iff *raw_path* resolves inside a scope root.

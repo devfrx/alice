@@ -157,9 +157,6 @@ FORBIDDEN_PATHS: list[str] = [
     r"C:\Boot",
 ]
 
-# System directories (normalized lowercase for comparison)
-SYSTEM_DIRS: list[str] = [p.lower().replace("\\", "/") for p in FORBIDDEN_PATHS]
-
 # -- Screenshot Settings --------------------------------------------------
 MAX_SCREENSHOT_PIXELS: int = 2_000_000
 """Maximum screenshot resolution (width * height). Downscale if exceeded."""

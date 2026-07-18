@@ -9,13 +9,11 @@ story for the terminal lives here.
 
 Design notes (every input is treated as hostile):
 
-* The path checks **replicate** — rather than import — the proven validator
-  :meth:`backend.services.scope_service.ScopeService.validate_folder`
-  (UNC/device rejection, resolve-first, exists/dir).  The codebase intentionally
-  duplicates these primitives so security-critical modules never couple to one
-  another's internals.  The check ``validate_folder`` *lacks* — positive
-  containment inside the conversation scope — is added here and is the load-
-  bearing anti-escape step.
+* The path primitives (UNC rejection, resolve, containment, forbidden) come
+  from :mod:`backend.core.path_safety` — the single consolidated
+  implementation (Fase 2) shared with ``scope_service``/``permission_service``.
+  The check ``validate_folder`` *lacks* — positive containment inside the
+  conversation scope — is added here and is the load-bearing anti-escape step.
 * ``Path.resolve()`` is always called **before** any containment/forbidden
   comparison.  It collapses ``..`` segments and follows symlinks, so a traversal
   or a symlink that points outside the scope both surface as a *resolved* path
@@ -34,30 +32,9 @@ from pathlib import Path
 
 from loguru import logger
 
+from backend.core.path_safety import is_relative_to, is_unc_path, safe_resolve
+
 __all__ = ["build_argv", "ensure_sandbox", "validate_cwd_within_scope"]
-
-
-def _is_relative_to(target: Path, root: Path) -> bool:
-    """Return ``True`` iff *target* is at or under *root* (never raises).
-
-    An explicit helper (rather than :meth:`pathlib.PurePath.is_relative_to`) so
-    the containment semantics stay auditable and uniform across call sites: it
-    answers a pure "is *target* equal to, or nested inside, *root*?" question and
-    swallows the :class:`ValueError` that :meth:`Path.relative_to` raises when it
-    is not.
-
-    Args:
-        target: The already-resolved candidate path.
-        root: The already-resolved root to test containment against.
-
-    Returns:
-        ``True`` when *target* is *root* itself or a descendant of it.
-    """
-    try:
-        target.relative_to(root)
-        return True
-    except ValueError:
-        return False
 
 
 def validate_cwd_within_scope(
@@ -109,15 +86,16 @@ def validate_cwd_within_scope(
     raw = requested_cwd.strip()
 
     # 2. UNC (``\\server\share``) / device (``\\.\dev``) / forward-slash UNC.
-    if raw.startswith("\\") or raw.startswith("//"):
+    #    The single leading ``\`` (drive-relative) is a stricter caller-side
+    #    check that ``is_unc_path`` deliberately does not cover.
+    if raw.startswith("\\") or is_unc_path(raw):
         raise ValueError(f"UNC and device paths are not allowed: {requested_cwd}")
 
-    # 3. Resolve symlinks / ``..`` BEFORE any comparison.  ``strict=False`` —
-    #    existence is asserted explicitly in step 4.
-    try:
-        resolved = Path(raw).resolve()
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"Invalid working directory path: {exc}") from exc
+    # 3. Resolve symlinks / ``..`` BEFORE any comparison.  ``strict=False``
+    #    semantics — existence is asserted explicitly in step 4.
+    resolved = safe_resolve(raw)
+    if resolved is None:
+        raise ValueError(f"Invalid working directory path: {requested_cwd}")
 
     # 4. Must exist and be a directory.
     if not resolved.exists():
@@ -127,12 +105,11 @@ def validate_cwd_within_scope(
 
     # 5. Forbidden roots take precedence over scope membership.
     for entry in forbidden_paths:
-        try:
-            forbidden_root = Path(entry).resolve()
-        except (OSError, ValueError):
+        forbidden_root = safe_resolve(entry)
+        if forbidden_root is None:
             # A malformed forbidden entry must never weaken the check; skip it.
             continue
-        if _is_relative_to(resolved, forbidden_root):
+        if is_relative_to(resolved, forbidden_root):
             raise ValueError(
                 f"Working directory '{resolved}' is inside a forbidden root: {forbidden_root}"
             )
@@ -141,7 +118,7 @@ def validate_cwd_within_scope(
     #    empty *scope_roots* means nothing is in-scope, so this is False and the
     #    path is rejected — exactly the desired no-scope behaviour for an
     #    *explicit* cwd (the sandbox fallback is a separate primitive).
-    if not any(_is_relative_to(resolved, root) for root in scope_roots):
+    if not any(is_relative_to(resolved, root) for root in scope_roots):
         raise ValueError(
             f"Working directory '{resolved}' is outside the workspace scope"
         )
@@ -208,7 +185,7 @@ def ensure_sandbox(conversation_id: str, sandbox_root: str | Path) -> Path:
     target = (base / cid).resolve()
 
     # 3. Re-assert containment even after step 1 (defence in depth).
-    if not _is_relative_to(target, base):
+    if not is_relative_to(target, base):
         raise ValueError(
             f"Sandbox path '{target}' escaped the sandbox root '{base}'"
         )

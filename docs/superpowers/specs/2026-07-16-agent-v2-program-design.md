@@ -103,6 +103,23 @@ ripgrep, exec unificato con scope e permessi (convergenza col terminal PTY esist
 dei risultati (politiche di troncamento, immagini, guidance per-tool). Tool nuovi e tool
 esistenti riconciliati: una capability = una implementazione.
 
+**Perimetro permessi dei tool MCP** (censito nello smoke di Fase 1, 2026-07-18 — dimostrato
+live: scrittura su Desktop via `mcp_filesystem_write_file` SENZA conferma in strict): i tool
+MCP non dichiarano `capabilities`/`path_args`/`requires_confirmation` (default vuoti in
+`core/plugin_models.py`), quindi il gate salta sia il confinement di scope (`is_fs=False`,
+`permission_service.py:306`) sia la conferma dei tier. In questa fase i tool MCP entrano nel
+modello di capability:
+- consumare le **MCP tool annotations** (`readOnlyHint`/`destructiveHint`) quando il server
+  le espone, mappandole su capability/risk/`requires_confirmation` del gate (approccio
+  principled, scelto dall'utente rispetto al tampone euristico sui nomi);
+- fallback dichiarato e conservativo per i server senza annotations;
+- valutare il confinement per-conversazione dei tool MCP path-aware: il ponte scope→roots di
+  Fase 1 è deliberatamente GLOBALE al processo server (unione degli scope + dirs statiche,
+  limite documentato in `services/mcp_session.py`);
+- decidere la sorte del layer grant in-memory (`PermissionService.grant`/`is_granted`), oggi
+  consumato dal gate ma senza scrittori di produzione (la scelta "ricorda" delle conferme
+  crea `PermissionRule` su DB, fix post-smoke Fase 1).
+
 ### Fase 3 — Prompting e comportamento
 Riscrittura del prompt agentico: esplora-poi-agisci, verify-before-done, stile di comunicazione
 (aggiornamenti brevi durante il lavoro, esito in testa alla risposta finale), preamboli e

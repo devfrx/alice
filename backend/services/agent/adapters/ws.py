@@ -379,6 +379,15 @@ class WsInteractionPort:
         try:
             remember = RememberScope(raw_remember) if raw_remember else RememberScope.NONE
         except ValueError:
+            # Fuori vocabolario (es. il valore legacy "session" da un FE non
+            # aggiornato): la scelta va persa per contratto, ma MAI in
+            # silenzio — questo log è l'unico segnale diagnostico.
+            logger.warning(
+                "interaction.response: remember={!r} fuori dal vocabolario "
+                "wire (none|conversation|persistent) — scelta ignorata "
+                "(FE non aggiornato?)",
+                raw_remember,
+            )
             remember = RememberScope.NONE
         return ConfirmationResult(
             outcome=InteractionOutcome.APPROVED, remember=remember,

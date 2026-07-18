@@ -165,3 +165,12 @@ class PermissionServiceAdapter:
                 "remember_approval fallita: tool={} scope={} (regola non salvata)",
                 tool_name, scope.value,
             )
+        else:
+            # INFO (non debug): è l'esito di una scelta esplicita dell'utente,
+            # deve essere visibile nella console dev senza livelli verbose.
+            logger.info(
+                "Conferma ricordata: regola allow per '{}' ({})",
+                tool_name,
+                "questa conversazione" if scope is RememberScope.CONVERSATION
+                else "globale",
+            )

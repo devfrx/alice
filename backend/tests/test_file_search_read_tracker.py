@@ -59,6 +59,43 @@ def test_lru_cap_evicts_oldest(tmp_path: Path) -> None:
     assert t.verify("conv1", files[2]) is ReadState.FRESH
 
 
+def test_rerecord_after_modification_is_fresh(tmp_path: Path) -> None:
+    import os
+
+    f = tmp_path / "a.txt"
+    f.write_text("x")
+    t = ReadTracker()
+    t.record("conv1", f)
+    os.utime(f, ns=(1, 1))  # modifica esterna
+    assert t.verify("conv1", f) is ReadState.STALE
+    t.record("conv1", f)  # l'agente ri-legge (ciclo Task 11-12)
+    assert t.verify("conv1", f) is ReadState.FRESH
+
+
+def test_conversation_cap_evicts_least_recently_used(tmp_path: Path) -> None:
+    f = tmp_path / "a.txt"
+    f.write_text("x")
+    t = ReadTracker(max_conversations=2)
+    t.record("conv1", f)
+    t.record("conv2", f)
+    t.record("conv3", f)  # evict conv1 (la meno recentemente usata)
+    assert t.verify("conv1", f) is ReadState.UNREAD
+    assert t.verify("conv2", f) is ReadState.FRESH
+    assert t.verify("conv3", f) is ReadState.FRESH
+
+
+def test_verify_refreshes_conversation_lru_position(tmp_path: Path) -> None:
+    f = tmp_path / "a.txt"
+    f.write_text("x")
+    t = ReadTracker(max_conversations=2)
+    t.record("conv1", f)
+    t.record("conv2", f)
+    assert t.verify("conv1", f) is ReadState.FRESH  # conv1 torna in testa
+    t.record("conv3", f)  # evict conv2, non conv1
+    assert t.verify("conv1", f) is ReadState.FRESH
+    assert t.verify("conv2", f) is ReadState.UNREAD
+
+
 def test_rerecord_refreshes_lru_position(tmp_path: Path) -> None:
     t = ReadTracker(max_entries=2)
     a = tmp_path / "a.txt"

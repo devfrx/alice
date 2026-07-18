@@ -14,7 +14,6 @@ layer and is consumed only by the chat route package.
 Public surface:
     * :class:`WSEventSink` — structural protocol (``send`` + ``is_connected``).
     * :class:`TransportEventSink` — persist-path sink over the engine transport.
-    * :class:`WebSocketEventSink` — production sink over a FastAPI WebSocket.
     * :class:`NullEventSink` — drop sink for headless (autonomous) turns.
     * :func:`is_websocket_closed_runtime_error` — closed-socket detector.
 """
@@ -22,14 +21,7 @@ Public surface:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
-
-from loguru import logger
-from starlette.websockets import WebSocketState
-
-if TYPE_CHECKING:  # pragma: no cover — typing only
-    from fastapi import WebSocket
-
+from typing import Any, Protocol, runtime_checkable
 
 _CLOSED_WEBSOCKET_RUNTIME_MARKERS = (
     "WebSocket is not connected",
@@ -56,9 +48,10 @@ def is_websocket_closed_runtime_error(exc: RuntimeError) -> bool:
 class WSEventSink(Protocol):
     """Structural type for outbound event sinks used by the persist path.
 
-    The persist path emits events as plain JSON-serialisable dicts
-    (``done``, ``context_info``, ``context_compression_*`` …).
-    Implementations decide how to deliver them (WebSocket, drop, buffer).
+    The persist path emits events as plain JSON-serialisable dicts (the
+    ``context.usage`` / ``context.compaction`` maintenance frames it builds
+    itself). Implementations decide how to deliver them (transport, drop,
+    buffer).
     """
 
     async def send(self, event: dict[str, Any]) -> None:
@@ -69,60 +62,6 @@ class WSEventSink(Protocol):
     def is_connected(self) -> bool:
         """Whether the underlying transport is still usable."""
         ...
-
-
-class WebSocketEventSink:
-    """Production sink that forwards events to a FastAPI WebSocket.
-
-    Args:
-        ws: The accepted FastAPI ``WebSocket`` to forward events to.
-        frame_validator: Optional callable injected by the api layer to
-            validate outbound frames against the typed contract.
-    """
-
-    def __init__(
-        self,
-        ws: WebSocket,
-        frame_validator: Callable[[dict[str, Any]], None] | None = None,
-    ) -> None:
-        self._ws = ws
-        self._closed = False
-        self._validate = frame_validator
-
-    async def send(self, event: dict[str, Any]) -> None:
-        """Send ``event`` as JSON; swallow disconnect / runtime errors.
-
-        Callers inspect :attr:`is_connected` to decide whether to keep
-        emitting after a failure, so this method never raises on
-        transport-level issues.
-        """
-        if self._validate is not None:
-            self._validate(event)
-        # Lazy import keeps this module free of FastAPI at type-check time.
-        from fastapi import WebSocketDisconnect
-
-        try:
-            await self._ws.send_json(event)
-        except WebSocketDisconnect:
-            self._closed = True
-            logger.debug("WebSocketEventSink: client disconnected on send")
-        except RuntimeError as exc:
-            # Typical when the socket has already been closed.
-            if is_websocket_closed_runtime_error(exc):
-                self._closed = True
-            logger.debug("WebSocketEventSink: send failed ({})", exc)
-
-    @property
-    def is_connected(self) -> bool:
-        """Return ``True`` while the WebSocket is in CONNECTED state."""
-        try:
-            return (
-                not self._closed
-                and self._ws.client_state == WebSocketState.CONNECTED
-                and self._ws.application_state == WebSocketState.CONNECTED
-            )
-        except Exception:  # pragma: no cover — defensive
-            return False
 
 
 class TransportEventSink:
@@ -182,6 +121,5 @@ __all__ = [
     "NullEventSink",
     "TransportEventSink",
     "WSEventSink",
-    "WebSocketEventSink",
     "is_websocket_closed_runtime_error",
 ]

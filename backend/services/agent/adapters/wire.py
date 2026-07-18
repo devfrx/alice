@@ -99,7 +99,7 @@ def to_v2_frames(event: AgentEvent) -> list[dict[str, Any]]:
         return [_dump(ws.WsTurnToolResult(
             type="tool.result", turn_id=event.turn_id,
             execution_id=event.call_id, tool_name=event.name,
-            status=event.status, success=event.status == "ok",
+            status=event.status,
             result=event.result, content_type=event.content_type,
             artifact_id=event.artifact_id,
         ))]
@@ -181,7 +181,4 @@ def to_v2_frames(event: AgentEvent) -> list[dict[str, Any]]:
             input_tokens=event.input_tokens, output_tokens=event.output_tokens,
             cost=event.cost,
         ))]
-    if isinstance(event, ev.RawToolCallDeltaEvent):
-        # Diagnostico Mossa 1: non ha un frame v2 (muore nel Task 10).
-        return []
     return []

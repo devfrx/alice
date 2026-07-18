@@ -52,7 +52,6 @@ from backend.services.agent.ports import (
     LLMStepDone,
     LLMTextDelta,
     LLMThinkingDelta,
-    LLMToolCallDelta,
     LLMUsage,
     PermissionPort,
     PersistencePort,
@@ -283,10 +282,6 @@ class AgentEngine:
                 step_thinking += event.text
                 await self._events.emit(ev.TurnDeltaEvent(
                     turn_id=turn_id, step=step, kind="thinking", text=event.text,
-                ))
-            elif isinstance(event, LLMToolCallDelta):
-                await self._events.emit(ev.RawToolCallDeltaEvent(
-                    turn_id=turn_id, payload=event.payload,
                 ))
             elif isinstance(event, LLMUsage):
                 state.input_tokens += event.input_tokens

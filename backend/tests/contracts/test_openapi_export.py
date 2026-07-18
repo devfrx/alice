@@ -40,7 +40,7 @@ def test_ws_contract_injected_as_components() -> None:
     ):
         assert union_name in components, union_name
     # Discriminated member schemas land as named components too.
-    assert "WsToken" in components
+    assert "WsTurnStarted" in components
     assert "WsCalendarChanged" in components
     # The discriminator survives so openapi-typescript emits a tagged union.
     assert components["EventsServerMessage"]["discriminator"]["propertyName"] == "type"

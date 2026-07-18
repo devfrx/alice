@@ -104,8 +104,8 @@ def test_tool_progress_frame() -> None:
 
 
 def test_tool_result_frame() -> None:
-    """Esempio obbligatorio del piano: tool.result denied (``success`` False
-    resta fino alla purga del Task 10; ``result`` è il corpo COMPLETO)."""
+    """Esempio obbligatorio del piano: tool.result denied (``result`` è il corpo
+    COMPLETO; ``success`` è stato purgato dal contratto nel Task 10)."""
     frames = to_v2_frames(ev.ToolResultEvent(
         turn_id="t1", call_id="c1", name="web_search", status="denied",
         result="Chiamata negata: plan tier.", artifact_id=None,
@@ -113,7 +113,6 @@ def test_tool_result_frame() -> None:
     assert frames == [{
         "type": "tool.result", "origin": "agent", "turn_id": "t1",
         "execution_id": "c1", "tool_name": "web_search", "status": "denied",
-        "success": False,  # presente fino alla purga (Task 10 lo rimuove)
         "result": "Chiamata negata: plan tier.",
     }]
     _assert_valid(frames)
@@ -127,7 +126,7 @@ def test_tool_result_ok_with_artifact_and_content_type() -> None:
     assert frames == [{
         "type": "tool.result", "origin": "agent", "turn_id": "t1",
         "execution_id": "c1", "tool_name": "cad", "status": "ok",
-        "success": True, "result": "art", "content_type": "model/gltf-binary",
+        "result": "art", "content_type": "model/gltf-binary",
         "artifact_id": "art-1",
     }]
     _assert_valid(frames)
@@ -326,15 +325,6 @@ def test_turn_finished_frame_empty_message_id_when_no_final_message() -> None:
         "input_tokens": 10, "output_tokens": 2, "cost": 0.0,
     }]
     _assert_valid(frames)
-
-
-def test_raw_tool_call_delta_produces_no_frame() -> None:
-    """Il diagnostico Mossa 1 non ha frame v2 (muore nel Task 10)."""
-    frames = to_v2_frames(ev.RawToolCallDeltaEvent(
-        turn_id="t1",
-        payload={"id": "call_1", "function": {"name": "read", "arguments": "{}"}},
-    ))
-    assert frames == []
 
 
 def test_normalize_questions_filters_and_defaults() -> None:

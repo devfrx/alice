@@ -1,20 +1,14 @@
 """AL\\CE — Typed schema of the chat WebSocket channel (``/api/ws/chat``).
 
-One Pydantic model per frame. Field shapes originally audited from the
-legacy emit sites on 2026-06-11 (LLM stream forwarding, ``tool_loop.py``/
-``pipeline.py``, ``services/turn/events.py``, ``services/turn/channel.py``
-``_REQUEST_SPECS``, reflective executor); those modules were demolished by
-the v2 AgentEngine migration. The current frame producers are the
-``services/agent`` engine via its WS adapters (``services/agent/adapters/
-ws.py``'s ``WsTransport``, ``services/agent/adapters/parity.py`` for
-legacy-shape parity) and ``api/routes/chat/_persist.py`` (which still
-builds the final ``done`` event after the engine's ``TurnOutcome``).
-
-The "Canonical v2 (Mossa 2)" section below is an ADDITIVE contract widening
-(Task 6): new frame types plus optional ``# v2`` fields on existing models.
-No emitter changes yet — the wire is unchanged. Emitters switch to the v2
-vocabulary in Tasks 7-9; the legacy types and ``adapters/parity.py`` are
-purged in Task 10.
+One Pydantic model per frame. The chat channel speaks ONLY the canonical v2
+vocabulary (spec §4): every turn fact is streamed by the AgentEngine through
+its definitive WS translator (``services/agent/adapters/wire.py``, which builds
+each frame through the model below, so a frame that does not validate cannot be
+constructed), and the post-turn persistence path
+(``api/routes/chat/_persist.py`` / ``_assembly.py``) emits the typed
+conversation-maintenance frames (``context.usage`` / ``context.compaction``) on
+the SAME transport. There is no legacy frame vocabulary and no parity
+translator any more — both were purged in Mossa 2 Task 10.
 """
 
 from __future__ import annotations
@@ -44,102 +38,12 @@ InteractionOutcome = Literal[
 RememberChoice = Literal["none", "session", "persistent"]
 
 # ---------------------------------------------------------------------------
-# Legacy streaming
+# Shared sub-objects
 # ---------------------------------------------------------------------------
-
-
-class WsToken(ChatServerFrame):
-    """A single streamed token from the LLM."""
-
-    type: Literal["token"]
-    content: str
-
-
-class WsThinking(ChatServerFrame):
-    """A reasoning/thinking token from the LLM (extended thinking mode)."""
-
-    type: Literal["thinking"]
-    content: str
-
-
-class WsToolCallFunction(BaseModel):
-    """The function sub-object of a raw LLM tool-call stream forward."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    name: str
-    arguments: str
-
-
-class WsToolCallStream(ChatServerFrame):
-    """LLM requested a tool (raw stream forward, pre-execution)."""
-
-    type: Literal["tool_call"]
-    id: str
-    function: WsToolCallFunction
-
-
-class WsError(ChatServerFrame):
-    """A hard error that terminated the turn."""
-
-    type: Literal["error"]
-    content: str
-
-
-class WsDone(ChatServerFrame):
-    """Final turn frame (built in chat ``_persist`` after the DB commit)."""
-
-    type: Literal["done"]
-    conversation_id: str
-    message_id: str
-    user_message_id: str
-    finish_reason: str
-    version_group_id: str | None = None
-    version_index: int
-
-# ---------------------------------------------------------------------------
-# Tool loop
-# ---------------------------------------------------------------------------
-
-
-class WsToolExecutionStart(ChatServerFrame):
-    """The tool executor began running a tool."""
-
-    type: Literal["tool_execution_start"]
-    tool_name: str
-    execution_id: str
-
-
-class WsToolExecutionDone(ChatServerFrame):
-    """The tool executor finished running a tool."""
-
-    type: Literal["tool_execution_done"]
-    tool_name: str
-    result: str
-    execution_id: str
-    success: bool
-    content_type: str | None = None
-    artifact_id: str | None = None
-
-
-class WsToolProgressLegacy(ChatServerFrame):
-    """Incremental progress; tools merge arbitrary extra keys (extra=allow)."""
-
-    model_config = ConfigDict(extra="allow")
-
-    type: Literal["tool_progress"]
-    tool_name: str
-    execution_id: str
-    phase: str | None = None
-    label: str | None = None
-    step: int | None = None
-    total: int | None = None
-    percent: float | None = None
-    elapsed_s: float | None = None
 
 
 class WsContextBreakdown(BaseModel):
-    """Per-category token breakdown within a ``context_info`` frame."""
+    """Per-category token breakdown within a ``context.usage`` frame."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -151,82 +55,8 @@ class WsContextBreakdown(BaseModel):
     other: int
 
 
-class WsContextInfo(ChatServerFrame):
-    """Current context-window utilisation snapshot."""
-
-    type: Literal["context_info"]
-    used: int
-    available: int
-    context_window: int
-    percentage: float
-    was_compressed: bool
-    messages_summarized: int
-    is_estimated: bool = False
-    breakdown: WsContextBreakdown | None = None
-
-
-class WsContextCompressionStart(ChatServerFrame):
-    """Context compression is about to begin."""
-
-    type: Literal["context_compression_start"]
-
-
-class WsContextCompressionDone(ChatServerFrame):
-    """Context compression completed successfully."""
-
-    type: Literal["context_compression_done"]
-    messages_summarized: int
-    summary_message_id: str | None = None
-
-
-class WsContextCompressionFailed(ChatServerFrame):
-    """Context compression failed; the turn continues uncompressed."""
-
-    type: Literal["context_compression_failed"]
-
-
-class WsLlmRequery(ChatServerFrame):
-    """The tool loop is making another LLM call after tool execution."""
-
-    type: Literal["llm_requery"]
-    iteration: int
-
-
-class WsWarning(ChatServerFrame):
-    """A non-fatal warning from the turn executor."""
-
-    type: Literal["warning"]
-    content: str
-
-# ---------------------------------------------------------------------------
-# Interaction requests (round-trips driven by services/turn/channel.py)
-# ---------------------------------------------------------------------------
-
-
-class WsToolConfirmationRequired(ChatServerFrame):
-    """The turn executor needs the user to approve a risky tool call."""
-
-    type: Literal["tool_confirmation_required"]
-    execution_id: str
-    tool_name: str
-    args: dict[str, Any]
-    risk_level: RiskLevel
-    description: str
-    reasoning: str | None = None
-    allow_remember: bool = True
-
-
-class WsClientToolCall(ChatServerFrame):
-    """Delegate a UI-side tool execution to the connected client."""
-
-    type: Literal["client_tool_call"]
-    execution_id: str
-    tool_name: str
-    args: dict[str, Any]
-
-
 class WsAskUserQuestion(BaseModel):
-    """One question within an ``ask_user_required`` frame."""
+    """One question within an ``interaction.requested`` (``ask_user``) frame."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -237,15 +67,17 @@ class WsAskUserQuestion(BaseModel):
     allow_free_text: bool = False
 
 
-class WsAskUserRequired(ChatServerFrame):
-    """The agent needs clarification from the user before proceeding."""
+class WsAskUserAnswer(BaseModel):
+    """One answer within an ``interaction.response`` (``ask_user``) frame."""
 
-    type: Literal["ask_user_required"]
-    execution_id: str
-    questions: list[WsAskUserQuestion]
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: str
+    selected: list[str] = Field(default_factory=list)
+    free_text: str | None = None
 
 # ---------------------------------------------------------------------------
-# Canonical turn events (services/turn/events.py)
+# Canonical v2 turn events (services/agent/adapters/wire.py)
 # ---------------------------------------------------------------------------
 
 
@@ -255,103 +87,7 @@ class WsTurnStarted(ChatServerFrame):
     type: Literal["turn.started"]
     turn_id: str
     conversation_id: str
-    source: Literal["chat", "voice", "headless"] | None = None  # v2
-
-
-class WsTurnLlmStep(ChatServerFrame):
-    """The turn executor began an LLM step."""
-
-    type: Literal["turn.llm_step"]
-    turn_id: str
-    step: int
-
-
-class WsTurnToolCall(ChatServerFrame):
-    """The turn executor dispatched a tool call."""
-
-    type: Literal["tool.call"]
-    turn_id: str
-    execution_id: str
-    tool_name: str
-    args: dict[str, Any]
-    step: int | None = None  # v2
-
-
-class WsTurnToolResult(ChatServerFrame):
-    """A tool returned its result to the turn executor."""
-
-    type: Literal["tool.result"]
-    turn_id: str
-    execution_id: str
-    tool_name: str
-    success: bool
-    result: str
-    content_type: str | None = None
-    artifact_id: str | None = None
-    status: str | None = None  # v2
-
-
-class WsInteractionRequested(ChatServerFrame):
-    """An interaction (confirmation / client tool / clarification) was requested."""
-
-    type: Literal["interaction.requested"]
-    turn_id: str
-    execution_id: str
-    kind: InteractionKind
-    tool_name: str | None = None
-    interaction_id: str | None = None  # v2
-    args: dict[str, Any] | None = None  # v2
-    risk_level: RiskLevel | None = None  # v2
-    description: str | None = None  # v2
-    reasoning: str | None = None  # v2
-    allow_remember: bool | None = None  # v2
-    questions: list[WsAskUserQuestion] | None = None  # v2
-
-
-class WsInteractionResolved(ChatServerFrame):
-    """An in-flight interaction completed (or was cancelled/timed-out)."""
-
-    type: Literal["interaction.resolved"]
-    turn_id: str
-    execution_id: str
-    kind: InteractionKind
-    outcome: InteractionOutcome
-    interaction_id: str | None = None  # v2
-
-
-class WsTurnUsage(ChatServerFrame):
-    """Per-step token usage snapshot emitted by the turn executor."""
-
-    type: Literal["turn.usage"]
-    turn_id: str
-    step: int
-    input_tokens: int
-    output_tokens: int
-    tool_calls: int
-    max_steps: int
-    cost: float | None = None  # v2
-
-
-class WsTurnFinished(ChatServerFrame):
-    """The turn has finished; summary statistics follow."""
-
-    type: Literal["turn.finished"]
-    turn_id: str
-    finish_reason: str | None = None
-    input_tokens: int
-    output_tokens: int
-    steps: int
-    cost: float | None = None
-    conversation_id: str | None = None  # v2
-    message_id: str | None = None  # v2
-    user_message_id: str | None = None  # v2
-    version_group_id: str | None = None  # v2
-    version_index: int | None = None  # v2
-    tool_calls: int | None = None  # v2
-
-# ---------------------------------------------------------------------------
-# Canonical v2 (Mossa 2)
-# ---------------------------------------------------------------------------
+    source: Literal["chat", "voice", "headless"]
 
 
 class WsTurnDelta(ChatServerFrame):
@@ -362,6 +98,25 @@ class WsTurnDelta(ChatServerFrame):
     step: int
     kind: Literal["text", "thinking"]
     text: str
+
+
+class WsTurnLlmStep(ChatServerFrame):
+    """The engine began an LLM step."""
+
+    type: Literal["turn.llm_step"]
+    turn_id: str
+    step: int
+
+
+class WsTurnToolCall(ChatServerFrame):
+    """The engine dispatched a tool call."""
+
+    type: Literal["tool.call"]
+    turn_id: str
+    execution_id: str
+    tool_name: str
+    args: dict[str, Any]
+    step: int
 
 
 class WsToolStarted(ChatServerFrame):
@@ -381,6 +136,53 @@ class WsToolProgress(ChatServerFrame):
     execution_id: str
     tool_name: str
     progress: dict[str, Any]
+
+
+class WsTurnToolResult(ChatServerFrame):
+    """A tool returned its result to the engine.
+
+    ``status`` is the engine outcome vocabulary
+    (ok/error/parse_error/duplicate/unknown_tool/denied/rejected/timeout/
+    cancelled/budget_exhausted); ``result`` is the COMPLETE tool-response body
+    (including the synthetic prose of the refusal branches).
+    """
+
+    type: Literal["tool.result"]
+    turn_id: str
+    execution_id: str
+    tool_name: str
+    status: str
+    result: str
+    content_type: str | None = None
+    artifact_id: str | None = None
+
+
+class WsInteractionRequested(ChatServerFrame):
+    """An interaction (confirmation / client tool / clarification) was requested."""
+
+    type: Literal["interaction.requested"]
+    turn_id: str
+    interaction_id: str
+    execution_id: str
+    kind: InteractionKind
+    tool_name: str | None = None
+    args: dict[str, Any] | None = None
+    risk_level: RiskLevel | None = None
+    description: str | None = None
+    reasoning: str | None = None
+    allow_remember: bool | None = None
+    questions: list[WsAskUserQuestion] | None = None
+
+
+class WsInteractionResolved(ChatServerFrame):
+    """An in-flight interaction completed (or was cancelled/timed-out)."""
+
+    type: Literal["interaction.resolved"]
+    turn_id: str
+    interaction_id: str
+    execution_id: str
+    kind: InteractionKind
+    outcome: InteractionOutcome
 
 
 class WsContextUsage(ChatServerFrame):
@@ -428,27 +230,39 @@ class WsTurnError(ChatServerFrame):
     code: str
     message: str
 
-# ---------------------------------------------------------------------------
-# Reflective executor
-# ---------------------------------------------------------------------------
+
+class WsTurnUsage(ChatServerFrame):
+    """Per-step token/cost usage snapshot emitted by the engine."""
+
+    type: Literal["turn.usage"]
+    turn_id: str
+    step: int
+    input_tokens: int
+    output_tokens: int
+    cost: float
+    tool_calls: int
+    max_steps: int
 
 
-class WsAgentCriticInvoked(ChatServerFrame):
-    """The reflective executor invoked the critic pass."""
+class WsTurnFinished(ChatServerFrame):
+    """The turn has finished; summary statistics follow.
 
-    type: Literal["agent.critic_invoked"]
-    run_id: str | None = None
-    step_index: int = 0
-    source: str
+    ``message_id`` is ``""`` when the turn saved no final assistant message.
+    """
 
-
-class WsAgentWarning(ChatServerFrame):
-    """A structural warning from the agentic layer (e.g. degeneration)."""
-
-    type: Literal["agent.warning"]
-    run_id: str | None = None
-    code: str
-    message: str
+    type: Literal["turn.finished"]
+    turn_id: str
+    finish_reason: str
+    conversation_id: str
+    message_id: str
+    user_message_id: str | None = None
+    version_group_id: str | None = None
+    version_index: int
+    steps: int
+    tool_calls: int
+    input_tokens: int
+    output_tokens: int
+    cost: float
 
 # ---------------------------------------------------------------------------
 # Client→server frames
@@ -477,43 +291,6 @@ class WsCancel(ClientFrame):
     type: Literal["cancel"]
 
 
-class WsToolConfirmationResponse(ClientFrame):
-    """User response to a ``tool_confirmation_required`` request."""
-
-    type: Literal["tool_confirmation_response"]
-    execution_id: str
-    approved: bool
-    remember: RememberChoice = "none"
-
-
-class WsClientToolResult(ClientFrame):
-    """Result of a UI-side tool execution requested by ``client_tool_call``."""
-
-    type: Literal["client_tool_result"]
-    execution_id: str
-    success: bool = False
-    result: str | list[Any] | dict[str, Any] | None = None
-    error: str | None = None
-
-
-class WsAskUserAnswer(BaseModel):
-    """One answer within an ``ask_user_response`` frame."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    question_id: str
-    selected: list[str] = Field(default_factory=list)
-    free_text: str | None = None
-
-
-class WsAskUserResponse(ClientFrame):
-    """User answers to an ``ask_user_required`` request."""
-
-    type: Literal["ask_user_response"]
-    execution_id: str
-    answers: list[WsAskUserAnswer]
-
-
 class WsInteractionResponse(ClientFrame):
     """Unified response to interactions (kind-discriminated payload)."""
 
@@ -535,48 +312,25 @@ class WsInteractionResponse(ClientFrame):
 # ---------------------------------------------------------------------------
 
 ChatServerMessage = Annotated[
-    WsToken
-    | WsThinking
-    | WsToolCallStream
-    | WsError
-    | WsDone
-    | WsToolExecutionStart
-    | WsToolExecutionDone
-    | WsToolProgressLegacy
-    | WsContextInfo
-    | WsContextCompressionStart
-    | WsContextCompressionDone
-    | WsContextCompressionFailed
-    | WsLlmRequery
-    | WsWarning
-    | WsToolConfirmationRequired
-    | WsClientToolCall
-    | WsAskUserRequired
-    | WsTurnStarted
+    WsTurnStarted
+    | WsTurnDelta
     | WsTurnLlmStep
     | WsTurnToolCall
+    | WsToolStarted
+    | WsToolProgress
     | WsTurnToolResult
     | WsInteractionRequested
     | WsInteractionResolved
-    | WsTurnUsage
-    | WsTurnFinished
-    | WsAgentCriticInvoked
-    | WsAgentWarning
-    | WsTurnDelta
-    | WsToolStarted
-    | WsToolProgress
     | WsContextUsage
     | WsContextCompaction
     | WsTurnWarning
-    | WsTurnError,
+    | WsTurnError
+    | WsTurnUsage
+    | WsTurnFinished,
     Field(discriminator="type"),
 ]
 
 ChatClientMessage = Annotated[
-    WsCancel
-    | WsToolConfirmationResponse
-    | WsClientToolResult
-    | WsAskUserResponse
-    | WsInteractionResponse,
+    WsCancel | WsInteractionResponse,
     Field(discriminator="type"),
 ]

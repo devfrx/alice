@@ -214,19 +214,10 @@ class TurnFinishedEvent(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class RawToolCallDeltaEvent(BaseModel):
-    """Evento diagnostico: delta grezzo di tool call (solo Mossa 1)."""
-
-    type: Literal["diag.tool_call_delta"] = "diag.tool_call_delta"
-    turn_id: str
-    payload: dict[str, Any]
-    model_config = ConfigDict(frozen=True)
-
-
 AgentEvent = (
     TurnStartedEvent | TurnDeltaEvent | LlmStepEvent | ToolCallEvent
     | ToolStartedEvent | ToolProgressEvent | ToolResultEvent
     | InteractionRequestedEvent | InteractionResolvedEvent
     | ContextUsageEvent | CompactionEvent | TurnWarningEvent | TurnErrorEvent
-    | TurnUsageEvent | TurnFinishedEvent | RawToolCallDeltaEvent
+    | TurnUsageEvent | TurnFinishedEvent
 )

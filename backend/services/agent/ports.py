@@ -40,13 +40,6 @@ class LLMThinkingDelta:
 
 
 @dataclass(frozen=True, slots=True)
-class LLMToolCallDelta:
-    """Chunk raw di una tool call in streaming (solo diagnostica/parity)."""
-
-    payload: dict[str, Any]
-
-
-@dataclass(frozen=True, slots=True)
 class LLMUsage:
     """Utilizzo token/costo riportato dal modello."""
 
@@ -73,7 +66,7 @@ class LLMFailure:
 
 
 LLMEvent = (
-    LLMTextDelta | LLMThinkingDelta | LLMToolCallDelta | LLMUsage | LLMStepDone | LLMFailure
+    LLMTextDelta | LLMThinkingDelta | LLMUsage | LLMStepDone | LLMFailure
 )
 
 

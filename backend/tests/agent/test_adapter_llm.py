@@ -90,7 +90,7 @@ async def test_token_and_thinking_chunks_become_deltas() -> None:
     assert done[0].tool_calls == ()
 
 
-async def test_complete_tool_call_chunks_become_one_stepdone_with_n_deltas() -> None:
+async def test_complete_tool_call_chunks_become_one_stepdone() -> None:
     """Contratto reale: ogni chunk 'tool_call' è già una call completa."""
     fake = FakeLLMService(chunks=[
         {"type": "tool_call", "id": "call_1",
@@ -100,9 +100,6 @@ async def test_complete_tool_call_chunks_become_one_stepdone_with_n_deltas() -> 
         {"type": "done", "finish_reason": "tool_calls"},
     ])
     events = await _collect(LLMServiceAdapter(fake))
-
-    deltas = [e for e in events if isinstance(e, ports.LLMToolCallDelta)]
-    assert len(deltas) == 2
 
     done = [e for e in events if isinstance(e, ports.LLMStepDone)]
     assert len(done) == 1
@@ -125,9 +122,6 @@ async def test_partial_tool_call_fragments_with_same_id_are_merged() -> None:
         {"type": "done", "finish_reason": "tool_calls"},
     ])
     events = await _collect(LLMServiceAdapter(fake))
-
-    deltas = [e for e in events if isinstance(e, ports.LLMToolCallDelta)]
-    assert len(deltas) == 2
 
     done = [e for e in events if isinstance(e, ports.LLMStepDone)]
     assert len(done) == 1

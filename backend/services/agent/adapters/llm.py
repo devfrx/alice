@@ -76,7 +76,6 @@ from backend.services.agent.ports import (
     LLMStepDone,
     LLMTextDelta,
     LLMThinkingDelta,
-    LLMToolCallDelta,
     LLMUsage,
 )
 
@@ -107,9 +106,7 @@ class LLMServiceAdapter:
         """Stream di uno step LLM, tradotto in ``LLMEvent`` tipizzati.
 
         Accumula i chunk ``tool_call`` (per ``id``, vedi docstring di modulo)
-        e li normalizza in un unico ``LLMStepDone`` quando arriva ``done``,
-        emettendo comunque un ``LLMToolCallDelta`` di parity per ogni chunk
-        raw ricevuto.
+        e li normalizza in un unico ``LLMStepDone`` quando arriva ``done``.
         """
         # Accumulatore: id tool-call -> raw dict OpenAI-shape per
         # normalize_tool_invocations. L'ordine di prima apparizione è
@@ -133,7 +130,6 @@ class LLMServiceAdapter:
             elif chunk_type == "thinking":
                 yield LLMThinkingDelta(text=chunk.get("content", "") or "")
             elif chunk_type == "tool_call":
-                yield LLMToolCallDelta(payload=chunk)
                 call_id = chunk.get("id") or ""
                 fn = chunk.get("function") or {}
                 key = call_id

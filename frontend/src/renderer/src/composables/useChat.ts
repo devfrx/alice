@@ -30,11 +30,10 @@ import { useSettingsStore } from '../stores/settings'
 import type {
   AskUserAnswer,
   FileAttachment,
-  WsAskUserResponsePayload,
   WsCancelPayload,
+  WsInteractionResponsePayload,
   RememberChoice,
-  WsSendPayload,
-  WsToolConfirmationResponsePayload
+  WsSendPayload
 } from '../types/chat'
 import type { ChatServerMessage } from '../types/generated'
 
@@ -63,10 +62,14 @@ export interface UseChatReturn {
   editMessage: (messageId: string, newContent: string, attachments?: File[]) => Promise<void>
   /** Stop the in-progress generation. */
   stopGeneration: () => void
-  /** Respond to a tool confirmation request. */
-  respondToConfirmation: (executionId: string, approved: boolean) => void
+  /** Respond to a tool confirmation request (keyed by `interactionId`). */
+  respondToConfirmation: (
+    interactionId: string,
+    approved: boolean,
+    remember?: RememberChoice
+  ) => void
   /** Answer an inline `ask_user` prompt with the user's structured answers. */
-  answerAskUser: (executionId: string, answers: AskUserAnswer[]) => void
+  answerAskUser: (interactionId: string, answers: AskUserAnswer[]) => void
   /** Reactive flag — `true` while the socket is open. */
   isConnected: Ref<boolean>
   /** Reactive connection status string. */
@@ -137,177 +140,93 @@ export function useChat(): UseChatReturn {
   // Chat frame handlers (exhaustive over ChatServerMessage['type'])
   // -----------------------------------------------------------------------
 
-  const noop = (): void => {}
-
   const handlers: ChatHandlerMap = {
-    token: (msg) => {
+    // -- Turn lifecycle ----------------------------------------------------
+    // Run-scoped frames (keyed by turn_id) fold into the agentRun store and
+    // are NOT gated on the stale-generation guard, so late frames after
+    // navigation still land on the correct run. Streaming text/context frames
+    // touch the chat store and ARE gated (by generation and/or conversation).
+
+    'turn.started': (msg) => agentRunStore.applyTurnStarted(msg),
+
+    'turn.delta': (msg) => {
       if (store.streamGeneration !== activeGeneration) return // stale event
-      store.appendToStream(msg.content)
+      if (msg.kind === 'text') store.appendToStream(msg.text)
+      else store.appendToThinking(msg.text)
     },
 
-    thinking: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return // stale event
-      store.appendToThinking(msg.content)
-    },
-
-    done: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return // stale event
-      if (msg.finish_reason && msg.finish_reason !== 'stop') {
-        console.debug('[useChat] Stream finished with reason:', msg.finish_reason)
-      }
-      store.finalizeStream(
-        msg.conversation_id,
-        msg.message_id,
-        msg.version_group_id,
-        msg.version_index
-      )
-    },
-
-    error: (msg) => {
-      console.error('[useChat] Server error:', msg.content)
-      // Don't cancel stream here — transient LLM errors during tool loop
-      // re-queries would kill the entire stream.  The backend sends a
-      // proper "done" event when the response is truly finished.
-    },
-
-    warning: (msg) => {
-      console.warn('[useChat] Server warning:', msg.content)
-    },
-
-    // Legacy handler kept for backward compatibility with older backends.
-    tool_call: (msg) => console.debug('[useChat] Legacy tool_call frame:', msg),
-
-    tool_execution_start: (msg) => {
+    'turn.llm_step': (msg) => {
+      agentRunStore.applyLlmStep(msg)
       if (store.streamGeneration !== activeGeneration) return
-      store.addToolExecution(msg.execution_id, msg.tool_name)
-    },
-
-    tool_execution_done: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
-      store.completeToolExecution(
-        msg.execution_id,
-        msg.result,
-        msg.success,
-        msg.content_type ?? undefined
-      )
-    },
-
-    tool_progress: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
-      store.updateToolExecutionProgress(msg.execution_id, {
-        phase: msg.phase ?? undefined,
-        label: msg.label ?? null,
-        step: msg.step ?? undefined,
-        total: msg.total ?? undefined,
-        percent: msg.percent ?? undefined,
-        elapsedS: msg.elapsed_s ?? undefined
-      })
-    },
-
-    tool_confirmation_required: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
-
-      // Auto-approve safe tools or ALL tools when confirmations are disabled.
-      if (msg.risk_level === 'safe' || !settingsStore.toolConfirmations) {
-        respondToConfirmation(msg.execution_id, true)
-        return
-      }
-
-      store.addPendingConfirmation({
-        executionId: msg.execution_id,
-        toolName: msg.tool_name,
-        args: msg.args,
-        riskLevel: msg.risk_level,
-        description: msg.description,
-        reasoning: msg.reasoning ?? undefined,
-        allowRemember: msg.allow_remember
-      })
-    },
-
-    ask_user_required: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
-
-      // ask_user always needs human input — there is no auto-approve path.
-      store.addPendingAskUser({
-        executionId: msg.execution_id,
-        questions: msg.questions
-      })
-    },
-
-    llm_requery: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
-      console.debug('[useChat] LLM re-query iteration:', msg.iteration)
-      // Reset streaming content for the new LLM iteration.
-      // The previous iteration's content is already persisted server-side.
-      store.currentStreamContent = ''
-      // Accumulate thinking across iterations so all reasoning stays visible.
-      // Previous iterations are separated by a horizontal rule.
-      if (store.currentThinkingContent) {
-        store.currentThinkingContent += '\n\n---\n\n'
+      if (msg.step > 1) {
+        // New LLM step: reset the text buffer (the previous step is already
+        // persisted server-side); thinking accumulates across steps, with a
+        // horizontal rule separating each (spec §4).
+        store.currentStreamContent = ''
+        if (store.currentThinkingContent) {
+          store.currentThinkingContent += '\n\n---\n\n'
+        }
       }
     },
 
-    context_info: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
+    'tool.call': (msg) => agentRunStore.applyToolCall(msg),
+    'tool.started': (msg) => agentRunStore.applyToolStarted(msg),
+    'tool.progress': (msg) => agentRunStore.applyToolProgress(msg),
+    'tool.result': (msg) => agentRunStore.applyToolResult(msg),
+
+    'interaction.requested': (msg) => {
+      agentRunStore.applyInteractionRequested(msg)
+      if (msg.kind === 'tool_confirmation') {
+        // Auto-approve safe tools or ALL tools when confirmations are disabled
+        // (parity with the legacy behaviour). The dialog gates its own render
+        // with the same predicate so the auto-approved entry never flashes.
+        if (msg.risk_level === 'safe' || !settingsStore.toolConfirmations) {
+          respondToConfirmation(msg.interaction_id, true)
+        }
+      }
+      // kind 'client_tool_call': no renderer executor is wired (dormant).
+    },
+    'interaction.resolved': (msg) => agentRunStore.applyInteractionResolved(msg),
+
+    'context.usage': (msg) => {
+      // Gated ONLY on the conversation (not the generation): the post-turn
+      // usage frame arrives after finalizeStream has advanced the generation.
       if (store.streamingConversationId !== store.currentConversation?.id) return
       store.updateContextInfo({
         used: msg.used,
         available: msg.available,
         contextWindow: msg.context_window,
         percentage: msg.percentage,
-        wasCompressed: msg.was_compressed,
+        wasCompressed: msg.was_compressed ?? false,
         messagesSummarized: msg.messages_summarized ?? 0,
         isEstimated: msg.is_estimated ?? true,
         breakdown: msg.breakdown ?? undefined
       })
     },
 
-    context_compression_start: () => {
-      if (store.streamGeneration !== activeGeneration) return
+    'context.compaction': (msg) => {
       if (store.streamingConversationId !== store.currentConversation?.id) return
-      store.setCompressingContext(true)
+      if (msg.phase === 'started') store.setCompressingContext(true)
+      else if (msg.phase === 'done') store.setCompressionDone(msg.messages_summarized ?? 0)
+      else store.setCompressingContext(false)
     },
 
-    context_compression_done: (msg) => {
-      if (store.streamGeneration !== activeGeneration) return
-      if (store.streamingConversationId !== store.currentConversation?.id) return
-      store.setCompressionDone(msg.messages_summarized)
-    },
-
-    context_compression_failed: () => {
-      if (store.streamGeneration !== activeGeneration) return
-      if (store.streamingConversationId !== store.currentConversation?.id) return
-      store.setCompressingContext(false)
-    },
-
-    // Client-tool bridge: no renderer executor is wired yet (dormant since 1b).
-    client_tool_call: noop,
-
-    // -- Canonical turn-event stream (Fase 3) ------------------------------
-    // Additive, run-scoped frames folded into the agentRun store. They are
-    // NOT gated on the stale-generation guard: runs are keyed by `turn_id`,
-    // so late frames after navigation still land on the correct run.
-
-    'turn.started': (msg) => agentRunStore.applyTurnStarted(msg),
-    'turn.llm_step': (msg) => agentRunStore.applyLlmStep(msg),
-    'tool.call': (msg) => agentRunStore.applyToolCall(msg),
-    'tool.result': (msg) => agentRunStore.applyToolResult(msg),
-    'interaction.requested': (msg) => agentRunStore.applyInteractionRequested(msg),
-    'interaction.resolved': (msg) => agentRunStore.applyInteractionResolved(msg),
     'turn.usage': (msg) => agentRunStore.applyTurnUsage(msg),
+
+    'turn.warning': (msg) => console.warn('[useChat] Turn warning:', msg.code, msg.message),
+    'turn.error': (msg) => console.error('[useChat] Turn error:', msg.code, msg.message),
+
     'turn.finished': (msg) => {
       agentRunStore.applyTurnFinished(msg)
-      // Il costo accumula sul chip della conversazione CORRENTE: a differenza
-      // dei frame run-scoped (keyed by turn_id) va gated come context_info.
       if (store.streamGeneration !== activeGeneration) return
-      if (store.streamingConversationId !== store.currentConversation?.id) return
+      store.finalizeStream(
+        msg.conversation_id,
+        msg.message_id,
+        msg.version_group_id,
+        msg.version_index
+      )
       store.addTurnCost(msg.cost ?? null)
-    },
-
-    // Reflective-executor telemetry frames — no UI surface yet (backlog).
-    'agent.critic_invoked': noop,
-
-    'agent.warning': (msg) => console.warn('[useChat] Agent warning frame:', msg)
+    }
   }
 
   const dispatchFrame = (frame: ChatServerMessage): void => {
@@ -556,39 +475,41 @@ export function useChat(): UseChatReturn {
   /**
    * Respond to a tool confirmation request (approve or reject).
    *
-   * `remember` carries an optional "don't ask again" persistence choice and is
-   * only meaningful on an approval — the server ignores it on rejection. It is
-   * sent only when not `'none'` to keep the wire frame minimal.
+   * Correlated by `interactionId`. `remember` carries an optional "don't ask
+   * again" persistence choice, only meaningful on an approval — the server
+   * ignores it on rejection. It is sent only when not `'none'` to keep the
+   * wire frame minimal. The pending state resolves when the server's
+   * `interaction.resolved` frame folds into the agentRun store.
    */
   function respondToConfirmation(
-    executionId: string,
+    interactionId: string,
     approved: boolean,
     remember: RememberChoice = 'none'
   ): void {
-    const payload: WsToolConfirmationResponsePayload = {
-      type: 'tool_confirmation_response',
-      execution_id: executionId,
+    const payload: WsInteractionResponsePayload = {
+      type: 'interaction.response',
+      interaction_id: interactionId,
+      kind: 'tool_confirmation',
       approved
     }
     if (remember !== 'none') payload.remember = remember
     wsManager.send(payload)
-    store.removePendingConfirmation(executionId)
   }
 
   /**
    * Answer an inline `ask_user` prompt with the user's structured answers.
    *
-   * One `executionId` per interaction; each answer is correlated back to its
+   * One `interactionId` per interaction; each answer is correlated back to its
    * question by `question_id`.
    */
-  function answerAskUser(executionId: string, answers: AskUserAnswer[]): void {
-    const payload: WsAskUserResponsePayload = {
-      type: 'ask_user_response',
-      execution_id: executionId,
+  function answerAskUser(interactionId: string, answers: AskUserAnswer[]): void {
+    const payload: WsInteractionResponsePayload = {
+      type: 'interaction.response',
+      interaction_id: interactionId,
+      kind: 'ask_user',
       answers
     }
     wsManager.send(payload)
-    store.removePendingAskUser(executionId)
   }
 
   return {

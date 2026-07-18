@@ -138,19 +138,19 @@ export type BranchConversationRequest = ApiSchema<'BranchConversationRequest'>
 /**
  * Generated from the backend WS contract — do not redefine locally.
  *
- * Only the aliases with live consumers are kept: since the exhaustive
- * `ChatHandlerMap` dispatcher (Fase 6, Task 4) handler parameters are
- * narrowed via `Extract<ChatServerMessage, …>`, so the per-frame server
- * aliases (WsToken, WsDone, …) are no longer needed here.
+ * Only the aliases with live consumers are kept: the exhaustive
+ * `ChatHandlerMap` dispatcher narrows handler parameters via
+ * `Extract<ChatServerMessage, …>`, so the per-frame server aliases live in
+ * `types/turn.ts`. The client channel (v2) is the untagged user message,
+ * `cancel`, and the unified `interaction.response`.
  */
 export type WsSendPayload = ApiSchema<'WsUserMessage'>
 export type WsCancelPayload = ApiSchema<'WsCancel'>
-export type WsToolCallMessage = ApiSchema<'WsToolCallStream'>
-export type RememberChoice = NonNullable<ApiSchema<'WsToolConfirmationResponse'>['remember']>
-export type WsToolConfirmationResponsePayload = ApiSchema<'WsToolConfirmationResponse'>
+/** Unified client→server interaction reply (tool_confirmation / ask_user / client_tool_call). */
+export type WsInteractionResponsePayload = ApiSchema<'WsInteractionResponse'>
+export type RememberChoice = NonNullable<WsInteractionResponsePayload['remember']>
 export type AskUserQuestion = ApiSchema<'WsAskUserQuestion'>
 export type AskUserAnswer = ApiSchema<'WsAskUserAnswer'>
-export type WsAskUserResponsePayload = ApiSchema<'WsAskUserResponse'>
 export type ContextBreakdown = ApiSchema<'WsContextBreakdown'>
 
 // ---------------------------------------------------------------------------
@@ -237,21 +237,8 @@ export function extractCharts(messages: ChatMessage[]): ChartPayload[] {
 }
 
 // ---------------------------------------------------------------------------
-// Tool execution tracking (client-side)
+// Tool progress (client-side view-model)
 // ---------------------------------------------------------------------------
-
-/** Tracks the lifecycle of a single tool execution during streaming. */
-export interface ToolExecution {
-  executionId: string
-  toolName: string
-  status: 'running' | 'done' | 'error'
-  result?: string
-  success?: boolean
-  /** MIME type of the result content (e.g. "image/png"). */
-  contentType?: string
-  /** Latest progress snapshot, when the tool reports incremental updates. */
-  progress?: ToolProgressSnapshot
-}
 
 /** Latest progress frame received from a long-running tool. */
 export interface ToolProgressSnapshot {
@@ -269,8 +256,11 @@ export interface ToolProgressSnapshot {
   elapsedS?: number
 }
 
-/** A pending tool confirmation awaiting user approval. */
+/** A pending tool confirmation awaiting user approval (projected from the fold). */
 export interface ConfirmationRequest {
+  /** Wire correlation key — sent back in the `interaction.response`. */
+  interactionId: string
+  /** Tool execution id, kept for tool-chip correlation in the timeline. */
   executionId: string
   toolName: string
   args: Record<string, unknown>
@@ -287,6 +277,9 @@ export interface ConfirmationRequest {
 
 /** A pending `ask_user` request awaiting the user's answers (client-side). */
 export interface AskUserRequest {
+  /** Wire correlation key — sent back in the `interaction.response`. */
+  interactionId: string
+  /** Tool execution id, kept for tool-chip correlation in the timeline. */
   executionId: string
   questions: AskUserQuestion[]
 }

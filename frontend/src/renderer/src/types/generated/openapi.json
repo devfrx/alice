@@ -348,10 +348,8 @@
       "ChatClientMessage": {
         "discriminator": {
           "mapping": {
-            "ask_user_response": "#/components/schemas/WsAskUserResponse",
             "cancel": "#/components/schemas/WsCancel",
-            "client_tool_result": "#/components/schemas/WsClientToolResult",
-            "tool_confirmation_response": "#/components/schemas/WsToolConfirmationResponse"
+            "interaction.response": "#/components/schemas/WsInteractionResponse"
           },
           "propertyName": "type"
         },
@@ -360,109 +358,49 @@
             "$ref": "#/components/schemas/WsCancel"
           },
           {
-            "$ref": "#/components/schemas/WsToolConfirmationResponse"
-          },
-          {
-            "$ref": "#/components/schemas/WsClientToolResult"
-          },
-          {
-            "$ref": "#/components/schemas/WsAskUserResponse"
+            "$ref": "#/components/schemas/WsInteractionResponse"
           }
         ]
       },
       "ChatServerMessage": {
         "discriminator": {
           "mapping": {
-            "agent.critic_invoked": "#/components/schemas/WsAgentCriticInvoked",
-            "agent.warning": "#/components/schemas/WsAgentWarning",
-            "ask_user_required": "#/components/schemas/WsAskUserRequired",
-            "client_tool_call": "#/components/schemas/WsClientToolCall",
-            "context_compression_done": "#/components/schemas/WsContextCompressionDone",
-            "context_compression_failed": "#/components/schemas/WsContextCompressionFailed",
-            "context_compression_start": "#/components/schemas/WsContextCompressionStart",
-            "context_info": "#/components/schemas/WsContextInfo",
-            "done": "#/components/schemas/WsDone",
-            "error": "#/components/schemas/WsError",
+            "context.compaction": "#/components/schemas/WsContextCompaction",
+            "context.usage": "#/components/schemas/WsContextUsage",
             "interaction.requested": "#/components/schemas/WsInteractionRequested",
             "interaction.resolved": "#/components/schemas/WsInteractionResolved",
-            "llm_requery": "#/components/schemas/WsLlmRequery",
-            "thinking": "#/components/schemas/WsThinking",
-            "token": "#/components/schemas/WsToken",
             "tool.call": "#/components/schemas/WsTurnToolCall",
+            "tool.progress": "#/components/schemas/WsToolProgress",
             "tool.result": "#/components/schemas/WsTurnToolResult",
-            "tool_call": "#/components/schemas/WsToolCallStream",
-            "tool_confirmation_required": "#/components/schemas/WsToolConfirmationRequired",
-            "tool_execution_done": "#/components/schemas/WsToolExecutionDone",
-            "tool_execution_start": "#/components/schemas/WsToolExecutionStart",
-            "tool_progress": "#/components/schemas/WsToolProgress",
+            "tool.started": "#/components/schemas/WsToolStarted",
+            "turn.delta": "#/components/schemas/WsTurnDelta",
+            "turn.error": "#/components/schemas/WsTurnError",
             "turn.finished": "#/components/schemas/WsTurnFinished",
             "turn.llm_step": "#/components/schemas/WsTurnLlmStep",
             "turn.started": "#/components/schemas/WsTurnStarted",
             "turn.usage": "#/components/schemas/WsTurnUsage",
-            "warning": "#/components/schemas/WsWarning"
+            "turn.warning": "#/components/schemas/WsTurnWarning"
           },
           "propertyName": "type"
         },
         "oneOf": [
           {
-            "$ref": "#/components/schemas/WsToken"
-          },
-          {
-            "$ref": "#/components/schemas/WsThinking"
-          },
-          {
-            "$ref": "#/components/schemas/WsToolCallStream"
-          },
-          {
-            "$ref": "#/components/schemas/WsError"
-          },
-          {
-            "$ref": "#/components/schemas/WsDone"
-          },
-          {
-            "$ref": "#/components/schemas/WsToolExecutionStart"
-          },
-          {
-            "$ref": "#/components/schemas/WsToolExecutionDone"
-          },
-          {
-            "$ref": "#/components/schemas/WsToolProgress"
-          },
-          {
-            "$ref": "#/components/schemas/WsContextInfo"
-          },
-          {
-            "$ref": "#/components/schemas/WsContextCompressionStart"
-          },
-          {
-            "$ref": "#/components/schemas/WsContextCompressionDone"
-          },
-          {
-            "$ref": "#/components/schemas/WsContextCompressionFailed"
-          },
-          {
-            "$ref": "#/components/schemas/WsLlmRequery"
-          },
-          {
-            "$ref": "#/components/schemas/WsWarning"
-          },
-          {
-            "$ref": "#/components/schemas/WsToolConfirmationRequired"
-          },
-          {
-            "$ref": "#/components/schemas/WsClientToolCall"
-          },
-          {
-            "$ref": "#/components/schemas/WsAskUserRequired"
-          },
-          {
             "$ref": "#/components/schemas/WsTurnStarted"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnDelta"
           },
           {
             "$ref": "#/components/schemas/WsTurnLlmStep"
           },
           {
             "$ref": "#/components/schemas/WsTurnToolCall"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolStarted"
+          },
+          {
+            "$ref": "#/components/schemas/WsToolProgress"
           },
           {
             "$ref": "#/components/schemas/WsTurnToolResult"
@@ -474,16 +412,22 @@
             "$ref": "#/components/schemas/WsInteractionResolved"
           },
           {
+            "$ref": "#/components/schemas/WsContextUsage"
+          },
+          {
+            "$ref": "#/components/schemas/WsContextCompaction"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnWarning"
+          },
+          {
+            "$ref": "#/components/schemas/WsTurnError"
+          },
+          {
             "$ref": "#/components/schemas/WsTurnUsage"
           },
           {
             "$ref": "#/components/schemas/WsTurnFinished"
-          },
-          {
-            "$ref": "#/components/schemas/WsAgentCriticInvoked"
-          },
-          {
-            "$ref": "#/components/schemas/WsAgentWarning"
           }
         ]
       },
@@ -3030,126 +2974,6 @@
         "title": "VoiceSection",
         "type": "object"
       },
-      "WsAgentCriticInvoked": {
-        "additionalProperties": false,
-        "description": "The reflective executor invoked the critic pass.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Run Id"
-          },
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "step_index": {
-            "default": 0,
-            "title": "Step Index",
-            "type": "integer"
-          },
-          "type": {
-            "const": "agent.critic_invoked",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "source"
-        ],
-        "title": "WsAgentCriticInvoked",
-        "type": "object"
-      },
-      "WsAgentWarning": {
-        "additionalProperties": false,
-        "description": "A structural warning from the agentic layer (e.g. degeneration).",
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Run Id"
-          },
-          "type": {
-            "const": "agent.warning",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "code",
-          "message"
-        ],
-        "title": "WsAgentWarning",
-        "type": "object"
-      },
       "WsArtifactBulkDeleted": {
         "additionalProperties": false,
         "description": "Bulk artifact deletion (conversation cleanup or full wipe).\n\n``conversation_id`` is ``None`` for the delete-all wipe.  Pinned\nartifacts of a deleted conversation survive detached\n(``conversation_id=NULL``) and are NOT listed in ``artifact_ids``.",
@@ -3368,7 +3192,7 @@
       },
       "WsAskUserAnswer": {
         "additionalProperties": false,
-        "description": "One answer within an ``ask_user_response`` frame.",
+        "description": "One answer within an ``interaction.response`` (``ask_user``) frame.",
         "properties": {
           "free_text": {
             "anyOf": [
@@ -3402,7 +3226,7 @@
       },
       "WsAskUserQuestion": {
         "additionalProperties": false,
-        "description": "One question within an ``ask_user_required`` frame.",
+        "description": "One question within an ``interaction.requested`` (``ask_user``) frame.",
         "properties": {
           "allow_free_text": {
             "default": false,
@@ -3439,108 +3263,6 @@
           "type"
         ],
         "title": "WsAskUserQuestion",
-        "type": "object"
-      },
-      "WsAskUserRequired": {
-        "additionalProperties": false,
-        "description": "The agent needs clarification from the user before proceeding.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "questions": {
-            "items": {
-              "$ref": "#/components/schemas/WsAskUserQuestion"
-            },
-            "title": "Questions",
-            "type": "array"
-          },
-          "type": {
-            "const": "ask_user_required",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "execution_id",
-          "questions"
-        ],
-        "title": "WsAskUserRequired",
-        "type": "object"
-      },
-      "WsAskUserResponse": {
-        "additionalProperties": false,
-        "description": "User answers to an ``ask_user_required`` request.",
-        "properties": {
-          "answers": {
-            "items": {
-              "$ref": "#/components/schemas/WsAskUserAnswer"
-            },
-            "title": "Answers",
-            "type": "array"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "user",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "ask_user_response",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "execution_id",
-          "answers"
-        ],
-        "title": "WsAskUserResponse",
         "type": "object"
       },
       "WsAttentionRaised": {
@@ -3808,140 +3530,6 @@
         "title": "WsCancel",
         "type": "object"
       },
-      "WsClientToolCall": {
-        "additionalProperties": false,
-        "description": "Delegate a UI-side tool execution to the connected client.",
-        "properties": {
-          "args": {
-            "additionalProperties": true,
-            "title": "Args",
-            "type": "object"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "tool_name": {
-            "title": "Tool Name",
-            "type": "string"
-          },
-          "type": {
-            "const": "client_tool_call",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "execution_id",
-          "tool_name",
-          "args"
-        ],
-        "title": "WsClientToolCall",
-        "type": "object"
-      },
-      "WsClientToolResult": {
-        "additionalProperties": false,
-        "description": "Result of a UI-side tool execution requested by ``client_tool_call``.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Error"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "user",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "result": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "items": {},
-                "type": "array"
-              },
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Result"
-          },
-          "success": {
-            "default": false,
-            "title": "Success",
-            "type": "boolean"
-          },
-          "type": {
-            "const": "client_tool_result",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "execution_id"
-        ],
-        "title": "WsClientToolResult",
-        "type": "object"
-      },
       "WsCommandManifest": {
         "additionalProperties": false,
         "description": "The frontend's agent-exposable command manifest.\n\nSent on events-WS connect and whenever the exposed set changes. It\nREPLACES the backend's previous manifest wholesale.",
@@ -4146,7 +3734,7 @@
       },
       "WsContextBreakdown": {
         "additionalProperties": false,
-        "description": "Per-category token breakdown within a ``context_info`` frame.",
+        "description": "Per-category token breakdown within a ``context.usage`` frame.",
         "properties": {
           "files": {
             "title": "Files",
@@ -4184,9 +3772,9 @@
         "title": "WsContextBreakdown",
         "type": "object"
       },
-      "WsContextCompressionDone": {
+      "WsContextCompaction": {
         "additionalProperties": false,
-        "description": "Context compression completed successfully.",
+        "description": "A context-compaction cycle (started/done/failed).",
         "properties": {
           "correlation_id": {
             "anyOf": [
@@ -4200,9 +3788,29 @@
             "default": null,
             "title": "Correlation Id"
           },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
           "messages_summarized": {
-            "title": "Messages Summarized",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Messages Summarized"
           },
           "origin": {
             "default": "agent",
@@ -4212,6 +3820,15 @@
               "system"
             ],
             "title": "Origin",
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "started",
+              "done",
+              "failed"
+            ],
+            "title": "Phase",
             "type": "string"
           },
           "summary_message_id": {
@@ -4226,98 +3843,58 @@
             "default": null,
             "title": "Summary Message Id"
           },
+          "tokens_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tokens After"
+          },
+          "tokens_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tokens Before"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
+          },
           "type": {
-            "const": "context_compression_done",
+            "const": "context.compaction",
             "title": "Type",
             "type": "string"
           }
         },
         "required": [
           "type",
-          "messages_summarized"
+          "phase"
         ],
-        "title": "WsContextCompressionDone",
+        "title": "WsContextCompaction",
         "type": "object"
       },
-      "WsContextCompressionFailed": {
+      "WsContextUsage": {
         "additionalProperties": false,
-        "description": "Context compression failed; the turn continues uncompressed.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "context_compression_failed",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type"
-        ],
-        "title": "WsContextCompressionFailed",
-        "type": "object"
-      },
-      "WsContextCompressionStart": {
-        "additionalProperties": false,
-        "description": "Context compression is about to begin.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "context_compression_start",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type"
-        ],
-        "title": "WsContextCompressionStart",
-        "type": "object"
-      },
-      "WsContextInfo": {
-        "additionalProperties": false,
-        "description": "Current context-window utilisation snapshot.",
+        "description": "Context-window utilisation (``percentage`` is a fraction in [0, 1]).",
         "properties": {
           "available": {
             "title": "Available",
@@ -4351,11 +3928,12 @@
             "title": "Correlation Id"
           },
           "is_estimated": {
-            "default": false,
+            "default": true,
             "title": "Is Estimated",
             "type": "boolean"
           },
           "messages_summarized": {
+            "default": 0,
             "title": "Messages Summarized",
             "type": "integer"
           },
@@ -4373,8 +3951,20 @@
             "title": "Percentage",
             "type": "number"
           },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
+          },
           "type": {
-            "const": "context_info",
+            "const": "context.usage",
             "title": "Type",
             "type": "string"
           },
@@ -4383,6 +3973,7 @@
             "type": "integer"
           },
           "was_compressed": {
+            "default": false,
             "title": "Was Compressed",
             "type": "boolean"
           }
@@ -4392,86 +3983,9 @@
           "used",
           "available",
           "context_window",
-          "percentage",
-          "was_compressed",
-          "messages_summarized"
+          "percentage"
         ],
-        "title": "WsContextInfo",
-        "type": "object"
-      },
-      "WsDone": {
-        "additionalProperties": false,
-        "description": "Final turn frame (built in chat ``_persist`` after the DB commit).",
-        "properties": {
-          "conversation_id": {
-            "title": "Conversation Id",
-            "type": "string"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "finish_reason": {
-            "title": "Finish Reason",
-            "type": "string"
-          },
-          "message_id": {
-            "title": "Message Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "done",
-            "title": "Type",
-            "type": "string"
-          },
-          "user_message_id": {
-            "title": "User Message Id",
-            "type": "string"
-          },
-          "version_group_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Version Group Id"
-          },
-          "version_index": {
-            "title": "Version Index",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "type",
-          "conversation_id",
-          "message_id",
-          "user_message_id",
-          "finish_reason",
-          "version_index"
-        ],
-        "title": "WsDone",
+        "title": "WsContextUsage",
         "type": "object"
       },
       "WsEmailReceived": {
@@ -4567,49 +4081,6 @@
         "title": "WsEmailSent",
         "type": "object"
       },
-      "WsError": {
-        "additionalProperties": false,
-        "description": "A hard error that terminated the turn.",
-        "properties": {
-          "content": {
-            "title": "Content",
-            "type": "string"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "error",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "content"
-        ],
-        "title": "WsError",
-        "type": "object"
-      },
       "WsHeartbeat": {
         "additionalProperties": false,
         "description": "Periodic liveness frame pushed when the client is idle.",
@@ -4652,6 +4123,31 @@
         "additionalProperties": false,
         "description": "An interaction (confirmation / client tool / clarification) was requested.",
         "properties": {
+          "allow_remember": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allow Remember"
+          },
+          "args": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Args"
+          },
           "correlation_id": {
             "anyOf": [
               {
@@ -4664,8 +4160,24 @@
             "default": null,
             "title": "Correlation Id"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
           "execution_id": {
             "title": "Execution Id",
+            "type": "string"
+          },
+          "interaction_id": {
+            "title": "Interaction Id",
             "type": "string"
           },
           "kind": {
@@ -4686,6 +4198,51 @@
             ],
             "title": "Origin",
             "type": "string"
+          },
+          "questions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WsAskUserQuestion"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Questions"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reasoning"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "safe",
+                  "medium",
+                  "dangerous",
+                  "forbidden"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Risk Level"
           },
           "tool_name": {
             "anyOf": [
@@ -4712,6 +4269,7 @@
         "required": [
           "type",
           "turn_id",
+          "interaction_id",
           "execution_id",
           "kind"
         ],
@@ -4736,6 +4294,10 @@
           },
           "execution_id": {
             "title": "Execution Id",
+            "type": "string"
+          },
+          "interaction_id": {
+            "title": "Interaction Id",
             "type": "string"
           },
           "kind": {
@@ -4784,11 +4346,146 @@
         "required": [
           "type",
           "turn_id",
+          "interaction_id",
           "execution_id",
           "kind",
           "outcome"
         ],
         "title": "WsInteractionResolved",
+        "type": "object"
+      },
+      "WsInteractionResponse": {
+        "additionalProperties": false,
+        "description": "Unified response to interactions (kind-discriminated payload).",
+        "properties": {
+          "answers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WsAskUserAnswer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Answers"
+          },
+          "approved": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Approved"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "interaction_id": {
+            "title": "Interaction Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "tool_confirmation",
+              "client_tool_call",
+              "ask_user"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "default": "user",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "remember": {
+            "default": "none",
+            "enum": [
+              "none",
+              "session",
+              "persistent"
+            ],
+            "title": "Remember",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Result"
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Success"
+          },
+          "type": {
+            "const": "interaction.response",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "interaction_id",
+          "kind"
+        ],
+        "title": "WsInteractionResponse",
         "type": "object"
       },
       "WsKnowledgeStatus": {
@@ -4875,49 +4572,6 @@
           "type"
         ],
         "title": "WsKnowledgeStatus",
-        "type": "object"
-      },
-      "WsLlmRequery": {
-        "additionalProperties": false,
-        "description": "The tool loop is making another LLM call after tool execution.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "iteration": {
-            "title": "Iteration",
-            "type": "integer"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "llm_requery",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "iteration"
-        ],
-        "title": "WsLlmRequery",
         "type": "object"
       },
       "WsMcpServerConnected": {
@@ -6147,115 +5801,9 @@
         "title": "WsTerminalSessionOpened",
         "type": "object"
       },
-      "WsThinking": {
+      "WsToolProgress": {
         "additionalProperties": false,
-        "description": "A reasoning/thinking token from the LLM (extended thinking mode).",
-        "properties": {
-          "content": {
-            "title": "Content",
-            "type": "string"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "thinking",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "content"
-        ],
-        "title": "WsThinking",
-        "type": "object"
-      },
-      "WsToken": {
-        "additionalProperties": false,
-        "description": "A single streamed token from the LLM.",
-        "properties": {
-          "content": {
-            "title": "Content",
-            "type": "string"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "token",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "content"
-        ],
-        "title": "WsToken",
-        "type": "object"
-      },
-      "WsToolCallFunction": {
-        "additionalProperties": false,
-        "description": "The function sub-object of a raw LLM tool-call stream forward.",
-        "properties": {
-          "arguments": {
-            "title": "Arguments",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "arguments"
-        ],
-        "title": "WsToolCallFunction",
-        "type": "object"
-      },
-      "WsToolCallStream": {
-        "additionalProperties": false,
-        "description": "LLM requested a tool (raw stream forward, pre-execution).",
+        "description": "Incremental progress of a long-running tool (typed, nested payload).",
         "properties": {
           "correlation_id": {
             "anyOf": [
@@ -6269,11 +5817,8 @@
             "default": null,
             "title": "Correlation Id"
           },
-          "function": {
-            "$ref": "#/components/schemas/WsToolCallFunction"
-          },
-          "id": {
-            "title": "Id",
+          "execution_id": {
+            "title": "Execution Id",
             "type": "string"
           },
           "origin": {
@@ -6286,419 +5831,218 @@
             "title": "Origin",
             "type": "string"
           },
-          "type": {
-            "const": "tool_call",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "id",
-          "function"
-        ],
-        "title": "WsToolCallStream",
-        "type": "object"
-      },
-      "WsToolConfirmationRequired": {
-        "additionalProperties": false,
-        "description": "The turn executor needs the user to approve a risky tool call.",
-        "properties": {
-          "allow_remember": {
-            "default": true,
-            "title": "Allow Remember",
-            "type": "boolean"
-          },
-          "args": {
+          "progress": {
             "additionalProperties": true,
-            "title": "Args",
+            "title": "Progress",
             "type": "object"
           },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "reasoning": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Reasoning"
-          },
-          "risk_level": {
-            "enum": [
-              "safe",
-              "medium",
-              "dangerous",
-              "forbidden"
-            ],
-            "title": "Risk Level",
-            "type": "string"
-          },
           "tool_name": {
             "title": "Tool Name",
             "type": "string"
           },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
           "type": {
-            "const": "tool_confirmation_required",
+            "const": "tool.progress",
             "title": "Type",
             "type": "string"
           }
         },
         "required": [
           "type",
+          "turn_id",
           "execution_id",
           "tool_name",
-          "args",
-          "risk_level",
-          "description"
-        ],
-        "title": "WsToolConfirmationRequired",
-        "type": "object"
-      },
-      "WsToolConfirmationResponse": {
-        "additionalProperties": false,
-        "description": "User response to a ``tool_confirmation_required`` request.",
-        "properties": {
-          "approved": {
-            "title": "Approved",
-            "type": "boolean"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "user",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "remember": {
-            "default": "none",
-            "enum": [
-              "none",
-              "session",
-              "persistent"
-            ],
-            "title": "Remember",
-            "type": "string"
-          },
-          "type": {
-            "const": "tool_confirmation_response",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "execution_id",
-          "approved"
-        ],
-        "title": "WsToolConfirmationResponse",
-        "type": "object"
-      },
-      "WsToolExecutionDone": {
-        "additionalProperties": false,
-        "description": "The tool executor finished running a tool.",
-        "properties": {
-          "artifact_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Artifact Id"
-          },
-          "content_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Content Type"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "result": {
-            "title": "Result",
-            "type": "string"
-          },
-          "success": {
-            "title": "Success",
-            "type": "boolean"
-          },
-          "tool_name": {
-            "title": "Tool Name",
-            "type": "string"
-          },
-          "type": {
-            "const": "tool_execution_done",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "tool_name",
-          "result",
-          "execution_id",
-          "success"
-        ],
-        "title": "WsToolExecutionDone",
-        "type": "object"
-      },
-      "WsToolExecutionStart": {
-        "additionalProperties": false,
-        "description": "The tool executor began running a tool.",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "tool_name": {
-            "title": "Tool Name",
-            "type": "string"
-          },
-          "type": {
-            "const": "tool_execution_start",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "tool_name",
-          "execution_id"
-        ],
-        "title": "WsToolExecutionStart",
-        "type": "object"
-      },
-      "WsToolProgress": {
-        "additionalProperties": true,
-        "description": "Incremental progress; tools merge arbitrary extra keys (extra=allow).",
-        "properties": {
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "elapsed_s": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Elapsed S"
-          },
-          "execution_id": {
-            "title": "Execution Id",
-            "type": "string"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Label"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "percent": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Percent"
-          },
-          "phase": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Phase"
-          },
-          "step": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Step"
-          },
-          "tool_name": {
-            "title": "Tool Name",
-            "type": "string"
-          },
-          "total": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Total"
-          },
-          "type": {
-            "const": "tool_progress",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "tool_name",
-          "execution_id"
+          "progress"
         ],
         "title": "WsToolProgress",
         "type": "object"
       },
+      "WsToolStarted": {
+        "additionalProperties": false,
+        "description": "A greenlit tool call has started server-side execution.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool.started",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "execution_id",
+          "tool_name"
+        ],
+        "title": "WsToolStarted",
+        "type": "object"
+      },
+      "WsTurnDelta": {
+        "additionalProperties": false,
+        "description": "A turn output delta (text or thinking).",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "thinking"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.delta",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "step",
+          "kind",
+          "text"
+        ],
+        "title": "WsTurnDelta",
+        "type": "object"
+      },
+      "WsTurnError": {
+        "additionalProperties": false,
+        "description": "A turn error; ``turn_id`` is absent for pre-turn errors (validation).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "turn.error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "code",
+          "message"
+        ],
+        "title": "WsTurnError",
+        "type": "object"
+      },
       "WsTurnFinished": {
         "additionalProperties": false,
-        "description": "The turn has finished; summary statistics follow.",
+        "description": "The turn has finished; summary statistics follow.\n\n``message_id`` is ``\"\"`` when the turn saved no final assistant message.",
         "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
           "correlation_id": {
             "anyOf": [
               {
@@ -6712,32 +6056,20 @@
             "title": "Correlation Id"
           },
           "cost": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Cost"
+            "title": "Cost",
+            "type": "number"
           },
           "finish_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Finish Reason"
+            "title": "Finish Reason",
+            "type": "string"
           },
           "input_tokens": {
             "title": "Input Tokens",
             "type": "integer"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
           },
           "origin": {
             "default": "agent",
@@ -6757,6 +6089,10 @@
             "title": "Steps",
             "type": "integer"
           },
+          "tool_calls": {
+            "title": "Tool Calls",
+            "type": "integer"
+          },
           "turn_id": {
             "title": "Turn Id",
             "type": "string"
@@ -6765,21 +6101,55 @@
             "const": "turn.finished",
             "title": "Type",
             "type": "string"
+          },
+          "user_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Message Id"
+          },
+          "version_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Version Group Id"
+          },
+          "version_index": {
+            "title": "Version Index",
+            "type": "integer"
           }
         },
         "required": [
           "type",
           "turn_id",
+          "finish_reason",
+          "conversation_id",
+          "message_id",
+          "version_index",
+          "steps",
+          "tool_calls",
           "input_tokens",
           "output_tokens",
-          "steps"
+          "cost"
         ],
         "title": "WsTurnFinished",
         "type": "object"
       },
       "WsTurnLlmStep": {
         "additionalProperties": false,
-        "description": "The turn executor began an LLM step.",
+        "description": "The engine began an LLM step.",
         "properties": {
           "correlation_id": {
             "anyOf": [
@@ -6855,6 +6225,15 @@
             "title": "Origin",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "chat",
+              "voice",
+              "headless"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "turn_id": {
             "title": "Turn Id",
             "type": "string"
@@ -6868,14 +6247,15 @@
         "required": [
           "type",
           "turn_id",
-          "conversation_id"
+          "conversation_id",
+          "source"
         ],
         "title": "WsTurnStarted",
         "type": "object"
       },
       "WsTurnToolCall": {
         "additionalProperties": false,
-        "description": "The turn executor dispatched a tool call.",
+        "description": "The engine dispatched a tool call.",
         "properties": {
           "args": {
             "additionalProperties": true,
@@ -6908,6 +6288,10 @@
             "title": "Origin",
             "type": "string"
           },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
           "tool_name": {
             "title": "Tool Name",
             "type": "string"
@@ -6927,14 +6311,15 @@
           "turn_id",
           "execution_id",
           "tool_name",
-          "args"
+          "args",
+          "step"
         ],
         "title": "WsTurnToolCall",
         "type": "object"
       },
       "WsTurnToolResult": {
         "additionalProperties": false,
-        "description": "A tool returned its result to the turn executor.",
+        "description": "A tool returned its result to the engine.\n\n``status`` is the engine outcome vocabulary\n(ok/error/parse_error/duplicate/unknown_tool/denied/rejected/timeout/\ncancelled/budget_exhausted); ``result`` is the COMPLETE tool-response body\n(including the synthetic prose of the refusal branches).",
         "properties": {
           "artifact_id": {
             "anyOf": [
@@ -6990,9 +6375,9 @@
             "title": "Result",
             "type": "string"
           },
-          "success": {
-            "title": "Success",
-            "type": "boolean"
+          "status": {
+            "title": "Status",
+            "type": "string"
           },
           "tool_name": {
             "title": "Tool Name",
@@ -7013,7 +6398,7 @@
           "turn_id",
           "execution_id",
           "tool_name",
-          "success",
+          "status",
           "result"
         ],
         "title": "WsTurnToolResult",
@@ -7021,7 +6406,7 @@
       },
       "WsTurnUsage": {
         "additionalProperties": false,
-        "description": "Per-step token usage snapshot emitted by the turn executor.",
+        "description": "Per-step token/cost usage snapshot emitted by the engine.",
         "properties": {
           "correlation_id": {
             "anyOf": [
@@ -7034,6 +6419,10 @@
             ],
             "default": null,
             "title": "Correlation Id"
+          },
+          "cost": {
+            "title": "Cost",
+            "type": "number"
           },
           "input_tokens": {
             "title": "Input Tokens",
@@ -7081,10 +6470,64 @@
           "step",
           "input_tokens",
           "output_tokens",
+          "cost",
           "tool_calls",
           "max_steps"
         ],
         "title": "WsTurnUsage",
+        "type": "object"
+      },
+      "WsTurnWarning": {
+        "additionalProperties": false,
+        "description": "A non-fatal turn warning.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correlation Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "origin": {
+            "default": "agent",
+            "enum": [
+              "user",
+              "agent",
+              "system"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.warning",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "turn_id",
+          "code",
+          "message"
+        ],
+        "title": "WsTurnWarning",
         "type": "object"
       },
       "WsUserMessage": {
@@ -7177,49 +6620,6 @@
           "content"
         ],
         "title": "WsUserMessage",
-        "type": "object"
-      },
-      "WsWarning": {
-        "additionalProperties": false,
-        "description": "A non-fatal warning from the turn executor.",
-        "properties": {
-          "content": {
-            "title": "Content",
-            "type": "string"
-          },
-          "correlation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Correlation Id"
-          },
-          "origin": {
-            "default": "agent",
-            "enum": [
-              "user",
-              "agent",
-              "system"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "type": {
-            "const": "warning",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "content"
-        ],
-        "title": "WsWarning",
         "type": "object"
       },
       "_ExecuteRequest": {

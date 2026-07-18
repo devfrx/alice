@@ -16,6 +16,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import type { AskUserRequest, ConfirmationRequest } from '../types/chat'
 import type {
   AgentRun,
   InteractionActivity,
@@ -23,7 +24,9 @@ import type {
   WsInteractionRequestedMessage,
   WsInteractionResolvedMessage,
   WsToolCallMessage,
+  WsToolProgressMessage,
   WsToolResultMessage,
+  WsToolStartedMessage,
   WsTurnFinishedMessage,
   WsTurnLlmStepMessage,
   WsTurnStartedMessage,
@@ -83,6 +86,44 @@ export const useAgentRunStore = defineStore('agentRun', () => {
   function runByTurnId(id: string): AgentRun | null {
     return runs.value[id] ?? null
   }
+
+  /**
+   * Pending tool confirmations of the current run, projected into the dialog
+   * view-model ({@link ConfirmationRequest}). The canonical fold (spec §5):
+   * the dialog reads its state from `agentRun`, keyed by `interactionId`.
+   */
+  const pendingConfirmations = computed<ConfirmationRequest[]>(() => {
+    const run = currentRun.value
+    if (!run) return []
+    return run.interactions
+      .filter((i) => i.status === 'pending' && i.kind === 'tool_confirmation')
+      .map((i) => ({
+        interactionId: i.interactionId,
+        executionId: i.executionId,
+        toolName: i.toolName ?? '',
+        args: i.args ?? {},
+        riskLevel: (i.riskLevel ?? 'medium') as ConfirmationRequest['riskLevel'],
+        description: i.description ?? '',
+        reasoning: i.reasoning ?? undefined,
+        allowRemember: i.allowRemember ?? undefined
+      }))
+  })
+
+  /**
+   * Pending `ask_user` requests of the current run, projected into the
+   * inline-wizard view-model ({@link AskUserRequest}).
+   */
+  const pendingAskUser = computed<AskUserRequest[]>(() => {
+    const run = currentRun.value
+    if (!run) return []
+    return run.interactions
+      .filter((i) => i.status === 'pending' && i.kind === 'ask_user')
+      .map((i) => ({
+        interactionId: i.interactionId,
+        executionId: i.executionId,
+        questions: i.questions ?? []
+      }))
+  })
 
   // -----------------------------------------------------------------------
   // Internal helpers
@@ -161,10 +202,42 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     run.tools = [...run.tools, activity]
   }
 
+  /**
+   * `tool.started` → mark the matching tool activity `running` (idempotent).
+   *
+   * Create-if-absent: `tool.started` may arrive before its `tool.call`
+   * (out of order), so a minimal `running` activity is materialised rather
+   * than dropped. A tool already resolved by an out-of-order `tool.result`
+   * is left untouched.
+   */
+  function applyToolStarted(msg: WsToolStartedMessage): void {
+    const run = ensureRun(msg.turn_id)
+    if (run.tools.some((t) => t.executionId === msg.execution_id)) return
+    const activity: ToolActivity = {
+      executionId: msg.execution_id,
+      toolName: msg.tool_name,
+      args: {},
+      status: 'running',
+      seq: run.tools.length + run.interactions.length
+    }
+    run.tools = [...run.tools, activity]
+  }
+
+  /** `tool.progress` → merge the latest progress snapshot into the activity. */
+  function applyToolProgress(msg: WsToolProgressMessage): void {
+    const run = ensureRun(msg.turn_id)
+    const idx = run.tools.findIndex((t) => t.executionId === msg.execution_id)
+    if (idx === -1) return
+    const updated: ToolActivity = { ...run.tools[idx], progress: msg.progress }
+    run.tools = [...run.tools.slice(0, idx), updated, ...run.tools.slice(idx + 1)]
+  }
+
   /** `tool.result` → resolve the matching tool activity (create if absent). */
   function applyToolResult(msg: WsToolResultMessage): void {
     const run = ensureRun(msg.turn_id)
-    const status: ToolActivity['status'] = msg.success ? 'success' : 'error'
+    // v2: success is derived from the engine `status` vocabulary
+    // (ok/error/denied/timeout/…); `status === 'ok'` is the success gate.
+    const status: ToolActivity['status'] = msg.status === 'ok' ? 'success' : 'error'
     const idx = run.tools.findIndex((t) => t.executionId === msg.execution_id)
     if (idx === -1) {
       const activity: ToolActivity = {
@@ -172,6 +245,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         toolName: msg.tool_name,
         args: {},
         status,
+        rawStatus: msg.status,
         result: msg.result,
         contentType: msg.content_type ?? undefined,
         artifactId: msg.artifact_id ?? undefined,
@@ -183,6 +257,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     const updated: ToolActivity = {
       ...run.tools[idx],
       status,
+      rawStatus: msg.status,
       result: msg.result,
       contentType: msg.content_type ?? undefined,
       artifactId: msg.artifact_id ?? undefined
@@ -191,19 +266,28 @@ export const useAgentRunStore = defineStore('agentRun', () => {
   }
 
   /**
-   * `interaction.requested` → append a `pending` interaction activity.
+   * `interaction.requested` → append a `pending` interaction activity with
+   * its full v2 payload (args/risk/description/reasoning/questions).
    *
-   * Idempotent: a repeated request for the same `execution_id` is ignored
-   * (the existing entry — possibly already `resolved` — is left untouched).
+   * Idempotent, keyed by `interaction_id`: a repeated request for the same
+   * interaction is ignored (the existing entry — possibly already `resolved`
+   * — is left untouched).
    */
   function applyInteractionRequested(msg: WsInteractionRequestedMessage): void {
     const run = ensureRun(msg.turn_id)
-    if (run.interactions.some((i) => i.executionId === msg.execution_id)) return
+    if (run.interactions.some((i) => i.interactionId === msg.interaction_id)) return
     const activity: InteractionActivity = {
+      interactionId: msg.interaction_id,
       executionId: msg.execution_id,
       kind: msg.kind,
       toolName: msg.tool_name ?? undefined,
       status: 'pending',
+      args: msg.args ?? undefined,
+      riskLevel: msg.risk_level ?? undefined,
+      description: msg.description ?? undefined,
+      reasoning: msg.reasoning ?? undefined,
+      allowRemember: msg.allow_remember ?? undefined,
+      questions: msg.questions ?? undefined,
       seq: run.tools.length + run.interactions.length
     }
     run.interactions = [...run.interactions, activity]
@@ -212,13 +296,15 @@ export const useAgentRunStore = defineStore('agentRun', () => {
   /**
    * `interaction.resolved` → resolve the matching interaction with its
    * outcome (create it already-`resolved` when the request never arrived,
-   * mirroring {@link applyToolResult}'s create-if-absent path).
+   * mirroring {@link applyToolResult}'s create-if-absent path). Keyed by
+   * `interaction_id`.
    */
   function applyInteractionResolved(msg: WsInteractionResolvedMessage): void {
     const run = ensureRun(msg.turn_id)
-    const idx = run.interactions.findIndex((i) => i.executionId === msg.execution_id)
+    const idx = run.interactions.findIndex((i) => i.interactionId === msg.interaction_id)
     if (idx === -1) {
       const activity: InteractionActivity = {
+        interactionId: msg.interaction_id,
         executionId: msg.execution_id,
         kind: msg.kind,
         status: 'resolved',
@@ -258,6 +344,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     run.inputTokens = msg.input_tokens
     run.outputTokens = msg.output_tokens
     run.step = msg.steps
+    if (msg.tool_calls != null) run.toolCalls = msg.tool_calls
     run.cost = msg.cost ?? null
   }
 
@@ -287,10 +374,14 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     // getters
     currentRun,
     runByTurnId,
+    pendingConfirmations,
+    pendingAskUser,
     // actions
     applyTurnStarted,
     applyLlmStep,
     applyToolCall,
+    applyToolStarted,
+    applyToolProgress,
     applyToolResult,
     applyInteractionRequested,
     applyInteractionResolved,

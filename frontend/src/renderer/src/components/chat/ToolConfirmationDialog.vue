@@ -17,7 +17,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  respond: [executionId: string, approved: boolean, remember: RememberChoice]
+  respond: [interactionId: string, approved: boolean, remember: RememberChoice]
 }>()
 
 /* ── Remember choice ──
@@ -59,11 +59,11 @@ const formattedTime = computed(() => {
 const showReasoning = ref(false)
 
 function approve(): void {
-  emit('respond', props.confirmation.executionId, true, rememberChoice.value)
+  emit('respond', props.confirmation.interactionId, true, rememberChoice.value)
 }
 
 function reject(): void {
-  emit('respond', props.confirmation.executionId, false, 'none')
+  emit('respond', props.confirmation.interactionId, false, 'none')
 }
 
 function handleKeydown(e: KeyboardEvent): void {
@@ -95,7 +95,7 @@ onMounted(() => {
         clearInterval(timerInterval)
         timerInterval = null
       }
-      emit('respond', props.confirmation.executionId, false, 'none')
+      emit('respond', props.confirmation.interactionId, false, 'none')
     }
   }, 1000)
 })

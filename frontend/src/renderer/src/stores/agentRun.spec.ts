@@ -2,9 +2,9 @@
  * Unit tests for stores/agentRun.ts
  *
  * Pure Pinia store tests (vitest node env, no DOM required). A fresh Pinia is
- * installed per test. The store folds the canonical turn-event stream (see
- * types/turn.ts, mirroring backend/services/turn/events.py) into per-turn
- * AgentRun view-models keyed by `turnId`.
+ * installed per test. The store folds the canonical v2 turn-event stream (see
+ * types/turn.ts, mirroring backend/services/agent/adapters/wire.py) into
+ * per-turn AgentRun view-models keyed by `turnId`.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
@@ -13,7 +13,9 @@ import type {
   WsInteractionRequestedMessage,
   WsInteractionResolvedMessage,
   WsToolCallMessage,
+  WsToolProgressMessage,
   WsToolResultMessage,
+  WsToolStartedMessage,
   WsTurnFinishedMessage,
   WsTurnLlmStepMessage,
   WsTurnStartedMessage,
@@ -21,11 +23,11 @@ import type {
 } from '../types/turn'
 
 // ---------------------------------------------------------------------------
-// Frame factories
+// Frame factories (v2 vocabulary)
 // ---------------------------------------------------------------------------
 
 function started(turnId: string, conversationId = 'conv-1'): WsTurnStartedMessage {
-  return { type: 'turn.started', turn_id: turnId, conversation_id: conversationId }
+  return { type: 'turn.started', turn_id: turnId, conversation_id: conversationId, source: 'chat' }
 }
 
 function llmStep(turnId: string, step: number): WsTurnLlmStepMessage {
@@ -43,7 +45,30 @@ function toolCall(
     turn_id: turnId,
     execution_id: executionId,
     tool_name: toolName,
-    args
+    args,
+    step: 1
+  }
+}
+
+function toolStarted(
+  turnId: string,
+  executionId: string,
+  toolName = 'web_search'
+): WsToolStartedMessage {
+  return { type: 'tool.started', turn_id: turnId, execution_id: executionId, tool_name: toolName }
+}
+
+function toolProgress(
+  turnId: string,
+  executionId: string,
+  progress: Record<string, unknown>
+): WsToolProgressMessage {
+  return {
+    type: 'tool.progress',
+    turn_id: turnId,
+    execution_id: executionId,
+    tool_name: 'cad_generate',
+    progress
   }
 }
 
@@ -57,7 +82,7 @@ function toolResult(
     turn_id: turnId,
     execution_id: executionId,
     tool_name: 'web_search',
-    success: true,
+    status: 'ok',
     result: 'ok',
     ...overrides
   }
@@ -71,6 +96,7 @@ function interactionRequested(
   return {
     type: 'interaction.requested',
     turn_id: turnId,
+    interaction_id: `int-${executionId}`,
     execution_id: executionId,
     kind: 'tool_confirmation',
     tool_name: 'run_terminal_command',
@@ -86,6 +112,7 @@ function interactionResolved(
   return {
     type: 'interaction.resolved',
     turn_id: turnId,
+    interaction_id: `int-${executionId}`,
     execution_id: executionId,
     kind: 'tool_confirmation',
     outcome: 'approved',
@@ -100,6 +127,7 @@ function usage(turnId: string, overrides: Partial<WsTurnUsageMessage> = {}): WsT
     step: 1,
     input_tokens: 100,
     output_tokens: 20,
+    cost: 0,
     tool_calls: 1,
     max_steps: 8,
     ...overrides
@@ -114,9 +142,14 @@ function finished(
     type: 'turn.finished',
     turn_id: turnId,
     finish_reason: 'stop',
+    conversation_id: 'conv-1',
+    message_id: 'm1',
+    version_index: 0,
+    steps: 1,
+    tool_calls: 1,
     input_tokens: 100,
     output_tokens: 20,
-    steps: 1,
+    cost: 0,
     ...overrides
   }
 }
@@ -155,6 +188,7 @@ describe('happy-path turn', () => {
       executionId: 'e1',
       toolName: 'web_search',
       status: 'success',
+      rawStatus: 'ok',
       result: 'ok'
     })
     expect(run!.tools[0].args).toEqual({ q: 'alice' })
@@ -173,16 +207,51 @@ describe('happy-path turn', () => {
 })
 
 // ---------------------------------------------------------------------------
+// tool.started / tool.progress
+// ---------------------------------------------------------------------------
+
+describe('tool.started / tool.progress', () => {
+  it('tool.started creates a running activity when tool.call has not arrived', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyToolStarted(toolStarted('t1', 'e1'))
+    expect(s.currentRun!.tools).toHaveLength(1)
+    expect(s.currentRun!.tools[0].status).toBe('running')
+    // A later tool.call for the same executionId must NOT duplicate it.
+    s.applyToolCall(toolCall('t1', 'e1'))
+    expect(s.currentRun!.tools).toHaveLength(1)
+  })
+
+  it('tool.progress merges the latest snapshot onto the activity', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyToolCall(toolCall('t1', 'e1', 'cad_generate'))
+    s.applyToolProgress(toolProgress('t1', 'e1', { phase: 'sampling', percent: 40 }))
+    expect(s.currentRun!.tools[0].progress).toEqual({ phase: 'sampling', percent: 40 })
+    s.applyToolProgress(toolProgress('t1', 'e1', { phase: 'decoding', percent: 80 }))
+    expect(s.currentRun!.tools[0].progress).toEqual({ phase: 'decoding', percent: 80 })
+  })
+
+  it('tool.progress for an unknown execution is a no-op', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyToolProgress(toolProgress('t1', 'ghost', { percent: 10 }))
+    expect(s.currentRun!.tools).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // tool.result handling
 // ---------------------------------------------------------------------------
 
 describe('tool.result handling', () => {
-  it('maps success:false to status error', () => {
+  it('maps a non-ok status to status error and preserves rawStatus', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
     s.applyToolCall(toolCall('t1', 'e1'))
-    s.applyToolResult(toolResult('t1', 'e1', { success: false, result: 'boom' }))
+    s.applyToolResult(toolResult('t1', 'e1', { status: 'denied', result: 'boom' }))
     expect(s.currentRun!.tools[0].status).toBe('error')
+    expect(s.currentRun!.tools[0].rawStatus).toBe('denied')
     expect(s.currentRun!.tools[0].result).toBe('boom')
   })
 
@@ -199,7 +268,7 @@ describe('tool.result handling', () => {
   it('creates the activity when tool.result arrives before tool.call (out of order)', () => {
     const s = useAgentRunStore()
     // No turn.started, no tool.call — the result frame arrives first.
-    s.applyToolResult(toolResult('t1', 'e1', { success: true, result: 'early' }))
+    s.applyToolResult(toolResult('t1', 'e1', { status: 'ok', result: 'early' }))
 
     const run = s.runByTurnId('t1')
     expect(run).not.toBeNull()
@@ -228,20 +297,34 @@ describe('interaction handling', () => {
     expect(s.currentRun!.interactions).toEqual([])
   })
 
-  it('appends a pending entry on interaction.requested', () => {
+  it('appends a pending entry with the full payload on interaction.requested', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
-    s.applyInteractionRequested(interactionRequested('t1', 'x1'))
+    s.applyInteractionRequested(
+      interactionRequested('t1', 'x1', {
+        args: { cmd: 'rm -rf /' },
+        risk_level: 'dangerous',
+        description: 'Delete everything',
+        reasoning: 'because',
+        allow_remember: true
+      })
+    )
     expect(s.currentRun!.interactions).toHaveLength(1)
     expect(s.currentRun!.interactions[0]).toMatchObject({
+      interactionId: 'int-x1',
       executionId: 'x1',
       kind: 'tool_confirmation',
       toolName: 'run_terminal_command',
-      status: 'pending'
+      status: 'pending',
+      riskLevel: 'dangerous',
+      description: 'Delete everything',
+      reasoning: 'because',
+      allowRemember: true
     })
+    expect(s.currentRun!.interactions[0].args).toEqual({ cmd: 'rm -rf /' })
   })
 
-  it('dedups a repeated interaction.requested by executionId', () => {
+  it('dedups a repeated interaction.requested by interaction_id', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
     s.applyInteractionRequested(interactionRequested('t1', 'x1'))
@@ -276,13 +359,14 @@ describe('interaction handling', () => {
     expect(run!.status).toBe('running')
     expect(run!.interactions).toHaveLength(1)
     expect(run!.interactions[0]).toMatchObject({
+      interactionId: 'int-x1',
       executionId: 'x1',
       kind: 'ask_user',
       status: 'resolved',
       outcome: 'answered'
     })
 
-    // A subsequent requested for the same executionId must NOT duplicate it.
+    // A subsequent requested for the same interaction_id must NOT duplicate it.
     s.applyInteractionRequested(interactionRequested('t1', 'x1', { kind: 'ask_user' }))
     expect(s.runByTurnId('t1')!.interactions).toHaveLength(1)
   })
@@ -295,6 +379,69 @@ describe('interaction handling', () => {
     const io = s.currentRun!.interactions[0]
     expect(io.status).toBe('pending')
     expect(io.outcome).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// pending getters (dialog projections)
+// ---------------------------------------------------------------------------
+
+describe('pending getters', () => {
+  it('pendingConfirmations projects pending tool_confirmation interactions', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(
+      interactionRequested('t1', 'x1', {
+        args: { path: '/etc' },
+        risk_level: 'medium',
+        description: 'write',
+        allow_remember: true
+      })
+    )
+    // An ask_user interaction is NOT a confirmation.
+    s.applyInteractionRequested(
+      interactionRequested('t1', 'x2', { kind: 'ask_user', tool_name: 'agent_ask_user' })
+    )
+
+    const confs = s.pendingConfirmations
+    expect(confs).toHaveLength(1)
+    expect(confs[0]).toMatchObject({
+      interactionId: 'int-x1',
+      executionId: 'x1',
+      toolName: 'run_terminal_command',
+      riskLevel: 'medium',
+      description: 'write',
+      allowRemember: true
+    })
+    expect(confs[0].args).toEqual({ path: '/etc' })
+
+    const asks = s.pendingAskUser
+    expect(asks).toHaveLength(1)
+    expect(asks[0].interactionId).toBe('int-x2')
+  })
+
+  it('drops resolved confirmations from pendingConfirmations', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1'))
+    expect(s.pendingConfirmations).toHaveLength(1)
+    s.applyInteractionResolved(interactionResolved('t1', 'x1'))
+    expect(s.pendingConfirmations).toHaveLength(0)
+  })
+
+  it('projects ask_user questions into the wizard view-model', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(
+      interactionRequested('t1', 'x1', {
+        kind: 'ask_user',
+        tool_name: 'agent_ask_user',
+        questions: [{ id: 'q1', text: 'Which?', type: 'radio', options: ['a', 'b'] }]
+      })
+    )
+    const asks = s.pendingAskUser
+    expect(asks).toHaveLength(1)
+    expect(asks[0].questions[0]).toMatchObject({ id: 'q1', text: 'Which?' })
   })
 })
 
@@ -352,27 +499,11 @@ describe('seq', () => {
   it('assigns monotonic seq across interleaved tools and interactions', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
-    s.applyToolCall({
-      type: 'tool.call',
-      turn_id: 't1',
-      execution_id: 'e1',
-      tool_name: 'web_search',
-      args: {}
-    })
-    s.applyInteractionRequested({
-      type: 'interaction.requested',
-      turn_id: 't1',
-      execution_id: 'e2',
-      kind: 'tool_confirmation',
-      tool_name: 'write_file'
-    })
-    s.applyToolCall({
-      type: 'tool.call',
-      turn_id: 't1',
-      execution_id: 'e3',
-      tool_name: 'read_file',
-      args: {}
-    })
+    s.applyToolCall(toolCall('t1', 'e1', 'web_search', {}))
+    s.applyInteractionRequested(
+      interactionRequested('t1', 'e2', { kind: 'tool_confirmation', tool_name: 'write_file' })
+    )
+    s.applyToolCall(toolCall('t1', 'e3', 'read_file', {}))
     const run = s.runByTurnId('t1')!
     expect(run.tools.find((t) => t.executionId === 'e1')!.seq).toBe(0)
     expect(run.interactions.find((i) => i.executionId === 'e2')!.seq).toBe(1)
@@ -388,14 +519,7 @@ describe('beginPendingTurn', () => {
   it('beginPendingTurn shows a fresh pending run, not the prior finished one', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))
-    s.applyTurnFinished({
-      type: 'turn.finished',
-      turn_id: 't1',
-      finish_reason: 'stop',
-      input_tokens: 10,
-      output_tokens: 5,
-      steps: 1
-    })
+    s.applyTurnFinished(finished('t1'))
     expect(s.currentRun!.status).toBe('finished')
     s.beginPendingTurn()
     expect(s.currentRun!.status).toBe('running')

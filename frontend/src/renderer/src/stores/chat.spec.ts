@@ -1,18 +1,17 @@
 /**
- * Unit tests for stores/chat.ts — `pendingAskUser` lifecycle (Fase 4 FE).
+ * Unit tests for stores/chat.ts — streaming lifecycle + load race guard.
  *
  * Pure Pinia store tests (vitest node env). A fresh Pinia is installed per
- * test. Focused on the inline `ask_user` prompt state: the add/remove mutators
- * plus the invariant that NO ask_user prompt lingers after a stream ends
- * (cancel / finalize) or after its tool execution completes — a lingering
- * prompt after stream end is a bug.
+ * test. Since the v2 migration (Mossa 2), tool/confirmation/ask_user state
+ * lives in the `agentRun` store — the chat store owns only conversations,
+ * streaming text/thinking, context, cost and versioning.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 import { useChatStore } from './chat'
 import { chatApi } from '../services/api'
-import type { AskUserRequest, ConversationDetail } from '../types/chat'
+import type { ConversationDetail } from '../types/chat'
 
 // finalizeStream() fires loadConversations()/loadConversation() as
 // fire-and-forget REST calls; stub the API layer so they resolve instead of
@@ -33,70 +32,16 @@ vi.mock('../services/api', () => ({
   resolveBackendUrl: (u: string) => u
 }))
 
-function askReq(executionId: string, text = 'Which file?', options?: string[]): AskUserRequest {
-  return { executionId, questions: [{ id: 'q1', text, type: 'radio', options }] }
-}
-
 beforeEach(() => {
   setActivePinia(createPinia())
 })
 
 // ---------------------------------------------------------------------------
-// add / remove mutators
+// streaming lifecycle
 // ---------------------------------------------------------------------------
 
-describe('pendingAskUser add/remove', () => {
-  it('addPendingAskUser exposes the request keyed by executionId', () => {
-    const s = useChatStore()
-    expect(s.pendingAskUser).toEqual({})
-
-    s.addPendingAskUser(askReq('e1', 'Pick one', ['a', 'b']))
-
-    expect(Object.keys(s.pendingAskUser)).toEqual(['e1'])
-    expect(s.pendingAskUser['e1']).toMatchObject({
-      executionId: 'e1',
-      questions: [{ id: 'q1', text: 'Pick one', options: ['a', 'b'] }]
-    })
-  })
-
-  it('addPendingAskUser stores a multi-question request', () => {
-    const store = useChatStore()
-    store.addPendingAskUser({
-      executionId: 'e1',
-      questions: [{ id: 'q1', text: 'Hi?', type: 'radio', options: ['a'] }]
-    })
-    const pending = store.pendingAskUser['e1']
-    expect(pending.questions[0].id).toBe('q1')
-  })
-
-  it('removePendingAskUser clears only the matching entry', () => {
-    const s = useChatStore()
-    s.addPendingAskUser(askReq('e1'))
-    s.addPendingAskUser(askReq('e2'))
-
-    s.removePendingAskUser('e1')
-
-    expect(s.pendingAskUser['e1']).toBeUndefined()
-    expect(s.pendingAskUser['e2']).toBeDefined()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// cleanup on stream end / tool completion
-// ---------------------------------------------------------------------------
-
-describe('pendingAskUser cleanup', () => {
-  it('cancelStream() clears all pending ask_user prompts', () => {
-    const s = useChatStore()
-    s.addPendingAskUser(askReq('e1'))
-    s.addPendingAskUser(askReq('e2'))
-
-    s.cancelStream()
-
-    expect(s.pendingAskUser).toEqual({})
-  })
-
-  it('finalizeStream() clears pending ask_user prompts (in-view branch)', () => {
+describe('streaming lifecycle', () => {
+  it('finalizeStream() ends the stream and appends the assistant message (in-view)', () => {
     const s = useChatStore()
     const conv: ConversationDetail = {
       id: 'c1',
@@ -109,22 +54,34 @@ describe('pendingAskUser cleanup', () => {
     // Drive the store into a streaming state so finalizeStream's guard passes.
     s.addUserMessage('hello')
     expect(s.isStreaming).toBe(true)
+    s.appendToStream('hi there')
 
-    s.addPendingAskUser(askReq('e1'))
     s.finalizeStream('c1', 'm1')
 
     expect(s.isStreaming).toBe(false)
-    expect(s.pendingAskUser).toEqual({})
+    const last = s.currentConversation!.messages.at(-1)
+    expect(last).toMatchObject({ id: 'm1', role: 'assistant', content: 'hi there' })
   })
 
-  it('completeToolExecution() drops the ask_user prompt for that execution', () => {
+  it('cancelStream() clears streaming state and preserves partial content', () => {
     const s = useChatStore()
-    s.addToolExecution('e1', 'ask_user')
-    s.addPendingAskUser(askReq('e1'))
+    const conv: ConversationDetail = {
+      id: 'c1',
+      title: null,
+      created_at: '',
+      updated_at: '',
+      messages: []
+    }
+    s.currentConversation = conv
+    s.addUserMessage('hello')
+    s.appendToStream('partial')
 
-    s.completeToolExecution('e1', 'answered', true)
+    s.cancelStream()
 
-    expect(s.pendingAskUser['e1']).toBeUndefined()
+    expect(s.isStreaming).toBe(false)
+    expect(s.currentStreamContent).toBe('')
+    const last = s.currentConversation!.messages.at(-1)
+    expect(last).toMatchObject({ role: 'assistant', content: 'partial' })
   })
 })
 

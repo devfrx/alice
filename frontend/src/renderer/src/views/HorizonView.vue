@@ -38,6 +38,8 @@ import {
 import { extractArtifacts } from '../composables/horizon/horizonArtifacts'
 import { useGenerationState } from '../composables/useGenerationState'
 import { useChatStore } from '../stores/chat'
+import { useAgentRunStore } from '../stores/agentRun'
+import { useSettingsStore } from '../stores/settings'
 import { useVoiceStore } from '../stores/voice'
 import { useTasksStore } from '../stores/tasks'
 import { useCalendarStore } from '../stores/calendar'
@@ -45,6 +47,8 @@ import { useDeskStore } from '../stores/desk'
 import '../assets/styles/horizon.css'
 
 const chatStore = useChatStore()
+const agentRunStore = useAgentRunStore()
+const settingsStore = useSettingsStore()
 const voiceStore = useVoiceStore()
 const tasksStore = useTasksStore()
 const calendarStore = useCalendarStore()
@@ -99,7 +103,7 @@ const sceneInputs = computed<HorizonSceneInputs>(() => ({
   isSttProcessing: voiceStore.isProcessing,
   isSpeaking: voiceStore.isSpeaking,
   isStreaming: chatStore.isStreamingCurrentConversation,
-  activeToolCount: chatStore.activeToolExecutions.length,
+  activeToolCount: agentRunStore.currentRun?.tools.length ?? 0,
   planSteps: planSteps.value,
   composerActive: composerActive.value,
   isThinking: isThinking.value
@@ -161,9 +165,9 @@ const stateLabel = computed(() => {
 const toolAnnotation = ref('')
 let annotationTimer: ReturnType<typeof setTimeout> | null = null
 watch(
-  () => chatStore.activeToolExecutions.map((t) => t.toolName).join(','),
+  () => (agentRunStore.currentRun?.tools ?? []).map((t) => t.toolName).join(','),
   () => {
-    const tools = chatStore.activeToolExecutions
+    const tools = agentRunStore.currentRun?.tools ?? []
     const last = tools[tools.length - 1]
     if (!last) return
     toolAnnotation.value = last.toolName.replace(/_/g, ' ')
@@ -174,8 +178,18 @@ watch(
   }
 )
 
-const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
-const pendingAskUserList = computed(() => Object.values(chatStore.pendingAskUser))
+/**
+ * Pending confirmations to render as a dialog. Auto-approvable requests
+ * (safe risk, or confirmations disabled) are hidden — `useChat` approves them
+ * immediately, so the still-`pending` fold entry must not flash a dialog
+ * before its `interaction.resolved` arrives (spec §5 ledger nuance).
+ */
+const pendingConfirmationsList = computed(() =>
+  agentRunStore.pendingConfirmations.filter(
+    (c) => !(c.riskLevel === 'safe' || !settingsStore.toolConfirmations)
+  )
+)
+const pendingAskUserList = computed(() => agentRunStore.pendingAskUser)
 const sceneDimmed = computed(
   () => pendingConfirmationsList.value.length > 0 || pendingAskUserList.value.length > 0
 )
@@ -417,7 +431,7 @@ onBeforeUnmount(() => {
 
     <ToolConfirmationDialog
       v-if="pendingConfirmationsList.length > 0"
-      :key="pendingConfirmationsList[0].executionId"
+      :key="pendingConfirmationsList[0].interactionId"
       :confirmation="pendingConfirmationsList[0]"
       @respond="respondToConfirmation"
     />
@@ -426,7 +440,7 @@ onBeforeUnmount(() => {
     <div v-if="pendingAskUserList.length > 0" class="horizon-view__ask">
       <AskUserPrompt
         v-for="r in pendingAskUserList"
-        :key="r.executionId"
+        :key="r.interactionId"
         :request="r"
         @answer="answerAskUser"
       />

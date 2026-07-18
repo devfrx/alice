@@ -15,7 +15,7 @@ import UiButton from '../ui/UiButton.vue'
 import UiInput from '../ui/UiInput.vue'
 
 const props = defineProps<{ request: AskUserRequest }>()
-const emit = defineEmits<{ answer: [executionId: string, answers: AskUserAnswer[]] }>()
+const emit = defineEmits<{ answer: [interactionId: string, answers: AskUserAnswer[]] }>()
 
 const step = ref(0)
 const total = computed(() => props.request.questions.length)
@@ -58,7 +58,7 @@ function submit(): void {
     selected: selected.value[q.id] ?? [],
     free_text: freeText.value[q.id]?.trim() || undefined
   }))
-  emit('answer', props.request.executionId, answers)
+  emit('answer', props.request.interactionId, answers)
 }
 </script>
 

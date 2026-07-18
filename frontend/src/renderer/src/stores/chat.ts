@@ -13,15 +13,12 @@ import { computed, ref, watch } from 'vue'
 
 import { chatApi, resolveBackendUrl } from '../services/api'
 import type {
-  AskUserRequest,
   ChatMessage,
-  ConfirmationRequest,
   ContextInfo,
   ConversationDetail,
   ConversationExport,
   ConversationSummary,
-  FileAttachment,
-  ToolExecution
+  FileAttachment
 } from '../types/chat'
 
 const ACTIVE_CONVERSATION_STORAGE_KEY = 'alice_active_conversation_id'
@@ -146,15 +143,6 @@ export const useChatStore = defineStore('chat', () => {
 
   /** True while a cancel has been sent but the server hasn't confirmed yet. */
   const isCancelling = ref(false)
-
-  /** Tool executions running during the current stream. */
-  const activeToolExecutions = ref<ToolExecution[]>([])
-
-  /** Tool confirmations awaiting user approval. */
-  const pendingConfirmations = ref<Record<string, ConfirmationRequest>>({})
-
-  /** `ask_user` prompts awaiting the user's free-form answer (keyed by execution id). */
-  const pendingAskUser = ref<Record<string, AskUserRequest>>({})
 
   /** Latest context window usage information from the server. */
   const contextInfo = ref<ContextInfo | null>(null)
@@ -672,9 +660,6 @@ export const useChatStore = defineStore('chat', () => {
       isCancelling.value = false
       isCompressingContext.value = false
       streamingConversationId.value = null
-      activeToolExecutions.value = []
-      pendingConfirmations.value = {}
-      pendingAskUser.value = {}
       loadConversations().catch(console.error)
       return
     }
@@ -699,9 +684,6 @@ export const useChatStore = defineStore('chat', () => {
     isCancelling.value = false
     isCompressingContext.value = false
     streamingConversationId.value = null
-    activeToolExecutions.value = []
-    pendingConfirmations.value = {}
-    pendingAskUser.value = {}
 
     // Refresh sidebar list asynchronously (fire-and-forget)
     loadConversations().catch(console.error)
@@ -723,63 +705,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // -----------------------------------------------------------------------
-  // Tool execution actions
+  // Context window actions
   // -----------------------------------------------------------------------
-
-  /** Register a new tool execution as running. */
-  function addToolExecution(executionId: string, toolName: string): void {
-    activeToolExecutions.value.push({ executionId, toolName, status: 'running' })
-  }
-
-  /** Mark a tool execution as completed. */
-  function completeToolExecution(
-    executionId: string,
-    result: string,
-    success: boolean,
-    contentType?: string
-  ): void {
-    const exec = activeToolExecutions.value.find((e) => e.executionId === executionId)
-    if (exec) {
-      exec.status = success ? 'done' : 'error'
-      exec.result = result
-      exec.success = success
-      if (contentType) exec.contentType = contentType
-    }
-    // Clean up any orphaned confirmation (e.g. backend timeout before user responded).
-    delete pendingConfirmations.value[executionId]
-    // Same for an orphaned ask_user prompt tied to this execution.
-    delete pendingAskUser.value[executionId]
-  }
-
-  /** Merge an incremental progress update into a running tool execution. */
-  function updateToolExecutionProgress(
-    executionId: string,
-    progress: ToolExecution['progress']
-  ): void {
-    const exec = activeToolExecutions.value.find((e) => e.executionId === executionId)
-    if (!exec || exec.status !== 'running') return
-    exec.progress = { ...exec.progress, ...progress }
-  }
-
-  /** Add a pending confirmation request. */
-  function addPendingConfirmation(req: ConfirmationRequest): void {
-    pendingConfirmations.value[req.executionId] = req
-  }
-
-  /** Remove a pending confirmation (after user responds). */
-  function removePendingConfirmation(executionId: string): void {
-    delete pendingConfirmations.value[executionId]
-  }
-
-  /** Add a pending ask_user request. */
-  function addPendingAskUser(req: AskUserRequest): void {
-    pendingAskUser.value[req.executionId] = req
-  }
-
-  /** Remove a pending ask_user request (after the user answers). */
-  function removePendingAskUser(executionId: string): void {
-    delete pendingAskUser.value[executionId]
-  }
 
   /** Update the context window usage info from a server event. */
   function updateContextInfo(info: ContextInfo): void {
@@ -831,9 +758,6 @@ export const useChatStore = defineStore('chat', () => {
     isCancelling.value = false
     isCompressingContext.value = false
     streamingConversationId.value = null
-    activeToolExecutions.value = []
-    pendingConfirmations.value = {}
-    pendingAskUser.value = {}
   }
 
   /**
@@ -925,9 +849,6 @@ export const useChatStore = defineStore('chat', () => {
     streamGeneration,
     isWaitingForResponse,
     isCancelling,
-    activeToolExecutions,
-    pendingConfirmations,
-    pendingAskUser,
     contextInfo,
     isCompressingContext,
     conversationCost,
@@ -963,14 +884,7 @@ export const useChatStore = defineStore('chat', () => {
     getVersionCount,
     getActiveVersionIndex,
 
-    // tool execution actions
-    addToolExecution,
-    completeToolExecution,
-    updateToolExecutionProgress,
-    addPendingConfirmation,
-    removePendingConfirmation,
-    addPendingAskUser,
-    removePendingAskUser,
+    // context window actions
     updateContextInfo,
     setCompressingContext,
     setCompressionDone,

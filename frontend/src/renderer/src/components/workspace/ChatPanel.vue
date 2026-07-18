@@ -28,6 +28,8 @@ import { ChatApiKey } from '../../composables/useChat'
 import { useModal } from '../../composables/useModal'
 import { useVoice } from '../../composables/useVoice'
 import { useChatStore } from '../../stores/chat'
+import { useAgentRunStore } from '../../stores/agentRun'
+import { useSettingsStore } from '../../stores/settings'
 
 const props = defineProps<{
   /** Optional conversation hint — reserved for future per-tile conversations. */
@@ -41,6 +43,8 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const agentRunStore = useAgentRunStore()
+const settingsStore = useSettingsStore()
 const chatApi = inject(ChatApiKey, null)
 const { openCustom } = useModal()
 
@@ -97,8 +101,15 @@ async function handleSend(content: string, attachments: File[]): Promise<void> {
   await send(content, undefined, attachments)
 }
 
-const pendingConfirmationsList = computed(() => Object.values(chatStore.pendingConfirmations))
-const pendingAskUserList = computed(() => Object.values(chatStore.pendingAskUser))
+// Auto-approvable confirmations (safe risk, or confirmations disabled) are
+// hidden: useChat approves them immediately, so the still-`pending` fold entry
+// must not flash a dialog before its `interaction.resolved` arrives (spec §5).
+const pendingConfirmationsList = computed(() =>
+  agentRunStore.pendingConfirmations.filter(
+    (c) => !(c.riskLevel === 'safe' || !settingsStore.toolConfirmations)
+  )
+)
+const pendingAskUserList = computed(() => agentRunStore.pendingAskUser)
 
 // ── Auto-scroll ─────────────────────────────────────────────────────────────
 function scrollConversation(): void {
@@ -174,7 +185,7 @@ const conversationTitle = computed<string>(() => {
 
         <AskUserPrompt
           v-for="r in pendingAskUserList"
-          :key="r.executionId"
+          :key="r.interactionId"
           :request="r"
           @answer="answerAskUser"
         />
@@ -209,7 +220,7 @@ const conversationTitle = computed<string>(() => {
 
     <ToolConfirmationDialog
       v-if="pendingConfirmationsList.length > 0"
-      :key="pendingConfirmationsList[0].executionId"
+      :key="pendingConfirmationsList[0].interactionId"
       :confirmation="pendingConfirmationsList[0]"
       @respond="respondToConfirmation"
     />

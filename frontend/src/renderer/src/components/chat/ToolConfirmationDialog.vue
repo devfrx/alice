@@ -28,8 +28,12 @@ const rememberChoice = ref<RememberChoice>('none')
 
 const REMEMBER_OPTIONS: { value: RememberChoice; label: string; hint: string }[] = [
   { value: 'none', label: 'Solo ora', hint: 'Chiedi di nuovo la prossima volta' },
-  { value: 'session', label: 'Questa sessione', hint: 'Consenti per questa conversazione' },
-  { value: 'persistent', label: 'Sempre', hint: 'Crea una regola permanente' }
+  {
+    value: 'conversation',
+    label: 'Questa conversazione',
+    hint: 'Crea una regola per questa conversazione'
+  },
+  { value: 'persistent', label: 'Sempre', hint: 'Crea una regola permanente globale' }
 ]
 
 const dialogRoot = ref<HTMLElement | null>(null)

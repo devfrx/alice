@@ -194,7 +194,7 @@ REPRESENTATIVE_CLIENT_FRAMES: list[dict[str, Any]] = [
         "interaction_id": "i1",
         "kind": "tool_confirmation",
         "approved": True,
-        "remember": "session",
+        "remember": "conversation",
     },
     {
         "type": "interaction.response",

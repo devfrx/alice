@@ -49,6 +49,7 @@ from backend.services.agent.adapters.ws import (
 from backend.services.agent.engine import AgentEngine
 from backend.services.agent.models import ToolInvocation, TurnOutcome, TurnRequest
 from backend.services.agent.ports import (
+    ConfirmationResult,
     GateVerdict,
     InteractionOutcome,
     ToolExecutionOutput,
@@ -127,7 +128,7 @@ class SinkEventPort:
 class AutoDeclineInteractionPort:
     """``InteractionPort`` headless: nessuna UN, ogni interazione è declinata.
 
-    * ``confirm_tool`` → :class:`InteractionOutcome.REJECTED` (il motore
+    * ``confirm_tool`` → ``ConfirmationResult(REJECTED)`` (il motore
       persiste la tool response sintetica di rifiuto e prosegue);
     * ``run_client_tool`` / ``ask_user`` → ``ToolExecutionOutput(ok=False)``
       con messaggio esplicito (il tool non può essere servito senza UI).
@@ -141,9 +142,9 @@ class AutoDeclineInteractionPort:
         verdict: GateVerdict,
         timeout_s: float,
         cancel: asyncio.Event,
-    ) -> InteractionOutcome:
+    ) -> ConfirmationResult:
         """Nessuna UI per confermare: rifiuto pulito."""
-        return InteractionOutcome.REJECTED
+        return ConfirmationResult(outcome=InteractionOutcome.REJECTED)
 
     async def run_client_tool(
         self,
@@ -217,6 +218,7 @@ async def run_agent_turn(
         permission_service=ctx.permission_service,
         mode_service=ctx.permission_mode_service,
         tool_registry=tool_registry,
+        rule_service=ctx.permission_rule_service,
         conversation_id=request.conversation_id,
     )
     execution_port = ToolRegistryAdapter(

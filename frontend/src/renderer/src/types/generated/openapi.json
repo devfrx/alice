@@ -4436,7 +4436,7 @@
             "default": "none",
             "enum": [
               "none",
-              "session",
+              "conversation",
               "persistent"
             ],
             "title": "Remember",

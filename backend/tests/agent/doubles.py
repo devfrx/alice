@@ -138,12 +138,21 @@ class StaticPermissionPort:
         self._verdicts = verdicts
         self._default = default
         self.calls: list[ToolInvocation] = []
+        self.remember_calls: list[dict[str, Any]] = []
 
     async def decide(
         self, call: ToolInvocation, *, conversation_id: str,
     ) -> ports.GateVerdict:
         self.calls.append(call)
         return self._verdicts.get(call.name, self._default)
+
+    async def remember_approval(
+        self, call: ToolInvocation, *, conversation_id: str,
+        scope: ports.RememberScope,
+    ) -> None:
+        self.remember_calls.append({
+            "name": call.name, "conversation_id": conversation_id, "scope": scope,
+        })
 
 
 class ScriptedInteractionPort:
@@ -154,17 +163,21 @@ class ScriptedInteractionPort:
         confirm: ports.InteractionOutcome = ports.InteractionOutcome.APPROVED,
         client_result: ports.ToolExecutionOutput | None = None,
         ask_user_result: ports.ToolExecutionOutput | None = None,
+        confirm_remember: ports.RememberScope = ports.RememberScope.NONE,
     ) -> None:
         self._confirm = confirm
         self._client_result = client_result
         self._ask_user_result = ask_user_result
+        self._confirm_remember = confirm_remember
 
     async def confirm_tool(
         self, call: ToolInvocation, *, interaction_id: str, verdict: ports.GateVerdict,
         timeout_s: float, cancel: asyncio.Event,
-    ) -> ports.InteractionOutcome:
+    ) -> ports.ConfirmationResult:
         # DISCONNECTED torna come dato: il motore persiste prima di fermarsi (spec §6.5)
-        return self._confirm
+        return ports.ConfirmationResult(
+            outcome=self._confirm, remember=self._confirm_remember,
+        )
 
     async def run_client_tool(
         self, call: ToolInvocation, *, interaction_id: str, timeout_s: float,

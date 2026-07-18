@@ -19,7 +19,12 @@ import asyncio
 from typing import Any
 
 from backend.services.agent.models import ToolInvocation
-from backend.services.agent.ports import GateAction, GateVerdict, InteractionOutcome
+from backend.services.agent.ports import (
+    GateAction,
+    GateVerdict,
+    InteractionOutcome,
+    RememberScope,
+)
 from backend.services.agent.runner import AutoDeclineInteractionPort, SinkEventPort
 from backend.tests.agent._llm_shim import ScriptedLLMShim
 
@@ -64,10 +69,11 @@ async def test_auto_decline_interaction_port_declines_all() -> None:
     d'errore esplicito (mai un'eccezione: il motore riceve comunque un dato)."""
     port = AutoDeclineInteractionPort()
 
-    outcome = await port.confirm_tool(
+    result = await port.confirm_tool(
         _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=1, cancel=asyncio.Event(),
     )
-    assert outcome is InteractionOutcome.REJECTED
+    assert result.outcome is InteractionOutcome.REJECTED
+    assert result.remember is RememberScope.NONE
 
     client_out = await port.run_client_tool(
         _CALL, interaction_id="ix", timeout_s=1, cancel=asyncio.Event(),

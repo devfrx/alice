@@ -70,15 +70,18 @@ def _engine(
     context: ports.ContextPort | None = None,
     client_result: ports.ToolExecutionOutput | None = None,
     ask_user_result: ports.ToolExecutionOutput | None = None,
+    confirm_remember: ports.RememberScope = ports.RememberScope.NONE,
+    permission_port: StaticPermissionPort | None = None,
 ) -> AgentEngine:
     return AgentEngine(
         llm=llm,
-        permissions=StaticPermissionPort(
+        permissions=permission_port if permission_port is not None else StaticPermissionPort(
             verdicts=verdicts or {},
             default=ports.GateVerdict(action=ports.GateAction.EXECUTE, outcome="allow"),
         ),
         interaction=ScriptedInteractionPort(
             confirm=confirm, client_result=client_result, ask_user_result=ask_user_result,
+            confirm_remember=confirm_remember,
         ),
         events=events,
         persistence=persistence,
@@ -108,6 +111,8 @@ async def _run_with_port(
     user_message_id: str | None = None,
     version_group_id: str | None = None,
     version_index: int | None = None,
+    confirm_remember: ports.RememberScope = ports.RememberScope.NONE,
+    permission_port: StaticPermissionPort | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort, MapExecutionPort]:
     """Costruisce l'engine coi double e lo esegue, esponendo anche l'ExecutionPort."""
     persistence = InMemoryPersistence(
@@ -121,7 +126,8 @@ async def _run_with_port(
     engine = _engine(
         llm=llm, events=rec, persistence=persistence, execution=exec_port,
         verdicts=verdicts, confirm=confirm, client_result=client_result,
-        ask_user_result=ask_user_result,
+        ask_user_result=ask_user_result, confirm_remember=confirm_remember,
+        permission_port=permission_port,
     )
     request = _request(
         max_steps=max_steps, max_tool_calls=max_tool_calls,
@@ -152,6 +158,8 @@ async def _run_with(
     user_message_id: str | None = None,
     version_group_id: str | None = None,
     version_index: int | None = None,
+    confirm_remember: ports.RememberScope = ports.RememberScope.NONE,
+    permission_port: StaticPermissionPort | None = None,
 ) -> tuple[InMemoryPersistence, TurnOutcome, RecordingEventPort]:
     """Come ``_run_with_port`` ma senza esporre l'ExecutionPort."""
     persistence, outcome, rec, _ = await _run_with_port(
@@ -161,7 +169,8 @@ async def _run_with(
         ask_user_result=ask_user_result, progress=progress, fail_final=fail_final,
         fail_final_checkpoint=fail_final_checkpoint,
         user_message_id=user_message_id, version_group_id=version_group_id,
-        version_index=version_index,
+        version_index=version_index, confirm_remember=confirm_remember,
+        permission_port=permission_port,
     )
     return persistence, outcome, rec
 

@@ -58,9 +58,11 @@ from starlette.websockets import WebSocketDisconnect
 
 from backend.services.agent.models import ToolInvocation
 from backend.services.agent.ports import (
+    ConfirmationResult,
     EngineDisconnected,
     GateVerdict,
     InteractionOutcome,
+    RememberScope,
     ToolExecutionOutput,
 )
 
@@ -350,25 +352,37 @@ class WsInteractionPort:
         verdict: GateVerdict,
         timeout_s: float,
         cancel: asyncio.Event,
-    ) -> InteractionOutcome:
+    ) -> ConfirmationResult:
         """Attende l'esito della conferma per ``interaction_id``.
 
         Su disconnessione ritorna ``DISCONNECTED`` come DATO (adjudicazione
         T4): il motore persiste la tool response sintetica prima di fermarsi.
+
+        La scelta ``remember`` del frame è decodificata SOLO su approvazione
+        (una call declinata non va mai ricordata) e normalizzata a ``NONE``
+        per valori fuori dal vocabolario wire — il frame inbound non passa da
+        una validazione Pydantic, la porta è l'ultimo presidio.
         """
         try:
             response = await self._transport.wait_response(
                 interaction_id, timeout_s=timeout_s, cancel=cancel,
             )
         except EngineDisconnected:
-            return InteractionOutcome.DISCONNECTED
+            return ConfirmationResult(outcome=InteractionOutcome.DISCONNECTED)
         if response is None:
             if cancel.is_set():
-                return InteractionOutcome.CANCELLED
-            return InteractionOutcome.TIMEOUT
-        if bool(response.get("approved")):
-            return InteractionOutcome.APPROVED
-        return InteractionOutcome.REJECTED
+                return ConfirmationResult(outcome=InteractionOutcome.CANCELLED)
+            return ConfirmationResult(outcome=InteractionOutcome.TIMEOUT)
+        if not bool(response.get("approved")):
+            return ConfirmationResult(outcome=InteractionOutcome.REJECTED)
+        raw_remember = response.get("remember")
+        try:
+            remember = RememberScope(raw_remember) if raw_remember else RememberScope.NONE
+        except ValueError:
+            remember = RememberScope.NONE
+        return ConfirmationResult(
+            outcome=InteractionOutcome.APPROVED, remember=remember,
+        )
 
     async def run_client_tool(
         self,

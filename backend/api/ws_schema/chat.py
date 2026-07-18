@@ -36,7 +36,11 @@ InteractionOutcome = Literal[
     "disconnected",
     "failed",
 ]
-RememberChoice = Literal["none", "session", "persistent"]
+# "conversation" crea una regola allow per-conversazione, "persistent" una
+# regola allow globale (entrambe visibili in Impostazioni → Sicurezza).
+# Rinominato da "session" (fix smoke Fase 1): la semantica è una regola
+# durabile per-conversazione, non un grant effimero di sessione.
+RememberChoice = Literal["none", "conversation", "persistent"]
 
 # ---------------------------------------------------------------------------
 # Shared sub-objects

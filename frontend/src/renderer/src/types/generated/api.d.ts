@@ -4413,7 +4413,7 @@ export interface components {
              * @default none
              * @enum {string}
              */
-            remember?: "none" | "session" | "persistent";
+            remember?: "none" | "conversation" | "persistent";
             /**
              * Result
              * @default null

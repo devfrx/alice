@@ -35,6 +35,7 @@ from backend.services.agent.ports import (
     GateAction,
     GateVerdict,
     InteractionOutcome,
+    RememberScope,
 )
 
 _DISCONNECT = object()
@@ -320,8 +321,8 @@ async def test_confirm_tool_builds_no_frame() -> None:
     ))
     await _registered(t, "ix")
     await ws.feed({"type": "interaction.response", "interaction_id": "ix", "approved": True})
-    outcome = await asyncio.wait_for(task, timeout=1)
-    assert outcome is InteractionOutcome.APPROVED
+    result = await asyncio.wait_for(task, timeout=1)
+    assert result.outcome is InteractionOutcome.APPROVED
     assert ws.sent == []  # nessun frame costruito dalla porta
     await t.aclose()
 
@@ -339,14 +340,92 @@ async def test_confirm_tool_maps_response() -> None:
     ))
     await _registered(t, "ia")
     await ws.feed({"type": "interaction.response", "interaction_id": "ia", "approved": True})
-    assert await asyncio.wait_for(task, timeout=1) is InteractionOutcome.APPROVED
+    result = await asyncio.wait_for(task, timeout=1)
+    assert result.outcome is InteractionOutcome.APPROVED
 
     task2 = asyncio.create_task(port.confirm_tool(
         _CALL, interaction_id="ib", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
     ))
     await _registered(t, "ib")
     await ws.feed({"type": "interaction.response", "interaction_id": "ib", "approved": False})
-    assert await asyncio.wait_for(task2, timeout=1) is InteractionOutcome.REJECTED
+    result2 = await asyncio.wait_for(task2, timeout=1)
+    assert result2.outcome is InteractionOutcome.REJECTED
+    await t.aclose()
+
+
+async def test_confirm_tool_extracts_remember_choice() -> None:
+    """La scelta ``remember`` della risposta approvata arriva nel risultato
+    (fix smoke Fase 1: la porta la SCARTAVA e nessuna regola veniva salvata)."""
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    port = _port(t)
+
+    task = asyncio.create_task(port.confirm_tool(
+        _CALL, interaction_id="ir1", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    ))
+    await _registered(t, "ir1")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "ir1",
+        "approved": True, "remember": "conversation",
+    })
+    result = await asyncio.wait_for(task, timeout=1)
+    assert result.outcome is InteractionOutcome.APPROVED
+    assert result.remember is RememberScope.CONVERSATION
+
+    task2 = asyncio.create_task(port.confirm_tool(
+        _CALL, interaction_id="ir2", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    ))
+    await _registered(t, "ir2")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "ir2",
+        "approved": True, "remember": "persistent",
+    })
+    result2 = await asyncio.wait_for(task2, timeout=1)
+    assert result2.remember is RememberScope.PERSISTENT
+    await t.aclose()
+
+
+async def test_confirm_tool_remember_defaults_to_none_when_absent_invalid_or_rejected() -> None:
+    """remember assente o non nel vocabolario → NONE; su rifiuto la scelta è
+    IGNORATA (una call declinata non va mai ricordata, difesa in profondità
+    oltre al 'none' forzato dal FE)."""
+    ws = FakeWebSocket()
+    t = WsTransport(ws)
+    t.begin_turn()
+    await t.start()
+    port = _port(t)
+
+    for interaction_id, frame_extra in (
+        ("in1", {}),                                     # assente
+        ("in2", {"remember": "sempre"}),                 # fuori vocabolario
+        ("in3", {"remember": 42}),                       # tipo sbagliato
+    ):
+        task = asyncio.create_task(port.confirm_tool(
+            _CALL, interaction_id=interaction_id, verdict=_VERDICT,
+            timeout_s=2, cancel=asyncio.Event(),
+        ))
+        await _registered(t, interaction_id)
+        await ws.feed({
+            "type": "interaction.response", "interaction_id": interaction_id,
+            "approved": True, **frame_extra,
+        })
+        result = await asyncio.wait_for(task, timeout=1)
+        assert result.outcome is InteractionOutcome.APPROVED
+        assert result.remember is RememberScope.NONE
+
+    task = asyncio.create_task(port.confirm_tool(
+        _CALL, interaction_id="in4", verdict=_VERDICT, timeout_s=2, cancel=asyncio.Event(),
+    ))
+    await _registered(t, "in4")
+    await ws.feed({
+        "type": "interaction.response", "interaction_id": "in4",
+        "approved": False, "remember": "persistent",
+    })
+    result = await asyncio.wait_for(task, timeout=1)
+    assert result.outcome is InteractionOutcome.REJECTED
+    assert result.remember is RememberScope.NONE
     await t.aclose()
 
 
@@ -357,16 +436,16 @@ async def test_confirm_tool_timeout_and_cancel_outcomes() -> None:
     t.begin_turn()
     await t.start()
     port = _port(t)
-    outcome = await port.confirm_tool(
+    result = await port.confirm_tool(
         _CALL, interaction_id="ix", verdict=_VERDICT, timeout_s=0.05, cancel=asyncio.Event(),
     )
-    assert outcome is InteractionOutcome.TIMEOUT
+    assert result.outcome is InteractionOutcome.TIMEOUT
     cancelled = asyncio.Event()
     cancelled.set()
-    outcome2 = await port.confirm_tool(
+    result2 = await port.confirm_tool(
         _CALL, interaction_id="iy", verdict=_VERDICT, timeout_s=5, cancel=cancelled,
     )
-    assert outcome2 is InteractionOutcome.CANCELLED
+    assert result2.outcome is InteractionOutcome.CANCELLED
     await t.aclose()
 
 
@@ -383,8 +462,8 @@ async def test_confirm_tool_disconnect_returns_disconnected_as_data() -> None:
     ))
     await _registered(t, "ix")
     await ws.disconnect()
-    outcome = await asyncio.wait_for(task, timeout=1)
-    assert outcome is InteractionOutcome.DISCONNECTED
+    result = await asyncio.wait_for(task, timeout=1)
+    assert result.outcome is InteractionOutcome.DISCONNECTED
     await t.aclose()
 
 

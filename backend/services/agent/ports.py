@@ -99,6 +99,32 @@ class InteractionOutcome(StrEnum):
     DISCONNECTED = "disconnected"
 
 
+class RememberScope(StrEnum):
+    """Portata della scelta "ricorda la decisione" di una conferma approvata.
+
+    Valori allineati al vocabolario wire ``RememberChoice``
+    (``api/ws_schema/chat.py``): ``conversation`` crea una regola allow
+    per-conversazione, ``persistent`` una regola allow globale.
+    """
+
+    NONE = "none"
+    CONVERSATION = "conversation"
+    PERSISTENT = "persistent"
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmationResult:
+    """Esito completo di una conferma tool: outcome + scelta remember.
+
+    ``remember`` è significativo SOLO con outcome ``APPROVED``: la porta lo
+    normalizza a ``NONE`` in ogni altro caso (una call declinata non va mai
+    ricordata).
+    """
+
+    outcome: InteractionOutcome
+    remember: RememberScope = RememberScope.NONE
+
+
 @dataclass(frozen=True, slots=True)
 class ToolExecutionOutput:
     """Risultato dell'esecuzione di un tool.
@@ -157,6 +183,18 @@ class PermissionPort(Protocol):
         self, call: ToolInvocation, *, conversation_id: str,
     ) -> GateVerdict: ...
 
+    async def remember_approval(
+        self, call: ToolInvocation, *, conversation_id: str,
+        scope: RememberScope,
+    ) -> None:
+        """Persiste la scelta "ricorda" di una conferma APPROVATA.
+
+        Best-effort: non solleva mai (un errore di persistenza della
+        preferenza non deve far fallire la call appena approvata).
+        ``scope=NONE`` è un no-op.
+        """
+        ...
+
 
 class InteractionPort(Protocol):
     """Interazioni con l'utente: conferma, esecuzione client-side, ask_user.
@@ -169,7 +207,7 @@ class InteractionPort(Protocol):
     async def confirm_tool(
         self, call: ToolInvocation, *, interaction_id: str, verdict: GateVerdict,
         timeout_s: float, cancel: asyncio.Event,
-    ) -> InteractionOutcome: ...
+    ) -> ConfirmationResult: ...
 
     async def run_client_tool(
         self, call: ToolInvocation, *, interaction_id: str, timeout_s: float,

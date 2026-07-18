@@ -44,14 +44,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
 from backend.services.agent.adapters._tool_lookup import resolve_tool_definition
 from backend.services.agent.models import ToolInvocation
-from backend.services.agent.ports import GateAction, GateVerdict
+from backend.services.agent.ports import GateAction, GateVerdict, RememberScope
+from backend.services.permission_rules import RuleEffect
 from backend.services.permission_service import GateAction as PlatformGateAction
 
 if TYPE_CHECKING:
     from backend.core.tool_registry import ToolRegistry
     from backend.services.permission_mode_service import PermissionModeService
+    from backend.services.permission_rules import PermissionRuleService
     from backend.services.permission_service import PermissionService
 
 _ACTION_MAP: dict[PlatformGateAction, GateAction] = {
@@ -70,6 +74,7 @@ class PermissionServiceAdapter:
         permission_service: PermissionService,
         mode_service: PermissionModeService,
         tool_registry: ToolRegistry,
+        rule_service: PermissionRuleService,
         conversation_id: str,
     ) -> None:
         """Inizializza l'adapter.
@@ -79,6 +84,8 @@ class PermissionServiceAdapter:
             mode_service: Servizio del tier di permesso per-conversazione.
             tool_registry: Registro tool, per recuperare la ``ToolDefinition``
                 di ogni chiamata (fresca a ogni ``decide``, mai cache).
+            rule_service: Servizio delle regole persistite — destinazione
+                della scelta "ricorda" delle conferme (``remember_approval``).
             conversation_id: ID di conversazione di default per questo adapter
                 (documentale — il metodo ``decide`` usa comunque il
                 ``conversation_id`` ricevuto per-call, come da ``PermissionPort``).
@@ -86,6 +93,7 @@ class PermissionServiceAdapter:
         self._permission_service = permission_service
         self._mode_service = mode_service
         self._tool_registry = tool_registry
+        self._rule_service = rule_service
         self._conversation_id = conversation_id
 
     async def decide(
@@ -117,3 +125,43 @@ class PermissionServiceAdapter:
             risk_level=tool_def.risk_level if tool_def is not None else None,
             description=tool_def.description if tool_def is not None else None,
         )
+
+    async def remember_approval(
+        self,
+        call: ToolInvocation,
+        *,
+        conversation_id: str,
+        scope: RememberScope,
+    ) -> None:
+        """Persiste la scelta "ricorda" di una conferma approvata come regola.
+
+        Mapping (fix smoke Fase 1 — la scelta era scartata in
+        ``adapters/ws.py`` e nessuna regola veniva mai creata):
+
+        * ``CONVERSATION`` → regola ``allow`` scoped alla conversazione;
+        * ``PERSISTENT``   → regola ``allow`` globale;
+        * ``NONE``         → no-op.
+
+        La regola è keyed sul nome NAMESPACED risolto (stessa regola del fix
+        M1 su ``decide``: rules/grants keyed sul nome bare non farebbero mai
+        match nel gate). Best-effort come da contratto ``PermissionPort``: un
+        errore di persistenza è loggato, mai propagato — la call è già stata
+        approvata dall'utente e deve proseguire.
+        """
+        if scope is RememberScope.NONE:
+            return
+        resolved = resolve_tool_definition(self._tool_registry, call.name)
+        tool_name = resolved[0] if resolved is not None else call.name
+        try:
+            await self._rule_service.add_rule(
+                tool_name=tool_name,
+                effect=RuleEffect.ALLOW,
+                conversation_id=(
+                    conversation_id if scope is RememberScope.CONVERSATION else None
+                ),
+            )
+        except Exception:  # noqa: BLE001 — best-effort: mai far fallire la call approvata
+            logger.exception(
+                "remember_approval fallita: tool={} scope={} (regola non salvata)",
+                tool_name, scope.value,
+            )

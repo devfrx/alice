@@ -7,7 +7,7 @@ isolamento, senza costruire i servizi reali.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,6 +15,7 @@ from backend.services.agent import ports
 from backend.services.agent.adapters.permission import PermissionServiceAdapter
 from backend.services.agent.models import ToolInvocation
 from backend.services.permission_mode_service import PermissionMode
+from backend.services.permission_rules import RuleEffect
 from backend.services.permission_service import GateAction as PlatformGateAction
 from backend.services.permission_service import GateDecision, PermissionOutcome
 
@@ -23,26 +24,34 @@ def _call(name: str = "fs_read_file", args: dict | None = None) -> ToolInvocatio
     return ToolInvocation(call_id="call_1", name=name, args=args or {}, raw_args="{}")
 
 
+def _rule_service() -> MagicMock:
+    rule_service = MagicMock()
+    rule_service.add_rule = AsyncMock()
+    return rule_service
+
+
 def _make_adapter(
     *, decision: GateDecision, tool_def: object | None = None,
-) -> tuple[PermissionServiceAdapter, MagicMock, MagicMock, MagicMock]:
+) -> tuple[PermissionServiceAdapter, MagicMock, MagicMock, MagicMock, MagicMock]:
     permission_service = MagicMock()
     permission_service.decide.return_value = decision
     mode_service = MagicMock()
     mode_service.get_mode.return_value = PermissionMode.STRICT
     tool_registry = MagicMock()
     tool_registry.get_tool_definition.return_value = tool_def
+    rule_service = _rule_service()
     adapter = PermissionServiceAdapter(
         permission_service=permission_service,
         mode_service=mode_service,
         tool_registry=tool_registry,
+        rule_service=rule_service,
         conversation_id="conv-1",
     )
-    return adapter, permission_service, mode_service, tool_registry
+    return adapter, permission_service, mode_service, tool_registry, rule_service
 
 
 async def test_mode_and_tool_def_resolved_on_every_call() -> None:
-    adapter, permission_service, mode_service, tool_registry = _make_adapter(
+    adapter, permission_service, mode_service, tool_registry, _ = _make_adapter(
         decision=GateDecision.allow(),
     )
     call = _call()
@@ -56,7 +65,7 @@ async def test_mode_and_tool_def_resolved_on_every_call() -> None:
 
 
 async def test_decide_passes_resolved_mode_and_tool_def_through() -> None:
-    adapter, permission_service, mode_service, tool_registry = _make_adapter(
+    adapter, permission_service, mode_service, tool_registry, _ = _make_adapter(
         decision=GateDecision.allow(),
     )
     mode_service.get_mode.return_value = PermissionMode.AUTOPILOT
@@ -142,6 +151,7 @@ async def test_decide_passes_resolved_namespaced_name_for_bare_tool_call() -> No
         permission_service=permission_service,
         mode_service=mode_service,
         tool_registry=tool_registry,
+        rule_service=_rule_service(),
         conversation_id="conv-1",
     )
     call = _call(name="remember", args={"fact": "x"})
@@ -172,6 +182,7 @@ async def test_decide_falls_back_to_bare_name_when_unresolvable() -> None:
         permission_service=permission_service,
         mode_service=mode_service,
         tool_registry=tool_registry,
+        rule_service=_rule_service(),
         conversation_id="conv-1",
     )
     call = _call(name="totally_unknown", args={})
@@ -185,3 +196,88 @@ async def test_decide_falls_back_to_bare_name_when_unresolvable() -> None:
         conversation_id="conv-1",
         mode=PermissionMode.STRICT,
     )
+
+
+# ---------------------------------------------------------------------------
+# remember_approval (fix smoke Fase 1: persistenza della scelta "ricorda")
+# ---------------------------------------------------------------------------
+
+
+async def test_remember_approval_conversation_creates_conversation_rule() -> None:
+    adapter, *_, rule_service = _make_adapter(decision=GateDecision.allow())
+
+    await adapter.remember_approval(
+        _call(name="fs_write_file"), conversation_id="conv-9",
+        scope=ports.RememberScope.CONVERSATION,
+    )
+
+    rule_service.add_rule.assert_awaited_once_with(
+        tool_name="fs_write_file", effect=RuleEffect.ALLOW, conversation_id="conv-9",
+    )
+
+
+async def test_remember_approval_persistent_creates_global_rule() -> None:
+    adapter, *_, rule_service = _make_adapter(decision=GateDecision.allow())
+
+    await adapter.remember_approval(
+        _call(name="fs_write_file"), conversation_id="conv-9",
+        scope=ports.RememberScope.PERSISTENT,
+    )
+
+    rule_service.add_rule.assert_awaited_once_with(
+        tool_name="fs_write_file", effect=RuleEffect.ALLOW, conversation_id=None,
+    )
+
+
+async def test_remember_approval_none_is_noop() -> None:
+    adapter, *_, rule_service = _make_adapter(decision=GateDecision.allow())
+
+    await adapter.remember_approval(
+        _call(), conversation_id="conv-9", scope=ports.RememberScope.NONE,
+    )
+
+    rule_service.add_rule.assert_not_awaited()
+
+
+async def test_remember_approval_uses_resolved_namespaced_name() -> None:
+    """La regola è keyed sul nome NAMESPACED risolto (stessa regola del fix M1
+    su ``decide``): una regola su ``remember`` nudo non farebbe mai match."""
+    tool_def = MagicMock(risk_level="safe", description="ricorda un fatto")
+    permission_service = MagicMock()
+    mode_service = MagicMock()
+    tool_registry = MagicMock()
+    tool_registry.get_tool_definition.side_effect = (
+        lambda name: tool_def if name == "memory_remember" else None
+    )
+    tool_registry.get_all_tools.return_value = [
+        {"function": {"name": "memory_remember"}},
+        {"function": {"name": "other_tool"}},
+    ]
+    rule_service = _rule_service()
+    adapter = PermissionServiceAdapter(
+        permission_service=permission_service,
+        mode_service=mode_service,
+        tool_registry=tool_registry,
+        rule_service=rule_service,
+        conversation_id="conv-1",
+    )
+
+    await adapter.remember_approval(
+        _call(name="remember", args={"fact": "x"}), conversation_id="conv-1",
+        scope=ports.RememberScope.CONVERSATION,
+    )
+
+    rule_service.add_rule.assert_awaited_once_with(
+        tool_name="memory_remember", effect=RuleEffect.ALLOW, conversation_id="conv-1",
+    )
+
+
+async def test_remember_approval_failure_is_swallowed() -> None:
+    """Best-effort: un errore di persistenza della regola NON deve mai far
+    fallire la call appena approvata dall'utente (contratto della porta)."""
+    adapter, *_, rule_service = _make_adapter(decision=GateDecision.allow())
+    rule_service.add_rule = AsyncMock(side_effect=RuntimeError("db boom"))
+
+    await adapter.remember_approval(
+        _call(), conversation_id="conv-9", scope=ports.RememberScope.PERSISTENT,
+    )  # non solleva

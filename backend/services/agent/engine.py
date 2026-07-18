@@ -55,6 +55,7 @@ from backend.services.agent.ports import (
     LLMUsage,
     PermissionPort,
     PersistencePort,
+    RememberScope,
     ToolExecutionOutput,
 )
 from backend.services.agent.retry import RetryPolicy
@@ -576,7 +577,10 @@ class AgentEngine:
                 content=f"Chiamata negata: {reason}.", status=_STATUS_DENIED,
             )
         if verdict.action == GateAction.CONFIRM:
-            confirm_res = await self._confirm_call(turn_id, call, verdict, cancel)
+            confirm_res = await self._confirm_call(
+                turn_id, call, verdict, cancel,
+                conversation_id=state.request.conversation_id,
+            )
             if confirm_res is not None:
                 return confirm_res
             # APPROVED → prosegue al routing.
@@ -601,12 +605,19 @@ class AgentEngine:
         call: ToolInvocation,
         verdict: GateVerdict,
         cancel: asyncio.Event,
+        *,
+        conversation_id: str,
     ) -> _CallResolution | None:
         """Flusso di conferma: eventi requested/resolved, audit, mappatura esito.
 
         Ritorna ``None`` se APPROVED (la call prosegue al routing); altrimenti
         la resolution sintetica. DISCONNECTED è un DATO: result sintetico +
         flag disconnect (lo stop scatta DOPO la persistenza, §6.5).
+
+        Su APPROVED con scelta ``remember`` la persistenza della regola passa
+        dalla ``PermissionPort`` (``remember_approval``, best-effort) — è
+        l'unico ramo che la consuma: una call non approvata non viene mai
+        ricordata.
 
         INVARIANTE: nessun ``await`` tra il ritorno di
         ``emit(InteractionRequestedEvent)`` e la chiamata alla porta
@@ -626,10 +637,11 @@ class AgentEngine:
                 "allow_remember": True,
             },
         ))
-        outcome = await self._interaction.confirm_tool(
+        result = await self._interaction.confirm_tool(
             call, interaction_id=interaction_id, verdict=verdict,
             timeout_s=self._confirmation_timeout_s, cancel=cancel,
         )
+        outcome = result.outcome
         await self._events.emit(ev.InteractionResolvedEvent(
             turn_id=turn_id, interaction_id=interaction_id, kind="confirm",
             call_id=call.call_id, outcome=outcome.value,
@@ -638,6 +650,10 @@ class AgentEngine:
             call=call, verdict=verdict, interaction=outcome,
         )
         if outcome == InteractionOutcome.APPROVED:
+            if result.remember is not RememberScope.NONE:
+                await self._permissions.remember_approval(
+                    call, conversation_id=conversation_id, scope=result.remember,
+                )
             return None
         if outcome == InteractionOutcome.REJECTED:
             return _CallResolution(

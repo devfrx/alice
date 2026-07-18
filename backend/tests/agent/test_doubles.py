@@ -49,4 +49,4 @@ async def test_scripted_interaction_confirm_returns_disconnected_as_data() -> No
     out = await port.confirm_tool(
         call, interaction_id="ix", verdict=verdict, timeout_s=1.0, cancel=asyncio.Event()
     )
-    assert out is ports.InteractionOutcome.DISCONNECTED
+    assert out.outcome is ports.InteractionOutcome.DISCONNECTED

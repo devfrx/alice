@@ -11,6 +11,16 @@ from backend.tests.agent._engine_helpers import (
     _run_with_port,
     _tool_step,
 )
+from backend.tests.agent.doubles import StaticPermissionPort
+
+
+def _confirm_permission_port(tool: str = "write") -> StaticPermissionPort:
+    """PermissionPort che chiede conferma per *tool* e osserva remember_approval."""
+    return StaticPermissionPort(
+        verdicts={tool: ports.GateVerdict(action=ports.GateAction.CONFIRM,
+                                          outcome="needs_confirmation")},
+        default=ports.GateVerdict(action=ports.GateAction.EXECUTE, outcome="allow"),
+    )
 
 
 async def test_every_call_id_gets_a_tool_result_across_branches() -> None:
@@ -196,6 +206,57 @@ async def test_client_tool_failure_emits_failed_outcome() -> None:
     assert len(resolved) == 1 and resolved[0].outcome == "failed"
     saved = [r for r in persistence.tool_results if r["call_id"] == "c1"]
     assert saved and saved[0]["status"] == "error"
+
+
+async def test_approved_confirmation_with_remember_persists_via_permission_port() -> None:
+    """APPROVED + remember ≠ none → il motore chiama ``remember_approval``
+    sulla PermissionPort (fix smoke Fase 1: la scelta 'ricorda' era scartata
+    e nessuna regola veniva mai salvata)."""
+    calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
+    perm = _confirm_permission_port()
+    persistence, _outcome, _rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        permission_port=perm,
+        confirm=ports.InteractionOutcome.APPROVED,
+        confirm_remember=ports.RememberScope.CONVERSATION,
+    )
+    assert perm.remember_calls == [
+        {"name": "write", "conversation_id": "c1",
+         "scope": ports.RememberScope.CONVERSATION},
+    ]
+    # la call approvata è comunque eseguita e persistita normalmente
+    assert any(r["call_id"] == "c1" and r["status"] == "ok"
+               for r in persistence.tool_results)
+
+
+async def test_approved_confirmation_without_remember_persists_no_rule() -> None:
+    calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
+    perm = _confirm_permission_port()
+    _persistence, _outcome, _rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        permission_port=perm,
+        confirm=ports.InteractionOutcome.APPROVED,
+    )
+    assert perm.remember_calls == []
+
+
+async def test_rejected_confirmation_ignores_remember_choice() -> None:
+    """Su rifiuto la scelta remember NON persiste mai una regola (il gate del
+    motore la consuma solo sul ramo APPROVED)."""
+    calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
+    perm = _confirm_permission_port()
+    persistence, _outcome, _rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        permission_port=perm,
+        confirm=ports.InteractionOutcome.REJECTED,
+        confirm_remember=ports.RememberScope.PERSISTENT,
+    )
+    assert perm.remember_calls == []
+    saved = [r for r in persistence.tool_results if r["call_id"] == "c1"]
+    assert saved and saved[0]["status"] == "rejected"
 
 
 async def test_rejection_still_persists_tool_response() -> None:

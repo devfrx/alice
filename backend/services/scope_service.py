@@ -33,6 +33,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 from backend.core.config import WorkspaceScopeConfig
+from backend.core.path_safety import is_relative_to, is_unc_path, safe_resolve
 from backend.db.models import ConversationScope
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None]]
@@ -64,15 +65,6 @@ def _utcnow() -> datetime:
 def _to_uuid(value: uuid.UUID | str) -> uuid.UUID:
     """Coerce *value* to ``uuid.UUID`` (accepts an existing UUID or a str)."""
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
-
-
-def _is_relative_to(target: Path, root: Path) -> bool:
-    """Return ``True`` iff *target* is at or under *root* (never raises)."""
-    try:
-        target.relative_to(root)
-        return True
-    except ValueError:
-        return False
 
 
 class ScopeService:
@@ -328,14 +320,12 @@ class ScopeService:
     def validate_folder(self, folder: str) -> Path:
         """Validate *folder* is a safe, existing directory and resolve it.
 
-        Replicates the minimal filesystem-safety checks used by the
-        ``pc_automation`` and ``file_search`` plugins (rather than importing
-        their internals, which would couple this service to plugin code):
+        Built on the shared primitives in :mod:`backend.core.path_safety`
+        (the single consolidated implementation, Fase 2):
 
         * reject empty / blank input;
-        * reject UNC and device paths — a leading ``\\`` or ``//`` — mirroring
-          :func:`backend.plugins.pc_automation.security.validate_path` and
-          :func:`backend.plugins.file_search.searcher._validate_path`, which
+        * reject UNC and device paths — a leading ``\\`` or ``//`` — the same
+          rejection set used by ``pc_automation`` and ``file_search``, which
           both refuse network/device paths outright;
         * resolve symlinks and ``..`` first so a traversal cannot smuggle a
           path past the forbidden-root check below;
@@ -360,18 +350,17 @@ class ScopeService:
 
         # Reject UNC (``\\server\share``) and device (``\\.\dev``) paths, plus
         # forward-slash UNC (``//server/share``).  A single leading backslash
-        # is also refused (it can degrade into a UNC path on normalisation),
-        # mirroring ``pc_automation.security.validate_path``.
-        if raw.startswith("\\") or raw.startswith("//"):
+        # is also refused (it can degrade into a UNC path on normalisation) —
+        # a stricter caller-side check ``is_unc_path`` deliberately omits.
+        if raw.startswith("\\") or is_unc_path(raw):
             raise ValueError(f"UNC and device paths are not allowed: {folder}")
 
         # Resolve symlinks / ``..`` before the forbidden-root check (a
-        # traversal must not be able to escape it).  ``strict=False`` —
-        # existence is asserted explicitly just below.
-        try:
-            resolved = Path(raw).resolve()
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"Invalid folder path: {exc}") from exc
+        # traversal must not be able to escape it).  ``strict=False``
+        # semantics — existence is asserted explicitly just below.
+        resolved = safe_resolve(raw)
+        if resolved is None:
+            raise ValueError(f"Invalid folder path: {folder}")
 
         if not resolved.exists():
             raise ValueError(f"Folder does not exist: {resolved}")
@@ -381,11 +370,10 @@ class ScopeService:
         # Forbidden / system roots: configured roots first, then the
         # replicated Windows system roots.  Each is resolved best-effort.
         for entry in (*self._config.forbidden_paths, *_SYSTEM_ROOTS):
-            try:
-                forbidden_root = Path(entry).resolve()
-            except (OSError, ValueError):
+            forbidden_root = safe_resolve(entry)
+            if forbidden_root is None:
                 continue
-            if _is_relative_to(resolved, forbidden_root):
+            if is_relative_to(resolved, forbidden_root):
                 raise ValueError(
                     f"Folder '{resolved}' is inside a forbidden/system root: "
                     f"{forbidden_root}"

@@ -111,9 +111,37 @@ dell'addendum M1 è risolta. Gate di chiusura fase (spec §9) tutti verdi al HEA
 5. 2 subagent stallati su pytest in background: recuperati via `SendMessage`; nei dispatch
    va ribadito FOREGROUND-only.
 
-## Prossimo passo del programma
+## Prossima sessione (delega esplicita dell'utente): SESSIONE DI FIX
 
-**Fase 2** del programma Agent v2 (`2026-07-16-agent-v2-program-design.md`) — leggere il
-programma e questo handoff prima di iniziare. Prima del merge di `feat/agent-engine-fase1`:
-smoke manuale su Horizon (censito sopra) e decisione utente merge/PR
-(skill `finishing-a-development-branch`).
+La prossima sessione NON inizia la Fase 2: è dedicata a **fixare quanto l'utente
+richiederà** (probabilmente dopo lo smoke manuale su Horizon e/o dal backlog censito
+sopra). Regole d'ingaggio per quell'agente:
+
+1. **Leggere PRIMA, nell'ordine**: questo handoff INTERO (principi, debito, gotcha),
+   poi la spec di fase (§4 vocabolario, §5 FE) per il contesto del wire, e — solo se il
+   fix tocca il motore — `CLAUDE.md` sezione "Tools & the AgentEngine".
+2. **Aspettare la lista dei fix dall'utente** prima di toccare codice: la delega copre i
+   fix che LUI nominerà, non il backlog in autonomia. Il backlog censito sopra è la mappa
+   per capire al volo di cosa parla, con questa corrispondenza probabile:
+   - "le conferme/i dialoghi non funzionano" → round-trip `interaction.requested/response`
+     (T8/T11), FE `useChat.ts` + `agentRun`.
+   - "la context bar è sbagliata" → frame `context.*` + gate `lastStreamedConversationId`.
+   - "bolla vuota / messaggio doppio" → `finalizeStream` con `message_id=""` (censito).
+   - "i test skippati" → risanamento infra WS/REST (debito #1, il più oneroso).
+3. **Metodo**: per fix piccoli e puntuali l'agente può lavorare inline con
+   systematic-debugging + TDD (rosso prima); per fix strutturali (es. debito #1) torna il
+   metodo subagent-driven con review. OGNI fix: gate mirati verdi + ruff 0 prima del commit.
+4. **Principi NON negoziabili invariati**: pilastro (niente scorciatoie/debiti non
+   censiti), contratti (ogni tocco al wire = ws_schema → frozen test → gen-contracts →
+   FE ChatHandlerMap; MAI tipi TS a mano), eval a pagamento SOLO con OK esplicito
+   dell'utente (la baseline di fase è già committata: serve un re-run solo se un fix
+   tocca il comportamento agentico).
+5. **Gotcha macchina**: sezione sopra, tutti ancora validi. In più: il ledger
+   `.superpowers/sdd/progress.md` è LOCALE (gitignored) — contiene la cronaca completa
+   task-per-task delle due Mosse; consultarlo per il "perché" di ogni scelta.
+
+## Dopo i fix
+
+Smoke manuale su Horizon (se non già fatto dall'utente), poi decisione utente merge/PR di
+`feat/agent-engine-fase1` (skill `finishing-a-development-branch`). Solo DOPO il merge:
+**Fase 2** del programma (`2026-07-16-agent-v2-program-design.md`).

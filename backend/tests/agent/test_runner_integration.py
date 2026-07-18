@@ -1,9 +1,9 @@
 """Test d'integrazione del composition root (``services/agent/runner.py``).
 
-Un turno headless COMPLETO sull'app di test con ``ALICE_AGENT__ENGINE=v2``
-(pattern env-before-boot dell'eval runner, ``tests/evals/test_runner_mock.py``):
-il ramo v2 di ``run_headless_turn`` costruisce un ``TurnRequest``, monta le
-porte via ``run_agent_turn`` e guida il turno attraverso ``AgentEngine``.
+Un turno headless COMPLETO sull'app di test: ``run_headless_turn`` costruisce
+un ``TurnRequest``, monta le porte via ``run_agent_turn`` e guida il turno
+attraverso ``AgentEngine`` (l'unico motore dopo la rimozione del flag inerte
+``agent.engine`` a fine Fase 1 Mossa 2).
 
 PILASTRO (engine tests own their doubles): lo shim LLM (``ScriptedLLMShim``,
 importato da ``_llm_shim.py``) è LOCALE alla suite ``tests/agent/``, NON
@@ -18,30 +18,17 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import pytest
-
-from backend.core.app import create_app
 from backend.services.agent.models import ToolInvocation
 from backend.services.agent.ports import GateAction, GateVerdict, InteractionOutcome
 from backend.services.agent.runner import AutoDeclineInteractionPort, SinkEventPort
 from backend.tests.agent._llm_shim import ScriptedLLMShim
 
 
-@pytest.fixture
-async def v2_app(monkeypatch: pytest.MonkeyPatch):
-    """App di test bootata con ``agent.engine=v2`` (env-before-boot)."""
-    monkeypatch.setenv("ALICE_AGENT__ENGINE", "v2")
-    application = create_app(testing=True)
-    async with application.router.lifespan_context(application):
-        yield application
-
-
-async def test_headless_turn_runs_on_v2_engine(v2_app: Any) -> None:
+async def test_headless_turn_runs_on_v2_engine(app: Any) -> None:
     from backend.api.routes.chat.headless import run_headless_turn
     from backend.evals.sink import RecordingSink
 
-    ctx = v2_app.state.context
-    assert ctx.config.agent.engine == "v2"
+    ctx = app.state.context
 
     ctx.llm_service = ScriptedLLMShim([
         {"type": "token", "content": "Ciao! Come posso aiutarti?"},

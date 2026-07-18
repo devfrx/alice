@@ -1204,13 +1204,6 @@ class AgentConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__")
 
-    engine: Literal["v2"] = "v2"
-    """Turn engine selector (TEMPORANEO Fase 1). ``v2`` = greenfield
-    ``AgentEngine`` (``services/agent``) è l'UNICO path: il legacy
-    ``DirectTurnExecutor`` (v1) e il suo ramo sono stati rimossi in Task 19.
-    Il campo resta come config inerte (nessun branch lo legge più) e viene
-    rimosso a fine Mossa 2 (spec §2)."""
-
     planning: bool = True
     """Expose the ``update_tasks`` todo-list tool in the model-driven loop."""
 
@@ -1293,6 +1286,12 @@ _REMOVED_LEGACY_KEYS: tuple[tuple[str, str], ...] = (
     ("pc_automation", "enabled"),
     ("notifications", "sound_enabled"),
     ("email", "use_keyring"),
+    # Inert turn-engine selector removed at the end of Fase 1 Mossa 2: v2 was
+    # the only engine since Task 19 (v1 branch gone). A persisted user/system
+    # layer written by an older build can still carry ``agent.engine``; because
+    # every config model forbids unknown fields, it must be dropped rather than
+    # rejected so old installs keep loading.
+    ("agent", "engine"),
 )
 
 # Dotted-path view of _REMOVED_LEGACY_KEYS above. A removed-legacy key is a

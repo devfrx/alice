@@ -36,7 +36,7 @@ feature servono ENTRAMBI.
 | `trellis.enabled` | true | bootstrap (`stage_senses`), route services | microservizio 3D |
 | `trellis2.enabled` | true | bootstrap (`stage_senses`), plugin `cad_generator` | |
 | `trellis2multiview.enabled` | true | bootstrap (`stage_senses`), plugin `cad_generator` | |
-| `agent.engine` | v2 | (nessun branch: config inerte) | **TEMPORANEO Fase 1**: solo v2=`AgentEngine` greenfield (`services/agent/runner.py`); il legacy v1 e il suo ramo sono stati rimossi in Task 19. Il campo resta inerte, rimosso a fine Mossa 2 |
+| `agent.engine` | ~~v2~~ RIMOSSO | — | **RIMOSSO** a fine Fase 1 Mossa 2 (campo tolto da `AgentConfig` + `config/default.yaml`; chiave aggiunta a `_REMOVED_LEGACY_KEYS` così i layer persistiti da vecchie build vengono strippati). Flag inerte da Task 19 M1, quando v2=`AgentEngine` (`services/agent/runner.py`) è diventato l'unico motore (v1 demolito) |
 | `mcp.servers[].enabled` | true (per server) | plugin `mcp_client`, `chat/_helpers.py`, route mcp | per-server |
 | `attention.enabled` | true | `bootstrap/jarvis.py`, `services/attention_service.py` | spegne OGNI iniziativa dell'agente verso l'utente (decision point unico §8) |
 | `triggers.enabled` | true | `bootstrap/jarvis.py`, `services/trigger_service.py` | spegne i turni autonomi (nessun trigger registrato di default) |

@@ -155,7 +155,6 @@ agent:
   # update_plan / spawn_subagent meta-tools for structure. There is no
   # enable switch and no legacy structured pipeline — the turn runs on the
   # greenfield AgentEngine (services/agent).
-  engine: "v2"                    # TEMPORANEO Fase 1: solo v2=AgentEngine greenfield (v1 rimosso in Task 19); flag inerte, rimosso a fine Mossa 2
   planning: true                  # expose update_plan (visible mutable todo-list)
   delegation: true                # expose spawn_subagent (isolated-context delegation)
   clarification: true             # expose ask_user (clarifying question, client-answered)

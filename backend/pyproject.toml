@@ -263,11 +263,3 @@ ignore_imports = [
     "backend.core.context -> backend.services.rag_readiness",
     "backend.core.service_groups -> backend.services.rag_readiness",
 ]
-
-# §Fase 1 — AgentEngine (greenfield, Agent v2) is independent of the legacy
-# turn execution path.
-[[tool.importlinter.contracts]]
-name = "agent engine independent from legacy turn path"
-type = "forbidden"
-source_modules = ["backend.services.agent"]
-forbidden_modules = ["backend.services.turn"]

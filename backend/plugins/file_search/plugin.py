@@ -191,7 +191,12 @@ class FileSearchPlugin(BasePlugin):
                 description=(
                     "Read the text content of a file. Supports plain text "
                     "formats (.txt, .md, .py, .json, etc.), PDF and DOCX. "
-                    "Content may be truncated for large files."
+                    "Text files are returned with cat -n style line numbers; "
+                    "use 'offset' and 'limit' to read a window of lines and, "
+                    "when the result is truncated, continue from the returned "
+                    "'next_offset'. Line numbering and offset/limit apply to "
+                    "text files only — PDF and DOCX return plain extracted "
+                    "text. Content may be truncated for large files."
                 ),
                 parameters={
                     "type": "object",
@@ -199,6 +204,24 @@ class FileSearchPlugin(BasePlugin):
                         "path": {
                             "type": "string",
                             "description": "Absolute path to the file.",
+                        },
+                        "offset": {
+                            "type": "integer",
+                            "description": (
+                                "1-based line number to start reading "
+                                "from (text files only). Defaults to 1."
+                            ),
+                            "minimum": 1,
+                            "default": 1,
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": (
+                                "Maximum number of lines to read (text "
+                                "files only). Defaults to configured "
+                                "max_read_lines."
+                            ),
+                            "minimum": 1,
                         },
                         "max_chars": {
                             "type": "integer",
@@ -416,7 +439,7 @@ class FileSearchPlugin(BasePlugin):
             cfg.follow_symlinks,
         )
 
-        def _gather_metadata() -> dict:
+        def _gather_metadata() -> dict[str, Any]:
             if not resolved.exists():
                 raise ValueError(f"File not found: {resolved}")
 
@@ -447,7 +470,8 @@ class FileSearchPlugin(BasePlugin):
         """Execute the read_text_file tool.
 
         Args:
-            args: Must contain "path"; optionally "max_chars".
+            args: Must contain "path"; optionally "offset", "limit"
+                and "max_chars".
 
         Returns:
             A dict with file content or a ToolResult error.
@@ -480,11 +504,19 @@ class FileSearchPlugin(BasePlugin):
             int(args.get("max_chars", cfg.max_content_chars)),
             cfg.max_content_chars,
         )
+        offset: int = max(int(args.get("offset", 1)), 1)
+        limit: int = max(
+            min(int(args.get("limit", cfg.max_read_lines)), cfg.max_read_lines),
+            1,
+        )
 
         return await read_text_file(
             path=resolved,
             max_bytes=cfg.max_file_size_read_bytes,
             max_chars=max_chars,
+            offset=offset,
+            limit=limit,
+            max_line_chars=cfg.max_line_chars,
         )
 
     async def _exec_open_file(self, args: dict[str, Any]) -> str:

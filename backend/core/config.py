@@ -660,6 +660,8 @@ class FileSearchConfig(BaseSettings):
     max_results: int = 50
     max_file_size_read_bytes: int = 1_048_576
     max_content_chars: int = 8000
+    max_read_lines: int = 2000
+    max_line_chars: int = 2000
     follow_symlinks: bool = False
 
 

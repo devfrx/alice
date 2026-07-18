@@ -434,10 +434,12 @@ class TestReadTextFileTool:
         plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
         target = Path("/tmp/allowed/readme.txt").resolve()
         content_data = {
-            "content": "Hello world",
-            "truncated": False,
-            "chars_read": 11,
+            "content": "     1\tHello world",
             "path": str(target),
+            "total_lines": 1,
+            "lines_read": 1,
+            "truncated": False,
+            "next_offset": 0,
         }
 
         with (
@@ -457,7 +459,7 @@ class TestReadTextFileTool:
             )
 
         assert result.success is True
-        assert result.content["content"] == "Hello world"
+        assert result.content["content"] == "     1\tHello world"
         assert result.content["truncated"] is False
 
     @pytest.mark.asyncio
@@ -465,10 +467,12 @@ class TestReadTextFileTool:
         plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
         target = Path("/tmp/allowed/notes.md").resolve()
         content_data = {
-            "content": "# Title\nSome markdown",
-            "truncated": False,
-            "chars_read": 21,
+            "content": "     1\t# Title\n     2\tSome markdown",
             "path": str(target),
+            "total_lines": 2,
+            "lines_read": 2,
+            "truncated": False,
+            "next_offset": 0,
         }
 
         with (
@@ -519,35 +523,84 @@ class TestReadTextFileTool:
         assert "pdfplumber" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_content_truncation(self):
-        plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
-        target = Path("/tmp/allowed/big.txt").resolve()
-        content_data = {
-            "content": "A" * 8000,
-            "truncated": True,
-            "chars_read": 8000,
-            "path": str(target),
-        }
+    async def test_content_truncation(self, tmp_path):
+        """The downstream max_chars cap fires on the numbered output."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "big.txt"
+        target.write_text(
+            "\n".join("A" * 40 for _ in range(200)), encoding="utf-8",
+        )
 
-        with (
-            patch.object(Path, "resolve", return_value=target),
-            patch.object(Path, "is_file", return_value=True),
-            patch.object(Path, "stat", return_value=_fake_stat(size=500_000)),
-            patch(
-                "backend.plugins.file_search.plugin.read_text_file",
-                new_callable=AsyncMock,
-                return_value=content_data,
-            ),
-        ):
-            result = await plugin.execute_tool(
-                "read_text_file",
-                {"path": str(target), "max_chars": 8000},
-                _make_exec_ctx(),
-            )
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target), "max_chars": 500},
+            _make_exec_ctx(),
+        )
 
         assert result.success is True
         assert result.content["truncated"] is True
-        assert len(result.content["content"]) == 8000
+        assert "output troncato a max_chars" in result.content["content"]
+        # 500 chars of numbered output + the truncation note
+        assert len(result.content["content"]) < 600
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_numbers_lines(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "notes.txt"
+        target.write_text("alpha\nbeta\ngamma\n", encoding="utf-8")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        content = result.content["content"]
+        assert "     1\talpha" in content
+        assert "     3\tgamma" in content
+        assert result.content["total_lines"] == 3
+        assert result.content["truncated"] is False
+        assert result.content["next_offset"] == 0
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_offset_and_limit(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "big.txt"
+        target.write_text(
+            "\n".join(f"line{i}" for i in range(1, 101)), encoding="utf-8",
+        )
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target), "offset": 50, "limit": 2},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        content = result.content["content"]
+        assert "    50\tline50" in content
+        assert "    51\tline51" in content
+        assert "line52" not in content
+        assert result.content["next_offset"] == 52
+        assert result.content["truncated"] is True
+
+    @pytest.mark.asyncio
+    async def test_read_text_file_long_line_capped(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        target = tmp_path / "long.txt"
+        target.write_text("x" * 5000 + "\nshort\n", encoding="utf-8")
+
+        result = await plugin.execute_tool(
+            "read_text_file",
+            {"path": str(target)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        content = result.content["content"]
+        assert "[riga troncata]" in content
+        assert "     2\tshort" in content
 
     @pytest.mark.asyncio
     async def test_file_too_large_returns_error(self):
@@ -1056,8 +1109,10 @@ class TestReaders:
             )
 
         assert isinstance(result, dict)
-        assert result["content"] == fake_content.decode("utf-8")
+        assert result["content"] == "     1\tLine 1\n     2\tLine 2"
+        assert result["total_lines"] == 2
         assert result["truncated"] is False
+        assert result["next_offset"] == 0
 
     @pytest.mark.asyncio
     async def test_read_unsupported_extension(self):

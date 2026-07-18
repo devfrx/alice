@@ -224,6 +224,8 @@ file_search:
   max_results: 50
   max_file_size_read_bytes: 1048576
   max_content_chars: 8000
+  max_read_lines: 2000
+  max_line_chars: 2000
   follow_symlinks: false
 
 news:

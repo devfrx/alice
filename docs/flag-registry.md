@@ -45,6 +45,13 @@ feature servono ENTRAMBI.
 Affini fuori convenzione: `agent.planning` / `agent.delegation` /
 `agent.clarification` (gate dei meta-tool; rinominati dai legacy `*_enabled`).
 
+## MCP — config per-server (Fase 2 Agent v2, Blocco A)
+
+| Flag | Default runtime | Letto da | Note |
+|---|---|---|---|
+| `mcp.servers[].trust_annotations` | true (per server) | `services/mcp_tool_mapping.py` | onora le MCP tool annotations (`readOnlyHint`/`destructiveHint`) per il mapping sul gate dei permessi; `false` degrada OGNI tool del server al fallback conservativo (`mcp_write`, `dangerous`, sempre confermato) |
+| `mcp.servers[].path_args` | `{}` (per server) | `services/mcp_tool_mapping.py` | mappa `tool → [nomi arg che portano un path]`; i tool dichiarati (con arg presenti in `inputSchema.properties`) vengono promossi a capability fs (`fs_read`/`fs_write`) con confinement per-conversazione sul gate; arg dichiarato ma assente dallo schema ⇒ fail-closed, fallback conservativo con warning. Compilata in `config/default.yaml` per il server `filesystem` builtin (`@modelcontextprotocol/server-filesystem`); `read_multiple_files` è deliberatamente escluso — il suo arg `paths` è una lista e il ramo scope confinement del gate (`services/permission_service.py`, `str(raw)` su `_within_scope`) non gestisce valori lista |
+
 ## Flag rimossi in Fase 5 (morti: mai letti da alcun consumatore)
 
 | Flag | Perché era morto |

@@ -355,6 +355,25 @@ mcp:
       transport: stdio
       command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "~"]
       enabled: true
+      # trust_annotations: true (default) — annotations onorate.
+      # path_args compilata per @modelcontextprotocol/server-filesystem v2026.7.10.
+      # read_multiple_files: paths è una lista — non supportato dal gate (il ramo
+      # scope confinement fa str(raw) sull'arg, che su una lista produce una
+      # stringa "['a', 'b']" non risolvibile a un path reale: ogni chiamata
+      # verrebbe negata, non semplicemente non controllata) — resta al fallback
+      # conservativo finché il gate non gestisce gli arg-lista.
+      path_args:
+        read_file: [path]
+        read_text_file: [path]
+        read_media_file: [path]
+        write_file: [path]
+        edit_file: [path]
+        create_directory: [path]
+        list_directory: [path]
+        directory_tree: [path]
+        move_file: [source, destination]
+        search_files: [path]
+        get_file_info: [path]
   # ── Plug & Play (zero config, solo Node.js/Python richiesto) ─────────────────
   #about:blank#blocked
   # PRIMP FETCH — fetch con TLS fingerprint Chrome reale (primp). Bypassa Cloudflare,

@@ -1,8 +1,27 @@
 """Loop multi-step: budget step, disconnect via porte, voice trim, costo."""
 
+import asyncio
+from collections.abc import AsyncIterator
+from typing import Any
+
 from backend.services.agent import ports
+from backend.services.agent.engine import AgentEngine
 from backend.services.agent.models import StopReason, ToolInvocation
-from backend.tests.agent._engine_helpers import _final_step, _run_with, _tool_step
+from backend.services.agent.retry import RetryPolicy
+from backend.tests.agent._engine_helpers import (
+    _final_step,
+    _request,
+    _run_with,
+    _tool_step,
+)
+from backend.tests.agent.doubles import (
+    InMemoryPersistence,
+    MapExecutionPort,
+    NoopContextPort,
+    RecordingEventPort,
+    ScriptedInteractionPort,
+    StaticPermissionPort,
+)
 
 
 async def test_max_steps_stops_loop_with_warning() -> None:
@@ -42,6 +61,68 @@ async def test_disconnect_from_interaction_port_stops_after_persist() -> None:
     assert outcome.finish_reason == "disconnected"
     # la tool response del call annullato esiste comunque (§6.1.1)
     assert any(r["call_id"] == "c1" for r in persistence.tool_results)
+    assert rec.events[-1].type == "turn.finished"
+
+
+async def test_llm_failure_retry_emits_turn_warning() -> None:
+    """Ogni retry su fallimento LLM emette ``turn.warning(llm_retry)``: i
+    tentativi non devono essere invisibili alla UI (smoke fase 1: turno
+    percepito come appeso durante i retry silenziosi)."""
+    persistence, outcome, rec = await _run_with(
+        llm_steps=[
+            [ports.LLMFailure(message="upstream saturo", status_code=None,
+                              retryable=True)],
+            _final_step(),
+        ],
+        exec_tools={},
+    )
+    warnings = [e for e in rec.events if e.type == "turn.warning"]
+    assert len(warnings) == 1
+    assert warnings[0].code == "llm_retry"
+    assert "upstream saturo" in warnings[0].message
+    assert outcome.finish_reason == "stop"
+
+
+async def test_cancel_interrupts_silent_llm_stream() -> None:
+    """Stop deve funzionare anche con lo stream LLM MUTO (provider saturo che
+    accetta la connessione e non manda nulla): il motore mette lo stream in
+    gara col cancel invece di bloccarsi sulla read fino al timeout di rete
+    (600s — smoke fase 1: turno inarrestabile)."""
+
+    class _SilentLLMPort:
+        def stream_step(
+            self, *, system_prompt: str, messages: list[dict[str, Any]],
+            tools: list[dict[str, Any]], max_tokens: int | None,
+            cancel: asyncio.Event,
+        ) -> AsyncIterator[ports.LLMEvent]:
+            return self._stream()
+
+        async def _stream(self) -> AsyncIterator[ports.LLMEvent]:
+            await asyncio.Event().wait()  # stream muto: nessun chunk, mai
+            yield ports.LLMTextDelta(text="irraggiungibile")  # pragma: no cover
+
+    persistence = InMemoryPersistence()
+    rec = RecordingEventPort()
+    engine = AgentEngine(
+        llm=_SilentLLMPort(),
+        permissions=StaticPermissionPort(
+            verdicts={},
+            default=ports.GateVerdict(action=ports.GateAction.EXECUTE, outcome="allow"),
+        ),
+        interaction=ScriptedInteractionPort(),
+        events=rec,
+        persistence=persistence,
+        context=NoopContextPort(),
+        execution=MapExecutionPort(tools={}),
+        retry=RetryPolicy(),
+    )
+    cancel = asyncio.Event()
+    task = asyncio.create_task(engine.run(_request(), cancel=cancel))
+    await asyncio.sleep(0.05)
+    cancel.set()
+    outcome = await asyncio.wait_for(task, timeout=2)
+    assert outcome.stop_reason is StopReason.CANCELLED
+    assert outcome.finish_reason == "cancelled"
     assert rec.events[-1].type == "turn.finished"
 
 

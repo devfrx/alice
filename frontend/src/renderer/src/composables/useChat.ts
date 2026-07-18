@@ -27,6 +27,7 @@ import { wsManager } from '../services/ws'
 import { useAgentRunStore } from '../stores/agentRun'
 import { useChatStore } from '../stores/chat'
 import { useSettingsStore } from '../stores/settings'
+import { useToast } from './useToast'
 import type {
   AskUserAnswer,
   FileAttachment,
@@ -90,6 +91,7 @@ export function useChat(): UseChatReturn {
   const store = useChatStore()
   const settingsStore = useSettingsStore()
   const agentRunStore = useAgentRunStore()
+  const toast = useToast()
 
   const isConnected = ref(false)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
@@ -218,8 +220,28 @@ export function useChat(): UseChatReturn {
 
     'turn.usage': (msg) => agentRunStore.applyTurnUsage(msg),
 
-    'turn.warning': (msg) => console.warn('[useChat] Turn warning:', msg.code, msg.message),
-    'turn.error': (msg) => console.error('[useChat] Turn error:', msg.code, msg.message),
+    'turn.warning': (msg) => {
+      console.warn('[useChat] Turn warning:', msg.code, msg.message)
+      // I retry LLM non devono essere invisibili (fix smoke fase 1): senza
+      // questo la UI resta muta per l'intera finestra dei tentativi.
+      if (msg.code === 'llm_retry') {
+        toast.warning('Errore dal modello — nuovo tentativo in corso…')
+      }
+    },
+
+    'turn.error': (msg) => {
+      console.error('[useChat] Turn error:', msg.code, msg.message)
+      agentRunStore.applyTurnError()
+      toast.error(`Errore del turno: ${msg.message}`)
+      if (!msg.turn_id) {
+        // Errore PRE-turno (validazione assembly/route): nessun
+        // turn.started/turn.finished seguirà — senza recovery locale il
+        // composer resterebbe bloccato e il rail su "avvio…" per sempre.
+        // Per gli errori del MOTORE (turn_id presente) la chiusura resta a
+        // turn.finished: niente teardown doppio qui.
+        store.cancelStream()
+      }
+    },
 
     'turn.finished': (msg) => {
       agentRunStore.applyTurnFinished(msg)

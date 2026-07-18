@@ -23,7 +23,9 @@ implementazioni concrete di piattaforma (quelle vivono negli adapter,
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -47,6 +49,7 @@ from backend.services.agent.ports import (
     GateVerdict,
     InteractionOutcome,
     InteractionPort,
+    LLMEvent,
     LLMFailure,
     LLMPort,
     LLMStepDone,
@@ -238,6 +241,13 @@ class AgentEngine:
                 state.content = step_result.step_content
                 if step_result.step_content:
                     state.last_step_content = step_result.step_content
+                if (cancel.is_set() and step_result.failure is None
+                        and step_result.finish_reason is None):
+                    # Stream abortito dalla gara col cancel (stream muto,
+                    # nessun ``done``): niente _after_step (nudge/retry) —
+                    # il turno chiude CANCELLED col parziale accumulato.
+                    stop = StopReason.CANCELLED
+                    break
                 stop = await self._after_step(
                     turn_id, step, step_result, state, budget, cancel,
                 )
@@ -279,7 +289,12 @@ class AgentEngine:
             max_tokens=state.request.resolved_max_tokens,
             cancel=cancel,
         )
-        async for event in stream:
+        # Lo stream è messo in GARA col cancel: il client controlla il cancel
+        # solo tra un chunk e l'altro, quindi con uno stream MUTO (provider
+        # saturo che accetta la connessione e non risponde) un `async for`
+        # nudo resterebbe bloccato sulla read fino al timeout di rete (600s)
+        # e Stop sarebbe inefficace (smoke fase 1: turno inarrestabile).
+        async for event in self._race_stream(stream, cancel):
             if isinstance(event, LLMTextDelta):
                 state.content += event.text
                 step_content += event.text
@@ -314,6 +329,54 @@ class AgentEngine:
             finish_reason=finish_reason, tool_calls=tool_calls,
             failure=failure, step_content=step_content, step_thinking=step_thinking,
         )
+
+    @staticmethod
+    async def _race_stream(
+        stream: AsyncIterator[LLMEvent], cancel: asyncio.Event,
+    ) -> AsyncIterator[LLMEvent]:
+        """Itera *stream* interrompendosi APPENA ``cancel`` scatta.
+
+        Ogni ``__anext__`` è messo in gara con ``cancel.wait()``: se il
+        cancel vince (stream fermo — es. provider saturo che accetta la
+        connessione e non manda chunk), la richiesta in volo viene abortita
+        (task cancel + ``aclose`` dello stream, che chiude la connessione
+        HTTP sottostante) invece di attendere il read-timeout del client.
+        A stream vivo il costo è un task in più per evento (~µs), dello
+        stesso ordine della costruzione dei frame Pydantic (T7).
+        """
+        iterator = stream.__aiter__()
+        cancel_task: asyncio.Task[bool] | None = None
+        try:
+            while True:
+                next_task: asyncio.Task[LLMEvent] = asyncio.ensure_future(
+                    iterator.__anext__()
+                )
+                if cancel_task is None:
+                    cancel_task = asyncio.ensure_future(cancel.wait())
+                done, _pending = await asyncio.wait(
+                    {next_task, cancel_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if next_task not in done:
+                    # Cancel su stream fermo: abortisce la richiesta in corso.
+                    next_task.cancel()
+                    with contextlib.suppress(BaseException):
+                        await next_task
+                    return
+                try:
+                    event = next_task.result()
+                except StopAsyncIteration:
+                    return
+                yield event
+        finally:
+            if cancel_task is not None:
+                cancel_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await cancel_task
+            aclose = getattr(stream, "aclose", None)
+            if aclose is not None:
+                with contextlib.suppress(Exception):
+                    await aclose()
 
     async def _maybe_compact(self, turn_id: str, step: int, state: _TurnState) -> None:
         """Valuta ed eventualmente esegue la compaction PRIMA di uno step LLM.
@@ -387,6 +450,12 @@ class AgentEngine:
             state.failure_attempts += 1
             decision = self._retry.on_failure(step_result.failure, state.failure_attempts)
             if decision.retry:
+                # Il retry non deve mai essere invisibile (smoke fase 1: la
+                # UI percepiva il turno come appeso durante i tentativi).
+                await self._events.emit(ev.TurnWarningEvent(
+                    turn_id=turn_id, code="llm_retry",
+                    message=step_result.failure.message,
+                ))
                 return None
             state.errored = True
             await self._events.emit(ev.TurnErrorEvent(

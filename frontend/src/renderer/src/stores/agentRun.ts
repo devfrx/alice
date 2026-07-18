@@ -359,6 +359,18 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     pendingTurn.value = true
   }
 
+  /**
+   * `turn.error` → drop the pending sentinel.
+   *
+   * A pre-turn error (assembly/route validation, no `turn_id`) is never
+   * followed by `turn.started`/`turn.finished`: without this the sentinel
+   * would keep the reasoning thread on "avvio…" forever. For engine errors
+   * the sentinel is already cleared and the run closes via `turn.finished`.
+   */
+  function applyTurnError(): void {
+    pendingTurn.value = false
+  }
+
   /** Clear all runs and the current-turn pointer. */
   function reset(): void {
     runs.value = {}
@@ -387,6 +399,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
     applyInteractionResolved,
     applyTurnUsage,
     applyTurnFinished,
+    applyTurnError,
     beginPendingTurn,
     reset
   }

@@ -13,13 +13,17 @@ from loguru import logger
 
 from backend.core.plugin_models import ToolDefinition
 
+# The gate owns the capability vocabulary — single source of truth (no cycle:
+# the gate never imports this mapper).
+from backend.services.permission_service import (
+    MCP_READ_CAPABILITY,
+    MCP_WRITE_CAPABILITY,
+)
+
 if TYPE_CHECKING:
     from mcp.types import Tool
 
     from backend.core.config import McpServerConfig
-
-MCP_READ_CAPABILITY = "mcp_read"
-MCP_WRITE_CAPABILITY = "mcp_write"
 
 
 def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:

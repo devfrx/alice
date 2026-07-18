@@ -53,10 +53,16 @@ CommandCapabilityProvider = Callable[[str], "str | None"]
 #: the injected ``command_capability_provider``.
 UI_COMMAND_CAPABILITY = "ui_command"
 
-#: Capability tag marking an MCP tool that (potentially) mutates state (Fase 2
-#: MCP perimeter). Treated by the plan tier exactly like ``fs_write`` /
-#: ``process_exec``: denied, and withheld from the offered toolset
-#: (``permission_mode_policy``).
+#: Capability tag marking an MCP tool declared read-only by trusted
+#: annotations (Fase 2 del programma Agent v2, perimetro MCP). Reads never
+#: prompt, in any tier.
+MCP_READ_CAPABILITY = "mcp_read"
+
+#: Capability tag marking an MCP tool that (potentially) mutates state
+#: (Fase 2 del programma Agent v2, perimetro MCP). Treated by the plan tier
+#: exactly like ``fs_write`` / ``process_exec``: denied, and withheld from
+#: the offered toolset (``permission_mode_policy``). The gate owns the
+#: capability vocabulary; ``mcp_tool_mapping`` imports these constants.
 MCP_WRITE_CAPABILITY = "mcp_write"
 
 # Capability tags that mark a tool as filesystem-path-confined.
@@ -249,10 +255,10 @@ class PermissionService:
 
         1. forbidden risk → DENY (breaker).
         2. explicit ``deny`` rule → DENY (a user prohibition wins everywhere).
-        2-bis. ``ui_command`` tool without fs/exec capabilities → the §7
-           matrix on the invoked command's manifest tag
-           (:meth:`_decide_ui_command`); a hybrid with fs/exec capabilities
-           falls through to the scope guard below.
+        2-bis. ``ui_command`` tool without fs/exec/MCP-write capabilities →
+           the §7 matrix on the invoked command's manifest tag
+           (:meth:`_decide_ui_command`); a hybrid with fs/exec/MCP-write
+           capabilities falls through to the scope guard / plan block below.
         3. fs tool with no scope set → DENY (scope is the workspace boundary —
            holds even in autopilot).
         4. fs tool whose path is out of scope → DENY (a session grant or an
@@ -302,10 +308,13 @@ class PermissionService:
         # the invoked command's manifest tag, not the tool's own — resolve it
         # per-call and apply the §7 matrix. Grants and allow/ask rules keep
         # their usual precedence; the deny rule above already won. A hybrid
-        # declaring ui_command TOGETHER with fs/exec capabilities does NOT
-        # take this branch: it falls through to scope confinement below, so
-        # the tag can never be used to skip the by-construction fs guard.
-        if UI_COMMAND_CAPABILITY in caps and not (is_fs or is_exec):
+        # declaring ui_command TOGETHER with fs/exec/MCP-write capabilities
+        # does NOT take this branch: it falls through to scope confinement /
+        # the plan block below, so the tag can never be used to skip the
+        # by-construction fs guard nor the read-only stance for MCP writes.
+        if UI_COMMAND_CAPABILITY in caps and not (
+            is_fs or is_exec or MCP_WRITE_CAPABILITY in caps
+        ):
             return self._decide_ui_command(args, mode, granted=granted, rule=rule)
 
         # 3 + 4. filesystem scope confinement (by construction).

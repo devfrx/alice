@@ -166,6 +166,18 @@ def test_promoted_fs_write_in_scope_prompts_in_strict(tmp_path: Path) -> None:
     assert act is GateAction.NEEDS_CONFIRMATION
 
 
+def test_promoted_fs_write_denied_in_plan(tmp_path: Path) -> None:
+    # Promoted MCP write in plan: read-only stance holds even for in-scope paths.
+    svc = _svc(scope=[tmp_path])
+    tool = _mcp_fs_write()
+    d = svc.decide(
+        tool_name=tool.name, args={"path": str(tmp_path / "f.txt")},
+        tool_def=tool, conversation_id=CONV, mode=PermissionMode.PLAN,
+    )
+    assert d.action is GateAction.DENY
+    assert d.outcome is PermissionOutcome.DENY_PLAN_MODE
+
+
 def test_deny_rule_wins_on_mcp_tool_in_every_tier() -> None:
     # 9. an explicit user deny-rule on an mcp_* name beats even autopilot.
     tool = _mcp_write_dangerous("mcp_srv_write")
@@ -177,3 +189,58 @@ def test_deny_rule_wins_on_mcp_tool_in_every_tier() -> None:
     assert d.action is GateAction.DENY
     assert d.outcome is PermissionOutcome.DENY_RULE
     assert d.reason == "user_denied"
+
+
+# ---------------------------------------------------------------------------
+# plan is read-only for real: rules/grants do not reopen writes
+# ---------------------------------------------------------------------------
+
+
+def test_allow_rule_does_not_reopen_mcp_write_in_plan() -> None:
+    # SECURITY PIN: an explicit ALLOW rule must NOT reopen an MCP write in
+    # plan — the plan-block precedes the rule layer in ``decide`` and a
+    # refactor hoisting the rule check would silently break this.
+    tool = _mcp_write_dangerous("mcp_srv_write")
+    svc = _svc(rules={"mcp_srv_write": RuleEffect.ALLOW})
+    d = svc.decide(
+        tool_name=tool.name, args={}, tool_def=tool,
+        conversation_id=CONV, mode=PermissionMode.PLAN,
+    )
+    assert d.action is GateAction.DENY
+    assert d.outcome is PermissionOutcome.DENY_PLAN_MODE
+
+
+def test_allow_rule_does_not_reopen_promoted_fs_write_in_plan(tmp_path: Path) -> None:
+    # SECURITY PIN (fs twin): same property for a path_args-promoted fs_write —
+    # the allow-rule bypasses only the out-of-scope check, never the plan block.
+    svc = _svc(scope=[tmp_path], rules={"write_file": RuleEffect.ALLOW})
+    tool = _mcp_fs_write("write_file")
+    d = svc.decide(
+        tool_name=tool.name, args={"path": str(tmp_path / "f.txt")},
+        tool_def=tool, conversation_id=CONV, mode=PermissionMode.PLAN,
+    )
+    assert d.action is GateAction.DENY
+    assert d.outcome is PermissionOutcome.DENY_PLAN_MODE
+
+
+# ---------------------------------------------------------------------------
+# ui_command/mcp_write hybrid cannot ride the ui_command matrix
+# ---------------------------------------------------------------------------
+
+
+def test_ui_command_mcp_write_hybrid_denied_in_plan() -> None:
+    # A (theoretical) hybrid declaring ui_command TOGETHER with mcp_write must
+    # NOT take the ui_command branch: with a "read"-tagged command the §7
+    # matrix would allow it in plan — the mcp_write capability has to force
+    # the fall-through to the plan block instead.
+    tool = ToolDefinition(
+        name="app_command", description="d",
+        capabilities=("ui_command", "mcp_write"),
+    )
+    svc = PermissionService(command_capability_provider=lambda _name: "read")
+    d = svc.decide(
+        tool_name=tool.name, args={"name": "open_view"}, tool_def=tool,
+        conversation_id=CONV, mode=PermissionMode.PLAN,
+    )
+    assert d.action is GateAction.DENY
+    assert d.outcome is PermissionOutcome.DENY_PLAN_MODE

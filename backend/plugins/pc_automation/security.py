@@ -13,6 +13,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend.core.path_safety import (
+    is_forbidden,
+    is_relative_to,
+    is_unc_path,
+    safe_resolve,
+)
+
 # Re-exported from core (single source of truth, shared process-wide lockout).
 from backend.core.screenshot_lockout import ScreenshotLockout  # noqa: F401
 from backend.plugins.pc_automation.constants import (
@@ -23,8 +30,16 @@ from backend.plugins.pc_automation.constants import (
     FILE_MANAGEMENT_CMDS,
     FORBIDDEN_FLAGS,
     FORBIDDEN_KEY_COMBOS,
-    SYSTEM_DIRS,
+    FORBIDDEN_PATHS,
 )
+
+# Protected system directories, resolved once for containment checks.
+# ``None`` entries (invalid paths) are filtered out per the path_safety
+# fail-closed contract; on Windows ``relative_to`` is case-insensitive, so
+# this matches the former lowercase string-prefix comparison on SYSTEM_DIRS.
+_FORBIDDEN_DIRS: list[Path] = [
+    p for p in (safe_resolve(raw) for raw in FORBIDDEN_PATHS) if p is not None
+]
 
 
 def validate_app_name(app_name: str) -> tuple[bool, str, str | None]:
@@ -205,39 +220,20 @@ def validate_path(path: str) -> tuple[bool, str]:
 
     # Block UNC paths (\\server\share), Win32 device paths (\\.\device),
     # and single-backslash-leading paths (could be UNC degraded by
-    # backslash normalization in exec_command).
-    if path.startswith("\\") or path.startswith("//"):
+    # backslash normalization in exec_command). The single leading ``\``
+    # is a caller-side stricter check that ``is_unc_path`` deliberately
+    # does not cover.
+    if path.startswith("\\") or is_unc_path(path):
         return False, f"UNC and device paths are not allowed: {path}"
 
-    try:
-        resolved = Path(path).resolve()
-    except (OSError, ValueError) as e:
-        return False, f"Invalid path: {e}"
+    resolved = safe_resolve(path)
+    if resolved is None:
+        return False, f"Invalid path: {path}"
 
-    normalized = str(resolved).lower().replace("\\", "/")
-
-    for sys_dir in SYSTEM_DIRS:
-        if normalized == sys_dir or normalized.startswith(sys_dir + "/"):
-            return False, f"Path '{path}' is in a protected system directory"
+    if is_forbidden(resolved, _FORBIDDEN_DIRS):
+        return False, f"Path '{path}' is in a protected system directory"
 
     return True, "Path is valid"
-
-
-def _is_within(candidate: Path, root: Path) -> bool:
-    """Return ``True`` when *candidate* is *root* itself or nested under it.
-
-    Args:
-        candidate: An already-resolved absolute path.
-        root: The resolved workspace root.
-
-    Returns:
-        ``True`` if *candidate* does not escape *root*.
-    """
-    try:
-        candidate.relative_to(root)
-        return True
-    except ValueError:
-        return False
 
 
 def command_paths_within_workspace(
@@ -290,10 +286,9 @@ def command_paths_within_workspace(
         _tokenize_command,
     )
 
-    try:
-        ws_root = Path(workspace_root).resolve()
-    except (OSError, ValueError) as exc:
-        return False, f"Invalid workspace root: {exc}"
+    ws_root = safe_resolve(workspace_root)
+    if ws_root is None:
+        return False, f"Invalid workspace root: {workspace_root}"
 
     tokens = _tokenize_command(_normalize_backslashes(command))
     for token in tokens[1:]:  # skip the command verb (tokens[0])
@@ -303,11 +298,10 @@ def command_paths_within_workspace(
         # A token carrying its own drive/anchor replaces ws_root (so it falls
         # outside and is rejected); a relative ``..`` token climbs above
         # ws_root and is rejected too.
-        try:
-            candidate = (ws_root / token).resolve()
-        except (OSError, ValueError):
+        candidate = safe_resolve(ws_root / token)
+        if candidate is None:
             return False, f"'{token}' is not a valid path inside the workspace"
-        if not _is_within(candidate, ws_root):
+        if not is_relative_to(candidate, ws_root):
             return False, f"'{token}' is outside the workspace"
 
     return True, ""

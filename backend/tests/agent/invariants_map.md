@@ -1,5 +1,9 @@
 # Invariants map — Fase 1 AgentEngine (Task 17)
 
+> NOTA STORICA: documento punto-nel-tempo del Task 19 M1; i riferimenti al
+> flag `agent.engine` e al wire legacy sono superati dalla Mossa 2 (vedi
+> handoff).
+
 Riferimenti: checklist §6 in
 `docs/superpowers/specs/2026-07-17-agent-engine-fase1-design.md`.
 

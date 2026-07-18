@@ -1,4 +1,5 @@
-"""Unit del translator wire DEFINITIVO (``to_v2_frames``, adapter v2).
+"""Unit del translator wire DEFINITIVO (``to_v2_frames``,
+``api/ws_schema/wire.py`` — vive coi contratti perché pinna i frame wire).
 
 Value-pinned su OGNI classe di ``AgentEvent``: si costruisce l'evento con
 valori pinnati e si asserisce il frame risultante CAMPO PER CAMPO (chiavi
@@ -13,10 +14,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from backend.api.ws_schema import validate_chat_server
+from backend.api.ws_schema.wire import normalize_questions, to_v2_frames
 from backend.services.agent import events as ev
-from backend.services.agent.adapters.wire import normalize_questions, to_v2_frames
 from backend.services.agent.models import ToolInvocation
 
 _CALL = ToolInvocation(call_id="c1", name="read", args={"q": "x"}, raw_args='{"q":"x"}')

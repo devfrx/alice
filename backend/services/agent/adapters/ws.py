@@ -13,8 +13,9 @@ Un unico task asyncio (il read-pump) consuma ``receive_json()`` e smista per
   turni in ``ws.py``).
 
 Il frame di RICHIESTA di un'interazione NON nasce qui: è l'evento canonico
-``interaction.requested`` che il motore emette via ``EventPort`` (tradotto da
-``wire.to_v2_frames``) PRIMA di chiamare la porta. Le porte non costruiscono
+``interaction.requested`` che il motore emette via ``EventPort`` (tradotto
+dal translator iniettato, ``to_v2_frames`` di ``api/ws_schema/wire.py``)
+PRIMA di chiamare la porta. Le porte non costruiscono
 alcun frame outbound; il bridge ``correlation_id``/``alt_key`` è morto.
 
 Su ``WebSocketDisconnect``/``RuntimeError`` (socket chiuso) il pump marca il
@@ -32,8 +33,8 @@ anche quando cancel/timeout scattano nello stesso giro di loop.
 Le porte:
 
 * ``WsEventPort`` implementa ``EventPort``: traduce ogni ``AgentEvent`` in
-  zero o più frame wire v2 (il translator è ``wire.to_v2_frames``) e li invia
-  best-effort via ``send_json``.
+  zero o più frame wire v2 (via il translator iniettato dal call site api)
+  e li invia best-effort via ``send_json``.
 * ``WsInteractionPort`` implementa ``InteractionPort`` attendendo la
   ``interaction.response`` correlata per ``interaction_id``. NON emette e NON
   costruisce frame: la richiesta è l'evento del motore (un evento = un fatto
@@ -303,7 +304,8 @@ class WsEventPort:
         Args:
             transport: Il trasporto WS proprietario del socket.
             translator: Mappa un ``AgentEvent`` in zero o più frame wire v2
-                (``wire.to_v2_frames``, l'adapter wire definitivo).
+                (tipicamente ``to_v2_frames`` da ``api/ws_schema/wire.py``,
+                iniettato dal call site api).
         """
         self._transport = transport
         self._translator = translator

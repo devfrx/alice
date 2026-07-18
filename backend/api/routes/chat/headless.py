@@ -24,6 +24,7 @@ from backend.api.routes.chat._assembly import TurnAssembler
 from backend.api.routes.chat._persist import _persist_final_turn
 from backend.api.routes.chat._shared import conversation_active
 from backend.api.routes.chat._sink import NullEventSink, WSEventSink
+from backend.api.ws_schema.wire import to_v2_frames
 from backend.services.agent.models import TurnSource
 from backend.services.agent.runner import run_agent_turn
 
@@ -120,6 +121,7 @@ async def run_headless_turn(
                 request=request,
                 session=session,
                 transport=None,
+                translator=to_v2_frames,
                 sink_fallback=turn_sink,
                 cancel=cancel_event,
             )

@@ -2,7 +2,8 @@
 
 One Pydantic model per frame. The chat channel speaks ONLY the canonical v2
 vocabulary (spec §4): every turn fact is streamed by the AgentEngine through
-its definitive WS translator (``services/agent/adapters/wire.py``, which builds
+its definitive WS translator (``api/ws_schema/wire.py``, injected into the
+composition root by the api call sites, which builds
 each frame through the model below, so a frame that does not validate cannot be
 constructed), and the post-turn persistence path
 (``api/routes/chat/_persist.py`` / ``_assembly.py``) emits the typed
@@ -77,7 +78,7 @@ class WsAskUserAnswer(BaseModel):
     free_text: str | None = None
 
 # ---------------------------------------------------------------------------
-# Canonical v2 turn events (services/agent/adapters/wire.py)
+# Canonical v2 turn events (api/ws_schema/wire.py)
 # ---------------------------------------------------------------------------
 
 

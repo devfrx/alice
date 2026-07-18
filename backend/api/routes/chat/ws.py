@@ -20,6 +20,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 
 from backend.api.ws_schema.guard import chat_frame_validator
+from backend.api.ws_schema.wire import to_v2_frames
 from backend.services.agent.adapters.ws import WsTransport
 from backend.services.agent.models import TurnOutcome
 from backend.services.agent.runner import run_agent_turn
@@ -176,6 +177,7 @@ async def ws_chat(websocket: WebSocket) -> None:
                         request=assembly.request,
                         session=session,
                         transport=transport,
+                        translator=to_v2_frames,
                         cancel=cancel_event,
                     )
 

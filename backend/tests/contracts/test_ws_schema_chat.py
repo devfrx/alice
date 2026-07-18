@@ -1,7 +1,7 @@
 """Contract tests: chat-channel WS frames validate against ws_schema.
 
 Representative frames copied VERBATIM from the emit sites: the v2 AgentEngine's
-WS adapter (``services/agent/adapters/wire.py``, which builds every turn-fact
+WS translator (``api/ws_schema/wire.py``, which builds every turn-fact
 frame through its Pydantic model) and chat ``_persist``/``_assembly`` (typed
 conversation-maintenance frames on the same transport). The chat channel speaks
 ONLY the canonical v2 vocabulary since Mossa 2 Task 10: legacy and diagnostic

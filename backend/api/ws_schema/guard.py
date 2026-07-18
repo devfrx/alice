@@ -11,7 +11,7 @@ chokepoints (``WSConnectionManager`` on the events channel,
 composition root — ``services`` modules must never import this package
 (spec §4).
 
-The AgentEngine's own wire (``services/agent/adapters/wire.py``) is NOT one
+The AgentEngine's own wire (``api/ws_schema/wire.py``) is NOT one
 of those chokepoints: it is not wired to these validators. Its guarantee is
 by-construction instead — every engine frame is built THROUGH its Pydantic
 contract model, so a frame that does not validate cannot be constructed. The

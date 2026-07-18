@@ -1,7 +1,15 @@
 """Translator DEFINITIVO: ``AgentEvent`` → frame wire v2 (spec Fase 1 §4).
 
+Vive nel layer api (``backend/api/ws_schema/wire.py``) accanto ai modelli del
+contratto: È la mappatura del vocabolario wire, quindi appartiene al contratto
+stesso — api può importare services (``services.agent.events``), mai il
+contrario. Il composition root (``services/agent/runner.py``) riceve
+``to_v2_frames`` come ``translator`` iniettato dai call site api
+(``api/routes/chat/ws.py`` / ``headless.py``): il motore resta indipendente
+dal layer api (contratto import-linter "services do not import api").
+
 Ogni frame è costruito ATTRAVERSO il modello Pydantic del contratto
-(``backend/api/ws_schema/chat.py``) e serializzato con
+(``backend/api/ws_schema/chat.py``, modulo fratello) e serializzato con
 ``model_dump(mode="json", exclude_none=True)``: un frame che non valida non
 può essere costruito — la garanzia sul wire è by-construction, non più solo
 a livello di test (chiude il debito M1 "frame del motore non validati a

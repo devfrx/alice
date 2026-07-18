@@ -5,10 +5,16 @@ partire dall'``AppContext`` di piattaforma e da una ``TurnRequest`` già
 assemblata, poi esegue il turno. È l'UNICO punto in cui il motore greenfield
 viene cablato ai servizi reali.
 
+Il translator eventi→frame wire è INIETTATO dal call site api
+(``translator=to_v2_frames``, da ``backend/api/ws_schema/wire.py``): il
+vocabolario wire vive col contratto nel layer api, e questo modulo non
+importa MAI ``backend.api`` (contratto import-linter "services do not
+import api").
+
 Due configurazioni di porte, selezionate dalla presenza di un ``transport``:
 
 * **WebSocket** (``transport`` fornito): eventi via :class:`WsEventPort`
-  (tradotti in frame wire v2 da ``to_v2_frames``), interazioni via
+  (tradotti in frame wire v2 dal ``translator`` iniettato), interazioni via
   :class:`WsInteractionPort` (conferme/ask_user/client tool sul socket).
 * **Headless/eval** (``transport is None``): eventi via
   :class:`SinkEventPort` sopra un ``WSEventSink`` iniettato (tipicamente il
@@ -17,9 +23,10 @@ Due configurazioni di porte, selezionate dalla presenza di un ``transport``:
   UI da servire — la conferma diventa una negazione pulita, i tool
   client/ask_user un ``ToolResult`` d'errore).
 
-PILASTRO: questo modulo NON importa ``backend.services.turn`` (lint enforced).
-Il tipo del sink iniettato è descritto qui da un ``Protocol`` strutturale
-locale (:class:`_EventSink`), non importato dal package legacy.
+PILASTRO: questo modulo NON importa ``backend.api`` (lint enforced,
+contratto "services do not import api"). Il tipo del sink iniettato è
+descritto qui da un ``Protocol`` strutturale locale (:class:`_EventSink`),
+non importato dal modulo api-owned che lo implementa.
 """
 
 from __future__ import annotations
@@ -34,7 +41,6 @@ from backend.services.agent.adapters.db import SqlModelPersistence
 from backend.services.agent.adapters.execution import ToolRegistryAdapter
 from backend.services.agent.adapters.llm import LLMServiceAdapter
 from backend.services.agent.adapters.permission import PermissionServiceAdapter
-from backend.services.agent.adapters.wire import to_v2_frames
 from backend.services.agent.adapters.ws import (
     WsEventPort,
     WsInteractionPort,
@@ -80,8 +86,8 @@ class _EventSink(Protocol):
 class SinkEventPort:
     """``EventPort`` sopra un ``WSEventSink`` iniettato (headless/eval).
 
-    Traduce ogni ``AgentEvent`` in frame wire v2 (``to_v2_frames``) e li
-    consegna via ``sink.send``. Best-effort come da contratto ``EventPort``:
+    Traduce ogni ``AgentEvent`` in frame wire v2 (via il ``translator``
+    iniettato) e li consegna via ``sink.send``. Best-effort come da contratto ``EventPort``:
     non solleva MAI. Rispetta ``sink.is_connected`` (contratto eval §6.14:
     ``RecordingSink`` parte con ``is_connected=True``).
     """
@@ -96,7 +102,8 @@ class SinkEventPort:
         Args:
             sink: Il sink di destinazione (recording/null/…).
             translator: Mappa un ``AgentEvent`` in zero o più frame wire
-                (``to_v2_frames``, l'adapter wire v2 definitivo).
+                (tipicamente ``to_v2_frames`` da ``api/ws_schema/wire.py``,
+                iniettato dal call site api).
         """
         self._sink = sink
         self._translator = translator
@@ -171,6 +178,7 @@ async def run_agent_turn(
     request: TurnRequest,
     session: AsyncSession,
     transport: WsTransport | None,
+    translator: Callable[[AgentEvent], list[dict[str, Any]]],
     sink_fallback: _EventSink | None = None,
     cancel: asyncio.Event,
 ) -> TurnOutcome:
@@ -182,6 +190,10 @@ async def run_agent_turn(
         session: Sessione async SQLModel del turno (unit-of-work del motore).
         transport: Il :class:`WsTransport` proprietario del socket, oppure
             ``None`` per un turno headless (eventi via ``sink_fallback``).
+        translator: Mappa un ``AgentEvent`` in zero o più frame wire.
+            Iniettato dal call site api (``to_v2_frames`` da
+            ``backend/api/ws_schema/wire.py``): il vocabolario wire vive col
+            contratto, il motore non importa il layer api.
         sink_fallback: Sink degli eventi per il path headless/eval
             (``RecordingSink``/``NullEventSink``). Ignorato quando
             ``transport`` è fornito.
@@ -222,11 +234,11 @@ async def run_agent_turn(
     )
 
     if transport is not None:
-        event_port: Any = WsEventPort(transport, to_v2_frames)
+        event_port: Any = WsEventPort(transport, translator)
         interaction_port: Any = WsInteractionPort(transport)
     else:
         sink = sink_fallback if sink_fallback is not None else _DropSink()
-        event_port = SinkEventPort(sink, to_v2_frames)
+        event_port = SinkEventPort(sink, translator)
         interaction_port = AutoDeclineInteractionPort()
 
     engine = AgentEngine(

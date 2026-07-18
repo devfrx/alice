@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from loguru import logger
+
 from backend.core.plugin_models import ToolDefinition
 
 if TYPE_CHECKING:
@@ -33,6 +35,17 @@ def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:
         requires_confirmation / path_args reflect the (trusted) MCP
         annotations, falling back to the conservative destructive-write
         classification when annotations are absent or untrusted.
+
+    Notes:
+        ``path_args`` promotion is validated against the tool's
+        ``inputSchema``: every declared argument must exist in the schema's
+        ``properties``, otherwise the scope check would be vacuous
+        (``args.get(name)`` always ``None``). On mismatch (config typo, or
+        the server renamed the argument) the tool falls back to the
+        conservative classification with empty ``path_args`` — fail-closed.
+        A tool mapped to an explicitly empty list (``path_args: {"tool": []}``)
+        is deliberately treated as NOT path-aware: no fs promotion, the plain
+        annotation-derived classification applies.
     """
     annotations = tool.annotations if server.trust_annotations else None
 
@@ -54,9 +67,27 @@ def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:
 
     declared_paths = tuple(server.path_args.get(tool.name, ()))
     if declared_paths:
-        # Path-aware tool: promote to a real fs capability so the gate's
-        # per-conversation scope confinement applies by construction.
-        capabilities = ("fs_read",) if capabilities == (MCP_READ_CAPABILITY,) else ("fs_write",)
+        schema_properties = (tool.inputSchema or {}).get("properties", {})
+        missing = [arg for arg in declared_paths if arg not in schema_properties]
+        if missing:
+            # Fail-closed: promoting anyway would give the gate a vacuous
+            # scope check (the declared arg never appears in the call args,
+            # so ``args.get(name)`` is always ``None`` and every call passes).
+            logger.warning(
+                "MCP server '{}' tool '{}': declared path_args {} not found "
+                "in the tool's inputSchema properties — ignoring path_args "
+                "and applying the conservative classification",
+                server.name,
+                tool.name,
+                missing,
+            )
+            capabilities = (MCP_WRITE_CAPABILITY,)
+            risk_level, requires_confirmation = "dangerous", True
+            declared_paths = ()
+        else:
+            # Path-aware tool: promote to a real fs capability so the gate's
+            # per-conversation scope confinement applies by construction.
+            capabilities = ("fs_read",) if capabilities == (MCP_READ_CAPABILITY,) else ("fs_write",)
 
     return ToolDefinition(
         name=tool.name,

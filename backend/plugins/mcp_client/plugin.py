@@ -225,7 +225,13 @@ class McpClientPlugin(BasePlugin):
                 except (TypeError, ValueError) as exc:
                     # ValueError: __post_init__ re-validation of the renamed
                     # tool failed.  TypeError: the session handed us something
-                    # that is not a ToolDefinition dataclass at all.
+                    # that is not a ToolDefinition dataclass, or ``replace``
+                    # was given a stale kwarg after a field rename — both
+                    # programming bugs rather than bad server data.  This
+                    # code runs on the turn-assembly path, so per-tool
+                    # isolation (warn + skip) is the deliberate choice over
+                    # letting one broken tool take down every MCP tool of
+                    # every server.
                     self.logger.warning(
                         "Skipping invalid MCP tool '{}': {}",
                         full_name, exc,

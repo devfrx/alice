@@ -42,7 +42,11 @@ def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:
         provenance that this mapping would otherwise discard (server name,
         whether annotations were present, whether they were trusted) is
         preserved structured in ``ToolDefinition.mcp`` (:class:`McpToolMeta`)
-        for downstream consumers — informational only, never read by the gate.
+        for downstream consumers — informational only, never read by the
+        gate.  ``mcp`` describes the ANNOTATION PROVENANCE, not the final
+        gate classification: in the fail-closed ``path_args`` branch below
+        the two can diverge (the meta may keep ``read_only=True`` while the
+        gate resets to the conservative dangerous/confirmed classification).
 
     Notes:
         ``path_args`` promotion is validated against the tool's
@@ -58,16 +62,11 @@ def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:
     annotations = tool.annotations if server.trust_annotations else None
 
     risk_level: Literal["safe", "medium", "dangerous", "forbidden"]
+    meta_destructive: bool | None
     if annotations is not None and annotations.readOnlyHint is True:
         capabilities: tuple[str, ...] = (MCP_READ_CAPABILITY,)
         risk_level, requires_confirmation = "safe", False
-        meta = McpToolMeta(
-            server=server.name,
-            annotated=True,
-            trusted=True,
-            read_only=True,
-            destructive=False,
-        )
+        meta_read_only, meta_destructive = True, False
     elif annotations is not None:
         # Annotations present, not read-only.  MCP spec: destructiveHint
         # defaults to True when omitted.
@@ -75,27 +74,24 @@ def map_mcp_tool(tool: Tool, server: McpServerConfig) -> ToolDefinition:
         capabilities = (MCP_WRITE_CAPABILITY,)
         risk_level = "dangerous" if destructive else "medium"
         requires_confirmation = True
-        meta = McpToolMeta(
-            server=server.name,
-            annotated=True,
-            trusted=True,
-            read_only=False,
-            destructive=destructive,
-        )
+        meta_read_only, meta_destructive = False, destructive
     else:
         # No annotations (or untrusted server): conservative fallback.
-        # ``annotated`` legge ``tool.annotations`` ORIGINALE: la locale
-        # ``annotations`` è già azzerata quando il server non è fidato,
-        # ma il meta deve dire la verità sulla provenienza.
         capabilities = (MCP_WRITE_CAPABILITY,)
         risk_level, requires_confirmation = "dangerous", True
-        meta = McpToolMeta(
-            server=server.name,
-            annotated=tool.annotations is not None,
-            trusted=server.trust_annotations,
-            read_only=False,
-            destructive=None,
-        )
+        meta_read_only, meta_destructive = False, None
+
+    # Annotation provenance, preserved for downstream consumers.  Built once,
+    # post-branch: ``annotated``/``trusted`` read the ORIGINAL inputs (the
+    # local ``annotations`` is already zeroed for untrusted servers) and hold
+    # in every branch by construction.
+    meta = McpToolMeta(
+        server=server.name,
+        annotated=tool.annotations is not None,
+        trusted=server.trust_annotations,
+        read_only=meta_read_only,
+        destructive=meta_destructive,
+    )
 
     declared_paths = tuple(server.path_args.get(tool.name, ()))
     if declared_paths:

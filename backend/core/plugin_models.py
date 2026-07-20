@@ -47,21 +47,28 @@ class ConnectionStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class McpToolMeta:
-    """Provenienza MCP di un tool (``None`` su ``ToolDefinition`` per i tool nativi).
+    """MCP provenance of a tool (``None`` on ``ToolDefinition`` for native tools).
 
-    Conserva ciò che ``map_mcp_tool`` altrimenti consuma e scarta: serve al
-    dialogo di conferma (trasparenza sul fallback), al catalogo tool e al
-    pannello MCP. ``destructive`` è ``None`` quando le annotations mancano o
-    il server non è fidato (fallback conservativo).
+    Preserves what ``map_mcp_tool`` would otherwise consume and discard —
+    read by the confirmation dialog (transparency about the fallback), the
+    tool catalog and the MCP panel. It describes the PROVENANCE of the
+    server's annotations, NOT the gate's final classification: in the
+    fail-closed ``path_args`` branch of ``map_mcp_tool`` the two can diverge
+    (the meta may keep ``read_only=True`` while the gate falls back to the
+    conservative dangerous/confirmed classification). The gate fields
+    (``capabilities`` / ``risk_level`` / ``requires_confirmation``) remain
+    the operational authority.
 
     Attributes:
-        server: Nome del server MCP che espone il tool.
-        annotated: ``True`` se il tool dichiara annotations (a prescindere
-            dal trust del server).
-        trusted: Valore di ``trust_annotations`` del server.
-        read_only: ``True`` solo per il ramo readOnly fidato del mapping.
-        destructive: ``destructiveHint`` effettivo per il ramo write annotato
-            e fidato; ``None`` nel fallback conservativo.
+        server: Name of the MCP server exposing the tool.
+        annotated: ``True`` when the tool declares annotations (regardless
+            of the server's trust).
+        trusted: The server's ``trust_annotations`` value.
+        read_only: ``True`` only for the trusted read-only mapping branch.
+        destructive: Effective ``destructiveHint`` for the trusted annotated
+            write branch; ``False`` (derived) in the read-only branch;
+            ``None`` when annotations are missing or the server is untrusted
+            (conservative fallback).
     """
 
     server: str
@@ -123,10 +130,10 @@ class ToolDefinition:
             use this tool. Collected for the tools actually offered in a
             turn and composed into the ``[ORCHESTRAZIONE]`` block — never
             serialised into the OpenAI schema.
-        mcp: Provenienza MCP (server, annotations, trust) popolata da
-            ``map_mcp_tool`` per i tool MCP; ``None`` per i tool nativi.
-            Solo informativa: il gate legge capabilities/risk, mai questo
-            campo.
+        mcp: MCP provenance (server, annotations, trust) populated by
+            ``map_mcp_tool`` for MCP tools; ``None`` for native tools.
+            Informational only: the gate reads capabilities/risk, never
+            this field.
     """
 
     name: str

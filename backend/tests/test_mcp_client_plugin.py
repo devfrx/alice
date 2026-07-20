@@ -295,10 +295,10 @@ class TestMcpClientPluginGetTools:
         assert td.max_result_chars == plugin._MCP_MAX_RESULT_CHARS
 
     def test_get_tools_preserves_mcp_meta(self) -> None:
-        """Il re-namespacing (``dataclasses.replace``) deve conservare il
-        campo ``mcp`` (provenienza server/annotations) impostato dal
-        mapping — i consumatori a valle (dialogo di conferma, catalogo,
-        pannello MCP) lo leggono dal ToolDefinition finale."""
+        """Re-namespacing (``dataclasses.replace``) must preserve the ``mcp``
+        field (server/annotations provenance) set by the mapping — downstream
+        consumers (confirmation dialog, tool catalog, MCP panel) read it from
+        the final ToolDefinition."""
         meta = McpToolMeta(
             server="srv",
             annotated=True,
@@ -322,7 +322,6 @@ class TestMcpClientPluginGetTools:
         assert tools[0].name == "mcp_srv_read_file"
         assert tools[0].mcp is not None
         assert tools[0].mcp == meta
-        assert tools[0].mcp.server == "srv"
 
     def test_get_tools_isolates_invalid_tool(self) -> None:
         """A single invalid tool doesn't crash the entire get_tools()."""

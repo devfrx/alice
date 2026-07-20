@@ -81,6 +81,10 @@ def test_all_hints_omitted_maps_to_destructive_default() -> None:
     assert td.capabilities == ("mcp_write",)
     assert td.risk_level == "dangerous"
     assert td.requires_confirmation is True
+    assert td.mcp is not None
+    assert td.mcp.annotated is True
+    assert td.mcp.read_only is False
+    assert td.mcp.destructive is True
 
 
 def test_missing_annotations_falls_back_conservative() -> None:
@@ -176,7 +180,7 @@ def test_path_args_missing_from_schema_fail_closed() -> None:
 
 
 # ---------------------------------------------------------------------------
-# McpToolMeta — provenienza MCP conservata sul ToolDefinition (Mossa 2, Task 1)
+# McpToolMeta — MCP provenance preserved on ToolDefinition (Mossa 2, Task 1)
 # ---------------------------------------------------------------------------
 
 
@@ -205,7 +209,7 @@ def test_write_tool_meta_destructive_flag() -> None:
 
 
 def test_write_tool_meta_destructive_default() -> None:
-    """destructiveHint omesso → True (default MCP); esplicito True → True."""
+    """destructiveHint omitted → True (MCP default); explicit True → True."""
     omitted = map_mcp_tool(_tool(annotations=ToolAnnotations(readOnlyHint=False)), _server())
     explicit = map_mcp_tool(
         _tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True)),
@@ -227,8 +231,8 @@ def test_unannotated_tool_meta_marks_fallback() -> None:
 
 
 def test_untrusted_server_meta_marks_untrusted() -> None:
-    """Server non fidato: il meta dice la verità (annotated, non trusted) ma il
-    gate resta al fallback conservativo — invariante Mossa 1 che NON cambia."""
+    """Untrusted server: the meta tells the truth (annotated, not trusted) but
+    the gate stays on the conservative fallback — Mossa 1 invariant, unchanged."""
     td = map_mcp_tool(
         _tool(annotations=ToolAnnotations(readOnlyHint=True)),
         _server(trust_annotations=False),
@@ -257,6 +261,33 @@ def test_path_args_promotion_keeps_mcp_meta() -> None:
     assert td.mcp.read_only is True
 
 
+def test_path_args_fail_closed_meta_keeps_annotation_provenance() -> None:
+    """Fail-closed path_args (declared arg missing from the schema): the gate
+    resets to the conservative classification, but the meta still describes
+    the ANNOTATION PROVENANCE (read_only=True) — meta = provenance, gate
+    fields = operational authority. Pinned so the divergence is deliberate."""
+    server = _server(path_args={"read_file": ["pth"]})  # typo: schema says "path"
+    td = map_mcp_tool(
+        _tool(
+            name="read_file",
+            annotations=ToolAnnotations(readOnlyHint=True),
+            properties={"path": {"type": "string"}},
+        ),
+        server,
+    )
+    assert td.capabilities == ("mcp_write",)
+    assert td.risk_level == "dangerous"
+    assert td.requires_confirmation is True
+    assert td.path_args == ()
+    assert td.mcp == McpToolMeta(
+        server="srv",
+        annotated=True,
+        trusted=True,
+        read_only=True,
+        destructive=False,
+    )
+
+
 def test_native_tool_definition_has_no_mcp_meta() -> None:
-    td = ToolDefinition(name="native_tool", description="Un tool nativo")
+    td = ToolDefinition(name="native_tool", description="A native tool")
     assert td.mcp is None

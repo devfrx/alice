@@ -442,6 +442,8 @@ describe('pending getters', () => {
     expect(s.pendingConfirmations[0].toolMeta?.annotated).toBe(false)
     expect(s.pendingConfirmations[0].toolMeta?.origin).toBe('mcp')
     expect(s.pendingConfirmations[0].toolMeta?.trusted).toBe(true)
+    // The wire omits None sub-keys (exclude_none): absent stays absent.
+    expect(s.pendingConfirmations[0].toolMeta?.destructive).toBeUndefined()
   })
 
   it('lascia toolMeta undefined quando il frame non porta tool_meta', () => {

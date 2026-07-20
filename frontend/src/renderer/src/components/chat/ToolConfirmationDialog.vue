@@ -66,12 +66,15 @@ const mcpBadgeLabel = computed<string | null>(() => {
 })
 
 /**
- * Transparency warning (spec §6.1): an MCP tool without annotations, or
- * whose annotations are not trusted, was gated as destructive by fallback.
+ * Transparency warning (spec §6.1) — null when not needed. Differentiated:
+ * a tool without annotations vs a server whose annotations are present but
+ * not trusted (`trust_annotations: false`) get a truthful, distinct message.
  */
-const showFallbackWarning = computed<boolean>(() => {
+const fallbackWarning = computed<string | null>(() => {
   const meta = props.confirmation.toolMeta
-  return meta?.annotated === false || meta?.trusted === false
+  if (meta?.annotated === false) return 'Tool non annotato: trattato come distruttivo'
+  if (meta?.trusted === false) return 'Annotazioni non attendibili: trattato come distruttivo'
+  return null
 })
 
 const formattedTime = computed(() => {
@@ -157,8 +160,8 @@ onUnmounted(() => {
           </UiBadge>
         </div>
 
-        <p v-if="showFallbackWarning" class="confirm-card__meta-warning">
-          Tool non annotato: trattato come distruttivo
+        <p v-if="fallbackWarning" role="note" class="confirm-card__meta-warning">
+          {{ fallbackWarning }}
         </p>
 
         <div class="confirm-card__risk">

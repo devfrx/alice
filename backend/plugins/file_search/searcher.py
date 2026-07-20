@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -20,6 +21,26 @@ from backend.core.path_safety import (
 
 class ForbiddenPathError(ValueError):
     """Raised when a path is in a forbidden directory."""
+
+
+def normalize_extensions(extensions: Iterable[str]) -> set[str]:
+    """Normalize an extension whitelist to lowercase dotted suffixes.
+
+    Single source shared by ``_sync_walk`` (search_files) and
+    ``grep.run_grep`` — the third inline copy was consolidated here.
+
+    Args:
+        extensions: Raw suffixes, with or without the leading dot,
+            in any case (e.g. ``["txt", ".PY"]``).
+
+    Returns:
+        A set of lowercase suffixes, each with a leading dot.
+    """
+    normalized: set[str] = set()
+    for ext in extensions:
+        e = ext.lower()
+        normalized.add(e if e.startswith(".") else f".{e}")
+    return normalized
 
 
 def _validate_path(
@@ -118,10 +139,7 @@ def _sync_walk(
     # Normalize extensions to lowercase with leading dot
     ext_filter: set[str] | None = None
     if extensions:
-        ext_filter = set()
-        for ext in extensions:
-            e = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
-            ext_filter.add(e)
+        ext_filter = normalize_extensions(extensions)
 
     for root in roots:
         if not root.is_dir():

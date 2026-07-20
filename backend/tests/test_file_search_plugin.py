@@ -738,6 +738,55 @@ class TestGrepContentTool:
         assert "restringi" in result.content["note"].lower()
 
     @pytest.mark.asyncio
+    async def test_grep_count_partial_file_in_payload(self, tmp_path):
+        """When the match budget fires mid-file in count mode, the payload
+        names the file whose count is a lower bound."""
+        plugin = FileSearchPlugin()
+        ctx = _make_app_context(
+            allowed_paths=[str(tmp_path)], forbidden_paths=[],
+        )
+        ctx.config.file_search.grep_max_matches = 2
+        await plugin.initialize(ctx)
+        target = tmp_path / "a.txt"
+        target.write_text("hit\nhit\nhit\n")
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "hit", "path": str(tmp_path), "output_mode": "count"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["counts"] == {str(target.resolve()): 2}
+        assert result.content["partial_file"] == str(target.resolve())
+        assert "lower bound" in result.content["note"]
+
+    @pytest.mark.asyncio
+    async def test_grep_capped_lines_noted(self, tmp_path):
+        """Lines over max_line_chars are matched on the prefix only: the
+        payload counts them and the note warns about possibly lost matches."""
+        plugin = FileSearchPlugin()
+        ctx = _make_app_context(
+            allowed_paths=[str(tmp_path)], forbidden_paths=[],
+        )
+        ctx.config.file_search.max_line_chars = 50
+        await plugin.initialize(ctx)
+        (tmp_path / "min.js").write_text("x" * 200 + "needle\nok needle\n")
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "needle", "path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["files"] == [
+            str((tmp_path / "min.js").resolve()),
+        ]
+        assert result.content["lines_capped"] == 1
+        assert "cap" in result.content["note"]
+
+    @pytest.mark.asyncio
     async def test_grep_timeout_returns_partial_results(self, tmp_path):
         """On timeout the handler must salvage what the scan collected so
         far (shared sink) instead of returning [], flagged truncated."""

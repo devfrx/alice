@@ -233,15 +233,19 @@ class FileSearchPlugin(BasePlugin):
                     "Search file CONTENTS with a Python regular "
                     "expression, line by line, under a root directory. "
                     "For file NAMES use glob_files or search_files "
-                    "instead. Three output modes: 'files_with_matches' "
-                    "(default, list of file paths), 'content' (matching "
-                    "lines with line numbers and optional context), "
-                    "'count' (per-file hit counts). Binary files and "
-                    "files over 1 MiB are skipped. Results are bounded "
-                    "server-side (files scanned, total matches, "
-                    "timeout): when 'truncated' is true, narrow the "
-                    "search with 'glob', 'extensions', a more specific "
-                    "root or a more selective regex."
+                    "instead. Matching is strictly per-line: multi-line "
+                    "patterns are not supported (a pattern containing a "
+                    "newline never matches), and lines longer than the "
+                    "configured cap are matched on their prefix only. "
+                    "Three output modes: 'files_with_matches' (default, "
+                    "list of file paths), 'content' (matching lines "
+                    "with line numbers and optional context), 'count' "
+                    "(per-file hit counts). Binary and oversized files "
+                    "are skipped. Results are bounded server-side "
+                    "(files scanned, total matches, timeout): when "
+                    "'truncated' is true, narrow the search with "
+                    "'glob', 'extensions', a more specific root or a "
+                    "more selective regex."
                 ),
                 parameters={
                     "type": "object",
@@ -747,9 +751,11 @@ class FileSearchPlugin(BasePlugin):
 
         Returns:
             A dict with the mode-specific payload ("files", "matches"
-            or "counts"), plus "root", "truncated", "files_scanned"
-            and, when truncated, an Italian "note" telling the model
-            how to narrow the search.
+            or "counts"), plus "root", "truncated", "files_scanned",
+            "lines_capped" (when lines were matched on a truncated
+            prefix), "partial_file" (count mode, when that file's
+            count is a lower bound) and an Italian "note" explaining
+            truncation/caps and how to narrow the search.
         """
         pattern: str = args.get("pattern", "")
         if not pattern:
@@ -791,6 +797,8 @@ class FileSearchPlugin(BasePlugin):
             case_insensitive=bool(args.get("case_insensitive", False)),
             max_files=cfg.grep_max_files,
             max_matches=max_matches,
+            max_file_bytes=cfg.max_file_size_read_bytes,
+            max_line_chars=cfg.max_line_chars,
             follow_symlinks=cfg.follow_symlinks,
         )
 
@@ -838,13 +846,31 @@ class FileSearchPlugin(BasePlugin):
             payload["counts"] = dict(result.counts)
         else:
             payload["files"] = [str(p) for p in list(result.files)]
+
+        notes: list[str] = []
         if result.truncated:
-            payload["note"] = (
+            notes.append(
                 "Risultati troncati (bound su file scanditi, match "
                 "totali o timeout): restringi la ricerca con 'glob', "
                 "'extensions', una root più vicina ai file cercati o "
                 "una regex più selettiva."
             )
+        if result.lines_capped:
+            payload["lines_capped"] = result.lines_capped
+            notes.append(
+                f"{result.lines_capped} righe più lunghe di "
+                f"{cfg.max_line_chars} caratteri sono state cercate "
+                "solo sul prefisso (cap anti-backtracking): eventuali "
+                "match oltre il cap sono persi."
+            )
+        if output_mode == "count" and result.partial_file:
+            payload["partial_file"] = result.partial_file
+            notes.append(
+                "Il conteggio di 'partial_file' è un lower bound: il "
+                "budget di match è scattato a metà file."
+            )
+        if notes:
+            payload["note"] = " ".join(notes)
         return payload
 
     async def _exec_get_file_info(

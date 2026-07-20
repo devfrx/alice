@@ -1307,6 +1307,12 @@ def test_execute_command_retired(plugin):
 
 ## Cosa NON fa questa mossa (→ Mossa 2, piano separato)
 
+- **Consegna delle immagini al modello e rendering FE** (censito in review T10): i tool result
+  `image/*` oggi non hanno consumatori — né vision parts nel prompting né componenti FE che
+  leggono `contentType`. La Mossa 1 mette la guardia fail-safe (placeholder nella working
+  history, mai base64 grezzo nel contesto); la consegna vision (dipendente dal supporto del
+  provider) e il rendering nel fold FE sono lavoro esplicito di Mossa 2.
+
 - Campo wire `tool_meta` su `interaction.requested` (rituale contratti completo) + badge FE.
 - `GET /api/tools/catalog` + picker in `PermissionRulesManager.vue`.
 - Pannello MCP in Impostazioni + `response_model` sulle route `/api/mcp/*`.

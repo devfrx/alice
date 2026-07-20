@@ -117,6 +117,12 @@ export function buildMcpBadgeLabel(meta: ToolMeta | undefined): string | null {
  * annotations vs a server whose annotations are present but not trusted
  * (`trust_annotations: false`) get a truthful, distinct message. Unknown
  * (absent) flags never warn — only an explicit `false` does.
+ *
+ * NOTE (invariant wording): the "trattato come distruttivo" phrasing also
+ * appears in the settings-panel fallback badge built by
+ * `components/settings/mcpToolLevel.ts::toolLevelBadge`. The two modules
+ * serve different domains (live confirmation vs settings panel) and are
+ * intentionally NOT consolidated, but their wording must stay in sync.
  */
 export function buildFallbackWarning(meta: ToolMeta | undefined): string | null {
   if (meta?.annotated === false) return 'Tool non annotato: trattato come distruttivo'

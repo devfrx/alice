@@ -56,7 +56,7 @@
             <span
               class="mcp-badge"
               :class="`mcp-badge--${serverTrustBadge(server).variant}`"
-              title="Riflette mcp.servers[].trust_annotations nella config (sola lettura)"
+              title="Riflette mcp.servers[].trust_annotations nella config (non modificabile da qui)"
             >
               {{ serverTrustBadge(server).label }}
             </span>
@@ -102,7 +102,7 @@
                 class="mcp-tool-tag__level"
                 :class="`mcp-tool-tag__level--${toolLevelBadge(tool).variant}`"
               >
-                {{ toolLevelShortLabel(tool) }}
+                {{ toolLevelBadge(tool).shortLabel }}
               </span>
             </span>
           </div>
@@ -151,8 +151,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useMcpStore } from '../../stores/mcp'
-import type { McpServerInfo, McpServerTool } from '../../types/mcp'
-import { serverTrustBadge, toolLevelBadge } from './mcpToolLevel'
+import type { McpServerInfo } from '../../types/mcp'
+import { serverTrustBadge, toolLevelBadge, toolTitle } from './mcpToolLevel'
 import AppIcon from '../ui/AppIcon.vue'
 import UiButton from '../ui/UiButton.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
@@ -175,21 +175,6 @@ function statusLabel(status: McpServerInfo['status']): string {
     case 'not_loaded':
       return 'Non caricato'
   }
-}
-
-/**
- * Short in-tag label for the tool level: the full fallback label is too long
- * for a tag, so it is abbreviated here and spelled out in the tooltip.
- */
-function toolLevelShortLabel(tool: McpServerTool): string {
-  return tool.level === 'fallback' ? 'non annotato' : toolLevelBadge(tool).label
-}
-
-/** Tooltip: description + full derived level + gate risk. */
-function toolTitle(tool: McpServerTool): string {
-  const badge = toolLevelBadge(tool)
-  const confirm = tool.requires_confirmation ? 'con conferma' : 'senza conferma'
-  return `${tool.description}\nLivello: ${badge.label} — rischio ${tool.risk_level}, ${confirm}`
 }
 
 onMounted(() => {
@@ -330,7 +315,9 @@ onMounted(() => {
   letter-spacing: var(--tracking-normal);
 }
 
-.mcp-badge--connected {
+/* Trust badge variants (serverTrustBadge) share the status colors */
+.mcp-badge--connected,
+.mcp-badge--success {
   background: var(--success-light);
   color: var(--success);
 }
@@ -355,17 +342,7 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-.mcp-badge--degraded {
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-
-/* Trust badge variants (serverTrustBadge) */
-.mcp-badge--success {
-  background: var(--success-light);
-  color: var(--success);
-}
-
+.mcp-badge--degraded,
 .mcp-badge--warning {
   background: var(--warning-bg);
   color: var(--warning);
@@ -421,7 +398,6 @@ onMounted(() => {
 
 .mcp-tool-tag__level {
   font-size: var(--text-2xs);
-  opacity: var(--opacity-medium);
 }
 
 .mcp-tool-tag__level--success {

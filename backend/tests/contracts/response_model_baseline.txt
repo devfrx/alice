@@ -19,8 +19,6 @@ GET /api/email/folders
 GET /api/email/inbox
 GET /api/email/{uid}
 GET /api/health
-GET /api/mcp/servers
-GET /api/mcp/servers/{server_name}
 GET /api/models
 GET /api/models/capabilities
 GET /api/models/download/{job_id}
@@ -43,7 +41,6 @@ POST /api/chat/upload
 POST /api/config/reload
 POST /api/config/sync-model
 POST /api/email/search
-POST /api/mcp/servers/{server_name}/reconnect
 POST /api/models/download
 POST /api/models/load
 POST /api/models/unload

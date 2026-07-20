@@ -2,61 +2,121 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
+from pydantic import BaseModel
 
+from backend.api.ws_schema.chat import RiskLevel
+from backend.core.config import McpServerConfig
 from backend.core.context import AppContext
 from backend.core.event_bus import AliceEvent
-from backend.services.mcp_gateway import get_mcp_client
+from backend.core.plugin_models import ToolDefinition
+from backend.services.mcp_gateway import McpClientProtocol, get_mcp_client
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
+McpToolLevel = Literal["read_only", "write", "fallback"]
+"""UI-facing level derived from the PROVENANCE of the server annotations."""
 
-@router.get("/servers")
-async def list_mcp_servers(request: Request) -> dict[str, Any]:
+
+class McpToolOut(BaseModel):
+    """Tool MCP col livello derivato dal gate (spec Fase 2 §6.4)."""
+
+    name: str
+    description: str
+    level: McpToolLevel
+    risk_level: RiskLevel
+    requires_confirmation: bool
+
+
+class McpServerOut(BaseModel):
+    """Server MCP configurato: config statica + stato live + tool tipizzati."""
+
+    name: str
+    transport: str
+    enabled: bool
+    command: list[str] | None = None
+    url: str | None = None
+    status: str
+    trust_annotations: bool
+    tools: list[McpToolOut]
+
+
+class McpServersResponse(BaseModel):
+    """Elenco completo dei server MCP configurati."""
+
+    servers: list[McpServerOut]
+
+
+class McpReconnectResponse(BaseModel):
+    """Esito di una riconnessione riuscita a un server MCP."""
+
+    status: str
+    tools_count: int
+
+
+def _tool_level(tool_def: ToolDefinition) -> McpToolLevel:
+    """Livello UI derivato dalla provenienza annotations (non dall'autorità gate)."""
+    m = tool_def.mcp
+    if m is None or not m.annotated or not m.trusted:
+        return "fallback"
+    return "read_only" if m.read_only else "write"
+
+
+def _server_out(
+    cfg: McpServerConfig,
+    status: str,
+    plugin: McpClientProtocol | None,
+) -> McpServerOut:
+    """Build the typed view of one configured server."""
+    tools: list[McpToolOut] = []
+    if plugin:
+        tools = [
+            McpToolOut(
+                name=t.name,
+                description=t.description,
+                level=_tool_level(t),
+                risk_level=t.risk_level,
+                requires_confirmation=t.requires_confirmation,
+            )
+            for t in plugin.get_server_tools(cfg.name)
+        ]
+    return McpServerOut(
+        name=cfg.name,
+        transport=cfg.transport,
+        enabled=cfg.enabled,
+        command=cfg.command,
+        url=cfg.url,
+        status=status,
+        trust_annotations=cfg.trust_annotations,
+        tools=tools,
+    )
+
+
+@router.get("/servers", response_model=McpServersResponse)
+async def list_mcp_servers(request: Request) -> McpServersResponse:
     """List configured MCP servers and their connection status."""
     ctx: AppContext = request.app.state.context
-
-    configured = [
-        {
-            "name": s.name,
-            "transport": s.transport,
-            "enabled": s.enabled,
-            "command": s.command,
-            "url": s.url,
-        }
-        for s in ctx.config.mcp.servers
-    ]
 
     plugin = get_mcp_client(ctx)
     statuses: dict[str, str] = {}
     if plugin:
         statuses = await plugin.get_status()
 
-    servers = []
-    for srv in configured:
-        name = srv["name"]
-        srv_tools: list[dict[str, str]] = []
-        if plugin:
-            srv_tools = [
-                {"name": t.name, "description": t.description}
-                for t in plugin.get_server_tools(name)
-            ]
-        servers.append({
-            **srv,
-            "status": statuses.get(name, "not_loaded"),
-            "tools": srv_tools,
-        })
-
-    return {"servers": servers}
+    return McpServersResponse(
+        servers=[
+            _server_out(cfg, statuses.get(cfg.name, "not_loaded"), plugin)
+            for cfg in ctx.config.mcp.servers
+        ],
+    )
 
 
-@router.get("/servers/{server_name}")
+@router.get("/servers/{server_name}", response_model=McpServerOut)
 async def get_mcp_server(
     request: Request, server_name: str,
-) -> dict[str, Any]:
+) -> McpServerOut:
     """Get details for a specific MCP server."""
     ctx: AppContext = request.app.state.context
 
@@ -75,28 +135,18 @@ async def get_mcp_server(
     if plugin:
         statuses = await plugin.get_status()
 
-    tools: list[dict[str, str]] = []
-    if plugin:
-        tools = [
-            {"name": t.name, "description": t.description}
-            for t in plugin.get_server_tools(server_name)
-        ]
-
-    return {
-        "name": server_config.name,
-        "transport": server_config.transport,
-        "enabled": server_config.enabled,
-        "command": server_config.command,
-        "url": server_config.url,
-        "status": statuses.get(server_name, "not_loaded"),
-        "tools": tools,
-    }
+    return _server_out(
+        server_config, statuses.get(server_name, "not_loaded"), plugin,
+    )
 
 
-@router.post("/servers/{server_name}/reconnect")
+@router.post(
+    "/servers/{server_name}/reconnect",
+    response_model=McpReconnectResponse,
+)
 async def reconnect_mcp_server(
     request: Request, server_name: str,
-) -> dict[str, Any]:
+) -> McpReconnectResponse:
     """Attempt to reconnect to a specific MCP server."""
     ctx: AppContext = request.app.state.context
 
@@ -124,10 +174,10 @@ async def reconnect_mcp_server(
         await ctx.event_bus.emit(
             AliceEvent.MCP_SERVER_CONNECTED, server=server_name,
         )
-        return {
-            "status": "connected",
-            "tools_count": len(session.get_tools()),
-        }
+        return McpReconnectResponse(
+            status="connected",
+            tools_count=len(session.get_tools()),
+        )
     except Exception as exc:
         logger.warning(
             "MCP reconnect '{}' failed: {}", server_name, exc,

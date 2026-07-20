@@ -131,9 +131,14 @@ class FileSearchPlugin(BasePlugin):
             ToolDefinition(
                 name="search_files",
                 description=(
-                    "Search for files by name on the local filesystem. "
-                    "Returns matching file paths, sizes and dates. "
-                    "Optionally filter by directory and file extensions."
+                    "Search for files by NAME (substring) on the local "
+                    "filesystem. Returns matching file paths, sizes and "
+                    "dates in 'matches', bounded by max_results. When "
+                    "'truncated' is true, a 'note' explains how to narrow "
+                    "the search. Optionally filter by directory and file "
+                    "extensions. For structured path patterns (e.g. "
+                    "'**/*.py') use glob_files instead; for file CONTENTS "
+                    "use grep_content."
                 ),
                 parameters={
                     "type": "object",
@@ -176,6 +181,12 @@ class FileSearchPlugin(BasePlugin):
                 risk_level="safe",
                 capabilities=("fs_read",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Usa `search_files` per trovare file dal NOME (ricerca "
+                    "per sottostringa case-insensitive); per pattern di "
+                    "percorso strutturati (es. `**/*.ext`) usa `glob_files`, "
+                    "per cercare nei CONTENUTI usa `grep_content`."
+                ),
                 timeout_ms=60_000,
             ),
             ToolDefinition(
@@ -225,6 +236,12 @@ class FileSearchPlugin(BasePlugin):
                 risk_level="safe",
                 capabilities=("fs_read",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Usa `glob_files` per trovare file per pattern di "
+                    "percorso strutturati (es. `**/*.py`), risultati "
+                    "newest-first: per il contenuto dei file usa poi "
+                    "`grep_content`."
+                ),
                 timeout_ms=60_000,
             ),
             ToolDefinition(
@@ -322,6 +339,13 @@ class FileSearchPlugin(BasePlugin):
                 risk_level="safe",
                 capabilities=("fs_read",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Usa `grep_content` per cercare nei CONTENUTI dei file "
+                    "con una regex, riga per riga; per i NOMI dei file usa "
+                    "`glob_files`/`search_files`. Se `truncated` è true, "
+                    "restringi con `glob`/`extensions` o una root più "
+                    "specifica."
+                ),
                 timeout_ms=30_000,
             ),
             ToolDefinition(
@@ -344,6 +368,11 @@ class FileSearchPlugin(BasePlugin):
                 risk_level="safe",
                 capabilities=("fs_read",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Usa `get_file_info` per ottenere solo i metadati di un "
+                    "file (dimensione, date, MIME type) senza leggerne il "
+                    "contenuto."
+                ),
                 timeout_ms=3_000,
             ),
             ToolDefinition(
@@ -402,6 +431,12 @@ class FileSearchPlugin(BasePlugin):
                 requires_confirmation=True,
                 capabilities=("fs_read",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Usa `offset`/`limit` su `read_text_file` per i file "
+                    "lunghi: l'output è numerato per riga (il prefisso "
+                    "\"     N\\t\" NON è contenuto del file) e, se troncato, "
+                    "riprendi da `next_offset`."
+                ),
                 timeout_ms=15_000,
             ),
             ToolDefinition(
@@ -425,6 +460,12 @@ class FileSearchPlugin(BasePlugin):
                 requires_confirmation=True,
                 capabilities=("fs_read",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Usa `open_file` solo per aprire un file con "
+                    "l'applicazione predefinita del sistema (effetto "
+                    "visibile all'utente), MAI per leggerne il contenuto — "
+                    "per quello usa `read_text_file`."
+                ),
                 timeout_ms=5_000,
             ),
             ToolDefinition(
@@ -463,6 +504,12 @@ class FileSearchPlugin(BasePlugin):
                 requires_confirmation=True,
                 capabilities=("fs_write",),
                 path_args=("path",),
+                usage_guidance=(
+                    "`write_text_file` sovrascrive l'intero file: usalo "
+                    "solo su file nuovi o già letti in questa conversazione "
+                    "con `read_text_file`; per una modifica puntuale "
+                    "preferisci `edit_text_file`."
+                ),
                 timeout_ms=10_000,
             ),
             ToolDefinition(
@@ -516,6 +563,13 @@ class FileSearchPlugin(BasePlugin):
                 requires_confirmation=True,
                 capabilities=("fs_write",),
                 path_args=("path",),
+                usage_guidance=(
+                    "Preferisci `edit_text_file` a `write_text_file` per "
+                    "modifiche puntuali: richiede una lettura precedente "
+                    "con `read_text_file`, e `old_string` va passata SENZA "
+                    "il prefisso di numerazione riga e deve essere unica "
+                    "nel file (o usa `replace_all`)."
+                ),
                 timeout_ms=10_000,
             ),
         ]
@@ -602,7 +656,7 @@ class FileSearchPlugin(BasePlugin):
         self,
         args: dict[str, Any],
         context: ExecutionContext,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """Execute the search_files tool.
 
         Args:
@@ -611,7 +665,9 @@ class FileSearchPlugin(BasePlugin):
             context: Execution metadata (unused).
 
         Returns:
-            A list of file-info dicts.
+            A dict with "matches" (file-info dicts), "truncated" and,
+            when truncated, a "note" telling the model how to narrow
+            the search (max_results cap or the 60-second timeout).
         """
         query: str = args.get("query", "")
         if not query:
@@ -637,7 +693,7 @@ class FileSearchPlugin(BasePlugin):
 
         extensions: list[str] | None = args.get("extensions")
 
-        return await search_files(
+        outcome = await search_files(
             query=query,
             roots=roots,
             extensions=extensions,
@@ -645,6 +701,19 @@ class FileSearchPlugin(BasePlugin):
             forbidden=self._forbidden_paths,
             follow_symlinks=cfg.follow_symlinks,
         )
+
+        payload: dict[str, Any] = {
+            "matches": outcome.matches,
+            "truncated": outcome.truncated,
+        }
+        if outcome.truncated:
+            payload["note"] = (
+                "Risultati troncati a max_results (o timeout della "
+                "ricerca): alza max_results, restringi 'path' o "
+                "'extensions', oppure usa una query più specifica per "
+                "vedere il resto."
+            )
+        return payload
 
     async def _exec_glob_files(
         self,

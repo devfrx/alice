@@ -120,6 +120,12 @@ class TerminalPlugin(BasePlugin):
             requires_confirmation=True,
             capabilities=("process_exec", "fs_write"),
             path_args=("cwd",),
+            usage_guidance=(
+                "`run_terminal_command` è l'unica via per eseguire comandi: "
+                "niente shell (pipe/redirect sono letterali, non "
+                "interpretati), output bounded, cwd confinato allo scope "
+                "della conversazione."
+            ),
             supports_cancellation=True,
             # One step above the executor's own timeout so the run self-times-out
             # gracefully (returning a partial result) before this outer budget.

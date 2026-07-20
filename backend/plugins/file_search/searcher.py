@@ -111,6 +111,20 @@ def _validate_path(
     return resolved
 
 
+class SearchOutcome(NamedTuple):
+    """Result of :func:`_sync_walk` / :func:`search_files`.
+
+    Attributes:
+        matches: File-info dicts, at most ``max_results`` of them.
+        truncated: ``True`` when the result set was cut short — the
+            ``max_results`` cap fired during the walk, or the caller-side
+            timeout fired (in which case ``matches`` is empty).
+    """
+
+    matches: list[dict]
+    truncated: bool
+
+
 def _sync_walk(
     query: str,
     roots: list[Path],
@@ -118,7 +132,7 @@ def _sync_walk(
     max_results: int,
     forbidden: list[Path],
     follow_symlinks: bool,
-) -> list[dict]:
+) -> SearchOutcome:
     """Walk directories synchronously, matching files by name.
 
     Args:
@@ -130,7 +144,8 @@ def _sync_walk(
         follow_symlinks: Whether os.walk should follow symlinks.
 
     Returns:
-        A list of file-info dicts.
+        A ``SearchOutcome`` with the matched file-info dicts and whether
+        the ``max_results`` cap cut the walk short.
     """
     query_lower = query.lower()
     forbidden_resolved = [fb.resolve() for fb in forbidden]
@@ -196,9 +211,9 @@ def _sync_walk(
                     continue
 
                 if len(results) >= max_results:
-                    return results
+                    return SearchOutcome(results, True)
 
-    return results
+    return SearchOutcome(results, False)
 
 
 class GlobOutcome(NamedTuple):
@@ -335,7 +350,7 @@ async def search_files(
     max_results: int,
     forbidden: list[Path],
     follow_symlinks: bool,
-) -> list[dict]:
+) -> SearchOutcome:
     """Search for files matching *query* across the given roots.
 
     Runs the synchronous directory walk in a thread pool with a 5-second
@@ -350,11 +365,12 @@ async def search_files(
         follow_symlinks: Whether to follow symlinks during the walk.
 
     Returns:
-        A list of file-info dicts with path, name, size, modified date
-        and extension.
+        A ``SearchOutcome`` with file-info dicts (path, name, size,
+        modified date, extension) and whether the result was truncated
+        (``max_results`` cap or the 60-second timeout).
     """
     try:
-        results = await asyncio.wait_for(
+        outcome = await asyncio.wait_for(
             asyncio.to_thread(
                 _sync_walk, query, roots, extensions,
                 max_results, forbidden, follow_symlinks,
@@ -363,6 +379,6 @@ async def search_files(
         )
     except TimeoutError:
         logger.warning("File search timed out after 60 seconds")
-        results = []
+        outcome = SearchOutcome([], True)
 
-    return results
+    return outcome

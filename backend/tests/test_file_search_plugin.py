@@ -165,6 +165,16 @@ class TestFileSearchPluginLifecycle:
         assert tool.capabilities == ("fs_write",)
         assert tool.path_args == ("path",)
 
+    def test_tool_definitions_carry_usage_guidance(self):
+        plugin = FileSearchPlugin()
+        tools = {t.name: t for t in plugin.get_tools()}
+        for name in (
+            "read_text_file", "edit_text_file", "write_text_file",
+            "glob_files", "grep_content", "search_files",
+            "get_file_info", "open_file",
+        ):
+            assert tools[name].usage_guidance, f"{name} senza usage_guidance"
+
     @pytest.mark.asyncio
     @patch("backend.plugins.file_search.plugin._PDF_AVAILABLE", True)
     @patch("backend.plugins.file_search.plugin._DOCX_AVAILABLE", True)
@@ -234,9 +244,11 @@ class TestSearchFilesTool:
             )
 
         assert result.success is True
-        items = result.content
+        items = result.content["matches"]
         assert len(items) == 1
         assert items[0]["name"] == "readme.txt"
+        assert result.content["truncated"] is False
+        assert "note" not in result.content
 
     @pytest.mark.asyncio
     async def test_no_results_returns_empty(self):
@@ -254,7 +266,7 @@ class TestSearchFilesTool:
             )
 
         assert result.success is True
-        assert result.content == []
+        assert result.content["matches"] == []
 
     @pytest.mark.asyncio
     async def test_max_results_limit(self):
@@ -276,7 +288,62 @@ class TestSearchFilesTool:
             )
 
         assert result.success is True
-        assert len(result.content) == 5
+        assert len(result.content["matches"]) == 5
+
+    @pytest.mark.asyncio
+    async def test_max_results_limit_sets_truncated_note(self):
+        """When max_results cuts the walk short, 'truncated' is true and a
+        'note' explains how to see the rest — same style as glob/grep."""
+        many_files = [f"match_{i}.txt" for i in range(100)]
+        walk_data = [("/tmp/allowed", [], many_files)]
+
+        plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
+
+        with (
+            patch("backend.plugins.file_search.searcher.os.walk", return_value=iter(walk_data)),
+            patch("pathlib.Path.is_dir", return_value=True),
+            patch("pathlib.Path.stat", return_value=_fake_stat()),
+        ):
+            result = await plugin.execute_tool(
+                "search_files",
+                {"query": "match", "max_results": 5},
+                _make_exec_ctx(),
+            )
+
+        assert result.success is True
+        assert result.content["truncated"] is True
+        assert "note" in result.content
+        assert result.content["note"]
+
+    @pytest.mark.asyncio
+    async def test_search_files_timeout_sets_truncated_note(self):
+        """On the 60s wait_for timeout, search_files reports an empty,
+        truncated outcome with an actionable note (same shape as the
+        max_results cut)."""
+        plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
+
+        async def fake_wait_for(awaitable, timeout):
+            await awaitable  # let the (mocked, empty) walk complete
+            raise TimeoutError
+
+        with (
+            patch("backend.plugins.file_search.searcher.os.walk", return_value=iter([])),
+            patch("pathlib.Path.is_dir", return_value=True),
+            patch(
+                "backend.plugins.file_search.searcher.asyncio.wait_for",
+                new=fake_wait_for,
+            ),
+        ):
+            result = await plugin.execute_tool(
+                "search_files",
+                {"query": "match"},
+                _make_exec_ctx(),
+            )
+
+        assert result.success is True
+        assert result.content["matches"] == []
+        assert result.content["truncated"] is True
+        assert result.content["note"]
 
     @pytest.mark.asyncio
     async def test_extension_filter_pdf(self):
@@ -294,8 +361,8 @@ class TestSearchFilesTool:
             )
 
         assert result.success is True
-        assert len(result.content) == 1
-        assert result.content[0]["name"] == "report.pdf"
+        assert len(result.content["matches"]) == 1
+        assert result.content["matches"][0]["name"] == "report.pdf"
 
     @pytest.mark.asyncio
     async def test_extension_filter_docx(self):
@@ -313,8 +380,8 @@ class TestSearchFilesTool:
             )
 
         assert result.success is True
-        assert len(result.content) == 1
-        assert result.content[0]["name"] == "summary.docx"
+        assert len(result.content["matches"]) == 1
+        assert result.content["matches"][0]["name"] == "summary.docx"
 
     @pytest.mark.asyncio
     async def test_search_validates_custom_path(self):
@@ -2130,7 +2197,8 @@ class TestSearchPerformance:
 
     @pytest.mark.asyncio
     async def test_timeout_returns_empty(self):
-        """If os.walk takes >5 seconds, search_files returns []."""
+        """A slow-but-completing os.walk (under the 60s wait_for budget)
+        still returns a normal, non-truncated empty outcome."""
 
         def slow_walk(*args, **kwargs):
             import time
@@ -2141,7 +2209,7 @@ class TestSearchPerformance:
             patch("backend.plugins.file_search.searcher.os.walk", side_effect=slow_walk),
             patch("pathlib.Path.is_dir", return_value=True),
         ):
-            results = await search_files(
+            outcome = await search_files(
                 query="test",
                 roots=[Path("/tmp/allowed")],
                 extensions=None,
@@ -2150,7 +2218,8 @@ class TestSearchPerformance:
                 follow_symlinks=False,
             )
 
-        assert results == []
+        assert outcome.matches == []
+        assert outcome.truncated is False
 
     @pytest.mark.asyncio
     async def test_permission_error_continues_search(self):
@@ -2172,7 +2241,7 @@ class TestSearchPerformance:
             patch("pathlib.Path.is_dir", return_value=True),
             patch("pathlib.Path.stat", side_effect=mock_stat_side_effect),
         ):
-            results = await search_files(
+            outcome = await search_files(
                 query=".txt",
                 roots=[Path("/tmp/allowed")],
                 extensions=None,
@@ -2182,7 +2251,7 @@ class TestSearchPerformance:
             )
 
         # ok.txt and also_ok.txt succeed; denied.txt is skipped
-        assert len(results) == 2
+        assert len(outcome.matches) == 2
 
     @pytest.mark.asyncio
     async def test_os_error_on_stat_continues(self):
@@ -2203,7 +2272,7 @@ class TestSearchPerformance:
             patch("pathlib.Path.is_dir", return_value=True),
             patch("pathlib.Path.stat", side_effect=mock_stat_side_effect),
         ):
-            results = await search_files(
+            outcome = await search_files(
                 query=".txt",
                 roots=[Path("/tmp/allowed")],
                 extensions=None,
@@ -2212,14 +2281,14 @@ class TestSearchPerformance:
                 follow_symlinks=False,
             )
 
-        assert len(results) == 1
-        assert results[0]["name"] == "good.txt"
+        assert len(outcome.matches) == 1
+        assert outcome.matches[0]["name"] == "good.txt"
 
     @pytest.mark.asyncio
     async def test_non_existent_root_is_skipped(self):
         """If root directory doesn't exist, search returns empty."""
         with patch("pathlib.Path.is_dir", return_value=False):
-            results = await search_files(
+            outcome = await search_files(
                 query="test",
                 roots=[Path("/nonexistent")],
                 extensions=None,
@@ -2228,7 +2297,7 @@ class TestSearchPerformance:
                 follow_symlinks=False,
             )
 
-        assert results == []
+        assert outcome.matches == []
 
 
 # ===========================================================================

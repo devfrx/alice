@@ -124,6 +124,7 @@ async def test_get_tools_one_tool_when_enabled(tmp_path: Path) -> None:
     assert tool.capabilities == ("process_exec", "fs_write")
     assert tool.path_args == ("cwd",)
     assert tool.supports_cancellation is True
+    assert tool.usage_guidance, "run_terminal_command senza usage_guidance"
 
 
 # ---------------------------------------------------------------------------

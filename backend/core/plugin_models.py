@@ -46,6 +46,32 @@ class ConnectionStatus(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class McpToolMeta:
+    """Provenienza MCP di un tool (``None`` su ``ToolDefinition`` per i tool nativi).
+
+    Conserva ciò che ``map_mcp_tool`` altrimenti consuma e scarta: serve al
+    dialogo di conferma (trasparenza sul fallback), al catalogo tool e al
+    pannello MCP. ``destructive`` è ``None`` quando le annotations mancano o
+    il server non è fidato (fallback conservativo).
+
+    Attributes:
+        server: Nome del server MCP che espone il tool.
+        annotated: ``True`` se il tool dichiara annotations (a prescindere
+            dal trust del server).
+        trusted: Valore di ``trust_annotations`` del server.
+        read_only: ``True`` solo per il ramo readOnly fidato del mapping.
+        destructive: ``destructiveHint`` effettivo per il ramo write annotato
+            e fidato; ``None`` nel fallback conservativo.
+    """
+
+    server: str
+    annotated: bool
+    trusted: bool
+    read_only: bool
+    destructive: bool | None
+
+
+@dataclass(frozen=True, slots=True)
 class ToolDefinition:
     """Immutable descriptor for a single tool exposed by a plugin.
 
@@ -97,6 +123,10 @@ class ToolDefinition:
             use this tool. Collected for the tools actually offered in a
             turn and composed into the ``[ORCHESTRAZIONE]`` block — never
             serialised into the OpenAI schema.
+        mcp: Provenienza MCP (server, annotations, trust) popolata da
+            ``map_mcp_tool`` per i tool MCP; ``None`` per i tool nativi.
+            Solo informativa: il gate legge capabilities/risk, mai questo
+            campo.
     """
 
     name: str
@@ -117,6 +147,7 @@ class ToolDefinition:
     path_args: tuple[str, ...] = ()
     always_offered: bool = False
     usage_guidance: str | None = None
+    mcp: McpToolMeta | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.parameters, dict):

@@ -3,6 +3,7 @@
 from mcp.types import Tool, ToolAnnotations
 
 from backend.core.config import McpServerConfig
+from backend.core.plugin_models import McpToolMeta, ToolDefinition
 from backend.services.mcp_tool_mapping import map_mcp_tool
 
 
@@ -172,3 +173,90 @@ def test_path_args_missing_from_schema_fail_closed() -> None:
     assert td.risk_level == "dangerous"
     assert td.requires_confirmation is True
     assert td.path_args == ()
+
+
+# ---------------------------------------------------------------------------
+# McpToolMeta — provenienza MCP conservata sul ToolDefinition (Mossa 2, Task 1)
+# ---------------------------------------------------------------------------
+
+
+def test_read_only_tool_carries_mcp_meta() -> None:
+    server = McpServerConfig(name="files", command=["x"])
+    td = map_mcp_tool(_tool(annotations=ToolAnnotations(readOnlyHint=True)), server)
+    assert td.mcp == McpToolMeta(
+        server="files",
+        annotated=True,
+        trusted=True,
+        read_only=True,
+        destructive=False,
+    )
+
+
+def test_write_tool_meta_destructive_flag() -> None:
+    td = map_mcp_tool(
+        _tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False)),
+        _server(),
+    )
+    assert td.mcp is not None
+    assert td.mcp.destructive is False
+    assert td.mcp.read_only is False
+    assert td.mcp.annotated is True
+    assert td.mcp.trusted is True
+
+
+def test_write_tool_meta_destructive_default() -> None:
+    """destructiveHint omesso → True (default MCP); esplicito True → True."""
+    omitted = map_mcp_tool(_tool(annotations=ToolAnnotations(readOnlyHint=False)), _server())
+    explicit = map_mcp_tool(
+        _tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True)),
+        _server(),
+    )
+    assert omitted.mcp is not None and omitted.mcp.destructive is True
+    assert explicit.mcp is not None and explicit.mcp.destructive is True
+
+
+def test_unannotated_tool_meta_marks_fallback() -> None:
+    td = map_mcp_tool(_tool(annotations=None), _server())
+    assert td.mcp == McpToolMeta(
+        server="srv",
+        annotated=False,
+        trusted=True,
+        read_only=False,
+        destructive=None,
+    )
+
+
+def test_untrusted_server_meta_marks_untrusted() -> None:
+    """Server non fidato: il meta dice la verità (annotated, non trusted) ma il
+    gate resta al fallback conservativo — invariante Mossa 1 che NON cambia."""
+    td = map_mcp_tool(
+        _tool(annotations=ToolAnnotations(readOnlyHint=True)),
+        _server(trust_annotations=False),
+    )
+    assert td.mcp is not None
+    assert td.mcp.annotated is True
+    assert td.mcp.trusted is False
+    assert td.mcp.read_only is False
+    assert td.mcp.destructive is None
+    assert td.risk_level == "dangerous"
+    assert td.requires_confirmation is True
+
+
+def test_path_args_promotion_keeps_mcp_meta() -> None:
+    server = _server(path_args={"read_file": ["path"]})
+    td = map_mcp_tool(
+        _tool(
+            name="read_file",
+            annotations=ToolAnnotations(readOnlyHint=True),
+            properties={"path": {"type": "string"}},
+        ),
+        server,
+    )
+    assert td.capabilities == ("fs_read",)
+    assert td.mcp is not None
+    assert td.mcp.read_only is True
+
+
+def test_native_tool_definition_has_no_mcp_meta() -> None:
+    td = ToolDefinition(name="native_tool", description="Un tool nativo")
+    assert td.mcp is None

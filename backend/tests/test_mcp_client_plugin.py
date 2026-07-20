@@ -13,6 +13,7 @@ from backend.core.event_bus import AliceEvent, EventBus
 from backend.core.plugin_models import (
     ConnectionStatus,
     ExecutionContext,
+    McpToolMeta,
     ToolDefinition,
 )
 from backend.plugins.mcp_client.plugin import McpClientPlugin
@@ -292,6 +293,36 @@ class TestMcpClientPluginGetTools:
         assert td.path_args == ("path",)
         # The MCP-specific result ceiling must still be applied.
         assert td.max_result_chars == plugin._MCP_MAX_RESULT_CHARS
+
+    def test_get_tools_preserves_mcp_meta(self) -> None:
+        """Il re-namespacing (``dataclasses.replace``) deve conservare il
+        campo ``mcp`` (provenienza server/annotations) impostato dal
+        mapping — i consumatori a valle (dialogo di conferma, catalogo,
+        pannello MCP) lo leggono dal ToolDefinition finale."""
+        meta = McpToolMeta(
+            server="srv",
+            annotated=True,
+            trusted=True,
+            read_only=True,
+            destructive=False,
+        )
+        mapped = ToolDefinition(
+            name="read_file",
+            description="Read a file",
+            capabilities=("mcp_read",),
+            mcp=meta,
+        )
+        plugin = McpClientPlugin()
+        plugin._sessions = {
+            "srv": _make_mock_session("srv", tools=[mapped]),
+        }
+
+        tools = plugin.get_tools()
+        assert len(tools) == 1
+        assert tools[0].name == "mcp_srv_read_file"
+        assert tools[0].mcp is not None
+        assert tools[0].mcp == meta
+        assert tools[0].mcp.server == "srv"
 
     def test_get_tools_isolates_invalid_tool(self) -> None:
         """A single invalid tool doesn't crash the entire get_tools()."""

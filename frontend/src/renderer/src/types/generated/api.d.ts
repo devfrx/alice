@@ -4319,6 +4319,8 @@ export interface components {
              * @default null
              */
             risk_level?: ("safe" | "medium" | "dangerous" | "forbidden") | null;
+            /** @default null */
+            tool_meta?: components["schemas"]["WsToolMeta"] | null;
             /**
              * Tool Name
              * @default null
@@ -5118,6 +5120,42 @@ export interface components {
              * @enum {string}
              */
             type: "terminal.session_opened";
+        };
+        /**
+         * WsToolMeta
+         * @description Provenienza del tool nel dialogo di conferma (spec Fase 2 §6.1).
+         */
+        WsToolMeta: {
+            /**
+             * Annotated
+             * @default null
+             */
+            annotated?: boolean | null;
+            /**
+             * Destructive
+             * @default null
+             */
+            destructive?: boolean | null;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "native" | "mcp";
+            /**
+             * Read Only
+             * @default null
+             */
+            read_only?: boolean | null;
+            /**
+             * Server
+             * @default null
+             */
+            server?: string | null;
+            /**
+             * Trusted
+             * @default null
+             */
+            trusted?: boolean | null;
         };
         /**
          * WsToolProgress

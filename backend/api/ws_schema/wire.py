@@ -129,6 +129,7 @@ def to_v2_frames(event: AgentEvent) -> list[dict[str, Any]]:
             description=payload.get("description"),
             reasoning=payload.get("reasoning"),
             allow_remember=payload.get("allow_remember"),
+            tool_meta=payload.get("tool_meta"),
             questions=(
                 normalize_questions(questions) if questions is not None else None
             ),

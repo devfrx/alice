@@ -152,6 +152,56 @@ def test_interaction_requested_confirm_value_pinned() -> None:
     _assert_valid(frames)
 
 
+def test_interaction_requested_confirm_tool_meta_value_pinned() -> None:
+    """Il confirm porta ``tool_meta`` (provenienza, Task 4): il dict a 6 chiavi
+    di ``ToolMetaInfo.as_payload()`` passa dal modello ``WsToolMeta`` e le
+    sotto-chiavi ``None`` sono OMESSE dal dump (``exclude_none`` è ricorsivo)."""
+    frames = to_v2_frames(ev.InteractionRequestedEvent(
+        turn_id="t1", interaction_id="i1", kind="confirm", call_id="c1",
+        tool_name="mcp_client_mcp_files_write_file",
+        payload={
+            "args": {"path": "x.txt"}, "risk_level": "dangerous",
+            "description": "[files] Write file", "reasoning": None,
+            "allow_remember": True,
+            "tool_meta": {"origin": "mcp", "server": "files",
+                          "annotated": False, "read_only": False,
+                          "destructive": None, "trusted": True},
+        },
+    ))
+    assert frames == [{
+        "type": "interaction.requested", "origin": "agent", "turn_id": "t1",
+        "interaction_id": "i1", "execution_id": "c1", "kind": "tool_confirmation",
+        "tool_name": "mcp_client_mcp_files_write_file",
+        "args": {"path": "x.txt"}, "risk_level": "dangerous",
+        "description": "[files] Write file", "allow_remember": True,
+        "tool_meta": {"origin": "mcp", "server": "files", "annotated": False,
+                      "read_only": False, "trusted": True},
+    }]
+    _assert_valid(frames)
+
+
+def test_interaction_requested_confirm_tool_meta_none_key_omitted() -> None:
+    """``payload["tool_meta"] = None`` (verdetto senza provenienza): la chiave
+    NON compare nel frame dumped (``exclude_none``)."""
+    frames = to_v2_frames(ev.InteractionRequestedEvent(
+        turn_id="t1", interaction_id="i1", kind="confirm", call_id="c1",
+        tool_name="read",
+        payload={
+            "args": {"path": "/x"}, "risk_level": "medium",
+            "description": "Scrive un file", "reasoning": None,
+            "allow_remember": True, "tool_meta": None,
+        },
+    ))
+    assert frames == [{
+        "type": "interaction.requested", "origin": "agent", "turn_id": "t1",
+        "interaction_id": "i1", "execution_id": "c1", "kind": "tool_confirmation",
+        "tool_name": "read", "args": {"path": "/x"}, "risk_level": "medium",
+        "description": "Scrive un file", "allow_remember": True,
+    }]
+    assert "tool_meta" not in frames[0]
+    _assert_valid(frames)
+
+
 def test_interaction_requested_ask_user_value_pinned() -> None:
     """Esempio obbligatorio del piano: le questions raw sono normalizzate
     alla forma del contratto (chiavi estranee filtrate, default riempiti)."""

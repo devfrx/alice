@@ -60,6 +60,19 @@ class WsContextBreakdown(BaseModel):
     other: int
 
 
+class WsToolMeta(BaseModel):
+    """Provenienza del tool nel dialogo di conferma (spec Fase 2 §6.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    origin: Literal["native", "mcp"]
+    server: str | None = None
+    annotated: bool | None = None
+    read_only: bool | None = None
+    destructive: bool | None = None
+    trusted: bool | None = None
+
+
 class WsAskUserQuestion(BaseModel):
     """One question within an ``interaction.requested`` (``ask_user``) frame."""
 
@@ -177,6 +190,7 @@ class WsInteractionRequested(ChatServerFrame):
     reasoning: str | None = None
     allow_remember: bool | None = None
     questions: list[WsAskUserQuestion] | None = None
+    tool_meta: WsToolMeta | None = None
 
 
 class WsInteractionResolved(ChatServerFrame):

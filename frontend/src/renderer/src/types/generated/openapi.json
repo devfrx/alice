@@ -4244,6 +4244,17 @@
             "default": null,
             "title": "Risk Level"
           },
+          "tool_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WsToolMeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "tool_name": {
             "anyOf": [
               {
@@ -5799,6 +5810,85 @@
           "session"
         ],
         "title": "WsTerminalSessionOpened",
+        "type": "object"
+      },
+      "WsToolMeta": {
+        "additionalProperties": false,
+        "description": "Provenienza del tool nel dialogo di conferma (spec Fase 2 §6.1).",
+        "properties": {
+          "annotated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Annotated"
+          },
+          "destructive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destructive"
+          },
+          "origin": {
+            "enum": [
+              "native",
+              "mcp"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "read_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Read Only"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Server"
+          },
+          "trusted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Trusted"
+          }
+        },
+        "required": [
+          "origin"
+        ],
+        "title": "WsToolMeta",
         "type": "object"
       },
       "WsToolProgress": {

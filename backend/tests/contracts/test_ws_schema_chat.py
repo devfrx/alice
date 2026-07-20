@@ -99,6 +99,26 @@ REPRESENTATIVE_SERVER_FRAMES: list[dict[str, Any]] = [
     {
         "type": "interaction.requested",
         "turn_id": "t1",
+        "interaction_id": "i1",
+        "execution_id": "c1",
+        "kind": "tool_confirmation",
+        "tool_name": "mcp_client_mcp_files_write_file",
+        "args": {"path": "x.txt"},
+        "risk_level": "dangerous",
+        "description": "[files] Write file",
+        "allow_remember": True,
+        "tool_meta": {
+            "origin": "mcp",
+            "server": "files",
+            "annotated": False,
+            "read_only": False,
+            "destructive": None,
+            "trusted": True,
+        },
+    },
+    {
+        "type": "interaction.requested",
+        "turn_id": "t1",
         "interaction_id": "i2",
         "execution_id": "e2",
         "kind": "ask_user",
@@ -261,6 +281,21 @@ def test_user_message_accepts_optional_voice_source() -> None:
 def test_unknown_chat_type_is_rejected() -> None:
     with pytest.raises(ValidationError):
         validate_chat_server({"type": "usage", "input_tokens": 1, "output_tokens": 2})
+
+
+def test_tool_meta_rejects_unknown_keys() -> None:
+    """``WsToolMeta`` (extra=forbid): una chiave sconosciuta nella provenienza
+    deve far fallire la validazione dell'intero frame ``interaction.requested``."""
+    with pytest.raises(ValidationError):
+        validate_chat_server({
+            "type": "interaction.requested",
+            "turn_id": "t1",
+            "interaction_id": "i1",
+            "execution_id": "c1",
+            "kind": "tool_confirmation",
+            "tool_name": "write_file",
+            "tool_meta": {"origin": "native", "sneaky": True},
+        })
 
 
 def test_tool_result_rejects_removed_success_field() -> None:

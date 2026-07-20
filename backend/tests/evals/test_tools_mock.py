@@ -42,7 +42,13 @@ def _dump(checks: list[CheckResult]) -> list[dict[str, Any]]:
 
 
 async def test_fs_edit_exact_mock(app: FastAPI, tmp_path: Path) -> None:
-    """fs-edit-exact-01: modifica UNA sola delle due occorrenze, l'altra intatta."""
+    """fs-edit-exact-01: due righe IDENTICHE, modifica solo quella giusta.
+
+    Lo script rispecchia il comportamento che lo scenario vuole misurare:
+    il primo edit con la old_string naive ``"timeout = 30"`` FALLISCE
+    ("non è unica: 2 occorrenze" — verificato in RED contro la fixture),
+    il modello estende il contesto con l'header di sezione e riprova.
+    """
     scenario = load_scenario(SCENARIOS_DIR / "fs-edit-exact-01.yaml")
     ctx = app.state.context
     ctx.llm_service = SandboxScriptedLLM(
@@ -57,21 +63,39 @@ async def test_fs_edit_exact_mock(app: FastAPI, tmp_path: Path) -> None:
                 _STEP_DONE,
             ],
             [
+                # Tentativo naive: la riga esiste in ENTRAMBE le sezioni,
+                # il tool risponde con l'errore di non-unicità.
                 tool_call_event(
                     "file_search_edit_text_file",
                     {
                         "path": "{sandbox}/settings.txt",
-                        "old_string": "client_timeout = 30",
-                        "new_string": "client_timeout = 60",
+                        "old_string": "timeout = 30",
+                        "new_string": "timeout = 60",
                     },
-                    "call_edit_1",
+                    "call_edit_naive",
+                ),
+                _STEP_DONE,
+            ],
+            [
+                # Disambiguazione: contesto esteso con l'header [client].
+                tool_call_event(
+                    "file_search_edit_text_file",
+                    {
+                        "path": "{sandbox}/settings.txt",
+                        "old_string": "[client]\ntimeout = 30",
+                        "new_string": "[client]\ntimeout = 60",
+                    },
+                    "call_edit_scoped",
                 ),
                 _STEP_DONE,
             ],
             [
                 {
                     "type": "token",
-                    "content": ("Fatto: client_timeout ora vale 60, server_timeout resta 30."),
+                    "content": (
+                        "Fatto: il timeout della sezione [client] ora vale 60, "
+                        "quello di [server] resta 30."
+                    ),
                 },
                 _USAGE,
                 _STOP,
@@ -85,6 +109,7 @@ async def test_fs_edit_exact_mock(app: FastAPI, tmp_path: Path) -> None:
     assert result.passed is True, _dump(result.checks)
     assert result.trace.tool_calls == [
         "file_search_read_text_file",
+        "file_search_edit_text_file",
         "file_search_edit_text_file",
     ]
 
@@ -201,6 +226,9 @@ async def test_mcp_gate_strict_auto_decline(app: FastAPI, tmp_path: Path) -> Non
     assert tool_def.requires_confirmation is True
 
     assert ctx.tool_registry is not None
+    # Scorciatoia deliberata: register_kernel_tool pinna il GATE (che guarda
+    # solo capabilities/risk/confirm della ToolDefinition), NON il path di
+    # registrazione del plugin mcp_client.
     await ctx.tool_registry.register_kernel_tool(tool_def, _handler)
 
     scenario = Scenario(

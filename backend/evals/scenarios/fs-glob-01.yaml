@@ -13,8 +13,8 @@ setup:
       content: "body { margin: 0; }\n"
 prompt: |-
   Cartella di lavoro: {sandbox}
-  Elenca SOLO i file Python (.py) presenti nella cartella di lavoro, a
-  qualunque profondità. Non citare file di altro tipo.
+  Elenca i file Python (.py) presenti nella cartella di lavoro, a
+  qualunque profondità.
 checks:
   - kind: tool_called
     name: file_search_glob_files
@@ -22,8 +22,11 @@ checks:
     pattern: "main\\.py"
   - kind: response_matches
     pattern: "helpers\\.py"
+  # Negativi ancorati al PATH (dir + separatore): falliscono solo se la
+  # risposta ELENCA il file escluso come risultato, non se lo menziona
+  # di passaggio ("ho ignorato note.txt").
   - kind: response_not_matches
-    pattern: "note\\.txt"
+    pattern: "docs[/\\\\]note\\.txt"
   - kind: response_not_matches
-    pattern: "style\\.css"
+    pattern: "src[/\\\\]style\\.css"
   - kind: finished_ok

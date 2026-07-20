@@ -158,7 +158,14 @@ class SandboxScriptedLLM(ScriptedLLM):
                 match = self._WORKSPACE_RE.search(content)
                 if match:
                     return match.group(1).strip()
-        return ""
+        # Fail-fast: senza il marker il placeholder resterebbe irrisolto e
+        # il tool fallirebbe a valle con un errore di path fuorviante.
+        raise RuntimeError(
+            "SandboxScriptedLLM: nessun messaggio contiene la riga "
+            "'Cartella di lavoro: <path>' richiesta dalla convenzione "
+            "sandbox degli scenari mock — aggiungila al prompt dello "
+            "scenario."
+        )
 
     async def chat(
         self,

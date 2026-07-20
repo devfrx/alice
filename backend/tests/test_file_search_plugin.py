@@ -1116,6 +1116,7 @@ class TestWriteTextFileTool:
         )
 
         assert not result.success
+        assert f.read_text() == "originale cambiato fuori"
         assert "modificat" in result.error_message.lower()
 
     @pytest.mark.asyncio
@@ -1154,6 +1155,31 @@ class TestWriteTextFileTool:
 
         assert second.success
         assert f.read_text() == "v2"
+
+    @pytest.mark.asyncio
+    async def test_write_then_edit_without_reread(self, tmp_path):
+        """record() is shared between the two tools via the same
+        ReadTracker: a write_text_file (new file) pins the mtime, so a
+        follow-up edit_text_file in the same conversation needs no
+        re-read either (interop, mirror of test_write_then_write)."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.txt"
+
+        written = await plugin.execute_tool(
+            "write_text_file",
+            {"path": str(f), "content": "x = 1\n"},
+            _make_exec_ctx(),
+        )
+        assert written.success
+
+        edited = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1", "new_string": "x = 2"},
+            _make_exec_ctx(),
+        )
+
+        assert edited.success
+        assert f.read_text() == "x = 2\n"
 
 
 # ===========================================================================

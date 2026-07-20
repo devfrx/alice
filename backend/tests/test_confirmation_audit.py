@@ -15,7 +15,7 @@ class TestToolConfirmationAuditModel:
         entry = ToolConfirmationAudit(
             conversation_id=uuid.uuid4(),
             execution_id=str(uuid.uuid4()),
-            tool_name="pc_automation_execute_command",
+            tool_name="terminal_run_terminal_command",
             args_json='{"command": "ipconfig"}',
             risk_level="dangerous",
             user_approved=True,

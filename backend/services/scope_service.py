@@ -39,12 +39,12 @@ from backend.db.models import ConversationScope
 EventCallback = Callable[[dict[str, Any]], Awaitable[None]]
 """Awaitable callback invoked after a scope is created, changed or cleared."""
 
-# Windows system roots that are always out of scope.  Replicated (not
-# imported) from ``backend.plugins.pc_automation.constants.FORBIDDEN_PATHS``
-# — and matching the system-dir check in
-# ``backend.plugins.pc_automation.security.validate_path`` — so the service
-# stays decoupled from plugin internals.  ``WorkspaceScopeConfig.forbidden_paths``
-# is layered on top of these at validation time.
+# Windows system roots that are always out of scope.  Originally replicated
+# (not imported) from the pc_automation forbidden-path list so the service
+# stays decoupled from plugin internals; that list was retired with
+# ``execute_command`` (Fase 2), leaving this as the canonical set.
+# ``WorkspaceScopeConfig.forbidden_paths`` is layered on top of these at
+# validation time.
 _SYSTEM_ROOTS: tuple[str, ...] = (
     r"C:\Windows",
     r"C:\Program Files",
@@ -332,7 +332,7 @@ class ScopeService:
         * require the resolved path to exist and be a directory;
         * reject anything at or under a forbidden / system root —
           ``self._config.forbidden_paths`` plus the Windows system roots
-          replicated from ``pc_automation`` ``FORBIDDEN_PATHS``.
+          in ``_SYSTEM_ROOTS`` above.
 
         Args:
             folder: The candidate absolute folder path.

@@ -3,9 +3,10 @@
 After a screenshot is captured, certain dangerous tools are temporarily
 blocked to prevent prompt-injection attacks from exfiltrating screen
 contents via tool chaining. This policy is owned by ``core`` so that a
-single process-wide instance protects **every** dangerous tool — both
-``pc_automation``'s ``execute_command`` and the scoped terminal's
-``run_terminal_command`` — from one screenshot event.
+single process-wide instance protects **every** dangerous tool from one
+screenshot event — today the scoped terminal's ``run_terminal_command``,
+the single exec path since ``pc_automation.execute_command`` was retired
+(Fase 2).
 
 The lockout is intentionally synchronous and guarded by a
 ``threading.Lock``: it is recorded from inside the blocking screenshot
@@ -24,7 +25,7 @@ import time
 SCREENSHOT_LOCKOUT_S: float = 60.0
 """Seconds to block dangerous tools after a screenshot is taken."""
 
-LOCKOUT_TOOLS: frozenset[str] = frozenset({"execute_command", "run_terminal_command"})
+LOCKOUT_TOOLS: frozenset[str] = frozenset({"run_terminal_command"})
 """Raw tool names blocked while a screenshot lockout is active (anti-exfiltration)."""
 
 
@@ -32,9 +33,9 @@ class ScreenshotLockout:
     """Thread-safe lockout manager for post-screenshot security.
 
     After a screenshot is taken, the tools in :data:`LOCKOUT_TOOLS` (such as
-    ``execute_command`` and ``run_terminal_command``) are blocked for
-    :data:`SCREENSHOT_LOCKOUT_S` seconds to prevent prompt-injection attacks
-    that could exfiltrate screenshot data.
+    ``run_terminal_command``) are blocked for :data:`SCREENSHOT_LOCKOUT_S`
+    seconds to prevent prompt-injection attacks that could exfiltrate
+    screenshot data.
     """
 
     def __init__(self) -> None:

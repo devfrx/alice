@@ -96,66 +96,10 @@ ALLOWED_KEY_COMBOS: list[list[str]] = [
     ["ctrl", "shift", "tab"],  # Previous tab
 ]
 
-# -- Command Whitelist ----------------------------------------------------
-# Only these commands can be executed. Maps command name to description.
-COMMAND_WHITELIST: dict[str, str] = {
-    # Informational
-    "ipconfig": "Show network configuration",
-    "systeminfo": "Show system information",
-    "tasklist": "List running processes",
-    "hostname": "Show computer name",
-    "whoami": "Show current user",
-    "date": "Show current date",
-    "time": "Show current time",
-    "dir": "List directory contents",
-    "echo": "Print text",
-    "type": "Display file contents",
-    "ping": "Test network connectivity",
-    "nslookup": "DNS lookup",
-    "netstat": "Network statistics",
-    "ver": "Show Windows version",
-    "vol": "Show disk volume label",
-    "where": "Locate executables in PATH",
-    "tree": "Show directory tree structure",
-    "findstr": "Search text in files",
-    # File management
-    "mkdir": "Create a directory",
-    "md": "Create a directory (alias)",
-    "copy": "Copy files",
-    "move": "Move or rename files and directories",
-    "rename": "Rename a file or directory",
-    "ren": "Rename a file or directory (alias)",
-    "rmdir": "Remove an empty directory",
-    "rd": "Remove an empty directory (alias)",
-    "robocopy": "Robust file copy",
-}
-
-# Commands that operate on file paths (validated against FORBIDDEN_PATHS)
-FILE_MANAGEMENT_CMDS: set[str] = {
-    "mkdir", "md", "copy", "move", "rename", "ren",
-    "rmdir", "rd", "robocopy", "dir", "type", "tree",
-}
-
-# CMD.exe built-in commands that cannot run as standalone executables.
-# These must be executed via 'cmd.exe /c <command>'.
-CMD_BUILTINS: set[str] = {
-    "dir", "echo", "type", "date", "time", "ver", "vol",
-    "mkdir", "md", "copy", "move", "rename", "ren", "rmdir", "rd",
-    "cls", "color", "title", "pushd", "popd", "cd",
-}
-
-# -- Path Security --------------------------------------------------------
-# Directories that tools CANNOT target or access
-FORBIDDEN_PATHS: list[str] = [
-    r"C:\Windows",
-    r"C:\Program Files",
-    r"C:\Program Files (x86)",
-    r"C:\ProgramData",
-    r"C:\$Recycle.Bin",
-    r"C:\System Volume Information",
-    r"C:\Recovery",
-    r"C:\Boot",
-]
+# The command whitelist (COMMAND_WHITELIST / FILE_MANAGEMENT_CMDS /
+# CMD_BUILTINS / FORBIDDEN_PATHS / FORBIDDEN_FLAGS) was removed with the
+# retirement of ``execute_command`` (Fase 2): the scoped
+# ``terminal.run_terminal_command`` tool is the single exec path.
 
 # -- Screenshot Settings --------------------------------------------------
 MAX_SCREENSHOT_PIXELS: int = 2_000_000
@@ -164,13 +108,6 @@ MAX_SCREENSHOT_PIXELS: int = 2_000_000
 # SCREENSHOT_LOCKOUT_S and LOCKOUT_TOOLS were promoted to
 # backend.core.screenshot_lockout (shared process-wide lockout) and are
 # re-exported at the top of this module for backward compatibility.
-
-# Per-command forbidden flags (prevent destructive operations)
-FORBIDDEN_FLAGS: dict[str, set[str]] = {
-    "rmdir": {"/s", "/q"},
-    "rd": {"/s", "/q"},
-    "robocopy": {"/mir", "/purge", "/move", "/mov"},
-}
 
 # -- Subprocess Settings --------------------------------------------------
 MAX_COMMAND_OUTPUT_CHARS: int = 8000

@@ -11,19 +11,16 @@ import asyncio
 import contextlib
 import csv
 import io
-import re
 
 from loguru import logger
 
 from backend.core.screenshot_lockout import get_lockout
 from backend.plugins.pc_automation.constants import (
     ALLOWED_APPS,
-    CMD_BUILTINS,
     MAX_SCREENSHOT_PIXELS,
 )
 from backend.plugins.pc_automation.security import (
     validate_app_name,
-    validate_command,
     validate_keys,
 )
 from backend.plugins.pc_automation.validators import (
@@ -56,10 +53,9 @@ except ImportError:
     pywinauto = None  # type: ignore[assignment]
     _PYWINAUTO_AVAILABLE = False
 
-# Bind the process-wide lockout singleton (owned by core) so this module's
-# call sites and the plugin share one instance — a screenshot also locks out
-# the terminal tool. ``get_lockout`` (imported above) stays importable from
-# here for backward compatibility (e.g. plugin.py).
+# Bind the process-wide lockout singleton (owned by core): a screenshot
+# taken here locks out the scoped terminal tool. ``get_lockout`` (imported
+# above) stays importable from here for backward compatibility.
 _lockout = get_lockout()
 
 
@@ -71,73 +67,6 @@ def check_dependencies() -> list[str]:
     if not _PYWINAUTO_AVAILABLE:
         missing.append("pywinauto")
     return missing
-
-
-# ---------------------------------------------------------------------------
-# Command normalisation helpers
-# ---------------------------------------------------------------------------
-
-_RE_MULTI_BACKSLASH = re.compile(r"\\{2,}")
-
-
-def _normalize_backslashes(command: str) -> str:
-    """Collapse doubled backslashes produced by LLM JSON encoding.
-
-    ``"C:\\\\Users\\\\Jays"`` → ``"C:\\Users\\Jays"``.
-    UNC paths (``\\\\server\\share``) are preserved as ``\\server\\share``
-    because the regex collapses *any* run of 2+ backslashes into one.
-    """
-    return _RE_MULTI_BACKSLASH.sub("\\\\", command)
-
-
-def _tokenize_command(command: str) -> list[str]:
-    """Tokenise a Windows command string respecting double-quoted paths.
-
-    Backslash is NOT treated as an escape character (Windows semantics).
-    Surrounding double quotes are stripped from each token.  Trailing
-    backslashes are stripped **only from tokens that were originally
-    quoted** to work around the cmd.exe ``\\"`` trailing-backslash
-    bug where a quoted destination path ends with a backslash, e.g.::
-
-        move "C:\\src\\a.jpg" "C:\\dest\\"
-
-    Unquoted tokens like ``C:\\`` are preserved so that root drive
-    references keep their trailing backslash.
-
-    Args:
-        command: The raw command string (e.g. from the LLM).
-
-    Returns:
-        List of string tokens with quotes removed and trailing backslashes
-        stripped from quoted multi-character tokens.
-    """
-    tokens: list[str] = []
-    current: list[str] = []
-    in_quotes = False
-    was_quoted = False
-
-    for ch in command:
-        if ch == '"':
-            in_quotes = not in_quotes
-            was_quoted = True
-        elif ch == ' ' and not in_quotes:
-            if current:
-                token = "".join(current)
-                if was_quoted and len(token) > 1:
-                    token = token.rstrip("\\")
-                tokens.append(token)
-                current = []
-                was_quoted = False
-        else:
-            current.append(ch)
-
-    if current:
-        token = "".join(current)
-        if was_quoted and len(token) > 1:
-            token = token.rstrip("\\")
-        tokens.append(token)
-
-    return tokens
 
 
 def _find_executable(candidates: list[str]) -> str | None:
@@ -467,48 +396,6 @@ async def exec_get_running_apps() -> list[dict[str, str]]:
             break
 
     return apps
-
-
-async def exec_command(command: str, cwd: str | None = None) -> str:
-    """Execute a whitelisted command safely.
-
-    Checks the screenshot lockout before execution.
-
-    Args:
-        command: The whitelisted command string to execute.
-        cwd: Working directory for the subprocess (the active workspace
-            sandbox). ``None`` inherits the backend process cwd. Relative
-            paths in the command resolve against this directory.
-    """
-    if _lockout.is_locked("execute_command"):
-        remaining = _lockout.get_remaining_s()
-        raise RuntimeError(
-            f"Command execution is locked for {remaining:.0f}s "
-            "due to recent screenshot (anti-exfiltration protection)"
-        )
-
-    # LLMs often JSON-encode backslashes in Windows paths, producing
-    # doubled backslashes (e.g. "C:\\\\Users\\\\..." → "C:\\Users\\...").
-    # Collapse them so cmd.exe receives valid paths.
-    command = _normalize_backslashes(command)
-
-    valid, msg = validate_command(command)
-    if not valid:
-        raise ValueError(msg)
-
-    tokens = _tokenize_command(command)
-    base_cmd = tokens[0].lower()
-    if base_cmd.endswith(".exe"):
-        base_cmd = base_cmd[:-4]
-
-    if base_cmd in CMD_BUILTINS:
-        # CMD built-in commands must run through cmd.exe /c.
-        # Pass tokens as a proper argument list so subprocess does not
-        # re-quote already-stripped paths.
-        return await safe_subprocess("cmd.exe", ["/c"] + tokens, cwd=cwd)
-
-    # External executables: split into command + args
-    return await safe_subprocess(tokens[0], tokens[1:], cwd=cwd)
 
 
 async def exec_move_mouse(x: int, y: int) -> str:

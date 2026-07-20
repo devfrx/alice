@@ -95,8 +95,8 @@ def test_safe_resolve_invalid_path_returns_none() -> None:
 
 # ---------------------------------------------------------------------------
 # is_relative_to — pinned from terminal._is_relative_to (equal-or-descendant),
-# permission_service._is_relative_to (never raises) and the SYSTEM_DIRS
-# prefix-sibling case in pc_automation.validate_path.
+# permission_service._is_relative_to (never raises) and the system-dirs
+# prefix-sibling case of the retired pc_automation command-path validation.
 # ---------------------------------------------------------------------------
 
 

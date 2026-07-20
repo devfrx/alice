@@ -41,7 +41,7 @@ def scenario() -> Scenario:
         checks=[
             CheckSpec(kind="response_matches", pattern="segreto-42"),
             CheckSpec(kind="finished_ok"),
-            CheckSpec(kind="tool_not_called", name="execute_command"),
+            CheckSpec(kind="tool_not_called", name="run_terminal_command"),
         ],
         judge=JudgeSpec(criteria=["La risposta è pertinente?"]),
     )

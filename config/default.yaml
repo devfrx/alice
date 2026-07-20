@@ -119,7 +119,6 @@ voice:
 pc_automation:
   screenshot_lockout_s: 60
   command_timeout_s: 30
-  max_command_output_chars: 500
 
 # Scoped-terminal plugin policy (Fase 6). Disabled by default; while
 # enabled=false the plugin registers but exposes no tools.

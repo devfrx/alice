@@ -1,8 +1,9 @@
 """Tests for the shared core screenshot lockout (Fase 6d).
 
 Verifies the lockout was promoted to :mod:`backend.core.screenshot_lockout`
-as a single process-wide instance covering both ``execute_command`` and the
-scoped terminal's ``run_terminal_command``, and that the ``pc_automation``
+as a single process-wide instance covering the scoped terminal's
+``run_terminal_command`` (the single exec path since the Fase 2 retirement
+of ``pc_automation.execute_command``), and that the ``pc_automation``
 re-export shims resolve to the very same class and singleton.
 """
 
@@ -16,25 +17,22 @@ from backend.core.screenshot_lockout import (
 )
 
 
-def test_lockout_tools_cover_both_dangerous_tools() -> None:
-    """Both the PC-automation and terminal tools are in the lockout set."""
-    assert "execute_command" in LOCKOUT_TOOLS
-    assert "run_terminal_command" in LOCKOUT_TOOLS
+def test_lockout_tools_cover_the_terminal_tool_only() -> None:
+    """The terminal exec tool is the only tracked tool post-retirement."""
+    assert frozenset({"run_terminal_command"}) == LOCKOUT_TOOLS
 
 
 def test_fresh_lockout_not_locked_before_screenshot() -> None:
     """A fresh lockout blocks nothing until a screenshot is recorded."""
     lockout = ScreenshotLockout()
-    assert lockout.is_locked("execute_command") is False
     assert lockout.is_locked("run_terminal_command") is False
 
 
-def test_screenshot_locks_both_tools() -> None:
+def test_screenshot_locks_tracked_tool() -> None:
     """One screenshot locks out every tracked tool, but not untracked ones."""
     lockout = ScreenshotLockout()
     lockout.record_screenshot()
 
-    assert lockout.is_locked("execute_command") is True
     assert lockout.is_locked("run_terminal_command") is True
     # A tool name that is not part of the lockout set is never blocked.
     assert lockout.is_locked("something_else") is False

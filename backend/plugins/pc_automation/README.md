@@ -19,11 +19,13 @@ pc_automation/
 
 All PC automation tools are security-sensitive. The plugin implements multiple layers of protection:
 
+> **Shell execution is NOT provided by this plugin.** The former
+> `execute_command` tool was retired in Fase 2 (Agent v2): the scoped
+> `terminal.run_terminal_command` tool is the single exec path.
+
 ### 1. Whitelists (constants.py)
 - **Applications**: Only pre-approved apps can be opened/closed
-- **Commands**: Only safe, read-only commands can be executed
 - **Key combos**: Dangerous shortcuts (Ctrl+Alt+Del, Win+R) are blocked
-- **Paths**: System directories (C:\Windows, C:\Program Files) are protected
 
 ### 2. Risk Levels
 | Tool | Risk Level | Confirmation Required |
@@ -37,20 +39,19 @@ All PC automation tools are security-sensitive. The plugin implements multiple l
 | take_screenshot | medium | Yes |
 | move_mouse | medium | Yes |
 | click | medium | Yes |
-| execute_command | dangerous | Yes |
 
 ### 3. Post-Screenshot Lockout
-After `take_screenshot` is called, `execute_command` is blocked for 60 seconds to prevent prompt injection attacks that could exfiltrate screenshot data.
+After `take_screenshot` is called, the terminal's `run_terminal_command` is blocked for 60 seconds (process-wide `core.screenshot_lockout`) to prevent prompt injection attacks that could exfiltrate screenshot data.
 
 ### 4. FORBIDDEN Enforcement
 Tools with `risk_level="forbidden"` are blocked at the tool loop level and cannot be executed under any circumstances.
 
 ### 5. Subprocess Security
+Internal subprocess calls (taskkill, tasklist) go through `safe_subprocess`:
 - Always `shell=False` (no shell injection)
 - Arguments passed as list (no command concatenation)
 - Timeout enforcement (30s default)
-- Output truncation (500 chars max)
-- Shell metacharacters blocked (`;`, `|`, `&`, `` ` ``, etc.)
+- Output truncation
 
 ## Configuration
 
@@ -59,8 +60,6 @@ Tools with `risk_level="forbidden"` are blocked at the tool loop level and canno
 pc_automation:
   screenshot_lockout_s: 60
   command_timeout_s: 30
-  max_command_output_chars: 500
-  confirmations_enabled: true
 ```
 
 ## Dependencies

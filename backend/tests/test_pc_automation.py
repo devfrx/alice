@@ -54,7 +54,6 @@ EXPECTED_TOOLS: dict[str, dict] = {
     "take_screenshot":    {"risk": "medium",    "confirm": True},
     "move_mouse":         {"risk": "medium",    "confirm": True},
     "click":              {"risk": "medium",    "confirm": True},
-    "execute_command":    {"risk": "dangerous", "confirm": True},
 }
 
 
@@ -62,6 +61,23 @@ def _get_plugin():
     """Import and return PcAutomationPlugin (lazy to avoid import errors)."""
     from backend.plugins.pc_automation.plugin import PcAutomationPlugin
     return PcAutomationPlugin()
+
+
+def test_execute_command_retired():
+    """Exec is unified on terminal.run_terminal_command (Fase 2, spec 5.1).
+
+    The parallel ``execute_command`` path (command whitelist + workspace_root
+    confinement) was retired; app launching stays.
+    """
+    names = {t.name for t in _get_plugin().get_tools()}
+    assert "execute_command" not in names
+    assert "open_application" in names  # il lancio app resta
+
+
+def test_open_application_declares_process_exec_capability():
+    """open_application still declares the process_exec capability."""
+    tools = {t.name: t for t in _get_plugin().get_tools()}
+    assert "process_exec" in tools["open_application"].capabilities
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +105,7 @@ class TestPcAutomationPluginLifecycle:
         assert plugin.ctx is ctx
 
     def test_get_tools(self):
-        """get_tools returns 10 ToolDefinition objects with correct names."""
+        """get_tools returns 9 ToolDefinition objects with correct names."""
         plugin = _get_plugin()
         tools = plugin.get_tools()
         assert len(tools) == len(EXPECTED_TOOLS)
@@ -145,10 +161,10 @@ class TestPcAutomationToolRiskLevels:
         for name in medium_names:
             assert tm[name].risk_level == "medium", f"{name} should be medium"
 
-    def test_dangerous_tools(self):
-        """execute_command is risk 'dangerous'."""
+    def test_no_dangerous_tools(self):
+        """No pc_automation tool is risk 'dangerous' since the exec retirement."""
         tm = self._tool_map()
-        assert tm["execute_command"].risk_level == "dangerous"
+        assert all(td.risk_level != "dangerous" for td in tm.values())
 
     def test_confirmation_required(self):
         """All medium/dangerous tools have requires_confirmation=True."""
@@ -311,42 +327,6 @@ class TestPcAutomationExecuteTool:
         assert not result.success
         assert result.error_message
 
-    # -- execute_command ---------------------------------------------------
-
-    @pytest.mark.asyncio
-    @patch("backend.plugins.pc_automation.executor.safe_subprocess")
-    @patch("backend.plugins.pc_automation.executor.validate_command")
-    @patch("backend.plugins.pc_automation.executor._lockout")
-    async def test_exec_command_whitelisted(
-        self, mock_lockout, mock_validate_cmd, mock_subprocess,
-        ctx, exec_context,
-    ):
-        """A whitelisted command (ipconfig) executes successfully."""
-        mock_lockout.is_locked.return_value = False
-        mock_validate_cmd.return_value = (True, "Command 'ipconfig' is whitelisted")
-        mock_subprocess.return_value = "Windows IP Configuration\nIPv4: 192.168.1.10"
-
-        plugin = _get_plugin()
-        await plugin.initialize(ctx)
-
-        result = await plugin.execute_tool(
-            "execute_command", {"command": "ipconfig"}, exec_context,
-        )
-        assert result.success
-        assert "192.168.1.10" in str(result.content)
-
-    @pytest.mark.asyncio
-    async def test_exec_command_blocked(self, ctx, exec_context):
-        """A non-whitelisted command (rm) returns error."""
-        plugin = _get_plugin()
-        await plugin.initialize(ctx)
-
-        result = await plugin.execute_tool(
-            "execute_command", {"command": "rm -rf /"}, exec_context,
-        )
-        assert not result.success
-        assert result.error_message
-
     # -- take_screenshot ---------------------------------------------------
 
     @pytest.mark.asyncio
@@ -388,16 +368,12 @@ class TestPcAutomationConnectionStatus:
     """Verify get_connection_status returns correct state."""
 
     @pytest.mark.asyncio
-    @patch("backend.plugins.pc_automation.plugin.get_lockout")
     @patch("backend.plugins.pc_automation.plugin.check_executor_deps")
-    async def test_connected_when_deps_available_no_lockout(
-        self, mock_check_deps, mock_get_lockout, ctx,
+    async def test_connected_when_deps_available(
+        self, mock_check_deps, ctx,
     ):
-        """Status is CONNECTED when all deps present and no lockout."""
+        """Status is CONNECTED when all deps are present."""
         mock_check_deps.return_value = []
-        mock_lockout = MagicMock()
-        mock_lockout.is_locked.return_value = False
-        mock_get_lockout.return_value = mock_lockout
 
         plugin = _get_plugin()
         await plugin.initialize(ctx)
@@ -418,21 +394,3 @@ class TestPcAutomationConnectionStatus:
 
         status = await plugin.get_connection_status()
         assert status == ConnectionStatus.DISCONNECTED
-
-    @pytest.mark.asyncio
-    @patch("backend.plugins.pc_automation.plugin.get_lockout")
-    @patch("backend.plugins.pc_automation.plugin.check_executor_deps")
-    async def test_degraded_when_lockout_active(
-        self, mock_check_deps, mock_get_lockout, ctx,
-    ):
-        """Status is DEGRADED when deps OK but lockout is active."""
-        mock_check_deps.return_value = []
-        mock_lockout = MagicMock()
-        mock_lockout.is_locked.return_value = True
-        mock_get_lockout.return_value = mock_lockout
-
-        plugin = _get_plugin()
-        await plugin.initialize(ctx)
-
-        status = await plugin.get_connection_status()
-        assert status == ConnectionStatus.DEGRADED

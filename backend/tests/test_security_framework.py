@@ -10,9 +10,7 @@ from backend.plugins.pc_automation.constants import (
 from backend.plugins.pc_automation.security import (
     ScreenshotLockout,
     validate_app_name,
-    validate_command,
     validate_keys,
-    validate_path,
 )
 
 # ===================================================================
@@ -53,65 +51,6 @@ class TestValidateAppName:
         expected = ALLOWED_APPS["chrome"]
         assert isinstance(expected, list)
         assert exe == expected[0]
-
-
-# ===================================================================
-# TestValidateCommand
-# ===================================================================
-
-
-class TestValidateCommand:
-    """Validate command whitelist and shell-injection blocking."""
-
-    def test_valid_command(self) -> None:
-        ok, msg = validate_command("ipconfig")
-        assert ok is True
-        assert "whitelisted" in msg.lower()
-
-    def test_valid_command_with_args(self) -> None:
-        ok, _msg = validate_command("ping 127.0.0.1")
-        assert ok is True
-
-    def test_invalid_command(self) -> None:
-        ok, msg = validate_command("rm")
-        assert ok is False
-        assert "not whitelisted" in msg.lower()
-
-    def test_shell_injection_semicolon(self) -> None:
-        ok, msg = validate_command("ipconfig; rm -rf /")
-        assert ok is False
-        # Rejected either as unrecognised command or shell metacharacter
-        assert "not whitelisted" in msg.lower() or "not allowed" in msg.lower()
-
-    def test_shell_injection_pipe(self) -> None:
-        ok, msg = validate_command("ipconfig | evil")
-        assert ok is False
-        assert "not allowed" in msg.lower()
-
-    def test_shell_injection_ampersand(self) -> None:
-        ok, msg = validate_command("ipconfig & evil")
-        assert ok is False
-        assert "not allowed" in msg.lower()
-
-    def test_shell_injection_backtick(self) -> None:
-        ok, msg = validate_command("ipconfig `evil`")
-        assert ok is False
-        assert "not allowed" in msg.lower()
-
-    def test_empty_command(self) -> None:
-        ok, msg = validate_command("")
-        assert ok is False
-        assert "empty" in msg.lower()
-
-    def test_newline_injection(self) -> None:
-        ok, msg = validate_command("dir C:\\Users\necho pwned")
-        assert ok is False
-        assert "newline" in msg.lower()
-
-    def test_carriage_return_injection(self) -> None:
-        ok, msg = validate_command("dir C:\\Users\r\necho pwned")
-        assert ok is False
-        assert "newline" in msg.lower()
 
 
 # ===================================================================
@@ -159,41 +98,6 @@ class TestValidateKeys:
 
 
 # ===================================================================
-# TestValidatePath
-# ===================================================================
-
-
-class TestValidatePath:
-    """Validate path traversal blocking against FORBIDDEN_PATHS."""
-
-    def test_valid_path(self) -> None:
-        ok, _msg = validate_path("C:\\Users\\Test\\file.txt")
-        assert ok is True
-
-    def test_forbidden_windows_dir(self) -> None:
-        ok, msg = validate_path("C:\\Windows\\System32\\config")
-        assert ok is False
-        assert "protected" in msg.lower()
-
-    def test_forbidden_program_files(self) -> None:
-        ok, msg = validate_path("C:\\Program Files\\test")
-        assert ok is False
-        assert "protected" in msg.lower()
-
-    def test_relative_path_ok(self) -> None:
-        """A relative path that does not resolve into a system dir passes."""
-        # This resolves against cwd which should be the project root,
-        # not a system directory.
-        ok, _msg = validate_path("relative/path.txt")
-        assert ok is True
-
-    def test_empty_path(self) -> None:
-        ok, msg = validate_path("")
-        assert ok is False
-        assert "empty" in msg.lower()
-
-
-# ===================================================================
 # TestScreenshotLockout
 # ===================================================================
 
@@ -203,12 +107,12 @@ class TestScreenshotLockout:
 
     def test_not_locked_initially(self) -> None:
         lockout = ScreenshotLockout()
-        assert lockout.is_locked("execute_command") is False
+        assert lockout.is_locked("run_terminal_command") is False
 
     def test_locked_after_screenshot(self) -> None:
         lockout = ScreenshotLockout()
         lockout.record_screenshot()
-        assert lockout.is_locked("execute_command") is True
+        assert lockout.is_locked("run_terminal_command") is True
 
     def test_unlocked_after_timeout(self) -> None:
         lockout = ScreenshotLockout()
@@ -220,7 +124,7 @@ class TestScreenshotLockout:
             t0 = time.monotonic()
             lockout._last_screenshot = t0
             mock_time.monotonic.return_value = t0 + 61
-            assert lockout.is_locked("execute_command") is False
+            assert lockout.is_locked("run_terminal_command") is False
 
     def test_non_lockout_tool_not_affected(self) -> None:
         lockout = ScreenshotLockout()
@@ -268,133 +172,3 @@ class TestForbiddenToolEnforcement:
         )
         assert td.risk_level == "forbidden"
         assert td.requires_confirmation is True
-
-
-# ===================================================================
-# TestForbiddenFlags
-# ===================================================================
-
-
-class TestForbiddenFlags:
-    """FORBIDDEN_FLAGS must block dangerous flags for destructive commands."""
-
-    def test_rmdir_s_blocked(self) -> None:
-        valid, msg = validate_command("rmdir /s /q C:\\temp")
-        assert not valid
-        assert "/s" in msg or "/q" in msg
-
-    def test_rmdir_q_blocked(self) -> None:
-        valid, msg = validate_command("rmdir /q C:\\temp")
-        assert not valid
-        assert "/q" in msg
-
-    def test_rd_s_blocked(self) -> None:
-        valid, msg = validate_command("rd /s /q C:\\temp")
-        assert not valid
-        assert "/s" in msg or "/q" in msg
-
-    def test_robocopy_mir_blocked(self) -> None:
-        valid, msg = validate_command("robocopy C:\\src C:\\dst /mir")
-        assert not valid
-        assert "/mir" in msg
-
-    def test_robocopy_purge_blocked(self) -> None:
-        valid, msg = validate_command("robocopy C:\\src C:\\dst /purge")
-        assert not valid
-        assert "/purge" in msg
-
-    def test_robocopy_move_blocked(self) -> None:
-        valid, msg = validate_command("robocopy C:\\src C:\\dst /move")
-        assert not valid
-        assert "/move" in msg
-
-    def test_rmdir_without_forbidden_flags_allowed(self) -> None:
-        """rmdir without /s or /q should pass the flag check."""
-        valid, msg = validate_command("rmdir C:\\temp\\empty_dir")
-        # Should not be blocked by forbidden-flag logic.
-        # It may still be blocked by path validation, but NOT by flag check.
-        assert "forbidden" not in msg.lower() or valid
-
-    def test_robocopy_with_safe_flags_allowed(self) -> None:
-        """robocopy with non-destructive flags should pass flag check."""
-        valid, msg = validate_command("robocopy C:\\src C:\\dst /e /r:3")
-        assert "forbidden" not in msg.lower() or valid
-
-
-# ===================================================================
-# TestShellMetacharacters
-# ===================================================================
-
-
-class TestShellMetacharacters:
-    """Shell chaining operators must be blocked by the metacharacter check.
-
-    Uses whitelisted base commands (dir, echo) so the test reaches the
-    metacharacter check instead of failing at the whitelist check.
-    """
-
-    def test_pipe_blocked(self) -> None:
-        valid, msg = validate_command("dir | findstr test")
-        assert not valid
-        assert "metacharacter" in msg.lower() or "|" in msg
-
-    def test_ampersand_blocked(self) -> None:
-        valid, msg = validate_command("dir & echo pwned")
-        assert not valid
-        assert "metacharacter" in msg.lower() or "&" in msg
-
-    def test_semicolon_blocked(self) -> None:
-        valid, msg = validate_command("echo hello; echo world")
-        assert not valid
-        assert "metacharacter" in msg.lower() or ";" in msg
-
-    def test_backtick_blocked(self) -> None:
-        valid, msg = validate_command("echo `whoami`")
-        assert not valid
-        assert "metacharacter" in msg.lower() or "`" in msg
-
-    def test_redirect_out_blocked(self) -> None:
-        valid, msg = validate_command("echo secret > file.txt")
-        assert not valid
-        assert "metacharacter" in msg.lower() or ">" in msg
-
-    def test_redirect_in_blocked(self) -> None:
-        valid, msg = validate_command("findstr pattern < input.txt")
-        assert not valid
-        assert "metacharacter" in msg.lower() or "<" in msg
-
-    def test_env_var_percent_blocked(self) -> None:
-        valid, msg = validate_command("echo %USERNAME%")
-        assert not valid
-        assert "variable" in msg.lower() or "%" in msg
-
-    def test_env_var_dollar_blocked(self) -> None:
-        valid, msg = validate_command("echo $HOME")
-        assert not valid
-        assert "variable" in msg.lower() or "$" in msg
-
-
-# ===================================================================
-# TestPathValidationExtended
-# ===================================================================
-
-
-class TestPathValidationExtended:
-    """Extended path validation: UNC, device and extended-length paths."""
-
-    def test_unc_path_blocked(self) -> None:
-        valid, _msg = validate_path("\\\\server\\share\\file.txt")
-        assert not valid
-
-    def test_device_path_blocked(self) -> None:
-        valid, _msg = validate_path("\\\\.\\PhysicalDrive0")
-        assert not valid
-
-    def test_system_dir_blocked(self) -> None:
-        valid, msg = validate_path("C:\\Windows\\System32\\cmd.exe")
-        assert not valid
-        assert "protected" in msg.lower()
-
-    def test_safe_user_path_allowed(self) -> None:
-        valid, msg = validate_path("C:\\Users\\test\\Documents\\file.txt")
-        assert valid

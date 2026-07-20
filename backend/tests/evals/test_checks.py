@@ -38,7 +38,7 @@ def test_response_and_tools() -> None:
         [
             CheckSpec(kind="response_matches", pattern="creat[oa]"),
             CheckSpec(kind="tool_called", name="write_text_file"),
-            CheckSpec(kind="tool_not_called", name="execute_command"),
+            CheckSpec(kind="tool_not_called", name="run_terminal_command"),
         ],
         sandbox=Path("."),
         response="Ho creato il file richiesto.",

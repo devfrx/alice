@@ -91,14 +91,14 @@ class TestPostScreenshotLockout:
     def test_lockout_initial_state(self):
         """No lockout initially."""
         lockout = ScreenshotLockout()
-        assert not lockout.is_locked("execute_command")
+        assert not lockout.is_locked("run_terminal_command")
         assert lockout.get_remaining_s() == 0.0
 
     def test_lockout_after_screenshot(self):
-        """Only execute_command is locked after screenshot."""
+        """Only run_terminal_command is locked after screenshot."""
         lockout = ScreenshotLockout()
         lockout.record_screenshot()
-        assert lockout.is_locked("execute_command")
+        assert lockout.is_locked("run_terminal_command")
         assert lockout.get_remaining_s() > 0
 
     def test_non_lockout_tool_unaffected(self):
@@ -123,11 +123,11 @@ class TestPostScreenshotLockout:
 
         # Still locked at 100 + 30s
         mock_time.return_value = 130.0
-        assert lockout.is_locked("execute_command")
+        assert lockout.is_locked("run_terminal_command")
 
         # Unlocked at 100 + 61s
         mock_time.return_value = 161.0
-        assert not lockout.is_locked("execute_command")
+        assert not lockout.is_locked("run_terminal_command")
 
     @patch("backend.core.screenshot_lockout.time.monotonic")
     def test_remaining_seconds_accuracy(self, mock_time):
@@ -151,7 +151,7 @@ class TestPostScreenshotLockout:
             try:
                 for _ in range(100):
                     lockout.record_screenshot()
-                    lockout.is_locked("execute_command")
+                    lockout.is_locked("run_terminal_command")
                     lockout.get_remaining_s()
             except Exception as e:
                 errors.append(e)

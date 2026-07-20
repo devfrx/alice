@@ -1,9 +1,10 @@
 """AL\\CE — PC Automation plugin.
 
-Exposes ten tools for controlling the local PC: opening/closing apps,
-keyboard input, screenshots, mouse control, and shell commands.
-All actions go through a hardened executor layer with whitelists,
-confirmation requirements, and security lockouts.
+Exposes nine tools for controlling the local PC: opening/closing apps,
+keyboard input, screenshots, and mouse control. All actions go through a
+hardened executor layer with whitelists, confirmation requirements, and
+security lockouts. Shell execution is NOT provided here: the scoped
+``terminal.run_terminal_command`` tool is the single exec path (Fase 2).
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ from backend.plugins.pc_automation.executor import (
 from backend.plugins.pc_automation.executor import (
     exec_click,
     exec_close_app,
-    exec_command,
     exec_get_active_window,
     exec_get_running_apps,
     exec_move_mouse,
@@ -35,9 +35,7 @@ from backend.plugins.pc_automation.executor import (
     exec_press_keys,
     exec_take_screenshot,
     exec_type_text,
-    get_lockout,
 )
-from backend.plugins.pc_automation.security import command_paths_within_workspace
 
 if TYPE_CHECKING:
     from backend.core.context import AppContext
@@ -50,7 +48,7 @@ class PcAutomationPlugin(BasePlugin):
     plugin_version: str = "1.0.0"
     plugin_description: str = (
         "Open/close apps, type text, press keys, take screenshots, "
-        "move mouse, click, list windows, and execute whitelisted commands."
+        "move mouse, click, and list windows."
     )
     plugin_dependencies: list[str] = []
     plugin_priority: int = 50
@@ -73,7 +71,7 @@ class PcAutomationPlugin(BasePlugin):
     # -- Tools -------------------------------------------------------------
 
     def get_tools(self) -> list[ToolDefinition]:
-        """Return the ten PC-automation tool definitions.
+        """Return the nine PC-automation tool definitions.
 
         Returns:
             A list of ``ToolDefinition`` objects for each tool.
@@ -215,34 +213,6 @@ class PcAutomationPlugin(BasePlugin):
                 timeout_ms=15000,
             ),
             ToolDefinition(
-                name="execute_command",
-                description=(
-                    "Execute a whitelisted shell command. Requires explicit confirmation. "
-                    "Informational: dir, echo, type, ipconfig, systeminfo, tasklist, hostname, "
-                    "whoami, ping, nslookup, netstat, ver, vol, where, tree, findstr. "
-                    "File management: mkdir, copy, move, rename, ren, rmdir, robocopy. "
-                    "BLOCKED: system dirs (C:\\Windows, C:\\Program Files, C:\\ProgramData), "
-                    "destructive flags (rmdir /s /q, robocopy /mir /purge /move), "
-                    "shell metacharacters (| & ; ` < > % $). "
-                    "Always use absolute paths."
-                ),
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "The command string to execute.",
-                        },
-                    },
-                    "required": ["command"],
-                },
-                result_type="string",
-                risk_level="dangerous",
-                requires_confirmation=True,
-                timeout_ms=30000,
-                capabilities=("process_exec",),
-            ),
-            ToolDefinition(
                 name="move_mouse",
                 description="Move the mouse cursor to absolute screen coordinates.",
                 parameters={
@@ -308,7 +278,7 @@ class PcAutomationPlugin(BasePlugin):
         """Dispatch to the matching executor function.
 
         Args:
-            tool_name: One of the ten registered tool names.
+            tool_name: One of the nine registered tool names.
             args: Caller-supplied keyword arguments.
             context: Execution metadata.
 
@@ -357,19 +327,6 @@ class PcAutomationPlugin(BasePlugin):
                     content_type="application/json",
                     execution_time_ms=elapsed,
                 )
-            elif tool_name == "execute_command":
-                command = args.get("command")
-                if not command:
-                    return ToolResult.error("Missing required parameter: command")
-                # Confine execution to the active workspace: reject any
-                # absolute path in the command that escapes the sandbox, and
-                # run with cwd=workspace so relative paths resolve inside it.
-                within, reason = command_paths_within_workspace(
-                    command, context.workspace_root,
-                )
-                if not within:
-                    return ToolResult.error(reason)
-                result = await exec_command(command, cwd=context.workspace_root)
             elif tool_name == "move_mouse":
                 x = args.get("x")
                 y = args.get("y")
@@ -423,14 +380,16 @@ class PcAutomationPlugin(BasePlugin):
         return check_executor_deps()
 
     async def get_connection_status(self) -> ConnectionStatus:
-        """Return CONNECTED if all deps are available, DEGRADED on lockout.
+        """Return CONNECTED if all deps are available.
+
+        The post-screenshot lockout no longer degrades this plugin: since the
+        retirement of ``execute_command`` (exec unified on the scoped
+        terminal), none of its own tools are subject to the lockout.
 
         Returns:
-            ``ConnectionStatus.CONNECTED``, ``DEGRADED``, or ``DISCONNECTED``.
+            ``ConnectionStatus.CONNECTED`` or ``DISCONNECTED``.
         """
         missing = check_executor_deps()
         if missing:
             return ConnectionStatus.DISCONNECTED
-        if get_lockout().is_locked("execute_command"):
-            return ConnectionStatus.DEGRADED
         return ConnectionStatus.CONNECTED

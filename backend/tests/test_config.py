@@ -185,12 +185,18 @@ def test_removed_legacy_keys_are_stripped() -> None:
 
     data = {
         "voice": {"wake_word": "alice", "voice_confirmation_enabled": True},
-        "pc_automation": {"enabled": False, "command_timeout_s": 30},
+        "pc_automation": {
+            "enabled": False,
+            "command_timeout_s": 30,
+            # Retired with execute_command (Fase 2 Agent v2).
+            "max_command_output_chars": 500,
+        },
         "notifications": {"sound_enabled": True, "app_id": "AL\\CE"},
     }
     migrate_legacy_config_keys(data)
     assert "voice_confirmation_enabled" not in data["voice"]
     assert "enabled" not in data["pc_automation"]
+    assert "max_command_output_chars" not in data["pc_automation"]
     assert "sound_enabled" not in data["notifications"]
     assert data["pc_automation"]["command_timeout_s"] == 30
 

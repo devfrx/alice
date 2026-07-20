@@ -420,8 +420,6 @@ class PcAutomationConfig(BaseSettings):
     """Seconds to block dangerous tools after a screenshot."""
     command_timeout_s: int = 30
     """Maximum seconds a command can run."""
-    max_command_output_chars: int = 500
-    """Maximum characters of command output to return."""
 
 
 class PermissionsConfig(BaseSettings):
@@ -1309,6 +1307,11 @@ _REMOVED_LEGACY_KEYS: tuple[tuple[str, str], ...] = (
     # every config model forbids unknown fields, it must be dropped rather than
     # rejected so old installs keep loading.
     ("agent", "engine"),
+    # Output cap of the retired ``pc_automation.execute_command`` tool (exec
+    # unified on ``terminal.run_terminal_command`` in Fase 2 Agent v2). A
+    # persisted user/system layer written by an older build can still carry
+    # the key; drop it so old installs keep loading.
+    ("pc_automation", "max_command_output_chars"),
 )
 
 # Dotted-path view of _REMOVED_LEGACY_KEYS above. A removed-legacy key is a

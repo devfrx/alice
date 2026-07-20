@@ -1062,6 +1062,99 @@ class TestWriteTextFileTool:
         assert result.success is False
         assert "too large" in result.error_message.lower()
 
+    @pytest.mark.asyncio
+    async def test_write_new_file_is_free(self, tmp_path):
+        """A brand new path has nothing to protect: no read tracker check."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "new.txt"
+
+        result = await plugin.execute_tool(
+            "write_text_file",
+            {"path": str(f), "content": "hello"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_text() == "hello"
+
+    @pytest.mark.asyncio
+    async def test_overwrite_requires_prior_read(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.txt"
+        f.write_text("originale")
+
+        result = await plugin.execute_tool(
+            "write_text_file",
+            {"path": str(f), "content": "nuovo"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert f.read_text() == "originale"
+        assert "lett" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_overwrite_stale_read_fails(self, tmp_path):
+        import os as _os
+
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.txt"
+        f.write_text("originale")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        f.write_text("originale cambiato fuori")
+        # Forza un mtime diverso: su filesystem a granularita' grossolana
+        # due scritture ravvicinate possono condividere lo stesso timestamp.
+        _os.utime(f, ns=(1, 1))
+
+        result = await plugin.execute_tool(
+            "write_text_file",
+            {"path": str(f), "content": "nuovo"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "modificat" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_overwrite_allowed_after_read(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.txt"
+        f.write_text("originale")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "write_text_file",
+            {"path": str(f), "content": "nuovo"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_text() == "nuovo"
+
+    @pytest.mark.asyncio
+    async def test_write_then_write_without_reread(self, tmp_path):
+        """record() after a successful write pins the NEW mtime: a second
+        overwrite in the same conversation needs no re-read."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.txt"
+
+        first = await plugin.execute_tool(
+            "write_text_file", {"path": str(f), "content": "v1"}, _make_exec_ctx(),
+        )
+        assert first.success
+
+        second = await plugin.execute_tool(
+            "write_text_file", {"path": str(f), "content": "v2"}, _make_exec_ctx(),
+        )
+
+        assert second.success
+        assert f.read_text() == "v2"
+
 
 # ===========================================================================
 # 5c. edit_text_file tool

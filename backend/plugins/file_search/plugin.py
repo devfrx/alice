@@ -275,9 +275,14 @@ class FileSearchPlugin(BasePlugin):
             ToolDefinition(
                 name="write_text_file",
                 description=(
-                    "Create or overwrite a text file with the given "
-                    "content. The path must be inside an allowed "
-                    "directory. Executable extensions are blocked."
+                    "Create a new text file, or overwrite an existing "
+                    "one, with the given content. The path must be "
+                    "inside an allowed directory. Overwriting an "
+                    "existing file requires having read it earlier in "
+                    "this conversation with read_text_file (re-read if "
+                    "it changed on disk since); for a small, targeted "
+                    "change prefer edit_text_file instead. Executable "
+                    "extensions are blocked."
                 ),
                 parameters={
                     "type": "object",
@@ -660,6 +665,34 @@ class FileSearchPlugin(BasePlugin):
         await asyncio.to_thread(_open_with_system)
         return f"Opened file: {resolved.name}"
 
+    @staticmethod
+    def _atomic_write_bytes(path: Path, data: bytes) -> None:
+        """Write ``data`` to ``path`` atomically.
+
+        Creates the parent directory if needed, writes to a tmp file in
+        the same directory (same volume) and ``os.replace``s it onto the
+        target: a crash mid-write never leaves a half-written file. The
+        tmp file is removed if anything goes wrong before the replace.
+
+        Args:
+            path: Destination file path (need not exist yet).
+            data: Raw bytes to write.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(path.parent),
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+            os.replace(tmp_name, path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_name)
+            raise
+
     async def _exec_write_text_file(
         self,
         args: dict[str, Any],
@@ -667,21 +700,30 @@ class FileSearchPlugin(BasePlugin):
     ) -> str:
         """Execute the write_text_file tool.
 
-        Creates or overwrites a text file at the given path with the
-        supplied content.  Executable extensions are blocked and path
-        validation applies the same allowed/forbidden rules as read.
+        Creating a new file is always free. Overwriting an existing file
+        requires a prior successful ``read_text_file`` on the same path
+        in this conversation (same ``ReadTracker`` guard as
+        ``edit_text_file``): UNREAD/STALE fail with an actionable
+        message. Executable extensions are blocked and path validation
+        applies the same allowed/forbidden rules as read. The write
+        itself is atomic (tmp file + ``os.replace``), and a successful
+        write (new or overwrite) is recorded in the tracker so a
+        follow-up write/edit in the same conversation does not need a
+        re-read.
 
         Args:
             args: Must contain "path" and a non-empty string "content".
-            context: Execution metadata (unused).
+            context: Execution metadata (conversation id for the
+                read-tracking guard).
 
         Returns:
             A success message string.
 
         Raises:
             ValueError: If "path" or "content" is missing/empty, "content" is
-                not a string, the target is an executable, or content exceeds
-                the maximum write size.
+                not a string, the target is an executable, the target exists
+                and was never read (or was read but is now stale), or
+                content exceeds the maximum write size.
         """
         raw_path: str = args.get("path", "")
         if not raw_path:
@@ -716,11 +758,23 @@ class FileSearchPlugin(BasePlugin):
                 f"Maximum is {self._MAX_WRITE_BYTES:,} bytes."
             )
 
-        def _write() -> None:
-            resolved.parent.mkdir(parents=True, exist_ok=True)
-            resolved.write_bytes(encoded)
+        if await asyncio.to_thread(resolved.exists):
+            state = self._read_tracker.verify(context.conversation_id, resolved)
+            if state is ReadState.UNREAD:
+                raise ValueError(
+                    "File esistente mai letto in questa conversazione: "
+                    "leggi il file con read_text_file prima di "
+                    "sovrascriverlo (o usa edit_text_file per modifiche "
+                    "puntuali)."
+                )
+            if state is ReadState.STALE:
+                raise ValueError(
+                    "Il file è stato modificato dopo l'ultima lettura: "
+                    "rileggilo con read_text_file e riprova."
+                )
 
-        await asyncio.to_thread(_write)
+        await asyncio.to_thread(self._atomic_write_bytes, resolved, encoded)
+        self._read_tracker.record(context.conversation_id, resolved)
         logger.info("file_search: wrote {} bytes to {}", len(encoded), resolved)
         return f"File written: {resolved.name} ({len(encoded):,} bytes)"
 
@@ -882,24 +936,7 @@ class FileSearchPlugin(BasePlugin):
                 f"Massimo {self._MAX_WRITE_BYTES:,} bytes."
             )
 
-        def _write_atomic() -> None:
-            # Tmp file in the same directory (same volume) + os.replace:
-            # a crash mid-write never leaves a half-written target.
-            fd, tmp_name = tempfile.mkstemp(
-                dir=str(resolved.parent),
-                prefix=f".{resolved.name}.",
-                suffix=".tmp",
-            )
-            try:
-                with os.fdopen(fd, "wb") as fh:
-                    fh.write(encoded)
-                os.replace(tmp_name, resolved)
-            except BaseException:
-                with contextlib.suppress(OSError):
-                    os.unlink(tmp_name)
-                raise
-
-        await asyncio.to_thread(_write_atomic)
+        await asyncio.to_thread(self._atomic_write_bytes, resolved, encoded)
         self._read_tracker.record(context.conversation_id, resolved)
         logger.info(
             "file_search: edited {} ({} replacement(s))", resolved, replaced,

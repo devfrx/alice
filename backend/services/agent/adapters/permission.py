@@ -18,9 +18,10 @@ Mapping ``GateAction`` (piattaforma -> motore), come da brief:
     NEEDS_CONFIRMATION -> CONFIRM
 
 ``GateVerdict.outcome`` = ``decision.outcome.value`` (stringa dell'enum
-``PermissionOutcome``); ``reason`` propagato verbatim. ``risk_level`` e
-``description`` sono popolati best-effort dalla ``ToolDefinition`` (``None``
-se il tool non è risolvibile nel registry).
+``PermissionOutcome``); ``reason`` propagato verbatim. ``risk_level``,
+``description`` e ``tool_meta`` (provenienza native/MCP da
+``ToolDefinition.mcp``) sono popolati best-effort dalla ``ToolDefinition``
+(``None`` se il tool non è risolvibile nel registry).
 
 Fix review T12 (bare tool name): la ``ToolDefinition`` è recuperata con
 ``_tool_lookup.resolve_tool_definition`` (condivisa con
@@ -48,7 +49,12 @@ from loguru import logger
 
 from backend.services.agent.adapters._tool_lookup import resolve_tool_definition
 from backend.services.agent.models import ToolInvocation
-from backend.services.agent.ports import GateAction, GateVerdict, RememberScope
+from backend.services.agent.ports import (
+    GateAction,
+    GateVerdict,
+    RememberScope,
+    ToolMetaInfo,
+)
 from backend.services.permission_rules import RuleEffect
 from backend.services.permission_service import GateAction as PlatformGateAction
 
@@ -118,12 +124,27 @@ class PermissionServiceAdapter:
             conversation_id=conversation_id,
             mode=mode,
         )
+        tool_meta: ToolMetaInfo | None = None
+        if tool_def is not None:
+            mcp_meta = tool_def.mcp
+            if mcp_meta is not None:
+                tool_meta = ToolMetaInfo(
+                    origin="mcp",
+                    server=mcp_meta.server,
+                    annotated=mcp_meta.annotated,
+                    read_only=mcp_meta.read_only,
+                    destructive=mcp_meta.destructive,
+                    trusted=mcp_meta.trusted,
+                )
+            else:
+                tool_meta = ToolMetaInfo(origin="native")
         return GateVerdict(
             action=_ACTION_MAP[decision.action],
             outcome=decision.outcome.value,
             reason=decision.reason,
             risk_level=tool_def.risk_level if tool_def is not None else None,
             description=tool_def.description if tool_def is not None else None,
+            tool_meta=tool_meta,
         )
 
     async def remember_approval(

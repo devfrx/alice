@@ -79,6 +79,35 @@ class GateAction(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class ToolMetaInfo:
+    """Provenienza del tool per il dialogo di conferma (wire ``tool_meta``).
+
+    Origin ``"native"`` per i tool di piattaforma (tutti gli altri campi
+    ``None``); ``"mcp"`` per i tool MCP, con i campi copiati dalla
+    ``McpToolMeta`` della ``ToolDefinition``. È provenienza informativa:
+    l'autorità operativa resta nei campi gate del verdetto.
+    """
+
+    origin: str  # "native" | "mcp"
+    server: str | None = None
+    annotated: bool | None = None
+    read_only: bool | None = None
+    destructive: bool | None = None
+    trusted: bool | None = None
+
+    def as_payload(self) -> dict[str, Any]:
+        """Forma dict per il payload evento (chiavi = contratto wire)."""
+        return {
+            "origin": self.origin,
+            "server": self.server,
+            "annotated": self.annotated,
+            "read_only": self.read_only,
+            "destructive": self.destructive,
+            "trusted": self.trusted,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class GateVerdict:
     """Verdetto del gate dei permessi per una tool call."""
 
@@ -87,6 +116,7 @@ class GateVerdict:
     reason: str | None = None
     risk_level: str | None = None
     description: str | None = None
+    tool_meta: ToolMetaInfo | None = None
 
 
 class InteractionOutcome(StrEnum):

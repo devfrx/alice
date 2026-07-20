@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from backend.core.plugin_models import McpToolMeta
 from backend.services.agent import ports
 from backend.services.agent.adapters.permission import PermissionServiceAdapter
 from backend.services.agent.models import ToolInvocation
@@ -196,6 +197,89 @@ async def test_decide_falls_back_to_bare_name_when_unresolvable() -> None:
         conversation_id="conv-1",
         mode=PermissionMode.STRICT,
     )
+
+
+# ---------------------------------------------------------------------------
+# tool_meta (Task 2 Fase 2: provenienza del tool nel verdetto del gate)
+# ---------------------------------------------------------------------------
+
+
+async def test_verdict_tool_meta_native() -> None:
+    """Tool nativo noto (``mcp=None``) -> ``tool_meta`` con origin ``native``."""
+    tool_def = MagicMock(risk_level="safe", description="legge un file", mcp=None)
+    adapter, *_ = _make_adapter(decision=GateDecision.allow(), tool_def=tool_def)
+
+    verdict = await adapter.decide(_call(), conversation_id="conv-1")
+
+    assert verdict.tool_meta is not None
+    assert verdict.tool_meta.origin == "native"
+    assert verdict.tool_meta.server is None
+    assert verdict.tool_meta.annotated is None
+    assert verdict.tool_meta.read_only is None
+    assert verdict.tool_meta.destructive is None
+    assert verdict.tool_meta.trusted is None
+
+
+async def test_verdict_tool_meta_mcp() -> None:
+    """Tool MCP -> la provenienza (``McpToolMeta``) è copiata campo per campo."""
+    meta = McpToolMeta(
+        server="files", annotated=False, trusted=True, read_only=False, destructive=None,
+    )
+    tool_def = MagicMock(risk_level="dangerous", description="scrive un file", mcp=meta)
+    adapter, *_ = _make_adapter(decision=GateDecision.allow(), tool_def=tool_def)
+
+    verdict = await adapter.decide(_call(name="mcp_files_write"), conversation_id="conv-1")
+
+    assert verdict.tool_meta is not None
+    assert verdict.tool_meta.origin == "mcp"
+    assert verdict.tool_meta.server == "files"
+    assert verdict.tool_meta.annotated is False
+    assert verdict.tool_meta.read_only is False
+    assert verdict.tool_meta.destructive is None
+    assert verdict.tool_meta.trusted is True
+
+
+async def test_verdict_tool_meta_unknown_tool_is_none() -> None:
+    """Tool sconosciuto al registry -> nessuna provenienza (``tool_meta is None``)."""
+    adapter, *_ = _make_adapter(decision=GateDecision.allow(), tool_def=None)
+
+    verdict = await adapter.decide(_call(name="unknown_tool"), conversation_id="conv-1")
+
+    assert verdict.tool_meta is None
+
+
+async def test_verdict_tool_meta_populated_on_deny() -> None:
+    """Anche un verdetto DENY porta ``tool_meta`` quando la tool_def è risolta."""
+    decision = GateDecision(
+        action=PlatformGateAction.DENY,
+        outcome=PermissionOutcome.DENY_SCOPE,
+        reason="outside_scope",
+    )
+    tool_def = MagicMock(risk_level="dangerous", description="fuori scope", mcp=None)
+    adapter, *_ = _make_adapter(decision=decision, tool_def=tool_def)
+
+    verdict = await adapter.decide(_call(), conversation_id="conv-1")
+
+    assert verdict.action == ports.GateAction.DENY
+    assert verdict.tool_meta is not None
+    assert verdict.tool_meta.origin == "native"
+
+
+def test_tool_meta_as_payload_contract() -> None:
+    """``as_payload()`` produce ESATTAMENTE le 6 chiavi del contratto wire."""
+    meta = ports.ToolMetaInfo(
+        origin="mcp", server="files", annotated=True,
+        read_only=True, destructive=False, trusted=True,
+    )
+
+    assert meta.as_payload() == {
+        "origin": "mcp",
+        "server": "files",
+        "annotated": True,
+        "read_only": True,
+        "destructive": False,
+        "trusted": True,
+    }
 
 
 # ---------------------------------------------------------------------------

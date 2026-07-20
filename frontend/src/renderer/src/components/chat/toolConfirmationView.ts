@@ -20,6 +20,7 @@
  * No wire fields are involved: this is FE-only presentation over the existing
  * confirmation frame.
  */
+import type { ToolMeta } from '../../types/turn'
 import { computeLineDiff, type DiffRow } from './editDiff'
 
 /** Discriminated union of the three dialog body renderings. */
@@ -96,4 +97,29 @@ export function buildConfirmationBody(
   }
 
   return { mode: 'args', json: JSON.stringify(args ?? {}, null, 2) }
+}
+
+/* ── Tool provenance (tool_meta, spec §6.1) ──
+ * Informative only: the operational authority stays with the frame's
+ * `riskLevel` — these labels never drive approve/reject behavior. */
+
+/**
+ * Origin badge label — `MCP · <server>` for MCP tools, `MCP` when the server
+ * name is missing, null for native tools or absent meta.
+ */
+export function buildMcpBadgeLabel(meta: ToolMeta | undefined): string | null {
+  if (meta?.origin !== 'mcp') return null
+  return meta.server ? `MCP · ${meta.server}` : 'MCP'
+}
+
+/**
+ * Transparency warning — null when not needed. Differentiated: a tool without
+ * annotations vs a server whose annotations are present but not trusted
+ * (`trust_annotations: false`) get a truthful, distinct message. Unknown
+ * (absent) flags never warn — only an explicit `false` does.
+ */
+export function buildFallbackWarning(meta: ToolMeta | undefined): string | null {
+  if (meta?.annotated === false) return 'Tool non annotato: trattato come distruttivo'
+  if (meta?.trusted === false) return 'Annotazioni non attendibili: trattato come distruttivo'
+  return null
 }

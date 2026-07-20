@@ -8,7 +8,11 @@
  */
 import { describe, it, expect } from 'vitest'
 
-import { buildConfirmationBody } from './toolConfirmationView'
+import {
+  buildConfirmationBody,
+  buildFallbackWarning,
+  buildMcpBadgeLabel
+} from './toolConfirmationView'
 
 describe('buildConfirmationBody', () => {
   describe('diff mode (edit_text_file)', () => {
@@ -229,5 +233,58 @@ describe('buildConfirmationBody', () => {
       })
       expect(body.mode).toBe('args')
     })
+  })
+})
+
+describe('buildMcpBadgeLabel', () => {
+  it('native origin -> null', () => {
+    expect(buildMcpBadgeLabel({ origin: 'native' })).toBeNull()
+  })
+
+  it('mcp with server -> "MCP · <server>"', () => {
+    expect(buildMcpBadgeLabel({ origin: 'mcp', server: 'files' })).toBe('MCP · files')
+  })
+
+  it('mcp without server -> "MCP"', () => {
+    expect(buildMcpBadgeLabel({ origin: 'mcp' })).toBe('MCP')
+    expect(buildMcpBadgeLabel({ origin: 'mcp', server: null })).toBe('MCP')
+  })
+
+  it('undefined meta -> null', () => {
+    expect(buildMcpBadgeLabel(undefined)).toBeNull()
+  })
+})
+
+describe('buildFallbackWarning', () => {
+  it('annotated === false -> non-annotated message', () => {
+    expect(buildFallbackWarning({ origin: 'mcp', annotated: false })).toBe(
+      'Tool non annotato: trattato come distruttivo'
+    )
+  })
+
+  it('trusted === false (annotated true) -> untrusted-annotations message', () => {
+    expect(buildFallbackWarning({ origin: 'mcp', annotated: true, trusted: false })).toBe(
+      'Annotazioni non attendibili: trattato come distruttivo'
+    )
+  })
+
+  it('both false -> the non-annotated message wins', () => {
+    expect(buildFallbackWarning({ origin: 'mcp', annotated: false, trusted: false })).toBe(
+      'Tool non annotato: trattato come distruttivo'
+    )
+  })
+
+  it('undefined meta -> null', () => {
+    expect(buildFallbackWarning(undefined)).toBeNull()
+  })
+
+  it('absent flags -> null (unknown never warns)', () => {
+    expect(buildFallbackWarning({ origin: 'mcp' })).toBeNull()
+    expect(buildFallbackWarning({ origin: 'mcp', annotated: null, trusted: null })).toBeNull()
+    expect(buildFallbackWarning({ origin: 'native' })).toBeNull()
+  })
+
+  it('annotated and trusted true -> null', () => {
+    expect(buildFallbackWarning({ origin: 'mcp', annotated: true, trusted: true })).toBeNull()
   })
 })

@@ -11,7 +11,11 @@ import type { ConfirmationRequest, RememberChoice } from '../../types/chat'
 import UiButton from '../ui/UiButton.vue'
 import UiBadge from '../ui/UiBadge.vue'
 import type { DiffRow } from './editDiff'
-import { buildConfirmationBody } from './toolConfirmationView'
+import {
+  buildConfirmationBody,
+  buildFallbackWarning,
+  buildMcpBadgeLabel
+} from './toolConfirmationView'
 
 const props = defineProps<{
   /** The pending confirmation request to display. */
@@ -58,26 +62,12 @@ const riskBadgeVariant = computed<'warning' | 'danger'>(() =>
 
 /* ── Tool provenance (tool_meta) ──
  * Informative only: the operational authority stays with `riskLevel` —
- * these flags never drive approve/reject behavior, only transparency. */
+ * these flags never drive approve/reject behavior, only transparency.
+ * Pure logic in `toolConfirmationView.ts` (tested there). */
 
-/** Origin badge label — `MCP · <server>` for MCP tools, null for native. */
-const mcpBadgeLabel = computed<string | null>(() => {
-  const meta = props.confirmation.toolMeta
-  if (meta?.origin !== 'mcp') return null
-  return meta.server ? `MCP · ${meta.server}` : 'MCP'
-})
+const mcpBadgeLabel = computed(() => buildMcpBadgeLabel(props.confirmation.toolMeta))
 
-/**
- * Transparency warning (spec §6.1) — null when not needed. Differentiated:
- * a tool without annotations vs a server whose annotations are present but
- * not trusted (`trust_annotations: false`) get a truthful, distinct message.
- */
-const fallbackWarning = computed<string | null>(() => {
-  const meta = props.confirmation.toolMeta
-  if (meta?.annotated === false) return 'Tool non annotato: trattato come distruttivo'
-  if (meta?.trusted === false) return 'Annotazioni non attendibili: trattato come distruttivo'
-  return null
-})
+const fallbackWarning = computed(() => buildFallbackWarning(props.confirmation.toolMeta))
 
 const formattedTime = computed(() => {
   const s = remainingSeconds.value

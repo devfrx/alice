@@ -1,5 +1,5 @@
 /**
- * Pure-TS line-based diff for the edit-preview confirmation UI (Task 7).
+ * Pure-TS line-based diff for the edit-preview confirmation UI.
  *
  * Contract:
  * - Both inputs are normalized `\r\n` -> `\n` BEFORE splitting into lines
@@ -31,7 +31,13 @@ export interface DiffRow {
 /** Lines beyond this count, on either side, bypass the O(n*m) LCS DP. */
 const MAX_LCS_LINES = 400
 
-/** Normalize CRLF to LF, then split into lines. */
+/**
+ * Normalize CRLF to LF, then split into lines.
+ *
+ * A lone `\r` (not followed by `\n`) is left untouched by design — it is not
+ * a line separator, and treating it as one would diverge from how the
+ * backend/editors split `old_string`/`new_string` into lines.
+ */
 function toLines(value: string): string[] {
   return value.replace(/\r\n/g, '\n').split('\n')
 }
@@ -62,7 +68,7 @@ export function computeLineDiff(oldStr: string, newStr: string): DiffRow[] {
   const n = newLines.length
 
   // Classic LCS length table: dp[i][j] = LCS length of oldLines[i..] vs
-  // newLines[j..]. (m+1) x (n+1) of numbers; bounded by MAX_LCS_LINES^2.
+  // newLines[j..]. (m+1) x (n+1) of numbers; bounded by (MAX_LCS_LINES+1)^2.
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0))
   for (let i = m - 1; i >= 0; i--) {
     for (let j = n - 1; j >= 0; j--) {
@@ -81,6 +87,9 @@ export function computeLineDiff(oldStr: string, newStr: string): DiffRow[] {
       i++
       j++
     } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      // Tie-break: `>=` prefers consuming the old side, so in a changed
+      // block all `removed` rows are emitted before the `added` rows
+      // (the "removed-first" order promised in the module contract).
       rows.push({ kind: 'removed', text: oldLines[i] })
       i++
     } else {

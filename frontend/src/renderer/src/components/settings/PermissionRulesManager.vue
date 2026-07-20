@@ -104,7 +104,11 @@ function onToolFocus(): void {
   openPicker()
 }
 
-/** Delayed close so a click on an option lands before the list unmounts. */
+/**
+ * Delayed close on blur. Clicks inside the listbox never blur the input
+ * (mousedown.prevent on the container); the delay is only a safety belt for
+ * any residual focus-loss path, not the primary click-selection mechanism.
+ */
 function onToolBlur(): void {
   if (blurTimer !== null) window.clearTimeout(blurTimer)
   blurTimer = window.setTimeout(() => {
@@ -265,11 +269,14 @@ onBeforeUnmount(() => {
             @blur="onToolBlur"
             @keydown="onToolKeydown"
           />
+          <!-- mousedown.prevent on the whole listbox keeps focus in the input
+               for clicks on options AND on the list's scrollbar alike. -->
           <ul
             v-if="pickerOpen"
             class="prm__picker-list"
             role="listbox"
             aria-label="Strumenti disponibili"
+            @mousedown.prevent
           >
             <li
               v-for="(entry, i) in suggestions"
@@ -278,8 +285,7 @@ onBeforeUnmount(() => {
               :class="{ 'prm__picker-option--active': i === highlightIndex }"
               role="option"
               :aria-selected="i === highlightIndex"
-              @mousedown.prevent
-              @mousemove="highlightIndex = i"
+              @mouseenter="highlightIndex = i"
               @click="selectEntry(entry)"
             >
               <span class="prm__picker-name" :title="entry.description">{{ entry.name }}</span>

@@ -10,6 +10,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { ConfirmationRequest, RememberChoice } from '../../types/chat'
 import UiButton from '../ui/UiButton.vue'
 import UiBadge from '../ui/UiBadge.vue'
+import { buildConfirmationBody } from './toolConfirmationView'
 
 const props = defineProps<{
   /** The pending confirmation request to display. */
@@ -102,9 +103,21 @@ function handleKeydown(e: KeyboardEvent): void {
   }
 }
 
-/** Format arguments for display. */
-function formatArgs(args: Record<string, unknown>): string {
-  return JSON.stringify(args, null, 2)
+/**
+ * Body view-model (spec §6.2): line diff for exact-string edits, truncated
+ * preview for writes, raw JSON for everything else. Pure logic lives in
+ * `toolConfirmationView.ts` (tested there — this component is not mounted
+ * in tests).
+ */
+const body = computed(() =>
+  buildConfirmationBody(props.confirmation.toolName, props.confirmation.args)
+)
+
+/** Visual gutter prefix for a diff row kind. */
+const DIFF_PREFIX: Record<'context' | 'removed' | 'added', string> = {
+  context: ' ',
+  removed: '-',
+  added: '+'
 }
 
 onMounted(() => {
@@ -186,8 +199,39 @@ onUnmounted(() => {
         </div>
 
         <div class="confirm-card__args-wrap">
-          <span class="confirm-card__args-label">Argomenti:</span>
-          <pre class="confirm-card__args"><code>{{ formatArgs(confirmation.args) }}</code></pre>
+          <!-- Exact-string edit: red/green line diff (spec §6.2) -->
+          <template v-if="body.mode === 'diff'">
+            <div class="confirm-card__file-header">
+              <span class="confirm-card__file-path">{{ body.path }}</span>
+              <span v-if="body.replaceAll" class="confirm-card__diff-tag">replace_all</span>
+            </div>
+            <div class="confirm-card__diff" role="figure" aria-label="Anteprima modifica">
+              <div
+                v-for="(row, idx) in body.rows"
+                :key="idx"
+                class="diff-row"
+                :class="`diff-row--${row.kind}`"
+              >
+                <span class="diff-row__prefix">{{ DIFF_PREFIX[row.kind] }}</span
+                >{{ row.text }}
+              </div>
+            </div>
+          </template>
+
+          <!-- File write: truncated content preview -->
+          <template v-else-if="body.mode === 'write-preview'">
+            <div class="confirm-card__file-header">
+              <span class="confirm-card__file-path">{{ body.path }}</span>
+            </div>
+            <pre class="confirm-card__args"><code>{{ body.preview }}</code></pre>
+            <p v-if="body.truncated" class="confirm-card__truncated-note">(troncato)</p>
+          </template>
+
+          <!-- Everything else: raw JSON args (historical rendering) -->
+          <template v-else>
+            <span class="confirm-card__args-label">Argomenti:</span>
+            <pre class="confirm-card__args"><code>{{ body.json }}</code></pre>
+          </template>
         </div>
 
         <!-- Remember decision (only when the server allows it) -->
@@ -405,6 +449,77 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 200px;
+}
+
+.confirm-card__file-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  min-width: 0;
+}
+
+.confirm-card__file-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl; /* Ellipsize the head, keep the filename tail visible */
+  text-align: left;
+}
+
+.confirm-card__diff-tag {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1-5);
+}
+
+.confirm-card__diff {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 200px;
+  padding: var(--space-1) 0;
+}
+
+.diff-row {
+  white-space: pre;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  color: var(--text-secondary);
+}
+
+.diff-row__prefix {
+  display: inline-block;
+  width: 1.5ch;
+  user-select: none;
+}
+
+.diff-row--removed {
+  color: var(--danger);
+  background: var(--danger-light);
+}
+
+.diff-row--added {
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.confirm-card__truncated-note {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .confirm-card__remember {

@@ -72,6 +72,35 @@ if TYPE_CHECKING:
     from backend.core.tool_registry import ToolRegistry
 
 
+def _image_placeholder(content_type: str, b64_content: str) -> str:
+    """Placeholder compatto per un payload immagine base64 (guardia I1).
+
+    I tool result ``image/*`` non hanno oggi consumatori vision: il base64
+    entrerebbe INTERO come testo nella working history del modello
+    (~33K token per uno screenshot, ~1.75M per un'immagine da 5 MiB —
+    context bomb). Finché la consegna vision non arriva (censita per la
+    Mossa 2), il motore riceve solo questo placeholder; il ``ToolResult``
+    della piattaforma resta integro a monte (raw_content/audit).
+
+    La size dichiarata è la stima aritmetica dei byte DECODIFICATI
+    (``len*3/4`` meno il padding), non la lunghezza della stringa base64.
+
+    Args:
+        content_type: MIME type dell'immagine (es. ``image/png``).
+        b64_content: Payload base64 così come prodotto dal tool.
+
+    Returns:
+        Il testo placeholder destinato al motore.
+    """
+    padding = 2 if b64_content.endswith("==") else 1 if b64_content.endswith("=") else 0
+    size = max(len(b64_content) * 3 // 4 - padding, 0)
+    size_str = f"{size:,}".replace(",", ".")
+    return (
+        f"[immagine {content_type}, {size_str} byte, base64 non incluso "
+        "nel contesto del modello — consegna vision pianificata]"
+    )
+
+
 class ToolRegistryAdapter:
     """Implementa ``ExecutionPort`` sopra ``ToolRegistry``."""
 
@@ -158,10 +187,24 @@ class ToolRegistryAdapter:
 
         content: str
         payload: dict[str, Any] | None = None
+        is_image = (
+            result.content_type is not None
+            and result.content_type.startswith("image/")
+        )
         if result.content is None:
             content = ""
         elif isinstance(result.content, str):
-            content = result.content
+            # Guardia I1: il base64 di un'immagine non entra MAI come testo
+            # nella working history del motore (né nel wire frame né nella
+            # riga tool persistita, che rialimenterebbe il contesto ai turni
+            # successivi) — solo il placeholder compatto. Il ``ToolResult``
+            # della piattaforma non viene mutato. Questo è il choke point
+            # unico: ogni produttore image/* server-side (take_screenshot,
+            # read_text_file, futuri) passa da qui per costruzione.
+            if is_image and result.success and result.content:
+                content = _image_placeholder(result.content_type, result.content)
+            else:
+                content = result.content
         elif isinstance(result.content, dict):
             payload = result.content
             content = json.dumps(result.content, ensure_ascii=False)

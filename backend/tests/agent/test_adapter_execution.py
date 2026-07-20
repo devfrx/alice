@@ -165,6 +165,79 @@ async def test_execute_timeout_returns_ok_false_with_timeout_message() -> None:
 
 
 # ---------------------------------------------------------------------------
+# guardia image/*: mai base64 grezzo verso il motore (I1 Fase 2 Mossa 1)
+# ---------------------------------------------------------------------------
+
+
+async def test_execute_image_result_becomes_placeholder() -> None:
+    """Un ``ToolResult`` con ``content_type`` image/* NON passa il base64 al
+    motore: ``content`` diventa un placeholder compatto (il base64 di uno
+    screenshot vale ~33K token, un'immagine da 5 MiB ~1.75M — context bomb).
+    Il ``content_type`` resta sull'output (il frame wire lo espone)."""
+    b64 = "aGVsbG8td29ybGQ=" * 100  # payload base64 riconoscibile
+    registry = _registry_with(fs_read=_tool_def("read_text_file"))
+    registry.execute_result = ToolResult.ok(b64, content_type="image/png")
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("fs_read"), client_ip=None, conversation_id="c1")
+
+    assert output.ok is True
+    assert b64 not in output.content
+    assert "aGVsbG8" not in output.content
+    assert "immagine" in output.content
+    assert "image/png" in output.content
+    assert "byte" in output.content
+    assert len(output.content) < 300
+    assert output.content_type == "image/png"
+
+
+async def test_execute_image_placeholder_reports_decoded_size() -> None:
+    """La size nel placeholder è quella dei byte DECODIFICATI (stima
+    aritmetica dal base64), non la lunghezza della stringa base64."""
+    import base64 as b64mod
+
+    raw = b"\x89PNG" + b"\x00" * 996  # 1000 byte decodificati
+    encoded = b64mod.b64encode(raw).decode("ascii")
+    registry = _registry_with(shot=_tool_def("take_screenshot"))
+    registry.execute_result = ToolResult.ok(encoded, content_type="image/png")
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("shot"), client_ip=None, conversation_id="c1")
+
+    assert "1.000 byte" in output.content or "1,000 byte" in output.content
+
+
+async def test_execute_image_does_not_mutate_tool_result() -> None:
+    """Il ``ToolResult`` originale della piattaforma resta INTEGRO
+    (raw_content/audit non toccati): la guardia agisce solo sull'output
+    verso il motore."""
+    b64 = "QUJDREVGRw==" * 50
+    result = ToolResult.ok(b64, content_type="image/png")
+    registry = _registry_with(shot=_tool_def("take_screenshot"))
+    registry.execute_result = result
+    adapter = _adapter(registry)
+
+    await adapter.execute(_call("shot"), client_ip=None, conversation_id="c1")
+
+    assert result.content == b64
+    assert result.content_type == "image/png"
+
+
+async def test_execute_textual_result_passes_unchanged() -> None:
+    """Un ``ToolResult`` testuale (non image/*) passa INVARIATO."""
+    text = "contenuto testuale con /home/user e roba varia " * 20
+    registry = _registry_with(fs_read=_tool_def("read_text_file"))
+    registry.execute_result = ToolResult.ok(text, content_type="text/plain")
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("fs_read"), client_ip=None, conversation_id="c1")
+
+    assert output.ok is True
+    assert output.content == text
+    assert output.content_type == "text/plain"
+
+
+# ---------------------------------------------------------------------------
 # tool progress: ContextVar wiring (carry #1)
 # ---------------------------------------------------------------------------
 

@@ -1212,6 +1212,193 @@ class TestEditTextFileTool:
         assert f.read_bytes() == b"ALPHA\r\nbeta\r\ngamma\r\n"
 
     @pytest.mark.asyncio
+    async def test_edit_mixed_eol_aborts(self, tmp_path):
+        """Mixed CRLF/LF file: fail-closed, no silent EOL rewrite."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "mixed.txt"
+        original = b"one\r\ntwo\nthree\r\n"
+        f.write_bytes(original)
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "three", "new_string": "THREE"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "misti" in result.error_message.lower()
+        assert f.read_bytes() == original  # file intatto byte-per-byte
+
+    @pytest.mark.asyncio
+    async def test_edit_bom_in_old_string_matches(self, tmp_path):
+        """A BOM copied into old_string from line 1 must not break the match."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "bom.txt"
+        f.write_bytes(b"\xef\xbb\xbffirst\nsecond\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        bom = b"\xef\xbb\xbf".decode("utf-8")
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {
+                "path": str(f),
+                "old_string": bom + "first",
+                "new_string": "FIRST",
+            },
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_bytes() == b"\xef\xbb\xbfFIRST\nsecond\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_then_edit_without_reread(self, tmp_path):
+        """record() after a successful edit pins the NEW mtime: a second
+        edit in the same conversation needs no re-read."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\ny = 2\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        first = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1", "new_string": "x = 9"},
+            _make_exec_ctx(),
+        )
+        assert first.success
+
+        second = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "y = 2", "new_string": "y = 8"},
+            _make_exec_ctx(),
+        )
+
+        assert second.success
+        assert f.read_text() == "x = 9\ny = 8\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_bom_crlf_roundtrip(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "bomwin.txt"
+        f.write_bytes(b"\xef\xbb\xbfa = 1\r\nb = 2\r\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "a = 1", "new_string": "a = 9"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_bytes() == b"\xef\xbb\xbfa = 9\r\nb = 2\r\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_crlf_new_string_in_lf_file(self, tmp_path):
+        """A new_string quoted with CRLF must not leak \\r into an LF file."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "unix.txt"
+        f.write_bytes(b"alpha\nbeta\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {
+                "path": str(f),
+                "old_string": "alpha",
+                "new_string": "ALPHA\r\nextra",
+            },
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        data = f.read_bytes()
+        assert b"\r" not in data
+        assert data == b"ALPHA\nextra\nbeta\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_identical_strings_error(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1", "new_string": "x = 1"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "identiche" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_non_utf8_file_clean_error(self, tmp_path):
+        """read succeeds (errors='replace') so the guard passes; the edit
+        must then fail with a clean non-UTF-8 message, not a crash."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "latin.txt"
+        f.write_bytes(b"caf\xe9 ole\n")
+        read = await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+        assert read.success
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "ole", "new_string": "olee"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "utf-8" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_edit_empty_new_string_deletes(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\ny = 2\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1\n", "new_string": ""},
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_text() == "y = 2\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_empty_old_string_message(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "", "new_string": "x = 2"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "vuota" in result.error_message
+
+    @pytest.mark.asyncio
     async def test_edit_bom_file_line1(self, tmp_path):
         plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
         f = tmp_path / "bom.txt"

@@ -8,10 +8,12 @@ against allowed/forbidden root directories before any operation.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import mimetypes
 import os
 import string
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -734,8 +736,11 @@ class FileSearchPlugin(BasePlugin):
         ``ReadTracker`` (UNREAD/STALE fail with an actionable message).
         Matching happens in a normalized space (BOM stripped, CRLF
         folded to LF on both file content and arguments) and the result
-        is written back in the file's native convention (original EOL
-        style and BOM preserved).
+        is written back atomically (tmp file + ``os.replace``) in the
+        file's native convention when it is uniform (all-CRLF or all-LF,
+        BOM preserved).  Files with MIXED line endings are rejected
+        fail-closed: rewriting them would silently normalize lines the
+        edit never touched.
 
         Args:
             args: Must contain "path", "old_string" and "new_string";
@@ -748,16 +753,19 @@ class FileSearchPlugin(BasePlugin):
 
         Raises:
             ValueError: On missing/invalid parameters, guard failures,
-                non-UTF-8 content, zero or non-unique occurrences, or a
-                result exceeding the maximum write size.
+                non-UTF-8 content, mixed line endings, zero or
+                non-unique occurrences, or a result exceeding the
+                maximum write size.
         """
         raw_path: str = args.get("path", "")
         if not raw_path:
             raise ValueError("'path' parameter is required")
 
         old_string = args.get("old_string")
-        if not isinstance(old_string, str) or not old_string:
+        if not isinstance(old_string, str):
             raise ValueError("'old_string' parameter is required")
+        if not old_string:
+            raise ValueError("old_string non può essere vuota")
 
         new_string = args.get("new_string")
         if not isinstance(new_string, str):
@@ -818,9 +826,20 @@ class FileSearchPlugin(BasePlugin):
         if had_bom:
             text = text.removeprefix(bom)
         is_crlf = "\r\n" in text
+        if is_crlf and "\n" in text.replace("\r\n", ""):
+            # Lone \n alongside \r\n: the round-trip would silently
+            # rewrite every line to CRLF, including untouched ones.
+            raise ValueError(
+                "Il file ha EOL misti (CRLF e LF): edit non applicato "
+                "per non riscrivere righe non toccate; normalizza prima "
+                "gli EOL del file."
+            )
         text = text.replace("\r\n", "\n")
-        old = old_string.replace("\r\n", "\n")
-        new = new_string.replace("\r\n", "\n")
+        # Strip a leading BOM from the arguments too: read_text_file
+        # renders the file's BOM invisibly on line 1, so the model may
+        # copy it into old_string (or omit it) either way.
+        old = old_string.replace("\r\n", "\n").removeprefix(bom)
+        new = new_string.replace("\r\n", "\n").removeprefix(bom)
 
         if old == new:
             raise ValueError(
@@ -863,7 +882,24 @@ class FileSearchPlugin(BasePlugin):
                 f"Massimo {self._MAX_WRITE_BYTES:,} bytes."
             )
 
-        await asyncio.to_thread(resolved.write_bytes, encoded)
+        def _write_atomic() -> None:
+            # Tmp file in the same directory (same volume) + os.replace:
+            # a crash mid-write never leaves a half-written target.
+            fd, tmp_name = tempfile.mkstemp(
+                dir=str(resolved.parent),
+                prefix=f".{resolved.name}.",
+                suffix=".tmp",
+            )
+            try:
+                with os.fdopen(fd, "wb") as fh:
+                    fh.write(encoded)
+                os.replace(tmp_name, resolved)
+            except BaseException:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_name)
+                raise
+
+        await asyncio.to_thread(_write_atomic)
         self._read_tracker.record(context.conversation_id, resolved)
         logger.info(
             "file_search: edited {} ({} replacement(s))", resolved, replaced,

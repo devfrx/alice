@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import cast
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
+from backend.api.ws_schema.chat import RiskLevel
 from backend.core.context import AppContext
 
 router = APIRouter(prefix="/tools", tags=["tools"])
@@ -15,12 +16,17 @@ router = APIRouter(prefix="/tools", tags=["tools"])
 class ToolCatalogEntry(BaseModel):
     """Descrittore flat di un tool del registry."""
 
+    # Chiavi future del catalog vengono scartate finché non dichiarate qui;
+    # una chiave RIMOSSA dal catalog resta invece un 500 rumoroso (campo
+    # required mancante), mai un buco silenzioso nel contratto.
+    model_config = ConfigDict(extra="ignore")
+
     name: str
     plugin: str
     label: str
     description: str
     capabilities: list[str]
-    risk_level: Literal["safe", "medium", "dangerous", "forbidden"]
+    risk_level: RiskLevel
     requires_confirmation: bool
     mcp_server: str | None = None
 

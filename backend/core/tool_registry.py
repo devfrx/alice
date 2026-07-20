@@ -252,20 +252,10 @@ class ToolRegistry:
         return self._catalog.get_tool_definition(tool_name)
 
     def get_tool_catalog(self) -> list[dict[str, Any]]:
-        """Return every registered tool grouped-ready for the chat UI.
+        """Return every registered tool as flat lightweight descriptors.
 
-        Produces a flat list of lightweight descriptors so the frontend
-        can render a plugin → tools picker without pulling the full
-        OpenAI schemas. Each entry contains:
-
-        * ``plugin``: owning plugin name.
-        * ``name``: namespaced tool name (the value stored in
-          :attr:`LLMConfig.disabled_tools`).
-        * ``label``: bare tool name for display.
-        * ``description``: human-readable tool description.
-        * ``capabilities``: the tool's capability tags (e.g. ``fs_write``,
-          ``process_exec``) so the UI can reflect what a permission tier
-          withholds.
+        Delegates to :meth:`ToolCatalog.get_tool_catalog` — see there for
+        the entry shape.
 
         Returns:
             One descriptor dict per registered tool.

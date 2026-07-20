@@ -26,10 +26,12 @@ async def test_catalog_returns_200_with_flat_entries(client: AsyncClient) -> Non
     assert set(body.keys()) == {"tools"}
     assert isinstance(body["tools"], list)
 
-    if body["tools"]:
-        first = body["tools"][0]
-        assert set(first.keys()) == _ENTRY_KEYS
-        assert isinstance(first["capabilities"], list)
-        assert isinstance(first["requires_confirmation"], bool)
-        names = [entry["name"] for entry in body["tools"]]
-        assert names == sorted(names)
+    if not body["tools"]:
+        pytest.skip("No plugins/tools loaded in the test app")
+
+    first = body["tools"][0]
+    assert set(first.keys()) == _ENTRY_KEYS
+    assert isinstance(first["capabilities"], list)
+    assert isinstance(first["requires_confirmation"], bool)
+    names = [entry["name"] for entry in body["tools"]]
+    assert names == sorted(names)

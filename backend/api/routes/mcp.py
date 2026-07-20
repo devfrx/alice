@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, cast
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
@@ -20,6 +20,15 @@ router = APIRouter(prefix="/mcp", tags=["mcp"])
 McpToolLevel = Literal["read_only", "write", "fallback"]
 """UI-facing level derived from the PROVENANCE of the server annotations."""
 
+McpTransport = Literal["stdio", "sse"]
+"""Connection transport — mirrors ``McpServerConfig.transport``."""
+
+McpServerStatus = Literal[
+    "unknown", "connected", "disconnected", "degraded", "error", "not_loaded",
+]
+"""``ConnectionStatus`` StrEnum values ∪ ``"not_loaded"`` (server configured
+but the MCP client plugin has no entry for it, e.g. plugin not loaded)."""
+
 
 class McpToolOut(BaseModel):
     """Tool MCP col livello derivato dal gate (spec Fase 2 §6.4)."""
@@ -35,11 +44,11 @@ class McpServerOut(BaseModel):
     """Server MCP configurato: config statica + stato live + tool tipizzati."""
 
     name: str
-    transport: str
+    transport: McpTransport
     enabled: bool
     command: list[str] | None = None
     url: str | None = None
-    status: str
+    status: McpServerStatus
     trust_annotations: bool
     tools: list[McpToolOut]
 
@@ -51,9 +60,14 @@ class McpServersResponse(BaseModel):
 
 
 class McpReconnectResponse(BaseModel):
-    """Esito di una riconnessione riuscita a un server MCP."""
+    """Esito di una riconnessione riuscita a un server MCP.
 
-    status: str
+    Invariante: la route risponde con questo body SOLO sul successo — ogni
+    fallimento è un 503 (o 404 se il server non è configurato), mai un body
+    2xx con status diverso. Il vocabolario è quindi chiuso a ``"connected"``.
+    """
+
+    status: Literal["connected"]
     tools_count: int
 
 
@@ -67,7 +81,7 @@ def _tool_level(tool_def: ToolDefinition) -> McpToolLevel:
 
 def _server_out(
     cfg: McpServerConfig,
-    status: str,
+    status: McpServerStatus,
     plugin: McpClientProtocol | None,
 ) -> McpServerOut:
     """Build the typed view of one configured server."""
@@ -107,7 +121,14 @@ async def list_mcp_servers(request: Request) -> McpServersResponse:
 
     return McpServersResponse(
         servers=[
-            _server_out(cfg, statuses.get(cfg.name, "not_loaded"), plugin)
+            _server_out(
+                cfg,
+                # Il plugin riporta valori di ConnectionStatus (dict[str, str]
+                # sul Protocol): il cast li àncora al vocabolario chiuso e la
+                # validazione Pydantic li rifiuta rumorosamente se divergono.
+                cast(McpServerStatus, statuses.get(cfg.name, "not_loaded")),
+                plugin,
+            )
             for cfg in ctx.config.mcp.servers
         ],
     )
@@ -136,7 +157,9 @@ async def get_mcp_server(
         statuses = await plugin.get_status()
 
     return _server_out(
-        server_config, statuses.get(server_name, "not_loaded"), plugin,
+        server_config,
+        cast(McpServerStatus, statuses.get(server_name, "not_loaded")),
+        plugin,
     )
 
 

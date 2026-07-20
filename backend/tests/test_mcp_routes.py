@@ -16,6 +16,7 @@ import pytest
 from httpx import AsyncClient
 
 from backend.api.routes.mcp import _tool_level
+from backend.api.ws_schema.chat import RiskLevel
 from backend.core.config import McpServerConfig
 from backend.core.plugin_models import McpToolMeta, ToolDefinition
 
@@ -28,13 +29,13 @@ def _mcp_tool(
     name: str,
     *,
     meta: McpToolMeta | None,
-    risk: str = "medium",
+    risk: RiskLevel = "medium",
     confirm: bool = True,
 ) -> ToolDefinition:
     return ToolDefinition(
         name=name,
         description=f"desc {name}",
-        risk_level=risk,  # type: ignore[arg-type]
+        risk_level=risk,
         requires_confirmation=confirm,
         mcp=meta,
     )
@@ -220,10 +221,29 @@ async def test_list_servers_typed_shape(
 
 
 @pytest.mark.asyncio
+async def test_list_servers_plugin_missing_is_not_loaded(
+    client: AsyncClient, app: Any, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No MCP client plugin → configured server shown as not_loaded, no tools."""
+    _install(monkeypatch, app, plugin=None)
+
+    resp = await client.get("/api/mcp/servers")
+    assert resp.status_code == 200
+    srv = resp.json()["servers"][0]
+    assert srv["status"] == "not_loaded"
+    assert srv["tools"] == []
+
+
+@pytest.mark.asyncio
 async def test_list_servers_disconnected_has_no_tools(
     client: AsyncClient, app: Any, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Disconnected server keeps its config entry but exposes no tools."""
+    """Disconnected server keeps its config entry but exposes no tools.
+
+    The fake replicates the real plugin contract here: ``get_server_tools``
+    returns ``[]`` for any server without a connected session (the route
+    forwards it verbatim, it does not filter by status itself).
+    """
     plugin = _FakeMcpClient(tools=[_mcp_tool("t", meta=_meta())], status="error")
     _install(monkeypatch, app, plugin=plugin, trust_annotations=False)
 

@@ -53,6 +53,13 @@
             <span class="mcp-badge mcp-badge--transport">
               {{ server.transport.toUpperCase() }}
             </span>
+            <span
+              class="mcp-badge"
+              :class="`mcp-badge--${serverTrustBadge(server).variant}`"
+              title="Riflette mcp.servers[].trust_annotations nella config (sola lettura)"
+            >
+              {{ serverTrustBadge(server).label }}
+            </span>
           </div>
 
           <!-- Connection details -->
@@ -84,9 +91,19 @@
               v-for="tool in server.tools"
               :key="tool.name"
               class="mcp-tool-tag"
-              :title="tool.description"
+              :title="toolTitle(tool)"
             >
+              <span
+                class="mcp-tool-tag__dot"
+                :class="`mcp-tool-tag__dot--${toolLevelBadge(tool).variant}`"
+              />
               {{ tool.name }}
+              <span
+                class="mcp-tool-tag__level"
+                :class="`mcp-tool-tag__level--${toolLevelBadge(tool).variant}`"
+              >
+                {{ toolLevelShortLabel(tool) }}
+              </span>
             </span>
           </div>
         </div>
@@ -134,6 +151,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useMcpStore } from '../../stores/mcp'
+import type { McpServerInfo, McpServerTool } from '../../types/mcp'
+import { serverTrustBadge, toolLevelBadge } from './mcpToolLevel'
 import AppIcon from '../ui/AppIcon.vue'
 import UiButton from '../ui/UiButton.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
@@ -141,19 +160,36 @@ import AliceSpinner from '../ui/AliceSpinner.vue'
 
 const mcpStore = useMcpStore()
 
-function statusLabel(status: string): string {
+function statusLabel(status: McpServerInfo['status']): string {
   switch (status) {
+    case 'unknown':
+      return 'Sconosciuto'
     case 'connected':
       return 'Connesso'
     case 'disconnected':
       return 'Disconnesso'
+    case 'degraded':
+      return 'Degradato'
     case 'error':
       return 'Errore'
     case 'not_loaded':
       return 'Non caricato'
-    default:
-      return status
   }
+}
+
+/**
+ * Short in-tag label for the tool level: the full fallback label is too long
+ * for a tag, so it is abbreviated here and spelled out in the tooltip.
+ */
+function toolLevelShortLabel(tool: McpServerTool): string {
+  return tool.level === 'fallback' ? 'non annotato' : toolLevelBadge(tool).label
+}
+
+/** Tooltip: description + full derived level + gate risk. */
+function toolTitle(tool: McpServerTool): string {
+  const badge = toolLevelBadge(tool)
+  const confirm = tool.requires_confirmation ? 'con conferma' : 'senza conferma'
+  return `${tool.description}\nLivello: ${badge.label} — rischio ${tool.risk_level}, ${confirm}`
 }
 
 onMounted(() => {
@@ -314,6 +350,27 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
+.mcp-badge--unknown {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+}
+
+.mcp-badge--degraded {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+/* Trust badge variants (serverTrustBadge) */
+.mcp-badge--success {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.mcp-badge--warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
 .mcp-badge--transport {
   background: var(--surface-2);
   color: var(--text-secondary);
@@ -330,6 +387,9 @@ onMounted(() => {
 }
 
 .mcp-tool-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--text-2xs);
   padding: 2px var(--space-1-5);
   border-radius: var(--radius-sm);
@@ -337,6 +397,43 @@ onMounted(() => {
   border: 1px solid var(--border);
   color: var(--text-secondary);
   cursor: default;
+}
+
+.mcp-tool-tag__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.mcp-tool-tag__dot--success {
+  background: var(--success);
+}
+
+.mcp-tool-tag__dot--warning {
+  background: var(--warning);
+}
+
+.mcp-tool-tag__dot--danger {
+  background: var(--danger);
+}
+
+.mcp-tool-tag__level {
+  font-size: var(--text-2xs);
+  opacity: var(--opacity-medium);
+}
+
+.mcp-tool-tag__level--success {
+  color: var(--success);
+}
+
+.mcp-tool-tag__level--warning {
+  color: var(--warning);
+}
+
+.mcp-tool-tag__level--danger {
+  color: var(--danger);
 }
 
 /* ── Actions & Buttons ──────────────────────────────────────── */

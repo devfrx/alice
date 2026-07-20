@@ -1509,6 +1509,167 @@
         "title": "LoadModelRequest",
         "type": "object"
       },
+      "McpReconnectResponse": {
+        "description": "Esito di una riconnessione riuscita a un server MCP.\n\nInvariante: la route risponde con questo body SOLO sul successo — ogni\nfallimento è un 503 (o 404 se il server non è configurato), mai un body\n2xx con status diverso. Il vocabolario è quindi chiuso a ``\"connected\"``.",
+        "properties": {
+          "status": {
+            "const": "connected",
+            "title": "Status",
+            "type": "string"
+          },
+          "tools_count": {
+            "title": "Tools Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "tools_count"
+        ],
+        "title": "McpReconnectResponse",
+        "type": "object"
+      },
+      "McpServerOut": {
+        "description": "Server MCP configurato: config statica + stato live + tool tipizzati.",
+        "properties": {
+          "command": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "unknown",
+              "connected",
+              "disconnected",
+              "degraded",
+              "error",
+              "not_loaded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/McpToolOut"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "transport": {
+            "enum": [
+              "stdio",
+              "sse"
+            ],
+            "title": "Transport",
+            "type": "string"
+          },
+          "trust_annotations": {
+            "title": "Trust Annotations",
+            "type": "boolean"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "name",
+          "transport",
+          "enabled",
+          "status",
+          "trust_annotations",
+          "tools"
+        ],
+        "title": "McpServerOut",
+        "type": "object"
+      },
+      "McpServersResponse": {
+        "description": "Elenco completo dei server MCP configurati.",
+        "properties": {
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/McpServerOut"
+            },
+            "title": "Servers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "servers"
+        ],
+        "title": "McpServersResponse",
+        "type": "object"
+      },
+      "McpToolOut": {
+        "description": "Tool MCP col livello derivato dal gate (spec Fase 2 §6.4).",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "read_only",
+              "write",
+              "fallback"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requires_confirmation": {
+            "title": "Requires Confirmation",
+            "type": "boolean"
+          },
+          "risk_level": {
+            "enum": [
+              "safe",
+              "medium",
+              "dangerous",
+              "forbidden"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "level",
+          "risk_level",
+          "requires_confirmation"
+        ],
+        "title": "McpToolOut",
+        "type": "object"
+      },
       "MemoryDeleteCountResponse": {
         "description": "Bulk-delete count.",
         "properties": {
@@ -9127,9 +9288,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Mcp Servers Api Mcp Servers Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpServersResponse"
                 }
               }
             },
@@ -9162,9 +9321,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Mcp Server Api Mcp Servers  Server Name  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpServerOut"
                 }
               }
             },
@@ -9207,9 +9364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Reconnect Mcp Server Api Mcp Servers  Server Name  Reconnect Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpReconnectResponse"
                 }
               }
             },

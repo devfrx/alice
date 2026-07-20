@@ -2945,6 +2945,81 @@ export interface components {
             offload_kv_cache_to_gpu?: boolean | null;
         };
         /**
+         * McpReconnectResponse
+         * @description Esito di una riconnessione riuscita a un server MCP.
+         *
+         *     Invariante: la route risponde con questo body SOLO sul successo — ogni
+         *     fallimento è un 503 (o 404 se il server non è configurato), mai un body
+         *     2xx con status diverso. Il vocabolario è quindi chiuso a ``"connected"``.
+         */
+        McpReconnectResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "connected";
+            /** Tools Count */
+            tools_count: number;
+        };
+        /**
+         * McpServerOut
+         * @description Server MCP configurato: config statica + stato live + tool tipizzati.
+         */
+        McpServerOut: {
+            /** Command */
+            command?: string[] | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "unknown" | "connected" | "disconnected" | "degraded" | "error" | "not_loaded";
+            /** Tools */
+            tools: components["schemas"]["McpToolOut"][];
+            /**
+             * Transport
+             * @enum {string}
+             */
+            transport: "stdio" | "sse";
+            /** Trust Annotations */
+            trust_annotations: boolean;
+            /** Url */
+            url?: string | null;
+        };
+        /**
+         * McpServersResponse
+         * @description Elenco completo dei server MCP configurati.
+         */
+        McpServersResponse: {
+            /** Servers */
+            servers: components["schemas"]["McpServerOut"][];
+        };
+        /**
+         * McpToolOut
+         * @description Tool MCP col livello derivato dal gate (spec Fase 2 §6.4).
+         */
+        McpToolOut: {
+            /** Description */
+            description: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "read_only" | "write" | "fallback";
+            /** Name */
+            name: string;
+            /** Requires Confirmation */
+            requires_confirmation: boolean;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "safe" | "medium" | "dangerous" | "forbidden";
+        };
+        /**
          * MemoryDeleteCountResponse
          * @description Bulk-delete count.
          */
@@ -7277,9 +7352,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["McpServersResponse"];
                 };
             };
         };
@@ -7301,9 +7374,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["McpServerOut"];
                 };
             };
             /** @description Validation Error */
@@ -7334,9 +7405,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["McpReconnectResponse"];
                 };
             };
             /** @description Validation Error */

@@ -730,6 +730,7 @@ class AgentEngine:
                 "description": verdict.description,
                 "reasoning": verdict.reason,
                 "allow_remember": True,
+                "tool_meta": verdict.tool_meta.as_payload() if verdict.tool_meta else None,
             },
         ))
         result = await self._interaction.confirm_tool(

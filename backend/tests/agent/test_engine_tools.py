@@ -143,6 +143,7 @@ async def test_confirm_event_payload_is_complete() -> None:
         "description": "scrive un file",
         "reasoning": "fuori scope",
         "allow_remember": True,
+        "tool_meta": None,
     }
     res = resolved[0]
     assert res.kind == "confirm" and res.call_id == "c1" and res.outcome == "approved"
@@ -150,6 +151,51 @@ async def test_confirm_event_payload_is_complete() -> None:
     assert (rec.events.index(req) < rec.events.index(res)
             < next(i for i, e in enumerate(rec.events)
                    if isinstance(e, ev.ToolResultEvent) and e.call_id == "c1"))
+
+
+async def test_confirm_event_payload_carries_tool_meta() -> None:
+    """Il requested del confirm porta ``tool_meta`` (provenienza, Task 3):
+    forma a 6 chiavi da ``ToolMetaInfo.as_payload()`` quando il verdetto la ha."""
+    calls = (ToolInvocation(call_id="c1", name="files_write",
+                            args={"path": "x.txt"}, raw_args="{}"),)
+    verdict = ports.GateVerdict(
+        action=ports.GateAction.CONFIRM, outcome="needs_confirmation",
+        risk_level="medium",
+        tool_meta=ports.ToolMetaInfo(
+            origin="mcp", server="files", annotated=False,
+            read_only=False, destructive=None, trusted=True,
+        ),
+    )
+    _persistence, _outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"files_write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        verdicts={"files_write": verdict},
+        confirm=ports.InteractionOutcome.APPROVED,
+    )
+    requested = [e for e in rec.events if isinstance(e, ev.InteractionRequestedEvent)]
+    assert len(requested) == 1
+    req = requested[0]
+    assert req.payload["tool_meta"] == {
+        "origin": "mcp", "server": "files", "annotated": False,
+        "read_only": False, "destructive": None, "trusted": True,
+    }
+
+
+async def test_confirm_event_payload_tool_meta_none_when_absent() -> None:
+    """Verdetto CONFIRM senza tool_meta -> chiave presente con valore None
+    (contratto stabile: il translator wire non deve fare .get difensivi)."""
+    calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
+    _persistence, _outcome, rec = await _run_with(
+        llm_steps=[_tool_step(calls), _final_step()],
+        exec_tools={"write": ports.ToolExecutionOutput(ok=True, content="ok")},
+        verdicts={"write": ports.GateVerdict(action=ports.GateAction.CONFIRM,
+                                             outcome="needs_confirmation")},
+        confirm=ports.InteractionOutcome.APPROVED,
+    )
+    requested = [e for e in rec.events if isinstance(e, ev.InteractionRequestedEvent)]
+    assert len(requested) == 1
+    assert "tool_meta" in requested[0].payload
+    assert requested[0].payload["tool_meta"] is None
 
 
 async def test_ask_user_emits_interaction_events() -> None:

@@ -96,7 +96,9 @@ class InteractionRequestedEvent(BaseModel):
     """Evento: interazione richiesta (payload COMPLETO, spec §4).
 
     ``payload`` per kind:
-      * ``confirm``: args, risk_level, description, reasoning, allow_remember.
+      * ``confirm``: args, risk_level, description, reasoning, allow_remember,
+        tool_meta (dict a 6 chiavi da ``ToolMetaInfo.as_payload()`` — provenienza
+        native/MCP del tool — oppure ``None`` se il verdetto non la porta).
       * ``ask_user``: questions RAW dagli args del tool, NON ancora
         normalizzate al wire (la normalizzazione è responsabilità del layer
         wire: oggi ``adapters/ws.py``, dal Task 7 ``wire.py``).

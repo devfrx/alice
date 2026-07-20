@@ -106,17 +106,17 @@ class TestFileSearchPluginLifecycle:
         else:
             assert Path.home() in plugin._allowed_paths
 
-    def test_get_tools_returns_five(self):
+    def test_get_tools_returns_six(self):
         plugin = FileSearchPlugin()
         tools = plugin.get_tools()
-        assert len(tools) == 5
+        assert len(tools) == 6
 
     def test_tool_names(self):
         plugin = FileSearchPlugin()
         names = {t.name for t in plugin.get_tools()}
         assert names == {
             "search_files", "get_file_info", "read_text_file",
-            "open_file", "write_text_file",
+            "open_file", "write_text_file", "edit_text_file",
         }
 
     def test_search_files_risk_level(self):
@@ -148,6 +148,14 @@ class TestFileSearchPluginLifecycle:
         tool = next(t for t in plugin.get_tools() if t.name == "write_text_file")
         assert tool.risk_level == "medium"
         assert tool.requires_confirmation is True
+
+    def test_edit_text_file_risk_level(self):
+        plugin = FileSearchPlugin()
+        tool = next(t for t in plugin.get_tools() if t.name == "edit_text_file")
+        assert tool.risk_level == "medium"
+        assert tool.requires_confirmation is True
+        assert tool.capabilities == ("fs_write",)
+        assert tool.path_args == ("path",)
 
     @pytest.mark.asyncio
     @patch("backend.plugins.file_search.plugin._PDF_AVAILABLE", True)
@@ -1053,6 +1061,173 @@ class TestWriteTextFileTool:
 
         assert result.success is False
         assert "too large" in result.error_message.lower()
+
+
+# ===========================================================================
+# 5c. edit_text_file tool
+# ===========================================================================
+
+
+class TestEditTextFileTool:
+    """Test the edit_text_file tool (exact-string, read-tracking guard)."""
+
+    @pytest.mark.asyncio
+    async def test_edit_requires_prior_read(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1", "new_string": "x = 2"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "lett" in result.error_message.lower()  # "leggi il file prima"
+
+    @pytest.mark.asyncio
+    async def test_edit_exact_string_happy_path(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\ny = 2\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1", "new_string": "x = 99"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_text() == "x = 99\ny = 2\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_fails_on_non_unique(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("v\nv\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "v", "new_string": "w"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "2" in result.error_message  # conteggio occorrenze
+
+    @pytest.mark.asyncio
+    async def test_edit_replace_all(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("v\nv\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {
+                "path": str(f),
+                "old_string": "v",
+                "new_string": "w",
+                "replace_all": True,
+            },
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_text() == "w\nw\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_fails_on_stale_read(self, tmp_path):
+        import os as _os
+
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        f.write_text("x = 1  # cambiato fuori\n")
+        # Forza un mtime diverso: su filesystem a granularita' grossolana due
+        # scritture ravvicinate possono condividere lo stesso timestamp.
+        _os.utime(f, ns=(1, 1))
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "x = 1", "new_string": "x = 2"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "modificat" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_edit_zero_occurrences(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "z = 9", "new_string": "z = 0"},
+            _make_exec_ctx(),
+        )
+
+        assert not result.success
+        assert "0 occorrenze" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_crlf_file_matches_lf_old_string(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "win.txt"
+        f.write_bytes(b"alpha\r\nbeta\r\ngamma\r\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {
+                "path": str(f),
+                "old_string": "alpha\nbeta",
+                "new_string": "ALPHA\nbeta",
+            },
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        # EOL nativi preservati
+        assert f.read_bytes() == b"ALPHA\r\nbeta\r\ngamma\r\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_bom_file_line1(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        f = tmp_path / "bom.txt"
+        f.write_bytes(b"\xef\xbb\xbffirst\nsecond\n")
+        await plugin.execute_tool(
+            "read_text_file", {"path": str(f)}, _make_exec_ctx(),
+        )
+
+        result = await plugin.execute_tool(
+            "edit_text_file",
+            {"path": str(f), "old_string": "first", "new_string": "FIRST"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success
+        assert f.read_bytes() == b"\xef\xbb\xbfFIRST\nsecond\n"  # BOM preservato
 
 
 # ===========================================================================

@@ -182,6 +182,71 @@ def _sync_walk(
     return results
 
 
+def run_glob(
+    root: Path,
+    pattern: str,
+    *,
+    max_results: int,
+    forbidden: list[Path] | tuple[Path, ...],
+    follow_symlinks: bool,
+) -> tuple[list[Path], bool]:
+    """Glob under *root*, newest-first, bounded.
+
+    Runs ``Path.glob`` with the given pattern (real ``**`` recursion is
+    supported), keeping only regular files that resolve inside *root*
+    and outside every forbidden directory.  Collection stops early at
+    ``max_results * 4`` candidates as a defence against huge trees; the
+    survivors are sorted by modification time (newest first) and cut to
+    ``max_results``.
+
+    Symlink behaviour: when *follow_symlinks* is ``False``, symlinked
+    files are skipped; ``Path.glob`` itself never recurses into
+    symlinked directories when expanding ``**``, and a candidate whose
+    resolution escapes *root* (e.g. via a symlinked path component) is
+    dropped by the containment check either way.
+
+    Args:
+        root: Already-validated root directory to glob under.
+        pattern: Glob pattern relative to *root* (e.g. ``**/*.py``).
+        max_results: Maximum number of paths to return (>= 1).
+        forbidden: Directories that are always blocked.
+        follow_symlinks: Whether symlinked files may appear in results.
+
+    Returns:
+        A ``(matches, truncated)`` tuple: resolved absolute file paths
+        sorted newest-first, and whether the result set was cut short.
+    """
+    root_resolved = root.resolve()
+    forbidden_resolved = [fb.resolve() for fb in forbidden]
+    stamped: list[tuple[int, Path]] = []
+    truncated = False
+
+    for candidate in root_resolved.glob(pattern):
+        try:
+            if not candidate.is_file():
+                continue
+            if not follow_symlinks and candidate.is_symlink():
+                continue
+            resolved = candidate.resolve()
+            if not is_relative_to(resolved, root_resolved):
+                continue
+            if is_forbidden(resolved, forbidden_resolved):
+                continue
+            stamped.append((resolved.stat().st_mtime_ns, resolved))
+        except OSError as exc:
+            logger.warning("glob: skipping {}: {}", candidate, exc)
+            continue
+        if len(stamped) >= max_results * 4:
+            # Collected enough extras: sort what we have and cut.
+            truncated = True
+            break
+
+    stamped.sort(key=lambda t: t[0], reverse=True)
+    if len(stamped) > max_results:
+        truncated = True
+    return [p for _, p in stamped[:max_results]], truncated
+
+
 async def search_files(
     query: str,
     roots: list[Path],

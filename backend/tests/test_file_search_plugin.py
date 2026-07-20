@@ -106,18 +106,26 @@ class TestFileSearchPluginLifecycle:
         else:
             assert Path.home() in plugin._allowed_paths
 
-    def test_get_tools_returns_six(self):
+    def test_get_tools_returns_seven(self):
         plugin = FileSearchPlugin()
         tools = plugin.get_tools()
-        assert len(tools) == 6
+        assert len(tools) == 7
 
     def test_tool_names(self):
         plugin = FileSearchPlugin()
         names = {t.name for t in plugin.get_tools()}
         assert names == {
-            "search_files", "get_file_info", "read_text_file",
+            "search_files", "glob_files", "get_file_info", "read_text_file",
             "open_file", "write_text_file", "edit_text_file",
         }
+
+    def test_glob_files_risk_level(self):
+        plugin = FileSearchPlugin()
+        tool = next(t for t in plugin.get_tools() if t.name == "glob_files")
+        assert tool.risk_level == "safe"
+        assert tool.requires_confirmation is False
+        assert tool.capabilities == ("fs_read",)
+        assert tool.path_args == ("path",)
 
     def test_search_files_risk_level(self):
         plugin = FileSearchPlugin()
@@ -344,6 +352,118 @@ class TestSearchFilesTool:
         result = await plugin.execute_tool(
             "search_files",
             {"query": ""},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "required" in result.error_message.lower()
+
+
+# ===========================================================================
+# 2b. glob_files tool
+# ===========================================================================
+
+
+class TestGlobFilesTool:
+    """Test the glob_files tool executed through the plugin."""
+
+    @pytest.mark.asyncio
+    async def test_glob_recursive_pattern(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "a.py").write_text("x")
+        (tmp_path / "b.py").write_text("x")
+        (tmp_path / "c.txt").write_text("x")
+
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "**/*.py", "path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        paths = result.content["matches"]
+        assert len(paths) == 2
+        assert all(p.endswith(".py") for p in paths)
+        assert result.content["truncated"] is False
+
+    @pytest.mark.asyncio
+    async def test_glob_sorted_by_mtime_desc_and_bounded(self, tmp_path):
+        import os as _os
+
+        older = tmp_path / "old.py"
+        older.write_text("x")
+        _os.utime(older, ns=(1, 1))
+        newer = tmp_path / "new.py"
+        newer.write_text("x")
+
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "*.py", "path": str(tmp_path), "max_results": 1},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["matches"] == [str(newer.resolve())]
+        assert result.content["truncated"] is True
+
+    @pytest.mark.asyncio
+    async def test_glob_excludes_files_under_forbidden_dir(self, tmp_path):
+        plugin = await _init_plugin(
+            allowed=[str(tmp_path)],
+            forbidden=[str(tmp_path / "secret")],
+        )
+        (tmp_path / "secret").mkdir()
+        (tmp_path / "secret" / "hidden.py").write_text("x")
+        (tmp_path / "ok.py").write_text("x")
+
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "**/*.py", "path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["matches"] == [str((tmp_path / "ok.py").resolve())]
+
+    @pytest.mark.asyncio
+    async def test_glob_forbidden_root_rejected(self, tmp_path):
+        plugin = await _init_plugin(
+            allowed=[str(tmp_path)],
+            forbidden=[str(tmp_path / "secret")],
+        )
+        (tmp_path / "secret").mkdir()
+
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "*.py", "path": str(tmp_path / "secret")},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "forbidden" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_glob_invalid_root_rejected(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "*.py", "path": "C:\\Windows"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "outside" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_glob_missing_pattern_returns_error(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"path": str(tmp_path)},
             _make_exec_ctx(),
         )
 

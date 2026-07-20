@@ -1,8 +1,9 @@
 """AL\\CE — File Search plugin.
 
-Exposes six tools for searching, reading, writing and editing files on
-the local filesystem with path access control.  All paths are validated
-against allowed/forbidden root directories before any operation.
+Exposes seven tools for searching, globbing, reading, writing and
+editing files on the local filesystem with path access control.  All
+paths are validated against allowed/forbidden root directories before
+any operation.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ from backend.plugins.file_search.readers import (
 )
 from backend.plugins.file_search.searcher import (
     _validate_path,
+    run_glob,
     search_files,
 )
 
@@ -113,7 +115,7 @@ class FileSearchPlugin(BasePlugin):
     _MAX_WRITE_BYTES: int = 1_048_576  # 1 MiB
 
     def get_tools(self) -> list[ToolDefinition]:
-        """Return the five file-search tool definitions.
+        """Return the seven file-search tool definitions.
 
         Returns:
             A list of ``ToolDefinition`` objects.
@@ -162,6 +164,52 @@ class FileSearchPlugin(BasePlugin):
                         },
                     },
                     "required": ["query"],
+                },
+                result_type="json",
+                risk_level="safe",
+                capabilities=("fs_read",),
+                path_args=("path",),
+                timeout_ms=60_000,
+            ),
+            ToolDefinition(
+                name="glob_files",
+                description=(
+                    "Find files matching a glob pattern under a root "
+                    "directory. Supports real recursive patterns like "
+                    "'**/*.py'. Returns absolute file paths sorted "
+                    "newest-first (by modification time), bounded by "
+                    "max_results. Matches file paths only, never file "
+                    "contents. For a simple name-substring lookup use "
+                    "search_files; this tool is for structured path "
+                    "patterns."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "pattern": {
+                            "type": "string",
+                            "description": (
+                                "Glob pattern relative to 'path' "
+                                "(e.g. '*.txt', 'src/**/*.py')."
+                            ),
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": (
+                                "Root directory to glob under."
+                            ),
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": (
+                                "Maximum number of results. "
+                                "Defaults to configured max_results."
+                            ),
+                            "minimum": 1,
+                            "maximum": 200,
+                        },
+                    },
+                    "required": ["pattern", "path"],
                 },
                 result_type="json",
                 risk_level="safe",
@@ -374,7 +422,7 @@ class FileSearchPlugin(BasePlugin):
         """Dispatch to the requested tool.
 
         Args:
-            tool_name: One of the six file-search tool names.
+            tool_name: One of the seven file-search tool names.
             args: Caller-supplied keyword arguments.
             context: Execution metadata.
 
@@ -385,6 +433,7 @@ class FileSearchPlugin(BasePlugin):
 
         handlers = {
             "search_files": self._exec_search_files,
+            "glob_files": self._exec_glob_files,
             "get_file_info": self._exec_get_file_info,
             "read_text_file": self._exec_read_text_file,
             "open_file": self._exec_open_file,
@@ -488,6 +537,73 @@ class FileSearchPlugin(BasePlugin):
             forbidden=self._forbidden_paths,
             follow_symlinks=cfg.follow_symlinks,
         )
+
+    async def _exec_glob_files(
+        self,
+        args: dict[str, Any],
+        context: ExecutionContext,
+    ) -> dict[str, Any]:
+        """Execute the glob_files tool.
+
+        Args:
+            args: Must contain "pattern" and "path"; optionally
+                "max_results".
+            context: Execution metadata (unused).
+
+        Returns:
+            A dict with "matches" (absolute paths, newest-first),
+            "truncated", "root" and, when truncated, a "note" on how
+            to narrow the search.
+        """
+        pattern: str = args.get("pattern", "")
+        if not pattern:
+            raise ValueError("'pattern' parameter is required")
+
+        raw_path: str = args.get("path", "")
+        if not raw_path:
+            raise ValueError("'path' parameter is required")
+
+        cfg = self.ctx.config.file_search
+        max_results: int = max(
+            min(int(args.get("max_results", cfg.max_results)), cfg.max_results),
+            1,
+        )
+
+        root = _validate_path(
+            raw_path,
+            self._allowed_paths,
+            self._forbidden_paths,
+            cfg.follow_symlinks,
+        )
+
+        try:
+            matches, truncated = await asyncio.wait_for(
+                asyncio.to_thread(
+                    run_glob,
+                    root,
+                    pattern,
+                    max_results=max_results,
+                    forbidden=self._forbidden_paths,
+                    follow_symlinks=cfg.follow_symlinks,
+                ),
+                timeout=60.0,
+            )
+        except TimeoutError:
+            logger.warning("file_search: glob timed out after 60 seconds")
+            matches, truncated = [], True
+
+        payload: dict[str, Any] = {
+            "matches": [str(p) for p in matches],
+            "truncated": truncated,
+            "root": str(root),
+        }
+        if truncated:
+            payload["note"] = (
+                "Risultati troncati: usa un pattern più specifico "
+                "(o una directory radice più vicina ai file cercati) "
+                "oppure alza max_results."
+            )
+        return payload
 
     async def _exec_get_file_info(
         self,

@@ -106,17 +106,17 @@ class TestFileSearchPluginLifecycle:
         else:
             assert Path.home() in plugin._allowed_paths
 
-    def test_get_tools_returns_seven(self):
+    def test_get_tools_returns_eight(self):
         plugin = FileSearchPlugin()
         tools = plugin.get_tools()
-        assert len(tools) == 7
+        assert len(tools) == 8
 
     def test_tool_names(self):
         plugin = FileSearchPlugin()
         names = {t.name for t in plugin.get_tools()}
         assert names == {
-            "search_files", "glob_files", "get_file_info", "read_text_file",
-            "open_file", "write_text_file", "edit_text_file",
+            "search_files", "glob_files", "grep_content", "get_file_info",
+            "read_text_file", "open_file", "write_text_file", "edit_text_file",
         }
 
     def test_glob_files_risk_level(self):
@@ -587,6 +587,181 @@ class TestGlobFilesTool:
 
         assert result.success is False
         assert "required" in result.error_message.lower()
+
+
+# ===========================================================================
+# 2c. grep_content tool
+# ===========================================================================
+
+
+class TestGrepContentTool:
+    """Test the grep_content tool executed through the plugin."""
+
+    def test_grep_tool_definition(self):
+        plugin = FileSearchPlugin()
+        tool = next(t for t in plugin.get_tools() if t.name == "grep_content")
+        assert tool.risk_level == "safe"
+        assert tool.requires_confirmation is False
+        assert tool.capabilities == ("fs_read",)
+        assert tool.path_args == ("path",)
+        props = tool.parameters["properties"]
+        assert props["output_mode"]["enum"] == [
+            "files_with_matches", "content", "count",
+        ]
+        assert "cappato" in props["max_matches"]["description"].lower()
+        assert set(tool.parameters["required"]) == {"pattern", "path"}
+
+    @pytest.mark.asyncio
+    async def test_grep_default_files_with_matches(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        (tmp_path / "a.py").write_text("def foo():\n    return 42\n")
+        (tmp_path / "b.txt").write_text("nothing\n")
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "foo", "path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["files"] == [str((tmp_path / "a.py").resolve())]
+        assert result.content["truncated"] is False
+        assert "matches" not in result.content
+        assert "counts" not in result.content
+
+    @pytest.mark.asyncio
+    async def test_grep_content_mode_payload(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        (tmp_path / "a.py").write_text("def foo():\n    return 42\n")
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {
+                "pattern": "return",
+                "path": str(tmp_path),
+                "output_mode": "content",
+                "context_lines": 1,
+            },
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        [match] = result.content["matches"]
+        assert match["path"] == str((tmp_path / "a.py").resolve())
+        assert match["line_number"] == 2
+        assert match["line"] == "    return 42"
+        assert match["context_before"] == ["def foo():"]
+        assert match["context_after"] == [""]
+
+    @pytest.mark.asyncio
+    async def test_grep_count_mode_payload(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        (tmp_path / "a.py").write_text("foo\nfoo\n")
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "foo", "path": str(tmp_path), "output_mode": "count"},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["counts"] == {
+            str((tmp_path / "a.py").resolve()): 2,
+        }
+
+    @pytest.mark.asyncio
+    async def test_grep_forbidden_root_rejected(self, tmp_path):
+        plugin = await _init_plugin(
+            allowed=[str(tmp_path)],
+            forbidden=[str(tmp_path / "secret")],
+        )
+        (tmp_path / "secret").mkdir()
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "x", "path": str(tmp_path / "secret")},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "forbidden" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_grep_missing_pattern_returns_error(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "required" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_grep_invalid_regex_clean_error(self, tmp_path):
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "foo[", "path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is False
+        assert "regex" in result.error_message
+        assert "Internal error" not in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_grep_max_matches_capped_server_side(self, tmp_path):
+        """A max_matches above the config cap is clamped, truncation is
+        flagged and the Italian note tells the model how to narrow."""
+        plugin = FileSearchPlugin()
+        ctx = _make_app_context(
+            allowed_paths=[str(tmp_path)], forbidden_paths=[],
+        )
+        ctx.config.file_search.grep_max_matches = 3
+        await plugin.initialize(ctx)
+        for i in range(5):
+            (tmp_path / f"f{i}.txt").write_text("hit\n")
+
+        result = await plugin.execute_tool(
+            "grep_content",
+            {"pattern": "hit", "path": str(tmp_path), "max_matches": 999},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["truncated"] is True
+        assert len(result.content["files"]) == 3
+        assert "restringi" in result.content["note"].lower()
+
+    @pytest.mark.asyncio
+    async def test_grep_timeout_returns_partial_results(self, tmp_path):
+        """On timeout the handler must salvage what the scan collected so
+        far (shared sink) instead of returning [], flagged truncated."""
+        (tmp_path / "a.py").write_text("hit\n")
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        async def fake_wait_for(awaitable, timeout):
+            await awaitable  # let run_grep complete and fill the sink
+            raise TimeoutError
+
+        with patch(
+            "backend.plugins.file_search.plugin.asyncio.wait_for",
+            new=fake_wait_for,
+        ):
+            result = await plugin.execute_tool(
+                "grep_content",
+                {"pattern": "hit", "path": str(tmp_path)},
+                _make_exec_ctx(),
+            )
+
+        assert result.success is True
+        assert result.content["files"] == [str((tmp_path / "a.py").resolve())]
+        assert result.content["truncated"] is True
+        assert "note" in result.content
 
 
 # ===========================================================================

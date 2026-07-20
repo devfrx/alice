@@ -1,9 +1,9 @@
 """AL\\CE — File Search plugin.
 
-Exposes seven tools for searching, globbing, reading, writing and
-editing files on the local filesystem with path access control.  All
-paths are validated against allowed/forbidden root directories before
-any operation.
+Exposes eight tools for searching, globbing, grepping, reading, writing
+and editing files on the local filesystem with path access control.
+All paths are validated against allowed/forbidden root directories
+before any operation.
 """
 
 from __future__ import annotations
@@ -28,6 +28,12 @@ from backend.core.plugin_models import (
     ExecutionContext,
     ToolDefinition,
     ToolResult,
+)
+from backend.plugins.file_search.grep import (
+    OUTPUT_MODES,
+    GrepOptions,
+    GrepResult,
+    run_grep,
 )
 from backend.plugins.file_search.read_tracker import ReadState, ReadTracker
 from backend.plugins.file_search.readers import (
@@ -116,7 +122,7 @@ class FileSearchPlugin(BasePlugin):
     _MAX_WRITE_BYTES: int = 1_048_576  # 1 MiB
 
     def get_tools(self) -> list[ToolDefinition]:
-        """Return the seven file-search tool definitions.
+        """Return the eight file-search tool definitions.
 
         Returns:
             A list of ``ToolDefinition`` objects.
@@ -220,6 +226,99 @@ class FileSearchPlugin(BasePlugin):
                 capabilities=("fs_read",),
                 path_args=("path",),
                 timeout_ms=60_000,
+            ),
+            ToolDefinition(
+                name="grep_content",
+                description=(
+                    "Search file CONTENTS with a Python regular "
+                    "expression, line by line, under a root directory. "
+                    "For file NAMES use glob_files or search_files "
+                    "instead. Three output modes: 'files_with_matches' "
+                    "(default, list of file paths), 'content' (matching "
+                    "lines with line numbers and optional context), "
+                    "'count' (per-file hit counts). Binary files and "
+                    "files over 1 MiB are skipped. Results are bounded "
+                    "server-side (files scanned, total matches, "
+                    "timeout): when 'truncated' is true, narrow the "
+                    "search with 'glob', 'extensions', a more specific "
+                    "root or a more selective regex."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "pattern": {
+                            "type": "string",
+                            "description": (
+                                "Python regular expression matched "
+                                "against each line of file content."
+                            ),
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": (
+                                "Root directory to search under."
+                            ),
+                        },
+                        "glob": {
+                            "type": "string",
+                            "description": (
+                                "Optional filename filter pattern "
+                                "(e.g. '*.py')."
+                            ),
+                        },
+                        "extensions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional list of file extensions to "
+                                "filter by (e.g. ['.py', '.txt'])."
+                            ),
+                        },
+                        "output_mode": {
+                            "type": "string",
+                            "enum": [
+                                "files_with_matches", "content", "count",
+                            ],
+                            "default": "files_with_matches",
+                            "description": (
+                                "What to return: matching file paths, "
+                                "matching lines with context, or "
+                                "per-file hit counts."
+                            ),
+                        },
+                        "context_lines": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 10,
+                            "default": 0,
+                            "description": (
+                                "Lines of context around each match "
+                                "(content mode only)."
+                            ),
+                        },
+                        "case_insensitive": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": (
+                                "Match the regex case-insensitively."
+                            ),
+                        },
+                        "max_matches": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": (
+                                "Maximum total matches, cappato "
+                                "server-side (default 200)."
+                            ),
+                        },
+                    },
+                    "required": ["pattern", "path"],
+                },
+                result_type="json",
+                risk_level="safe",
+                capabilities=("fs_read",),
+                path_args=("path",),
+                timeout_ms=30_000,
             ),
             ToolDefinition(
                 name="get_file_info",
@@ -426,7 +525,7 @@ class FileSearchPlugin(BasePlugin):
         """Dispatch to the requested tool.
 
         Args:
-            tool_name: One of the seven file-search tool names.
+            tool_name: One of the eight file-search tool names.
             args: Caller-supplied keyword arguments.
             context: Execution metadata.
 
@@ -438,6 +537,7 @@ class FileSearchPlugin(BasePlugin):
         handlers = {
             "search_files": self._exec_search_files,
             "glob_files": self._exec_glob_files,
+            "grep_content": self._exec_grep_content,
             "get_file_info": self._exec_get_file_info,
             "read_text_file": self._exec_read_text_file,
             "open_file": self._exec_open_file,
@@ -624,6 +724,126 @@ class FileSearchPlugin(BasePlugin):
                 "Risultati troncati a max_results: l'ordinamento "
                 "newest-first è completo; alza max_results o restringi "
                 "il pattern per vederne di più."
+            )
+        return payload
+
+    async def _exec_grep_content(
+        self,
+        args: dict[str, Any],
+        context: ExecutionContext,
+    ) -> dict[str, Any]:
+        """Execute the grep_content tool.
+
+        Runs the bounded pure-Python content grep in a worker thread
+        under ``grep_timeout_s``; on timeout the partial harvest is
+        salvaged from the shared, incrementally-filled ``GrepResult``
+        (same sink/snapshot approach as glob) and flagged truncated.
+
+        Args:
+            args: Must contain "pattern" and "path"; optionally "glob",
+                "extensions", "output_mode", "context_lines",
+                "case_insensitive", "max_matches".
+            context: Execution metadata (unused).
+
+        Returns:
+            A dict with the mode-specific payload ("files", "matches"
+            or "counts"), plus "root", "truncated", "files_scanned"
+            and, when truncated, an Italian "note" telling the model
+            how to narrow the search.
+        """
+        pattern: str = args.get("pattern", "")
+        if not pattern:
+            raise ValueError("'pattern' parameter is required")
+
+        raw_path: str = args.get("path", "")
+        if not raw_path:
+            raise ValueError("'path' parameter is required")
+
+        cfg = self.ctx.config.file_search
+        output_mode = str(args.get("output_mode", "files_with_matches"))
+        if output_mode not in OUTPUT_MODES:
+            raise ValueError(
+                f"output_mode non valido: {output_mode!r} "
+                f"(ammessi: {', '.join(OUTPUT_MODES)})"
+            )
+        max_matches: int = max(
+            min(
+                int(args.get("max_matches", cfg.grep_max_matches)),
+                cfg.grep_max_matches,
+            ),
+            1,
+        )
+        context_lines: int = max(min(int(args.get("context_lines", 0)), 10), 0)
+
+        root = _validate_path(
+            raw_path,
+            self._allowed_paths,
+            self._forbidden_paths,
+            cfg.follow_symlinks,
+        )
+
+        options = GrepOptions(
+            pattern=pattern,
+            glob=args.get("glob") or None,
+            extensions=tuple(args.get("extensions") or ()),
+            output_mode=output_mode,
+            context_lines=context_lines,
+            case_insensitive=bool(args.get("case_insensitive", False)),
+            max_files=cfg.grep_max_files,
+            max_matches=max_matches,
+            follow_symlinks=cfg.follow_symlinks,
+        )
+
+        # Shared, incrementally-filled result: on timeout the scan's
+        # partial harvest is still readable here (the abandoned thread
+        # only appends).
+        sink = GrepResult()
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(
+                    run_grep,
+                    root,
+                    options,
+                    tuple(self._forbidden_paths),
+                    sink,
+                ),
+                timeout=float(cfg.grep_timeout_s),
+            )
+        except TimeoutError:
+            logger.warning(
+                "file_search: grep timed out after {}s; "
+                "returning partial results",
+                cfg.grep_timeout_s,
+            )
+            result = sink
+            result.truncated = True
+
+        payload: dict[str, Any] = {
+            "root": str(root),
+            "truncated": result.truncated,
+            "files_scanned": result.files_scanned,
+        }
+        if output_mode == "content":
+            payload["matches"] = [
+                {
+                    "path": str(m.path),
+                    "line_number": m.line_number,
+                    "line": m.line,
+                    "context_before": list(m.context_before),
+                    "context_after": list(m.context_after),
+                }
+                for m in list(result.matches)
+            ]
+        elif output_mode == "count":
+            payload["counts"] = dict(result.counts)
+        else:
+            payload["files"] = [str(p) for p in list(result.files)]
+        if result.truncated:
+            payload["note"] = (
+                "Risultati troncati (bound su file scanditi, match "
+                "totali o timeout): restringi la ricerca con 'glob', "
+                "'extensions', una root più vicina ai file cercati o "
+                "una regex più selettiva."
             )
         return payload
 

@@ -664,6 +664,9 @@ class FileSearchConfig(BaseSettings):
     max_read_lines: int = 2000
     max_line_chars: int = 2000
     follow_symlinks: bool = False
+    grep_max_files: int = 5000
+    grep_max_matches: int = 200
+    grep_timeout_s: int = 20
 
 
 class NewsConfig(BaseSettings):

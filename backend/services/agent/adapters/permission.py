@@ -59,6 +59,7 @@ from backend.services.permission_rules import RuleEffect
 from backend.services.permission_service import GateAction as PlatformGateAction
 
 if TYPE_CHECKING:
+    from backend.core.plugin_models import ToolDefinition
     from backend.core.tool_registry import ToolRegistry
     from backend.services.permission_mode_service import PermissionModeService
     from backend.services.permission_rules import PermissionRuleService
@@ -69,6 +70,31 @@ _ACTION_MAP: dict[PlatformGateAction, GateAction] = {
     PlatformGateAction.DENY: GateAction.DENY,
     PlatformGateAction.NEEDS_CONFIRMATION: GateAction.CONFIRM,
 }
+
+#: Provenienza condivisa per i tool nativi (frozen, quindi sicura da riusare).
+_NATIVE_TOOL_META = ToolMetaInfo(origin="native")
+
+
+def _tool_meta_from(tool_def: ToolDefinition | None) -> ToolMetaInfo | None:
+    """Provenienza wire dalla ``ToolDefinition`` risolta.
+
+    ``None`` se il tool non è risolvibile nel registry; origin ``"native"``
+    per i tool di piattaforma (``tool_def.mcp is None``); origin ``"mcp"``
+    con i campi copiati dalla ``McpToolMeta`` altrimenti.
+    """
+    if tool_def is None:
+        return None
+    mcp_meta = tool_def.mcp
+    if mcp_meta is None:
+        return _NATIVE_TOOL_META
+    return ToolMetaInfo(
+        origin="mcp",
+        server=mcp_meta.server,
+        annotated=mcp_meta.annotated,
+        read_only=mcp_meta.read_only,
+        destructive=mcp_meta.destructive,
+        trusted=mcp_meta.trusted,
+    )
 
 
 class PermissionServiceAdapter:
@@ -124,27 +150,13 @@ class PermissionServiceAdapter:
             conversation_id=conversation_id,
             mode=mode,
         )
-        tool_meta: ToolMetaInfo | None = None
-        if tool_def is not None:
-            mcp_meta = tool_def.mcp
-            if mcp_meta is not None:
-                tool_meta = ToolMetaInfo(
-                    origin="mcp",
-                    server=mcp_meta.server,
-                    annotated=mcp_meta.annotated,
-                    read_only=mcp_meta.read_only,
-                    destructive=mcp_meta.destructive,
-                    trusted=mcp_meta.trusted,
-                )
-            else:
-                tool_meta = ToolMetaInfo(origin="native")
         return GateVerdict(
             action=_ACTION_MAP[decision.action],
             outcome=decision.outcome.value,
             reason=decision.reason,
             risk_level=tool_def.risk_level if tool_def is not None else None,
             description=tool_def.description if tool_def is not None else None,
-            tool_meta=tool_meta,
+            tool_meta=_tool_meta_from(tool_def),
         )
 
     async def remember_approval(

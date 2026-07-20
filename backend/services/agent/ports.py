@@ -12,7 +12,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from backend.services.agent.events import AgentEvent
 from backend.services.agent.models import ToolInvocation, ToolMeta
@@ -88,7 +88,7 @@ class ToolMetaInfo:
     l'autorità operativa resta nei campi gate del verdetto.
     """
 
-    origin: str  # "native" | "mcp"
+    origin: Literal["native", "mcp"]
     server: str | None = None
     annotated: bool | None = None
     read_only: bool | None = None

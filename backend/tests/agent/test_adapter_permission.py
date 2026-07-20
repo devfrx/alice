@@ -25,6 +25,21 @@ def _call(name: str = "fs_read_file", args: dict | None = None) -> ToolInvocatio
     return ToolInvocation(call_id="call_1", name=name, args=args or {}, raw_args="{}")
 
 
+def _tool_def(
+    *,
+    risk_level: str = "safe",
+    description: str = "",
+    mcp: McpToolMeta | None = None,
+) -> MagicMock:
+    """``ToolDefinition`` finta con default sicuri (``mcp=None`` esplicito).
+
+    Un ``MagicMock`` nudo auto-crea ``.mcp`` non-None e produrrebbe un
+    ``tool_meta`` MCP spazzatura nel verdetto: passare da questa factory
+    rende il default sicuro impossibile da dimenticare.
+    """
+    return MagicMock(risk_level=risk_level, description=description, mcp=mcp)
+
+
 def _rule_service() -> MagicMock:
     rule_service = MagicMock()
     rule_service.add_rule = AsyncMock()
@@ -107,7 +122,7 @@ async def test_gate_action_mapping(
 
 
 async def test_verdict_carries_risk_level_and_description_from_tool_def() -> None:
-    tool_def = MagicMock(risk_level="dangerous", description="borra tutto")
+    tool_def = _tool_def(risk_level="dangerous", description="borra tutto")
     adapter, *_ = _make_adapter(decision=GateDecision.allow(), tool_def=tool_def)
 
     verdict = await adapter.decide(_call(), conversation_id="conv-1")
@@ -131,7 +146,7 @@ async def test_decide_passes_resolved_namespaced_name_for_bare_tool_call() -> No
     non come nome nudo — altrimenti rules/grants per-conversazione keyed sul nome
     namespaced non fanno mai match.
     """
-    tool_def = MagicMock(risk_level="safe", description="ricorda un fatto")
+    tool_def = _tool_def(description="ricorda un fatto")
     permission_service = MagicMock()
     permission_service.decide.return_value = GateDecision.allow()
     mode_service = MagicMock()
@@ -206,7 +221,7 @@ async def test_decide_falls_back_to_bare_name_when_unresolvable() -> None:
 
 async def test_verdict_tool_meta_native() -> None:
     """Tool nativo noto (``mcp=None``) -> ``tool_meta`` con origin ``native``."""
-    tool_def = MagicMock(risk_level="safe", description="legge un file", mcp=None)
+    tool_def = _tool_def(description="legge un file")
     adapter, *_ = _make_adapter(decision=GateDecision.allow(), tool_def=tool_def)
 
     verdict = await adapter.decide(_call(), conversation_id="conv-1")
@@ -225,7 +240,7 @@ async def test_verdict_tool_meta_mcp() -> None:
     meta = McpToolMeta(
         server="files", annotated=False, trusted=True, read_only=False, destructive=None,
     )
-    tool_def = MagicMock(risk_level="dangerous", description="scrive un file", mcp=meta)
+    tool_def = _tool_def(risk_level="dangerous", description="scrive un file", mcp=meta)
     adapter, *_ = _make_adapter(decision=GateDecision.allow(), tool_def=tool_def)
 
     verdict = await adapter.decide(_call(name="mcp_files_write"), conversation_id="conv-1")
@@ -255,7 +270,7 @@ async def test_verdict_tool_meta_populated_on_deny() -> None:
         outcome=PermissionOutcome.DENY_SCOPE,
         reason="outside_scope",
     )
-    tool_def = MagicMock(risk_level="dangerous", description="fuori scope", mcp=None)
+    tool_def = _tool_def(risk_level="dangerous", description="fuori scope")
     adapter, *_ = _make_adapter(decision=decision, tool_def=tool_def)
 
     verdict = await adapter.decide(_call(), conversation_id="conv-1")
@@ -326,7 +341,7 @@ async def test_remember_approval_none_is_noop() -> None:
 async def test_remember_approval_uses_resolved_namespaced_name() -> None:
     """La regola è keyed sul nome NAMESPACED risolto (stessa regola del fix M1
     su ``decide``): una regola su ``remember`` nudo non farebbe mai match."""
-    tool_def = MagicMock(risk_level="safe", description="ricorda un fatto")
+    tool_def = _tool_def(description="ricorda un fatto")
     permission_service = MagicMock()
     mode_service = MagicMock()
     tool_registry = MagicMock()

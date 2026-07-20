@@ -71,6 +71,31 @@ def test_file_contains_missing_file(tmp_path: Path) -> None:
     assert "no.txt" in results[0].detail
 
 
+def test_response_not_matches() -> None:
+    results = evaluate_checks(
+        [
+            CheckSpec(kind="response_not_matches", pattern="note\\.txt"),
+            CheckSpec(kind="response_not_matches", pattern="main\\.py"),
+        ],
+        sandbox=Path("."),
+        response="I file Python sono src/main.py e src/utils/helpers.py.",
+        trace=_trace(),
+    )
+    assert [r.passed for r in results] == [True, False]
+
+
+def test_response_not_matches_invalid_regex_fails() -> None:
+    """Una regex invalida non passa mai, nemmeno nella variante negata."""
+    results = evaluate_checks(
+        [CheckSpec(kind="response_not_matches", pattern="[non chiuso")],
+        sandbox=Path("."),
+        response="qualsiasi",
+        trace=_trace(),
+    )
+    assert results[0].passed is False
+    assert "pattern invalido" in results[0].detail
+
+
 def test_response_matches_invalid_regex() -> None:
     results = evaluate_checks(
         [CheckSpec(kind="response_matches", pattern="[non chiuso")],

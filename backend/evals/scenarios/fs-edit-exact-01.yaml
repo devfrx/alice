@@ -1,0 +1,27 @@
+id: fs-edit-exact-01
+title: Modifica esatta di UNA sola tra due occorrenze identiche
+domain: filesystem
+setup:
+  sandbox:
+    - path: "settings.txt"
+      content: |
+        server_timeout = 30
+        client_timeout = 30
+prompt: |-
+  Cartella di lavoro: {sandbox}
+  Nel file settings.txt sia server_timeout sia client_timeout valgono 30.
+  Porta a 60 SOLO client_timeout, lasciando server_timeout invariato.
+  Leggi prima il file, poi applica una modifica mirata (non riscrivere
+  l'intero file).
+checks:
+  - kind: tool_called
+    name: file_search_read_text_file
+  - kind: tool_called
+    name: file_search_edit_text_file
+  - kind: file_contains
+    path: settings.txt
+    text: "client_timeout = 60"
+  - kind: file_contains
+    path: settings.txt
+    text: "server_timeout = 30"
+  - kind: finished_ok

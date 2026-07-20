@@ -27,9 +27,11 @@ def evaluate_check(
     - ``file_exists`` / ``file_absent``: ``check.path`` relativo alla sandbox.
     - ``file_contains``: substring case-insensitive (``casefold``) di
       ``check.text`` nel contenuto di ``check.path``.
-    - ``response_matches``: ``re.search`` di ``check.pattern`` su *response*
-      con i flag ``IGNORECASE | DOTALL``. Un pattern regex invalido non
-      solleva: il check fallisce con un detail dedicato.
+    - ``response_matches`` / ``response_not_matches``: ``re.search`` di
+      ``check.pattern`` su *response* con i flag ``IGNORECASE | DOTALL``
+      (la variante ``not`` passa quando il pattern NON matcha). Un pattern
+      regex invalido non solleva: il check fallisce con un detail dedicato
+      in entrambe le varianti.
     - ``tool_called`` / ``tool_not_called``: match sul nome namespaced esatto
       oppure sul suffisso ``_<check.name>`` (es. ``file_search_write_text_file``
       matcha ``name: write_text_file``).
@@ -72,17 +74,18 @@ def evaluate_check(
         ok = (check.text or "").casefold() in content.casefold()
         return CheckResult(kind=kind, passed=ok, detail=f"{rel}: contains={ok}")
 
-    if kind == "response_matches":
+    if kind in ("response_matches", "response_not_matches"):
         pattern = check.pattern or ""
         try:
-            ok = re.search(pattern, response, re.IGNORECASE | re.DOTALL) is not None
+            hit = re.search(pattern, response, re.IGNORECASE | re.DOTALL) is not None
         except re.error as exc:
             return CheckResult(
                 kind=kind,
                 passed=False,
                 detail=f"pattern invalido {pattern!r}: {exc}",
             )
-        return CheckResult(kind=kind, passed=ok, detail=f"pattern={pattern!r} match={ok}")
+        ok = hit if kind == "response_matches" else not hit
+        return CheckResult(kind=kind, passed=ok, detail=f"pattern={pattern!r} match={hit}")
 
     if kind in ("tool_called", "tool_not_called"):
         wanted = check.name or ""

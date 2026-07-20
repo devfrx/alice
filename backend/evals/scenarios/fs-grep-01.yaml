@@ -1,0 +1,21 @@
+id: fs-grep-01
+title: Trova in quale file compare un pattern cercando nei contenuti
+domain: search
+setup:
+  sandbox:
+    - path: "data/alpha.txt"
+      content: "testo ordinario senza sorprese\n"
+    - path: "data/beta.txt"
+      content: "qui compare il riferimento MAGIC-42 da trovare\n"
+    - path: "data/gamma.txt"
+      content: "altro testo qualunque\n"
+prompt: |-
+  Cartella di lavoro: {sandbox}
+  In uno dei file sotto data/ compare la stringa MAGIC-42. Cerca nei
+  CONTENUTI dei file (non nei nomi) e dimmi in quale file si trova.
+checks:
+  - kind: tool_called
+    name: file_search_grep_content
+  - kind: response_matches
+    pattern: "beta\\.txt"
+  - kind: finished_ok

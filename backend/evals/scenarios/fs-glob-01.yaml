@@ -1,0 +1,29 @@
+id: fs-glob-01
+title: Trova i file .py annidati con un pattern glob
+domain: search
+setup:
+  sandbox:
+    - path: "src/main.py"
+      content: "print('main')\n"
+    - path: "src/utils/helpers.py"
+      content: "def helper():\n    return 42\n"
+    - path: "docs/note.txt"
+      content: "appunti vari\n"
+    - path: "src/style.css"
+      content: "body { margin: 0; }\n"
+prompt: |-
+  Cartella di lavoro: {sandbox}
+  Elenca SOLO i file Python (.py) presenti nella cartella di lavoro, a
+  qualunque profondità. Non citare file di altro tipo.
+checks:
+  - kind: tool_called
+    name: file_search_glob_files
+  - kind: response_matches
+    pattern: "main\\.py"
+  - kind: response_matches
+    pattern: "helpers\\.py"
+  - kind: response_not_matches
+    pattern: "note\\.txt"
+  - kind: response_not_matches
+    pattern: "style\\.css"
+  - kind: finished_ok

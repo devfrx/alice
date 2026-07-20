@@ -11,6 +11,7 @@ CheckKind = Literal[
     "file_absent",
     "file_contains",
     "response_matches",
+    "response_not_matches",
     "tool_called",
     "tool_not_called",
     "max_steps",

@@ -407,6 +407,10 @@ class TestGlobFilesTool:
         assert result.success is True
         assert result.content["matches"] == [str(newer.resolve())]
         assert result.content["truncated"] is True
+        # Full enumeration, only the final slice-cut fired: the note must
+        # say the newest-first ordering is complete, not partial.
+        assert "completo" in result.content["note"]
+        assert "parziali" not in result.content["note"]
 
     @pytest.mark.asyncio
     async def test_glob_excludes_files_under_forbidden_dir(self, tmp_path):
@@ -456,6 +460,120 @@ class TestGlobFilesTool:
 
         assert result.success is False
         assert "outside" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_glob_early_break_notes_partial_ordering(self, tmp_path):
+        """When the max_results*4 enumeration cap fires, newest-first only
+        holds over the files examined: the note must say so explicitly."""
+        for i in range(9):  # cap = 2 * 4 = 8 < 9 matches
+            (tmp_path / f"f{i}.py").write_text("x")
+
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "*.py", "path": str(tmp_path), "max_results": 2},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert len(result.content["matches"]) == 2
+        assert result.content["truncated"] is True
+        assert "parziali" in result.content["note"]
+        assert "esaminati" in result.content["note"]
+
+    @pytest.mark.asyncio
+    async def test_glob_timeout_returns_partial_results(self, tmp_path):
+        """On timeout the handler must salvage what the walk collected so
+        far (shared sink) instead of returning [], flagged as partial."""
+        (tmp_path / "a.py").write_text("x")
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        async def fake_wait_for(awaitable, timeout):
+            await awaitable  # let run_glob complete and fill the sink
+            raise TimeoutError
+
+        with patch(
+            "backend.plugins.file_search.plugin.asyncio.wait_for",
+            new=fake_wait_for,
+        ):
+            result = await plugin.execute_tool(
+                "glob_files",
+                {"pattern": "*.py", "path": str(tmp_path)},
+                _make_exec_ctx(),
+            )
+
+        assert result.success is True
+        assert result.content["matches"] == [str((tmp_path / "a.py").resolve())]
+        assert result.content["truncated"] is True
+        assert "parziali" in result.content["note"]
+
+    @pytest.mark.asyncio
+    async def test_glob_absolute_pattern_clean_error(self, tmp_path):
+        """An absolute/root-anchored pattern must fail with a clean,
+        actionable message — not pathlib's NotImplementedError."""
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+
+        for pattern in ("C:\\Windows\\*", "\\Windows\\*"):
+            result = await plugin.execute_tool(
+                "glob_files",
+                {"pattern": pattern, "path": str(tmp_path)},
+                _make_exec_ctx(),
+            )
+            assert result.success is False, pattern
+            assert "relativo" in result.error_message
+            assert "Internal error" not in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_glob_dotdot_pattern_cannot_escape_root(self, tmp_path):
+        """Path.glob('../..') yields paths outside the root: the resolved
+        containment check must drop them (no escape via pattern)."""
+        (tmp_path / "sub").mkdir()
+        (tmp_path / "outside.py").write_text("x")
+
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "../*.py", "path": str(tmp_path / "sub")},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["matches"] == []
+
+    @pytest.mark.asyncio
+    async def test_glob_symlink_file_excluded_when_not_followed(self, tmp_path):
+        """With follow_symlinks=False (default) a symlinked file matching
+        the pattern must not appear in the results."""
+        import os as _os
+
+        target = tmp_path / "real.txt"
+        target.write_text("x")
+        link = tmp_path / "link.py"
+        try:
+            _os.symlink(target, link)
+        except (OSError, NotImplementedError) as exc:  # pragma: no cover
+            pytest.skip(f"symlink not permitted on this platform: {exc}")
+
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
+        result = await plugin.execute_tool(
+            "glob_files",
+            {"pattern": "*.py", "path": str(tmp_path)},
+            _make_exec_ctx(),
+        )
+
+        assert result.success is True
+        assert result.content["matches"] == []
+
+    def test_max_results_schema_is_honest(self):
+        """No static 'maximum' on max_results: the real cap is the server
+        config (default 50) — a static 200 would lie to the model.  Holds
+        for both search_files and glob_files."""
+        plugin = FileSearchPlugin()
+        for name in ("search_files", "glob_files"):
+            tool = next(t for t in plugin.get_tools() if t.name == name)
+            schema = tool.parameters["properties"]["max_results"]
+            assert "maximum" not in schema, name
+            assert "capped" in schema["description"].lower(), name
 
     @pytest.mark.asyncio
     async def test_glob_missing_pattern_returns_error(self, tmp_path):

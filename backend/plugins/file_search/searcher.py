@@ -6,6 +6,7 @@ import asyncio
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 from loguru import logger
 
@@ -182,6 +183,41 @@ def _sync_walk(
     return results
 
 
+class GlobOutcome(NamedTuple):
+    """Result of :func:`run_glob`.
+
+    Attributes:
+        matches: Resolved absolute file paths, newest-first, at most
+            ``max_results`` of them.
+        truncated: ``True`` when the result set was cut short for any
+            reason (early-break, slice-cut or caller-side timeout).
+        partial: ``True`` when the enumeration itself stopped early
+            (cap or timeout): newest-first then holds only over the
+            files examined, NOT over the whole tree.
+    """
+
+    matches: list[Path]
+    truncated: bool
+    partial: bool
+
+
+def _finalize_glob(
+    stamped: list[tuple[int, Path]], max_results: int,
+) -> tuple[list[Path], bool]:
+    """Sort ``(mtime_ns, path)`` stamps newest-first and cut to *max_results*.
+
+    Args:
+        stamped: Collected ``(st_mtime_ns, resolved_path)`` tuples.
+        max_results: Maximum number of paths to keep.
+
+    Returns:
+        A ``(matches, slice_cut)`` tuple: the newest *max_results* paths
+        and whether anything was dropped by the cut.
+    """
+    ordered = sorted(stamped, key=lambda t: t[0], reverse=True)
+    return [p for _, p in ordered[:max_results]], len(ordered) > max_results
+
+
 def run_glob(
     root: Path,
     pattern: str,
@@ -189,37 +225,66 @@ def run_glob(
     max_results: int,
     forbidden: list[Path] | tuple[Path, ...],
     follow_symlinks: bool,
-) -> tuple[list[Path], bool]:
+    sink: list[tuple[int, Path]] | None = None,
+) -> GlobOutcome:
     """Glob under *root*, newest-first, bounded.
 
     Runs ``Path.glob`` with the given pattern (real ``**`` recursion is
     supported), keeping only regular files that resolve inside *root*
-    and outside every forbidden directory.  Collection stops early at
-    ``max_results * 4`` candidates as a defence against huge trees; the
-    survivors are sorted by modification time (newest first) and cut to
+    and outside every forbidden directory.  Collection stops early once
+    ``max_results * 4`` candidates have been gathered; survivors are
+    sorted by modification time (newest first) and cut to
     ``max_results``.
+
+    Truncation honesty: when the early-break cap fires (``partial`` is
+    ``True``), the enumeration is INCOMPLETE — newest-first then holds
+    only among the files examined in ``Path.glob`` traversal order, not
+    over the whole tree.  When only the final slice-cut fires, the
+    ordering is complete and merely shortened.
+
+    Bound caveat: the cap bounds how many MATCHES are collected, not
+    the walk itself — pathlib offers no pruning hook, so ``**`` still
+    descends into forbidden subtrees (their files are only filtered out
+    afterwards) and into match-free trees.  Unlike ``_sync_walk``,
+    which prunes forbidden directories during traversal, the real bound
+    on walk time here is the caller's timeout; passing *sink* lets the
+    caller salvage what was collected when it abandons the call.
 
     Symlink behaviour: when *follow_symlinks* is ``False``, symlinked
     files are skipped; ``Path.glob`` itself never recurses into
     symlinked directories when expanding ``**``, and a candidate whose
-    resolution escapes *root* (e.g. via a symlinked path component) is
-    dropped by the containment check either way.
+    resolution escapes *root* (e.g. via a symlinked path component or a
+    ``..`` in the pattern) is dropped by the containment check either
+    way.
 
     Args:
         root: Already-validated root directory to glob under.
         pattern: Glob pattern relative to *root* (e.g. ``**/*.py``).
+            Absolute or drive/root-anchored patterns are rejected.
         max_results: Maximum number of paths to return (>= 1).
         forbidden: Directories that are always blocked.
         follow_symlinks: Whether symlinked files may appear in results.
+        sink: Optional shared accumulator for ``(mtime_ns, path)``
+            stamps, filled in place during the walk so a caller that
+            times out can still read the partial harvest.
 
     Returns:
-        A ``(matches, truncated)`` tuple: resolved absolute file paths
-        sorted newest-first, and whether the result set was cut short.
+        A :class:`GlobOutcome` ``(matches, truncated, partial)``.
+
+    Raises:
+        ValueError: If *pattern* is absolute or root-anchored.
     """
+    if Path(pattern).anchor:
+        raise ValueError(
+            "Il pattern deve essere relativo alla root: indica la "
+            "directory di partenza con 'path' e usa un pattern come "
+            "'**/*.py'."
+        )
+
     root_resolved = root.resolve()
     forbidden_resolved = [fb.resolve() for fb in forbidden]
-    stamped: list[tuple[int, Path]] = []
-    truncated = False
+    stamped: list[tuple[int, Path]] = sink if sink is not None else []
+    partial = False
 
     for candidate in root_resolved.glob(pattern):
         try:
@@ -237,14 +302,12 @@ def run_glob(
             logger.warning("glob: skipping {}: {}", candidate, exc)
             continue
         if len(stamped) >= max_results * 4:
-            # Collected enough extras: sort what we have and cut.
-            truncated = True
+            # Enough extras collected: stop enumerating (incomplete!).
+            partial = True
             break
 
-    stamped.sort(key=lambda t: t[0], reverse=True)
-    if len(stamped) > max_results:
-        truncated = True
-    return [p for _, p in stamped[:max_results]], truncated
+    matches, slice_cut = _finalize_glob(stamped, max_results)
+    return GlobOutcome(matches, partial or slice_cut, partial)
 
 
 async def search_files(

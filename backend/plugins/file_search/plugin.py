@@ -37,6 +37,7 @@ from backend.plugins.file_search.readers import (
     read_text_file,
 )
 from backend.plugins.file_search.searcher import (
+    _finalize_glob,
     _validate_path,
     run_glob,
     search_files,
@@ -156,11 +157,11 @@ class FileSearchPlugin(BasePlugin):
                         "max_results": {
                             "type": "integer",
                             "description": (
-                                "Maximum number of results. "
-                                "Defaults to configured max_results."
+                                "Maximum number of results, capped "
+                                "server-side by the configured "
+                                "max_results (default 50)."
                             ),
                             "minimum": 1,
-                            "maximum": 200,
                         },
                     },
                     "required": ["query"],
@@ -178,10 +179,13 @@ class FileSearchPlugin(BasePlugin):
                     "directory. Supports real recursive patterns like "
                     "'**/*.py'. Returns absolute file paths sorted "
                     "newest-first (by modification time), bounded by "
-                    "max_results. Matches file paths only, never file "
-                    "contents. For a simple name-substring lookup use "
-                    "search_files; this tool is for structured path "
-                    "patterns."
+                    "max_results. When the result is truncated because "
+                    "the enumeration stopped early, newest-first only "
+                    "holds over the files examined, not the whole tree "
+                    "(the 'note' field says which case applies). "
+                    "Matches file paths only, never file contents. For "
+                    "a simple name-substring lookup use search_files; "
+                    "this tool is for structured path patterns."
                 ),
                 parameters={
                     "type": "object",
@@ -202,11 +206,11 @@ class FileSearchPlugin(BasePlugin):
                         "max_results": {
                             "type": "integer",
                             "description": (
-                                "Maximum number of results. "
-                                "Defaults to configured max_results."
+                                "Maximum number of results, capped "
+                                "server-side by the configured "
+                                "max_results (default 50)."
                             ),
                             "minimum": 1,
-                            "maximum": 200,
                         },
                     },
                     "required": ["pattern", "path"],
@@ -552,8 +556,10 @@ class FileSearchPlugin(BasePlugin):
 
         Returns:
             A dict with "matches" (absolute paths, newest-first),
-            "truncated", "root" and, when truncated, a "note" on how
-            to narrow the search.
+            "truncated", "root" and, when truncated, a "note" telling
+            the model whether the ordering is complete (slice-cut) or
+            only covers the files examined (early-break/timeout) and
+            how to narrow the search.
         """
         pattern: str = args.get("pattern", "")
         if not pattern:
@@ -576,8 +582,11 @@ class FileSearchPlugin(BasePlugin):
             cfg.follow_symlinks,
         )
 
+        # Shared accumulator: on timeout the walk's partial harvest is
+        # still readable here (the abandoned thread only appends).
+        sink: list[tuple[int, Path]] = []
         try:
-            matches, truncated = await asyncio.wait_for(
+            matches, truncated, partial = await asyncio.wait_for(
                 asyncio.to_thread(
                     run_glob,
                     root,
@@ -585,23 +594,36 @@ class FileSearchPlugin(BasePlugin):
                     max_results=max_results,
                     forbidden=self._forbidden_paths,
                     follow_symlinks=cfg.follow_symlinks,
+                    sink=sink,
                 ),
                 timeout=60.0,
             )
         except TimeoutError:
-            logger.warning("file_search: glob timed out after 60 seconds")
-            matches, truncated = [], True
+            logger.warning(
+                "file_search: glob timed out after 60 seconds; "
+                "returning partial results"
+            )
+            matches, _cut = _finalize_glob(list(sink), max_results)
+            truncated, partial = True, True
 
         payload: dict[str, Any] = {
             "matches": [str(p) for p in matches],
             "truncated": truncated,
             "root": str(root),
         }
-        if truncated:
+        if partial:
             payload["note"] = (
-                "Risultati troncati: usa un pattern più specifico "
-                "(o una directory radice più vicina ai file cercati) "
-                "oppure alza max_results."
+                "Risultati parziali: l'enumerazione si è fermata prima "
+                "di coprire tutto l'albero, quindi l'ordinamento "
+                "newest-first vale solo sui file esaminati. Restringi "
+                "il pattern (o usa una root più vicina ai file cercati) "
+                "per una vista completa."
+            )
+        elif truncated:
+            payload["note"] = (
+                "Risultati troncati a max_results: l'ordinamento "
+                "newest-first è completo; alza max_results o restringi "
+                "il pattern per vederne di più."
             )
         return payload
 

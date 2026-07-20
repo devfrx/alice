@@ -420,6 +420,38 @@ describe('pending getters', () => {
     expect(asks[0].interactionId).toBe('int-x2')
   })
 
+  it('propaga tool_meta fino a pendingConfirmations', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(
+      interactionRequested('t1', 'x1', {
+        args: { path: 'x' },
+        risk_level: 'dangerous',
+        // `destructive` omitted on purpose — the wire omits None sub-keys
+        // (recursive exclude_none); the generated type has them optional.
+        tool_meta: {
+          origin: 'mcp',
+          server: 'files',
+          annotated: false,
+          read_only: false,
+          trusted: true
+        }
+      })
+    )
+    expect(s.pendingConfirmations[0].toolMeta?.server).toBe('files')
+    expect(s.pendingConfirmations[0].toolMeta?.annotated).toBe(false)
+    expect(s.pendingConfirmations[0].toolMeta?.origin).toBe('mcp')
+    expect(s.pendingConfirmations[0].toolMeta?.trusted).toBe(true)
+  })
+
+  it('lascia toolMeta undefined quando il frame non porta tool_meta', () => {
+    const s = useAgentRunStore()
+    s.applyTurnStarted(started('t1'))
+    s.applyInteractionRequested(interactionRequested('t1', 'x1', { risk_level: 'medium' }))
+    expect(s.pendingConfirmations).toHaveLength(1)
+    expect(s.pendingConfirmations[0].toolMeta).toBeUndefined()
+  })
+
   it('drops resolved confirmations from pendingConfirmations', () => {
     const s = useAgentRunStore()
     s.applyTurnStarted(started('t1'))

@@ -38,6 +38,16 @@ export type WsTurnFinishedMessage = ApiSchema<'WsTurnFinished'>
 export type InteractionKind = WsInteractionRequestedMessage['kind']
 export type InteractionOutcome = WsInteractionResolvedMessage['outcome']
 
+/**
+ * Tool provenance carried by `interaction.requested` (tool_confirmation).
+ *
+ * Informative only — the operational authority stays with `risk_level`;
+ * never use these flags for gating decisions. None-valued sub-keys are
+ * omitted from the wire frame (absent == null == unknown); `origin:
+ * "native"` carries every other field absent.
+ */
+export type ToolMeta = NonNullable<WsInteractionRequestedMessage['tool_meta']>
+
 /** Discriminated union of every canonical turn-event server→client frame. */
 export type WsTurnEventMessage =
   | WsTurnStartedMessage
@@ -102,6 +112,8 @@ export interface InteractionActivity {
   reasoning?: string
   /** Whether the server accepts a `remember` choice (tool_confirmation). */
   allowRemember?: boolean
+  /** Tool provenance — informative only, never used for gating (tool_confirmation). */
+  toolMeta?: ToolMeta
   /** Questions carried by an `ask_user` request. */
   questions?: AskUserQuestion[]
   /** Monotonic insertion order within the run (interleaves tools + interactions). */

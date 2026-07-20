@@ -8,6 +8,7 @@
  */
 
 import type { ApiSchema, ChatServerMessage } from './generated'
+import type { ToolMeta } from './turn'
 
 // ---------------------------------------------------------------------------
 // Message
@@ -273,6 +274,11 @@ export interface ConfirmationRequest {
    * offer "don't ask again" (session / persistent) options.
    */
   allowRemember?: boolean
+  /**
+   * Tool provenance (native vs MCP server) — informative only: the
+   * operational authority stays with `riskLevel`, never these flags.
+   */
+  toolMeta?: ToolMeta
 }
 
 /** A pending `ask_user` request awaiting the user's answers (client-side). */

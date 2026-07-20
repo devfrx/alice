@@ -105,7 +105,8 @@ export const useAgentRunStore = defineStore('agentRun', () => {
         riskLevel: (i.riskLevel ?? 'medium') as ConfirmationRequest['riskLevel'],
         description: i.description ?? '',
         reasoning: i.reasoning ?? undefined,
-        allowRemember: i.allowRemember ?? undefined
+        allowRemember: i.allowRemember ?? undefined,
+        toolMeta: i.toolMeta
       }))
   })
 
@@ -287,6 +288,7 @@ export const useAgentRunStore = defineStore('agentRun', () => {
       description: msg.description ?? undefined,
       reasoning: msg.reasoning ?? undefined,
       allowRemember: msg.allow_remember ?? undefined,
+      toolMeta: msg.tool_meta ?? undefined,
       questions: msg.questions ?? undefined,
       seq: run.tools.length + run.interactions.length
     }

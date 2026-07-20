@@ -54,6 +54,26 @@ const riskBadgeVariant = computed<'warning' | 'danger'>(() =>
   props.confirmation.riskLevel === 'medium' ? 'warning' : 'danger'
 )
 
+/* ── Tool provenance (tool_meta) ──
+ * Informative only: the operational authority stays with `riskLevel` —
+ * these flags never drive approve/reject behavior, only transparency. */
+
+/** Origin badge label — `MCP · <server>` for MCP tools, null for native. */
+const mcpBadgeLabel = computed<string | null>(() => {
+  const meta = props.confirmation.toolMeta
+  if (meta?.origin !== 'mcp') return null
+  return meta.server ? `MCP · ${meta.server}` : 'MCP'
+})
+
+/**
+ * Transparency warning (spec §6.1): an MCP tool without annotations, or
+ * whose annotations are not trusted, was gated as destructive by fallback.
+ */
+const showFallbackWarning = computed<boolean>(() => {
+  const meta = props.confirmation.toolMeta
+  return meta?.annotated === false || meta?.trusted === false
+})
+
 const formattedTime = computed(() => {
   const s = remainingSeconds.value
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -132,7 +152,14 @@ onUnmounted(() => {
 
         <div class="confirm-card__tool">
           <span class="confirm-card__badge">{{ confirmation.toolName }}</span>
+          <UiBadge v-if="mcpBadgeLabel" class="confirm-card__origin-badge" variant="info">
+            {{ mcpBadgeLabel }}
+          </UiBadge>
         </div>
+
+        <p v-if="showFallbackWarning" class="confirm-card__meta-warning">
+          Tool non annotato: trattato come distruttivo
+        </p>
 
         <div class="confirm-card__risk">
           <UiBadge class="confirm-card__risk-badge" :variant="riskBadgeVariant">
@@ -257,7 +284,26 @@ onUnmounted(() => {
 }
 
 .confirm-card__tool {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-bottom: var(--space-3);
+}
+
+.confirm-card__origin-badge {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.confirm-card__meta-warning {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1-5) var(--space-2-5);
+  font-size: var(--text-xs);
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  line-height: var(--leading-snug);
 }
 
 .confirm-card__badge {

@@ -2254,6 +2254,26 @@ export interface paths {
         patch: operations["update_terminal_api_terminal__conversation_id___session_id__patch"];
         trace?: never;
     };
+    "/api/tools/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tools Catalog
+         * @description Elenco flat dei tool registrati con livello di rischio e provenienza.
+         */
+        get: operations["get_tools_catalog_api_tools_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/vector-store/reembed-tools": {
         parameters: {
             query?: never;
@@ -3475,6 +3495,31 @@ export interface components {
             enabled: boolean;
         };
         /**
+         * ToolCatalogEntry
+         * @description Descrittore flat di un tool del registry.
+         */
+        ToolCatalogEntry: {
+            /** Capabilities */
+            capabilities: string[];
+            /** Description */
+            description: string;
+            /** Label */
+            label: string;
+            /** Mcp Server */
+            mcp_server?: string | null;
+            /** Name */
+            name: string;
+            /** Plugin */
+            plugin: string;
+            /** Requires Confirmation */
+            requires_confirmation: boolean;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "safe" | "medium" | "dangerous" | "forbidden";
+        };
+        /**
          * ToolCatalogPlugin
          * @description Tools grouped under their owning plugin.
          */
@@ -3532,6 +3577,14 @@ export interface components {
         ToolConfirmationsResponse: {
             /** Confirmations Enabled */
             confirmations_enabled: boolean;
+        };
+        /**
+         * ToolsCatalogResponse
+         * @description Catalogo completo dei tool registrati.
+         */
+        ToolsCatalogResponse: {
+            /** Tools */
+            tools: components["schemas"]["ToolCatalogEntry"][];
         };
         /**
          * ToolsRequest
@@ -8880,6 +8933,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tools_catalog_api_tools_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolsCatalogResponse"];
                 };
             };
         };

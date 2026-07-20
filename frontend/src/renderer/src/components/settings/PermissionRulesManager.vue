@@ -16,17 +16,24 @@
  * Like every permission surface, these are reachable only from the user — never
  * from a tool — which is why they live in Settings, not in the tool registry.
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import AppIcon from '../ui/AppIcon.vue'
 import UiSelect, { type UiSelectOption } from '../ui/UiSelect.vue'
 import UiInput from '../ui/UiInput.vue'
+import UiBadge from '../ui/UiBadge.vue'
 import UiButton from '../ui/UiButton.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
 import UiEmptyState from '../ui/UiEmptyState.vue'
-import { permissionsApi } from '../../services/api'
+import { permissionsApi, toolsApi } from '../../services/api'
 import { useChatStore } from '../../stores/chat'
-import type { PermissionRule, RuleEffect, RuleScope } from '../../types/permission'
+import type {
+  PermissionRule,
+  RuleEffect,
+  RuleScope,
+  ToolCatalogEntry
+} from '../../types/permission'
+import { filterCatalog, moveHighlight } from './toolPicker'
 
 const chatStore = useChatStore()
 const conversationId = computed<string | null>(() => chatStore.currentConversation?.id ?? null)
@@ -55,6 +62,97 @@ const scopeOptions: UiSelectOption[] = [
 const canSubmit = computed(
   () => !!conversationId.value && newTool.value.trim().length > 0 && !busy.value
 )
+
+/* ── Tool picker (catalog autocomplete) ──
+ * The catalog is a best-effort suggestion source: on fetch failure the field
+ * stays a plain free-text input — rules may reference tools that are not
+ * currently registered. */
+const catalog = ref<ToolCatalogEntry[]>([])
+const pickerOpen = ref(false)
+const highlightIndex = ref(-1)
+let blurTimer: number | null = null
+
+const suggestions = computed<ToolCatalogEntry[]>(() => filterCatalog(catalog.value, newTool.value))
+
+/** Risk badge variant — same mapping as ToolConfirmationDialog, plus safe→success. */
+function riskVariant(risk: ToolCatalogEntry['risk_level']): 'success' | 'warning' | 'danger' {
+  if (risk === 'safe') return 'success'
+  return risk === 'medium' ? 'warning' : 'danger'
+}
+
+function openPicker(): void {
+  pickerOpen.value = suggestions.value.length > 0
+  if (!pickerOpen.value) highlightIndex.value = -1
+}
+
+function closePicker(): void {
+  pickerOpen.value = false
+  highlightIndex.value = -1
+}
+
+function onToolInput(value: string): void {
+  newTool.value = value
+  highlightIndex.value = -1
+  openPicker()
+}
+
+function onToolFocus(): void {
+  if (blurTimer !== null) {
+    window.clearTimeout(blurTimer)
+    blurTimer = null
+  }
+  openPicker()
+}
+
+/** Delayed close so a click on an option lands before the list unmounts. */
+function onToolBlur(): void {
+  if (blurTimer !== null) window.clearTimeout(blurTimer)
+  blurTimer = window.setTimeout(() => {
+    blurTimer = null
+    closePicker()
+  }, 150)
+}
+
+function selectEntry(entry: ToolCatalogEntry): void {
+  newTool.value = entry.name
+  closePicker()
+}
+
+function onToolKeydown(e: KeyboardEvent): void {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (!pickerOpen.value) openPicker()
+    if (!pickerOpen.value) return
+    const delta = e.key === 'ArrowDown' ? 1 : -1
+    highlightIndex.value = moveHighlight(highlightIndex.value, delta, suggestions.value.length)
+    return
+  }
+  if (e.key === 'Enter') {
+    // Only intercept when an option is highlighted; otherwise the form submits.
+    if (pickerOpen.value && highlightIndex.value >= 0) {
+      const entry = suggestions.value[highlightIndex.value]
+      if (entry) {
+        e.preventDefault()
+        selectEntry(entry)
+      }
+    }
+    return
+  }
+  if (e.key === 'Escape' && pickerOpen.value) {
+    e.preventDefault()
+    closePicker()
+  }
+}
+
+async function loadCatalog(): Promise<void> {
+  try {
+    catalog.value = (await toolsApi.getCatalog()).tools
+  } catch (e) {
+    // Silent fallback: no suggestions, the free-text input keeps working.
+    console.warn('[PermissionRulesManager] tool catalog unavailable:', e)
+    catalog.value = []
+  }
+}
 
 /** Rules sorted deny → ask → allow, then by tool name, for a stable read. */
 const sortedRules = computed<PermissionRule[]>(() => {
@@ -119,8 +217,14 @@ async function removeRule(rule: PermissionRule): Promise<void> {
   }
 }
 
-onMounted(() => load(conversationId.value))
+onMounted(() => {
+  void load(conversationId.value)
+  void loadCatalog()
+})
 watch(conversationId, (id) => load(id))
+onBeforeUnmount(() => {
+  if (blurTimer !== null) window.clearTimeout(blurTimer)
+})
 </script>
 
 <template>
@@ -142,14 +246,52 @@ watch(conversationId, (id) => load(id))
     <template v-else>
       <!-- Add form -->
       <form class="prm__add" @submit.prevent="addRule">
-        <UiInput
-          v-model="newTool"
-          type="text"
-          size="sm"
-          class="prm__input"
-          placeholder="Nome strumento (es. run_terminal_command)"
-          aria-label="Nome strumento"
-        />
+        <div
+          class="prm__picker"
+          role="combobox"
+          aria-haspopup="listbox"
+          :aria-expanded="pickerOpen"
+        >
+          <UiInput
+            :model-value="newTool"
+            type="text"
+            size="sm"
+            class="prm__input"
+            placeholder="Nome strumento (es. run_terminal_command)"
+            aria-label="Nome strumento"
+            autocomplete="off"
+            @update:model-value="onToolInput"
+            @focus="onToolFocus"
+            @blur="onToolBlur"
+            @keydown="onToolKeydown"
+          />
+          <ul
+            v-if="pickerOpen"
+            class="prm__picker-list"
+            role="listbox"
+            aria-label="Strumenti disponibili"
+          >
+            <li
+              v-for="(entry, i) in suggestions"
+              :key="entry.name"
+              class="prm__picker-option"
+              :class="{ 'prm__picker-option--active': i === highlightIndex }"
+              role="option"
+              :aria-selected="i === highlightIndex"
+              @mousedown.prevent
+              @mousemove="highlightIndex = i"
+              @click="selectEntry(entry)"
+            >
+              <span class="prm__picker-name" :title="entry.description">{{ entry.name }}</span>
+              <UiBadge size="sm" :variant="riskVariant(entry.risk_level)">
+                {{ entry.risk_level }}
+              </UiBadge>
+              <span class="prm__picker-src">
+                {{ entry.mcp_server ? `MCP · ${entry.mcp_server}` : entry.plugin }}
+              </span>
+            </li>
+          </ul>
+        </div>
         <UiSelect
           class="prm__select"
           :model-value="newEffect"
@@ -239,13 +381,68 @@ watch(conversationId, (id) => load(id))
   align-items: center;
 }
 
-.prm__input {
+.prm__picker {
+  position: relative;
   flex: 1 1 220px;
   min-width: 180px;
 }
 
 .prm__input :deep(.ui-input__field) {
   font-family: var(--font-mono);
+}
+
+/* Dropdown: unified floating recipe (surface-2, border, shadow-dropdown). */
+.prm__picker-list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dropdown);
+  z-index: var(--z-popover);
+}
+
+.prm__picker-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.prm__picker-option--active {
+  background: var(--surface-hover);
+}
+
+.prm__picker-name {
+  flex: 1 1 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prm__picker-src {
+  flex: 0 1 auto;
+  max-width: 40%;
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .prm__select {

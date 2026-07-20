@@ -2596,6 +2596,70 @@
         "title": "TogglePluginRequest",
         "type": "object"
       },
+      "ToolCatalogEntry": {
+        "description": "Descrittore flat di un tool del registry.",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mcp_server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Server"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plugin": {
+            "title": "Plugin",
+            "type": "string"
+          },
+          "requires_confirmation": {
+            "title": "Requires Confirmation",
+            "type": "boolean"
+          },
+          "risk_level": {
+            "enum": [
+              "safe",
+              "medium",
+              "dangerous",
+              "forbidden"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "plugin",
+          "label",
+          "description",
+          "capabilities",
+          "risk_level",
+          "requires_confirmation"
+        ],
+        "title": "ToolCatalogEntry",
+        "type": "object"
+      },
       "ToolCatalogPlugin": {
         "description": "Tools grouped under their owning plugin.",
         "properties": {
@@ -2716,6 +2780,23 @@
           "confirmations_enabled"
         ],
         "title": "ToolConfirmationsResponse",
+        "type": "object"
+      },
+      "ToolsCatalogResponse": {
+        "description": "Catalogo completo dei tool registrati.",
+        "properties": {
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCatalogEntry"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tools"
+        ],
+        "title": "ToolsCatalogResponse",
         "type": "object"
       },
       "ToolsRequest": {
@@ -11275,6 +11356,28 @@
         "summary": "Rename and/or assign a terminal session to the agent",
         "tags": [
           "terminal"
+        ]
+      }
+    },
+    "/api/tools/catalog": {
+      "get": {
+        "description": "Elenco flat dei tool registrati con livello di rischio e provenienza.",
+        "operationId": "get_tools_catalog_api_tools_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolsCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tools Catalog",
+        "tags": [
+          "tools"
         ]
       }
     },

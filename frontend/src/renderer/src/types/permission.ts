@@ -20,6 +20,12 @@ import type { ApiSchema } from './generated'
 export type PermissionMode = ApiSchema<'PermissionMode'>
 export type PermissionModeResponse = ApiSchema<'PermissionModeResponse'>
 
+/**
+ * One entry of `GET /api/tools/catalog` — generated from the backend
+ * contract. Feeds the tool picker in the permission-rules manager.
+ */
+export type ToolCatalogEntry = ApiSchema<'ToolCatalogEntry'>
+
 /** Generated from the backend WS contract — do not redefine locally. */
 export type WsPermissionModeUpdatedMessage = ApiSchema<'WsPermissionModeUpdated'>
 

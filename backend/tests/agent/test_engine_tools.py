@@ -183,7 +183,8 @@ async def test_confirm_event_payload_carries_tool_meta() -> None:
 
 async def test_confirm_event_payload_tool_meta_none_when_absent() -> None:
     """Verdetto CONFIRM senza tool_meta -> chiave presente con valore None
-    (contratto stabile: il translator wire non deve fare .get difensivi)."""
+    (contratto stabile: il .get del translator su un confirm non maschera
+    mai una chiave dimenticata)."""
     calls = (ToolInvocation(call_id="c1", name="write", args={}, raw_args="{}"),)
     _persistence, _outcome, rec = await _run_with(
         llm_steps=[_tool_step(calls), _final_step()],

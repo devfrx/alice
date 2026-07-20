@@ -61,7 +61,14 @@ class WsContextBreakdown(BaseModel):
 
 
 class WsToolMeta(BaseModel):
-    """Provenienza del tool nel dialogo di conferma (spec Fase 2 §6.1)."""
+    """Tool provenance shown in the confirmation dialog (spec Fase 2 §6.1).
+
+    Informative only: the operational authority stays with ``risk_level`` and
+    the gate fields of the frame — never use these flags for gating decisions.
+    ``origin: "native"`` carries every other field as None. None-valued
+    sub-keys are OMITTED from the dumped wire frame (recursive
+    ``exclude_none``), so on the TS side a missing key means null.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

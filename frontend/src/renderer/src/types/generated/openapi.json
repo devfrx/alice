@@ -5814,7 +5814,7 @@
       },
       "WsToolMeta": {
         "additionalProperties": false,
-        "description": "Provenienza del tool nel dialogo di conferma (spec Fase 2 §6.1).",
+        "description": "Tool provenance shown in the confirmation dialog (spec Fase 2 §6.1).\n\nInformative only: the operational authority stays with ``risk_level`` and\nthe gate fields of the frame — never use these flags for gating decisions.\n``origin: \"native\"`` carries every other field as None. None-valued\nsub-keys are OMITTED from the dumped wire frame (recursive\n``exclude_none``), so on the TS side a missing key means null.",
         "properties": {
           "annotated": {
             "anyOf": [

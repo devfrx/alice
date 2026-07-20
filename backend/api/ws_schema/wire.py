@@ -129,6 +129,10 @@ def to_v2_frames(event: AgentEvent) -> list[dict[str, Any]]:
             description=payload.get("description"),
             reasoning=payload.get("reasoning"),
             allow_remember=payload.get("allow_remember"),
+            # Il .get è strutturale, non difensivo: questo costruttore è
+            # condiviso coi kind ask_user/client, i cui payload non portano
+            # tool_meta. Sul kind confirm la chiave è garantita SEMPRE
+            # presente (pin in tests/agent/test_engine_tools.py).
             tool_meta=payload.get("tool_meta"),
             questions=(
                 normalize_questions(questions) if questions is not None else None

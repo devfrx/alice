@@ -202,6 +202,18 @@ def test_interaction_requested_confirm_tool_meta_none_key_omitted() -> None:
     _assert_valid(frames)
 
 
+def test_tool_meta_fields_match_ports_payload() -> None:
+    """Pin di simmetria bidirezionale: i campi di ``WsToolMeta`` e le chiavi
+    di ``ToolMetaInfo.as_payload()`` (services/agent/ports.py) devono restare
+    identici — un campo aggiunto da un lato solo deve fallire QUI."""
+    from backend.api.ws_schema.chat import WsToolMeta
+    from backend.services.agent.ports import ToolMetaInfo
+
+    assert set(WsToolMeta.model_fields) == set(
+        ToolMetaInfo(origin="native").as_payload()
+    )
+
+
 def test_interaction_requested_ask_user_value_pinned() -> None:
     """Esempio obbligatorio del piano: le questions raw sono normalizzate
     alla forma del contratto (chiavi estranee filtrate, default riempiti)."""

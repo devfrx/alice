@@ -118,11 +118,17 @@ class SearchOutcome(NamedTuple):
         matches: File-info dicts, at most ``max_results`` of them.
         truncated: ``True`` when the result set was cut short — the
             ``max_results`` cap fired during the walk, or the caller-side
-            timeout fired (in which case ``matches`` is empty).
+            timeout fired.
+        timed_out: ``True`` specifically when the 60-second caller-side
+            budget fired: ``matches`` is then the partial harvest
+            salvaged from the shared sink (the abandoned walk thread only
+            appends, so it is safe to read). ``False`` when only the
+            ``max_results`` cap fired within budget.
     """
 
     matches: list[dict]
     truncated: bool
+    timed_out: bool
 
 
 def _sync_walk(
@@ -132,6 +138,7 @@ def _sync_walk(
     max_results: int,
     forbidden: list[Path],
     follow_symlinks: bool,
+    sink: list[dict] | None = None,
 ) -> SearchOutcome:
     """Walk directories synchronously, matching files by name.
 
@@ -142,6 +149,10 @@ def _sync_walk(
         max_results: Maximum number of results to return.
         forbidden: Directories to skip entirely.
         follow_symlinks: Whether os.walk should follow symlinks.
+        sink: Optional shared accumulator for file-info dicts, filled in
+            place during the walk (same sink/snapshot approach as
+            ``run_glob``/``run_grep``) so a caller that abandons the call
+            on timeout can still read the partial harvest.
 
     Returns:
         A ``SearchOutcome`` with the matched file-info dicts and whether
@@ -149,7 +160,7 @@ def _sync_walk(
     """
     query_lower = query.lower()
     forbidden_resolved = [fb.resolve() for fb in forbidden]
-    results: list[dict] = []
+    results: list[dict] = sink if sink is not None else []
 
     # Normalize extensions to lowercase with leading dot
     ext_filter: set[str] | None = None
@@ -211,9 +222,9 @@ def _sync_walk(
                     continue
 
                 if len(results) >= max_results:
-                    return SearchOutcome(results, True)
+                    return SearchOutcome(results, True, False)
 
-    return SearchOutcome(results, False)
+    return SearchOutcome(results, False, False)
 
 
 class GlobOutcome(NamedTuple):
@@ -353,7 +364,7 @@ async def search_files(
 ) -> SearchOutcome:
     """Search for files matching *query* across the given roots.
 
-    Runs the synchronous directory walk in a thread pool with a 5-second
+    Runs the synchronous directory walk in a thread pool with a 60-second
     timeout to prevent blocking the event loop on deep hierarchies.
 
     Args:
@@ -367,18 +378,27 @@ async def search_files(
     Returns:
         A ``SearchOutcome`` with file-info dicts (path, name, size,
         modified date, extension) and whether the result was truncated
-        (``max_results`` cap or the 60-second timeout).
+        (``max_results`` cap or the 60-second timeout — see ``timed_out``
+        to tell the two apart).
     """
+    # Shared accumulator: on timeout the walk's partial harvest is still
+    # readable here (the abandoned thread only appends) — same
+    # sink/snapshot approach as run_glob/run_grep.
+    sink: list[dict] = []
     try:
         outcome = await asyncio.wait_for(
             asyncio.to_thread(
                 _sync_walk, query, roots, extensions,
                 max_results, forbidden, follow_symlinks,
+                sink=sink,
             ),
             timeout=60.0,
         )
     except TimeoutError:
-        logger.warning("File search timed out after 60 seconds")
-        outcome = SearchOutcome([], True)
+        logger.warning(
+            "file_search: search timed out after 60 seconds; "
+            "returning partial results"
+        )
+        outcome = SearchOutcome(list(sink), True, True)
 
     return outcome

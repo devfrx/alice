@@ -316,34 +316,57 @@ class TestSearchFilesTool:
         assert result.content["note"]
 
     @pytest.mark.asyncio
-    async def test_search_files_timeout_sets_truncated_note(self):
-        """On the 60s wait_for timeout, search_files reports an empty,
-        truncated outcome with an actionable note (same shape as the
-        max_results cut)."""
-        plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
+    async def test_search_files_timeout_salvages_partial_results(self, tmp_path):
+        """On timeout the handler must salvage what the walk collected so
+        far (shared sink) instead of returning [], flagged with a note
+        distinct from the max_results-cap note (same pattern as glob's
+        test_glob_timeout_returns_partial_results)."""
+        (tmp_path / "match_a.txt").write_text("x")
+        plugin = await _init_plugin(allowed=[str(tmp_path)], forbidden=[])
 
         async def fake_wait_for(awaitable, timeout):
-            await awaitable  # let the (mocked, empty) walk complete
+            await awaitable  # let _sync_walk complete and fill the sink
             raise TimeoutError
 
-        with (
-            patch("backend.plugins.file_search.searcher.os.walk", return_value=iter([])),
-            patch("pathlib.Path.is_dir", return_value=True),
-            patch(
-                "backend.plugins.file_search.searcher.asyncio.wait_for",
-                new=fake_wait_for,
-            ),
+        with patch(
+            "backend.plugins.file_search.searcher.asyncio.wait_for",
+            new=fake_wait_for,
         ):
             result = await plugin.execute_tool(
                 "search_files",
-                {"query": "match"},
+                {"query": "match", "path": str(tmp_path)},
                 _make_exec_ctx(),
             )
 
         assert result.success is True
-        assert result.content["matches"] == []
+        assert len(result.content["matches"]) == 1
+        assert result.content["matches"][0]["name"] == "match_a.txt"
         assert result.content["truncated"] is True
-        assert result.content["note"]
+        assert "timeout" in result.content["note"].lower()
+
+    @pytest.mark.asyncio
+    async def test_search_files_cap_note_distinct_from_timeout_note(self):
+        """The max_results-cap note must differ from the timeout-salvage
+        note so the model can tell the two situations apart."""
+        many_files = [f"match_{i}.txt" for i in range(100)]
+        walk_data = [("/tmp/allowed", [], many_files)]
+
+        plugin = await _init_plugin(allowed=["/tmp/allowed"], forbidden=[])
+
+        with (
+            patch("backend.plugins.file_search.searcher.os.walk", return_value=iter(walk_data)),
+            patch("pathlib.Path.is_dir", return_value=True),
+            patch("pathlib.Path.stat", return_value=_fake_stat()),
+        ):
+            result = await plugin.execute_tool(
+                "search_files",
+                {"query": "match", "max_results": 5},
+                _make_exec_ctx(),
+            )
+
+        assert result.success is True
+        assert result.content["truncated"] is True
+        assert "timeout" not in result.content["note"].lower()
 
     @pytest.mark.asyncio
     async def test_extension_filter_pdf(self):

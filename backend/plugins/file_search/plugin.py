@@ -666,8 +666,11 @@ class FileSearchPlugin(BasePlugin):
 
         Returns:
             A dict with "matches" (file-info dicts), "truncated" and,
-            when truncated, a "note" telling the model how to narrow
-            the search (max_results cap or the 60-second timeout).
+            when truncated, a "note" telling the model how to narrow the
+            search — worded differently for a max_results cap (complete
+            enumeration, just shortened) than for the 60-second timeout
+            (partial harvest salvaged from the shared sink, enumeration
+            incomplete).
         """
         query: str = args.get("query", "")
         if not query:
@@ -706,12 +709,18 @@ class FileSearchPlugin(BasePlugin):
             "matches": outcome.matches,
             "truncated": outcome.truncated,
         }
-        if outcome.truncated:
+        if outcome.timed_out:
             payload["note"] = (
-                "Risultati troncati a max_results (o timeout della "
-                "ricerca): alza max_results, restringi 'path' o "
-                "'extensions', oppure usa una query più specifica per "
-                "vedere il resto."
+                "Risultati parziali (timeout): la ricerca si è fermata "
+                "dopo 60 secondi prima di coprire tutto l'albero. "
+                "Restringi 'path' o 'extensions', oppure usa una query "
+                "più specifica per completarla in tempo."
+            )
+        elif outcome.truncated:
+            payload["note"] = (
+                "Risultati troncati a max_results: alza max_results, "
+                "restringi 'path' o 'extensions', oppure usa una query "
+                "più specifica per vedere il resto."
             )
         return payload
 

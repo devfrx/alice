@@ -75,6 +75,21 @@ describe('buildConfirmationBody', () => {
       expect(body).toMatchObject({ mode: 'diff', path: '' })
     })
 
+    it('CRLF old_string passes through computeLineDiff normalization (no \\r in rows)', () => {
+      const body = buildConfirmationBody('file_search_edit_text_file', {
+        old_string: 'a\r\nold',
+        new_string: 'a\nnew'
+      })
+      expect(body).toMatchObject({
+        mode: 'diff',
+        rows: [
+          { kind: 'context', text: 'a' },
+          { kind: 'removed', text: 'old' },
+          { kind: 'added', text: 'new' }
+        ]
+      })
+    })
+
     it('edit without old_string -> args fallback', () => {
       const body = buildConfirmationBody('file_search_edit_text_file', {
         path: 'p',
@@ -149,6 +164,24 @@ describe('buildConfirmationBody', () => {
       const content = Array.from({ length: 40 }, (_, i) => `l${i}`).join('\n')
       const body = buildConfirmationBody('file_search_write_text_file', { content })
       expect(body).toMatchObject({ mode: 'write-preview', preview: content, truncated: false })
+    })
+
+    it('exactly 40 lines WITH trailing newline -> not truncated, preview unchanged', () => {
+      const content = Array.from({ length: 40 }, (_, i) => `l${i}`).join('\n') + '\n'
+      const body = buildConfirmationBody('file_search_write_text_file', { content })
+      expect(body).toMatchObject({ mode: 'write-preview', preview: content, truncated: false })
+    })
+
+    it('41 lines with trailing newline -> first 40 lines, truncated true', () => {
+      const lines = Array.from({ length: 41 }, (_, i) => `l${i}`)
+      const body = buildConfirmationBody('file_search_write_text_file', {
+        content: lines.join('\n') + '\n'
+      })
+      expect(body).toMatchObject({
+        mode: 'write-preview',
+        preview: lines.slice(0, 40).join('\n'),
+        truncated: true
+      })
     })
 
     it('write without content -> args fallback', () => {

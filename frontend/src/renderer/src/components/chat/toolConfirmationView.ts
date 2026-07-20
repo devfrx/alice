@@ -47,6 +47,9 @@ function buildWritePreview(content: string): { preview: string; truncated: boole
   let truncated = false
 
   const lines = preview.split('\n')
+  // A trailing newline makes split() yield a phantom empty last element —
+  // drop it so exactly-40-lines-plus-newline is not reported as truncated.
+  if (lines[lines.length - 1] === '') lines.pop()
   if (lines.length > WRITE_PREVIEW_MAX_LINES) {
     preview = lines.slice(0, WRITE_PREVIEW_MAX_LINES).join('\n')
     truncated = true

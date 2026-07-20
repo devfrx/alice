@@ -10,6 +10,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { ConfirmationRequest, RememberChoice } from '../../types/chat'
 import UiButton from '../ui/UiButton.vue'
 import UiBadge from '../ui/UiBadge.vue'
+import type { DiffRow } from './editDiff'
 import { buildConfirmationBody } from './toolConfirmationView'
 
 const props = defineProps<{
@@ -114,7 +115,7 @@ const body = computed(() =>
 )
 
 /** Visual gutter prefix for a diff row kind. */
-const DIFF_PREFIX: Record<'context' | 'removed' | 'added', string> = {
+const DIFF_PREFIX: Record<DiffRow['kind'], string> = {
   context: ' ',
   removed: '-',
   added: '+'
@@ -201,11 +202,18 @@ onUnmounted(() => {
         <div class="confirm-card__args-wrap">
           <!-- Exact-string edit: red/green line diff (spec §6.2) -->
           <template v-if="body.mode === 'diff'">
-            <div class="confirm-card__file-header">
-              <span class="confirm-card__file-path">{{ body.path }}</span>
+            <div v-if="body.path || body.replaceAll" class="confirm-card__file-header">
+              <span v-if="body.path" class="confirm-card__file-path" :title="body.path">
+                {{ body.path }}
+              </span>
               <span v-if="body.replaceAll" class="confirm-card__diff-tag">replace_all</span>
             </div>
-            <div class="confirm-card__diff" role="figure" aria-label="Anteprima modifica">
+            <div
+              class="confirm-card__diff"
+              role="figure"
+              aria-label="Anteprima modifica"
+              tabindex="0"
+            >
               <div
                 v-for="(row, idx) in body.rows"
                 :key="idx"
@@ -220,10 +228,10 @@ onUnmounted(() => {
 
           <!-- File write: truncated content preview -->
           <template v-else-if="body.mode === 'write-preview'">
-            <div class="confirm-card__file-header">
-              <span class="confirm-card__file-path">{{ body.path }}</span>
+            <div v-if="body.path" class="confirm-card__file-header">
+              <span class="confirm-card__file-path" :title="body.path">{{ body.path }}</span>
             </div>
-            <pre class="confirm-card__args"><code>{{ body.preview }}</code></pre>
+            <pre class="confirm-card__args" tabindex="0"><code>{{ body.preview }}</code></pre>
             <p v-if="body.truncated" class="confirm-card__truncated-note">(troncato)</p>
           </template>
 
@@ -497,6 +505,10 @@ onUnmounted(() => {
   white-space: pre;
   padding: 0 var(--space-3) 0 var(--space-2);
   color: var(--text-secondary);
+  /* Rows must span the full scrollable width, or the red/green background
+     is cut off when scrolling horizontally past the container width. */
+  width: max-content;
+  min-width: 100%;
 }
 
 .diff-row__prefix {

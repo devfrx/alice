@@ -8,6 +8,7 @@ thread safety.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -19,6 +20,7 @@ from backend.core.plugin_models import (
     MAX_TOOL_RESULT_LENGTH,
     ConnectionStatus,
     ExecutionContext,
+    McpToolMeta,
     ToolDefinition,
     ToolResult,
 )
@@ -356,6 +358,53 @@ class TestToolCatalogAndExclusion:
         registry = make_registry({})
         await registry.refresh()
         assert registry.get_tool_catalog() == []
+
+    @pytest.mark.asyncio
+    async def test_catalog_exposes_risk_and_confirmation(
+        self, make_registry: Callable[..., ToolRegistry],
+    ) -> None:
+        """Entries carry risk_level/requires_confirmation; native → mcp_server None."""
+        tool = ToolDefinition(
+            name="wipe_disk",
+            description="Dangerous tool",
+            risk_level="dangerous",
+            requires_confirmation=True,
+        )
+        plugin = MockPlugin(tools=[tool], name="danger_plugin")
+        registry = make_registry({"danger_plugin": plugin})
+        await registry.refresh()
+
+        catalog = registry.get_tool_catalog()
+        assert len(catalog) == 1
+        entry = catalog[0]
+        assert entry["risk_level"] == "dangerous"
+        assert entry["requires_confirmation"] is True
+        assert entry["mcp_server"] is None
+
+    @pytest.mark.asyncio
+    async def test_catalog_exposes_mcp_server(
+        self, make_registry: Callable[..., ToolRegistry],
+    ) -> None:
+        """Entries of MCP-provenance tools expose the server name."""
+        tool = ToolDefinition(
+            name="read_file",
+            description="MCP file reader",
+            capabilities=("mcp_read",),
+            mcp=McpToolMeta(
+                server="files",
+                annotated=True,
+                trusted=True,
+                read_only=True,
+                destructive=None,
+            ),
+        )
+        plugin = MockPlugin(tools=[tool], name="mcp_client")
+        registry = make_registry({"mcp_client": plugin})
+        await registry.refresh()
+
+        catalog = registry.get_tool_catalog()
+        assert len(catalog) == 1
+        assert catalog[0]["mcp_server"] == "files"
 
     @pytest.mark.asyncio
     async def test_exclude_disabled_removes_matching_tools(self, make_registry):

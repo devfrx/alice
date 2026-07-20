@@ -305,6 +305,13 @@ class ToolCatalog:
         * ``capabilities``: the tool's capability tags (e.g. ``fs_write``,
           ``process_exec``) so the UI can reflect what a permission tier
           withholds.
+        * ``risk_level``: the tool's safety classification
+          (``safe``/``medium``/``dangerous``/``forbidden``).
+        * ``requires_confirmation``: whether the gate asks the user before
+          executing the tool.
+        * ``mcp_server``: name of the MCP server exposing the tool, or
+          ``None`` for native tools (provenance for the permission-rule
+          picker).
 
         Returns:
             One descriptor dict per registered tool.
@@ -318,6 +325,11 @@ class ToolCatalog:
                     "label": tool_def.name,
                     "description": tool_def.description,
                     "capabilities": list(tool_def.capabilities),
+                    "risk_level": tool_def.risk_level,
+                    "requires_confirmation": tool_def.requires_confirmation,
+                    "mcp_server": (
+                        tool_def.mcp.server if tool_def.mcp is not None else None
+                    ),
                 }
             )
         return catalog

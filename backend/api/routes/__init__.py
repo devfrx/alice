@@ -28,6 +28,7 @@ from backend.api.routes import (
     settings,
     tasks,
     terminal,
+    tools,
     vector_store,
     voice,
 )
@@ -59,6 +60,7 @@ router.include_router(scope.router)
 router.include_router(permission_mode.router)
 router.include_router(permission_rules.router)
 router.include_router(terminal.router)
+router.include_router(tools.router)
 
 
 @router.get("/health")

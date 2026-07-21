@@ -209,6 +209,8 @@ class ToolRegistryAdapter:
             # per i consumatori espliciti (vision injection, artifact IMAGE).
             if is_image and result.success and result.content:
                 content = _image_placeholder(result.content_type, result.content)
+                # Una sola immagine per costruzione: ToolResult ha UN content;
+                # un futuro supporto multi-immagine passa da questo seam.
                 images = (
                     ToolImage(mime=result.content_type, base64_data=result.content),
                 )

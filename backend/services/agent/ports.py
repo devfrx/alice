@@ -162,6 +162,8 @@ class ToolImage:
     Il placeholder testuale resta in ``content`` (guardia anti context-bomb);
     il base64 viaggia qui per i consumatori espliciti (vision injection,
     artifact IMAGE). ``mime`` è il content_type della ToolResult (image/*).
+    Vive solo in memoria per la durata del turno: la persistenza
+    (``adapters/db.py``) e il wire non serializzano ``images``.
     """
 
     mime: str

@@ -47,21 +47,21 @@ Divergenze dal brief (documentate, non "corrette" silenziosamente):
   ``"cad_generate"``), l'artifact non verrà riconosciuto — comportamento
   onesto e documentato, non silenziosamente "corretto" inventando una
   euristica di risoluzione qui.
-- **Nessuna persistenza immagini su disco.** Il Task 12 (vedi
-  ``.superpowers/sdd/task-12-report.md``) ha stabilito che
-  ``ToolExecutionOutput.images`` è SEMPRE ``()`` — la piattaforma
-  (``ToolResult``, ``backend/core/plugin_models.py:169``) non ha un campo
-  immagini separato, e ``ArtifactRegistry.register_from_tool_result`` non
-  accetta né consuma immagini: consuma solo ``payload`` (il dict originale
-  del risultato tool) + ``content_type``. I file (incluse eventuali immagini
-  generate, es. CAD/3D) sono già scritti su disco dal tool stesso PRIMA che
-  il risultato arrivi qui (``ArtifactRegistry`` "non possiede altro: gli
-  strumenti sottostanti restano responsabili di *produrre* il file su disco;
-  il registry si limita a registrarne l'esistenza" —
-  ``backend/services/artifacts/registry.py:76-82``). Non c'è quindi nulla da
-  implementare per "immagini persistite su disco prima della registrazione":
-  il payload (``output.payload``) è già la struttura pronta che i parser si
-  aspettano (es. ``file_path``), e la si passa così com'è.
+- **Nessuna persistenza immagini su disco.** Dalla Mossa 2 (T12)
+  ``ToolExecutionOutput.images`` può portare ``ToolImage`` fuori banda (il
+  base64 dei tool result image/* separato dal placeholder in ``content``).
+  QUESTA porta deliberatamente NON li persiste: il base64 vive solo in
+  memoria per la durata del turno — la registrazione artifact IMAGE è lavoro
+  del T16. ``ArtifactRegistry.register_from_tool_result`` non accetta né
+  consuma immagini: consuma solo ``payload`` (il dict originale del risultato
+  tool) + ``content_type``. I file (incluse eventuali immagini generate, es.
+  CAD/3D) sono già scritti su disco dal tool stesso PRIMA che il risultato
+  arrivi qui (``ArtifactRegistry`` "non possiede altro: gli strumenti
+  sottostanti restano responsabili di *produrre* il file su disco; il
+  registry si limita a registrarne l'esistenza" —
+  ``backend/services/artifacts/registry.py:76-82``): il payload
+  (``output.payload``) è già la struttura pronta che i parser si aspettano
+  (es. ``file_path``), e la si passa così com'è.
 - **``message_id`` per l'artifact.** ``save_tool_result`` ritorna ``None``
   per contratto di Port, quindi ``register_artifacts`` non riceve l'id della
   riga ``tool`` appena creata. Questo adapter tiene una mappa interna

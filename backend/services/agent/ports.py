@@ -156,6 +156,19 @@ class ConfirmationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolImage:
+    """Immagine prodotta da un tool (base64), trasportata fuori banda dal content.
+
+    Il placeholder testuale resta in ``content`` (guardia anti context-bomb);
+    il base64 viaggia qui per i consumatori espliciti (vision injection,
+    artifact IMAGE). ``mime`` è il content_type della ToolResult (image/*).
+    """
+
+    mime: str
+    base64_data: str
+
+
+@dataclass(frozen=True, slots=True)
 class ToolExecutionOutput:
     """Risultato dell'esecuzione di un tool.
 
@@ -166,7 +179,7 @@ class ToolExecutionOutput:
     ok: bool
     content: str
     error: str | None = None
-    images: tuple[dict[str, str], ...] = ()
+    images: tuple[ToolImage, ...] = ()
     payload: dict[str, Any] | None = None
     content_type: str | None = None
 

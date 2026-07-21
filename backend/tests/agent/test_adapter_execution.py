@@ -18,6 +18,7 @@ from backend.core.plugin_models import ExecutionContext, ToolDefinition, ToolRes
 from backend.core.tool_progress import current_progress_emitter, emit_tool_progress
 from backend.services.agent.adapters.execution import ToolRegistryAdapter
 from backend.services.agent.models import ToolInvocation
+from backend.services.agent.ports import ToolImage
 
 
 class StubToolRegistry:
@@ -235,6 +236,54 @@ async def test_execute_textual_result_passes_unchanged() -> None:
     assert output.ok is True
     assert output.content == text
     assert output.content_type == "text/plain"
+
+
+# ---------------------------------------------------------------------------
+# ToolImage: il base64 attraversa la porta fuori banda (T12 Fase 2 Mossa 2)
+# ---------------------------------------------------------------------------
+
+
+async def test_image_result_populates_images_and_placeholder() -> None:
+    """Un ``ToolResult`` image/* riuscito popola ``images`` con il base64
+    fuori banda (``ToolImage``); il placeholder in ``content`` resta INVARIATO
+    (la guardia anti context-bomb non cambia)."""
+    b64 = "aGVsbG8td29ybGQ=" * 100
+    registry = _registry_with(shot=_tool_def("take_screenshot"))
+    registry.execute_result = ToolResult.ok(b64, content_type="image/png")
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("shot"), client_ip=None, conversation_id="c1")
+
+    assert output.content.startswith("[immagine image/png")
+    assert output.images == (ToolImage(mime="image/png", base64_data=b64),)
+
+
+async def test_text_result_has_no_images() -> None:
+    """Un ``ToolResult`` testuale non produce immagini: ``images`` resta ``()``."""
+    registry = _registry_with(fs_read=_tool_def("read_text_file"))
+    registry.execute_result = ToolResult.ok("testo", content_type="text/plain")
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("fs_read"), client_ip=None, conversation_id="c1")
+
+    assert output.images == ()
+
+
+async def test_failed_image_result_has_no_images() -> None:
+    """``success=False`` con ``content_type`` image/* NON produce immagini:
+    ``images`` vuoto e ``content`` segue il path errore attuale (invariato)."""
+    b64 = "QUJDREVGRw==" * 50
+    registry = _registry_with(shot=_tool_def("take_screenshot"))
+    registry.execute_result = ToolResult(
+        success=False, content=b64, content_type="image/png", error_message="boom",
+    )
+    adapter = _adapter(registry)
+
+    output = await adapter.execute(_call("shot"), client_ip=None, conversation_id="c1")
+
+    assert output.ok is False
+    assert output.images == ()
+    assert output.content == b64  # path errore attuale: nessuna guardia, nessuna immagine
 
 
 # ---------------------------------------------------------------------------

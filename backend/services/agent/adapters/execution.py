@@ -31,10 +31,13 @@ la Port è fissa per questo task):
   che valida gli argomenti-path contro lo scope PRIMA che l'esecuzione
   arrivi qui).
 - ``ToolResult`` (``backend/core/plugin_models.py:169``) non ha un campo
-  ``images``: ``ToolExecutionOutput.images`` resta sempre ``()`` da questo
-  adapter. Contenuti binari (es. immagini) viaggiano oggi via
-  ``content_type`` + payload base64 dentro ``content``, non come lista
-  separata.
+  ``images``: la piattaforma trasporta il base64 dentro ``content`` con
+  ``content_type`` image/*. È QUESTO adapter a separare i due canali
+  (T12 Fase 2 Mossa 2): nel ramo guardia immagini ``content`` diventa il
+  placeholder compatto e il base64 viaggia fuori banda in
+  ``ToolExecutionOutput.images`` (``ToolImage``) per i consumatori espliciti
+  (vision injection T14, artifact IMAGE T16). Negli altri rami (fallimenti,
+  content vuoto, non-image) ``images`` resta ``()``.
 - ``content`` di ``ToolExecutionOutput`` è tipizzato ``str`` (non
   opzionale): un ``ToolResult.content`` dict/list viene serializzato JSON;
   il dict originale (quando è un dict) è comunque preservato in
@@ -66,7 +69,7 @@ from backend.core.plugin_models import ExecutionContext
 from backend.core.tool_progress import current_progress_emitter
 from backend.services.agent.adapters._tool_lookup import resolve_tool_definition
 from backend.services.agent.models import ToolInvocation, ToolMeta
-from backend.services.agent.ports import ProgressCallback, ToolExecutionOutput
+from backend.services.agent.ports import ProgressCallback, ToolExecutionOutput, ToolImage
 
 if TYPE_CHECKING:
     from backend.core.tool_registry import ToolRegistry
@@ -187,6 +190,7 @@ class ToolRegistryAdapter:
 
         content: str
         payload: dict[str, Any] | None = None
+        images: tuple[ToolImage, ...] = ()
         is_image = (
             result.content_type is not None
             and result.content_type.startswith("image/")
@@ -200,9 +204,14 @@ class ToolRegistryAdapter:
             # successivi) — solo il placeholder compatto. Il ``ToolResult``
             # della piattaforma non viene mutato. Questo è il choke point
             # unico: ogni produttore image/* server-side (take_screenshot,
-            # read_text_file, futuri) passa da qui per costruzione.
+            # read_text_file, futuri) passa da qui per costruzione. Il base64
+            # attraversa la porta fuori banda in ``images`` (``ToolImage``)
+            # per i consumatori espliciti (vision injection, artifact IMAGE).
             if is_image and result.success and result.content:
                 content = _image_placeholder(result.content_type, result.content)
+                images = (
+                    ToolImage(mime=result.content_type, base64_data=result.content),
+                )
             else:
                 content = result.content
         elif isinstance(result.content, dict):
@@ -215,6 +224,7 @@ class ToolRegistryAdapter:
             ok=result.success,
             content=content,
             error=result.error_message,
+            images=images,
             payload=payload,
             content_type=result.content_type,
         )

@@ -66,8 +66,9 @@ def _strip_image_parts(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     con content stringa (o ``None``) passano invariati (stessi oggetti); un
     content-list viene ricostruito in un NUOVO dict con le stesse chiavi ma
     content stringa: i text part concatenati e un marker per ogni image part
-    (separatore newline). Part sconosciuti degradano al loro JSON (stessa
-    scelta di ``ContextManager.estimate_message_tokens``). Il risultato è
+    (separatore newline). Part dict sconosciuti degradano al loro JSON, part
+    non-dict vengono scartati (stesse scelte di
+    ``ContextManager.estimate_message_tokens``). Il risultato è
     sempre content stringa — il summarizer e il segmento kept non vedono MAI
     base64. Gli input non vengono mai mutati.
 
@@ -141,7 +142,10 @@ class ContextManagerAdapter:
         Le immagini inline NON sopravvivono alla compaction: a ``compress``
         arriva sempre la forma stripped (``_strip_image_parts``), quindi né
         il summarizer né i ``kept_messages`` ritornati contengono base64 —
-        al posto di ogni image part resta il marker testuale.
+        al posto di ogni image part resta il marker testuale. Il perché:
+        il summarizer non è garantito vision, e un base64 nel prompt di
+        summary saturerebbe il budget della chiamata (~1.75M token per
+        5 MiB di base64).
         ``tokens_before`` è contato sulla lista originale (costo flat per
         immagine), coerente con ``estimate_tokens``.
         """

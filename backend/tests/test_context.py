@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -259,6 +260,37 @@ async def test_compress_success(cm: ContextManager) -> None:
 
 
 @pytest.mark.asyncio
+async def test_compress_guards_non_str_content(cm: ContextManager) -> None:
+    """A non-str content in archive must not crash nor leak into the prompt.
+
+    The agent adapter strips multimodal content-lists upstream
+    (``_strip_image_parts``); this pins the defensive guard for a future
+    caller that does not: no AttributeError on ``.startswith``, and the raw
+    parts (e.g. base64) never reach the summary prompt.
+    """
+    llm = AsyncMock()
+    llm.complete_nonstreaming.return_value = "Summary OK."
+    pad = "x" * 400
+    multimodal = [
+        {"type": "text", "text": "look at this"},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,RAWB64PAYLOAD"}},
+    ]
+    msgs: list[dict[str, Any]] = [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": multimodal},
+        {"role": "assistant", "content": pad},
+        {"role": "user", "content": pad},
+        {"role": "assistant", "content": pad},
+        {"role": "user", "content": pad},
+        {"role": "assistant", "content": pad},
+    ]
+    result = await cm.compress(msgs, llm, 1000, 200)
+    assert result.usage.was_compressed is True
+    summary_input = str(llm.complete_nonstreaming.call_args)
+    assert "RAWB64PAYLOAD" not in summary_input
+
+
+@pytest.mark.asyncio
 async def test_compress_handles_none_content(cm: ContextManager) -> None:
     """Messages with content=None in archive must not crash."""
     llm = AsyncMock()
@@ -394,8 +426,6 @@ async def test_compress_tool_tokens_affects_target_budget(cm: ContextManager) ->
 @pytest.mark.asyncio
 async def test_compress_prior_summary_in_archive_text(cm: ContextManager) -> None:
     """A second compression must include any prior summary in the archive prompt."""
-    from typing import Any
-
     captured: list[list[dict[str, Any]]] = []
 
     async def _capture(messages: list[dict[str, Any]], **kwargs: Any) -> str:

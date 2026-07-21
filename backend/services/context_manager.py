@@ -284,6 +284,12 @@ class ContextManager:
         for m in to_archive:
             role = m.get("role", "unknown")
             content = m.get("content") or ""
+            # Invariant: content is a str here — the agent adapter strips
+            # multimodal content-lists upstream (_strip_image_parts). Guard:
+            # a non-str is treated as non-summary and dropped from the
+            # summary input (never crash, never leak raw parts/base64).
+            if not isinstance(content, str):
+                content = ""
             if (
                 m.get("is_context_summary")
                 or content.startswith("[Context summary of ")

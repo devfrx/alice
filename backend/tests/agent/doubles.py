@@ -17,6 +17,11 @@ class ScriptedLLMPort:
     def __init__(self, steps: list[list[ports.LLMEvent]]) -> None:
         self._steps = list(steps)
         self.calls: list[dict[str, Any]] = []
+        # Capability vision del double: i test la accendono per-test.
+        self.vision = False
+
+    def supports_vision(self) -> bool:
+        return self.vision
 
     async def stream_step(
         self,

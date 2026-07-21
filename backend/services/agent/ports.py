@@ -210,6 +210,10 @@ ProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
 class LLMPort(Protocol):
     """Streaming di uno step LLM."""
 
+    def supports_vision(self) -> bool:
+        """True se il modello attivo accetta input immagine (vision)."""
+        ...
+
     def stream_step(
         self,
         *,

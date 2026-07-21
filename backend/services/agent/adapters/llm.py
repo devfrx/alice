@@ -94,6 +94,14 @@ class LLMServiceAdapter:
         """
         self._llm = llm
 
+    def supports_vision(self) -> bool:
+        """True se il modello attivo accetta input immagine (vision).
+
+        Delega alla property ``LLMService.supports_vision`` (che a sua volta
+        interroga ``ModelResolver.supports_vision`` sul modello attivo).
+        """
+        return bool(self._llm.supports_vision)
+
     async def stream_step(
         self,
         *,

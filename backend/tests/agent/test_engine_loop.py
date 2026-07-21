@@ -90,6 +90,9 @@ async def test_cancel_interrupts_silent_llm_stream() -> None:
     (600s — smoke fase 1: turno inarrestabile)."""
 
     class _SilentLLMPort:
+        def supports_vision(self) -> bool:
+            return False
+
         def stream_step(
             self, *, system_prompt: str, messages: list[dict[str, Any]],
             tools: list[dict[str, Any]], max_tokens: int | None,

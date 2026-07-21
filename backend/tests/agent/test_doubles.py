@@ -27,6 +27,14 @@ async def test_scripted_llm_yields_steps_in_order() -> None:
     assert isinstance(got[-1], ports.LLMStepDone)
 
 
+def test_scripted_llm_supports_vision_off_by_default_and_togglable() -> None:
+    """Protezione strutturale: il double espone ``supports_vision`` (LLMPort)."""
+    port = ScriptedLLMPort(steps=[])
+    assert port.supports_vision() is False
+    port.vision = True
+    assert port.supports_vision() is True
+
+
 async def test_map_execution_port_executes_and_describes() -> None:
     port = MapExecutionPort(tools={"echo": ports.ToolExecutionOutput(ok=True, content="hi")})
     assert port.describe("echo") == ToolMeta(exists=True)

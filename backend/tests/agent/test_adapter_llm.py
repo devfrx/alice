@@ -38,9 +38,12 @@ from backend.services.agent.adapters.llm import LLMServiceAdapter
 class FakeLLMService:
     """Fake locale: riproduce il contratto reale di ``LLMService.chat``."""
 
-    def __init__(self, chunks: list[dict[str, Any]]) -> None:
+    def __init__(
+        self, chunks: list[dict[str, Any]], *, supports_vision: bool = False,
+    ) -> None:
         self._chunks = chunks
         self.calls: list[dict[str, Any]] = []
+        self.supports_vision = supports_vision
 
     async def chat(
         self,
@@ -180,6 +183,19 @@ async def test_usage_chunk_has_cost() -> None:
     assert usages[0].input_tokens == 120
     assert usages[0].output_tokens == 30
     assert usages[0].cost == 0.0042
+
+
+def test_supports_vision_delegates_to_llm_service() -> None:
+    """La capability vision della porta delega al servizio wrappato."""
+    fake = FakeLLMService(chunks=[], supports_vision=True)
+    adapter = LLMServiceAdapter(fake)  # type: ignore[arg-type]
+    assert adapter.supports_vision() is True
+
+
+def test_supports_vision_false_by_default() -> None:
+    fake = FakeLLMService(chunks=[])
+    adapter = LLMServiceAdapter(fake)  # type: ignore[arg-type]
+    assert adapter.supports_vision() is False
 
 
 async def test_usage_chunk_without_cost_defaults_to_zero() -> None:

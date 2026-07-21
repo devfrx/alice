@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import uuid
 from pathlib import Path
 from typing import Any
@@ -19,13 +18,7 @@ from backend.services.artifacts.parsers import (
     _parse_cad_generate,
     _parse_cad_generate_from_image,
 )
-
-# 1x1 transparent PNG (real, decodable) used by the IMAGE-artifact tests.
-_PNG_1X1_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
-    "AAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-)
-_PNG_1X1_BYTES = base64.b64decode(_PNG_1X1_B64)
+from backend.tests._artifact_helpers import PNG_1X1_B64, PNG_1X1_BYTES
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -68,11 +61,15 @@ def captured_events() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def registry(session_factory, captured_events):
+def registry(session_factory, captured_events, tmp_path):
+    """Registry with the blob store rooted at ``tmp_path`` (never data/)."""
     async def _cb(event: dict[str, Any]) -> None:
         captured_events.append(event)
 
-    reg = ArtifactRegistry(session_factory=session_factory)
+    reg = ArtifactRegistry(
+        session_factory=session_factory,
+        blob_store=ArtifactBlobStore(tmp_path),
+    )
     reg.set_event_callback(_cb)
     return reg
 
@@ -199,19 +196,18 @@ async def test_create_image_artifact_writes_blob_and_row(
     tmp_path: Path,
 ) -> None:
     """Blob su disco (byte identici) + riga IMAGE + evento artifact.created."""
-    registry._blob_store = ArtifactBlobStore(tmp_path)
     artifact = await registry.create_image_artifact(
         conversation_id=conversation_id,
         message_id=None,
         tool_call_id="call_img",
         tool_name="browser_screenshot",
         mime="image/png",
-        base64_data=_PNG_1X1_B64,
+        base64_data=PNG_1X1_B64,
     )
     assert artifact is not None
     assert artifact.kind == ArtifactKind.IMAGE
     assert artifact.mime == "image/png"
-    assert artifact.size_bytes == len(_PNG_1X1_BYTES)
+    assert artifact.size_bytes == len(PNG_1X1_BYTES)
     assert artifact.conversation_id == conversation_id
     assert artifact.tool_call_id == "call_img"
     assert artifact.title == "browser_screenshot"
@@ -219,7 +215,8 @@ async def test_create_image_artifact_writes_blob_and_row(
     blob = Path(artifact.file_path)  # absolute: tmp_path is outside PROJECT_ROOT
     assert blob.parent == tmp_path / "image"
     assert blob.suffix == ".png"
-    assert blob.read_bytes() == _PNG_1X1_BYTES
+    assert blob.stem == str(artifact.id)  # blob named after the row id
+    assert blob.read_bytes() == PNG_1X1_BYTES
 
     assert captured_events == [
         {
@@ -236,16 +233,14 @@ async def test_create_image_artifact_writes_blob_and_row(
 async def test_create_image_artifact_unknown_mime_falls_back_to_bin(
     registry: ArtifactRegistry,
     conversation_id: uuid.UUID,
-    tmp_path: Path,
 ) -> None:
-    registry._blob_store = ArtifactBlobStore(tmp_path)
     artifact = await registry.create_image_artifact(
         conversation_id=conversation_id,
         message_id=None,
         tool_call_id=None,
         tool_name="weird_tool",
         mime="image/x-exotic",
-        base64_data=_PNG_1X1_B64,
+        base64_data=PNG_1X1_B64,
     )
     assert artifact is not None
     assert Path(artifact.file_path).suffix == ".bin"
@@ -259,7 +254,6 @@ async def test_create_image_artifact_rejects_bad_base64(
     tmp_path: Path,
 ) -> None:
     """Base64 non valido -> None (warning), nessun file, nessun evento."""
-    registry._blob_store = ArtifactBlobStore(tmp_path)
     out = await registry.create_image_artifact(
         conversation_id=conversation_id,
         message_id=None,

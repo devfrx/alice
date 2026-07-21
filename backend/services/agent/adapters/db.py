@@ -304,11 +304,15 @@ class SqlModelPersistence:
         Precedenza al ramo immagini (T16): se ``output.images`` è popolato,
         la PRIMA immagine diventa un artifact IMAGE via
         ``create_image_artifact`` (blob su disco + riga; il base64 resta
-        fuori dal DB messaggi — vedi docstring di modulo). Altrimenti il
-        ``payload`` strutturato passa a ``register_from_tool_result`` (i
-        parser lavorano su dict, non su stringhe grezze). No-op (``None``)
-        se: nessun registry iniettato, il tool ha fallito
-        (``output.ok is False``), o non c'è né immagine né payload.
+        fuori dal DB messaggi — vedi docstring di modulo). La precedenza
+        vale ANCHE quando il ramo immagini scarta (base64 invalido ->
+        ``None``): il ``payload`` non viene tentato come ripiego —
+        comportamento deliberato, un result immagine malformato non è un
+        result strutturato. Altrimenti il ``payload`` strutturato passa a
+        ``register_from_tool_result`` (i parser lavorano su dict, non su
+        stringhe grezze). No-op (``None``) se: nessun registry iniettato,
+        il tool ha fallito (``output.ok is False``), o non c'è né immagine
+        né payload.
         """
         if self._artifact_registry is None or not output.ok:
             return None

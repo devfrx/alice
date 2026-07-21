@@ -10,6 +10,7 @@ import pytest
 
 from backend.db.models import ArtifactKind, Conversation
 from backend.services.artifacts.blob_store import ArtifactBlobStore
+from backend.tests._artifact_helpers import PNG_1X1_B64, PNG_1X1_BYTES
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -139,28 +140,22 @@ async def test_download_serves_binary(app, client, tmp_path):
 async def test_download_serves_image_kind(app: Any, client: Any, tmp_path: Path) -> None:
     """T16: un artifact IMAGE creato dal registry è scaricabile senza modifiche
     alla route (200, MIME dell'artifact, byte identici al blob)."""
-    import base64
-
     conv_id = await _create_conversation(app)
     registry = app.state.context.artifact_registry
     registry._blob_store = ArtifactBlobStore(tmp_path)
-    png = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
-        "AAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-    )
     artifact = await registry.create_image_artifact(
         conversation_id=conv_id,
         message_id=None,
         tool_call_id="tc-img",
         tool_name="browser_screenshot",
         mime="image/png",
-        base64_data=base64.b64encode(png).decode("ascii"),
+        base64_data=PNG_1X1_B64,
     )
     assert artifact is not None
 
     resp = await client.get(f"/api/artifacts/{artifact.id}/download")
     assert resp.status_code == 200
-    assert resp.content == png
+    assert resp.content == PNG_1X1_BYTES
     assert resp.headers["content-type"] == "image/png"
     assert ".png" in resp.headers.get("content-disposition", "")
 

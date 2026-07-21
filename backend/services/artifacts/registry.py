@@ -169,10 +169,17 @@ class ArtifactRegistry:
         conversation_id: uuid.UUID,
         message_id: uuid.UUID | None,
         tool_call_id: str | None,
+        artifact_id: uuid.UUID | None = None,
     ) -> Artifact:
-        """Insert *descriptor* as an ``artifacts`` row and emit the event."""
+        """Insert *descriptor* as an ``artifacts`` row and emit the event.
+
+        ``artifact_id`` lets callers pre-generate the row id (e.g. to name
+        the on-disk blob after it); omitted, a fresh UUID4 is generated —
+        the same default the model itself would apply.
+        """
         rel_path = _normalize_path(descriptor.file_path)
         artifact = Artifact(
+            id=artifact_id or uuid.uuid4(),
             conversation_id=conversation_id,
             message_id=message_id,
             tool_call_id=tool_call_id,
@@ -213,29 +220,31 @@ class ArtifactRegistry:
         mime: str,
         base64_data: str,
     ) -> Artifact | None:
-        """Persiste un tool result immagine come artifact IMAGE (blob + row + evento).
+        """Persist an image/* tool result as an IMAGE artifact (blob + row + event).
 
-        Il base64 (``ToolImage.base64_data``) viene decodificato e scritto
-        come blob binario in ``data/artifacts/image/<uuid>.<ext>`` (ext dal
-        MIME, fallback ``.bin``); il titolo è il nome del tool produttore.
-        Ritorna ``None`` (con warning, mai eccezione fuori) su base64 non
-        valido.  Come per i blob JSON (:meth:`create_json_artifact`), il
-        blob è scritto prima del commit della riga: un commit fallito può
-        lasciare un blob orfano su disco (accettabile per l'app locale
-        single-user).
+        The base64 payload (``ToolImage.base64_data``) is decoded and
+        written as a binary blob at ``data/artifacts/image/<row id>.<ext>``
+        (extension from the MIME type, ``.bin`` fallback — the blob is
+        named after the artifact row id, same convention as the JSON
+        blobs); the title is the producing tool's name.  Returns ``None``
+        (with a warning, never an exception) on invalid base64.  As with
+        JSON blobs (:meth:`create_json_artifact`), the blob is written
+        before the row commit: a commit failure may leave an orphan blob
+        on disk (acceptable for the single-user local app).
         """
         try:
-            # binascii.Error è sottoclasse di ValueError: un solo except copre
-            # alfabeto invalido, padding errato e input non-ASCII.
+            # binascii.Error subclasses ValueError: one except covers an
+            # invalid alphabet, bad padding and non-ASCII input alike.
             data = base64.b64decode(base64_data, validate=True)
         except ValueError:
             logger.warning(
-                "Immagine artifact scartata: base64 non valido ({})", tool_name,
+                "Image artifact discarded: invalid base64 ({})", tool_name,
             )
             return None
+        aid = uuid.uuid4()
         ext = _IMAGE_EXT.get(mime, ".bin")
         path, size = await self._blob_store.write_bytes(
-            ArtifactKind.IMAGE, uuid.uuid4(), data, ext=ext,
+            ArtifactKind.IMAGE, aid, data, ext=ext,
         )
         return await self._persist_descriptor(
             descriptor=ArtifactDescriptor(
@@ -248,6 +257,7 @@ class ArtifactRegistry:
             conversation_id=_to_uuid(conversation_id),
             message_id=_to_uuid_or_none(message_id),
             tool_call_id=tool_call_id,
+            artifact_id=aid,
         )
 
     # ------------------------------------------------------------------

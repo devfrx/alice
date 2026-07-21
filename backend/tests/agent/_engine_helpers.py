@@ -72,6 +72,8 @@ def _engine(
     ask_user_result: ports.ToolExecutionOutput | None = None,
     confirm_remember: ports.RememberScope = ports.RememberScope.NONE,
     permission_port: StaticPermissionPort | None = None,
+    vision_enabled: bool = True,
+    vision_max_images: int = 4,
 ) -> AgentEngine:
     return AgentEngine(
         llm=llm,
@@ -88,6 +90,8 @@ def _engine(
         context=context or NoopContextPort(),
         execution=execution,
         retry=RetryPolicy(),
+        vision_enabled=vision_enabled,
+        vision_max_images=vision_max_images,
     )
 
 

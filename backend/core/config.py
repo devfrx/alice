@@ -1153,6 +1153,24 @@ class AgentVoiceConfig(BaseSettings):
     coverage; trimming the toolset keeps the first token quick."""
 
 
+class AgentVisionConfig(BaseSettings):
+    """Consegna vision dei tool result immagine (in-turn).
+
+    Quando un tool produce immagini e il modello è vision, l'``AgentEngine``
+    appende alla working history in memoria UN messaggio user multimodale
+    dopo i tool message del batch (mai persistito: nei turni successivi
+    resta il placeholder testuale).
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ALICE_AGENT__VISION__")
+
+    enabled: bool = True
+    """Attiva l'iniezione del messaggio vision dopo un batch con immagini."""
+
+    max_images_per_turn: int = 4
+    """Cap sulle immagini consegnate al modello in un singolo turno."""
+
+
 class AgentSubagentConfig(BaseSettings):
     """Runtime limits for the ``spawn_subagent`` delegation tool.
 
@@ -1233,6 +1251,9 @@ class AgentConfig(BaseSettings):
 
     voice: AgentVoiceConfig = Field(default_factory=AgentVoiceConfig)
     """Voice-turn tuning (e.g. tool cap for latency)."""
+
+    vision: AgentVisionConfig = Field(default_factory=AgentVisionConfig)
+    """In-turn vision delivery of image tool results."""
 
     prompts: AgentPromptsConfig = Field(default_factory=AgentPromptsConfig)
     """User-customisable prompt overrides (global persona + per-tier guidance)."""

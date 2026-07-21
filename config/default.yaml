@@ -164,6 +164,9 @@ agent:
     max_tools: 16                 # max tools exposed to a sub-agent (after filtering)
   voice:
     max_tools: 8                  # cap on tools exposed in voice turns (latency)
+  vision:
+    enabled: true                 # inject image tool results as a multimodal user message
+    max_images_per_turn: 4        # cap on images delivered to the model per turn
 
 vram:
   monitoring_enabled: true

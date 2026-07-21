@@ -243,6 +243,7 @@ async def run_agent_turn(
         event_port = SinkEventPort(sink, translator)
         interaction_port = AutoDeclineInteractionPort()
 
+    vision_cfg = ctx.config.agent.vision
     engine = AgentEngine(
         llm=llm_port,
         permissions=permission_port,
@@ -253,6 +254,8 @@ async def run_agent_turn(
         execution=execution_port,
         retry=RetryPolicy(),
         confirmation_timeout_s=float(ctx.config.permissions.confirmation_timeout_s),
+        vision_enabled=vision_cfg.enabled,
+        vision_max_images=vision_cfg.max_images_per_turn,
     )
     return await engine.run(request, cancel=cancel)
 

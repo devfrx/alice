@@ -32,7 +32,9 @@ class ScriptedLLMPort:
         max_tokens: int | None,
         cancel: asyncio.Event,
     ) -> AsyncIterator[ports.LLMEvent]:
-        self.calls.append({"messages": messages, "tools": tools})
+        # Snapshot (shallow copy): l'engine muta la working history in place,
+        # la copia congela ciò che il modello ha visto A QUESTO step.
+        self.calls.append({"messages": list(messages), "tools": tools})
         step_events = self._steps.pop(0)
         for event in step_events:
             yield event

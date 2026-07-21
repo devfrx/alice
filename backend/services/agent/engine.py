@@ -60,6 +60,7 @@ from backend.services.agent.ports import (
     PersistencePort,
     RememberScope,
     ToolExecutionOutput,
+    ToolImage,
 )
 from backend.services.agent.retry import RetryPolicy
 from backend.services.agent.stop import BudgetTracker, resolve_stop
@@ -110,6 +111,9 @@ class _TurnState:
     errored: bool = False
     final_assistant_message_id: str | None = None
     pending_tool_intent: bool = False
+    # Immagini già consegnate al modello in QUESTO turno (cap
+    # ``vision_max_images``, T14): il contatore non si azzera tra gli step.
+    vision_images_used: int = 0
     # Scelte "ricorda" delle conferme APPROVATE nello step corrente:
     # raccolte in _confirm_call, persistite da _run_tool_step SOLO dopo il
     # checkpoint del batch (§6.15 — remember_approval scrive su una sessione
@@ -176,6 +180,25 @@ def _tool_message(call: ToolInvocation, content: str) -> dict[str, Any]:
     return {"role": "tool", "tool_call_id": call.call_id, "content": content}
 
 
+def _vision_message(images: list[tuple[str, ToolImage]], truncated: bool) -> dict[str, Any]:
+    """Messaggio user multimodale coi risultati immagine del batch.
+
+    ``images`` è una lista (tool_name, ToolImage). Il testo dichiara la
+    provenienza; ``truncated`` aggiunge la nota sul cap raggiunto.
+    """
+    names = ", ".join(dict.fromkeys(name for name, _ in images))
+    text = f"[Risultato visivo dei tool: {names} — immagini allegate]"
+    if truncated:
+        text += " [alcune immagini omesse: cap per turno raggiunto]"
+    parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
+    for _, img in images:
+        parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{img.mime};base64,{img.base64_data}"},
+        })
+    return {"role": "user", "content": parts}
+
+
 class AgentEngine:
     """Motore agentico: un loop unificato, I/O solo attraverso le porte."""
 
@@ -191,6 +214,8 @@ class AgentEngine:
         execution: ExecutionPort,
         retry: RetryPolicy,
         confirmation_timeout_s: float = 120.0,
+        vision_enabled: bool = True,
+        vision_max_images: int = 4,
     ) -> None:
         self._llm = llm
         self._permissions = permissions
@@ -201,6 +226,8 @@ class AgentEngine:
         self._execution = execution
         self._retry = retry
         self._confirmation_timeout_s = confirmation_timeout_s
+        self._vision_enabled = vision_enabled
+        self._vision_max_images = vision_max_images
 
     async def run(self, request: TurnRequest, *, cancel: asyncio.Event) -> TurnOutcome:
         """Esegue un turno completo e ritorna il ``TurnOutcome``.
@@ -586,6 +613,14 @@ class AgentEngine:
             ))
             disconnect = disconnect or resolution.disconnect
 
+        # 4-ter. Consegna vision (T14): se il batch ha prodotto immagini, il
+        # modello è vision e la feature è attiva, si appende UN messaggio user
+        # multimodale DOPO tutti i tool message del batch (il modello vede
+        # prima i placeholder testuali, poi le immagini). Il messaggio vive
+        # SOLO nella working history in memoria: la persistenza qui sopra ha
+        # già salvato i placeholder e non vede mai il base64.
+        self._maybe_inject_vision(calls, resolutions, state)
+
         # 5. SOLO DOPO la persistenza (checkpoint + registrazione artifact):
         #    disconnect / cancel (§6.4) / budget
         #    di step esaurito → stop.
@@ -609,6 +644,34 @@ class AgentEngine:
                 out_of_steps=True, errored=False,
             )
         return None
+
+    def _maybe_inject_vision(
+        self,
+        calls: tuple[ToolInvocation, ...],
+        resolutions: dict[str, _CallResolution],
+        state: _TurnState,
+    ) -> None:
+        """Appende il messaggio user multimodale coi risultati immagine del batch.
+
+        No-op se il batch non ha prodotto immagini, se la feature è spenta
+        (``vision_enabled``), se il modello non è vision, o se il cap per
+        turno (``vision_max_images``) è già esaurito. Le immagini oltre il
+        cap vengono omesse e la nota di troncamento lo dichiara al modello.
+        """
+        collected: list[tuple[str, ToolImage]] = []
+        for call in calls:
+            output = resolutions[call.call_id].output
+            if output is not None:
+                collected.extend((call.name, img) for img in output.images)
+        if not collected or not self._vision_enabled or not self._llm.supports_vision():
+            return
+        remaining = self._vision_max_images - state.vision_images_used
+        if remaining <= 0:
+            return
+        shown = collected[:remaining]
+        truncated = len(collected) > len(shown)
+        state.vision_images_used += len(shown)
+        state.working_messages.append(_vision_message(shown, truncated))
 
     async def _gate_call(
         self,

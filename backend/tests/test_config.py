@@ -119,6 +119,12 @@ def test_ui_defaults(config: AliceConfig) -> None:
     assert config.ui.language == "it"
 
 
+def test_agent_vision_defaults(config: AliceConfig) -> None:
+    """Round-trip YAML: i default effettivi di agent.vision (T14)."""
+    assert config.agent.vision.enabled is True
+    assert config.agent.vision.max_images_per_turn == 4
+
+
 def test_load_config_missing_file_uses_defaults() -> None:
     """When the config file does not exist, defaults + env vars are used."""
     cfg = load_config(Path("/nonexistent/path.yaml"))

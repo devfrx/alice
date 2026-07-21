@@ -41,6 +41,7 @@ feature servono ENTRAMBI.
 | `attention.enabled` | true | `bootstrap/jarvis.py`, `services/attention_service.py` | spegne OGNI iniziativa dell'agente verso l'utente (decision point unico §8) |
 | `triggers.enabled` | true | `bootstrap/jarvis.py`, `services/trigger_service.py` | spegne i turni autonomi (nessun trigger registrato di default) |
 | `agent.voice.max_tools` | 8 | `api/routes/chat/_assembly.py` | trim del toolset per turni voce (source=voice), attivato in fase 8 |
+| `agent.vision.enabled` | true | `services/agent/runner.py` | consegna vision in-turn dei tool result immagine (messaggio user multimodale iniettato dopo il batch, solo working history); il cap è `agent.vision.max_images_per_turn` |
 
 Affini fuori convenzione: `agent.planning` / `agent.delegation` /
 `agent.clarification` (gate dei meta-tool; rinominati dai legacy `*_enabled`).

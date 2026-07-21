@@ -47,19 +47,21 @@ Divergenze dal brief (documentate, non "corrette" silenziosamente):
   ``"cad_generate"``), l'artifact non verrà riconosciuto — comportamento
   onesto e documentato, non silenziosamente "corretto" inventando una
   euristica di risoluzione qui.
-- **Nessuna persistenza immagini su disco.** Dalla Mossa 2 (T12)
-  ``ToolExecutionOutput.images`` può portare ``ToolImage`` fuori banda (il
-  base64 dei tool result image/* separato dal placeholder in ``content``).
-  QUESTA porta deliberatamente NON li persiste: il base64 vive solo in
-  memoria per la durata del turno — la registrazione artifact IMAGE è lavoro
-  del T16. ``ArtifactRegistry.register_from_tool_result`` non accetta né
-  consuma immagini: consuma solo ``payload`` (il dict originale del risultato
-  tool) + ``content_type``. I file (incluse eventuali immagini generate, es.
-  CAD/3D) sono già scritti su disco dal tool stesso PRIMA che il risultato
-  arrivi qui (``ArtifactRegistry`` "non possiede altro: gli strumenti
-  sottostanti restano responsabili di *produrre* il file su disco; il
-  registry si limita a registrarne l'esistenza" —
-  ``backend/services/artifacts/registry.py:76-82``): il payload
+- **Immagini: persistite VIA artifact IMAGE, mai nel DB messaggi.** Dalla
+  Mossa 2 (T12) ``ToolExecutionOutput.images`` può portare ``ToolImage``
+  fuori banda (il base64 dei tool result image/* separato dal placeholder in
+  ``content``). Dal T16 ``register_artifacts`` le persiste delegando ad
+  ``ArtifactRegistry.create_image_artifact`` (blob binario su
+  ``data/artifacts/image/`` + riga ``Artifact`` kind IMAGE): il base64 resta
+  comunque FUORI dalle righe ``Message`` (in ``content`` viaggia solo il
+  placeholder). Con più immagini nel result si registra solo la PRIMA (con
+  warning): il fold FE mostra un artifact per tool-call
+  (``ToolActivity.artifactId`` è scalare). Per i tool con ``payload``
+  strutturato invece i file (es. CAD/3D) sono già scritti su disco dal tool
+  stesso PRIMA che il risultato arrivi qui (``ArtifactRegistry`` "non
+  possiede altro: gli strumenti sottostanti restano responsabili di
+  *produrre* il file su disco; il registry si limita a registrarne
+  l'esistenza" — ``backend/services/artifacts/registry.py``): il payload
   (``output.payload``) è già la struttura pronta che i parser si aspettano
   (es. ``file_path``), e la si passa così com'è.
 - **``message_id`` per l'artifact.** ``save_tool_result`` ritorna ``None``
@@ -119,6 +121,7 @@ import json
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
 from sqlmodel import col, select
 
 from backend.db.models import Message, ToolConfirmationAudit
@@ -296,14 +299,37 @@ class SqlModelPersistence:
     async def register_artifacts(
         self, *, call: ToolInvocation, output: ToolExecutionOutput,
     ) -> str | None:
-        """Delega ad ``ArtifactRegistry.register_from_tool_result`` (§6.4.11).
+        """Delega ad ``ArtifactRegistry`` (§6.4.11): immagini o payload.
 
-        No-op (``None``) se: nessun registry iniettato, il tool ha fallito
-        (``output.ok is False``), o il risultato non porta un ``payload``
-        strutturato (i parser lavorano su dict, non su stringhe grezze — vedi
-        docstring di modulo per il perché non serve gestione immagini qui).
+        Precedenza al ramo immagini (T16): se ``output.images`` è popolato,
+        la PRIMA immagine diventa un artifact IMAGE via
+        ``create_image_artifact`` (blob su disco + riga; il base64 resta
+        fuori dal DB messaggi — vedi docstring di modulo). Altrimenti il
+        ``payload`` strutturato passa a ``register_from_tool_result`` (i
+        parser lavorano su dict, non su stringhe grezze). No-op (``None``)
+        se: nessun registry iniettato, il tool ha fallito
+        (``output.ok is False``), o non c'è né immagine né payload.
         """
-        if self._artifact_registry is None or not output.ok or output.payload is None:
+        if self._artifact_registry is None or not output.ok:
+            return None
+        if output.images:
+            first = output.images[0]
+            if len(output.images) > 1:
+                logger.warning(
+                    "register_artifacts: {} immagini nel result di '{}', "
+                    "registro solo la prima",
+                    len(output.images), call.name,
+                )
+            image_artifact = await self._artifact_registry.create_image_artifact(
+                conversation_id=self._conversation_id,
+                message_id=self._tool_message_ids.get(call.call_id),
+                tool_call_id=call.call_id,
+                tool_name=call.name,
+                mime=first.mime,
+                base64_data=first.base64_data,
+            )
+            return str(image_artifact.id) if image_artifact is not None else None
+        if output.payload is None:
             return None
         message_id = self._tool_message_ids.get(call.call_id)
         artifact = await self._artifact_registry.register_from_tool_result(

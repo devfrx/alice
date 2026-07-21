@@ -1,9 +1,10 @@
-"""AL\\CE — JSON blob store for artifact content.
+"""AL\\CE — Blob store for artifact content.
 
-Owns the on-disk *content* of JSON-kind artifacts (charts, whiteboards,
-...) under ``data/artifacts/<kind>/<artifact_id>.json``.  The DB row
-(:class:`backend.db.models.Artifact`) remains the source of truth for
-metadata; this store only owns blob bytes (atomic writes).
+Owns the on-disk *content* of registry-created artifacts under
+``data/artifacts/<kind>/``: JSON blobs (charts, whiteboards, ...) as
+``<artifact_id>.json`` and binary blobs (IMAGE) as ``<uuid>.<ext>``.
+The DB row (:class:`backend.db.models.Artifact`) remains the source of
+truth for metadata; this store only owns blob bytes (atomic writes).
 """
 
 from __future__ import annotations
@@ -46,6 +47,23 @@ class ArtifactBlobStore:
         size = await asyncio.to_thread(self._write_sync, path, data)
         return path, size
 
+    async def write_bytes(
+        self,
+        kind: ArtifactKind,
+        artifact_id: uuid.UUID,
+        data: bytes,
+        *,
+        ext: str,
+    ) -> tuple[Path, int]:
+        """Atomically write a binary blob; return ``(path, size_bytes)``.
+
+        The blob lands in ``<base_dir>/<kind>/<artifact_id><ext>`` (*ext*
+        includes the leading dot, e.g. ``".png"``).
+        """
+        path = self._base_dir / kind.value / f"{artifact_id}{ext}"
+        size = await asyncio.to_thread(self._write_bytes_sync, path, data)
+        return path, size
+
     async def read(self, file_path: str | Path) -> dict[str, Any] | None:
         """Load a blob by its (possibly relative) *file_path*.
 
@@ -61,6 +79,14 @@ class ArtifactBlobStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(data, encoding="utf-8", newline="\n")
+        os.replace(tmp, path)
+        return path.stat().st_size
+
+    @staticmethod
+    def _write_bytes_sync(path: Path, data: bytes) -> int:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_bytes(data)
         os.replace(tmp, path)
         return path.stat().st_size
 

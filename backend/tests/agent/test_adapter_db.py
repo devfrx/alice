@@ -21,14 +21,16 @@ from __future__ import annotations
 import datetime as dt
 import json
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.db.models import Conversation, Message
 from backend.services.agent import ports
 from backend.services.agent.adapters.db import SqlModelPersistence
 from backend.services.agent.models import ToolInvocation
+from backend.services.artifacts.registry import ArtifactRegistry
 
 
 class _StubArtifactRegistry:
@@ -36,10 +38,18 @@ class _StubArtifactRegistry:
 
     def __init__(self, artifact_id: str | None = "art-1") -> None:
         self.calls: list[dict[str, Any]] = []
+        self.image_calls: list[dict[str, Any]] = []
         self._artifact_id = artifact_id
 
     async def register_from_tool_result(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
+        if self._artifact_id is None:
+            return None
+        from types import SimpleNamespace
+        return SimpleNamespace(id=self._artifact_id)
+
+    async def create_image_artifact(self, **kwargs: Any) -> Any:
+        self.image_calls.append(kwargs)
         if self._artifact_id is None:
             return None
         from types import SimpleNamespace
@@ -263,3 +273,83 @@ async def test_register_artifacts_delegates_to_registry_with_call_id(
     )
     assert no_payload is None
     assert len(registry.calls) == 1
+
+
+async def test_register_artifacts_images_create_image_artifact(
+    db_session: AsyncSession, conv: Conversation,
+) -> None:
+    """T16: ``output.images`` popolato -> ``create_image_artifact`` col base64
+    della PRIMA immagine e ritorno dell'id; il ramo payload NON viene toccato
+    anche se il payload è presente (precedenza al ramo immagini)."""
+    registry = _StubArtifactRegistry(artifact_id="img-1")
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=cast(ArtifactRegistry, registry),
+        version_group_id=None, version_index=None,
+    )
+    call = ToolInvocation(call_id="call_img", name="browser_shot", args={}, raw_args="{}")
+    await p.save_tool_result(call=call, content="[image]", status="ok")
+    await p.checkpoint()
+
+    artifact_id = await p.register_artifacts(
+        call=call,
+        output=ports.ToolExecutionOutput(
+            ok=True, content="[image]",
+            images=(
+                ports.ToolImage(mime="image/png", base64_data="QUJD"),
+                ports.ToolImage(mime="image/jpeg", base64_data="REVG"),
+            ),
+            payload={"ignored": True},
+            content_type="image/png",
+        ),
+    )
+
+    assert artifact_id == "img-1"
+    assert registry.calls == []  # payload branch untouched
+    assert len(registry.image_calls) == 1
+    kwargs = registry.image_calls[0]
+    assert kwargs["tool_call_id"] == "call_img"
+    assert kwargs["tool_name"] == "browser_shot"
+    assert kwargs["mime"] == "image/png"
+    assert kwargs["base64_data"] == "QUJD"  # solo la prima immagine
+    assert kwargs["message_id"] is not None
+
+
+async def test_register_artifacts_images_none_paths(
+    db_session: AsyncSession, conv: Conversation,
+) -> None:
+    """Guardie: ok=False (anche con immagini) -> None; images+payload vuoti ->
+    None; registry che scarta il base64 -> None senza eccezioni."""
+    registry = _StubArtifactRegistry(artifact_id=None)
+    p = SqlModelPersistence(
+        session=db_session, conversation_id=str(conv.id),
+        artifact_registry=cast(ArtifactRegistry, registry),
+        version_group_id=None, version_index=None,
+    )
+    call = ToolInvocation(call_id="c1", name="t", args={}, raw_args="{}")
+
+    failed = await p.register_artifacts(
+        call=call,
+        output=ports.ToolExecutionOutput(
+            ok=False, content="err", error="boom",
+            images=(ports.ToolImage(mime="image/png", base64_data="QUJD"),),
+        ),
+    )
+    assert failed is None
+    assert registry.image_calls == []  # guardia ok=False a monte
+
+    empty = await p.register_artifacts(
+        call=call, output=ports.ToolExecutionOutput(ok=True, content="ok"),
+    )
+    assert empty is None
+
+    # Registry ritorna None (base64 scartato) -> None propagato, no raise.
+    rejected = await p.register_artifacts(
+        call=call,
+        output=ports.ToolExecutionOutput(
+            ok=True, content="[image]",
+            images=(ports.ToolImage(mime="image/png", base64_data="x"),),
+        ),
+    )
+    assert rejected is None
+    assert len(registry.image_calls) == 1

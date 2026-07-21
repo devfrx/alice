@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -24,6 +25,14 @@ from backend.services.artifacts.parsers import (
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None]]
 """Awaitable callback invoked after an artifact is created."""
+
+_IMAGE_EXT: dict[str, str] = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
+"""MIME → file extension for IMAGE artifact blobs (fallback ``.bin``)."""
 
 
 def _whiteboard_metadata(content: dict[str, Any]) -> dict[str, Any]:
@@ -193,6 +202,53 @@ class ArtifactRegistry:
             "title": artifact.title,
         })
         return artifact
+
+    async def create_image_artifact(
+        self,
+        *,
+        conversation_id: uuid.UUID | str,
+        message_id: uuid.UUID | str | None,
+        tool_call_id: str | None,
+        tool_name: str,
+        mime: str,
+        base64_data: str,
+    ) -> Artifact | None:
+        """Persiste un tool result immagine come artifact IMAGE (blob + row + evento).
+
+        Il base64 (``ToolImage.base64_data``) viene decodificato e scritto
+        come blob binario in ``data/artifacts/image/<uuid>.<ext>`` (ext dal
+        MIME, fallback ``.bin``); il titolo è il nome del tool produttore.
+        Ritorna ``None`` (con warning, mai eccezione fuori) su base64 non
+        valido.  Come per i blob JSON (:meth:`create_json_artifact`), il
+        blob è scritto prima del commit della riga: un commit fallito può
+        lasciare un blob orfano su disco (accettabile per l'app locale
+        single-user).
+        """
+        try:
+            # binascii.Error è sottoclasse di ValueError: un solo except copre
+            # alfabeto invalido, padding errato e input non-ASCII.
+            data = base64.b64decode(base64_data, validate=True)
+        except ValueError:
+            logger.warning(
+                "Immagine artifact scartata: base64 non valido ({})", tool_name,
+            )
+            return None
+        ext = _IMAGE_EXT.get(mime, ".bin")
+        path, size = await self._blob_store.write_bytes(
+            ArtifactKind.IMAGE, uuid.uuid4(), data, ext=ext,
+        )
+        return await self._persist_descriptor(
+            descriptor=ArtifactDescriptor(
+                kind=ArtifactKind.IMAGE,
+                title=tool_name,
+                file_path=str(path),
+                mime=mime,
+                size_bytes=size,
+            ),
+            conversation_id=_to_uuid(conversation_id),
+            message_id=_to_uuid_or_none(message_id),
+            tool_call_id=tool_call_id,
+        )
 
     # ------------------------------------------------------------------
     # JSON-kind artifacts (chart, whiteboard, ...)

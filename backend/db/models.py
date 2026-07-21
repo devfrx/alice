@@ -301,8 +301,8 @@ class ArtifactKind(enum.StrEnum):
     """Type of artifact produced by a tool.
 
     Extend with new members when adding new artifact-producing tools
-    (e.g. ``IMAGE``, ``AUDIO``, ``CHART``, ``WHITEBOARD``).  The string
-    value is what gets persisted in SQLite, so values must remain stable.
+    (e.g. ``AUDIO``).  The string value is what gets persisted in
+    SQLite, so values must remain stable.
     """
 
     CAD_3D_TEXT = "cad_3d_text"
@@ -313,6 +313,9 @@ class ArtifactKind(enum.StrEnum):
 
     CHART = "chart"
     """Interactive ECharts chart (chart_generator plugin) — JSON blob."""
+
+    IMAGE = "image"
+    """Immagine prodotta da un tool result image/* — blob su data/artifacts/image/."""
 
     WHITEBOARD = "whiteboard"
     """tldraw whiteboard (whiteboard plugin) — JSON blob with snapshot."""

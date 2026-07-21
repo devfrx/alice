@@ -13,6 +13,8 @@ import { computed, ref } from 'vue'
 import { useAgentRunStore } from '../../stores/agentRun'
 import type { InteractionActivity, InteractionOutcome, ToolActivity } from '../../types/turn'
 
+import { toolImageUrl } from './toolResultMedia'
+
 const agentRunStore = useAgentRunStore()
 const run = computed(() => agentRunStore.currentRun)
 
@@ -78,6 +80,21 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
   if (o === 'rejected' || o === 'failed') return 'err'
   return 'muted'
 }
+
+/** Execution ids whose result image failed to load (e.g. artifact deleted). */
+const failedImages = ref(new Set<string>())
+
+/** Image URL for a tool node's artifact result, or null (none / load failed). */
+function nodeImageUrl(d: ToolActivity): string | null {
+  if (failedImages.value.has(d.executionId)) return null
+  return toolImageUrl(d)
+}
+
+function onImageError(executionId: string): void {
+  const next = new Set(failedImages.value)
+  next.add(executionId)
+  failedImages.value = next
+}
 </script>
 
 <template>
@@ -102,7 +119,8 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
           :class="{
             'rt__node--ok': n.data.status === 'success',
             'rt__node--err': n.data.status === 'error',
-            'rt__node--act': n.data.status === 'running'
+            'rt__node--act': n.data.status === 'running',
+            'rt__node--media': nodeImageUrl(n.data) !== null
           }"
         >
           <span class="rt__tool">{{ n.data.toolName }}</span>
@@ -116,6 +134,15 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
           >
             {{ n.data.status === 'success' ? '✓' : n.data.status === 'error' ? 'errore' : '●' }}
           </span>
+          <div v-if="nodeImageUrl(n.data) !== null" class="rt__media">
+            <img
+              class="rt__img"
+              :src="nodeImageUrl(n.data) ?? undefined"
+              loading="lazy"
+              :alt="`Risultato di ${n.data.toolName}`"
+              @error="onImageError(n.data.executionId)"
+            />
+          </div>
         </div>
         <div
           v-else
@@ -161,7 +188,8 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
             class="rt__node"
             :class="{
               'rt__node--ok': n.data.status === 'success',
-              'rt__node--err': n.data.status === 'error'
+              'rt__node--err': n.data.status === 'error',
+              'rt__node--media': nodeImageUrl(n.data) !== null
             }"
           >
             <span class="rt__tool">{{ n.data.toolName }}</span>
@@ -171,6 +199,15 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
             >
               {{ n.data.status === 'error' ? 'errore' : '✓' }}
             </span>
+            <div v-if="nodeImageUrl(n.data) !== null" class="rt__media">
+              <img
+                class="rt__img"
+                :src="nodeImageUrl(n.data) ?? undefined"
+                loading="lazy"
+                :alt="`Risultato di ${n.data.toolName}`"
+                @error="onImageError(n.data.executionId)"
+              />
+            </div>
           </div>
           <div
             v-else
@@ -272,6 +309,26 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
 .rt__node--toggle {
   cursor: pointer;
   width: 100%;
+}
+
+/* Tool node carrying an image result: the media block wraps to its own row. */
+.rt__node--media {
+  flex-wrap: wrap;
+}
+
+.rt__media {
+  flex-basis: 100%;
+  min-width: 0;
+  margin-top: var(--space-1);
+}
+
+.rt__img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
 }
 
 .rt__ttl {

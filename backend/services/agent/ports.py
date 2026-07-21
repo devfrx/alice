@@ -176,6 +176,10 @@ class ToolExecutionOutput:
 
     ``content_type`` è il MIME della tool response quando la piattaforma lo
     espone (``ToolResult.content_type``); ``None`` se non disponibile.
+
+    INVARIANTE: ``images`` è attesa popolata SOLO su ``ok=True`` — su un
+    fallimento non c'è un risultato visivo da consegnare. I consumatori
+    (vision injection, artifact IMAGE) la ignorano comunque su ``ok=False``.
     """
 
     ok: bool

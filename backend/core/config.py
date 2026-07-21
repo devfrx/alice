@@ -1167,8 +1167,10 @@ class AgentVisionConfig(BaseSettings):
     enabled: bool = True
     """Attiva l'iniezione del messaggio vision dopo un batch con immagini."""
 
-    max_images_per_turn: int = 4
-    """Cap sulle immagini consegnate al modello in un singolo turno."""
+    max_images_per_turn: int = Field(default=4, ge=0)
+    """Cap sulle immagini consegnate al modello in un singolo turno.
+
+    ``0`` = nessuna immagine (equivale a ``enabled: false``)."""
 
 
 class AgentSubagentConfig(BaseSettings):

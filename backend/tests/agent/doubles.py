@@ -14,11 +14,14 @@ from backend.services.agent.models import ToolInvocation, ToolMeta
 class ScriptedLLMPort:
     """LLMPort: ogni chiamata a ``stream_step`` consuma la prossima lista."""
 
-    def __init__(self, steps: list[list[ports.LLMEvent]]) -> None:
+    def __init__(
+        self, steps: list[list[ports.LLMEvent]], vision: bool = False,
+    ) -> None:
         self._steps = list(steps)
         self.calls: list[dict[str, Any]] = []
-        # Capability vision del double: i test la accendono per-test.
-        self.vision = False
+        # Capability vision del double: attributo mutabile, settabile anche
+        # dal ctor per i test che la accendono alla costruzione.
+        self.vision = vision
 
     def supports_vision(self) -> bool:
         return self.vision

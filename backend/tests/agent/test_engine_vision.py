@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from backend.services.agent import events as ev
 from backend.services.agent import ports
 from backend.services.agent.models import ToolInvocation, TurnOutcome
 from backend.tests.agent._engine_helpers import _engine, _final_step, _request, _tool_step
@@ -39,12 +40,11 @@ async def _run_vision(
     vision: bool = True,
     vision_enabled: bool = True,
     vision_max_images: int = 4,
-) -> tuple[InMemoryPersistence, TurnOutcome, ScriptedLLMPort]:
-    """Esegue un turno coi double, esponendo l'LLMPort per leggere le messages."""
+) -> tuple[InMemoryPersistence, TurnOutcome, ScriptedLLMPort, RecordingEventPort]:
+    """Esegue un turno coi double, esponendo LLMPort ed EventPort per le asserzioni."""
     persistence = InMemoryPersistence()
     rec = RecordingEventPort()
-    llm = ScriptedLLMPort(steps=llm_steps)
-    llm.vision = vision
+    llm = ScriptedLLMPort(steps=llm_steps, vision=vision)
     exec_port = MapExecutionPort(tools=exec_tools)
     engine = _engine(
         llm=llm, events=rec, persistence=persistence, execution=exec_port,
@@ -52,7 +52,7 @@ async def _run_vision(
         vision_enabled=vision_enabled, vision_max_images=vision_max_images,
     )
     outcome = await engine.run(_request(), cancel=asyncio.Event())
-    return persistence, outcome, llm
+    return persistence, outcome, llm, rec
 
 
 def _multimodal_user_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -73,7 +73,7 @@ def _image_parts(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 async def test_vision_injects_user_message_after_batch() -> None:
     calls = (ToolInvocation(call_id="c1", name="screenshot", args={}, raw_args="{}"),)
-    _, outcome, llm = await _run_vision(
+    _, outcome, llm, _ = await _run_vision(
         llm_steps=[_tool_step(calls), _final_step()],
         exec_tools={"screenshot": _image_output(_PNG)},
     )
@@ -93,7 +93,7 @@ async def test_vision_injects_user_message_after_batch() -> None:
 
 async def test_vision_skipped_when_model_not_capable() -> None:
     calls = (ToolInvocation(call_id="c1", name="screenshot", args={}, raw_args="{}"),)
-    _, _, llm = await _run_vision(
+    _, _, llm, _ = await _run_vision(
         llm_steps=[_tool_step(calls), _final_step()],
         exec_tools={"screenshot": _image_output(_PNG)},
         vision=False,
@@ -105,7 +105,7 @@ async def test_vision_skipped_when_model_not_capable() -> None:
 
 async def test_vision_skipped_when_disabled() -> None:
     calls = (ToolInvocation(call_id="c1", name="screenshot", args={}, raw_args="{}"),)
-    _, _, llm = await _run_vision(
+    _, _, llm, _ = await _run_vision(
         llm_steps=[_tool_step(calls), _final_step()],
         exec_tools={"screenshot": _image_output(_PNG)},
         vision_enabled=False,
@@ -123,7 +123,7 @@ async def test_vision_caps_images_per_turn() -> None:
         ToolInvocation(call_id="b", name="shot_b", args={}, raw_args="{}"),
     )
     step2 = (ToolInvocation(call_id="c", name="shot_c", args={}, raw_args="{}"),)
-    _, outcome, llm = await _run_vision(
+    _, outcome, llm, _ = await _run_vision(
         llm_steps=[_tool_step(step1), _tool_step(step2), _final_step()],
         exec_tools={
             "shot_a": _image_output(_PNG, _PNG, _PNG),
@@ -147,9 +147,37 @@ async def test_vision_caps_images_per_turn() -> None:
     assert after_second[-1]["role"] == "tool"     # shot_c resta solo placeholder
 
 
+async def test_vision_cap_partial_remainder_across_batches() -> None:
+    # Batch 1: 3/4 del cap consumate (nessuna nota). Batch 2: 2 immagini con
+    # residuo 1 -> 1 iniettata + nota di troncamento.
+    step1 = (ToolInvocation(call_id="a", name="shot_a", args={}, raw_args="{}"),)
+    step2 = (ToolInvocation(call_id="b", name="shot_b", args={}, raw_args="{}"),)
+    _, outcome, llm, _ = await _run_vision(
+        llm_steps=[_tool_step(step1), _tool_step(step2), _final_step()],
+        exec_tools={
+            "shot_a": _image_output(_PNG, _PNG, _PNG),
+            "shot_b": _image_output(_PNG, _PNG),
+        },
+        vision_max_images=4,
+    )
+    assert outcome.finish_reason == "stop"
+    after_first = llm.calls[1]["messages"]
+    first = _multimodal_user_messages(after_first)
+    assert len(first) == 1
+    assert len(_image_parts(after_first)) == 3
+    assert "cap" not in first[0]["content"][0]["text"]     # sotto il cap: nessuna nota
+    after_second = llm.calls[2]["messages"]
+    injected = _multimodal_user_messages(after_second)
+    assert len(injected) == 2
+    assert len(_image_parts(after_second)) == 4            # 3 + il residuo di 1
+    second_text = injected[1]["content"][0]["text"]
+    assert "shot_b" in second_text
+    assert "cap" in second_text                            # nota di troncamento
+
+
 async def test_vision_message_not_persisted() -> None:
     calls = (ToolInvocation(call_id="c1", name="screenshot", args={}, raw_args="{}"),)
-    persistence, _, llm = await _run_vision(
+    persistence, _, llm, rec = await _run_vision(
         llm_steps=[_tool_step(calls), _final_step()],
         exec_tools={"screenshot": _image_output(_PNG)},
     )
@@ -164,3 +192,11 @@ async def test_vision_message_not_persisted() -> None:
     )
     assert all(isinstance(c, str) for c in persisted)
     assert all(_DATA_URL not in c and "QUJD" not in c for c in persisted)
+    # Guardia larga: NIENTE nello stato della persistenza porta il base64
+    # (copre anche sink futuri aggiunti a InMemoryPersistence).
+    assert "QUJD" not in repr(vars(persistence))
+    # E nessun AgentEvent emesso porta il base64: la ToolResultEvent
+    # trasporta il placeholder, non il data URL.
+    tool_results = [e for e in rec.events if isinstance(e, ev.ToolResultEvent)]
+    assert [e.result for e in tool_results] == ["[immagine: shot.png]"]
+    assert all("QUJD" not in repr(e) for e in rec.events)

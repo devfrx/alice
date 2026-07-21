@@ -657,13 +657,22 @@ class AgentEngine:
         (``vision_enabled``), se il modello non è vision, o se il cap per
         turno (``vision_max_images``) è già esaurito. Le immagini oltre il
         cap vengono omesse e la nota di troncamento lo dichiara al modello.
+
+        Si raccolgono immagini SOLO dai success (``output.ok``): l'invariante
+        "images solo su ok=True" (``ToolExecutionOutput``) è self-enforcing
+        qui, come nella guardia gemella di ``register_artifacts`` — un
+        ``ExecutionPort`` alternativo che popolasse ``images`` su un errore
+        non farebbe iniettare un "Risultato visivo" con tool message
+        d'errore, né brucerebbe il cap.
         """
+        if not self._vision_enabled:
+            return
         collected: list[tuple[str, ToolImage]] = []
         for call in calls:
             output = resolutions[call.call_id].output
-            if output is not None:
+            if output is not None and output.ok:
                 collected.extend((call.name, img) for img in output.images)
-        if not collected or not self._vision_enabled or not self._llm.supports_vision():
+        if not collected or not self._llm.supports_vision():
             return
         remaining = self._vision_max_images - state.vision_images_used
         if remaining <= 0:

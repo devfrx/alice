@@ -45,6 +45,8 @@ sono documentati qui:
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 from typing import TYPE_CHECKING, Any
 
 from backend.services.agent.ports import CompactionResult
@@ -53,6 +55,50 @@ if TYPE_CHECKING:
     from backend.core.config import LLMConfig
     from backend.services.context_manager import ContextManager
     from backend.services.llm_service import LLMService
+
+_IMAGE_STRIP_MARKER = "[immagine rimossa dal contesto compattato]"
+
+
+def _strip_image_parts(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sostituisce gli image part con un marker testuale.
+
+    Contratto deliberato: vision non sopravvive alla compaction. I messaggi
+    con content stringa (o ``None``) passano invariati (stessi oggetti); un
+    content-list viene ricostruito in un NUOVO dict con le stesse chiavi ma
+    content stringa: i text part concatenati e un marker per ogni image part
+    (separatore newline). Part sconosciuti degradano al loro JSON (stessa
+    scelta di ``ContextManager.estimate_message_tokens``). Il risultato è
+    sempre content stringa — il summarizer e il segmento kept non vedono MAI
+    base64. Gli input non vengono mai mutati.
+
+    Args:
+        messages: Lista messaggi OpenAI-shape (content stringa o lista part).
+
+    Returns:
+        Lista di pari lunghezza; nuovi dict solo dove serviva lo strip.
+    """
+    out: list[dict[str, Any]] = []
+    for msg in messages:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            out.append(msg)
+            continue
+        pieces: list[str] = []
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            part_type = part.get("type")
+            if part_type == "text":
+                text = part.get("text") or ""
+                if text:
+                    pieces.append(text)
+            elif part_type in ("image_url", "image"):
+                pieces.append(_IMAGE_STRIP_MARKER)
+            else:
+                with contextlib.suppress(TypeError, ValueError):
+                    pieces.append(json.dumps(part))
+        out.append({**msg, "content": "\n".join(pieces)})
+    return out
 
 
 class ContextManagerAdapter:
@@ -90,11 +136,19 @@ class ContextManagerAdapter:
     async def compact(
         self, *, messages: list[dict[str, Any]], context_window: int,
     ) -> CompactionResult:
-        """Compatta la lista messaggi via riassunto LLM; non solleva mai."""
+        """Compatta la lista messaggi via riassunto LLM; non solleva mai.
+
+        Le immagini inline NON sopravvivono alla compaction: a ``compress``
+        arriva sempre la forma stripped (``_strip_image_parts``), quindi né
+        il summarizer né i ``kept_messages`` ritornati contengono base64 —
+        al posto di ogni image part resta il marker testuale.
+        ``tokens_before`` è contato sulla lista originale (costo flat per
+        immagine), coerente con ``estimate_tokens``.
+        """
         tokens_before = self._cm.count_messages_tokens(messages)
         try:
             result = await self._cm.compress(
-                messages, self._llm, context_window, self._reserve,
+                _strip_image_parts(messages), self._llm, context_window, self._reserve,
             )
         except asyncio.CancelledError:
             raise

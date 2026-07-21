@@ -33,6 +33,7 @@ const KIND_LABEL: Record<ArtifactKind, string> = {
   cad_3d_text: '3D · Testo',
   cad_3d_image: '3D · Immagine',
   chart: 'Grafico',
+  image: 'Immagine',
   whiteboard: 'Lavagna'
 }
 

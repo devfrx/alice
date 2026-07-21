@@ -43,6 +43,7 @@ export const useArtifactsStore = defineStore('artifacts', () => {
       cad_3d_text: [],
       cad_3d_image: [],
       chart: [],
+      image: [],
       whiteboard: []
     }
     for (const a of items.value) {

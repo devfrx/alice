@@ -8,7 +8,7 @@
  * when finished it collapses to a re-expandable one-line summary. Renders
  * nothing when no run is in flight (top-level v-if in the consumer).
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { useAgentRunStore } from '../../stores/agentRun'
 import type { InteractionActivity, InteractionOutcome, ToolActivity } from '../../types/turn'
@@ -84,6 +84,12 @@ function outcomeTone(o: InteractionOutcome | undefined): 'ok' | 'err' | 'muted' 
 /** Execution ids whose result image failed to load (e.g. artifact deleted). */
 const failedImages = ref(new Set<string>())
 
+/** A new run means new execution ids — drop the stale failure marks. */
+watch(
+  () => run.value?.turnId,
+  () => failedImages.value.clear()
+)
+
 /** Image URL for a tool node's artifact result, or null (none / load failed). */
 function nodeImageUrl(d: ToolActivity): string | null {
   if (failedImages.value.has(d.executionId)) return null
@@ -91,9 +97,7 @@ function nodeImageUrl(d: ToolActivity): string | null {
 }
 
 function onImageError(executionId: string): void {
-  const next = new Set(failedImages.value)
-  next.add(executionId)
-  failedImages.value = next
+  failedImages.value.add(executionId)
 }
 </script>
 

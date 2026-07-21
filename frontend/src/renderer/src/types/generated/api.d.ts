@@ -2426,11 +2426,11 @@ export interface components {
          * @description Type of artifact produced by a tool.
          *
          *     Extend with new members when adding new artifact-producing tools
-         *     (e.g. ``IMAGE``, ``AUDIO``, ``CHART``, ``WHITEBOARD``).  The string
-         *     value is what gets persisted in SQLite, so values must remain stable.
+         *     (e.g. ``AUDIO``).  The string value is what gets persisted in
+         *     SQLite, so values must remain stable.
          * @enum {string}
          */
-        ArtifactKind: "cad_3d_text" | "cad_3d_image" | "chart" | "whiteboard";
+        ArtifactKind: "cad_3d_text" | "cad_3d_image" | "chart" | "image" | "whiteboard";
         /**
          * ArtifactListResponse
          * @description Paginated list of artifacts.

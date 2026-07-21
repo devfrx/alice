@@ -97,11 +97,12 @@
         "type": "object"
       },
       "ArtifactKind": {
-        "description": "Type of artifact produced by a tool.\n\nExtend with new members when adding new artifact-producing tools\n(e.g. ``IMAGE``, ``AUDIO``, ``CHART``, ``WHITEBOARD``).  The string\nvalue is what gets persisted in SQLite, so values must remain stable.",
+        "description": "Type of artifact produced by a tool.\n\nExtend with new members when adding new artifact-producing tools\n(e.g. ``AUDIO``).  The string value is what gets persisted in\nSQLite, so values must remain stable.",
         "enum": [
           "cad_3d_text",
           "cad_3d_image",
           "chart",
+          "image",
           "whiteboard"
         ],
         "title": "ArtifactKind",
